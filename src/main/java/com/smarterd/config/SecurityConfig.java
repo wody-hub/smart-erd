@@ -25,6 +25,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
  * <ul>
  *   <li>{@code /api/auth/**} — 로그인·회원가입</li>
  *   <li>{@code /h2-console/**} — H2 데이터베이스 콘솔</li>
+ *   <li>{@code /swagger-ui/**, /v3/api-docs/**} — Swagger UI 및 OpenAPI 스펙</li>
  * </ul></p>
  */
 @Configuration
@@ -55,6 +56,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));

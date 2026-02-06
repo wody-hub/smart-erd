@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import type { TableNodeData } from '../../types/erd';
+import type { TableNode as TableNodeType } from '../../types/erd';
 
 /**
  * ERD 테이블 커스텀 노드 컴포넌트.
@@ -12,7 +12,7 @@ import type { TableNodeData } from '../../types/erd';
  *
  * @param props React Flow NodeProps (id, data)
  */
-function TableNode({ id, data }: NodeProps<TableNodeData>) {
+function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const { label, columns } = data;
 
   return (

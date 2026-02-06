@@ -49,6 +49,9 @@ dependencies {
     // OAuth2 Resource Server (JWT)
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 
+    // Springdoc OpenAPI (Swagger UI)
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
+
     // H2 Database
     runtimeOnly 'com.h2database:h2'
 

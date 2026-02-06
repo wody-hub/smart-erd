@@ -32,7 +32,7 @@ export default function ERDCanvas() {
       onNodesChange: s.onNodesChange,
       onEdgesChange: s.onEdgesChange,
       onConnect: s.onConnect,
-    }))
+    })),
   );
 
   return (
@@ -54,11 +54,7 @@ export default function ERDCanvas() {
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
         <Controls />
-        <MiniMap
-          nodeStrokeColor="#666"
-          nodeColor="#fff"
-          nodeBorderRadius={4}
-        />
+        <MiniMap nodeStrokeColor="#666" nodeColor="#fff" nodeBorderRadius={4} />
       </ReactFlow>
     </div>
   );

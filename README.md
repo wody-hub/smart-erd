@@ -13,8 +13,10 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 | 쿼리       | QueryDSL 5.1.0:jakarta, Blaze-Persistence 1.6.17                               |
 | DB         | H2 in-memory (`ddl-auto: create-drop`)                                          |
 | Frontend   | React 18, TypeScript 5.6, Vite 6, Tailwind CSS 3.4, shadcn/ui                  |
+| API 문서   | springdoc-openapi (Swagger UI)                                                   |
 | ERD 캔버스 | @xyflow/react 12, Zustand 5                                                     |
 | 에디터     | @monaco-editor/react 4.6                                                        |
+| 코드 품질  | ESLint + Prettier                                                                |
 
 ## 시작하기
 
@@ -53,14 +55,24 @@ npm run dev                # http://localhost:3000 (프록시 /api → :8080)
 src/main/java/com/smarterd/
 ├── SmartErdApplication.java         # 애플리케이션 진입점 (@SpringBootApplication)
 ├── package-info.java                # @NonNullApi 선언 (하위 패키지 전체 non-null 정책)
-├── api/auth/                        # HTTP 인터페이스 계층
-│   ├── AuthController.java          #   POST /api/auth/login, /api/auth/signup
-│   └── dto/                         #   LoginRequest, SignupRequest, AuthResponse (record)
+├── api/                             # HTTP 인터페이스 계층
+│   ├── auth/
+│   │   ├── AuthController.java      #   POST /api/auth/login, /api/auth/signup
+│   │   └── dto/                     #   LoginRequest, SignupRequest, AuthResponse (record)
+│   ├── team/
+│   │   ├── TeamController.java      #   팀 CRUD + 멤버 관리 (7 엔드포인트)
+│   │   └── dto/                     #   CreateTeamRequest, TeamResponse, AddMemberRequest 등
+│   ├── project/
+│   │   ├── ProjectController.java   #   프로젝트 CRUD (4 엔드포인트)
+│   │   └── dto/                     #   CreateProjectRequest, ProjectResponse
+│   └── common/
+│       └── GlobalExceptionHandler.java  # @RestControllerAdvice (400 에러 핸들링)
 ├── config/                          # 설정
 │   ├── SecurityConfig.java          #   Spring Security (OAuth2 Resource Server JWT, CSRF 비활성)
 │   ├── JwtConfig.java               #   JwtEncoder / JwtDecoder 빈 (NimbusJwtDecoder, HS256)
 │   ├── JwtProperties.java           #   @ConfigurationProperties("smart-erd.jwt") — secret, expiration
-│   └── CorsConfig.java              #   @ConfigurationProperties("smart-erd.cors") + CorsProperties 내부 클래스
+│   ├── CorsConfig.java              #   @ConfigurationProperties("smart-erd.cors") + CorsProperties 내부 클래스
+│   └── OpenApiConfig.java           #   Swagger/OpenAPI 설정 (JWT Bearer 인증 스킴)
 └── domain/                          # 도메인 계층 (Service도 여기에 위치)
     ├── common/entity/               #   BaseTimeEntity (createdAt, updatedAt 자동 감사)
     ├── user/
@@ -69,10 +81,12 @@ src/main/java/com/smarterd/
     │   └── service/                 #   AuthService, AuthUserDetailsService, JwtTokenService
     ├── team/
     │   ├── entity/                  #   Team, TeamMember (@IdClass 복합키), TeamMemberRole (ADMIN/MEMBER/VIEWER)
-    │   └── repository/             #   TeamRepository, TeamMemberRepository
+    │   ├── repository/             #   TeamRepository, TeamMemberRepository
+    │   └── service/                #   TeamService (팀 CRUD + 멤버 관리, 권한 체크)
     ├── project/
     │   ├── entity/                  #   Project (team 소속)
-    │   └── repository/             #   ProjectRepository
+    │   ├── repository/             #   ProjectRepository
+    │   └── service/                #   ProjectService (프로젝트 CRUD, 팀 소속 확인)
     ├── diagram/
     │   ├── entity/                  #   Diagram (CLOB content — React Flow JSON 직렬화)
     │   └── repository/             #   DiagramRepository
@@ -96,31 +110,42 @@ client/
 ├── postcss.config.js                # tailwindcss + autoprefixer
 ├── vite.config.ts                   # @/ alias → ./src, 프록시 /api → :8080
 ├── tsconfig.app.json                # paths: { "@/*": ["./src/*"] }
+├── .prettierrc.json                 # Prettier 설정
+├── .prettierignore                  # Prettier 무시 파일
+├── eslint.config.js                 # ESLint flat config (TypeScript + Prettier)
 └── src/
     ├── main.tsx                     # createRoot + StrictMode
-    ├── App.tsx                      # 루트 컴포넌트 (데모 데이터 로드 → DiagramPage)
+    ├── App.tsx                      # BrowserRouter + Routes (인증 가드 포함)
     ├── index.css                    # Tailwind directives + CSS 변수 (light/dark)
     ├── vite-env.d.ts                # Vite 타입 참조
     ├── api/
-    │   └── axiosInstance.ts         # baseURL: /api, JWT Bearer 토큰 자동 첨부 인터셉터
+    │   └── axiosInstance.ts         # baseURL: /api, JWT Bearer 자동 첨부, 401 리다이렉트
     ├── components/
+    │   ├── auth/
+    │   │   └── ProtectedRoute.tsx   # 인증 가드 (미인증 시 /login 리다이렉트)
     │   ├── erd/
     │   │   ├── ERDCanvas.tsx        # @xyflow/react 캔버스 (16x16 그리드 스냅, MiniMap, Controls, step edge)
     │   │   └── TableNode.tsx        # 커스텀 노드: 테이블 헤더 + 컬럼 행 (PK/FK 뱃지, 좌우 Handle)
     │   ├── layout/
-    │   │   ├── Header.tsx           # 상단 고정 헤더 (h-12, bg-gray-900)
+    │   │   ├── Header.tsx           # 상단 고정 헤더 (사용자명 표시, 로그아웃)
     │   │   └── Sidebar.tsx          # 좌측 사이드바 (w-56, 테이블 목록)
     │   └── ui/                      # shadcn/ui 컴포넌트
     │       ├── button.tsx           #   Button — 6 variant, 4 size, asChild(@radix-ui/react-slot)
     │       ├── card.tsx             #   Card/CardHeader/CardTitle/CardDescription/CardContent/CardFooter
+    │       ├── dialog.tsx           #   Dialog — @radix-ui/react-dialog
+    │       ├── dropdown-menu.tsx    #   DropdownMenu — @radix-ui/react-dropdown-menu
     │       ├── input.tsx            #   Input — 순수 HTML input (shadcn/ui 표준)
     │       └── label.tsx            #   Label — @radix-ui/react-label + CVA
     ├── lib/
     │   └── utils.ts                 # cn() = clsx + tailwind-merge
     ├── pages/
     │   ├── DiagramPage.tsx          # 메인 레이아웃: Header + Sidebar + ERDCanvas
-    │   └── LoginPage.tsx            # 로그인 폼 (Card + Label + Input + Button)
+    │   ├── LoginPage.tsx            # 로그인 폼 (API 연동, 회원가입 링크)
+    │   ├── SignupPage.tsx           # 회원가입 폼 (성공 시 자동 로그인)
+    │   ├── TeamsPage.tsx            # 팀 목록 + 팀 생성 다이얼로그
+    │   └── ProjectsPage.tsx         # 프로젝트 목록 + 생성/삭제 + 멤버 관리
     ├── stores/
+    │   ├── useAuthStore.ts          # Zustand: 인증 상태 (token, loginId, name) + localStorage 동기화
     │   └── useCanvasStore.ts        # Zustand: nodes, edges, onChange 핸들러, serialize/deserialize
     └── types/
         └── erd.ts                   # Column, TableNodeData, TableNode, ERDEdge
@@ -160,9 +185,32 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 | POST   | `/api/auth/signup`  | 회원가입 | `{ loginId, password (8+), name }`                   | `{ token, loginId, name }`       |
 | POST   | `/api/auth/login`   | 로그인   | `{ loginId, password }`                              | `{ token, loginId, name }`       |
 
-### 인증 필요 (Bearer Token)
+### 팀 (`/api/teams/**` — 인증 필요)
 
-현재 엔드포인트 미구현 상태. 향후 Team, Project, Diagram, Dictionary CRUD API가 추가될 예정.
+| Method | Path                              | 설명          | Request Body                    |
+| ------ | --------------------------------- | ------------- | ------------------------------- |
+| POST   | `/api/teams`                      | 팀 생성       | `{ name }`                      |
+| GET    | `/api/teams`                      | 내 팀 목록    | —                               |
+| GET    | `/api/teams/{id}`                 | 팀 상세       | —                               |
+| GET    | `/api/teams/{id}/members`         | 멤버 목록     | —                               |
+| POST   | `/api/teams/{id}/members`         | 멤버 초대     | `{ loginId, role }`             |
+| DELETE | `/api/teams/{id}/members/{userId}`| 멤버 제거     | —                               |
+| PATCH  | `/api/teams/{id}/members/{userId}`| 역할 변경     | `{ role }`                      |
+
+### 프로젝트 (`/api/teams/{teamId}/projects/**` — 인증 필요)
+
+| Method | Path                                          | 설명          | Request Body    |
+| ------ | --------------------------------------------- | ------------- | --------------- |
+| POST   | `/api/teams/{teamId}/projects`                | 프로젝트 생성 | `{ name }`      |
+| GET    | `/api/teams/{teamId}/projects`                | 프로젝트 목록 | —               |
+| GET    | `/api/teams/{teamId}/projects/{id}`           | 프로젝트 상세 | —               |
+| DELETE | `/api/teams/{teamId}/projects/{id}`           | 프로젝트 삭제 | —               |
+
+### Swagger UI
+
+Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+
+모든 컨트롤러에 `@Operation`, `@ApiResponse`, `@Parameter`, `@Schema` 어노테이션 적용됨. JWT Bearer 인증이 필요한 엔드포인트는 Swagger UI에서 Authorize 버튼으로 토큰 설정 후 테스트 가능.
 
 ### 인증 흐름
 
@@ -205,11 +253,24 @@ lib/utils.ts        →  cn() = clsx + tailwind-merge (클래스 병합 유틸�
 - Edge 타입: `step` (직각 연결), `MarkerType.ArrowClosed`
 - 상태: Zustand `useCanvasStore` — `serialize()` → JSON 문자열 → `Diagram.content` (CLOB)
 
+### 라우팅
+
+```text
+/login                                    — 로그인 (공개)
+/signup                                   — 회원가입 (공개)
+/teams                                    — 팀 목록 (인증 필요)
+/teams/:teamId/projects                   — 프로젝트 목록 (인증 필요)
+/teams/:teamId/projects/:projectId/diagrams/:diagramId — ERD 편집기 (인증 필요)
+```
+
+인증되지 않은 사용자는 `ProtectedRoute`에 의해 `/login`으로 리다이렉트된다.
+
 ### Axios 인스턴스
 
 ```text
 baseURL: /api  →  Vite 프록시  →  localhost:8080
 요청 인터셉터: localStorage.getItem('token') → Authorization: Bearer <token>
+응답 인터셉터: 401 응답 시 토큰 삭제 + /login 리다이렉트
 ```
 
 ## 설정 상세
@@ -234,11 +295,13 @@ smart-erd:
 
 ### Spring Security 접근 제어
 
-| 경로              | 접근 권한  |
-| ----------------- | --------- |
-| `/api/auth/**`    | 공개       |
-| `/h2-console/**`  | 공개       |
-| 그 외 모든 경로    | 인증 필요  |
+| 경로                | 접근 권한  |
+| ------------------- | --------- |
+| `/api/auth/**`      | 공개       |
+| `/h2-console/**`    | 공개       |
+| `/swagger-ui/**`    | 공개       |
+| `/v3/api-docs/**`   | 공개       |
+| 그 외 모든 경로      | 인증 필요  |
 
 ## 주요 규칙
 
@@ -293,6 +356,8 @@ cd client
 npm run dev                  # 개발 서버 기동 (:3000, 프록시 /api → :8080)
 npm run build                # 프로덕션 빌드 (tsc + vite)
 npm run lint                 # ESLint
+npm run format               # Prettier 포맷팅 적용
+npm run format:check         # Prettier 포맷팅 검사 (CI용)
 ```
 
 ## 데이터베이스
