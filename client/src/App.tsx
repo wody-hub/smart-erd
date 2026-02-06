@@ -1,105 +1,50 @@
-import { useEffect } from 'react';
-import { MarkerType } from '@xyflow/react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import TeamsPage from './pages/TeamsPage';
+import ProjectsPage from './pages/ProjectsPage';
 import DiagramPage from './pages/DiagramPage';
-import useCanvasStore from './stores/useCanvasStore';
-import type { TableNodeData } from './types/erd';
-import type { Node, Edge } from '@xyflow/react';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
-const demoNodes: Node<TableNodeData>[] = [
-  {
-    id: 'users',
-    type: 'table',
-    position: { x: 50, y: 50 },
-    data: {
-      label: 'users',
-      columns: [
-        { id: 'id', name: 'id', type: 'BIGINT', pk: true },
-        { id: 'login_id', name: 'login_id', type: 'VARCHAR(50)' },
-        { id: 'password', name: 'password', type: 'VARCHAR(255)' },
-        { id: 'name', name: 'name', type: 'VARCHAR(50)' },
-      ],
-    },
-  },
-  {
-    id: 'teams',
-    type: 'table',
-    position: { x: 400, y: 50 },
-    data: {
-      label: 'teams',
-      columns: [
-        { id: 'id', name: 'id', type: 'BIGINT', pk: true },
-        { id: 'name', name: 'name', type: 'VARCHAR(100)' },
-        { id: 'owner_id', name: 'owner_id', type: 'BIGINT', fk: true },
-      ],
-    },
-  },
-  {
-    id: 'projects',
-    type: 'table',
-    position: { x: 750, y: 50 },
-    data: {
-      label: 'projects',
-      columns: [
-        { id: 'id', name: 'id', type: 'BIGINT', pk: true },
-        { id: 'name', name: 'name', type: 'VARCHAR(100)' },
-        { id: 'team_id', name: 'team_id', type: 'BIGINT', fk: true },
-      ],
-    },
-  },
-  {
-    id: 'diagrams',
-    type: 'table',
-    position: { x: 750, y: 280 },
-    data: {
-      label: 'diagrams',
-      columns: [
-        { id: 'id', name: 'id', type: 'BIGINT', pk: true },
-        { id: 'name', name: 'name', type: 'VARCHAR(100)' },
-        { id: 'project_id', name: 'project_id', type: 'BIGINT', fk: true },
-        { id: 'content', name: 'content', type: 'CLOB' },
-      ],
-    },
-  },
-];
-
-const demoEdges: Edge[] = [
-  {
-    id: 'e-users-teams',
-    source: 'users',
-    sourceHandle: 'users-id-source',
-    target: 'teams',
-    targetHandle: 'teams-owner_id-target',
-    type: 'step',
-    markerEnd: { type: MarkerType.ArrowClosed },
-  },
-  {
-    id: 'e-teams-projects',
-    source: 'teams',
-    sourceHandle: 'teams-id-source',
-    target: 'projects',
-    targetHandle: 'projects-team_id-target',
-    type: 'step',
-    markerEnd: { type: MarkerType.ArrowClosed },
-  },
-  {
-    id: 'e-projects-diagrams',
-    source: 'projects',
-    sourceHandle: 'projects-id-source',
-    target: 'diagrams',
-    targetHandle: 'diagrams-project_id-target',
-    type: 'step',
-    markerEnd: { type: MarkerType.ArrowClosed },
-  },
-];
-
+/**
+ * 애플리케이션 루트 컴포넌트.
+ *
+ * BrowserRouter로 SPA 라우팅을 구성하고,
+ * 인증이 필요한 경로에 ProtectedRoute 가드를 적용한다.
+ */
 export default function App() {
-  const setNodes = useCanvasStore((s) => s.setNodes);
-  const setEdges = useCanvasStore((s) => s.setEdges);
-
-  useEffect(() => {
-    setNodes(demoNodes);
-    setEdges(demoEdges);
-  }, [setNodes, setEdges]);
-
-  return <DiagramPage />;
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route
+          path="/teams"
+          element={
+            <ProtectedRoute>
+              <TeamsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teams/:teamId/projects"
+          element={
+            <ProtectedRoute>
+              <ProjectsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teams/:teamId/projects/:projectId/diagrams/:diagramId"
+          element={
+            <ProtectedRoute>
+              <DiagramPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/" element={<Navigate to="/teams" replace />} />
+        <Route path="*" element={<Navigate to="/teams" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }

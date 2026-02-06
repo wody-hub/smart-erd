@@ -1,6 +1,7 @@
 # Gradle
 .gradle/
 build/
+bin/
 !gradle/wrapper/gradle-wrapper.jar
 
 # IDE
@@ -45,6 +46,7 @@ Thumbs.db
 .env.*.local
 
 # Node / Frontend
+node_modules/
 client/node_modules/
 client/dist/
 client/.cache/

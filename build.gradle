@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.5.8'
+    id 'org.springframework.boot' version '3.5.10'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -46,10 +46,11 @@ dependencies {
     runtimeOnly 'com.blazebit:blaze-persistence-integration-hibernate-6.2:1.6.17'
     implementation 'com.blazebit:blaze-persistence-integration-spring-data-3.3:1.6.17'
 
-    // JWT (JJWT 0.12.6)
-    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
-    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
-    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+    // OAuth2 Resource Server (JWT)
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+
+    // Springdoc OpenAPI (Swagger UI)
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
 
     // H2 Database
     runtimeOnly 'com.h2database:h2'

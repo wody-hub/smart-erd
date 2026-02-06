@@ -1,0 +1,16 @@
+{
+  "name": "smart-erd",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션.",
+  "scripts": {
+    "format": "prettier --write \"src/**/*.java\" \"client/src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"src/**/*.java\" \"client/src/**/*.{ts,tsx}\"",
+    "format:java": "prettier --write \"src/**/*.java\"",
+    "format:client": "cd client && prettier --write \"src/**/*.{ts,tsx}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.8.1",
+    "prettier-plugin-java": "^2.8.1"
+  }
+}

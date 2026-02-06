@@ -1,9 +1,19 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import type { TableNodeData } from '../../types/erd';
+import type { TableNode as TableNodeType } from '../../types/erd';
 
-function TableNode({ id, data }: NodeProps) {
-  const { label, columns } = data as TableNodeData;
+/**
+ * ERD 테이블 커스텀 노드 컴포넌트.
+ *
+ * 테이블 헤더(이름)와 컬럼 목록을 렌더링하며, 각 컬럼에 PK/FK 뱃지와
+ * 좌우 Handle(source/target)을 배치하여 컬럼 레벨의 관계 연결을 지원한다.
+ *
+ * Handle ID 규칙: `{nodeId}-{colId}-source` / `{nodeId}-{colId}-target`
+ *
+ * @param props React Flow NodeProps (id, data)
+ */
+function TableNode({ id, data }: NodeProps<TableNodeType>) {
+  const { label, columns } = data;
 
   return (
     <div className="bg-white border border-gray-300 rounded shadow-md min-w-[200px]">
