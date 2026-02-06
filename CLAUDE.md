@@ -25,25 +25,36 @@ npm run lint                         # ESLint
 
 ## Architecture
 
-### Backend: Spring Boot 3.4.2 / Java 21
+### Backend: Spring Boot 3.5.10 / Java 25
 Base package: `com.smarterd`
 
 ```
 src/main/java/com/smarterd/
-├── api/auth/          # REST controllers (currently stub login/signup)
-├── config/            # SecurityConfig, JwtTokenProvider, JwtAuthenticationFilter, CorsConfig, BlazePersistenceConfig
+├── SmartErdApplication.java         # Application entry point (@SpringBootApplication)
+├── package-info.java                # @NonNullApi (non-null by default for all sub-packages)
+├── api/auth/                        # HTTP interface layer (Controller + DTO)
+│   ├── AuthController.java
+│   └── dto/
+├── config/                          # SecurityConfig, JwtConfig, JwtProperties, CorsConfig (+ CorsProperties)
 └── domain/
-    ├── common/entity/ # BaseTimeEntity (createdAt/updatedAt audit)
-    ├── user/          # User entity + UserRepository
-    ├── team/          # Team, TeamMember (@IdClass composite key), TeamMemberRole enum
-    ├── project/       # Project entity + repo
-    ├── diagram/       # Diagram entity (CLOB content stores serialized React Flow JSON)
-    └── dictionary/    # Domain (logical→physical type mapping), Term (logical→physical name mapping)
+    ├── common/entity/               # BaseTimeEntity (createdAt/updatedAt audit)
+    ├── user/
+    │   ├── entity/                  # User
+    │   ├── repository/             # UserRepository
+    │   └── service/                # AuthService, AuthUserDetailsService, JwtTokenService
+    ├── team/                        # Team, TeamMember (@IdClass composite key), TeamMemberRole enum
+    ├── project/                     # Project entity + repo
+    ├── diagram/                     # Diagram entity (CLOB content stores serialized React Flow JSON)
+    └── dictionary/                  # Domain (logical→physical type mapping), Term (logical→physical name mapping)
 ```
 
 **Entity ownership chain:** User → Team → (Project → Diagram, Domain, Term). TeamMember is a join table with `@IdClass(TeamMemberId)` composite key (team_id + user_id) and role enum (ADMIN, MEMBER, VIEWER).
 
-**Security:** JWT stateless auth with Spring Security 6.x lambda DSL. `JwtAuthenticationFilter` extracts Bearer token, validates via `JwtTokenProvider` (JJWT 0.12.6, HMAC-SHA256). `/api/auth/**` and `/h2-console/**` are public; all else requires authentication.
+**Package convention:** `api/` layer holds HTTP interface only (Controller + DTO). Business logic (Service) resides in `domain/` layer under the relevant domain package.
+
+**Security:** JWT stateless auth with Spring Security OAuth2 Resource Server. Built-in `BearerTokenAuthenticationFilter` validates Bearer tokens via `JwtDecoder` (NimbusJwtDecoder, HMAC-SHA256). `/api/auth/**` and `/h2-console/**` are public; all else requires authentication.
+
+**Configuration:** Custom properties are namespaced under `smart-erd.*` in `application.yml`. JWT and CORS settings use `@ConfigurationProperties` for type-safe binding (`smart-erd.jwt.*`, `smart-erd.cors.*`).
 
 **Database:** H2 in-memory with `ddl-auto: create-drop`. H2 console at `/h2-console`.
 
@@ -58,7 +69,7 @@ client/src/
 │   └── layout/             # Header, Sidebar
 ├── pages/
 │   ├── DiagramPage.tsx     # Main layout: Header + Sidebar + ERDCanvas
-│   └── LoginPage.tsx       # Auth page (unused)
+│   └── LoginPage.tsx       # Auth page (UI shell)
 ├── stores/useCanvasStore.ts # Zustand store: nodes, edges, onNodesChange/onEdgesChange/onConnect, serialize/deserialize
 └── types/erd.ts            # Column, TableNodeData, TableNode, ERDEdge types
 ```
@@ -68,13 +79,14 @@ client/src/
 - **Edge IDs:** `e-{sourceHandle}-{targetHandle}`
 - **Diagram persistence:** `useCanvasStore.serialize()` → JSON string stored in `Diagram.content` (CLOB)
 - **Type assertion needed:** `applyNodeChanges()` returns generic `Node[]`, must cast to `Node<TableNodeData>[]`
+- **Documentation:** All classes, methods, and fields have Javadoc/JSDoc. Fields use single-line `/** */` format.
 
 ### Tech Stack
 | Layer | Stack |
 |-------|-------|
-| Backend | Spring Boot 3.4.2, Java 21, Gradle 8.12, Spring Security 6.x, Spring Data JPA |
-| Query | QueryDSL 5.1.0:jakarta, Blaze-Persistence 1.6.17 (configured, not yet used) |
-| Auth | JJWT 0.12.6 (HMAC-SHA256), BCrypt |
+| Backend | Spring Boot 3.5.10, Java 25, Gradle 8.12, Spring Security 6.x, Spring Data JPA |
+| Query | QueryDSL 5.1.0:jakarta |
+| Auth | Spring OAuth2 Resource Server (HMAC-SHA256 JWT), BCrypt |
 | DB | H2 in-memory |
 | Frontend | React 18, TypeScript 5.6, Vite 6, @xyflow/react 12, Zustand 5, Tailwind CSS 3.4 |
 | Editor | @monaco-editor/react 4.6 |

@@ -1,3 +1,9 @@
+/**
+ * 로그인 페이지 컴포넌트.
+ *
+ * 로그인 ID와 비밀번호 입력 폼을 중앙에 배치한 인증 화면이다.
+ * 현재는 UI 껍데기이며, 추후 실제 인증 API 연동이 추가될 예정이다.
+ */
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
