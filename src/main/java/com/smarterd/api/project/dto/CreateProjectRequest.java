@@ -11,7 +11,8 @@ import jakarta.validation.constraints.Size;
  */
 @Schema(description = "프로젝트 생성 요청")
 public record CreateProjectRequest(
-        @Schema(description = "프로젝트 이름 (1~100자)", example = "E-Commerce ERD")
-        @NotBlank @Size(min = 1, max = 100) String name
-) {
-}
+    @Schema(description = "프로젝트 이름 (1~100자)", example = "E-Commerce ERD")
+    @NotBlank
+    @Size(min = 1, max = 100)
+    String name
+) {}

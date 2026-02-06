@@ -1,6 +1,9 @@
 package com.smarterd.config;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import java.util.Base64;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,10 +12,6 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-import java.util.Base64;
 
 /**
  * JWT 인코더/디코더 빈 설정.
@@ -56,9 +55,7 @@ public class JwtConfig {
      */
     @Bean
     public JwtDecoder jwtDecoder(JwtProperties jwtProperties) {
-        return NimbusJwtDecoder.withSecretKey(secretKey(jwtProperties))
-                .macAlgorithm(MacAlgorithm.HS256)
-                .build();
+        return NimbusJwtDecoder.withSecretKey(secretKey(jwtProperties)).macAlgorithm(MacAlgorithm.HS256).build();
     }
 
     /**
@@ -68,7 +65,7 @@ public class JwtConfig {
      * @return HMAC-SHA256 SecretKey
      */
     private SecretKey secretKey(JwtProperties jwtProperties) {
-        byte[] keyBytes = Base64.getDecoder().decode(jwtProperties.getSecret());
+        var keyBytes = Base64.getDecoder().decode(jwtProperties.getSecret());
         return new SecretKeySpec(keyBytes, "HmacSHA256");
     }
 }

@@ -1,9 +1,8 @@
 package com.smarterd.domain.user.repository;
 
 import com.smarterd.domain.user.entity.User;
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
  * {@link User} 엔티티의 데이터 접근 레포지토리.
@@ -11,7 +10,6 @@ import java.util.Optional;
  * <p>Spring Data JPA가 런타임에 구현체를 자동 생성하며, 로그인 ID 기반 조회 메서드를 제공한다.</p>
  */
 public interface UserRepository extends JpaRepository<User, Long> {
-
     /**
      * 로그인 ID로 사용자를 조회한다.
      *

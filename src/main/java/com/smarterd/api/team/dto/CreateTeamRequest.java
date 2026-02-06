@@ -11,7 +11,5 @@ import jakarta.validation.constraints.Size;
  */
 @Schema(description = "팀 생성 요청")
 public record CreateTeamRequest(
-        @Schema(description = "팀 이름 (1~100자)", example = "Backend Team")
-        @NotBlank @Size(min = 1, max = 100) String name
-) {
-}
+    @Schema(description = "팀 이름 (1~100자)", example = "Backend Team") @NotBlank @Size(min = 1, max = 100) String name
+) {}

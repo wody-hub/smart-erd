@@ -1,8 +1,7 @@
-package com.smarterd.domain.user.service;
+package com.smarterd.config;
 
-import com.smarterd.config.JwtProperties;
 import java.time.Instant;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -17,14 +16,24 @@ import org.springframework.stereotype.Service;
  * 토큰의 subject에 사용자의 로그인 ID를 저장한다.</p>
  */
 @Service
-@RequiredArgsConstructor
 public class JwtTokenService {
 
     /** JWT 인코더 */
     private final JwtEncoder jwtEncoder;
 
-    /** JWT 설정 프로퍼티 */
-    private final JwtProperties jwtProperties;
+    /** 토큰 만료 시간 (밀리초) */
+    private final long expiration;
+
+    /**
+     * JwtTokenService를 생성한다.
+     *
+     * @param jwtEncoder JWT 인코더 빈
+     * @param expiration 토큰 만료 시간(ms) ({@code smart-erd.jwt.expiration})
+     */
+    public JwtTokenService(JwtEncoder jwtEncoder, @Value("${smart-erd.jwt.expiration}") long expiration) {
+        this.jwtEncoder = jwtEncoder;
+        this.expiration = expiration;
+    }
 
     /**
      * 지정된 로그인 ID에 대한 JWT 토큰을 생성한다.
@@ -41,12 +50,12 @@ public class JwtTokenService {
      * @return 서명된 JWT 토큰 문자열
      */
     public String generateToken(String loginId) {
-        var now = Instant.now();
-        var header = JwsHeader.with(MacAlgorithm.HS256).build();
-        var claims = JwtClaimsSet.builder()
+        Instant now = Instant.now();
+        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
             .subject(loginId)
             .issuedAt(now)
-            .expiresAt(now.plusMillis(jwtProperties.getExpiration()))
+            .expiresAt(now.plusMillis(expiration))
             .build();
         return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }

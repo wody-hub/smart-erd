@@ -1,14 +1,13 @@
 package com.smarterd.domain.user.service;
 
 import com.smarterd.domain.user.repository.UserRepository;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-
-import java.util.Collections;
 
 /**
  * Spring Security {@link UserDetailsService} 구현체.
@@ -19,6 +18,7 @@ import java.util.Collections;
  */
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class AuthUserDetailsService implements UserDetailsService {
 
     /** 사용자 레포지토리 */
@@ -33,8 +33,9 @@ public class AuthUserDetailsService implements UserDetailsService {
      */
     @Override
     public UserDetails loadUserByUsername(String loginId) throws UsernameNotFoundException {
-        return userRepository.findByLoginId(loginId)
-                .map(user -> new User(user.getLoginId(), user.getPassword(), Collections.emptyList()))
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + loginId));
+        return userRepository
+            .findByLoginId(loginId)
+            .map((user) -> new User(user.getLoginId(), user.getPassword(), List.of()))
+            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + loginId));
     }
 }

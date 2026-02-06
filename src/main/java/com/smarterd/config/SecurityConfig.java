@@ -47,19 +47,24 @@ public class SecurityConfig {
      * @throws Exception 설정 중 예외 발생 시
      */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource))
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        .anyRequest().authenticated()
-                )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+            .cors((cors) -> cors.configurationSource(corsConfigurationSource))
+            .csrf((csrf) -> csrf.disable())
+            .sessionManagement((session) -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .headers((headers) -> headers.frameOptions((frame) -> frame.sameOrigin()))
+            .authorizeHttpRequests((auth) ->
+                auth
+                    .requestMatchers("/api/auth/**")
+                    .permitAll()
+                    .requestMatchers("/h2-console/**")
+                    .permitAll()
+                    .requestMatchers("/swagger-ui/**", "/v3/api-docs/**")
+                    .permitAll()
+                    .anyRequest()
+                    .authenticated()
+            )
+            .oauth2ResourceServer((oauth2) -> oauth2.jwt(Customizer.withDefaults()));
 
         return http.build();
     }
@@ -70,7 +75,7 @@ public class SecurityConfig {
      * @return BCryptPasswordEncoder 인스턴스
      */
     @Bean
-    public PasswordEncoder passwordEncoder() {
+    PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
@@ -86,8 +91,8 @@ public class SecurityConfig {
      * @throws Exception 인증 관리자 조회 중 예외 발생 시
      */
     @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration authenticationConfiguration) throws Exception {
+    AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
+        throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
 }

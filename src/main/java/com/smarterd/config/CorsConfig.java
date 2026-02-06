@@ -1,5 +1,6 @@
 package com.smarterd.config;
 
+import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -8,8 +9,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.List;
 
 /**
  * CORS(Cross-Origin Resource Sharing) 설정.
@@ -27,7 +26,7 @@ public class CorsConfig {
      */
     @Bean
     @ConfigurationProperties(prefix = "smart-erd.cors")
-    public CorsProperties corsProperties() {
+    CorsProperties corsProperties() {
         return new CorsProperties();
     }
 
@@ -40,14 +39,14 @@ public class CorsConfig {
      * @return URL 기반 CORS 설정 소스
      */
     @Bean
-    public CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
-        CorsConfiguration configuration = new CorsConfiguration();
+    CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
+        var configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(corsProperties.getAllowedOrigins());
         configuration.setAllowedMethods(corsProperties.getAllowedMethods());
         configuration.setAllowedHeaders(corsProperties.getAllowedHeaders());
         configuration.setAllowCredentials(corsProperties.isAllowCredentials());
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }

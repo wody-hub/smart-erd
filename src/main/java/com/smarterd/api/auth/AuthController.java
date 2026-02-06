@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -42,7 +41,11 @@ public class AuthController {
      * @return 200 OK + AuthResponse (JWT 토큰 포함)
      */
     @Operation(summary = "로그인", description = "로그인 ID와 비밀번호로 인증하여 JWT 토큰을 발급한다.")
-    @ApiResponse(responseCode = "200", description = "로그인 성공", content = @Content(schema = @Schema(implementation = AuthResponse.class)))
+    @ApiResponse(
+        responseCode = "200",
+        description = "로그인 성공",
+        content = @Content(schema = @Schema(implementation = AuthResponse.class))
+    )
     @ApiResponse(responseCode = "400", description = "잘못된 요청 (유효성 검증 실패)", content = @Content)
     @ApiResponse(responseCode = "401", description = "인증 실패 (잘못된 자격 증명)", content = @Content)
     @SecurityRequirements
@@ -58,7 +61,11 @@ public class AuthController {
      * @return 201 Created + AuthResponse (JWT 토큰 포함)
      */
     @Operation(summary = "회원가입", description = "신규 사용자를 등록하고 JWT 토큰을 발급한다.")
-    @ApiResponse(responseCode = "201", description = "회원가입 성공", content = @Content(schema = @Schema(implementation = AuthResponse.class)))
+    @ApiResponse(
+        responseCode = "201",
+        description = "회원가입 성공",
+        content = @Content(schema = @Schema(implementation = AuthResponse.class))
+    )
     @ApiResponse(responseCode = "400", description = "잘못된 요청 (유효성 검증 실패 또는 중복 ID)", content = @Content)
     @SecurityRequirements
     @PostMapping("/signup")

@@ -3,6 +3,8 @@ package com.smarterd.domain.user.service;
 import com.smarterd.api.auth.dto.AuthResponse;
 import com.smarterd.api.auth.dto.LoginRequest;
 import com.smarterd.api.auth.dto.SignupRequest;
+import com.smarterd.domain.common.exception.DuplicateException;
+import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class AuthService {
 
     /** Spring Security 인증 관리자 */
@@ -47,13 +50,14 @@ public class AuthService {
      */
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.loginId(), request.password())
+            new UsernamePasswordAuthenticationToken(request.loginId(), request.password())
         );
 
-        User user = userRepository.findByLoginId(request.loginId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        var user = userRepository
+            .findByLoginId(request.loginId())
+            .orElseThrow(() -> new EntityNotFoundException("User not found: " + request.loginId()));
 
-        String token = jwtTokenService.generateToken(user.getLoginId());
+        var token = jwtTokenService.generateToken(user.getLoginId());
         return new AuthResponse(token, user.getLoginId(), user.getName());
     }
 
@@ -65,23 +69,23 @@ public class AuthService {
      *
      * @param request 회원가입 요청 DTO
      * @return 인증 응답 (토큰, 로그인 ID, 이름)
-     * @throws IllegalArgumentException 로그인 ID가 이미 존재하는 경우
+     * @throws DuplicateException 로그인 ID가 이미 존재하는 경우
      */
     @Transactional
     public AuthResponse signup(SignupRequest request) {
         if (userRepository.existsByLoginId(request.loginId())) {
-            throw new IllegalArgumentException("Login ID already exists");
+            throw new DuplicateException("Login ID already exists: " + request.loginId());
         }
 
-        User user = User.builder()
-                .loginId(request.loginId())
-                .password(passwordEncoder.encode(request.password()))
-                .name(request.name())
-                .build();
+        var user = User.builder()
+            .loginId(request.loginId())
+            .password(passwordEncoder.encode(request.password()))
+            .name(request.name())
+            .build();
 
         userRepository.save(user);
 
-        String token = jwtTokenService.generateToken(user.getLoginId());
+        var token = jwtTokenService.generateToken(user.getLoginId());
         return new AuthResponse(token, user.getLoginId(), user.getName());
     }
 }

@@ -23,6 +23,14 @@ npm run lint                         # ESLint
 ```
 **Note:** npm has cache permission issues on this machine. Use `--cache /tmp/npm-cache-smarterd` for install commands.
 
+### Formatting (Prettier — Java + TypeScript unified)
+```bash
+npm run format                       # Format all (Java + TypeScript)
+npm run format:java                  # Java only
+npm run format:client                # TypeScript only
+npm run format:check                 # Check formatting (CI)
+```
+
 ### Environment Variables
 
 | Variable | Description | Default |
@@ -39,31 +47,38 @@ Base package: `com.smarterd`
 src/main/java/com/smarterd/
 ├── SmartErdApplication.java         # Application entry point (@SpringBootApplication)
 ├── package-info.java                # @NonNullApi (non-null by default for all sub-packages)
-├── api/
-│   ├── auth/                        # Auth HTTP interface layer
+├── api/                             # HTTP interface layer (Controller + DTO only)
+│   ├── auth/
 │   │   ├── AuthController.java      #   POST /api/auth/login, /api/auth/signup
 │   │   └── dto/                     #   LoginRequest, SignupRequest, AuthResponse (record)
-│   ├── team/                        # Team HTTP interface layer
+│   ├── team/
 │   │   ├── TeamController.java      #   /api/teams CRUD + /api/teams/{id}/members management
 │   │   └── dto/                     #   CreateTeamRequest, TeamResponse, AddMemberRequest, UpdateMemberRoleRequest, TeamMemberResponse
-│   ├── project/                     # Project HTTP interface layer
+│   ├── project/
 │   │   ├── ProjectController.java   #   /api/teams/{teamId}/projects CRUD
 │   │   └── dto/                     #   CreateProjectRequest, ProjectResponse
 │   └── common/
-│       └── GlobalExceptionHandler.java  # @RestControllerAdvice (IllegalArgument→400, Validation→400)
+│       └── GlobalExceptionHandler.java  # @RestControllerAdvice (404/403/409/400 mapping)
 ├── config/                          # Configuration
 │   ├── SecurityConfig.java          #   Spring Security (OAuth2 Resource Server JWT, CSRF disabled)
 │   ├── JwtConfig.java               #   JwtEncoder / JwtDecoder beans (NimbusJwtDecoder, HS256)
 │   ├── JwtProperties.java           #   @ConfigurationProperties("smart-erd.jwt") — secret, expiration
-│   └── CorsConfig.java              #   @ConfigurationProperties("smart-erd.cors") + CorsProperties inner class
+│   ├── CorsConfig.java              #   @ConfigurationProperties("smart-erd.cors") + CorsProperties inner class
+│   └── OpenApiConfig.java           #   Swagger/OpenAPI config (JWT Bearer auth scheme)
 └── domain/                          # Domain layer (Services live here too)
-    ├── common/entity/               #   BaseTimeEntity (createdAt, updatedAt auto-audit)
+    ├── common/
+    │   ├── entity/                   #   BaseTimeEntity (createdAt, updatedAt auto-audit)
+    │   └── exception/               #   Custom exception hierarchy (4 types)
+    │       ├── EntityNotFoundException.java   # → 404 Not Found
+    │       ├── AccessDeniedException.java     # → 403 Forbidden
+    │       ├── DuplicateException.java        # → 409 Conflict
+    │       └── BusinessException.java         # → 400 Bad Request
     ├── user/
     │   ├── entity/                   #   User (loginId unique, BCrypt password)
     │   ├── repository/              #   UserRepository (findByLoginId, existsByLoginId)
     │   └── service/                 #   AuthService, AuthUserDetailsService, JwtTokenService
     ├── team/
-    │   ├── entity/                  #   Team, TeamMember (@IdClass composite key), TeamMemberRole (ADMIN/MEMBER/VIEWER)
+    │   ├── entity/                  #   Team, TeamMember (@IdClass), TeamMemberId (record), TeamMemberRole
     │   ├── repository/             #   TeamRepository, TeamMemberRepository (findByUser, findByTeam, existsByTeamAndUser)
     │   └── service/                #   TeamService (CRUD + member management with ADMIN permission checks)
     ├── project/
@@ -78,7 +93,7 @@ src/main/java/com/smarterd/
         └── repository/             #   DomainRepository, TermRepository
 ```
 
-**Entity ownership chain:** User → Team → (Project → Diagram, Domain, Term). TeamMember is a join table with `@IdClass(TeamMemberId)` composite key (team_id + user_id) and role enum (ADMIN, MEMBER, VIEWER).
+**Entity ownership chain:** User → Team → (Project → Diagram, Domain, Term). TeamMember is a join table with `@IdClass(TeamMemberId)` record composite key (team_id + user_id) and role enum (ADMIN, MEMBER, VIEWER).
 
 **Package convention:** `api/` layer holds HTTP interface only (Controller + DTO). Business logic (Service) resides in `domain/` layer under the relevant domain package. DTOs are Java `record` types with `@Valid` annotations.
 
@@ -88,6 +103,7 @@ src/main/java/com/smarterd/
 |------|--------|
 | `/api/auth/**` | Public |
 | `/h2-console/**` | Public |
+| `/swagger-ui/**`, `/v3/api-docs/**` | Public |
 | All other paths | Authenticated |
 
 **Configuration:** Custom properties are namespaced under `smart-erd.*` in `application.yml`. JWT and CORS settings use `@ConfigurationProperties` for type-safe binding (`smart-erd.jwt.*`, `smart-erd.cors.*`).
@@ -104,6 +120,9 @@ client/
 ├── postcss.config.js                # tailwindcss + autoprefixer
 ├── vite.config.ts                   # @/ alias → ./src, proxy /api → :8080
 ├── tsconfig.app.json                # paths: { "@/*": ["./src/*"] }
+├── .prettierrc.json                 # Prettier config
+├── .prettierignore                  # Prettier ignore
+├── eslint.config.js                 # ESLint flat config (TypeScript + Prettier)
 └── src/
     ├── main.tsx                     # createRoot + StrictMode
     ├── App.tsx                      # Root component (BrowserRouter + Routes + ProtectedRoute guards)
@@ -174,6 +193,60 @@ client/
 | Frontend | React 18, TypeScript 5.6, Vite 6, Tailwind CSS 3.4, shadcn/ui |
 | ERD Canvas | @xyflow/react 12, Zustand 5 |
 | Editor | @monaco-editor/react 4.6 |
+| Formatting | Prettier (Java + TypeScript), prettier-plugin-java |
+| Code Quality | ESLint, SonarQube / SonarLint |
+
+## Code Standards
+
+### Modern Java Idioms (MUST follow)
+
+- **`var`** for local variables where type is obvious from RHS: `var user = findUserByLoginId(loginId);`
+- **`record`** for DTOs and composite key classes: `public record TeamMemberId(Long team, Long user) implements Serializable {}`
+- **`List.of()`** instead of `Collections.emptyList()` for immutable empty collections
+- **Stream API** with `.toList()` for collection transformations
+- **Optional** with `.orElseThrow()` for JPA single-entity lookups
+
+### Import Rules
+
+- **No wildcard imports (`.*`)** — all imports must be explicit
+- Prettier auto-formats on save, VS Code `organizeImports` removes unused imports
+
+### Exception Hierarchy
+
+Use domain-specific custom exceptions (NOT `IllegalArgumentException`):
+
+| Exception | HTTP Status | Usage |
+|-----------|-------------|-------|
+| `EntityNotFoundException` | 404 | Entity lookup failure |
+| `AccessDeniedException` | 403 | Permission denied (not a member, not ADMIN) |
+| `DuplicateException` | 409 | Duplicate resource (member, login ID) |
+| `BusinessException` | 400 | Business rule violation (removing owner, etc.) |
+
+All exceptions in `domain/common/exception/`, mapped by `GlobalExceptionHandler`.
+
+### Transaction Pattern
+
+- Class-level `@Transactional(readOnly = true)` — default read-only
+- Method-level `@Transactional` override for writes only
+
+### JPA Dirty Checking
+
+Use setter methods for state changes, NOT delete+save:
+```java
+member.changeRole(request.role());  // Good — dirty checking
+```
+
+### Null Safety
+
+- Root package `@NonNullApi` → non-null by default
+- Service classes: `@SuppressWarnings("null")` to suppress JPA repository null analysis warnings
+
+### Formatting — Prettier
+
+- Root `.prettierrc.json` with `prettier-plugin-java`
+- Java: tabWidth 4, printWidth 120
+- TypeScript: tabWidth 2, printWidth 100
+- SonarQube S1611 (lambda parentheses) suppressed in favor of Prettier
 
 ### Gradle Annotation Processor Order
 

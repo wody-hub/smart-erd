@@ -23,20 +23,23 @@ public class OpenApiConfig {
      * @return JWT Bearer 인증이 포함된 OpenAPI 설정
      */
     @Bean
-    public OpenAPI openAPI() {
+    OpenAPI openAPI() {
         String securitySchemeName = "Bearer Authentication";
 
         return new OpenAPI()
-                .info(new Info()
-                        .title("Smart ERD API")
-                        .description("Smart ERD 애플리케이션 REST API 문서")
-                        .version("0.0.1"))
-                .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
-                .components(new Components()
-                        .addSecuritySchemes(securitySchemeName, new SecurityScheme()
-                                .name(securitySchemeName)
-                                .type(SecurityScheme.Type.HTTP)
-                                .scheme("bearer")
-                                .bearerFormat("JWT")));
+            .info(
+                new Info().title("Smart ERD API").description("Smart ERD 애플리케이션 REST API 문서").version("0.0.1")
+            )
+            .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
+            .components(
+                new Components().addSecuritySchemes(
+                    securitySchemeName,
+                    new SecurityScheme()
+                        .name(securitySchemeName)
+                        .type(SecurityScheme.Type.HTTP)
+                        .scheme("bearer")
+                        .bearerFormat("JWT")
+                )
+            );
     }
 }

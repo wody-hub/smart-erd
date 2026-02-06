@@ -3,12 +3,11 @@ package com.smarterd.domain.common.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.MappedSuperclass;
+import java.time.LocalDateTime;
 import lombok.Getter;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
-import java.time.LocalDateTime;
 
 /**
  * 모든 엔티티의 생성·수정 시각을 자동 관리하는 공통 상위 클래스.

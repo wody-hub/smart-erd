@@ -2,14 +2,23 @@ package com.smarterd.domain.team.entity;
 
 import com.smarterd.domain.common.entity.BaseTimeEntity;
 import com.smarterd.domain.user.entity.User;
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * 팀 엔티티.
@@ -38,7 +47,7 @@ public class Team extends BaseTimeEntity {
     private User owner;
 
     /** 팀 구성원 목록 (cascade PERSIST/MERGE, orphanRemoval) */
-    @OneToMany(mappedBy = "team", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
+    @OneToMany(mappedBy = "team", cascade = { CascadeType.PERSIST, CascadeType.MERGE }, orphanRemoval = true)
     private List<TeamMember> members = new ArrayList<>();
 
     /**

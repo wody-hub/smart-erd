@@ -1,0 +1,8 @@
+build/
+bin/
+.gradle/
+node_modules/
+client/node_modules/
+client/dist/
+*.class
+*.jar

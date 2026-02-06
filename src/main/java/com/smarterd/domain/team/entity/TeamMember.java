@@ -2,7 +2,16 @@ package com.smarterd.domain.team.entity;
 
 import com.smarterd.domain.common.entity.BaseTimeEntity;
 import com.smarterd.domain.user.entity.User;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -52,6 +61,15 @@ public class TeamMember extends BaseTimeEntity {
     public TeamMember(Team team, User user, TeamMemberRole role) {
         this.team = team;
         this.user = user;
+        this.role = role;
+    }
+
+    /**
+     * 팀 내 역할을 변경한다.
+     *
+     * @param role 새로운 역할
+     */
+    public void changeRole(TeamMemberRole role) {
         this.role = role;
     }
 }
