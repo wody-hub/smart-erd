@@ -18,6 +18,12 @@ spring:
       hibernate:
         format_sql: true
 
-jwt:
-  secret: c21hcnQtZXJkLWp3dC1zZWNyZXQta2V5LXRoYXQtaXMtbG9uZy1lbm91Z2gtZm9yLWhtYWMtc2hhMjU2
-  expiration: 86400000
+smart-erd:
+  cors:
+    allowed-origins: http://localhost:3000
+    allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+    allowed-headers: "*"
+    allow-credentials: true
+  jwt:
+    secret: ${SMART_ERD_JWT_SECRET:c21hcnQtZXJkLWp3dC1zZWNyZXQta2V5LXRoYXQtaXMtbG9uZy1lbm91Z2gtZm9yLWhtYWMtc2hhMjU2}
+    expiration: 86400000

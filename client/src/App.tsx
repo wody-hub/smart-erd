@@ -5,6 +5,7 @@ import useCanvasStore from './stores/useCanvasStore';
 import type { TableNodeData } from './types/erd';
 import type { Node, Edge } from '@xyflow/react';
 
+/** 초기 로딩 시 표시되는 데모 테이블 노드 목록 (users, teams, projects, diagrams) */
 const demoNodes: Node<TableNodeData>[] = [
   {
     id: 'users',
@@ -62,6 +63,7 @@ const demoNodes: Node<TableNodeData>[] = [
   },
 ];
 
+/** 데모 테이블 간 관계를 나타내는 엣지 목록 (users→teams, teams→projects, projects→diagrams) */
 const demoEdges: Edge[] = [
   {
     id: 'e-users-teams',
@@ -92,6 +94,12 @@ const demoEdges: Edge[] = [
   },
 ];
 
+/**
+ * 애플리케이션 루트 컴포넌트.
+ *
+ * 마운트 시 데모 노드·엣지 데이터를 캔버스 스토어에 로드하고,
+ * {@link DiagramPage}를 렌더링한다.
+ */
 export default function App() {
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
