@@ -5,6 +5,7 @@ import com.smarterd.api.team.dto.CreateTeamRequest;
 import com.smarterd.api.team.dto.TeamMemberResponse;
 import com.smarterd.api.team.dto.TeamResponse;
 import com.smarterd.api.team.dto.UpdateMemberRoleRequest;
+import com.smarterd.api.team.validator.AddMemberRequestValidator;
 import com.smarterd.domain.team.service.TeamService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -19,8 +20,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -42,6 +45,19 @@ public class TeamController {
 
     /** 팀 비즈니스 로직 서비스 */
     private final TeamService teamService;
+
+    /** 멤버 추가 요청 유효성 검사기 */
+    private final AddMemberRequestValidator addMemberRequestValidator;
+
+    /**
+     * 커스텀 Validator를 등록한다.
+     *
+     * @param binder 웹 데이터 바인더
+     */
+    @InitBinder
+    public void initBinder(WebDataBinder binder) {
+        binder.addValidators(addMemberRequestValidator);
+    }
 
     /**
      * 새 팀을 생성한다.

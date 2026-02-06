@@ -2,16 +2,12 @@ package com.smarterd.domain.project.service;
 
 import com.smarterd.api.project.dto.CreateProjectRequest;
 import com.smarterd.api.project.dto.ProjectResponse;
-import com.smarterd.domain.common.exception.AccessDeniedException;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.repository.ProjectRepository;
-import com.smarterd.domain.team.entity.Team;
-import com.smarterd.domain.team.repository.TeamMemberRepository;
-import com.smarterd.domain.team.repository.TeamRepository;
-import com.smarterd.domain.user.entity.User;
-import com.smarterd.domain.user.repository.UserRepository;
+import com.smarterd.domain.team.service.TeamService;
+import com.smarterd.domain.user.service.AuthService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,21 +29,14 @@ public class ProjectService {
     /** 프로젝트 레포지토리 */
     private final ProjectRepository projectRepository;
 
-    /** 팀 레포지토리 */
-    private final TeamRepository teamRepository;
+    /** 인증 서비스 (사용자 조회) */
+    private final AuthService authService;
 
-    /** 팀 멤버 레포지토리 */
-    private final TeamMemberRepository teamMemberRepository;
-
-    /** 사용자 레포지토리 */
-    private final UserRepository userRepository;
+    /** 팀 서비스 (팀 조회, 멤버십 확인) */
+    private final TeamService teamService;
 
     /**
      * 프로젝트를 생성한다.
-     *
-     * <p>
-     * 요청 사용자가 해당 팀의 멤버여야 한다.
-     * </p>
      *
      * @param loginId 요청 사용자의 로그인 ID
      * @param teamId  팀 ID
@@ -56,11 +45,11 @@ public class ProjectService {
      */
     @Transactional
     public ProjectResponse createProject(String loginId, Long teamId, CreateProjectRequest request) {
-        var user = findUserByLoginId(loginId);
-        var team = findTeamById(teamId);
-        verifyMembership(team, user);
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = teamService.findTeamById(teamId);
+        teamService.verifyMembership(team, user);
 
-        var project = Project.builder().name(request.name()).team(team).build();
+        final var project = Project.builder().name(request.name()).team(team).build();
         projectRepository.save(project);
 
         return ProjectResponse.from(project);
@@ -74,9 +63,9 @@ public class ProjectService {
      * @return 프로젝트 응답 목록
      */
     public List<ProjectResponse> getProjects(String loginId, Long teamId) {
-        var user = findUserByLoginId(loginId);
-        var team = findTeamById(teamId);
-        verifyMembership(team, user);
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = teamService.findTeamById(teamId);
+        teamService.verifyMembership(team, user);
 
         return projectRepository.findByTeam(team).stream().map(ProjectResponse::from).toList();
     }
@@ -90,11 +79,11 @@ public class ProjectService {
      * @return 프로젝트 응답
      */
     public ProjectResponse getProject(String loginId, Long teamId, Long projectId) {
-        var user = findUserByLoginId(loginId);
-        var team = findTeamById(teamId);
-        verifyMembership(team, user);
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = teamService.findTeamById(teamId);
+        teamService.verifyMembership(team, user);
 
-        var project = findProjectById(projectId);
+        final var project = findProjectById(projectId);
         verifyProjectBelongsToTeam(project, teamId);
 
         return ProjectResponse.from(project);
@@ -103,51 +92,43 @@ public class ProjectService {
     /**
      * 프로젝트를 삭제한다.
      *
-     * <p>
-     * 요청 사용자가 해당 팀의 멤버여야 한다.
-     * </p>
-     *
      * @param loginId   요청 사용자의 로그인 ID
      * @param teamId    팀 ID
      * @param projectId 프로젝트 ID
      */
     @Transactional
     public void deleteProject(String loginId, Long teamId, Long projectId) {
-        var user = findUserByLoginId(loginId);
-        var team = findTeamById(teamId);
-        verifyMembership(team, user);
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = teamService.findTeamById(teamId);
+        teamService.verifyMembership(team, user);
 
-        var project = findProjectById(projectId);
+        final var project = findProjectById(projectId);
         verifyProjectBelongsToTeam(project, teamId);
 
         projectRepository.delete(project);
     }
 
-    private User findUserByLoginId(String loginId) {
-        return userRepository
-            .findByLoginId(loginId)
-            .orElseThrow(() -> new EntityNotFoundException("User not found: " + loginId));
-    }
-
-    private Team findTeamById(Long teamId) {
-        return teamRepository
-            .findById(teamId)
-            .orElseThrow(() -> new EntityNotFoundException("Team not found: " + teamId));
-    }
-
-    private Project findProjectById(Long projectId) {
+    /**
+     * 프로젝트 ID로 프로젝트를 조회한다.
+     *
+     * @param projectId 프로젝트 ID
+     * @return 프로젝트 엔티티
+     * @throws EntityNotFoundException 프로젝트가 존재하지 않는 경우
+     */
+    public Project findProjectById(Long projectId) {
         return projectRepository
             .findById(projectId)
             .orElseThrow(() -> new EntityNotFoundException("Project not found: " + projectId));
     }
 
-    private void verifyMembership(Team team, User user) {
-        if (!teamMemberRepository.existsByTeamAndUser(team, user)) {
-            throw new AccessDeniedException("User is not a member of this team");
-        }
-    }
-
-    private void verifyProjectBelongsToTeam(Project project, Long teamId) {
+    /**
+     * 프로젝트가 해당 팀에 소속되어 있는지 확인한다.
+     *
+     * @param project 프로젝트 엔티티
+     * @param teamId  팀 ID
+     * @throws BusinessException 프로젝트가 해당 팀에 소속되지 않은 경우
+     */
+    public void verifyProjectBelongsToTeam(Project project, Long teamId) {
         if (!project.getTeam().getId().equals(teamId)) {
             throw new BusinessException("Project does not belong to this team");
         }

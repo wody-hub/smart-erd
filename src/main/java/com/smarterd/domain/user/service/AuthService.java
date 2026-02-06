@@ -3,7 +3,6 @@ package com.smarterd.domain.user.service;
 import com.smarterd.api.auth.dto.AuthResponse;
 import com.smarterd.api.auth.dto.LoginRequest;
 import com.smarterd.api.auth.dto.SignupRequest;
-import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.repository.UserRepository;
@@ -18,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 인증 비즈니스 로직 서비스.
  *
  * <p>로그인 시 {@link AuthenticationManager}를 통해 자격 증명을 검증하고,
- * 회원가입 시 중복 확인 후 사용자를 생성한다.
+ * 회원가입 시 사용자를 생성한다.
  * 두 경우 모두 JWT 토큰을 발급하여 {@link AuthResponse}로 반환한다.</p>
  */
 @Service
@@ -41,43 +40,28 @@ public class AuthService {
     /**
      * 사용자 로그인을 수행한다.
      *
-     * <p>{@link AuthenticationManager}를 통해 로그인 ID와 비밀번호를 검증한 후,
-     * JWT 토큰을 발급하여 반환한다.</p>
-     *
      * @param request 로그인 요청 DTO
      * @return 인증 응답 (토큰, 로그인 ID, 이름)
-     * @throws org.springframework.security.authentication.BadCredentialsException 자격 증명이 올바르지 않은 경우
      */
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(request.loginId(), request.password())
         );
 
-        var user = userRepository
-            .findByLoginId(request.loginId())
-            .orElseThrow(() -> new EntityNotFoundException("User not found: " + request.loginId()));
-
-        var token = jwtTokenService.generateToken(user.getLoginId());
+        final var user = findUserByLoginId(request.loginId());
+        final var token = jwtTokenService.generateToken(user.getLoginId());
         return new AuthResponse(token, user.getLoginId(), user.getName());
     }
 
     /**
      * 신규 사용자 회원가입을 수행한다.
      *
-     * <p>로그인 ID 중복 여부를 확인한 후, 비밀번호를 BCrypt로 해싱하여 사용자를 저장하고
-     * JWT 토큰을 발급하여 반환한다.</p>
-     *
      * @param request 회원가입 요청 DTO
      * @return 인증 응답 (토큰, 로그인 ID, 이름)
-     * @throws DuplicateException 로그인 ID가 이미 존재하는 경우
      */
     @Transactional
     public AuthResponse signup(SignupRequest request) {
-        if (userRepository.existsByLoginId(request.loginId())) {
-            throw new DuplicateException("Login ID already exists: " + request.loginId());
-        }
-
-        var user = User.builder()
+        final var user = User.builder()
             .loginId(request.loginId())
             .password(passwordEncoder.encode(request.password()))
             .name(request.name())
@@ -85,7 +69,20 @@ public class AuthService {
 
         userRepository.save(user);
 
-        var token = jwtTokenService.generateToken(user.getLoginId());
+        final var token = jwtTokenService.generateToken(user.getLoginId());
         return new AuthResponse(token, user.getLoginId(), user.getName());
+    }
+
+    /**
+     * 로그인 ID로 사용자를 조회한다.
+     *
+     * @param loginId 로그인 ID
+     * @return 사용자 엔티티
+     * @throws EntityNotFoundException 사용자가 존재하지 않는 경우
+     */
+    public User findUserByLoginId(String loginId) {
+        return userRepository
+            .findByLoginId(loginId)
+            .orElseThrow(() -> new EntityNotFoundException("User not found: " + loginId));
     }
 }

@@ -3,6 +3,7 @@ package com.smarterd.api.auth;
 import com.smarterd.api.auth.dto.AuthResponse;
 import com.smarterd.api.auth.dto.LoginRequest;
 import com.smarterd.api.auth.dto.SignupRequest;
+import com.smarterd.api.auth.validator.SignupRequestValidator;
 import com.smarterd.domain.user.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -14,6 +15,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,6 +36,19 @@ public class AuthController {
 
     /** 인증 비즈니스 로직 서비스 */
     private final AuthService authService;
+
+    /** 회원가입 요청 유효성 검사기 */
+    private final SignupRequestValidator signupRequestValidator;
+
+    /**
+     * 커스텀 Validator를 등록한다.
+     *
+     * @param binder 웹 데이터 바인더
+     */
+    @InitBinder
+    public void initBinder(WebDataBinder binder) {
+        binder.addValidators(signupRequestValidator);
+    }
 
     /**
      * 사용자 로그인을 처리한다.

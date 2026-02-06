@@ -40,13 +40,13 @@ public class CorsConfig {
      */
     @Bean
     CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
-        var configuration = new CorsConfiguration();
+        final var configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(corsProperties.getAllowedOrigins());
         configuration.setAllowedMethods(corsProperties.getAllowedMethods());
         configuration.setAllowedHeaders(corsProperties.getAllowedHeaders());
         configuration.setAllowCredentials(corsProperties.isAllowCredentials());
 
-        var source = new UrlBasedCorsConfigurationSource();
+        final var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }

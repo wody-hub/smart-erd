@@ -41,9 +41,9 @@ public class JwtTokenService {
      * @return 서명된 JWT 토큰 문자열
      */
     public String generateToken(String loginId) {
-        var now = Instant.now();
-        var header = JwsHeader.with(MacAlgorithm.HS256).build();
-        var claims = JwtClaimsSet.builder()
+        final var now = Instant.now();
+        final var header = JwsHeader.with(MacAlgorithm.HS256).build();
+        final var claims = JwtClaimsSet.builder()
             .subject(loginId)
             .issuedAt(now)
             .expiresAt(now.plusMillis(jwtProperties.getExpiration()))

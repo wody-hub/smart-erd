@@ -65,7 +65,7 @@ public class JwtConfig {
      * @return HMAC-SHA256 SecretKey
      */
     private SecretKey secretKey(JwtProperties jwtProperties) {
-        var keyBytes = Base64.getDecoder().decode(jwtProperties.getSecret());
+        final var keyBytes = Base64.getDecoder().decode(jwtProperties.getSecret());
         return new SecretKeySpec(keyBytes, "HmacSHA256");
     }
 }
