@@ -18,6 +18,7 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 | 데이터 페칭 | @tanstack/react-query 5 (useQuery, useMutation, 캐시 무효화)                   |
 | API 문서    | springdoc-openapi (Swagger UI)                                                 |
 | ERD 캔버스  | @xyflow/react 12, Zustand 5                                                    |
+| 자동 배치   | dagre 0.8                                                                |
 | 에디터      | @monaco-editor/react 4.6                                                       |
 | 단축키      | react-hotkeys-hook 5                                                           |
 | 다국어      | i18next, react-i18next, i18next-browser-languagedetector (FE) + Spring MessageSource (BE) |
@@ -136,8 +137,8 @@ client/
     │   ├── index.ts                 # i18next 초기화 (LanguageDetector + initReactI18next)
     │   ├── i18next.d.ts             # 타입 확장 (번역 키 자동완성)
     │   └── locales/
-    │       ├── en/translation.json  # 영어 번역 (~102 키)
-    │       └── ko/translation.json  # 한국어 번역 (~102 키)
+    │       ├── en/translation.json  # 영어 번역 (~117 키)
+    │       └── ko/translation.json  # 한국어 번역 (~117 키)
     ├── api/
     │   ├── axiosInstance.ts         # baseURL: /api, JWT 자동 첨부 + 401 Refresh Token 갱신 (큐 패턴)
     │   ├── authApi.ts               # login(), signup()
@@ -150,13 +151,17 @@ client/
     │   ├── routes.ts                # ROUTES — 라우트 경로 상수 (정적 + 파라미터)
     │   └── query-keys.ts            # queryKeys — React Query 캐시 키 계층 구조
     ├── hooks/
-    │   └── useInlineEdit.ts         # 인라인 텍스트 편집 공통 훅
+    │   ├── useInlineEdit.ts         # 인라인 텍스트 편집 공통 훅
+    │   └── useFkConnectMode.ts      # FK 연결 모드 상태/로직 캡슐화 훅
     ├── components/
     │   ├── auth/
     │   │   └── ProtectedRoute.tsx   # 인증 가드 (미인증 시 /login 리다이렉트)
     │   ├── erd/
-    │   │   ├── ERDCanvas.tsx        # @xyflow/react 캔버스 (16x16 그리드 스냅, MiniMap, Controls, step edge)
-    │   │   └── TableNode.tsx        # 커스텀 노드: 테이블 헤더 + 컬럼 행 (PK/FK 뱃지, 좌우 Handle)
+    │   │   ├── ERDCanvas.tsx        # @xyflow/react 캔버스 (FK 연결, 엣지 삭제, 자동 배치, 하이라이트)
+    │   │   ├── TableNode.tsx        # 커스텀 노드: 테이블 헤더 + 컬럼 행 (PK/FK 뱃지, 좌우 Handle)
+    │   │   ├── CanvasToolbar.tsx    # 플로팅 툴바 (FK Connect + Auto Layout 버튼)
+    │   │   ├── EdgeContextMenu.tsx  # 엣지 우클릭 컨텍스트 메뉴 (삭제)
+    │   │   └── DeleteEdgeDialog.tsx # 엣지 삭제 다이얼로그 (FK 제거/유지/취소 3버튼)
     │   ├── layout/
     │   │   ├── Header.tsx           # 상단 고정 헤더 (bg-header, 사용자명, 로그아웃, 다이어그램 Save)
     │   │   ├── LanguageSwitcher.tsx  # 언어 전환 드롭다운 (ko/en)
@@ -177,7 +182,8 @@ client/
     ├── lib/
     │   ├── utils.ts                 # cn() = clsx + tailwind-merge
     │   ├── api-error.ts             # getErrorMessage() — 서버 에러 메시지 추출
-    │   └── query-client.ts          # QueryClient 설정 (staleTime: 30s, retry: 1)
+    │   ├── query-client.ts          # QueryClient 설정 (staleTime: 30s, retry: 1)
+    │   └── auto-layout.ts           # dagre 기반 자동 배치 순수 함수 (LR 방향)
     ├── pages/                       # 도메인별 페이지 디렉토리
     │   ├── auth/
     │   │   ├── LoginPage.tsx        # 로그인 폼 (useMutation + authApi, 성공 시 /teams 이동)
@@ -726,6 +732,40 @@ ERD 편집기 영역(Header, Sidebar, TableNode, ERDCanvas)에서 사용하는 �
 - Edge ID: `e-{sourceHandle}-{targetHandle}`
 - Edge 타입: `step` (직각 연결), `MarkerType.ArrowClosed`
 - 상태: Zustand `useCanvasStore` — `serialize()` → JSON 문자열 → `Diagram.content` (TEXT)
+
+#### FK 연결 모드
+
+플로팅 툴바의 **FK Connect** 버튼으로 진입한다. 부모 테이블(PK 소스) → 자식 테이블(FK 대상) 순서로 클릭하면, 부모의 PK 컬럼을 기반으로 자식 테이블에 FK 컬럼과 엣지가 자동 생성된다.
+
+- FK 컬럼명: `{부모테이블명소문자}_{PK컬럼명}` (예: `users_id`). 중복 시 `_1`, `_2` suffix 추가
+- 복합 PK: 각 PK 컬럼에 대해 FK 컬럼 + 엣지 개별 생성
+- 자기 참조 허용 (동일 테이블 FK)
+- 부모에 PK 없으면 `toast.error` 표시, Escape 키로 모드 해제
+
+#### 엣지 상호작용
+
+- **클릭**: 엣지 + 양쪽 테이블 노드 하이라이트 (엣지: `stroke: primary, animated`, 노드: `ring-2 ring-primary`)
+- **Delete/Backspace**: 하이라이트된 엣지에 삭제 다이얼로그 표시. 3버튼: FK 제거(destructive) / FK 유지(outline) / 취소(ghost)
+- **우클릭**: 컨텍스트 메뉴 표시 → 삭제 다이얼로그
+- **빈 영역 클릭**: 모든 하이라이트 해제
+- React Flow의 기본 Delete 동작은 `deleteKeyCode={null}`로 비활성화
+
+#### 자동 배치
+
+플로팅 툴바의 **Auto Layout** 버튼으로 실행한다. `dagre` 알고리즘으로 좌→우(`LR`) 방향 자동 배치.
+
+- 노드 크기: width 280px, height = 40(헤더) + 컬럼수 × 28(행) + 32(푸터)
+- 간격: nodesep 80px, ranksep 120px, margin 40px
+
+#### 키보드 단축키
+
+| 단축키 | 상수 | 동작 |
+|--------|------|------|
+| `Ctrl+S` / `Cmd+S` | `KEYBINDINGS.SAVE` | 다이어그램 서버 저장 |
+| `Delete` / `Backspace` | `KEYBINDINGS.DELETE` | 선택된 엣지 삭제 다이얼로그 |
+| `Escape` | `KEYBINDINGS.ESCAPE` | FK 모드 해제, 컨텍스트 메뉴 닫기 |
+
+모든 키보드 단축키는 `constants/keybindings.ts`의 `KEYBINDINGS` 상수로 관리하고 `react-hotkeys-hook`의 `useHotkeys()`를 통해 등록한다. 네이티브 `addEventListener('keydown')` + 매직 스트링(`'Escape'` 등)은 사용 금지.
 
 ### 라우팅
 

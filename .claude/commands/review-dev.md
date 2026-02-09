@@ -81,7 +81,8 @@
 - [ ] localStorage 키: `STORAGE_KEYS.*` 사용 여부
 - [ ] 라우트 경로: `ROUTES.*` 사용 여부
 - [ ] 쿼리 키: `queryKeys.*` 사용 여부
-- [ ] 인라인 문자열 리터럴로 위 3종이 사용되고 있지 않은지 확인
+- [ ] 키보드 단축키: `KEYBINDINGS.*` + `useHotkeys()` 사용 여부 (네이티브 `addEventListener('keydown')` + 매직 스트링(`'Escape'`, `'Delete'` 등) 사용 금지)
+- [ ] 인라인 문자열 리터럴로 위 4종이 사용되고 있지 않은지 확인
 
 ### 4. 타입 공유 (MUST)
 

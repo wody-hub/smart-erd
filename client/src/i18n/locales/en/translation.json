@@ -163,6 +163,32 @@
         "deleteTable": "Delete table {{name}}"
       }
     },
+    "toolbar": {
+      "fkConnect": "FK Connect",
+      "fkConnectActive": "FK Connect (Active)",
+      "autoLayout": "Auto Layout",
+      "export": "Export"
+    },
+    "export": {
+      "noNodes": "No tables to export",
+      "success": "Diagram exported successfully",
+      "failed": "Failed to export diagram"
+    },
+    "fkMode": {
+      "selectParent": "Select parent table (PK source)",
+      "selectChild": "Select child table (FK target)",
+      "noPk": "Selected table has no primary key columns",
+      "success": "FK relationship created ({{count}} columns)",
+      "cancelled": "FK connection cancelled"
+    },
+    "edge": {
+      "deleteTitle": "Delete Connection",
+      "deleteDescription": "How would you like to handle the FK columns in \"{{childTable}}\"?",
+      "fkColumns": "FK columns: {{columns}}",
+      "removeFk": "Remove FK",
+      "keepFk": "Keep FK",
+      "contextDelete": "Delete connection"
+    },
     "tableNode": {
       "addColumn": "Add Column",
       "title": {

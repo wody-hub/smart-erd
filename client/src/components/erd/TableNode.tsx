@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import type { TableNode as TableNodeType } from '@/types/erd';
 import useCanvasStore from '@/stores/useCanvasStore';
 import { useInlineEdit } from '@/hooks/useInlineEdit';
+import { cn } from '@/lib/utils';
 
 /**
  * ERD 테이블 커스텀 노드 컴포넌트.
@@ -25,6 +26,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const addColumn = useCanvasStore((s) => s.addColumn);
   const deleteColumn = useCanvasStore((s) => s.deleteColumn);
   const updateColumn = useCanvasStore((s) => s.updateColumn);
+  const isHighlighted = useCanvasStore((s) => s.highlightedNodeIds.includes(id));
 
   /** 테이블 이름 변경 핸들러. @param value 새 테이블 이름 */
   const handleRename = (value: string) => renameTable(id, value);
@@ -33,7 +35,12 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
     useInlineEdit(handleRename);
 
   return (
-    <div className="bg-card border border-border rounded shadow-md min-w-[200px]">
+    <div
+      className={cn(
+        'bg-card border border-border rounded shadow-md min-w-[200px]',
+        isHighlighted && 'ring-2 ring-primary shadow-lg',
+      )}
+    >
       {/* Table header */}
       {editing ? (
         <div className="bg-erd-table-header px-3 py-2 rounded-t">

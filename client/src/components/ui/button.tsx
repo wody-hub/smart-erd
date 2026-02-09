@@ -47,4 +47,4 @@ function Button({
   return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />;
 }
 
-export { Button, buttonVariants };
+export { Button };

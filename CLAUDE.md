@@ -146,8 +146,8 @@ client/
     │   ├── index.ts                 # i18next initialization (LanguageDetector + initReactI18next)
     │   ├── i18next.d.ts             # Type augmentation (translation key autocomplete)
     │   └── locales/
-    │       ├── en/translation.json  # English translations (~102 keys)
-    │       └── ko/translation.json  # Korean translations (~102 keys)
+    │       ├── en/translation.json  # English translations (~117 keys)
+    │       └── ko/translation.json  # Korean translations (~117 keys)
     ├── api/
     │   ├── axiosInstance.ts         # baseURL: /api, JWT auto-attach + 401 Refresh Token rotation
     │   ├── authApi.ts               # login(), signup()
@@ -160,13 +160,17 @@ client/
     │   ├── routes.ts                # ROUTES — route path constants (static + parameterized)
     │   └── query-keys.ts            # queryKeys — React Query cache key hierarchy
     ├── hooks/
-    │   └── useInlineEdit.ts         # Inline text editing hook (startEdit, confirmEdit, cancelEdit)
+    │   ├── useInlineEdit.ts         # Inline text editing hook (startEdit, confirmEdit, cancelEdit)
+    │   └── useFkConnectMode.ts      # FK connect mode state/logic hook (parent→child 2-click flow)
     ├── components/
     │   ├── auth/
     │   │   └── ProtectedRoute.tsx   # Auth guard (redirects to /login if no token)
     │   ├── erd/
-    │   │   ├── ERDCanvas.tsx        # @xyflow/react canvas (16x16 grid snap, MiniMap, Controls, step edge)
-    │   │   └── TableNode.tsx        # Custom node: table header + column rows (PK/FK badges, L/R handles)
+    │   │   ├── ERDCanvas.tsx        # @xyflow/react canvas (FK connect, edge deletion, auto layout, highlights)
+    │   │   ├── TableNode.tsx        # Custom node: table header + column rows (PK/FK badges, L/R handles)
+    │   │   ├── CanvasToolbar.tsx    # Floating toolbar (FK Connect + Auto Layout buttons)
+    │   │   ├── EdgeContextMenu.tsx  # Edge right-click context menu (delete)
+    │   │   └── DeleteEdgeDialog.tsx # Edge deletion dialog (Remove FK / Keep FK / Cancel)
     │   ├── layout/
     │   │   ├── Header.tsx           # Top header (h-12, bg-header, user name + logout + save)
     │   │   ├── LanguageSwitcher.tsx  # Language switching dropdown (ko/en)
@@ -187,7 +191,8 @@ client/
     ├── lib/
     │   ├── utils.ts                 # cn() = clsx + tailwind-merge
     │   ├── api-error.ts             # getErrorMessage() — server error message extraction
-    │   └── query-client.ts          # QueryClient (staleTime: 30s, retry: 1, refetchOnWindowFocus: false)
+    │   ├── query-client.ts          # QueryClient (staleTime: 30s, retry: 1, refetchOnWindowFocus: false)
+    │   └── auto-layout.ts           # dagre-based auto layout pure function (LR direction)
     ├── pages/                       # Domain-based page directories
     │   ├── auth/
     │   │   ├── LoginPage.tsx        # Login form (useMutation + authApi, redirects to /teams on success)
@@ -249,8 +254,11 @@ baseURL: /api  →  Vite 프록시  →  localhost:8080
 
 - **Handle IDs:** `{nodeId}-{colId}-source` / `{nodeId}-{colId}-target` — enables column-level relationships
 - **Edge IDs:** `e-{sourceHandle}-{targetHandle}`
+- **extractColId helper:** `extractColId(handleId, nodeId)` — Handle ID에서 컬럼 ID를 추출하는 exported 함수 (`useCanvasStore.ts`)
 - **Diagram persistence:** `useCanvasStore.serialize()` → JSON string stored in `Diagram.content` (TEXT)
 - **Type assertion needed:** `applyNodeChanges()` returns generic `Node[]`, must cast to `Node<TableNodeData>[]`
+- **Keyboard shortcuts:** 모든 단축키는 `constants/keybindings.ts`의 `KEYBINDINGS` 상수로 정의하고, `react-hotkeys-hook`의 `useHotkeys(KEYBINDINGS.*, handler)` 패턴으로 등록. 네이티브 `addEventListener('keydown')` + 매직 스트링(`'Escape'`, `'Delete'` 등) 사용 금지.
+- **KEYBINDINGS registry:** `SAVE` (`mod+s`), `DELETE` (`delete, backspace`), `ESCAPE` (`escape`)
 
 ### Entity Relationships
 
@@ -366,6 +374,7 @@ Accept-Language: ko → { "error": "사용자를 찾을 수 없습니다: testus
 | Frontend      | React 19, TypeScript 5.6, Vite 6, Tailwind CSS 3.4, shadcn/ui                    |
 | Data Fetching | @tanstack/react-query 5 (useQuery, useMutation, cache invalidation)              |
 | ERD Canvas    | @xyflow/react 12, Zustand 5                                                      |
+| Auto Layout   | dagre 0.8                                                                  |
 | Editor        | @monaco-editor/react 4.6                                                         |
 | Shortcuts     | react-hotkeys-hook 5                                                             |
 | i18n          | i18next, react-i18next, i18next-browser-languagedetector (FE) + Spring MessageSource (BE) |
@@ -520,6 +529,7 @@ const createMutation = useMutation({
 - localStorage keys → `STORAGE_KEYS.*`
 - Route paths → `ROUTES.*`
 - React Query cache keys → `queryKeys.*`
+- Keyboard shortcuts → `KEYBINDINGS.*` + `useHotkeys()` (네이티브 `addEventListener('keydown')` + 매직 스트링 금지)
 - Inline string literals for these are forbidden.
 
 #### Types — Shared Definitions
@@ -535,6 +545,7 @@ const createMutation = useMutation({
 - `MembersDialog` — team member management (uses React Query internally)
 - `Spinner` — loading spinner (Loader2 animate-spin + optional text)
 - `useInlineEdit` hook — inline text editing pattern (SidebarTableItem, TableNode)
+- `useFkConnectMode` hook — FK connection mode state/logic (2-click parent→child flow, column auto-naming)
 
 #### Styling — Design Token System (MUST follow)
 

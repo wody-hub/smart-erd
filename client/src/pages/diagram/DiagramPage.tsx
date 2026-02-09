@@ -115,7 +115,7 @@ export default function DiagramPage() {
         <div className="flex flex-1 overflow-hidden">
           <Sidebar />
           <main className="flex-1">
-            <ERDCanvas />
+            <ERDCanvas diagramName={diagramName || 'diagram'} />
           </main>
         </div>
       </div>
