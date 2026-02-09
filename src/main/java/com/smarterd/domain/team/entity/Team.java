@@ -19,6 +19,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 
 /**
  * 팀 엔티티.
@@ -46,8 +47,9 @@ public class Team extends BaseTimeEntity {
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
-    /** 팀 구성원 목록 (cascade PERSIST/MERGE, orphanRemoval) */
+    /** 팀 구성원 목록 (cascade PERSIST/MERGE, orphanRemoval, 배치 로딩 50) */
     @OneToMany(mappedBy = "team", cascade = { CascadeType.PERSIST, CascadeType.MERGE }, orphanRemoval = true)
+    @BatchSize(size = 50)
     private List<TeamMember> members = new ArrayList<>();
 
     /**

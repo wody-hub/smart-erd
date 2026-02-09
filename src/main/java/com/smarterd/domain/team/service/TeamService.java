@@ -78,7 +78,7 @@ public class TeamService {
     public List<TeamResponse> getMyTeams(String loginId) {
         final var user = authService.findUserByLoginId(loginId);
         return teamMemberRepository
-            .findByUser(user)
+            .findByUserWithTeamAndOwner(user)
             .stream()
             .map((m) -> TeamResponse.from(m.getTeam()))
             .toList();
@@ -206,7 +206,7 @@ public class TeamService {
      */
     public Team findTeamById(Long teamId) {
         return teamRepository
-            .findById(teamId)
+            .findByIdWithOwner(teamId)
             .orElseThrow(() -> new EntityNotFoundException("Team not found: " + teamId));
     }
 

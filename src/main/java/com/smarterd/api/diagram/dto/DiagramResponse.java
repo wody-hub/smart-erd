@@ -28,14 +28,17 @@ public record DiagramResponse(
     /**
      * Diagram 엔티티로부터 목록용 응답 DTO를 생성한다.
      *
-     * @param diagram Diagram 엔티티
+     * <p>{@code projectId}를 직접 받아 LAZY 프록시 초기화를 방지한다.</p>
+     *
+     * @param diagram   Diagram 엔티티
+     * @param projectId 소속 프로젝트 ID
      * @return DiagramResponse
      */
-    public static DiagramResponse from(Diagram diagram) {
+    public static DiagramResponse from(Diagram diagram, Long projectId) {
         return new DiagramResponse(
             diagram.getId(),
             diagram.getName(),
-            diagram.getProject().getId(),
+            projectId,
             diagram.getCreatedAt(),
             diagram.getUpdatedAt()
         );

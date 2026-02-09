@@ -58,7 +58,7 @@ public class DiagramService {
         final var diagram = Diagram.builder().name(request.name()).project(project).build();
         diagramRepository.save(diagram);
 
-        return DiagramResponse.from(diagram);
+        return DiagramResponse.from(diagram, project.getId());
     }
 
     /**
@@ -71,8 +71,13 @@ public class DiagramService {
      */
     public List<DiagramResponse> getDiagrams(String loginId, Long teamId, Long projectId) {
         final var project = verifyAccess(loginId, teamId, projectId);
+        final var pid = project.getId();
 
-        return diagramRepository.findByProject(project).stream().map(DiagramResponse::from).toList();
+        return diagramRepository
+            .findByProject(project)
+            .stream()
+            .map((d) -> DiagramResponse.from(d, pid))
+            .toList();
     }
 
     /**
@@ -88,7 +93,7 @@ public class DiagramService {
         final var project = verifyAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
 
-        return DiagramDetailResponse.from(diagram);
+        return DiagramDetailResponse.from(diagram, project.getId());
     }
 
     /**
@@ -114,7 +119,7 @@ public class DiagramService {
 
         diagram.updateContent(request.content());
 
-        return DiagramDetailResponse.from(diagram);
+        return DiagramDetailResponse.from(diagram, project.getId());
     }
 
     /**
@@ -140,7 +145,7 @@ public class DiagramService {
 
         diagram.rename(request.name());
 
-        return DiagramResponse.from(diagram);
+        return DiagramResponse.from(diagram, project.getId());
     }
 
     /**

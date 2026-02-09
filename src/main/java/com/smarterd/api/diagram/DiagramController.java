@@ -133,7 +133,7 @@ public class DiagramController {
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
         @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
         @Parameter(description = "다이어그램 ID") @PathVariable Long diagramId,
-        @RequestBody SaveDiagramRequest request
+        @Valid @RequestBody SaveDiagramRequest request
     ) {
         return ResponseEntity.ok(diagramService.saveDiagram(jwt.getSubject(), teamId, projectId, diagramId, request));
     }

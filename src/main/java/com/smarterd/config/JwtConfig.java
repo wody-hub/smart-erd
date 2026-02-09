@@ -4,6 +4,8 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import java.util.Base64;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +24,8 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
  */
 @Configuration
 public class JwtConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtConfig.class);
 
     /**
      * JWT 프로퍼티를 {@code application.yml}의 {@code smart-erd.jwt} 접두사로 바인딩한다.
@@ -65,6 +69,14 @@ public class JwtConfig {
      * @return HMAC-SHA256 SecretKey
      */
     private SecretKey secretKey(JwtProperties jwtProperties) {
+        if (jwtProperties.isUsingDefaultSecret()) {
+            log.warn(
+                "========================================\n" +
+                    "  [SECURITY] JWT secret이 개발 환경 기본값입니다.\n" +
+                    "  프로덕션 배포 시 반드시 SMART_ERD_JWT_SECRET 환경 변수를 설정하세요.\n" +
+                    "========================================"
+            );
+        }
         final var keyBytes = Base64.getDecoder().decode(jwtProperties.getSecret());
         return new SecretKeySpec(keyBytes, "HmacSHA256");
     }
