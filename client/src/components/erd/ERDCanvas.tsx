@@ -54,7 +54,11 @@ export default function ERDCanvas() {
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
         <Controls />
-        <MiniMap nodeStrokeColor="#666" nodeColor="#fff" nodeBorderRadius={4} />
+        <MiniMap
+          nodeStrokeColor="hsl(var(--muted-foreground))"
+          nodeColor="hsl(var(--card))"
+          nodeBorderRadius={4}
+        />
       </ReactFlow>
     </div>
   );

@@ -31,12 +31,12 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
     useInlineEdit(handleRename);
 
   return (
-    <div className="bg-white border border-gray-300 rounded shadow-md min-w-[200px]">
+    <div className="bg-card border border-border rounded shadow-md min-w-[200px]">
       {/* Table header */}
       {editing ? (
-        <div className="bg-blue-600 px-3 py-2 rounded-t">
+        <div className="bg-erd-table-header px-3 py-2 rounded-t">
           <input
-            className="nodrag bg-transparent text-white font-semibold text-sm w-full outline-none placeholder-blue-200"
+            className="nodrag bg-transparent text-erd-table-header-foreground font-semibold text-sm w-full outline-none placeholder-erd-table-header-foreground/50"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onBlur={confirmEdit}
@@ -45,11 +45,12 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
               if (e.key === 'Escape') cancelEdit();
             }}
             autoFocus
+            aria-label="Table name"
           />
         </div>
       ) : (
         <div
-          className="bg-blue-600 text-white px-3 py-2 rounded-t font-semibold text-sm cursor-pointer select-none"
+          className="bg-erd-table-header text-erd-table-header-foreground px-3 py-2 rounded-t font-semibold text-sm cursor-pointer select-none"
           onDoubleClick={() => startEdit(label)}
         >
           {label}
@@ -57,7 +58,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
       )}
 
       {/* Columns */}
-      <div className="divide-y divide-gray-200">
+      <div className="divide-y divide-border">
         {columns.map((col) => (
           <div
             key={col.id}
@@ -67,55 +68,61 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
               type="target"
               position={Position.Left}
               id={`${id}-${col.id}-target`}
-              className="!w-2 !h-2 !bg-gray-400 !border-gray-500"
+              className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
             />
 
             {/* PK toggle */}
             <button
-              className={`nodrag w-5 text-center font-bold text-[10px] cursor-pointer ${col.pk ? 'text-yellow-600' : 'text-gray-300 hover:text-yellow-500'}`}
+              className={`nodrag w-5 text-center font-bold text-[10px] cursor-pointer ${col.pk ? 'text-erd-pk' : 'text-muted-foreground/40 hover:text-erd-pk/80'}`}
               onClick={() => updateColumn(id, col.id, { pk: !col.pk })}
               title="Toggle PK"
+              aria-label={`Toggle primary key for ${col.name}`}
             >
               PK
             </button>
 
             {/* FK toggle */}
             <button
-              className={`nodrag w-5 text-center font-bold text-[10px] cursor-pointer ${col.fk ? 'text-blue-600' : 'text-gray-300 hover:text-blue-500'}`}
+              className={`nodrag w-5 text-center font-bold text-[10px] cursor-pointer ${col.fk ? 'text-erd-fk' : 'text-muted-foreground/40 hover:text-erd-fk/80'}`}
               onClick={() => updateColumn(id, col.id, { fk: !col.fk })}
               title="Toggle FK"
+              aria-label={`Toggle foreign key for ${col.name}`}
             >
               FK
             </button>
 
             {/* Column name */}
             <input
-              className="nodrag flex-1 font-mono bg-transparent outline-none hover:bg-gray-50 focus:bg-gray-100 px-1 rounded min-w-0"
+              className="nodrag flex-1 font-mono bg-transparent outline-none hover:bg-accent focus:bg-accent px-1 rounded min-w-0"
               value={col.name}
               onChange={(e) => updateColumn(id, col.id, { name: e.target.value })}
+              aria-label="Column name"
             />
 
             {/* Column type */}
             <input
-              className="nodrag w-24 font-mono text-gray-400 bg-transparent outline-none hover:bg-gray-50 focus:bg-gray-100 px-1 rounded text-right"
+              className="nodrag w-24 font-mono text-muted-foreground bg-transparent outline-none hover:bg-accent focus:bg-accent px-1 rounded text-right"
               value={col.type}
               onChange={(e) => updateColumn(id, col.id, { type: e.target.value })}
+              aria-label="Column type"
             />
 
             {/* Nullable toggle */}
             <button
-              className={`nodrag text-[10px] cursor-pointer w-4 text-center ${col.nullable ? 'text-green-600' : 'text-gray-300 hover:text-green-500'}`}
+              className={`nodrag text-[10px] cursor-pointer w-4 text-center ${col.nullable ? 'text-erd-nullable' : 'text-muted-foreground/40 hover:text-erd-nullable/80'}`}
               onClick={() => updateColumn(id, col.id, { nullable: !col.nullable })}
               title="Toggle nullable"
+              aria-label={`Toggle nullable for ${col.name}`}
             >
               N
             </button>
 
             {/* Delete column */}
             <button
-              className="nodrag opacity-0 group-hover/col:opacity-100 transition-opacity text-gray-400 hover:text-red-500 cursor-pointer"
+              className="nodrag opacity-0 group-hover/col:opacity-100 transition-opacity text-muted-foreground hover:text-destructive cursor-pointer"
               onClick={() => deleteColumn(id, col.id)}
               title="Delete column"
+              aria-label={`Delete column ${col.name}`}
             >
               <X className="h-3 w-3" />
             </button>
@@ -124,16 +131,16 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
               type="source"
               position={Position.Right}
               id={`${id}-${col.id}-source`}
-              className="!w-2 !h-2 !bg-gray-400 !border-gray-500"
+              className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
             />
           </div>
         ))}
       </div>
 
       {/* Add column button */}
-      <div className="border-t border-gray-200">
+      <div className="border-t border-border">
         <button
-          className="nodrag w-full px-3 py-1 text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-1 cursor-pointer"
+          className="nodrag w-full px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent flex items-center justify-center gap-1 cursor-pointer"
           onClick={() => addColumn(id)}
         >
           <Plus className="h-3 w-3" />

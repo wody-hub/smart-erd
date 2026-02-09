@@ -24,6 +24,19 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+
+    --header-bg: 222.2 84% 4.9%;
+    --header-foreground: 210 40% 98%;
+    --header-muted: 215 20.2% 65.1%;
+
+    --erd-table-header: 221.2 83.2% 53.3%;
+    --erd-table-header-foreground: 0 0% 100%;
+    --erd-pk: 45.4 93.4% 47.5%;
+    --erd-fk: 221.2 83.2% 53.3%;
+    --erd-nullable: 142.1 76.2% 36.3%;
+    --erd-handle: 215 16.3% 46.9%;
+    --erd-handle-border: 215.4 16.3% 36.9%;
+    --erd-warning: 47.9 95.8% 53.1%;
   }
 
   .dark {
@@ -46,6 +59,19 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    --header-bg: 222.2 84% 4.9%;
+    --header-foreground: 210 40% 98%;
+    --header-muted: 215 20.2% 65.1%;
+
+    --erd-table-header: 217.2 91.2% 59.8%;
+    --erd-table-header-foreground: 0 0% 100%;
+    --erd-pk: 47.9 95.8% 53.1%;
+    --erd-fk: 217.2 91.2% 59.8%;
+    --erd-nullable: 142.1 70.6% 45.3%;
+    --erd-handle: 215 20.2% 65.1%;
+    --erd-handle-border: 215 20.2% 55.1%;
+    --erd-warning: 47.9 95.8% 53.1%;
   }
 }
 

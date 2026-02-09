@@ -48,10 +48,22 @@ export default function SidebarTableItem({
             if (e.key === 'Escape') cancelEdit();
           }}
         />
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={confirmEdit}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          onClick={confirmEdit}
+          aria-label="Confirm rename"
+        >
           <Check className="h-3 w-3" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={cancelEdit}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          onClick={cancelEdit}
+          aria-label="Cancel rename"
+        >
           <X className="h-3 w-3" />
         </Button>
       </div>
@@ -60,7 +72,7 @@ export default function SidebarTableItem({
 
   return (
     <div
-      className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-200 cursor-pointer group"
+      className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-accent cursor-pointer group"
       onClick={onClick}
     >
       <span className="text-sm truncate flex-1">{label}</span>
@@ -73,6 +85,7 @@ export default function SidebarTableItem({
             e.stopPropagation();
             startEdit(label);
           }}
+          aria-label={`Rename table ${label}`}
         >
           <Pencil className="h-3 w-3 text-muted-foreground" />
         </Button>
@@ -84,6 +97,7 @@ export default function SidebarTableItem({
             e.stopPropagation();
             onDelete();
           }}
+          aria-label={`Delete table ${label}`}
         >
           <Trash2 className="h-3 w-3 text-destructive" />
         </Button>

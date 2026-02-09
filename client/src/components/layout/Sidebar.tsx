@@ -29,15 +29,18 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-56 bg-gray-50 border-r border-gray-200 p-4 shrink-0 flex flex-col">
+    <aside className="w-56 bg-muted border-r border-border p-4 shrink-0 flex flex-col">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Tables</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Tables
+        </h2>
         <Button
           variant="ghost"
           size="icon"
           className="h-6 w-6"
           onClick={() => addTable()}
           title="Add table"
+          aria-label="Add table"
         >
           <Plus className="h-4 w-4" />
         </Button>
@@ -45,7 +48,7 @@ export default function Sidebar() {
 
       <div className="flex-1 overflow-auto space-y-0.5">
         {nodes.length === 0 ? (
-          <p className="text-xs text-gray-400">No tables yet</p>
+          <p className="text-xs text-muted-foreground">No tables yet</p>
         ) : (
           nodes.map((node) => (
             <SidebarTableItem

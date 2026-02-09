@@ -43,6 +43,21 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        header: {
+          DEFAULT: "hsl(var(--header-bg))",
+          foreground: "hsl(var(--header-foreground))",
+          muted: "hsl(var(--header-muted))",
+        },
+        erd: {
+          "table-header": "hsl(var(--erd-table-header))",
+          "table-header-foreground": "hsl(var(--erd-table-header-foreground))",
+          pk: "hsl(var(--erd-pk))",
+          fk: "hsl(var(--erd-fk))",
+          nullable: "hsl(var(--erd-nullable))",
+          handle: "hsl(var(--erd-handle))",
+          "handle-border": "hsl(var(--erd-handle-border))",
+          warning: "hsl(var(--erd-warning))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

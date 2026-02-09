@@ -39,17 +39,17 @@ export default function Header({ diagramName, onSave, saving, isDirty }: HeaderP
   };
 
   return (
-    <header className="h-12 bg-gray-900 text-white flex items-center px-4 shrink-0">
+    <header className="h-12 bg-header text-header-foreground flex items-center px-4 shrink-0">
       <h1 className="text-lg font-bold cursor-pointer" onClick={() => navigate(ROUTES.TEAMS)}>
         Smart ERD
       </h1>
 
       {diagramName && (
         <div className="ml-4 flex items-center gap-2">
-          <span className="text-sm text-gray-400">/</span>
+          <span className="text-sm text-header-muted">/</span>
           <span className="text-sm font-medium">{diagramName}</span>
           {isDirty && (
-            <span className="text-xs text-yellow-400" title="Unsaved changes">
+            <span className="text-xs text-erd-warning" title="Unsaved changes">
               (unsaved)
             </span>
           )}
@@ -59,7 +59,7 @@ export default function Header({ diagramName, onSave, saving, isDirty }: HeaderP
               size="sm"
               onClick={onSave}
               disabled={saving || !isDirty}
-              className="text-gray-300 hover:text-white hover:bg-gray-800 ml-1"
+              className="text-header-muted hover:text-header-foreground hover:bg-header/80 ml-1"
             >
               <Save className="h-4 w-4 mr-1" />
               {saving ? 'Saving...' : 'Save'}
@@ -70,12 +70,12 @@ export default function Header({ diagramName, onSave, saving, isDirty }: HeaderP
 
       {isAuthenticated && (
         <div className="ml-auto flex items-center gap-3">
-          <span className="text-sm text-gray-300">{name}</span>
+          <span className="text-sm text-header-muted">{name}</span>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleLogout}
-            className="text-gray-300 hover:text-white hover:bg-gray-800"
+            className="text-header-muted hover:text-header-foreground hover:bg-header/80"
           >
             Logout
           </Button>
