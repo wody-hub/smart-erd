@@ -14,7 +14,7 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 | 인증        | Spring OAuth2 Resource Server (HMAC-SHA256 JWT), BCrypt                        |
 | 쿼리        | QueryDSL 5.1.0:jakarta, Blaze-Persistence 1.6.17                               |
 | DB          | PostgreSQL 17 (Docker), Testcontainers (test), `ddl-auto: update`              |
-| Frontend    | React 18, TypeScript 5.6, Vite 6, Tailwind CSS 3.4, shadcn/ui                  |
+| Frontend    | React 19, TypeScript 5.6, Vite 6, Tailwind CSS 3.4, shadcn/ui                  |
 | 데이터 페칭 | @tanstack/react-query 5 (useQuery, useMutation, 캐시 무효화)                   |
 | API 문서    | springdoc-openapi (Swagger UI)                                                 |
 | ERD 캔버스  | @xyflow/react 12, Zustand 5                                                    |
@@ -398,7 +398,7 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 - ESM 전용 (`"type": "module"`) — `require()` 사용 금지, ESM import만 사용
 - `@/` alias로 import (`@/components/ui/button`, `@/lib/utils`)
 - 상태 관리: 클라이언트 상태는 Zustand (`stores/`), 서버 상태는 React Query (`useQuery`/`useMutation`)
-- shadcn/ui 컴포넌트 추가 시: `components/ui/`에 파일 생성, `cn()` 사용, `forwardRef` 패턴 적용
+- shadcn/ui 컴포넌트 추가 시: `components/ui/`에 파일 생성, `cn()` 사용, `ref`는 일반 prop으로 전달 (`forwardRef` 사용 금지 — React 19)
 - **하드코딩 색상 금지**: `bg-gray-*`, `text-blue-*`, `#hex` 등 Tailwind 기본 팔레트 직접 사용 금지. `index.css` CSS Variable → `tailwind.config.js` 시맨틱 매핑 → 컴포넌트에서 시맨틱 클래스 사용
 - 아이콘 전용 버튼에 `aria-label` 필수, 로딩 상태는 `Spinner` 컴포넌트 사용
 
@@ -641,7 +641,7 @@ ERD 편집기 영역(Header, Sidebar, TableNode, ERDCanvas)에서 사용하는 �
 2. `tailwind.config.js`의 `colors`에 `hsl(var(--token-name))` 매핑
 3. 컴포넌트에서 시맨틱 클래스 사용 (예: `bg-erd-table-header`)
 
-새 shadcn/ui 컴포넌트 추가 시: `components/ui/`에 파일 생성, `cn()` 사용, forwardRef 패턴 적용.
+새 shadcn/ui 컴포넌트 추가 시: `components/ui/`에 파일 생성, `cn()` 사용, `ref`는 일반 prop으로 전달 (`forwardRef` 사용 금지 — React 19).
 
 ### 접근성 (a11y)
 
