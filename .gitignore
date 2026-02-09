@@ -9,7 +9,7 @@ bin/
 *.iml
 *.ipr
 *.iws
-.vscode/
+.vscode/settings.local.json
 *.swp
 *.swo
 

@@ -1,0 +1,40 @@
+{
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.autobuild.enabled": true,
+    "cSpell.words": [
+        "blazebit",
+        "CLOB",
+        "gradlew",
+        "HMAC",
+        "jdbc",
+        "projectlombok",
+        "querydsl",
+        "signup",
+        "smarterd",
+        "springframework",
+        "xyflow"
+    ],
+    "java.format.settings.url": ".vscode/java-formatter.xml",
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 1000,
+    "files.insertFinalNewline": true,
+    "files.trimTrailingWhitespace": true,
+    "[java]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        }
+    },
+    "[typescript][typescriptreact]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        }
+    }
+}

@@ -1,39 +1,134 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import type { TableNode as TableNodeType } from '../../types/erd';
+import { Plus, X } from 'lucide-react';
+import type { TableNode as TableNodeType } from '@/types/erd';
+import useCanvasStore from '@/stores/useCanvasStore';
 
 /**
  * ERD 테이블 커스텀 노드 컴포넌트.
  *
  * 테이블 헤더(이름)와 컬럼 목록을 렌더링하며, 각 컬럼에 PK/FK 뱃지와
  * 좌우 Handle(source/target)을 배치하여 컬럼 레벨의 관계 연결을 지원한다.
+ * 인라인 편집을 통해 테이블명, 컬럼명, 타입, PK/FK/nullable을 변경할 수 있다.
  *
  * Handle ID 규칙: `{nodeId}-{colId}-source` / `{nodeId}-{colId}-target`
- *
- * @param props React Flow NodeProps (id, data)
  */
 function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const { label, columns } = data;
+  const renameTable = useCanvasStore((s) => s.renameTable);
+  const addColumn = useCanvasStore((s) => s.addColumn);
+  const deleteColumn = useCanvasStore((s) => s.deleteColumn);
+  const updateColumn = useCanvasStore((s) => s.updateColumn);
+
+  const [editingLabel, setEditingLabel] = useState(false);
+  const [labelValue, setLabelValue] = useState(label);
+
+  /** 테이블 이름 편집을 확정한다. */
+  const commitLabel = () => {
+    if (labelValue.trim()) {
+      renameTable(id, labelValue.trim());
+    } else {
+      setLabelValue(label);
+    }
+    setEditingLabel(false);
+  };
 
   return (
     <div className="bg-white border border-gray-300 rounded shadow-md min-w-[200px]">
-      <div className="bg-blue-600 text-white px-3 py-2 rounded-t font-semibold text-sm">
-        {label}
-      </div>
+      {/* Table header */}
+      {editingLabel ? (
+        <div className="bg-blue-600 px-3 py-2 rounded-t">
+          <input
+            className="nodrag bg-transparent text-white font-semibold text-sm w-full outline-none placeholder-blue-200"
+            value={labelValue}
+            onChange={(e) => setLabelValue(e.target.value)}
+            onBlur={commitLabel}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitLabel();
+              if (e.key === 'Escape') {
+                setLabelValue(label);
+                setEditingLabel(false);
+              }
+            }}
+            autoFocus
+          />
+        </div>
+      ) : (
+        <div
+          className="bg-blue-600 text-white px-3 py-2 rounded-t font-semibold text-sm cursor-pointer select-none"
+          onDoubleClick={() => {
+            setLabelValue(label);
+            setEditingLabel(true);
+          }}
+        >
+          {label}
+        </div>
+      )}
+
+      {/* Columns */}
       <div className="divide-y divide-gray-200">
         {columns.map((col) => (
-          <div key={col.id} className="relative px-3 py-1.5 text-xs flex items-center gap-2">
+          <div
+            key={col.id}
+            className="relative px-3 py-1.5 text-xs flex items-center gap-1 group/col"
+          >
             <Handle
               type="target"
               position={Position.Left}
               id={`${id}-${col.id}-target`}
               className="!w-2 !h-2 !bg-gray-400 !border-gray-500"
             />
-            <span className="text-yellow-600 font-bold w-4 text-center">
-              {col.pk ? 'PK' : col.fk ? 'FK' : ''}
-            </span>
-            <span className="flex-1 font-mono">{col.name}</span>
-            <span className="text-gray-400 font-mono">{col.type}</span>
+
+            {/* PK toggle */}
+            <button
+              className={`nodrag w-5 text-center font-bold text-[10px] cursor-pointer ${col.pk ? 'text-yellow-600' : 'text-gray-300 hover:text-yellow-500'}`}
+              onClick={() => updateColumn(id, col.id, { pk: !col.pk })}
+              title="Toggle PK"
+            >
+              PK
+            </button>
+
+            {/* FK toggle */}
+            <button
+              className={`nodrag w-5 text-center font-bold text-[10px] cursor-pointer ${col.fk ? 'text-blue-600' : 'text-gray-300 hover:text-blue-500'}`}
+              onClick={() => updateColumn(id, col.id, { fk: !col.fk })}
+              title="Toggle FK"
+            >
+              FK
+            </button>
+
+            {/* Column name */}
+            <input
+              className="nodrag flex-1 font-mono bg-transparent outline-none hover:bg-gray-50 focus:bg-gray-100 px-1 rounded min-w-0"
+              value={col.name}
+              onChange={(e) => updateColumn(id, col.id, { name: e.target.value })}
+            />
+
+            {/* Column type */}
+            <input
+              className="nodrag w-24 font-mono text-gray-400 bg-transparent outline-none hover:bg-gray-50 focus:bg-gray-100 px-1 rounded text-right"
+              value={col.type}
+              onChange={(e) => updateColumn(id, col.id, { type: e.target.value })}
+            />
+
+            {/* Nullable toggle */}
+            <button
+              className={`nodrag text-[10px] cursor-pointer w-4 text-center ${col.nullable ? 'text-green-600' : 'text-gray-300 hover:text-green-500'}`}
+              onClick={() => updateColumn(id, col.id, { nullable: !col.nullable })}
+              title="Toggle nullable"
+            >
+              N
+            </button>
+
+            {/* Delete column */}
+            <button
+              className="nodrag opacity-0 group-hover/col:opacity-100 transition-opacity text-gray-400 hover:text-red-500 cursor-pointer"
+              onClick={() => deleteColumn(id, col.id)}
+              title="Delete column"
+            >
+              <X className="h-3 w-3" />
+            </button>
+
             <Handle
               type="source"
               position={Position.Right}
@@ -42,6 +137,17 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
             />
           </div>
         ))}
+      </div>
+
+      {/* Add column button */}
+      <div className="border-t border-gray-200">
+        <button
+          className="nodrag w-full px-3 py-1 text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-1 cursor-pointer"
+          onClick={() => addColumn(id)}
+        >
+          <Plus className="h-3 w-3" />
+          Add Column
+        </button>
       </div>
     </div>
   );

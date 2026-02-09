@@ -3,6 +3,7 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import TeamsPage from './pages/TeamsPage';
 import ProjectsPage from './pages/ProjectsPage';
+import DiagramsPage from './pages/DiagramsPage';
 import DiagramPage from './pages/DiagramPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
@@ -31,6 +32,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ProjectsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teams/:teamId/projects/:projectId/diagrams"
+          element={
+            <ProtectedRoute>
+              <DiagramsPage />
             </ProtectedRoute>
           }
         />

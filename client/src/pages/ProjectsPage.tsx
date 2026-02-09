@@ -231,7 +231,7 @@ export default function ProjectsPage() {
                 <Card
                   key={project.id}
                   className="cursor-pointer hover:shadow-md transition-shadow group"
-                  onClick={() => navigate(`/teams/${teamId}/projects/${project.id}/diagrams/new`)}
+                  onClick={() => navigate(`/teams/${teamId}/projects/${project.id}/diagrams`)}
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">

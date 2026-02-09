@@ -65,6 +65,15 @@ public class Diagram extends BaseTimeEntity {
     }
 
     /**
+     * 다이어그램 이름을 변경한다.
+     *
+     * @param name 새로운 다이어그램 이름
+     */
+    public void rename(String name) {
+        this.name = name;
+    }
+
+    /**
      * 다이어그램의 콘텐츠를 갱신한다.
      *
      * @param content 새로운 React Flow JSON 문자열

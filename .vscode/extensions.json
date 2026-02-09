@@ -1,0 +1,52 @@
+{
+    "recommendations": [
+        // Java 개발 필수
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-gradle",
+        "redhat.java",
+        "vscjava.vscode-java-debug",
+        "vscjava.vscode-java-test",
+        "vscjava.vscode-maven",
+        "vscjava.vscode-java-dependency",
+        // Spring Boot 개발 필수
+        "vmware.vscode-boot-dev-pack",
+        "vmware.vscode-spring-boot",
+        "vscjava.vscode-spring-initializr",
+        "vscjava.vscode-spring-boot-dashboard",
+        // Lombok 지원
+        "gabrielbb.vscode-lombok",
+        // XML/YAML 지원 (MyBatis, application.yml)
+        "redhat.vscode-xml",
+        "redhat.vscode-yaml",
+        // 데이터베이스 지원
+        "cweijan.vscode-database-client2",
+        // Git 강화
+        "eamodio.gitlens",
+        "donjayamanne.githistory",
+        "mhutchie.git-graph",
+        // 코드 품질
+        "sonarsource.sonarlint-vscode",
+        "usernamehw.errorlens",
+        // 코드 가독성
+        "oderwat.indent-rainbow",
+        "aaron-bond.better-comments",
+        "streetsidesoftware.code-spell-checker",
+        // REST API 테스트
+        "humao.rest-client",
+        "rangav.vscode-thunder-client",
+        // Docker 지원
+        "ms-azuretools.vscode-docker",
+        // 테마 및 아이콘
+        "pkief.material-icon-theme",
+        "zhuangtongfa.material-theme",
+        // 생산성 도구
+        "formulahendry.auto-rename-tag",
+        "formulahendry.code-runner",
+        "esbenp.prettier-vscode",
+        "editorconfig.editorconfig",
+        // Markdown 지원
+        "yzhang.markdown-all-in-one",
+        "davidanson.vscode-markdownlint"
+    ],
+    "unwantedRecommendations": []
+}
