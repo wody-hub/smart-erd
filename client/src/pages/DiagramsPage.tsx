@@ -14,6 +14,7 @@ import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
 import { getErrorMessage } from '@/lib/api-error';
 import { toast } from 'sonner';
+import Spinner from '@/components/ui/spinner';
 
 /**
  * 다이어그램 목록 페이지.
@@ -116,7 +117,7 @@ export default function DiagramsPage() {
           </div>
 
           {isLoading ? (
-            <p className="text-muted-foreground">Loading...</p>
+            <Spinner text="Loading..." />
           ) : diagrams.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
@@ -162,6 +163,7 @@ export default function DiagramsPage() {
                             size="icon"
                             className="h-7 w-7"
                             onClick={confirmRename}
+                            aria-label="Confirm rename"
                           >
                             <Check className="h-3 w-3" />
                           </Button>
@@ -170,6 +172,7 @@ export default function DiagramsPage() {
                             size="icon"
                             className="h-7 w-7"
                             onClick={cancelRename}
+                            aria-label="Cancel rename"
                           >
                             <X className="h-3 w-3" />
                           </Button>
@@ -183,6 +186,7 @@ export default function DiagramsPage() {
                               size="icon"
                               className="h-8 w-8"
                               onClick={(e) => startRename(diagram, e)}
+                              aria-label={`Rename diagram ${diagram.name}`}
                             >
                               <Pencil className="h-4 w-4 text-muted-foreground" />
                             </Button>
@@ -194,6 +198,7 @@ export default function DiagramsPage() {
                                 e.stopPropagation();
                                 setDeleteTarget(diagram.id);
                               }}
+                              aria-label={`Delete diagram ${diagram.name}`}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>

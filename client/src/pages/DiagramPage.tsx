@@ -10,6 +10,7 @@ import { fetchDiagram, saveDiagram } from '@/api/diagramApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
 import { toast } from 'sonner';
+import Spinner from '@/components/ui/spinner';
 
 /**
  * 다이어그램 편집 페이지.
@@ -19,6 +20,7 @@ import { toast } from 'sonner';
  * Ctrl+S(Mac: Cmd+S) 단축키로 저장할 수 있다.
  */
 export default function DiagramPage() {
+  /** URL 파라미터: teamId, projectId, diagramId */
   const { teamId, projectId, diagramId } = useParams<{
     teamId: string;
     projectId: string;
@@ -99,7 +101,7 @@ export default function DiagramPage() {
       <div className="h-screen flex flex-col">
         <Header />
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-muted-foreground">Loading diagram...</p>
+          <Spinner text="Loading diagram..." />
         </div>
       </div>
     );

@@ -14,6 +14,7 @@ import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
 import { getErrorMessage } from '@/lib/api-error';
 import { toast } from 'sonner';
+import Spinner from '@/components/ui/spinner';
 
 /**
  * 프로젝트 목록 페이지.
@@ -93,7 +94,7 @@ export default function ProjectsPage() {
           </div>
 
           {isLoading ? (
-            <p className="text-muted-foreground">Loading...</p>
+            <Spinner text="Loading..." />
           ) : projects.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
@@ -126,6 +127,7 @@ export default function ProjectsPage() {
                           e.stopPropagation();
                           setDeleteTarget(project.id);
                         }}
+                        aria-label={`Delete project ${project.name}`}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

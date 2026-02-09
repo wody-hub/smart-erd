@@ -151,6 +151,7 @@ export default function MembersDialog({
                     size="icon"
                     className="h-7 w-7"
                     onClick={() => removeMutation.mutate(member.userId)}
+                    aria-label={`Remove member ${member.name}`}
                   >
                     <Trash2 className="h-3 w-3 text-destructive" />
                   </Button>
