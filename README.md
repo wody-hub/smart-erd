@@ -75,6 +75,10 @@ src/main/java/com/smarterd/
 │   ├── project/
 │   │   ├── ProjectController.java   #   프로젝트 CRUD (4 엔드포인트)
 │   │   └── dto/                     #   CreateProjectRequest, ProjectResponse
+│   ├── dictionary/
+│   │   ├── DomainController.java    #   도메인 사전 CRUD (5 엔드포인트)
+│   │   ├── TermController.java      #   용어 사전 CRUD (5 엔드포인트)
+│   │   └── dto/                     #   Create/Update/Response record (Domain, Term)
 │   └── common/
 │       └── GlobalExceptionHandler.java  # 전역 예외 처리 (404/403/409/400 매핑)
 ├── config/                          # 설정
@@ -114,7 +118,8 @@ src/main/java/com/smarterd/
     │   └── repository/             #   DiagramRepository
     └── dictionary/
         ├── entity/                  #   Domain (논리명→물리타입), Term (논리명→물리명)
-        └── repository/             #   DomainRepository, TermRepository
+        ├── repository/             #   DomainRepository, TermRepository (+Custom — QueryDSL fetch join)
+        └── service/                #   DomainService, TermService (CRUD + 팀 소속/중복 검증)
 ```
 
 ### 프론트엔드
@@ -139,14 +144,16 @@ client/
     │   ├── index.ts                 # i18next 초기화 (LanguageDetector + initReactI18next)
     │   ├── i18next.d.ts             # 타입 확장 (번역 키 자동완성)
     │   └── locales/
-    │       ├── en/translation.json  # 영어 번역 (~117 키)
-    │       └── ko/translation.json  # 한국어 번역 (~117 키)
+    │       ├── en/translation.json  # 영어 번역 (~200 키)
+    │       └── ko/translation.json  # 한국어 번역 (~200 키)
     ├── api/
     │   ├── axiosInstance.ts         # baseURL: /api, JWT 자동 첨부 + 401 Refresh Token 갱신 (큐 패턴)
     │   ├── authApi.ts               # login(), signup()
     │   ├── teamApi.ts               # fetchTeams(), fetchTeam(), createTeam(), fetchMembers(), inviteMember(), removeMember()
     │   ├── projectApi.ts            # fetchProjects(), createProject(), deleteProject()
-    │   └── diagramApi.ts            # fetchDiagrams(), fetchDiagram(), createDiagram(), saveDiagram(), renameDiagram(), deleteDiagram()
+    │   ├── diagramApi.ts            # fetchDiagrams(), fetchDiagram(), createDiagram(), saveDiagram(), renameDiagram(), deleteDiagram()
+    │   ├── domainApi.ts             # fetchDomains(), createDomain(), updateDomain(), deleteDomain()
+    │   └── termApi.ts               # fetchTerms(), createTerm(), updateTerm(), deleteTerm()
     ├── constants/
     │   ├── keybindings.ts           # KEYBINDINGS — 키보드 단축키 레지스트리
     │   ├── storage.ts               # STORAGE_KEYS — localStorage 키 상수
@@ -169,6 +176,11 @@ client/
     │   │   ├── LanguageSwitcher.tsx  # 언어 전환 드롭다운 (ko/en)
     │   │   ├── Sidebar.tsx          # 좌측 사이드바 (w-56, 테이블 목록)
     │   │   └── SidebarTableItem.tsx # 사이드바 개별 테이블 항목 (인라인 이름 변경)
+    │   ├── dictionary/
+    │   │   ├── DomainTab.tsx        # 도메인 목록 테이블 + CRUD (useQuery + useMutation)
+    │   │   ├── TermTab.tsx          # 용어 목록 테이블 + CRUD (useQuery + useMutation)
+    │   │   ├── DomainFormDialog.tsx  # 도메인 생성/수정 폼 다이얼로그
+    │   │   └── TermFormDialog.tsx    # 용어 생성/수정 폼 다이얼로그 (도메인 Select)
     │   ├── team/
     │   │   └── MembersDialog.tsx    # 팀 멤버 관리 다이얼로그 (초대/제거, React Query 사용)
     │   └── ui/                      # shadcn/ui + 공유 UI 컴포넌트
@@ -180,6 +192,9 @@ client/
     │       ├── dropdown-menu.tsx    #   DropdownMenu — @radix-ui/react-dropdown-menu
     │       ├── input.tsx            #   Input — 순수 HTML input (shadcn/ui 표준)
     │       ├── label.tsx            #   Label — @radix-ui/react-label + CVA
+    │       ├── select.tsx           #   Select — @radix-ui/react-select
+    │       ├── table.tsx            #   Table — 시맨틱 HTML 테이블 컴포넌트
+    │       ├── tabs.tsx             #   Tabs — @radix-ui/react-tabs
     │       └── spinner.tsx          #   Spinner — Loader2 animate-spin + 선택적 텍스트
     ├── lib/
     │   ├── utils.ts                 # cn() = clsx + tailwind-merge
@@ -194,6 +209,8 @@ client/
     │   │   └── TeamsPage.tsx        # 팀 목록 + 생성 (useQuery + useMutation + CreateResourceDialog)
     │   ├── project/
     │   │   └── ProjectsPage.tsx     # 프로젝트 목록 + CRUD + 멤버 관리 (useQuery + useMutation)
+    │   ├── dictionary/
+    │   │   └── DictionaryPage.tsx   # 데이터 사전: 도메인/용어 탭 (Tabs 컨테이너)
     │   └── diagram/
     │       ├── DiagramsPage.tsx     # 다이어그램 목록 + CRUD + 인라인 이름 변경 (useQuery + useMutation)
     │       └── DiagramPage.tsx      # 다이어그램 편집기: Header + Sidebar + ERDCanvas (useQuery + useMutation)
@@ -205,7 +222,8 @@ client/
         ├── auth.ts                  # AuthResponse
         ├── team.ts                  # Team, TeamMember, TeamMemberRole
         ├── project.ts              # Project
-        └── diagram.ts              # DiagramSummary, DiagramDetail
+        ├── diagram.ts              # DiagramSummary, DiagramDetail
+        └── dictionary.ts           # Domain, Term, DomainFormData, TermFormData
 ```
 
 ## 코드 표준
@@ -517,10 +535,11 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 | `types/`             | 도메인별 공유 TypeScript 타입 정의                                   |
 | `components/ui/`     | 범용 재사용 컴포넌트 (shadcn/ui + 공유 다이얼로그). 도메인 로직 금지 |
 | `components/team/`   | 팀 도메인 전용 컴포넌트 (MembersDialog)                              |
+| `components/dictionary/` | 사전 도메인 전용 컴포넌트 (DomainTab, TermTab, 폼 다이얼로그)    |
 | `components/auth/`   | 인증 관련 컴포넌트 (ProtectedRoute)                                  |
 | `components/erd/`    | ERD 도메인 전용 컴포넌트                                             |
 | `components/layout/` | 페이지 구조 컴포넌트 (Header, Sidebar)                               |
-| `pages/`             | 도메인별 서브디렉토리(`auth/`, `team/`, `project/`, `diagram/`)로 페이지 관리 |
+| `pages/`             | 도메인별 서브디렉토리(`auth/`, `team/`, `project/`, `dictionary/`, `diagram/`)로 페이지 관리 |
 | `stores/`            | Zustand 클라이언트 상태 관리 (`use` prefix)                          |
 
 ## 엔티티 관계
@@ -572,6 +591,26 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 | GET    | `/api/teams/{teamId}/projects`      | 프로젝트 목록 | —            |
 | GET    | `/api/teams/{teamId}/projects/{id}` | 프로젝트 상세 | —            |
 | DELETE | `/api/teams/{teamId}/projects/{id}` | 프로젝트 삭제 | —            |
+
+### 도메인 사전 (`/api/teams/{teamId}/domains/**` — 인증 필요)
+
+| Method | Path                                     | 설명        | Request Body                                  |
+| ------ | ---------------------------------------- | ----------- | --------------------------------------------- |
+| POST   | `/api/teams/{teamId}/domains`            | 도메인 생성 | `{ logicalName, physicalType, description? }` |
+| GET    | `/api/teams/{teamId}/domains`            | 도메인 목록 | —                                             |
+| GET    | `/api/teams/{teamId}/domains/{domainId}` | 도메인 상세 | —                                             |
+| PUT    | `/api/teams/{teamId}/domains/{domainId}` | 도메인 수정 | `{ logicalName, physicalType, description? }` |
+| DELETE | `/api/teams/{teamId}/domains/{domainId}` | 도메인 삭제 | —                                             |
+
+### 용어 사전 (`/api/teams/{teamId}/terms/**` — 인증 필요)
+
+| Method | Path                                   | 설명      | Request Body                                           |
+| ------ | -------------------------------------- | --------- | ------------------------------------------------------ |
+| POST   | `/api/teams/{teamId}/terms`            | 용어 생성 | `{ logicalName, physicalName, domainId?, description? }` |
+| GET    | `/api/teams/{teamId}/terms`            | 용어 목록 | —                                                      |
+| GET    | `/api/teams/{teamId}/terms/{termId}`   | 용어 상세 | —                                                      |
+| PUT    | `/api/teams/{teamId}/terms/{termId}`   | 용어 수정 | `{ logicalName, physicalName, domainId?, description? }` |
+| DELETE | `/api/teams/{teamId}/terms/{termId}`   | 용어 삭제 | —                                                      |
 
 ### Swagger UI
 
@@ -776,6 +815,7 @@ ERD 편집기 영역(Header, Sidebar, TableNode, ERDCanvas)에서 사용하는 �
 /signup                                                   — 회원가입 (공개)
 /teams                                                    — 팀 목록 (인증 필요)
 /teams/:teamId/projects                                   — 프로젝트 목록 (인증 필요)
+/teams/:teamId/dictionary                                 — 데이터 사전 (인증 필요)
 /teams/:teamId/projects/:projectId/diagrams               — 다이어그램 목록 (인증 필요)
 /teams/:teamId/projects/:projectId/diagrams/:diagramId    — ERD 편집기 (인증 필요)
 ```

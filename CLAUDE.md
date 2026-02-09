@@ -65,6 +65,10 @@ src/main/java/com/smarterd/
 │   ├── project/
 │   │   ├── ProjectController.java   #   /api/teams/{teamId}/projects CRUD
 │   │   └── dto/                     #   CreateProjectRequest, ProjectResponse
+│   ├── dictionary/
+│   │   ├── DomainController.java    #   /api/teams/{teamId}/domains CRUD (5 endpoints)
+│   │   ├── TermController.java      #   /api/teams/{teamId}/terms CRUD (5 endpoints)
+│   │   └── dto/                     #   Create/Update/Response records (Domain, Term)
 │   └── common/
 │       └── GlobalExceptionHandler.java  # @RestControllerAdvice (404/403/409/400 mapping)
 ├── config/                          # Configuration
@@ -104,7 +108,8 @@ src/main/java/com/smarterd/
     │   └── repository/             #   DiagramRepository
     └── dictionary/
         ├── entity/                  #   Domain (logical→physical type), Term (logical→physical name)
-        └── repository/             #   DomainRepository, TermRepository
+        ├── repository/             #   DomainRepository, TermRepository (+Custom — QueryDSL fetch join)
+        └── service/                #   DomainService, TermService (CRUD with team membership + duplicate checks)
 ```
 
 **Entity ownership chain:** User → Team → (Project → Diagram, Domain, Term). TeamMember is a join table with `@IdClass(TeamMemberId)` record composite key (team_id + user_id) and role enum (ADMIN, MEMBER, VIEWER).
@@ -149,14 +154,16 @@ client/
     │   ├── index.ts                 # i18next initialization (LanguageDetector + initReactI18next)
     │   ├── i18next.d.ts             # Type augmentation (translation key autocomplete)
     │   └── locales/
-    │       ├── en/translation.json  # English translations (~117 keys)
-    │       └── ko/translation.json  # Korean translations (~117 keys)
+    │       ├── en/translation.json  # English translations (~200 keys)
+    │       └── ko/translation.json  # Korean translations (~200 keys)
     ├── api/
     │   ├── axiosInstance.ts         # baseURL: /api, JWT auto-attach + 401 Refresh Token rotation
     │   ├── authApi.ts               # login(), signup()
     │   ├── teamApi.ts               # fetchTeams(), fetchTeam(), createTeam(), fetchMembers(), inviteMember(), removeMember()
     │   ├── projectApi.ts            # fetchProjects(), createProject(), deleteProject()
-    │   └── diagramApi.ts            # fetchDiagrams(), fetchDiagram(), createDiagram(), saveDiagram(), renameDiagram(), deleteDiagram()
+    │   ├── diagramApi.ts            # fetchDiagrams(), fetchDiagram(), createDiagram(), saveDiagram(), renameDiagram(), deleteDiagram()
+    │   ├── domainApi.ts             # fetchDomains(), createDomain(), updateDomain(), deleteDomain()
+    │   └── termApi.ts               # fetchTerms(), createTerm(), updateTerm(), deleteTerm()
     ├── constants/
     │   ├── keybindings.ts           # KEYBINDINGS — keyboard shortcut key registry
     │   ├── storage.ts               # STORAGE_KEYS — localStorage key constants
@@ -179,6 +186,11 @@ client/
     │   │   ├── LanguageSwitcher.tsx  # Language switching dropdown (ko/en)
     │   │   ├── Sidebar.tsx          # Left sidebar (w-56, table list)
     │   │   └── SidebarTableItem.tsx # Individual table item with inline rename
+    │   ├── dictionary/
+    │   │   ├── DomainTab.tsx        # Domain list table + CRUD (useQuery + useMutation)
+    │   │   ├── TermTab.tsx          # Term list table + CRUD (useQuery + useMutation)
+    │   │   ├── DomainFormDialog.tsx  # Domain create/edit form dialog
+    │   │   └── TermFormDialog.tsx    # Term create/edit form dialog (domain Select)
     │   ├── team/
     │   │   └── MembersDialog.tsx    # Team member management dialog (invite/remove, uses React Query)
     │   └── ui/                      # shadcn/ui + shared UI components
@@ -190,6 +202,9 @@ client/
     │       ├── dropdown-menu.tsx    #   DropdownMenu (full Radix implementation)
     │       ├── input.tsx            #   Input — plain HTML input (shadcn/ui standard)
     │       ├── label.tsx            #   Label — @radix-ui/react-label + CVA
+    │       ├── select.tsx           #   Select — @radix-ui/react-select
+    │       ├── table.tsx            #   Table — semantic HTML table components
+    │       ├── tabs.tsx             #   Tabs — @radix-ui/react-tabs
     │       └── spinner.tsx          #   Spinner — Loader2 animate-spin + optional text
     ├── lib/
     │   ├── utils.ts                 # cn() = clsx + tailwind-merge
@@ -204,6 +219,8 @@ client/
     │   │   └── TeamsPage.tsx        # Team list + create (useQuery + useMutation + CreateResourceDialog)
     │   ├── project/
     │   │   └── ProjectsPage.tsx     # Project list + CRUD + member management (useQuery + useMutation)
+    │   ├── dictionary/
+    │   │   └── DictionaryPage.tsx   # Data dictionary: Domain/Term tabs (Tabs container)
     │   └── diagram/
     │       ├── DiagramsPage.tsx     # Diagram list + CRUD + inline rename (useQuery + useMutation)
     │       └── DiagramPage.tsx      # Diagram editor: Header + Sidebar + ERDCanvas (useQuery + useMutation)
@@ -215,7 +232,8 @@ client/
         ├── auth.ts                  # AuthResponse
         ├── team.ts                  # Team, TeamMember, TeamMemberRole
         ├── project.ts              # Project
-        └── diagram.ts              # DiagramSummary, DiagramDetail
+        ├── diagram.ts              # DiagramSummary, DiagramDetail
+        └── dictionary.ts           # Domain, Term, DomainFormData, TermFormData
 ```
 
 **Frontend conventions:**
@@ -225,11 +243,12 @@ client/
 - `types/` — Shared TypeScript interfaces per domain. Inline type definitions in pages are forbidden.
 - `hooks/` — Reusable custom hooks. Extract when a pattern repeats across 2+ components.
 - `components/ui/` — Reusable primitives (shadcn/ui + shared dialogs). No domain logic.
+- `components/dictionary/` — Dictionary domain-specific components (DomainTab, TermTab, form dialogs).
 - `components/team/` — Team domain-specific components (MembersDialog).
 - `components/auth/` — Authentication components (ProtectedRoute).
 - `components/erd/` — ERD domain-specific components.
 - `components/layout/` — Page structure components (Header, Sidebar).
-- `pages/` — Domain-based subdirectories (`auth/`, `team/`, `project/`, `diagram/`). Each page groups code in standard order (see "Page Component Code Ordering").
+- `pages/` — Domain-based subdirectories (`auth/`, `team/`, `project/`, `dictionary/`, `diagram/`). Each page groups code in standard order (see "Page Component Code Ordering").
 - `lib/` — Pure utility functions and configurations (no React dependencies except query-client).
 - Use `@/` alias for imports (`@/components/ui/button`, `@/lib/utils`).
 - State management: Zustand for client-only state (`stores/`), React Query for server state (`useQuery`/`useMutation`).
@@ -238,7 +257,7 @@ client/
 - **i18n (Frontend):** All UI text is internationalized with `react-i18next`. Use `const { t } = useTranslation()` and `t('key')` instead of hardcoded strings. Translation files: `i18n/locales/{en,ko}/translation.json`. Key convention: `{domain}.{screen}.{usage}` (e.g., `auth.login.submit`). `useTranslation()` is placed after `useQueryClient` in page component code ordering.
 - **i18n (Backend):** All error messages (exceptions, validation) are localized server-side via Spring `MessageSource`. Message bundles: `src/main/resources/i18n/messages.properties` (English fallback) + `messages_ko.properties` (Korean). Exceptions carry message codes (e.g., `"error.not-found.user"`) resolved by `GlobalExceptionHandler` using request `Locale`. DTO validation uses `@NotBlank(message = "{validation.not-blank.login-id}")` interpolated through `MessageSource`.
 
-**Routes:** `/login`, `/signup`, `/teams`, `/teams/:teamId/projects`, `/teams/:teamId/projects/:projectId/diagrams`, `/teams/:teamId/projects/:projectId/diagrams/:diagramId`. All routes except `/login` and `/signup` are protected by `ProtectedRoute`.
+**Routes:** `/login`, `/signup`, `/teams`, `/teams/:teamId/projects`, `/teams/:teamId/dictionary`, `/teams/:teamId/projects/:projectId/diagrams`, `/teams/:teamId/projects/:projectId/diagrams/:diagramId`. All routes except `/login` and `/signup` are protected by `ProtectedRoute`.
 
 ### Axios Instance
 
@@ -312,6 +331,26 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 | GET    | `/api/teams/{teamId}/projects`      | 프로젝트 목록 | —            |
 | GET    | `/api/teams/{teamId}/projects/{id}` | 프로젝트 상세 | —            |
 | DELETE | `/api/teams/{teamId}/projects/{id}` | 프로젝트 삭제 | —            |
+
+#### 도메인 사전 (`/api/teams/{teamId}/domains/**` — 인증 필요)
+
+| Method | Path                                     | 설명        | Request Body                                  |
+| ------ | ---------------------------------------- | ----------- | --------------------------------------------- |
+| POST   | `/api/teams/{teamId}/domains`            | 도메인 생성 | `{ logicalName, physicalType, description? }` |
+| GET    | `/api/teams/{teamId}/domains`            | 도메인 목록 | —                                             |
+| GET    | `/api/teams/{teamId}/domains/{domainId}` | 도메인 상세 | —                                             |
+| PUT    | `/api/teams/{teamId}/domains/{domainId}` | 도메인 수정 | `{ logicalName, physicalType, description? }` |
+| DELETE | `/api/teams/{teamId}/domains/{domainId}` | 도메인 삭제 | —                                             |
+
+#### 용어 사전 (`/api/teams/{teamId}/terms/**` — 인증 필요)
+
+| Method | Path                                   | 설명      | Request Body                                           |
+| ------ | -------------------------------------- | --------- | ------------------------------------------------------ |
+| POST   | `/api/teams/{teamId}/terms`            | 용어 생성 | `{ logicalName, physicalName, domainId?, description? }` |
+| GET    | `/api/teams/{teamId}/terms`            | 용어 목록 | —                                                      |
+| GET    | `/api/teams/{teamId}/terms/{termId}`   | 용어 상세 | —                                                      |
+| PUT    | `/api/teams/{teamId}/terms/{termId}`   | 용어 수정 | `{ logicalName, physicalName, domainId?, description? }` |
+| DELETE | `/api/teams/{teamId}/terms/{termId}`   | 용어 삭제 | —                                                      |
 
 Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 
