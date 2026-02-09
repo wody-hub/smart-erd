@@ -146,7 +146,7 @@ client/
     │   │   ├── ERDCanvas.tsx        # @xyflow/react 캔버스 (16x16 그리드 스냅, MiniMap, Controls, step edge)
     │   │   └── TableNode.tsx        # 커스텀 노드: 테이블 헤더 + 컬럼 행 (PK/FK 뱃지, 좌우 Handle)
     │   ├── layout/
-    │   │   ├── Header.tsx           # 상단 고정 헤더 (사용자명, 로그아웃, 다이어그램 Save)
+    │   │   ├── Header.tsx           # 상단 고정 헤더 (bg-header, 사용자명, 로그아웃, 다이어그램 Save)
     │   │   ├── Sidebar.tsx          # 좌측 사이드바 (w-56, 테이블 목록)
     │   │   └── SidebarTableItem.tsx # 사이드바 개별 테이블 항목 (인라인 이름 변경)
     │   ├── team/
@@ -159,7 +159,8 @@ client/
     │       ├── dialog.tsx           #   Dialog — @radix-ui/react-dialog
     │       ├── dropdown-menu.tsx    #   DropdownMenu — @radix-ui/react-dropdown-menu
     │       ├── input.tsx            #   Input — 순수 HTML input (shadcn/ui 표준)
-    │       └── label.tsx            #   Label — @radix-ui/react-label + CVA
+    │       ├── label.tsx            #   Label — @radix-ui/react-label + CVA
+    │       └── spinner.tsx          #   Spinner — Loader2 animate-spin + 선택적 텍스트
     ├── lib/
     │   ├── utils.ts                 # cn() = clsx + tailwind-merge
     │   ├── api-error.ts             # getErrorMessage() — 서버 에러 메시지 추출
@@ -192,7 +193,7 @@ client/
 
 | 기능                          | 적용 범위                       | 예시                                                                          |
 | ----------------------------- | ------------------------------- | ----------------------------------------------------------------------------- |
-| `var` (지역 변수 타입 추론)   | 서비스, 설정 클래스의 지역 변수 | `var user = findUserByLoginId(loginId);`                                      |
+| `var` / `final var` (지역 변수 타입 추론) | 서비스, 설정 클래스의 지역 변수. 재할당 없으면 `final var`, 재할당하면 `var` | `final var user = findUserByLoginId(loginId);`                                |
 | `record` (불변 데이터 클래스) | DTO, 복합키 클래스              | `public record TeamMemberId(Long team, Long user) implements Serializable {}` |
 | `List.of()`                   | 불변 빈 컬렉션                  | `List.of()` (~~`Collections.emptyList()`~~ 사용 금지)                         |
 | Stream API                    | 컬렉션 변환, 필터링             | `.stream().map(ProjectResponse::from).toList()`                               |
@@ -394,6 +395,8 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 - `@/` alias로 import (`@/components/ui/button`, `@/lib/utils`)
 - 상태 관리: 클라이언트 상태는 Zustand (`stores/`), 서버 상태는 React Query (`useQuery`/`useMutation`)
 - shadcn/ui 컴포넌트 추가 시: `components/ui/`에 파일 생성, `cn()` 사용, `forwardRef` 패턴 적용
+- **하드코딩 색상 금지**: `bg-gray-*`, `text-blue-*`, `#hex` 등 Tailwind 기본 팔레트 직접 사용 금지. `index.css` CSS Variable → `tailwind.config.js` 시맨틱 매핑 → 컴포넌트에서 시맨틱 클래스 사용
+- 아이콘 전용 버튼에 `aria-label` 필수, 로딩 상태는 `Spinner` 컴포넌트 사용
 
 #### 데이터 페칭 — React Query
 
@@ -425,6 +428,7 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 - `CreateResourceDialog` — 범용 생성 다이얼로그 (Team/Project/Diagram)
 - `ConfirmDialog` — `window.confirm()` 대체 (비동기 지원)
 - `MembersDialog` — 팀 멤버 관리 (React Query 자체 사용)
+- `Spinner` — 로딩 스피너 (Loader2 animate-spin + 선택적 텍스트)
 - `useInlineEdit` 훅 — 인라인 텍스트 편집 (SidebarTableItem, TableNode)
 
 #### JSDoc 규칙
@@ -570,17 +574,56 @@ Client                                        Server
 
 ## 프론트엔드 상세
 
-### shadcn/ui 설정
+### 디자인 토큰 시스템
 
-CSS 변수 기반 디자인 토큰 시스템. `index.css`에 light/dark 테마 변수 정의.
+CSS Variable 기반 디자인 토큰 체계를 사용한다. **하드코딩 색상(`bg-gray-*`, `text-blue-*`, `#hex` 등) 사용을 금지**하고, 시맨틱 토큰을 통해 일관된 UI와 다크 모드 호환성을 보장한다.
 
 ```text
-tailwind.config.js  →  CSS 변수 색상 매핑 (hsl), darkMode: ["class"], tailwindcss-animate
-index.css           →  :root / .dark CSS 변수, 전역 border-border + box-sizing
-lib/utils.ts        →  cn() = clsx + tailwind-merge (클래스 병합 유틸리티)
+index.css (:root / .dark)  →  CSS Variable 정의 (HSL 값)
+tailwind.config.js         →  Tailwind 시맨틱 색상 매핑 (hsl(var(--token)))
+컴포넌트                    →  시맨틱 클래스 사용 (bg-card, text-muted-foreground 등)
 ```
 
+#### shadcn/ui 기본 토큰
+
+리스트 페이지, 폼, 다이얼로그 등 범용 UI에서 사용하는 표준 토큰:
+
+| 용도 | 토큰 예시 |
+|------|-----------|
+| 배경 | `bg-background`, `bg-card`, `bg-muted`, `bg-accent`, `bg-popover` |
+| 텍스트 | `text-foreground`, `text-muted-foreground`, `text-card-foreground` |
+| 강조/상태 | `bg-primary`, `bg-secondary`, `bg-destructive` |
+| 테두리 | `border-border`, `border-input` |
+| 인터랙션 | `hover:bg-accent`, `focus:bg-accent` |
+
+#### ERD 전용 토큰
+
+ERD 편집기 영역(Header, Sidebar, TableNode, ERDCanvas)에서 사용하는 도메인 토큰:
+
+| 토큰 | 용도 |
+|------|------|
+| `bg-header`, `text-header-foreground`, `text-header-muted` | 상단 헤더 바 |
+| `bg-erd-table-header`, `text-erd-table-header-foreground` | 테이블 노드 헤더 |
+| `text-erd-pk`, `text-erd-fk`, `text-erd-nullable` | PK/FK/nullable 뱃지 |
+| `bg-erd-handle`, `border-erd-handle-border` | Handle (연결점) |
+| `text-erd-warning` | unsaved 경고 표시 |
+
+모든 토큰은 `index.css`에 `:root` (라이트)와 `.dark` (다크) 양쪽에 정의되어 있다.
+
+#### 새 색상 추가 절차
+
+1. `index.css`의 `:root`와 `.dark` 모두에 CSS Variable 추가
+2. `tailwind.config.js`의 `colors`에 `hsl(var(--token-name))` 매핑
+3. 컴포넌트에서 시맨틱 클래스 사용 (예: `bg-erd-table-header`)
+
 새 shadcn/ui 컴포넌트 추가 시: `components/ui/`에 파일 생성, `cn()` 사용, forwardRef 패턴 적용.
+
+### 접근성 (a11y)
+
+- **아이콘 전용 버튼**: 반드시 `aria-label` 속성을 포함한다
+- **토글 버튼**: `aria-label`에 대상 컨텍스트를 포함한다 (예: `` aria-label={`Toggle PK for ${col.name}`} ``)
+- **form 요소**: `<label>` 연결이 불가능한 경우 `aria-label`을 추가한다
+- **로딩 상태**: `Spinner` 컴포넌트 (`components/ui/spinner.tsx`)를 사용한다 — 단순 텍스트 표시 금지
 
 ### ERD 캔버스
 

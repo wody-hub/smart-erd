@@ -156,7 +156,7 @@ client/
     │   │   ├── ERDCanvas.tsx        # @xyflow/react canvas (16x16 grid snap, MiniMap, Controls, step edge)
     │   │   └── TableNode.tsx        # Custom node: table header + column rows (PK/FK badges, L/R handles)
     │   ├── layout/
-    │   │   ├── Header.tsx           # Top header (h-12, bg-gray-900, user name + logout + save)
+    │   │   ├── Header.tsx           # Top header (h-12, bg-header, user name + logout + save)
     │   │   ├── Sidebar.tsx          # Left sidebar (w-56, table list)
     │   │   └── SidebarTableItem.tsx # Individual table item with inline rename
     │   ├── team/
@@ -169,7 +169,8 @@ client/
     │       ├── dialog.tsx           #   Dialog/DialogContent/DialogHeader/DialogFooter/DialogTitle
     │       ├── dropdown-menu.tsx    #   DropdownMenu (full Radix implementation)
     │       ├── input.tsx            #   Input — plain HTML input (shadcn/ui standard)
-    │       └── label.tsx            #   Label — @radix-ui/react-label + CVA
+    │       ├── label.tsx            #   Label — @radix-ui/react-label + CVA
+    │       └── spinner.tsx          #   Spinner — Loader2 animate-spin + optional text
     ├── lib/
     │   ├── utils.ts                 # cn() = clsx + tailwind-merge
     │   ├── api-error.ts             # getErrorMessage() — server error message extraction
@@ -238,7 +239,7 @@ client/
 
 ### Modern Java Idioms (MUST follow)
 
-- **`var`** for local variables where type is obvious from RHS: `var user = findUserByLoginId(loginId);`
+- **`var`** / **`final var`** for local variables where type is obvious from RHS. Use `final var` for non-reassigned variables, `var` for reassigned variables: `final var user = findUserByLoginId(loginId);`
 - **`record`** for DTOs and composite key classes: `public record TeamMemberId(Long team, Long user) implements Serializable {}`
 - **`List.of()`** instead of `Collections.emptyList()` for immutable empty collections
 - **Stream API** with `.toList()` for collection transformations
@@ -383,7 +384,55 @@ const createMutation = useMutation({
 - `CreateResourceDialog` — generic create dialog (Team/Project/Diagram)
 - `ConfirmDialog` — replaces `window.confirm()` with async-capable dialog
 - `MembersDialog` — team member management (uses React Query internally)
+- `Spinner` — loading spinner (Loader2 animate-spin + optional text)
 - `useInlineEdit` hook — inline text editing pattern (SidebarTableItem, TableNode)
+
+#### Styling — Design Token System (MUST follow)
+
+CSS Variable 기반 디자인 토큰 체계를 사용한다. **하드코딩 색상(`bg-gray-*`, `text-blue-*`, `#hex` 등)은 금지**한다.
+
+**토큰 구조:**
+```text
+index.css (:root / .dark)  →  CSS Variable 정의 (HSL 값)
+tailwind.config.js         →  Tailwind 시맨틱 색상 매핑 (hsl(var(--token)))
+컴포넌트                    →  시맨틱 클래스 사용 (bg-card, text-muted-foreground 등)
+```
+
+**shadcn/ui 기본 토큰** — 리스트 페이지, 폼, 다이얼로그에서 사용:
+```
+bg-background, bg-card, bg-muted, bg-accent, bg-popover
+text-foreground, text-muted-foreground, text-card-foreground
+bg-primary, bg-secondary, bg-destructive
+border-border, border-input
+```
+
+**ERD 전용 토큰** — ERD 편집기(Header, Sidebar, TableNode, ERDCanvas)에서 사용:
+```
+bg-header, text-header-foreground, text-header-muted        — 헤더 바
+bg-erd-table-header, text-erd-table-header-foreground        — 테이블 노드 헤더
+text-erd-pk, text-erd-fk, text-erd-nullable                  — PK/FK/nullable 뱃지
+bg-erd-handle, border-erd-handle-border                      — Handle (연결점)
+text-erd-warning                                              — unsaved 경고
+```
+
+**규칙:**
+- 새 컴포넌트에서 `gray-*`, `blue-*` 등 Tailwind 기본 팔레트 색상을 직접 사용하지 않는다
+- 새 색상이 필요하면 `index.css`에 CSS Variable 추가 → `tailwind.config.js`에 매핑 → 컴포넌트에서 시맨틱 클래스 사용
+- `hover:bg-accent`, `focus:bg-accent` — 인터랙티브 상태용 시맨틱 토큰
+- MiniMap 등 prop으로 색상을 전달해야 하는 경우: `hsl(var(--token-name))` 형식 사용
+
+#### Accessibility (a11y)
+
+- **아이콘 전용 버튼**: 반드시 `aria-label` 속성을 추가한다 (예: `aria-label="Delete column"`)
+- **토글 버튼**: `aria-label`에 대상 컨텍스트를 포함한다 (예: `` aria-label={`Toggle PK for ${col.name}`} ``)
+- **form 요소**: `<label>` 연결이 불가능한 경우 `aria-label`을 추가한다
+- shadcn/ui 컴포넌트는 Radix UI가 접근성을 처리하므로 추가 작업 불필요
+
+#### Loading States
+
+- 로딩 상태에는 `Spinner` 컴포넌트 (`components/ui/spinner.tsx`)를 사용한다
+- `<p>Loading...</p>` 텍스트만 표시하는 것은 금지한다
+- 사용법: `<Spinner text="Loading..." />`
 
 #### Documentation — JSDoc
 
