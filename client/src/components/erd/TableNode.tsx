@@ -1,4 +1,4 @@
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Plus, X } from 'lucide-react';
 import type { TableNode as TableNodeType } from '@/types/erd';
@@ -25,7 +25,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const updateColumn = useCanvasStore((s) => s.updateColumn);
 
   /** 테이블 이름 변경 핸들러. @param value 새 테이블 이름 */
-  const handleRename = useCallback((value: string) => renameTable(id, value), [id, renameTable]);
+  const handleRename = (value: string) => renameTable(id, value);
 
   const { editing, value, setValue, startEdit, confirmEdit, cancelEdit } =
     useInlineEdit(handleRename);

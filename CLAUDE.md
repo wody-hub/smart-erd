@@ -119,7 +119,7 @@ src/main/java/com/smarterd/
 
 **Database:** PostgreSQL 17 (Docker). `spring-boot-docker-compose`가 `compose.yaml`을 자동 감지하여 컨테이너를 시작하고, datasource를 자동 주입한다. `ddl-auto: update`. Docker Desktop이 실행 중이어야 한다.
 
-### Frontend: Vite 6 + React 18 + TypeScript + shadcn/ui + React Query
+### Frontend: Vite 6 + React 19 + TypeScript + shadcn/ui + React Query
 
 ```text
 client/
@@ -213,7 +213,7 @@ client/
 - Use `@/` alias for imports (`@/components/ui/button`, `@/lib/utils`).
 - State management: Zustand for client-only state (`stores/`), React Query for server state (`useQuery`/`useMutation`).
 - ESM only (`"type": "module"`) — never use `require()`, use ESM imports.
-- Adding new shadcn/ui components: create file in `components/ui/`, use `cn()`, apply `forwardRef` pattern.
+- Adding new shadcn/ui components: create file in `components/ui/`, use `cn()`, `ref`는 일반 prop으로 전달 (`forwardRef` 사용 금지 — React 19).
 
 **Routes:** `/login`, `/signup`, `/teams`, `/teams/:teamId/projects`, `/teams/:teamId/projects/:projectId/diagrams`, `/teams/:teamId/projects/:projectId/diagrams/:diagramId`. All routes except `/login` and `/signup` are protected by `ProtectedRoute`.
 
@@ -232,7 +232,7 @@ client/
 | Query         | QueryDSL 5.1.0:jakarta, Blaze-Persistence 1.6.17                                 |
 | Auth          | Spring OAuth2 Resource Server (HMAC-SHA256 JWT + Refresh Token rotation), BCrypt |
 | DB            | PostgreSQL 17 (Docker), Testcontainers (test)                                    |
-| Frontend      | React 18, TypeScript 5.6, Vite 6, Tailwind CSS 3.4, shadcn/ui                    |
+| Frontend      | React 19, TypeScript 5.6, Vite 6, Tailwind CSS 3.4, shadcn/ui                    |
 | Data Fetching | @tanstack/react-query 5 (useQuery, useMutation, cache invalidation)              |
 | ERD Canvas    | @xyflow/react 12, Zustand 5                                                      |
 | Editor        | @monaco-editor/react 4.6                                                         |

@@ -99,14 +99,19 @@
 - [ ] 토글 버튼의 `aria-label`에 대상 컨텍스트 포함 여부
 - [ ] 로딩 상태에 `Spinner` 컴포넌트 사용 여부
 
-### 7. 컴포넌트 구조 (Medium)
+### 7. React 19 컨벤션 (MUST)
+
+- [ ] `React.forwardRef` 사용 금지 — `ref`는 일반 prop으로 전달 (React 19)
+- [ ] `useCallback`/`useMemo` 수동 사용 지양 — React 19 compiler 자동 최적화 (단, useEffect 의존성 배열에 함수를 전달하는 경우 등 필요한 예외는 허용)
+
+### 8. 컴포넌트 구조 (Medium)
 
 - [ ] 2회 이상 반복 UI 패턴이 공유 컴포넌트로 추출되어 있는지
 - [ ] `components/ui/`에 도메인 로직이 포함되어 있지 않은지
 - [ ] `@/` alias import 사용 여부
 - [ ] ESM 전용 — `require()` 사용 금지
 
-### 8. 페이지 구조 (MUST)
+### 9. 페이지 구조 (MUST)
 
 - [ ] 페이지 파일이 도메인별 서브디렉토리(`pages/auth/`, `pages/team/`, `pages/project/`, `pages/diagram/`)에 위치하는지
 - [ ] 페이지 컴포넌트 내부 코드가 표준 순서를 준수하는지:
@@ -124,7 +129,7 @@
   12. JSX
 - [ ] `useEffect`가 쿼리/뮤테이션 사이에 끼어들지 않는지
 
-### 9. JSDoc (Medium)
+### 10. JSDoc (Medium)
 
 - [ ] 함수/컴포넌트: 멀티라인 JSDoc + `@param`
 - [ ] 인터페이스 필드: 한 줄 `/** 설명 */`

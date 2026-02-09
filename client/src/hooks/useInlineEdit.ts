@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 
 /**
  * 인라인 텍스트 편집을 위한 공통 훅.
@@ -10,18 +10,18 @@ export function useInlineEdit(onConfirm: (value: string) => void) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
 
-  const startEdit = useCallback((initialValue: string) => {
+  const startEdit = (initialValue: string) => {
     setValue(initialValue);
     setEditing(true);
-  }, []);
+  };
 
-  const confirmEdit = useCallback(() => {
+  const confirmEdit = () => {
     const trimmed = value.trim();
     if (trimmed) onConfirm(trimmed);
     setEditing(false);
-  }, [value, onConfirm]);
+  };
 
-  const cancelEdit = useCallback(() => setEditing(false), []);
+  const cancelEdit = () => setEditing(false);
 
   return { editing, value, setValue, startEdit, confirmEdit, cancelEdit };
 }
