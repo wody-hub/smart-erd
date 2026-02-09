@@ -20,6 +20,7 @@ import {
   renameDiagram,
   type DiagramSummary,
 } from '@/api/diagramApi';
+import { toast } from 'sonner';
 
 /**
  * 다이어그램 목록 페이지.
@@ -48,7 +49,7 @@ export default function DiagramsPage() {
       const data = await fetchDiagrams(teamId, projectId);
       setDiagrams(data);
     } catch {
-      console.error('Failed to fetch diagrams');
+      toast.error('Failed to load diagrams');
     } finally {
       setLoading(false);
     }
@@ -69,8 +70,9 @@ export default function DiagramsPage() {
       setNewName('');
       setDialogOpen(false);
       await loadDiagrams();
+      toast.success('Diagram created');
     } catch {
-      console.error('Failed to create diagram');
+      toast.error('Failed to create diagram');
     } finally {
       setCreating(false);
     }
@@ -85,8 +87,9 @@ export default function DiagramsPage() {
     try {
       await deleteDiagram(teamId, projectId, String(diagramId));
       await loadDiagrams();
+      toast.success('Diagram deleted');
     } catch {
-      console.error('Failed to delete diagram');
+      toast.error('Failed to delete diagram');
     }
   };
 
@@ -106,8 +109,9 @@ export default function DiagramsPage() {
       await renameDiagram(teamId, projectId, String(renamingId), renameValue.trim());
       setRenamingId(null);
       await loadDiagrams();
+      toast.success('Diagram renamed');
     } catch {
-      console.error('Failed to rename diagram');
+      toast.error('Failed to rename diagram');
     }
   };
 

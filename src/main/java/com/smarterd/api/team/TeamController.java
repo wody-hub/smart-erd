@@ -56,7 +56,9 @@ public class TeamController {
      */
     @InitBinder
     public void initBinder(WebDataBinder binder) {
-        binder.addValidators(addMemberRequestValidator);
+        if (binder.getTarget() instanceof AddMemberRequest) {
+            binder.addValidators(addMemberRequestValidator);
+        }
     }
 
     /**

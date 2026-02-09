@@ -6,6 +6,7 @@ import ProjectsPage from './pages/ProjectsPage';
 import DiagramsPage from './pages/DiagramsPage';
 import DiagramPage from './pages/DiagramPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import { Toaster } from './components/ui/sonner';
 
 /**
  * 애플리케이션 루트 컴포넌트.
@@ -15,45 +16,48 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
  */
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route
-          path="/teams"
-          element={
-            <ProtectedRoute>
-              <TeamsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/teams/:teamId/projects"
-          element={
-            <ProtectedRoute>
-              <ProjectsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/teams/:teamId/projects/:projectId/diagrams"
-          element={
-            <ProtectedRoute>
-              <DiagramsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/teams/:teamId/projects/:projectId/diagrams/:diagramId"
-          element={
-            <ProtectedRoute>
-              <DiagramPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/" element={<Navigate to="/teams" replace />} />
-        <Route path="*" element={<Navigate to="/teams" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <>
+      <Toaster />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route
+            path="/teams"
+            element={
+              <ProtectedRoute>
+                <TeamsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teams/:teamId/projects"
+            element={
+              <ProtectedRoute>
+                <ProjectsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teams/:teamId/projects/:projectId/diagrams"
+            element={
+              <ProtectedRoute>
+                <DiagramsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teams/:teamId/projects/:projectId/diagrams/:diagramId"
+            element={
+              <ProtectedRoute>
+                <DiagramPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/" element={<Navigate to="/teams" replace />} />
+          <Route path="*" element={<Navigate to="/teams" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </>
   );
 }

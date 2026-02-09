@@ -7,6 +7,7 @@ import com.smarterd.api.team.dto.TeamResponse;
 import com.smarterd.api.team.dto.UpdateMemberRoleRequest;
 import com.smarterd.domain.common.exception.AccessDeniedException;
 import com.smarterd.domain.common.exception.BusinessException;
+import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.entity.TeamMember;
@@ -112,6 +113,10 @@ public class TeamService {
         verifyAdmin(team, requester);
 
         final var targetUser = authService.findUserByLoginId(request.loginId());
+
+        if (teamMemberRepository.existsByTeamAndUser(team, targetUser)) {
+            throw new DuplicateException("User is already a member of this team: " + request.loginId());
+        }
 
         final var member = TeamMember.builder().team(team).user(targetUser).role(request.role()).build();
         teamMemberRepository.save(member);

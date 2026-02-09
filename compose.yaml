@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: 'postgres:17'
+    ports:
+      - '15432:5432'
+    environment:
+      POSTGRES_DB: smarterd
+      POSTGRES_USER: smarterd
+      POSTGRES_PASSWORD: smarterd
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    labels:
+      org.springframework.boot.service-connection: postgres
+
+volumes:
+  postgres-data:

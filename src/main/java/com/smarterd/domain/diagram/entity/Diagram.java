@@ -9,7 +9,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -21,7 +20,7 @@ import lombok.NoArgsConstructor;
  * 다이어그램 엔티티.
  *
  * <p>프로젝트({@link Project}) 소속의 ERD 다이어그램을 나타낸다.
- * {@code content} 필드에 React Flow 노드·엣지 JSON을 직렬화하여 CLOB으로 저장한다.</p>
+ * {@code content} 필드에 React Flow 노드·엣지 JSON을 직렬화하여 TEXT로 저장한다.</p>
  *
  * @see com.smarterd.domain.project.entity.Project
  */
@@ -46,8 +45,7 @@ public class Diagram extends BaseTimeEntity {
     private Project project;
 
     /** 직렬화된 React Flow JSON (노드 + 엣지) */
-    @Lob
-    @Column(columnDefinition = "CLOB")
+    @Column(columnDefinition = "TEXT")
     private String content;
 
     /**

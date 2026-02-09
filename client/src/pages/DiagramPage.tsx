@@ -6,6 +6,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import ERDCanvas from '@/components/erd/ERDCanvas';
 import useCanvasStore from '@/stores/useCanvasStore';
 import { fetchDiagram, saveDiagram } from '@/api/diagramApi';
+import { toast } from 'sonner';
 
 /**
  * 다이어그램 편집 페이지.
@@ -24,6 +25,7 @@ export default function DiagramPage() {
   const [diagramName, setDiagramName] = useState('');
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const deserialize = useCanvasStore((s) => s.deserialize);
   const serialize = useCanvasStore((s) => s.serialize);
@@ -49,7 +51,7 @@ export default function DiagramPage() {
         markClean();
         setLoaded(true);
       } catch {
-        console.error('Failed to load diagram');
+        setLoadError(true);
       }
     };
 
@@ -65,8 +67,9 @@ export default function DiagramPage() {
       const content = serialize();
       await saveDiagram(teamId, projectId, diagramId, content);
       markClean();
+      toast.success('Diagram saved');
     } catch {
-      console.error('Failed to save diagram');
+      toast.error('Failed to save diagram');
     } finally {
       setSaving(false);
     }
@@ -83,6 +86,17 @@ export default function DiagramPage() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [handleSave]);
+
+  if (loadError) {
+    return (
+      <div className="h-screen flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-destructive">Failed to load diagram. Please try again later.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!loaded) {
     return (

@@ -14,6 +14,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import axiosInstance from '@/api/axiosInstance';
+import { toast } from 'sonner';
 
 /** 팀 정보 인터페이스. */
 interface Team {
@@ -49,7 +50,7 @@ export default function TeamsPage() {
       const res = await axiosInstance.get('/teams');
       setTeams(res.data);
     } catch {
-      console.error('Failed to fetch teams');
+      toast.error('Failed to load teams');
     } finally {
       setLoading(false);
     }
@@ -70,8 +71,9 @@ export default function TeamsPage() {
       setNewTeamName('');
       setDialogOpen(false);
       await fetchTeams();
+      toast.success('Team created');
     } catch {
-      console.error('Failed to create team');
+      toast.error('Failed to create team');
     } finally {
       setCreating(false);
     }

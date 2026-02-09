@@ -2,11 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Language
+
+- **항상 한글로 답변한다.**
+
 ## Build & Run Commands
 
 ### Backend (Spring Boot)
 ```bash
-./gradlew bootRun                    # Start backend on :8080
+./gradlew bootRun                    # Start backend on :8080 (Docker PostgreSQL auto-start)
 ./gradlew build                      # Full build (compile + test)
 ./gradlew test                       # Run all tests
 ./gradlew test --tests "com.smarterd.SomeTest.methodName"  # Single test
@@ -86,7 +90,7 @@ src/main/java/com/smarterd/
     │   ├── repository/             #   ProjectRepository (findByTeam)
     │   └── service/                #   ProjectService (CRUD with team membership checks)
     ├── diagram/
-    │   ├── entity/                  #   Diagram (CLOB content — serialized React Flow JSON)
+    │   ├── entity/                  #   Diagram (TEXT content — serialized React Flow JSON)
     │   └── repository/             #   DiagramRepository
     └── dictionary/
         ├── entity/                  #   Domain (logical→physical type), Term (logical→physical name)
@@ -102,13 +106,12 @@ src/main/java/com/smarterd/
 | Path | Access |
 |------|--------|
 | `/api/auth/**` | Public |
-| `/h2-console/**` | Public |
 | `/swagger-ui/**`, `/v3/api-docs/**` | Public |
 | All other paths | Authenticated |
 
 **Configuration:** Custom properties are namespaced under `smart-erd.*` in `application.yml`. JWT and CORS settings use `@ConfigurationProperties` for type-safe binding (`smart-erd.jwt.*`, `smart-erd.cors.*`).
 
-**Database:** H2 in-memory with `ddl-auto: create-drop`. H2 console at `/h2-console`.
+**Database:** PostgreSQL 17 (Docker). `spring-boot-docker-compose`가 `compose.yaml`을 자동 감지하여 컨테이너를 시작하고, datasource를 자동 주입한다. `ddl-auto: create-drop`. Docker Desktop이 실행 중이어야 한다.
 
 ### Frontend: Vite 6 + React 18 + TypeScript + shadcn/ui
 
@@ -178,7 +181,7 @@ client/
 
 - **Handle IDs:** `{nodeId}-{colId}-source` / `{nodeId}-{colId}-target` — enables column-level relationships
 - **Edge IDs:** `e-{sourceHandle}-{targetHandle}`
-- **Diagram persistence:** `useCanvasStore.serialize()` → JSON string stored in `Diagram.content` (CLOB)
+- **Diagram persistence:** `useCanvasStore.serialize()` → JSON string stored in `Diagram.content` (TEXT)
 - **Type assertion needed:** `applyNodeChanges()` returns generic `Node[]`, must cast to `Node<TableNodeData>[]`
 - **Documentation:** All classes, methods, and fields have Javadoc/JSDoc. Fields use single-line `/** */` format.
 
@@ -189,7 +192,7 @@ client/
 | Backend | Spring Boot 3.5.10, Java 25, Gradle 8.12, Spring Security 6.x, Spring Data JPA |
 | Query | QueryDSL 5.1.0:jakarta, Blaze-Persistence 1.6.17 |
 | Auth | Spring OAuth2 Resource Server (HMAC-SHA256 JWT), BCrypt |
-| DB | H2 in-memory |
+| DB | PostgreSQL 17 (Docker), Testcontainers (test) |
 | Frontend | React 18, TypeScript 5.6, Vite 6, Tailwind CSS 3.4, shadcn/ui |
 | ERD Canvas | @xyflow/react 12, Zustand 5 |
 | Editor | @monaco-editor/react 4.6 |

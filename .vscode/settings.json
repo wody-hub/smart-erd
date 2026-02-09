@@ -12,6 +12,7 @@
         "signup",
         "smarterd",
         "springframework",
+        "Testcontainers",
         "xyflow"
     ],
     "java.format.settings.url": ".vscode/java-formatter.xml",

@@ -47,7 +47,9 @@ public class AuthController {
      */
     @InitBinder
     public void initBinder(WebDataBinder binder) {
-        binder.addValidators(signupRequestValidator);
+        if (binder.getTarget() instanceof SignupRequest) {
+            binder.addValidators(signupRequestValidator);
+        }
     }
 
     /**

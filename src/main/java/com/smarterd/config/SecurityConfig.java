@@ -24,7 +24,6 @@ import org.springframework.web.cors.CorsConfigurationSource;
  * <p>공개 경로:
  * <ul>
  *   <li>{@code /api/auth/**} — 로그인·회원가입</li>
- *   <li>{@code /h2-console/**} — H2 데이터베이스 콘솔</li>
  *   <li>{@code /swagger-ui/**, /v3/api-docs/**} — Swagger UI 및 OpenAPI 스펙</li>
  * </ul></p>
  */
@@ -39,7 +38,7 @@ public class SecurityConfig {
     /**
      * HTTP 보안 필터 체인을 구성한다.
      *
-     * <p>CSRF 비활성화, Stateless 세션, H2 콘솔 iframe 허용,
+     * <p>CSRF 비활성화, Stateless 세션, iframe 보안 설정,
      * OAuth2 Resource Server JWT 검증을 설정한다.</p>
      *
      * @param http HttpSecurity 빌더
@@ -56,8 +55,6 @@ public class SecurityConfig {
             .authorizeHttpRequests((auth) ->
                 auth
                     .requestMatchers("/api/auth/**")
-                    .permitAll()
-                    .requestMatchers("/h2-console/**")
                     .permitAll()
                     .requestMatchers("/swagger-ui/**", "/v3/api-docs/**")
                     .permitAll()

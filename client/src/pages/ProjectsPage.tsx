@@ -15,6 +15,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import axiosInstance from '@/api/axiosInstance';
+import { toast } from 'sonner';
 
 /** 프로젝트 정보 인터페이스. */
 interface Project {
@@ -93,7 +94,7 @@ export default function ProjectsPage() {
       const res = await axiosInstance.get(`/teams/${teamId}/projects`);
       setProjects(res.data);
     } catch {
-      console.error('Failed to fetch projects');
+      toast.error('Failed to load projects');
     } finally {
       setLoading(false);
     }
@@ -105,7 +106,7 @@ export default function ProjectsPage() {
       const res = await axiosInstance.get(`/teams/${teamId}/members`);
       setMembers(res.data);
     } catch {
-      console.error('Failed to fetch members');
+      toast.error('Failed to load members');
     }
   }, [teamId]);
 
@@ -126,8 +127,9 @@ export default function ProjectsPage() {
       setNewProjectName('');
       setProjectDialogOpen(false);
       await fetchProjects();
+      toast.success('Project created');
     } catch {
-      console.error('Failed to create project');
+      toast.error('Failed to create project');
     } finally {
       setCreatingProject(false);
     }
@@ -141,8 +143,9 @@ export default function ProjectsPage() {
     try {
       await axiosInstance.delete(`/teams/${teamId}/projects/${projectId}`);
       await fetchProjects();
+      toast.success('Project deleted');
     } catch {
-      console.error('Failed to delete project');
+      toast.error('Failed to delete project');
     }
   };
 
@@ -176,8 +179,9 @@ export default function ProjectsPage() {
       await axiosInstance.delete(`/teams/${teamId}/members/${userId}`);
       await fetchMembers();
       await fetchTeam();
+      toast.success('Member removed');
     } catch {
-      console.error('Failed to remove member');
+      toast.error('Failed to remove member');
     }
   };
 

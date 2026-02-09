@@ -3,6 +3,7 @@ package com.smarterd.domain.user.service;
 import com.smarterd.api.auth.dto.AuthResponse;
 import com.smarterd.api.auth.dto.LoginRequest;
 import com.smarterd.api.auth.dto.SignupRequest;
+import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.repository.UserRepository;
@@ -61,6 +62,10 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse signup(SignupRequest request) {
+        if (userRepository.existsByLoginId(request.loginId())) {
+            throw new DuplicateException("Login ID already exists: " + request.loginId());
+        }
+
         final var user = User.builder()
             .loginId(request.loginId())
             .password(passwordEncoder.encode(request.password()))

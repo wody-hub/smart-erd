@@ -1,5 +1,7 @@
 # Smart ERD
 
+> **Claude Code 응답 언어: 한글**
+
 ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션.
 
 테이블 노드를 시각적으로 배치하고, 컬럼 레벨의 관계(FK)를 드래그로 연결하며, 데이터 사전(도메인/용어)을 통해 컬럼 타입과 이름을 표준화할 수 있다.
@@ -11,7 +13,7 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 | Backend    | Spring Boot 3.5.10, Java 25, Gradle 8.12, Spring Security 6.x, Spring Data JPA |
 | 인증       | Spring OAuth2 Resource Server (HMAC-SHA256 JWT), BCrypt                         |
 | 쿼리       | QueryDSL 5.1.0:jakarta, Blaze-Persistence 1.6.17                               |
-| DB         | H2 in-memory (`ddl-auto: create-drop`)                                          |
+| DB         | PostgreSQL 17 (Docker), Testcontainers (test), `ddl-auto: create-drop`           |
 | Frontend   | React 18, TypeScript 5.6, Vite 6, Tailwind CSS 3.4, shadcn/ui                  |
 | API 문서   | springdoc-openapi (Swagger UI)                                                   |
 | ERD 캔버스 | @xyflow/react 12, Zustand 5                                                     |
@@ -25,11 +27,12 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 
 - Java 25+
 - Node.js 20+
+- Docker Desktop (PostgreSQL 컨테이너 자동 기동)
 
 ### 백엔드
 
 ```bash
-./gradlew bootRun          # http://localhost:8080
+./gradlew bootRun          # http://localhost:8080 (Docker PostgreSQL 자동 시작)
 ```
 
 ### 프론트엔드
@@ -95,7 +98,7 @@ src/main/java/com/smarterd/
     │   ├── repository/             #   ProjectRepository (findByTeam)
     │   └── service/                #   ProjectService (프로젝트 CRUD, 팀 소속 확인)
     ├── diagram/
-    │   ├── entity/                  #   Diagram (CLOB content — React Flow JSON 직렬화)
+    │   ├── entity/                  #   Diagram (TEXT content — React Flow JSON 직렬화)
     │   └── repository/             #   DiagramRepository
     └── dictionary/
         ├── entity/                  #   Domain (논리명→물리타입), Term (논리명→물리명)
@@ -357,7 +360,7 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 - **Team** : 프로젝트와 데이터 사전을 소유하는 조직 단위
 - **TeamMember** : 팀-사용자 다대다 조인 (`@IdClass(TeamMemberId)` record 복합키, 역할: ADMIN, MEMBER, VIEWER)
 - **Project** : ERD 프로젝트 그룹 (Team 소속)
-- **Diagram** : React Flow JSON을 CLOB으로 저장하는 ERD 다이어그램 (Project 소속)
+- **Diagram** : React Flow JSON을 TEXT로 저장하는 ERD 다이어그램 (Project 소속)
 - **Domain** : 논리명→물리 데이터타입 매핑 사전 (예: "금액" → `DECIMAL(15,2)`)
 - **Term** : 논리명→물리명 매핑 사전 (예: "사용자명" → `user_name`), Domain 참조 가능
 
@@ -454,7 +457,7 @@ lib/utils.ts        →  cn() = clsx + tailwind-merge (클래스 병합 유틸�
 - Handle ID: `{nodeId}-{colId}-source` / `{nodeId}-{colId}-target`
 - Edge ID: `e-{sourceHandle}-{targetHandle}`
 - Edge 타입: `step` (직각 연결), `MarkerType.ArrowClosed`
-- 상태: Zustand `useCanvasStore` — `serialize()` → JSON 문자열 → `Diagram.content` (CLOB)
+- 상태: Zustand `useCanvasStore` — `serialize()` → JSON 문자열 → `Diagram.content` (TEXT)
 
 ### 라우팅
 
@@ -482,8 +485,9 @@ baseURL: /api  →  Vite 프록시  →  localhost:8080
 
 ```yaml
 spring:
-  datasource:
-    url: jdbc:h2:mem:smarterd           # H2 인메모리
+  docker:
+    compose:
+      lifecycle-management: start-only  # 앱 종료 시 컨테이너 유지
   jpa:
     hibernate.ddl-auto: create-drop     # 기동 시 스키마 재생성
     show-sql: true
@@ -496,12 +500,13 @@ smart-erd:
     expiration: 86400000                # 24시간 (ms)
 ```
 
+> `spring-boot-docker-compose`가 `compose.yaml`을 자동 감지하여 PostgreSQL 컨테이너를 시작하고, datasource를 자동 주입한다.
+
 ### Spring Security 접근 제어
 
 | 경로                | 접근 권한  |
 | ------------------- | --------- |
 | `/api/auth/**`      | 공개       |
-| `/h2-console/**`    | 공개       |
 | `/swagger-ui/**`    | 공개       |
 | `/v3/api-docs/**`   | 공개       |
 | 그 외 모든 경로      | 인증 필요  |
@@ -521,7 +526,7 @@ annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
 
 ```bash
 # 백엔드
-./gradlew bootRun            # 개발 서버 기동 (:8080)
+./gradlew bootRun            # 개발 서버 기동 (:8080, Docker PostgreSQL 자동 시작)
 ./gradlew build              # 전체 빌드 (컴파일 + 테스트)
 ./gradlew test               # 테스트 실행
 ./gradlew compileJava        # 컴파일만 (QueryDSL/Lombok AP 트리거)
@@ -541,8 +546,9 @@ npm run format:check         # 포맷 검사 (CI용)
 
 ## 데이터베이스
 
-H2 인메모리 DB를 사용하며, 서버 기동 시마다 스키마가 재생성된다 (`ddl-auto: create-drop`).
+PostgreSQL 17을 Docker 컨테이너로 사용한다. `spring-boot-docker-compose`가 프로젝트 루트의 `compose.yaml`을 자동 감지하여 컨테이너 시작 및 datasource 주입을 처리한다.
 
-- H2 콘솔: `http://localhost:8080/h2-console`
-- JDBC URL: `jdbc:h2:mem:smarterd`
-- Username: `sa` / Password: (없음)
+- **개발 환경:** `./gradlew bootRun` 시 Docker 컨테이너 자동 시작 (`lifecycle-management: start-only` — 앱 종료 시 컨테이너 유지)
+- **테스트 환경:** Testcontainers가 임시 PostgreSQL 컨테이너를 자동 생성/폐기
+- **스키마:** `ddl-auto: create-drop` — 기동 시마다 재생성
+- **전제 조건:** Docker Desktop 실행 중, 포트 5432 사용 가능, 최초 실행 시 `postgres:17` 이미지 다운로드 (~400MB)
