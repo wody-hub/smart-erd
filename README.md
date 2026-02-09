@@ -20,7 +20,7 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 | ERD 캔버스  | @xyflow/react 12, Zustand 5                                                    |
 | 에디터      | @monaco-editor/react 4.6                                                       |
 | 단축키      | react-hotkeys-hook 5                                                           |
-| 다국어      | i18next, react-i18next, i18next-browser-languagedetector                       |
+| 다국어      | i18next, react-i18next, i18next-browser-languagedetector (FE) + Spring MessageSource (BE) |
 | 토스트      | Sonner                                                                         |
 | 포맷팅      | Prettier (Java + TypeScript 통합), prettier-plugin-java                        |
 | 코드 품질   | ESLint, SonarQube / SonarLint                                                  |
@@ -80,17 +80,20 @@ src/main/java/com/smarterd/
 │   ├── JwtConfig.java               #   JwtEncoder / JwtDecoder 빈 (NimbusJwtDecoder, HS256)
 │   ├── JwtProperties.java           #   @ConfigurationProperties("smart-erd.jwt") — secret, access-expiration, refresh-expiration
 │   ├── CorsConfig.java              #   @ConfigurationProperties("smart-erd.cors") + CorsProperties 내부 클래스
+│   ├── LocaleConfig.java            #   AcceptHeaderLocaleResolver (ko/en, 기본: en)
+│   ├── ValidationConfig.java        #   LocalValidatorFactoryBean + MessageSource 연결
 │   ├── QuerydslConfig.java          #   JPAQueryFactory 빈 (QueryDSL 타입 안전 쿼리 빌더)
 │   ├── BlazeConfig.java             #   CriteriaBuilderFactory 빈 (Blaze-Persistence 고급 쿼리)
 │   └── OpenApiConfig.java           #   Swagger/OpenAPI 설정 (JWT Bearer 인증 스킴)
 └── domain/                          # 도메인 계층 (Service도 여기에 위치)
     ├── common/
     │   ├── entity/                   #   BaseTimeEntity (createdAt, updatedAt UTC Instant 자동 감사)
-    │   └── exception/               #   커스텀 예외 계층 (4종)
-    │       ├── EntityNotFoundException.java   # → 404
+    │   └── exception/               #   커스텀 예외 계층 (5종, 모두 LocalizedException 상속)
+    │       ├── LocalizedException.java          # 추상 베이스 — messageCode + messageArgs
+    │       ├── EntityNotFoundException.java     # → 404
     │       ├── DomainAccessDeniedException.java # → 403
-    │       ├── DuplicateException.java        # → 409
-    │       └── BusinessException.java         # → 400
+    │       ├── DuplicateException.java          # → 409
+    │       └── BusinessException.java           # → 400
     ├── user/
     │   ├── entity/                   #   User, RefreshToken (loginId unique, BCrypt password)
     │   ├── repository/              #   UserRepository, RefreshTokenRepository (+Custom — QueryDSL bulk delete)
@@ -238,12 +241,15 @@ import jakarta.persistence.Id;
 | `DuplicateException`      | 409 Conflict    | 중복 리소스 (팀 멤버 중복, 로그인 ID 중복) |
 | `BusinessException`       | 400 Bad Request | 비즈니스 규칙 위반 (소유자 제거 시도 등)   |
 
-모든 예외는 `domain/common/exception/` 패키지에 위치하며, `GlobalExceptionHandler`에서 HTTP 응답으로 변환된다.
+모든 예외는 `LocalizedException(messageCode, messageArgs...)` 을 상속하며, `domain/common/exception/` 패키지에 위치한다. `GlobalExceptionHandler`가 `MessageSource`를 통해 요청 로케일에 맞는 다국어 메시지로 변환하여 HTTP 응답으로 반환한다.
 
 ```java
-// Good — 구체적 예외
+// Good — 메시지 코드 + 인자 (MessageSource가 로케일에 맞게 번역)
+throw new EntityNotFoundException("error.not-found.user", loginId);
+throw new DuplicateException("error.duplicate.login-id", request.loginId());
+
+// Bad — 하드코딩 메시지
 throw new EntityNotFoundException("User not found: " + loginId);
-throw new DuplicateException("Login ID already exists: " + request.loginId());
 
 // Bad — 범용 예외
 throw new IllegalArgumentException("User not found");
@@ -486,7 +492,7 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 | `api/`           | HTTP 인터페이스 계층 | Controller, DTO (record)                      |
 | `domain/`        | 비즈니스 도메인 계층 | Entity, Repository, Service                   |
 | `domain/common/` | 공통 코드            | BaseTimeEntity, 커스텀 예외                   |
-| `config/`        | 설정                 | Security, JWT, CORS, OpenAPI, QueryDSL, Blaze |
+| `config/`        | 설정                 | Security, JWT, CORS, Locale, Validation, OpenAPI, QueryDSL, Blaze |
 
 - DTO는 Java `record`로 작성, `@Valid` 검증 포함
 - `api/` 계층에 비즈니스 로직 금지
@@ -592,6 +598,48 @@ Client                                        Server
 - 프론트엔드는 `localStorage`에 두 토큰 저장, Axios 인터셉터로 자동 첨부
 - 401 발생 시 큐 패턴으로 동시 요청 관리: 갱신 중 다른 401 요청은 큐에 대기 → 갱신 완료 후 일괄 재시도
 
+### 다국어 (i18n)
+
+프론트엔드 UI 텍스트와 백엔드 에러 메시지 모두 다국어 처리된다. 지원 언어: **한국어(ko)**, **영어(en, 기본)**.
+
+**프론트엔드:** `react-i18next`로 UI 텍스트 번역. 번역 파일: `client/src/i18n/locales/{en,ko}/translation.json`.
+
+**백엔드:** Spring `MessageSource`로 에러 메시지(예외, 유효성 검증) 번역. 메시지 번들: `src/main/resources/i18n/messages.properties` (영어 fallback) + `messages_ko.properties` (한국어).
+
+**동작 흐름:**
+
+```text
+프론트엔드                                    백엔드
+  │  Accept-Language: ko                      │
+  │  (axiosInstance가 i18n.language 전송)      │
+  │                                    ────►  │ AcceptHeaderLocaleResolver → Locale.KOREAN
+  │                                           │ MessageSource.getMessage("error.not-found.user", {loginId}, ko)
+  │  ◄────  { "error": "사용자를 찾을 수       │
+  │           없습니다: testuser" }            │
+  │  toast.error(response.error)              │
+```
+
+**구성 요소:**
+
+| 구성 요소 | 역할 |
+|-----------|------|
+| `LocaleConfig` | `AcceptHeaderLocaleResolver` — `Accept-Language` 헤더에서 로케일 결정 (기본: en) |
+| `ValidationConfig` | `LocalValidatorFactoryBean` — Bean Validation `{key}` 보간을 `MessageSource`에 연결 |
+| `LocalizedException` | 추상 베이스 예외 — `messageCode` + `messageArgs` 보유 |
+| `GlobalExceptionHandler` | `MessageSource`로 메시지 코드를 로케일에 맞게 번역하여 반환 |
+| `messages.properties` | 영어 메시지 번들 (fallback) |
+| `messages_ko.properties` | 한국어 메시지 번들 |
+
+**메시지 키 규칙:**
+
+| 접두사 | 용도 | 예시 |
+|--------|------|------|
+| `error.not-found.*` | 엔티티 미존재 | `error.not-found.user` |
+| `error.access-denied.*` | 권한 부족 | `error.access-denied.not-member` |
+| `error.duplicate.*` | 중복 리소스 | `error.duplicate.login-id` |
+| `error.business.*` | 비즈니스 규칙 위반 | `error.business.remove-owner` |
+| `validation.*` | Bean Validation | `validation.not-blank.login-id` |
+
 ### 시간/타임존 정책 (UTC 표준화)
 
 - **백엔드 엔티티 시간 타입:** `Instant` (Java Time)
@@ -602,10 +650,11 @@ Client                                        Server
 
 ### 에러 응답 형식
 
-모든 에러는 통일된 JSON 형식으로 반환된다.
+모든 에러는 통일된 JSON 형식으로 반환되며, `Accept-Language` 헤더에 따라 다국어 메시지가 반환된다.
 
-```json
-{ "error": "User not found: testuser" }
+```text
+Accept-Language: en → { "error": "User not found: testuser" }
+Accept-Language: ko → { "error": "사용자를 찾을 수 없습니다: testuser" }
 ```
 
 | HTTP 상태 | 발생 조건                            |
@@ -696,11 +745,12 @@ ERD 편집기 영역(Header, Sidebar, TableNode, ERDCanvas)에서 사용하는 �
 
 ```text
 baseURL: /api  →  Vite 프록시  →  localhost:8080
-요청 인터셉터: localStorage Access Token → Authorization: Bearer <token>
+요청 인터셉터: Accept-Language (i18n.language) + localStorage Access Token → Authorization: Bearer <token>
 응답 인터셉터: 401 → Refresh Token으로 갱신 시도 (큐 패턴) → 실패 시 로그인 리다이렉트
 ```
 
 - 페이지에서 `axiosInstance`를 직접 호출하지 않는다. `api/` 모듈 함수를 통해서만 호출.
+- `Accept-Language` 헤더: 매 요청마다 `i18n.language` 값을 전송하여 서버 에러 메시지가 사용자 언어로 반환되도록 한다
 - 서버 에러 메시지 추출: `getErrorMessage(err, fallback)` (`lib/api-error.ts`)
 
 ## 설정 상세
@@ -712,6 +762,10 @@ spring:
     docker:
         compose:
             lifecycle-management: start-only # 앱 종료 시 컨테이너 유지
+    messages:
+        basename: i18n/messages          # 메시지 번들 경로 (i18n/messages.properties, i18n/messages_ko.properties)
+        encoding: UTF-8
+        fallback-to-system-locale: false # 항상 messages.properties (영어)로 fallback
     jackson:
         time-zone: UTC
         serialization:

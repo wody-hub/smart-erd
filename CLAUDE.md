@@ -72,17 +72,20 @@ src/main/java/com/smarterd/
 │   ├── JwtConfig.java               #   JwtEncoder / JwtDecoder beans (NimbusJwtDecoder, HS256)
 │   ├── JwtProperties.java           #   @ConfigurationProperties("smart-erd.jwt") — secret, expiration
 │   ├── CorsConfig.java              #   @ConfigurationProperties("smart-erd.cors") + CorsProperties inner class
+│   ├── LocaleConfig.java            #   AcceptHeaderLocaleResolver (ko/en, default: en)
+│   ├── ValidationConfig.java        #   LocalValidatorFactoryBean + MessageSource 연결
 │   ├── QuerydslConfig.java          #   JPAQueryFactory bean (QueryDSL type-safe query builder)
 │   ├── BlazeConfig.java             #   CriteriaBuilderFactory bean (Blaze-Persistence advanced queries)
 │   └── OpenApiConfig.java           #   Swagger/OpenAPI config (JWT Bearer auth scheme)
 └── domain/                          # Domain layer (Services live here too)
     ├── common/
     │   ├── entity/                   #   BaseTimeEntity (createdAt, updatedAt auto-audit)
-    │   └── exception/               #   Custom exception hierarchy (4 types)
-    │       ├── EntityNotFoundException.java   # → 404 Not Found
-    │       ├── AccessDeniedException.java     # → 403 Forbidden
-    │       ├── DuplicateException.java        # → 409 Conflict
-    │       └── BusinessException.java         # → 400 Bad Request
+    │   └── exception/               #   Custom exception hierarchy (5 types, all extend LocalizedException)
+    │       ├── LocalizedException.java          # Abstract base — messageCode + messageArgs
+    │       ├── EntityNotFoundException.java     # → 404 Not Found
+    │       ├── DomainAccessDeniedException.java # → 403 Forbidden
+    │       ├── DuplicateException.java          # → 409 Conflict
+    │       └── BusinessException.java           # → 400 Bad Request
     ├── user/
     │   ├── entity/                   #   User, RefreshToken (loginId unique, BCrypt password)
     │   ├── repository/              #   UserRepository, RefreshTokenRepository (+Custom — QueryDSL bulk delete)
@@ -116,6 +119,8 @@ src/main/java/com/smarterd/
 | All other paths                     | Authenticated |
 
 **Configuration:** Custom properties are namespaced under `smart-erd.*` in `application.yml`. JWT and CORS settings use `@ConfigurationProperties` for type-safe binding (`smart-erd.jwt.*`, `smart-erd.cors.*`).
+
+**Backend i18n:** All error messages (exceptions, validation) are localized server-side via Spring `MessageSource`. Message bundles: `src/main/resources/i18n/messages.properties` (English fallback) + `messages_ko.properties` (Korean). `AcceptHeaderLocaleResolver` resolves locale from `Accept-Language` header. Bean Validation `{key}` interpolation is connected to `MessageSource` via `ValidationConfig`. Frontend sends `Accept-Language: i18n.language` on every request.
 
 **Database:** PostgreSQL 17 (Docker). `spring-boot-docker-compose`가 `compose.yaml`을 자동 감지하여 컨테이너를 시작하고, datasource를 자동 주입한다. `ddl-auto: update`. Docker Desktop이 실행 중이어야 한다.
 
@@ -222,7 +227,8 @@ client/
 - State management: Zustand for client-only state (`stores/`), React Query for server state (`useQuery`/`useMutation`).
 - ESM only (`"type": "module"`) — never use `require()`, use ESM imports.
 - Adding new shadcn/ui components: create file in `components/ui/`, use `cn()`, `ref`는 일반 prop으로 전달 (`forwardRef` 사용 금지 — React 19).
-- **i18n:** All UI text is internationalized with `react-i18next`. Use `const { t } = useTranslation()` and `t('key')` instead of hardcoded strings. Translation files: `i18n/locales/{en,ko}/translation.json`. Key convention: `{domain}.{screen}.{usage}` (e.g., `auth.login.submit`). `useTranslation()` is placed after `useQueryClient` in page component code ordering.
+- **i18n (Frontend):** All UI text is internationalized with `react-i18next`. Use `const { t } = useTranslation()` and `t('key')` instead of hardcoded strings. Translation files: `i18n/locales/{en,ko}/translation.json`. Key convention: `{domain}.{screen}.{usage}` (e.g., `auth.login.submit`). `useTranslation()` is placed after `useQueryClient` in page component code ordering.
+- **i18n (Backend):** All error messages (exceptions, validation) are localized server-side via Spring `MessageSource`. Message bundles: `src/main/resources/i18n/messages.properties` (English fallback) + `messages_ko.properties` (Korean). Exceptions carry message codes (e.g., `"error.not-found.user"`) resolved by `GlobalExceptionHandler` using request `Locale`. DTO validation uses `@NotBlank(message = "{validation.not-blank.login-id}")` interpolated through `MessageSource`.
 
 **Routes:** `/login`, `/signup`, `/teams`, `/teams/:teamId/projects`, `/teams/:teamId/projects/:projectId/diagrams`, `/teams/:teamId/projects/:projectId/diagrams/:diagramId`. All routes except `/login` and `/signup` are protected by `ProtectedRoute`.
 
@@ -230,12 +236,13 @@ client/
 
 ```text
 baseURL: /api  →  Vite 프록시  →  localhost:8080
-요청 인터셉터: localStorage Access Token → Authorization: Bearer <token>
+요청 인터셉터: Accept-Language (i18n.language) + localStorage Access Token → Authorization: Bearer <token>
 응답 인터셉터: 401 → Refresh Token으로 갱신 시도 (큐 패턴) → 실패 시 로그인 리다이렉트
 ```
 
 - 페이지에서 `axiosInstance`를 직접 호출하지 않는다. `api/` 모듈 함수를 통해서만 호출.
 - 서버 에러 메시지 추출: `getErrorMessage(err, fallback)` (`lib/api-error.ts`)
+- `Accept-Language` 헤더: 매 요청마다 `i18n.language` 값을 전송하여 서버 에러 메시지가 사용자 언어로 반환되도록 한다
 - 401 발생 시 큐 패턴으로 동시 요청 관리: 갱신 중 다른 401 요청은 큐에 대기 → 갱신 완료 후 일괄 재시도
 
 ### Key Conventions
@@ -333,7 +340,12 @@ Client                                        Server
 
 ### Error Response Format
 
-모든 에러는 통일된 JSON 형식으로 반환된다: `{ "error": "User not found: testuser" }`
+모든 에러는 통일된 JSON 형식으로 반환되며, `Accept-Language` 헤더에 따라 다국어 메시지가 반환된다:
+
+```text
+Accept-Language: en → { "error": "User not found: testuser" }
+Accept-Language: ko → { "error": "사용자를 찾을 수 없습니다: testuser" }
+```
 
 | HTTP 상태 | 발생 조건                            |
 | --------- | ------------------------------------ |
@@ -356,7 +368,7 @@ Client                                        Server
 | ERD Canvas    | @xyflow/react 12, Zustand 5                                                      |
 | Editor        | @monaco-editor/react 4.6                                                         |
 | Shortcuts     | react-hotkeys-hook 5                                                             |
-| i18n          | i18next, react-i18next, i18next-browser-languagedetector                         |
+| i18n          | i18next, react-i18next, i18next-browser-languagedetector (FE) + Spring MessageSource (BE) |
 | Toast         | Sonner                                                                           |
 | Formatting    | Prettier (Java + TypeScript), prettier-plugin-java                               |
 | Code Quality  | ESLint, SonarQube / SonarLint                                                    |
@@ -378,16 +390,25 @@ Client                                        Server
 
 ### Exception Hierarchy
 
-Use domain-specific custom exceptions (NOT `IllegalArgumentException`):
+Use domain-specific custom exceptions (NOT `IllegalArgumentException`). All exceptions extend `LocalizedException` and carry a message code + args for i18n resolution.
 
-| Exception                 | HTTP Status | Usage                                          |
-| ------------------------- | ----------- | ---------------------------------------------- |
-| `EntityNotFoundException` | 404         | Entity lookup failure                          |
-| `AccessDeniedException`   | 403         | Permission denied (not a member, not ADMIN)    |
-| `DuplicateException`      | 409         | Duplicate resource (member, login ID)          |
-| `BusinessException`       | 400         | Business rule violation (removing owner, etc.) |
+| Exception                      | HTTP Status | Usage                                          |
+| ------------------------------ | ----------- | ---------------------------------------------- |
+| `EntityNotFoundException`      | 404         | Entity lookup failure                          |
+| `DomainAccessDeniedException`  | 403         | Permission denied (not a member, not ADMIN)    |
+| `DuplicateException`           | 409         | Duplicate resource (member, login ID)          |
+| `BusinessException`            | 400         | Business rule violation (removing owner, etc.) |
 
-All exceptions in `domain/common/exception/`, mapped by `GlobalExceptionHandler`.
+All exceptions extend `LocalizedException(messageCode, messageArgs...)` in `domain/common/exception/`. `GlobalExceptionHandler` resolves the message code via `MessageSource` + request `Locale` and returns the translated message.
+
+```java
+// Good — message code + args (resolved via MessageSource)
+throw new EntityNotFoundException("error.not-found.user", loginId);
+throw new DuplicateException("error.duplicate.login-id", request.loginId());
+
+// Bad — hardcoded message string
+throw new EntityNotFoundException("User not found: " + loginId);
+```
 
 ### Transaction Pattern
 
