@@ -21,6 +21,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  /** 로그인 폼 제출 핸들러. API 인증 후 토큰을 저장하고 /teams로 이동한다. */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');

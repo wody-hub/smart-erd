@@ -16,24 +16,39 @@ import {
 } from '@/components/ui/dialog';
 import axiosInstance from '@/api/axiosInstance';
 
+/** 프로젝트 정보 인터페이스. */
 interface Project {
+  /** 프로젝트 ID */
   id: number;
+  /** 프로젝트 이름 */
   name: string;
+  /** 소속 팀 ID */
   teamId: number;
+  /** 생성 일시 (ISO 8601) */
   createdAt: string;
 }
 
+/** 팀 멤버 정보 인터페이스. */
 interface TeamMember {
+  /** 사용자 ID */
   userId: number;
+  /** 로그인 ID */
   loginId: string;
+  /** 사용자 이름 */
   name: string;
+  /** 팀 내 역할 */
   role: 'ADMIN' | 'MEMBER' | 'VIEWER';
 }
 
+/** 팀 정보 인터페이스. */
 interface Team {
+  /** 팀 ID */
   id: number;
+  /** 팀 이름 */
   name: string;
+  /** 소유자 이름 */
   ownerName: string;
+  /** 멤버 수 */
   memberCount: number;
 }
 
@@ -62,6 +77,7 @@ export default function ProjectsPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState('');
 
+  /** 팀 상세 정보를 조회한다. 실패 시 팀 목록으로 이동한다. */
   const fetchTeam = useCallback(async () => {
     try {
       const res = await axiosInstance.get(`/teams/${teamId}`);
@@ -71,6 +87,7 @@ export default function ProjectsPage() {
     }
   }, [teamId, navigate]);
 
+  /** 팀의 프로젝트 목록을 조회한다. */
   const fetchProjects = useCallback(async () => {
     try {
       const res = await axiosInstance.get(`/teams/${teamId}/projects`);
@@ -82,6 +99,7 @@ export default function ProjectsPage() {
     }
   }, [teamId]);
 
+  /** 팀의 멤버 목록을 조회한다. */
   const fetchMembers = useCallback(async () => {
     try {
       const res = await axiosInstance.get(`/teams/${teamId}/members`);
@@ -97,6 +115,7 @@ export default function ProjectsPage() {
     fetchMembers();
   }, [fetchTeam, fetchProjects, fetchMembers]);
 
+  /** 프로젝트 생성 폼 제출 핸들러. 생성 후 목록을 갱신한다. */
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProjectName.trim()) return;
@@ -114,6 +133,7 @@ export default function ProjectsPage() {
     }
   };
 
+  /** 프로젝트 삭제 핸들러. 확인 후 삭제하고 목록을 갱신한다. */
   const handleDeleteProject = async (projectId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Are you sure you want to delete this project?')) return;
@@ -126,6 +146,7 @@ export default function ProjectsPage() {
     }
   };
 
+  /** 멤버 초대 폼 제출 핸들러. 초대 후 멤버 및 팀 정보를 갱신한다. */
   const handleInviteMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteLoginId.trim()) return;
@@ -147,6 +168,7 @@ export default function ProjectsPage() {
     }
   };
 
+  /** 멤버 제거 핸들러. 확인 후 제거하고 멤버 및 팀 정보를 갱신한다. */
   const handleRemoveMember = async (userId: number) => {
     if (!confirm('Remove this member from the team?')) return;
 

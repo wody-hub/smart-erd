@@ -15,11 +15,17 @@ import {
 } from '@/components/ui/dialog';
 import axiosInstance from '@/api/axiosInstance';
 
+/** 팀 정보 인터페이스. */
 interface Team {
+  /** 팀 ID */
   id: number;
+  /** 팀 이름 */
   name: string;
+  /** 소유자 이름 */
   ownerName: string;
+  /** 멤버 수 */
   memberCount: number;
+  /** 생성 일시 (ISO 8601) */
   createdAt: string;
 }
 
@@ -37,6 +43,7 @@ export default function TeamsPage() {
   const [newTeamName, setNewTeamName] = useState('');
   const [creating, setCreating] = useState(false);
 
+  /** 서버에서 팀 목록을 조회한다. */
   const fetchTeams = async () => {
     try {
       const res = await axiosInstance.get('/teams');
@@ -52,6 +59,7 @@ export default function TeamsPage() {
     fetchTeams();
   }, []);
 
+  /** 팀 생성 폼 제출 핸들러. 생성 후 목록을 갱신한다. */
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTeamName.trim()) return;

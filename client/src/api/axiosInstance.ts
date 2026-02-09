@@ -10,6 +10,7 @@ const axiosInstance = axios.create({
   baseURL: '/api',
 });
 
+/** 요청 인터셉터: localStorage의 JWT 토큰을 Authorization 헤더에 첨부한다. */
 axiosInstance.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -18,6 +19,7 @@ axiosInstance.interceptors.request.use((config) => {
   return config;
 });
 
+/** 응답 인터셉터: 401 응답 시 인증 정보를 삭제하고 로그인 페이지로 리다이렉트한다. */
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {

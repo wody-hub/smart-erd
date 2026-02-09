@@ -22,6 +22,7 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  /** 회원가입 폼 제출 핸들러. 가입 성공 시 자동 로그인 후 /teams로 이동한다. */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');

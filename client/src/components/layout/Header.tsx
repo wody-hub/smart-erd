@@ -12,6 +12,7 @@ export default function Header() {
   const navigate = useNavigate();
   const { name, isAuthenticated, logout } = useAuthStore();
 
+  /** 로그아웃 처리 후 로그인 페이지로 이동한다. */
   const handleLogout = () => {
     logout();
     navigate('/login');
