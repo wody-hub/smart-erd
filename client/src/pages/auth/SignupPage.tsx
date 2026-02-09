@@ -1,14 +1,16 @@
-import { signup } from '@/api/authApi';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ROUTES } from '@/constants/routes';
-import { getErrorMessage } from '@/lib/api-error';
-import useAuthStore from '@/stores/useAuthStore';
 import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { signup } from '@/api/authApi';
+import useAuthStore from '@/stores/useAuthStore';
+import { getErrorMessage } from '@/lib/api-error';
+import { ROUTES } from '@/constants/routes';
+import { toast } from 'sonner';
 
 /**
  * 회원가입 페이지 컴포넌트.
@@ -25,27 +27,21 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   /** 사용자 표시 이름 입력값 */
   const [name, setName] = useState('');
-  /** 회원가입 실패 시 에러 메시지 */
-  const [error, setError] = useState('');
-  /** 회원가입 API 호출 중 여부 */
-  const [loading, setLoading] = useState(false);
   const login = useAuthStore((s) => s.login);
 
-  /** 회원가입 폼 제출 핸들러. 가입 성공 시 자동 로그인 후 /teams로 이동한다. @param e 폼 이벤트 */
-  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      const data = await signup(loginId, password, name);
+  const signupMutation = useMutation({
+    mutationFn: () => signup(loginId, password, name),
+    onSuccess: (data) => {
       login(data.accessToken, data.refreshToken, data.loginId, data.name);
       navigate(ROUTES.TEAMS);
-    } catch (err) {
-      setError(getErrorMessage(err, t('auth.signup.error')));
-    } finally {
-      setLoading(false);
-    }
+    },
+    onError: (err) => toast.error(getErrorMessage(err, t('auth.signup.error'))),
+  });
+
+  /** 회원가입 폼 제출 핸들러. @param e 폼 이벤트 */
+  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    signupMutation.mutate();
   };
 
   return (
@@ -86,9 +82,8 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? t('auth.signup.submitting') : t('auth.signup.submit')}
+            <Button type="submit" className="w-full" disabled={signupMutation.isPending}>
+              {signupMutation.isPending ? t('auth.signup.submitting') : t('auth.signup.submit')}
             </Button>
           </form>
         </CardContent>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -9,6 +10,7 @@ import { login as loginApi } from '@/api/authApi';
 import useAuthStore from '@/stores/useAuthStore';
 import { getErrorMessage } from '@/lib/api-error';
 import { ROUTES } from '@/constants/routes';
+import { toast } from 'sonner';
 
 /**
  * 로그인 페이지 컴포넌트.
@@ -23,27 +25,21 @@ export default function LoginPage() {
   const [loginId, setLoginId] = useState('');
   /** 비밀번호 입력값 */
   const [password, setPassword] = useState('');
-  /** 로그인 실패 시 에러 메시지 */
-  const [error, setError] = useState('');
-  /** 로그인 API 호출 중 여부 */
-  const [loading, setLoading] = useState(false);
   const login = useAuthStore((s) => s.login);
 
-  /** 로그인 폼 제출 핸들러. API 인증 후 토큰을 저장하고 /teams로 이동한다. @param e 폼 이벤트 */
-  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      const data = await loginApi(loginId, password);
+  const loginMutation = useMutation({
+    mutationFn: () => loginApi(loginId, password),
+    onSuccess: (data) => {
       login(data.accessToken, data.refreshToken, data.loginId, data.name);
       navigate(ROUTES.TEAMS);
-    } catch (err) {
-      setError(getErrorMessage(err, t('auth.login.error')));
-    } finally {
-      setLoading(false);
-    }
+    },
+    onError: (err) => toast.error(getErrorMessage(err, t('auth.login.error'))),
+  });
+
+  /** 로그인 폼 제출 핸들러. @param e 폼 이벤트 */
+  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    loginMutation.mutate();
   };
 
   return (
@@ -74,9 +70,8 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? t('auth.login.submitting') : t('auth.login.submit')}
+            <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+              {loginMutation.isPending ? t('auth.login.submitting') : t('auth.login.submit')}
             </Button>
           </form>
         </CardContent>

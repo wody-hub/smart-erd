@@ -16,7 +16,8 @@
     "aria": {
       "confirmRename": "이름 변경 확인",
       "cancelRename": "이름 변경 취소",
-      "language": "언어"
+      "language": "언어",
+      "closeDialog": "대화상자 닫기"
     }
   },
   "auth": {
@@ -72,8 +73,9 @@
       "loginIdLabel": "로그인 ID",
       "loginIdPlaceholder": "로그인 ID",
       "roleLabel": "역할",
-      "roleMember": "MEMBER",
-      "roleViewer": "VIEWER",
+      "roleAdmin": "관리자",
+      "roleMember": "멤버",
+      "roleViewer": "조회자",
       "inviteFailed": "멤버 초대에 실패했습니다",
       "removed": "멤버가 제거되었습니다",
       "removeFailed": "멤버 제거에 실패했습니다",

@@ -2,7 +2,7 @@ package com.smarterd.api.team.dto;
 
 import com.smarterd.domain.team.entity.Team;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 팀 응답 DTO.
@@ -23,7 +23,7 @@ public record TeamResponse(
 
     @Schema(description = "멤버 수", example = "3") int memberCount,
 
-    @Schema(description = "생성 시각") LocalDateTime createdAt
+    @Schema(description = "생성 시각 (UTC, ISO-8601)") Instant createdAt
 ) {
     /**
      * Team 엔티티로부터 응답 DTO를 생성한다.

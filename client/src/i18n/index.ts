@@ -22,6 +22,9 @@ i18n
       ko: { translation: ko },
     },
     fallbackLng: 'en',
+    supportedLngs: ['en', 'ko'],
+    nonExplicitSupportedLngs: true,
+    load: 'languageOnly',
     interpolation: { escapeValue: false },
     detection: {
       order: ['localStorage', 'navigator'],
@@ -29,5 +32,13 @@ i18n
       caches: ['localStorage'],
     },
   });
+
+if (typeof document !== 'undefined') {
+  const syncHtmlLang = (lng: string) => {
+    document.documentElement.lang = lng.split('-')[0] ?? 'en';
+  };
+  syncHtmlLang(i18n.resolvedLanguage ?? i18n.language ?? 'en');
+  i18n.on('languageChanged', syncHtmlLang);
+}
 
 export default i18n;

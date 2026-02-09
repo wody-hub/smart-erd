@@ -16,7 +16,8 @@
     "aria": {
       "confirmRename": "Confirm rename",
       "cancelRename": "Cancel rename",
-      "language": "Language"
+      "language": "Language",
+      "closeDialog": "Close dialog"
     }
   },
   "auth": {
@@ -73,8 +74,9 @@
       "loginIdLabel": "Login ID",
       "loginIdPlaceholder": "Login ID",
       "roleLabel": "Role",
-      "roleMember": "MEMBER",
-      "roleViewer": "VIEWER",
+      "roleAdmin": "Admin",
+      "roleMember": "Member",
+      "roleViewer": "Viewer",
       "inviteFailed": "Failed to invite member",
       "removed": "Member removed",
       "removeFailed": "Failed to remove member",

@@ -2,7 +2,7 @@ package com.smarterd.api.diagram.dto;
 
 import com.smarterd.domain.diagram.entity.Diagram;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 다이어그램 상세용 응답 DTO (content 포함).
@@ -24,9 +24,9 @@ public record DiagramDetailResponse(
 
     @Schema(description = "직렬화된 React Flow JSON") String content,
 
-    @Schema(description = "생성 시각") LocalDateTime createdAt,
+    @Schema(description = "생성 시각 (UTC, ISO-8601)") Instant createdAt,
 
-    @Schema(description = "수정 시각") LocalDateTime updatedAt
+    @Schema(description = "수정 시각 (UTC, ISO-8601)") Instant updatedAt
 ) {
     /**
      * Diagram 엔티티로부터 상세 응답 DTO를 생성한다.

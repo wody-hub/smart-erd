@@ -3,7 +3,7 @@ package com.smarterd.domain.common.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.MappedSuperclass;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import lombok.Getter;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -23,10 +23,11 @@ public abstract class BaseTimeEntity {
 
     /** 엔티티 최초 생성 시각 (수정 불가) */
     @CreatedDate
-    @Column(updatable = false)
-    private LocalDateTime createdAt;
+    @Column(updatable = false, columnDefinition = "TIMESTAMP WITH TIME ZONE")
+    private Instant createdAt;
 
     /** 엔티티 마지막 수정 시각 */
     @LastModifiedDate
-    private LocalDateTime updatedAt;
+    @Column(columnDefinition = "TIMESTAMP WITH TIME ZONE")
+    private Instant updatedAt;
 }

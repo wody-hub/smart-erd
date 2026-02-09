@@ -3,6 +3,11 @@ spring:
     compose:
       lifecycle-management: start-only
 
+  jackson:
+    time-zone: UTC
+    serialization:
+      write-dates-as-timestamps: false
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -10,6 +15,8 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        jdbc:
+          time_zone: UTC
 
 smart-erd:
   cors:

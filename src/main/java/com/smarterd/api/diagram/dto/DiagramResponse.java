@@ -2,7 +2,7 @@ package com.smarterd.api.diagram.dto;
 
 import com.smarterd.domain.diagram.entity.Diagram;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 다이어그램 목록용 응답 DTO (content 미포함).
@@ -21,9 +21,9 @@ public record DiagramResponse(
 
     @Schema(description = "소속 프로젝트 ID", example = "1") Long projectId,
 
-    @Schema(description = "생성 시각") LocalDateTime createdAt,
+    @Schema(description = "생성 시각 (UTC, ISO-8601)") Instant createdAt,
 
-    @Schema(description = "수정 시각") LocalDateTime updatedAt
+    @Schema(description = "수정 시각 (UTC, ISO-8601)") Instant updatedAt
 ) {
     /**
      * Diagram 엔티티로부터 목록용 응답 DTO를 생성한다.

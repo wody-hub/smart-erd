@@ -45,7 +45,7 @@ public class RefreshToken {
     private String token;
 
     /** 토큰 만료 시각 */
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TIMESTAMP WITH TIME ZONE")
     private Instant expiresAt;
 
     /**

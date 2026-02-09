@@ -78,14 +78,14 @@ src/main/java/com/smarterd/
 ├── config/                          # 설정
 │   ├── SecurityConfig.java          #   Spring Security (OAuth2 Resource Server JWT, CSRF 비활성)
 │   ├── JwtConfig.java               #   JwtEncoder / JwtDecoder 빈 (NimbusJwtDecoder, HS256)
-│   ├── JwtProperties.java           #   @ConfigurationProperties("smart-erd.jwt") — secret, expiration
+│   ├── JwtProperties.java           #   @ConfigurationProperties("smart-erd.jwt") — secret, access-expiration, refresh-expiration
 │   ├── CorsConfig.java              #   @ConfigurationProperties("smart-erd.cors") + CorsProperties 내부 클래스
 │   ├── QuerydslConfig.java          #   JPAQueryFactory 빈 (QueryDSL 타입 안전 쿼리 빌더)
 │   ├── BlazeConfig.java             #   CriteriaBuilderFactory 빈 (Blaze-Persistence 고급 쿼리)
 │   └── OpenApiConfig.java           #   Swagger/OpenAPI 설정 (JWT Bearer 인증 스킴)
 └── domain/                          # 도메인 계층 (Service도 여기에 위치)
     ├── common/
-    │   ├── entity/                   #   BaseTimeEntity (createdAt, updatedAt 자동 감사)
+    │   ├── entity/                   #   BaseTimeEntity (createdAt, updatedAt UTC Instant 자동 감사)
     │   └── exception/               #   커스텀 예외 계층 (4종)
     │       ├── EntityNotFoundException.java   # → 404
     │       ├── AccessDeniedException.java     # → 403
@@ -177,8 +177,8 @@ client/
     │   └── query-client.ts          # QueryClient 설정 (staleTime: 30s, retry: 1)
     ├── pages/                       # 도메인별 페이지 디렉토리
     │   ├── auth/
-    │   │   ├── LoginPage.tsx        # 로그인 폼 (authApi, 성공 시 /teams 이동)
-    │   │   └── SignupPage.tsx       # 회원가입 폼 (authApi, 성공 시 자동 로그인)
+    │   │   ├── LoginPage.tsx        # 로그인 폼 (useMutation + authApi, 성공 시 /teams 이동)
+    │   │   └── SignupPage.tsx       # 회원가입 폼 (useMutation + authApi, 성공 시 자동 로그인)
     │   ├── team/
     │   │   └── TeamsPage.tsx        # 팀 목록 + 생성 (useQuery + useMutation + CreateResourceDialog)
     │   ├── project/
@@ -436,11 +436,11 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 
 #### 데이터 페칭 — React Query
 
-서버 상태는 반드시 React Query로 관리한다. 수동 `useEffect` + `useState(loading)` 패턴 사용 금지.
+서버 상태는 반드시 React Query로 관리한다. 수동 `useEffect` + `useState(loading)` 패턴 사용 금지. 인증 페이지(Login, Signup)를 포함한 **모든 페이지**에서 `useMutation`을 사용한다.
 
 - 조회: `useQuery` + `queryKeys.*` (URL 경로 계층 구조와 동일)
 - 변경: `useMutation` + `onSuccess`에서 `invalidateQueries`로 캐시 무효화
-- 에러: `onError`에서 `getErrorMessage(err, fallback)` + `toast.error()`
+- 에러: `onError`에서 `toast.error(getErrorMessage(err, t('key')))` 패턴으로 통일 (인라인 에러 표시 금지)
 
 #### API 레이어
 
@@ -525,7 +525,7 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 - **Domain** : 논리명→물리 데이터타입 매핑 사전 (예: "금액" → `DECIMAL(15,2)`)
 - **Term** : 논리명→물리명 매핑 사전 (예: "사용자명" → `user_name`), Domain 참조 가능
 
-모든 엔티티는 `BaseTimeEntity`를 상속하여 `createdAt`, `updatedAt`을 자동 기록한다.
+모든 엔티티는 `BaseTimeEntity`를 상속하여 `createdAt`, `updatedAt`을 UTC 기준 `Instant`로 자동 기록한다.
 
 ## API 엔드포인트
 
@@ -591,6 +591,14 @@ Client                                        Server
 - **Refresh Token**: UUID, 만료 24시간, 로테이션 전략 (사용 시 새 토큰 발급 + 기존 폐기)
 - 프론트엔드는 `localStorage`에 두 토큰 저장, Axios 인터셉터로 자동 첨부
 - 401 발생 시 큐 패턴으로 동시 요청 관리: 갱신 중 다른 401 요청은 큐에 대기 → 갱신 완료 후 일괄 재시도
+
+### 시간/타임존 정책 (UTC 표준화)
+
+- **백엔드 엔티티 시간 타입:** `Instant` (Java Time)
+- **DB 컬럼 타입:** `TIMESTAMP WITH TIME ZONE` (`timestamptz`)
+- **JPA/Jackson 설정:** `hibernate.jdbc.time_zone: UTC`, `spring.jackson.time-zone: UTC`
+- **API 응답 시간 포맷:** ISO-8601 UTC (예: `2026-02-09T07:23:34.065Z`)
+- **프론트 표시:** 브라우저 로컬 시간대로 변환하되, 포맷은 현재 선택 언어(`i18n`) 기준으로 렌더링
 
 ### 에러 응답 형식
 
@@ -704,16 +712,25 @@ spring:
     docker:
         compose:
             lifecycle-management: start-only # 앱 종료 시 컨테이너 유지
+    jackson:
+        time-zone: UTC
+        serialization:
+            write-dates-as-timestamps: false
     jpa:
         hibernate.ddl-auto: update # 엔티티 변경 시 스키마 자동 업데이트
         show-sql: true
+        properties:
+            hibernate:
+                format_sql: true
+                jdbc.time_zone: UTC
 
 smart-erd:
     cors:
         allowed-origins: http://localhost:3000
     jwt:
         secret: ${SMART_ERD_JWT_SECRET:기본값}
-        expiration: 86400000 # 24시간 (ms)
+        access-expiration: 1800000 # 30분 (ms)
+        refresh-expiration: 86400000 # 24시간 (ms)
 ```
 
 > `spring-boot-docker-compose`가 `compose.yaml`을 자동 감지하여 PostgreSQL 컨테이너를 시작하고, datasource를 자동 주입한다.
@@ -767,4 +784,6 @@ PostgreSQL 17을 Docker 컨테이너로 사용한다. `spring-boot-docker-compos
 - **개발 환경:** `./gradlew bootRun` 시 Docker 컨테이너 자동 시작 (`lifecycle-management: start-only` — 앱 종료 시 컨테이너 유지)
 - **테스트 환경:** Testcontainers가 임시 PostgreSQL 컨테이너를 자동 생성/폐기
 - **스키마:** `ddl-auto: update` — 엔티티 변경 시 자동 업데이트
+- **시간 컬럼:** 감사/만료 시각 컬럼은 `timestamptz` 사용 (UTC 기준 저장)
+- **기존 데이터 변환:** `plan/migration-utc-timestamptz.sql` 스크립트로 `timestamp without time zone` → `timestamptz` 변환 가능
 - **전제 조건:** Docker Desktop 실행 중, 포트 5432 사용 가능, 최초 실행 시 `postgres:17` 이미지 다운로드 (~400MB)

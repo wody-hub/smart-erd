@@ -26,7 +26,7 @@ export default function DiagramsPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   /** 다이어그램 생성 다이얼로그 열림 상태 */
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -214,7 +214,9 @@ export default function DiagramsPage() {
                   <CardContent>
                     <p className="text-xs text-muted-foreground">
                       {t('diagram.list.updatedAt', {
-                        date: new Date(diagram.updatedAt).toLocaleDateString(),
+                        date: new Date(diagram.updatedAt).toLocaleDateString(
+                          i18n.resolvedLanguage ?? i18n.language,
+                        ),
                       })}
                     </p>
                   </CardContent>

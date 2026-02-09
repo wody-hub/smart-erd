@@ -26,7 +26,7 @@ export default function ProjectsPage() {
   const { teamId } = useParams<{ teamId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   /** 프로젝트 생성 다이얼로그 열림 상태 */
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
@@ -137,7 +137,9 @@ export default function ProjectsPage() {
                   <CardContent>
                     <p className="text-xs text-muted-foreground">
                       {t('project.list.createdAt', {
-                        date: new Date(project.createdAt).toLocaleDateString(),
+                        date: new Date(project.createdAt).toLocaleDateString(
+                          i18n.resolvedLanguage ?? i18n.language,
+                        ),
                       })}
                     </p>
                   </CardContent>

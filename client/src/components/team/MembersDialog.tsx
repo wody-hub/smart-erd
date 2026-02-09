@@ -16,6 +16,7 @@ import { fetchMembers, inviteMember, removeMember } from '@/api/teamApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
 import { toast } from 'sonner';
+import type { TeamMemberRole } from '@/types/team';
 
 /** MembersDialog 컴포넌트의 props. */
 interface MembersDialogProps {
@@ -51,6 +52,18 @@ export default function MembersDialog({
   const [inviteRole, setInviteRole] = useState<'MEMBER' | 'VIEWER'>('MEMBER');
   /** 초대 실패 시 에러 메시지 */
   const [inviteError, setInviteError] = useState('');
+
+  /** 팀 멤버 역할 코드를 현재 언어 라벨로 변환한다. */
+  const getRoleLabel = (role: TeamMemberRole) => {
+    switch (role) {
+      case 'ADMIN':
+        return t('team.members.roleAdmin');
+      case 'MEMBER':
+        return t('team.members.roleMember');
+      case 'VIEWER':
+        return t('team.members.roleViewer');
+    }
+  };
 
   const { data: members = [] } = useQuery({
     queryKey: queryKeys.teams.members(teamId),
@@ -145,7 +158,7 @@ export default function MembersDialog({
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium px-2 py-0.5 rounded bg-background border">
-                  {member.role}
+                  {getRoleLabel(member.role)}
                 </span>
                 {member.role !== 'ADMIN' && (
                   <Button

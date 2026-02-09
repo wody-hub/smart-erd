@@ -185,8 +185,8 @@ client/
     │   └── query-client.ts          # QueryClient (staleTime: 30s, retry: 1, refetchOnWindowFocus: false)
     ├── pages/                       # Domain-based page directories
     │   ├── auth/
-    │   │   ├── LoginPage.tsx        # Login form (authApi, redirects to /teams on success)
-    │   │   └── SignupPage.tsx       # Signup form (authApi, auto-login on success)
+    │   │   ├── LoginPage.tsx        # Login form (useMutation + authApi, redirects to /teams on success)
+    │   │   └── SignupPage.tsx       # Signup form (useMutation + authApi, auto-login on success)
     │   ├── team/
     │   │   └── TeamsPage.tsx        # Team list + create (useQuery + useMutation + CreateResourceDialog)
     │   ├── project/
@@ -226,12 +226,122 @@ client/
 
 **Routes:** `/login`, `/signup`, `/teams`, `/teams/:teamId/projects`, `/teams/:teamId/projects/:projectId/diagrams`, `/teams/:teamId/projects/:projectId/diagrams/:diagramId`. All routes except `/login` and `/signup` are protected by `ProtectedRoute`.
 
+### Axios Instance
+
+```text
+baseURL: /api  →  Vite 프록시  →  localhost:8080
+요청 인터셉터: localStorage Access Token → Authorization: Bearer <token>
+응답 인터셉터: 401 → Refresh Token으로 갱신 시도 (큐 패턴) → 실패 시 로그인 리다이렉트
+```
+
+- 페이지에서 `axiosInstance`를 직접 호출하지 않는다. `api/` 모듈 함수를 통해서만 호출.
+- 서버 에러 메시지 추출: `getErrorMessage(err, fallback)` (`lib/api-error.ts`)
+- 401 발생 시 큐 패턴으로 동시 요청 관리: 갱신 중 다른 401 요청은 큐에 대기 → 갱신 완료 후 일괄 재시도
+
 ### Key Conventions
 
 - **Handle IDs:** `{nodeId}-{colId}-source` / `{nodeId}-{colId}-target` — enables column-level relationships
 - **Edge IDs:** `e-{sourceHandle}-{targetHandle}`
 - **Diagram persistence:** `useCanvasStore.serialize()` → JSON string stored in `Diagram.content` (TEXT)
 - **Type assertion needed:** `applyNodeChanges()` returns generic `Node[]`, must cast to `Node<TableNodeData>[]`
+
+### Entity Relationships
+
+```text
+User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
+      │   (record 복합키)        ├─< Domain
+      └── owner_id ─────────────┘└─< Term ──> Domain (nullable)
+```
+
+- **User** : 사용자 (`loginId`로 인증, BCrypt 비밀번호)
+- **Team** : 프로젝트와 데이터 사전을 소유하는 조직 단위
+- **TeamMember** : 팀-사용자 다대다 조인 (`@IdClass(TeamMemberId)` record 복합키, 역할: ADMIN, MEMBER, VIEWER)
+- **Project** : ERD 프로젝트 그룹 (Team 소속)
+- **Diagram** : React Flow JSON을 TEXT로 저장하는 ERD 다이어그램 (Project 소속)
+- **Domain** : 논리명→물리 데이터타입 매핑 사전 (예: "금액" → `DECIMAL(15,2)`)
+- **Term** : 논리명→물리명 매핑 사전 (예: "사용자명" → `user_name`), Domain 참조 가능
+
+모든 엔티티는 `BaseTimeEntity`를 상속하여 `createdAt`, `updatedAt`을 UTC 기준 `Instant`로 자동 기록한다.
+
+### API Endpoints
+
+#### 인증 (`/api/auth/**` — 공개)
+
+| Method | Path                | 설명      | Request Body                       | Response                                       |
+| ------ | ------------------- | --------- | ---------------------------------- | ---------------------------------------------- |
+| POST   | `/api/auth/signup`  | 회원가입  | `{ loginId, password (8+), name }` | `{ accessToken, refreshToken, loginId, name }` |
+| POST   | `/api/auth/login`   | 로그인    | `{ loginId, password }`            | `{ accessToken, refreshToken, loginId, name }` |
+| POST   | `/api/auth/refresh` | 토큰 갱신 | `{ refreshToken }`                 | `{ accessToken, refreshToken }`                |
+| POST   | `/api/auth/logout`  | 로그아웃  | `{ refreshToken }`                 | —                                              |
+
+#### 팀 (`/api/teams/**` — 인증 필요)
+
+| Method | Path                               | 설명       | Request Body        |
+| ------ | ---------------------------------- | ---------- | ------------------- |
+| POST   | `/api/teams`                       | 팀 생성    | `{ name }`          |
+| GET    | `/api/teams`                       | 내 팀 목록 | —                   |
+| GET    | `/api/teams/{id}`                  | 팀 상세    | —                   |
+| GET    | `/api/teams/{id}/members`          | 멤버 목록  | —                   |
+| POST   | `/api/teams/{id}/members`          | 멤버 초대  | `{ loginId, role }` |
+| DELETE | `/api/teams/{id}/members/{userId}` | 멤버 제거  | —                   |
+| PATCH  | `/api/teams/{id}/members/{userId}` | 역할 변경  | `{ role }`          |
+
+#### 프로젝트 (`/api/teams/{teamId}/projects/**` — 인증 필요)
+
+| Method | Path                                | 설명          | Request Body |
+| ------ | ----------------------------------- | ------------- | ------------ |
+| POST   | `/api/teams/{teamId}/projects`      | 프로젝트 생성 | `{ name }`   |
+| GET    | `/api/teams/{teamId}/projects`      | 프로젝트 목록 | —            |
+| GET    | `/api/teams/{teamId}/projects/{id}` | 프로젝트 상세 | —            |
+| DELETE | `/api/teams/{teamId}/projects/{id}` | 프로젝트 삭제 | —            |
+
+Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+
+### Authentication Flow
+
+```text
+Client                                        Server
+  │  POST /api/auth/login                      │
+  │  { loginId, password }              ────►  │ AuthenticationManager 검증
+  │                                            │ Access Token (30분) + Refresh Token (24시간) 발급
+  │  ◄────  { accessToken, refreshToken,       │
+  │           loginId, name }                  │
+  │                                            │
+  │  GET /api/...                              │
+  │  Authorization: Bearer <accessToken>       │ BearerTokenAuthenticationFilter
+  │                                     ────►  │ JwtDecoder (NimbusJwtDecoder, HS256)
+  │  ◄────  200 OK / 401                      │
+  │                                            │
+  │  (401 발생 시 — Access Token 만료)          │
+  │  POST /api/auth/refresh                    │
+  │  { refreshToken }                   ────►  │ Refresh Token 검증 + 로테이션
+  │  ◄────  { accessToken, refreshToken }      │ 새 Access + 새 Refresh 발급, 기존 Refresh 폐기
+  │  (원래 요청 재시도)                         │
+```
+
+- **Access Token**: HMAC-SHA256 JWT, 만료 30분
+- **Refresh Token**: UUID, 만료 24시간, 로테이션 전략 (사용 시 새 토큰 발급 + 기존 폐기)
+- 프론트엔드는 `localStorage`에 두 토큰 저장, Axios 인터셉터로 자동 첨부
+
+### Timezone Policy (UTC 표준화)
+
+- **백엔드 엔티티 시간 타입:** `Instant` (Java Time)
+- **DB 컬럼 타입:** `TIMESTAMP WITH TIME ZONE` (`timestamptz`)
+- **JPA/Jackson 설정:** `hibernate.jdbc.time_zone: UTC`, `spring.jackson.time-zone: UTC`
+- **API 응답 시간 포맷:** ISO-8601 UTC (예: `2026-02-09T07:23:34.065Z`)
+- **프론트 표시:** 브라우저 로컬 시간대로 변환하되, 포맷은 현재 선택 언어(`i18n`) 기준으로 렌더링
+
+### Error Response Format
+
+모든 에러는 통일된 JSON 형식으로 반환된다: `{ "error": "User not found: testuser" }`
+
+| HTTP 상태 | 발생 조건                            |
+| --------- | ------------------------------------ |
+| 400       | 유효성 검증 실패, 비즈니스 규칙 위반 |
+| 401       | JWT 토큰 없음 또는 만료              |
+| 403       | 팀 미소속, ADMIN 권한 필요           |
+| 404       | 엔티티 미존재                        |
+| 409       | 중복 리소스 (멤버, 로그인 ID)        |
 
 ### Tech Stack
 
@@ -363,24 +473,26 @@ useEffect(() => {
 }, []);
 ```
 
-Mutation 후 캐시 무효화는 `invalidateQueries`로 선언적으로 수행:
+Mutation 후 캐시 무효화는 `invalidateQueries`로 선언적으로 수행. 에러 처리는 반드시 `toast.error()` + `getErrorMessage(err, t('key'))` 패턴을 사용한다 (인라인 `<p>` 에러 표시 금지).
 
 ```typescript
 const createMutation = useMutation({
     mutationFn: (name: string) => createTeam(name),
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: queryKeys.teams.all });
-        toast.success('Team created');
+        toast.success(t('teams.createSuccess'));
     },
-    onError: (err) => toast.error(getErrorMessage(err, 'Failed to create team')),
+    onError: (err) => toast.error(getErrorMessage(err, t('teams.createError'))),
 });
 ```
+
+인증 페이지(Login, Signup)를 포함한 **모든 페이지**에서 서버 변경 작업에 `useMutation`을 사용한다.
 
 #### API Layer
 
 - Pages never call `axiosInstance` directly. Always go through `api/` module functions.
 - Each API function is typed with explicit return types and has JSDoc with `@param`.
-- Error handling: Use `getErrorMessage(err, fallback)` in `onError` callbacks to extract server error messages.
+- Error handling: `onError`에서 `toast.error(getErrorMessage(err, t('key')))` 패턴으로 통일. 인라인 에러 표시 금지.
 
 #### Constants — No Magic Strings
 
@@ -512,6 +624,32 @@ const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 - Java: tabWidth 4, printWidth 120
 - TypeScript: tabWidth 2, printWidth 100
 - SonarQube S1611 (lambda parentheses) suppressed in favor of Prettier
+- Prettier와 SonarQube 충돌: Prettier가 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...`), SonarQube S1611은 이를 제거하라고 경고한다. **Prettier를 우선**으로 하고, `sonar-project.properties`에서 S1611 전역 무시, VS Code에서 `sonarlint.rules: java:S1611: off` 설정.
+
+### VS Code Development Environment
+
+`.vscode/settings.json`에 다음 설정이 포함되어 있다:
+
+| 기능        | 설정                                        | 설명                                |
+| ----------- | ------------------------------------------- | ----------------------------------- |
+| 자동 포맷   | `editor.formatOnSave: true`                 | 저장 시 Prettier 자동 적용          |
+| Import 정리 | `source.organizeImports: explicit`          | 저장 시 미사용 import 제거 및 정렬  |
+| 자동 저장   | `files.autoSave: afterDelay` (1초)          | 1초 후 자동 저장                    |
+| Null 분석   | `java.compile.nullAnalysis.mode: automatic` | `@NonNullApi` 기반 null 분석 활성화 |
+| 후행 공백   | `files.trimTrailingWhitespace: true`        | 저장 시 후행 공백 제거              |
+| 최종 개행   | `files.insertFinalNewline: true`            | 파일 끝 개행 자동 추가              |
+
+에디터 기본 포맷터: Java, TypeScript 모두 `esbenp.prettier-vscode` (Prettier)
+
+### Database
+
+PostgreSQL 17을 Docker 컨테이너로 사용한다. `spring-boot-docker-compose`가 프로젝트 루트의 `compose.yaml`을 자동 감지하여 컨테이너 시작 및 datasource 주입을 처리한다.
+
+- **개발 환경:** `./gradlew bootRun` 시 Docker 컨테이너 자동 시작 (`lifecycle-management: start-only` — 앱 종료 시 컨테이너 유지)
+- **테스트 환경:** Testcontainers가 임시 PostgreSQL 컨테이너를 자동 생성/폐기
+- **스키마:** `ddl-auto: update` — 엔티티 변경 시 자동 업데이트
+- **시간 컬럼:** 감사/만료 시각 컬럼은 `timestamptz` 사용 (UTC 기준 저장)
+- **전제 조건:** Docker Desktop 실행 중, 포트 5432 사용 가능
 
 ### Gradle Annotation Processor Order
 

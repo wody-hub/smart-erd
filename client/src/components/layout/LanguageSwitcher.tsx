@@ -18,6 +18,7 @@ const LANGUAGES = ['ko', 'en'] as const;
  */
 export default function LanguageSwitcher() {
   const { t, i18n } = useTranslation();
+  const currentLanguage = (i18n.resolvedLanguage ?? i18n.language ?? 'en').split('-')[0];
 
   return (
     <DropdownMenu>
@@ -36,7 +37,7 @@ export default function LanguageSwitcher() {
           <DropdownMenuItem
             key={lang}
             onClick={() => i18n.changeLanguage(lang)}
-            className={i18n.language === lang ? 'font-bold' : ''}
+            className={currentLanguage === lang ? 'font-bold' : ''}
           >
             {t(`language.${lang}`)}
           </DropdownMenuItem>
