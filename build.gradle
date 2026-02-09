@@ -55,6 +55,9 @@ dependencies {
     // PostgreSQL
     runtimeOnly 'org.postgresql:postgresql'
 
+    // SQL 로깅 (p6spy — 개발 전용, 커스텀 포맷터 컴파일에 필요)
+    implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.12.1'
+
     // Spring Boot Docker Compose (개발 전용 — JAR에 포함 안 됨)
     developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
 

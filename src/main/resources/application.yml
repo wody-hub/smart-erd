@@ -1,3 +1,7 @@
+logging:
+  level:
+    p6spy: info
+
 spring:
   docker:
     compose:
@@ -16,12 +20,17 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
     properties:
       hibernate:
-        format_sql: true
         jdbc:
           time_zone: UTC
+
+decorator:
+  datasource:
+    p6spy:
+      enable-logging: true
+      multiline: false
+      logging: slf4j
 
 smart-erd:
   cors:
