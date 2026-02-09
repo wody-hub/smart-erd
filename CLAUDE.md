@@ -76,7 +76,8 @@ src/main/java/com/smarterd/
 │   ├── ValidationConfig.java        #   LocalValidatorFactoryBean + MessageSource 연결
 │   ├── QuerydslConfig.java          #   JPAQueryFactory bean (QueryDSL type-safe query builder)
 │   ├── BlazeConfig.java             #   CriteriaBuilderFactory bean (Blaze-Persistence advanced queries)
-│   └── OpenApiConfig.java           #   Swagger/OpenAPI config (JWT Bearer auth scheme)
+│   ├── OpenApiConfig.java           #   Swagger/OpenAPI config (JWT Bearer auth scheme)
+│   └── PrettySqlFormat.java         #   p6spy SQL 포맷터 (Hibernate FormatStyle.BASIC 기반 들여쓰기)
 └── domain/                          # Domain layer (Services live here too)
     ├── common/
     │   ├── entity/                   #   BaseTimeEntity (createdAt, updatedAt auto-audit)
@@ -123,6 +124,8 @@ src/main/java/com/smarterd/
 **Backend i18n:** All error messages (exceptions, validation) are localized server-side via Spring `MessageSource`. Message bundles: `src/main/resources/i18n/messages.properties` (English fallback) + `messages_ko.properties` (Korean). `AcceptHeaderLocaleResolver` resolves locale from `Accept-Language` header. Bean Validation `{key}` interpolation is connected to `MessageSource` via `ValidationConfig`. Frontend sends `Accept-Language: i18n.language` on every request.
 
 **Database:** PostgreSQL 17 (Docker). `spring-boot-docker-compose`가 `compose.yaml`을 자동 감지하여 컨테이너를 시작하고, datasource를 자동 주입한다. `ddl-auto: update`. Docker Desktop이 실행 중이어야 한다.
+
+**SQL 로깅:** p6spy (`p6spy-spring-boot-starter`)로 실제 바인딩 파라미터가 채워진 완성 SQL을 로깅한다. `PrettySqlFormat`이 Hibernate `FormatStyle.BASIC`으로 SQL을 포맷하여 들여쓰기/줄바꿈이 적용된다. 설정: `spy.properties` (`logMessageFormat`) + `application.yml` (`decorator.datasource.p6spy.*`). Hibernate 기본 `show-sql`/`format_sql`은 사용하지 않는다.
 
 ### Frontend: Vite 6 + React 19 + TypeScript + shadcn/ui + React Query
 
@@ -378,6 +381,7 @@ Accept-Language: ko → { "error": "사용자를 찾을 수 없습니다: testus
 | Editor        | @monaco-editor/react 4.6                                                         |
 | Shortcuts     | react-hotkeys-hook 5                                                             |
 | i18n          | i18next, react-i18next, i18next-browser-languagedetector (FE) + Spring MessageSource (BE) |
+| SQL 로깅      | p6spy-spring-boot-starter 1.12.1 (바인딩 파라미터 포함 SQL 로깅)                 |
 | Toast         | Sonner                                                                           |
 | Formatting    | Prettier (Java + TypeScript), prettier-plugin-java                               |
 | Code Quality  | ESLint, SonarQube / SonarLint                                                    |

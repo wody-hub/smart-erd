@@ -22,6 +22,7 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 | 에디터      | @monaco-editor/react 4.6                                                       |
 | 단축키      | react-hotkeys-hook 5                                                           |
 | 다국어      | i18next, react-i18next, i18next-browser-languagedetector (FE) + Spring MessageSource (BE) |
+| SQL 로깅    | p6spy-spring-boot-starter 1.12.1 (바인딩 파라미터 포함 SQL 로깅)               |
 | 토스트      | Sonner                                                                         |
 | 포맷팅      | Prettier (Java + TypeScript 통합), prettier-plugin-java                        |
 | 코드 품질   | ESLint, SonarQube / SonarLint                                                  |
@@ -85,7 +86,8 @@ src/main/java/com/smarterd/
 │   ├── ValidationConfig.java        #   LocalValidatorFactoryBean + MessageSource 연결
 │   ├── QuerydslConfig.java          #   JPAQueryFactory 빈 (QueryDSL 타입 안전 쿼리 빌더)
 │   ├── BlazeConfig.java             #   CriteriaBuilderFactory 빈 (Blaze-Persistence 고급 쿼리)
-│   └── OpenApiConfig.java           #   Swagger/OpenAPI 설정 (JWT Bearer 인증 스킴)
+│   ├── OpenApiConfig.java           #   Swagger/OpenAPI 설정 (JWT Bearer 인증 스킴)
+│   └── PrettySqlFormat.java         #   p6spy SQL 포맷터 (Hibernate FormatStyle.BASIC 기반 들여쓰기)
 └── domain/                          # 도메인 계층 (Service도 여기에 위치)
     ├── common/
     │   ├── entity/                   #   BaseTimeEntity (createdAt, updatedAt UTC Instant 자동 감사)
@@ -812,11 +814,16 @@ spring:
             write-dates-as-timestamps: false
     jpa:
         hibernate.ddl-auto: update # 엔티티 변경 시 스키마 자동 업데이트
-        show-sql: true
         properties:
             hibernate:
-                format_sql: true
                 jdbc.time_zone: UTC
+
+decorator:
+    datasource:
+        p6spy:
+            enable-logging: true   # p6spy 활성화 (바인딩 파라미터 포함 SQL 로깅)
+            multiline: false       # 커스텀 PrettySqlFormat이 포맷 담당
+            logging: slf4j         # SLF4J를 통해 Logback으로 출력
 
 smart-erd:
     cors:
