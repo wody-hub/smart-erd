@@ -26,29 +26,29 @@ interface CanvasState {
   onEdgesChange: OnEdgesChange;
   /** 노드 간 새로운 연결 생성 이벤트 핸들러 */
   onConnect: OnConnect;
-  /** 노드 목록을 직접 설정한다 */
+  /** 노드 목록을 직접 설정한다. @param nodes 설정할 노드 배열 */
   setNodes: (nodes: Node<TableNodeData>[]) => void;
-  /** 엣지 목록을 직접 설정한다 */
+  /** 엣지 목록을 직접 설정한다. @param edges 설정할 엣지 배열 */
   setEdges: (edges: Edge[]) => void;
   /** 마지막 저장 이후 변경 여부 */
   isDirty: boolean;
   /** dirty 상태를 초기화한다 (저장 후 호출) */
   markClean: () => void;
-  /** 새 테이블을 캔버스에 추가한다 */
+  /** 새 테이블을 캔버스에 추가한다. @param name 테이블 이름 (미지정 시 자동 생성) */
   addTable: (name?: string) => void;
-  /** 테이블을 캔버스에서 삭제한다 (관련 엣지도 제거) */
+  /** 테이블을 캔버스에서 삭제한다 (관련 엣지도 제거). @param nodeId 삭제할 노드 ID */
   deleteTable: (nodeId: string) => void;
-  /** 테이블 이름을 변경한다 */
+  /** 테이블 이름을 변경한다. @param nodeId 대상 노드 ID @param newName 새 이름 */
   renameTable: (nodeId: string, newName: string) => void;
-  /** 테이블에 새 컬럼을 추가한다 */
+  /** 테이블에 새 컬럼을 추가한다. @param nodeId 대상 노드 ID */
   addColumn: (nodeId: string) => void;
-  /** 테이블에서 컬럼을 삭제한다 */
+  /** 테이블에서 컬럼을 삭제한다. @param nodeId 대상 노드 ID @param colId 삭제할 컬럼 ID */
   deleteColumn: (nodeId: string, colId: string) => void;
-  /** 컬럼 속성을 업데이트한다 */
+  /** 컬럼 속성을 업데이트한다. @param nodeId 대상 노드 ID @param colId 대상 컬럼 ID @param updates 변경할 속성 */
   updateColumn: (nodeId: string, colId: string, updates: Partial<Column>) => void;
-  /** 현재 노드·엣지 상태를 JSON 문자열로 직렬화한다 */
+  /** 현재 노드·엣지 상태를 JSON 문자열로 직렬화한다. @returns 직렬화된 JSON */
   serialize: () => string;
-  /** JSON 문자열로부터 노드·엣지 상태를 복원한다 */
+  /** JSON 문자열로부터 노드·엣지 상태를 복원한다. @param json 직렬화된 다이어그램 JSON */
   deserialize: (json: string) => void;
 }
 

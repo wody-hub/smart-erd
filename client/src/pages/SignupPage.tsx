@@ -4,8 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import axiosInstance from '@/api/axiosInstance';
+import { signup } from '@/api/authApi';
 import useAuthStore from '@/stores/useAuthStore';
+import { getErrorMessage } from '@/lib/api-error';
+import { ROUTES } from '@/constants/routes';
 
 /**
  * 회원가입 페이지 컴포넌트.
@@ -16,24 +18,29 @@ import useAuthStore from '@/stores/useAuthStore';
 export default function SignupPage() {
   const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
+  /** 로그인 ID 입력값 */
   const [loginId, setLoginId] = useState('');
+  /** 비밀번호 입력값 */
   const [password, setPassword] = useState('');
+  /** 사용자 표시 이름 입력값 */
   const [name, setName] = useState('');
+  /** 회원가입 실패 시 에러 메시지 */
   const [error, setError] = useState('');
+  /** 회원가입 API 호출 중 여부 */
   const [loading, setLoading] = useState(false);
 
-  /** 회원가입 폼 제출 핸들러. 가입 성공 시 자동 로그인 후 /teams로 이동한다. */
+  /** 회원가입 폼 제출 핸들러. 가입 성공 시 자동 로그인 후 /teams로 이동한다. @param e 폼 이벤트 */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const res = await axiosInstance.post('/auth/signup', { loginId, password, name });
-      login(res.data.accessToken, res.data.refreshToken, res.data.loginId, res.data.name);
-      navigate('/teams');
-    } catch {
-      setError('Signup failed. Login ID may already exist.');
+      const data = await signup(loginId, password, name);
+      login(data.accessToken, data.refreshToken, data.loginId, data.name);
+      navigate(ROUTES.TEAMS);
+    } catch (err) {
+      setError(getErrorMessage(err, 'Signup failed. Login ID may already exist.'));
     } finally {
       setLoading(false);
     }
@@ -86,7 +93,7 @@ export default function SignupPage() {
         <CardFooter className="justify-center">
           <p className="text-sm text-muted-foreground">
             Already have an account?{' '}
-            <Link to="/login" className="text-primary underline-offset-4 hover:underline">
+            <Link to={ROUTES.LOGIN} className="text-primary underline-offset-4 hover:underline">
               Login
             </Link>
           </p>

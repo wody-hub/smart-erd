@@ -1,34 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Users } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Header from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import axiosInstance from '@/api/axiosInstance';
+import CreateResourceDialog from '@/components/ui/create-resource-dialog';
+import { fetchTeams, createTeam } from '@/api/teamApi';
+import { queryKeys } from '@/constants/query-keys';
+import { ROUTES } from '@/constants/routes';
+import { getErrorMessage } from '@/lib/api-error';
 import { toast } from 'sonner';
-
-/** 팀 정보 인터페이스. */
-interface Team {
-  /** 팀 ID */
-  id: number;
-  /** 팀 이름 */
-  name: string;
-  /** 소유자 이름 */
-  ownerName: string;
-  /** 멤버 수 */
-  memberCount: number;
-  /** 생성 일시 (ISO 8601) */
-  createdAt: string;
-}
 
 /**
  * 팀 목록 페이지.
@@ -38,46 +20,23 @@ interface Team {
  */
 export default function TeamsPage() {
   const navigate = useNavigate();
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  /** 팀 생성 다이얼로그 열림 상태 */
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [newTeamName, setNewTeamName] = useState('');
-  const [creating, setCreating] = useState(false);
 
-  /** 서버에서 팀 목록을 조회한다. */
-  const fetchTeams = async () => {
-    try {
-      const res = await axiosInstance.get('/teams');
-      setTeams(res.data);
-    } catch {
-      toast.error('Failed to load teams');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: teams = [], isLoading } = useQuery({
+    queryKey: queryKeys.teams.all,
+    queryFn: fetchTeams,
+  });
 
-  useEffect(() => {
-    fetchTeams();
-  }, []);
-
-  /** 팀 생성 폼 제출 핸들러. 생성 후 목록을 갱신한다. */
-  const handleCreateTeam = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTeamName.trim()) return;
-    setCreating(true);
-
-    try {
-      await axiosInstance.post('/teams', { name: newTeamName.trim() });
-      setNewTeamName('');
-      setDialogOpen(false);
-      await fetchTeams();
+  const createTeamMutation = useMutation({
+    mutationFn: (name: string) => createTeam(name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.teams.all });
       toast.success('Team created');
-    } catch {
-      toast.error('Failed to create team');
-    } finally {
-      setCreating(false);
-    }
-  };
+    },
+    onError: (err) => toast.error(getErrorMessage(err, 'Failed to create team')),
+  });
 
   return (
     <div className="h-screen flex flex-col">
@@ -92,7 +51,7 @@ export default function TeamsPage() {
             </Button>
           </div>
 
-          {loading ? (
+          {isLoading ? (
             <p className="text-muted-foreground">Loading...</p>
           ) : teams.length === 0 ? (
             <Card>
@@ -113,7 +72,7 @@ export default function TeamsPage() {
                 <Card
                   key={team.id}
                   className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => navigate(`/teams/${team.id}/projects`)}
+                  onClick={() => navigate(ROUTES.PROJECTS(team.id))}
                 >
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg">{team.name}</CardTitle>
@@ -134,35 +93,14 @@ export default function TeamsPage() {
         </div>
       </main>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Team</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreateTeam}>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="team-name">Team Name</Label>
-                <Input
-                  id="team-name"
-                  placeholder="Enter team name"
-                  value={newTeamName}
-                  onChange={(e) => setNewTeamName(e.target.value)}
-                  autoFocus
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={creating || !newTeamName.trim()}>
-                {creating ? 'Creating...' : 'Create'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <CreateResourceDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        title="Create New Team"
+        inputLabel="Team Name"
+        placeholder="Enter team name"
+        onCreate={(name) => createTeamMutation.mutateAsync(name)}
+      />
     </div>
   );
 }

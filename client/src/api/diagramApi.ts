@@ -1,24 +1,7 @@
 import axiosInstance from './axiosInstance';
+import type { DiagramSummary, DiagramDetail } from '@/types/diagram';
 
-/** 다이어그램 목록 응답 인터페이스. */
-export interface DiagramSummary {
-  /** 다이어그램 ID */
-  id: number;
-  /** 다이어그램 이름 */
-  name: string;
-  /** 소속 프로젝트 ID */
-  projectId: number;
-  /** 생성 일시 (ISO 8601) */
-  createdAt: string;
-  /** 수정 일시 (ISO 8601) */
-  updatedAt: string;
-}
-
-/** 다이어그램 상세 응답 인터페이스 (content 포함). */
-export interface DiagramDetail extends DiagramSummary {
-  /** 직렬화된 React Flow JSON (노드 + 엣지) */
-  content: string | null;
-}
+export type { DiagramSummary, DiagramDetail };
 
 /**
  * 프로젝트의 다이어그램 목록을 조회한다.

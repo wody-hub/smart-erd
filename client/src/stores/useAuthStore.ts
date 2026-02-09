@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { create } from 'zustand';
+import { STORAGE_KEYS } from '@/constants/storage';
 
 /**
  * 인증 상태를 관리하는 Zustand 스토어의 상태 인터페이스.
@@ -15,7 +16,14 @@ interface AuthState {
   name: string | null;
   /** 인증 여부 */
   isAuthenticated: boolean;
-  /** 로그인 성공 시 상태를 갱신한다 */
+  /**
+   * 로그인 성공 시 상태를 갱신한다.
+   *
+   * @param accessToken  JWT Access Token
+   * @param refreshToken UUID Refresh Token
+   * @param loginId      사용자 로그인 ID
+   * @param name         사용자 표시 이름
+   */
   login: (accessToken: string, refreshToken: string, loginId: string, name: string) => void;
   /** 로그아웃 시 상태를 초기화한다 */
   logout: () => void;
@@ -28,29 +36,29 @@ interface AuthState {
  * login/logout 시 localStorage와 동기화한다.
  */
 const useAuthStore = create<AuthState>((set) => ({
-  accessToken: localStorage.getItem('accessToken'),
-  refreshToken: localStorage.getItem('refreshToken'),
-  loginId: localStorage.getItem('loginId'),
-  name: localStorage.getItem('name'),
-  isAuthenticated: !!localStorage.getItem('accessToken'),
+  accessToken: localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN),
+  refreshToken: localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
+  loginId: localStorage.getItem(STORAGE_KEYS.LOGIN_ID),
+  name: localStorage.getItem(STORAGE_KEYS.NAME),
+  isAuthenticated: !!localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN),
 
   login: (accessToken, refreshToken, loginId, name) => {
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
-    localStorage.setItem('loginId', loginId);
-    localStorage.setItem('name', name);
+    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+    localStorage.setItem(STORAGE_KEYS.LOGIN_ID, loginId);
+    localStorage.setItem(STORAGE_KEYS.NAME, name);
     set({ accessToken, refreshToken, loginId, name, isAuthenticated: true });
   },
 
   logout: () => {
-    const rt = localStorage.getItem('refreshToken');
+    const rt = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
     if (rt) {
       axios.post('/api/auth/logout', { refreshToken: rt }).catch(() => {});
     }
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('loginId');
-    localStorage.removeItem('name');
+    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.LOGIN_ID);
+    localStorage.removeItem(STORAGE_KEYS.NAME);
     set({
       accessToken: null,
       refreshToken: null,

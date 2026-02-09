@@ -1,25 +1,18 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, FileText, ArrowLeft, Trash2, Pencil, Check, X } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Header from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  fetchDiagrams,
-  createDiagram,
-  deleteDiagram,
-  renameDiagram,
-  type DiagramSummary,
-} from '@/api/diagramApi';
+import CreateResourceDialog from '@/components/ui/create-resource-dialog';
+import ConfirmDialog from '@/components/ui/confirm-dialog';
+import { fetchDiagrams, createDiagram, deleteDiagram, renameDiagram } from '@/api/diagramApi';
+import type { DiagramSummary } from '@/types/diagram';
+import { queryKeys } from '@/constants/query-keys';
+import { ROUTES } from '@/constants/routes';
+import { getErrorMessage } from '@/lib/api-error';
 import { toast } from 'sonner';
 
 /**
@@ -30,92 +23,70 @@ import { toast } from 'sonner';
 export default function DiagramsPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
   const navigate = useNavigate();
-  const [diagrams, setDiagrams] = useState<DiagramSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  // Create dialog
+  /** 다이어그램 생성 다이얼로그 열림 상태 */
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [creating, setCreating] = useState(false);
-
-  // Inline rename
+  /** 삭제 확인 대상 다이어그램 ID (null이면 다이얼로그 닫힘) */
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  /** 이름 변경 중인 다이어그램 ID (null이면 편집 모드 아님) */
   const [renamingId, setRenamingId] = useState<number | null>(null);
+  /** 이름 변경 입력값 */
   const [renameValue, setRenameValue] = useState('');
 
-  /** 다이어그램 목록을 조회한다. */
-  const loadDiagrams = useCallback(async () => {
-    if (!teamId || !projectId) return;
-    try {
-      const data = await fetchDiagrams(teamId, projectId);
-      setDiagrams(data);
-    } catch {
-      toast.error('Failed to load diagrams');
-    } finally {
-      setLoading(false);
-    }
-  }, [teamId, projectId]);
+  const diagramsQueryKey = queryKeys.diagrams.byProject(teamId!, projectId!);
 
-  useEffect(() => {
-    loadDiagrams();
-  }, [loadDiagrams]);
+  const { data: diagrams = [], isLoading } = useQuery({
+    queryKey: diagramsQueryKey,
+    queryFn: () => fetchDiagrams(teamId!, projectId!),
+    enabled: !!teamId && !!projectId,
+  });
 
-  /** 다이어그램 생성 핸들러. 생성 후 목록을 갱신한다. */
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim() || !teamId || !projectId) return;
-    setCreating(true);
-
-    try {
-      await createDiagram(teamId, projectId, newName.trim());
-      setNewName('');
-      setDialogOpen(false);
-      await loadDiagrams();
+  const createMutation = useMutation({
+    mutationFn: (name: string) => createDiagram(teamId!, projectId!, name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
       toast.success('Diagram created');
-    } catch {
-      toast.error('Failed to create diagram');
-    } finally {
-      setCreating(false);
-    }
-  };
+    },
+    onError: (err) => toast.error(getErrorMessage(err, 'Failed to create diagram')),
+  });
 
-  /** 다이어그램 삭제 핸들러. 확인 후 삭제하고 목록을 갱신한다. */
-  const handleDelete = async (diagramId: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!teamId || !projectId) return;
-    if (!confirm('Are you sure you want to delete this diagram?')) return;
-
-    try {
-      await deleteDiagram(teamId, projectId, String(diagramId));
-      await loadDiagrams();
+  const deleteMutation = useMutation({
+    mutationFn: (diagramId: number) => deleteDiagram(teamId!, projectId!, String(diagramId)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
+      setDeleteTarget(null);
       toast.success('Diagram deleted');
-    } catch {
-      toast.error('Failed to delete diagram');
-    }
-  };
+    },
+    onError: (err) => toast.error(getErrorMessage(err, 'Failed to delete diagram')),
+  });
 
-  /** 이름 변경 모드를 시작한다. */
+  const renameMutation = useMutation({
+    mutationFn: ({ id, name }: { id: number; name: string }) =>
+      renameDiagram(teamId!, projectId!, String(id), name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
+      setRenamingId(null);
+      toast.success('Diagram renamed');
+    },
+    onError: (err) => toast.error(getErrorMessage(err, 'Failed to rename diagram')),
+  });
+
+  /** 다이어그램 이름 변경을 시작한다. @param diagram 대상 다이어그램 @param e 마우스 이벤트 (전파 차단용) */
   const startRename = (diagram: DiagramSummary, e: React.MouseEvent) => {
     e.stopPropagation();
     setRenamingId(diagram.id);
     setRenameValue(diagram.name);
   };
 
-  /** 이름 변경을 확정한다. */
-  const confirmRename = async (e: React.MouseEvent) => {
+  /** 다이어그램 이름 변경을 확정한다. @param e 마우스 이벤트 (전파 차단용) */
+  const confirmRename = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!teamId || !projectId || renamingId === null || !renameValue.trim()) return;
-
-    try {
-      await renameDiagram(teamId, projectId, String(renamingId), renameValue.trim());
-      setRenamingId(null);
-      await loadDiagrams();
-      toast.success('Diagram renamed');
-    } catch {
-      toast.error('Failed to rename diagram');
-    }
+    if (renamingId === null || !renameValue.trim()) return;
+    renameMutation.mutate({ id: renamingId, name: renameValue.trim() });
   };
 
-  /** 이름 변경을 취소한다. */
+  /** 다이어그램 이름 변경을 취소한다. @param e 마우스 이벤트 (전파 차단용) */
   const cancelRename = (e: React.MouseEvent) => {
     e.stopPropagation();
     setRenamingId(null);
@@ -130,7 +101,7 @@ export default function DiagramsPage() {
             variant="ghost"
             size="sm"
             className="mb-4"
-            onClick={() => navigate(`/teams/${teamId}/projects`)}
+            onClick={() => navigate(ROUTES.PROJECTS(teamId!))}
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back to Projects
@@ -144,7 +115,7 @@ export default function DiagramsPage() {
             </Button>
           </div>
 
-          {loading ? (
+          {isLoading ? (
             <p className="text-muted-foreground">Loading...</p>
           ) : diagrams.length === 0 ? (
             <Card>
@@ -165,9 +136,7 @@ export default function DiagramsPage() {
                 <Card
                   key={diagram.id}
                   className="cursor-pointer hover:shadow-md transition-shadow group"
-                  onClick={() =>
-                    navigate(`/teams/${teamId}/projects/${projectId}/diagrams/${diagram.id}`)
-                  }
+                  onClick={() => navigate(ROUTES.DIAGRAM(teamId!, projectId!, diagram.id))}
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
@@ -221,7 +190,10 @@ export default function DiagramsPage() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
-                              onClick={(e) => handleDelete(diagram.id, e)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteTarget(diagram.id);
+                              }}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
@@ -242,36 +214,27 @@ export default function DiagramsPage() {
         </div>
       </main>
 
-      {/* Create Diagram Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Diagram</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreate}>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="diagram-name">Diagram Name</Label>
-                <Input
-                  id="diagram-name"
-                  placeholder="Enter diagram name"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  autoFocus
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={creating || !newName.trim()}>
-                {creating ? 'Creating...' : 'Create'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <CreateResourceDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        title="Create New Diagram"
+        inputLabel="Diagram Name"
+        placeholder="Enter diagram name"
+        onCreate={(name) => createMutation.mutateAsync(name)}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete Diagram"
+        description="Are you sure you want to delete this diagram?"
+        onConfirm={() => {
+          if (deleteTarget !== null) deleteMutation.mutate(deleteTarget);
+        }}
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }

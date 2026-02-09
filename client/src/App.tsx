@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/query-client';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import TeamsPage from './pages/TeamsPage';
@@ -7,6 +9,7 @@ import DiagramsPage from './pages/DiagramsPage';
 import DiagramPage from './pages/DiagramPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { Toaster } from './components/ui/sonner';
+import { ROUTES } from '@/constants/routes';
 
 /**
  * 애플리케이션 루트 컴포넌트.
@@ -16,14 +19,14 @@ import { Toaster } from './components/ui/sonner';
  */
 export default function App() {
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       <Toaster />
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
+          <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+          <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
           <Route
-            path="/teams"
+            path={ROUTES.TEAMS}
             element={
               <ProtectedRoute>
                 <TeamsPage />
@@ -54,10 +57,10 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/" element={<Navigate to="/teams" replace />} />
-          <Route path="*" element={<Navigate to="/teams" replace />} />
+          <Route path="/" element={<Navigate to={ROUTES.TEAMS} replace />} />
+          <Route path="*" element={<Navigate to={ROUTES.TEAMS} replace />} />
         </Routes>
       </BrowserRouter>
-    </>
+    </QueryClientProvider>
   );
 }

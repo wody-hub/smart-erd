@@ -1,4 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { STORAGE_KEYS } from '@/constants/storage';
+import { ROUTES } from '@/constants/routes';
 
 /**
  * API 통신용 Axios 인스턴스.
@@ -11,13 +13,18 @@ const axiosInstance = axios.create({
   baseURL: '/api',
 });
 
-/** 토큰 갱신 진행 여부 플래그 */
+/** 토큰 갱신 API 호출 진행 여부. 동시 다발적 401에 대해 단일 갱신만 수행하기 위한 플래그. */
 let isRefreshing = false;
 
-/** 갱신 대기 중인 실패 요청 큐 */
+/** 토큰 갱신 대기 중인 실패 요청 큐. 갱신 완료 시 일괄 재시도된다. */
 let failedQueue: { resolve: (token: string) => void; reject: (error: unknown) => void }[] = [];
 
-/** 큐에 쌓인 요청들을 처리한다. */
+/**
+ * 큐에 쌓인 요청들을 처리한다.
+ *
+ * @param error 갱신 실패 시 에러 (성공 시 null)
+ * @param token 갱신된 Access Token (실패 시 null)
+ */
 function processQueue(error: unknown, token: string | null) {
   failedQueue.forEach(({ resolve, reject }) => {
     if (token) {
@@ -31,16 +38,16 @@ function processQueue(error: unknown, token: string | null) {
 
 /** 인증 정보를 삭제하고 로그인 페이지로 이동한다. */
 function clearAuthAndRedirect() {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-  localStorage.removeItem('loginId');
-  localStorage.removeItem('name');
-  window.location.href = '/login';
+  localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+  localStorage.removeItem(STORAGE_KEYS.LOGIN_ID);
+  localStorage.removeItem(STORAGE_KEYS.NAME);
+  window.location.href = ROUTES.LOGIN;
 }
 
 /** 요청 인터셉터: localStorage의 Access Token을 Authorization 헤더에 첨부한다. */
 axiosInstance.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken');
+  const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -67,7 +74,7 @@ axiosInstance.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
+        const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
         if (!refreshToken) {
           throw new Error('No refresh token');
         }
@@ -76,8 +83,8 @@ axiosInstance.interceptors.response.use(
         const newAccessToken: string = res.data.accessToken;
         const newRefreshToken: string = res.data.refreshToken;
 
-        localStorage.setItem('accessToken', newAccessToken);
-        localStorage.setItem('refreshToken', newRefreshToken);
+        localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, newAccessToken);
+        localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, newRefreshToken);
 
         processQueue(null, newAccessToken);
 

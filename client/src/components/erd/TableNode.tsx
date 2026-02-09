@@ -1,8 +1,9 @@
-import { memo, useState } from 'react';
+import { memo, useCallback } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Plus, X } from 'lucide-react';
 import type { TableNode as TableNodeType } from '@/types/erd';
 import useCanvasStore from '@/stores/useCanvasStore';
+import { useInlineEdit } from '@/hooks/useInlineEdit';
 
 /**
  * ERD 테이블 커스텀 노드 컴포넌트.
@@ -12,6 +13,9 @@ import useCanvasStore from '@/stores/useCanvasStore';
  * 인라인 편집을 통해 테이블명, 컬럼명, 타입, PK/FK/nullable을 변경할 수 있다.
  *
  * Handle ID 규칙: `{nodeId}-{colId}-source` / `{nodeId}-{colId}-target`
+ *
+ * @param props.id   React Flow 노드 ID
+ * @param props.data 테이블 데이터 (label, columns)
  */
 function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const { label, columns } = data;
@@ -20,35 +24,25 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const deleteColumn = useCanvasStore((s) => s.deleteColumn);
   const updateColumn = useCanvasStore((s) => s.updateColumn);
 
-  const [editingLabel, setEditingLabel] = useState(false);
-  const [labelValue, setLabelValue] = useState(label);
+  /** 테이블 이름 변경 핸들러. @param value 새 테이블 이름 */
+  const handleRename = useCallback((value: string) => renameTable(id, value), [id, renameTable]);
 
-  /** 테이블 이름 편집을 확정한다. */
-  const commitLabel = () => {
-    if (labelValue.trim()) {
-      renameTable(id, labelValue.trim());
-    } else {
-      setLabelValue(label);
-    }
-    setEditingLabel(false);
-  };
+  const { editing, value, setValue, startEdit, confirmEdit, cancelEdit } =
+    useInlineEdit(handleRename);
 
   return (
     <div className="bg-white border border-gray-300 rounded shadow-md min-w-[200px]">
       {/* Table header */}
-      {editingLabel ? (
+      {editing ? (
         <div className="bg-blue-600 px-3 py-2 rounded-t">
           <input
             className="nodrag bg-transparent text-white font-semibold text-sm w-full outline-none placeholder-blue-200"
-            value={labelValue}
-            onChange={(e) => setLabelValue(e.target.value)}
-            onBlur={commitLabel}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onBlur={confirmEdit}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') commitLabel();
-              if (e.key === 'Escape') {
-                setLabelValue(label);
-                setEditingLabel(false);
-              }
+              if (e.key === 'Enter') confirmEdit();
+              if (e.key === 'Escape') cancelEdit();
             }}
             autoFocus
           />
@@ -56,10 +50,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
       ) : (
         <div
           className="bg-blue-600 text-white px-3 py-2 rounded-t font-semibold text-sm cursor-pointer select-none"
-          onDoubleClick={() => {
-            setLabelValue(label);
-            setEditingLabel(true);
-          }}
+          onDoubleClick={() => startEdit(label)}
         >
           {label}
         </div>

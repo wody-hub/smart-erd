@@ -17,7 +17,7 @@ export default function Sidebar() {
   const renameTable = useCanvasStore((s) => s.renameTable);
   const reactFlowInstance = useReactFlow();
 
-  /** 테이블 클릭 시 캔버스에서 해당 노드로 포커스한다. */
+  /** 테이블 클릭 시 캔버스에서 해당 노드로 포커스한다. @param nodeId 포커스할 테이블 노드 ID */
   const handleFocusNode = (nodeId: string) => {
     const node = nodes.find((n) => n.id === nodeId);
     if (!node) return;

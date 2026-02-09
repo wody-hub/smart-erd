@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useAuthStore from '@/stores/useAuthStore';
+import { ROUTES } from '@/constants/routes';
 
 /** Header 컴포넌트의 props. */
 interface HeaderProps {
@@ -21,6 +22,11 @@ interface HeaderProps {
  * 고정 높이(48px)의 다크 배경 바에 애플리케이션 타이틀("Smart ERD"),
  * 사용자 이름, 로그아웃 버튼을 표시한다.
  * 다이어그램 편집 화면에서는 다이어그램 이름과 Save 버튼을 추가로 표시한다.
+ *
+ * @param props.diagramName 현재 다이어그램 이름 (다이어그램 편집 화면에서만 전달)
+ * @param props.onSave      저장 버튼 클릭 핸들러
+ * @param props.saving      저장 중 여부
+ * @param props.isDirty     변경 사항 존재 여부
  */
 export default function Header({ diagramName, onSave, saving, isDirty }: HeaderProps) {
   const navigate = useNavigate();
@@ -29,12 +35,12 @@ export default function Header({ diagramName, onSave, saving, isDirty }: HeaderP
   /** 로그아웃 처리 후 로그인 페이지로 이동한다. */
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate(ROUTES.LOGIN);
   };
 
   return (
     <header className="h-12 bg-gray-900 text-white flex items-center px-4 shrink-0">
-      <h1 className="text-lg font-bold cursor-pointer" onClick={() => navigate('/teams')}>
+      <h1 className="text-lg font-bold cursor-pointer" onClick={() => navigate(ROUTES.TEAMS)}>
         Smart ERD
       </h1>
 

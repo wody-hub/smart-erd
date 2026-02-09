@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { Trash2, Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useInlineEdit } from '@/hooks/useInlineEdit';
 
 /** SidebarTableItem의 props. */
 interface SidebarTableItemProps {
@@ -21,6 +21,11 @@ interface SidebarTableItemProps {
  * Sidebar 내 개별 테이블 항목 컴포넌트.
  *
  * 테이블 이름 표시, 클릭 시 캔버스 포커스, 인라인 이름 변경, 삭제 기능을 제공한다.
+ *
+ * @param props.label    테이블 표시 이름
+ * @param props.onClick  테이블 클릭 시 캔버스 포커스 핸들러
+ * @param props.onRename 이름 변경 확정 핸들러
+ * @param props.onDelete 삭제 핸들러
  */
 export default function SidebarTableItem({
   label,
@@ -28,29 +33,14 @@ export default function SidebarTableItem({
   onRename,
   onDelete,
 }: SidebarTableItemProps) {
-  const [editing, setEditing] = useState(false);
-  const [editValue, setEditValue] = useState(label);
-
-  /** 이름 변경을 확정한다. */
-  const confirmEdit = () => {
-    if (editValue.trim()) {
-      onRename(editValue.trim());
-    }
-    setEditing(false);
-  };
-
-  /** 이름 변경을 취소한다. */
-  const cancelEdit = () => {
-    setEditValue(label);
-    setEditing(false);
-  };
+  const { editing, value, setValue, startEdit, confirmEdit, cancelEdit } = useInlineEdit(onRename);
 
   if (editing) {
     return (
       <div className="flex items-center gap-1 px-2 py-1">
         <Input
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
           className="h-6 text-xs flex-1"
           autoFocus
           onKeyDown={(e) => {
@@ -81,8 +71,7 @@ export default function SidebarTableItem({
           className="h-6 w-6"
           onClick={(e) => {
             e.stopPropagation();
-            setEditValue(label);
-            setEditing(true);
+            startEdit(label);
           }}
         >
           <Pencil className="h-3 w-3 text-muted-foreground" />
