@@ -144,6 +144,7 @@ client/
     │   ├── projectApi.ts            # fetchProjects(), createProject(), deleteProject()
     │   └── diagramApi.ts            # fetchDiagrams(), fetchDiagram(), createDiagram(), saveDiagram(), renameDiagram(), deleteDiagram()
     ├── constants/
+    │   ├── keybindings.ts           # KEYBINDINGS — keyboard shortcut key registry
     │   ├── storage.ts               # STORAGE_KEYS — localStorage key constants
     │   ├── routes.ts                # ROUTES — route path constants (static + parameterized)
     │   └── query-keys.ts            # queryKeys — React Query cache key hierarchy
@@ -236,6 +237,7 @@ client/
 | Data Fetching | @tanstack/react-query 5 (useQuery, useMutation, cache invalidation)              |
 | ERD Canvas    | @xyflow/react 12, Zustand 5                                                      |
 | Editor        | @monaco-editor/react 4.6                                                         |
+| Shortcuts     | react-hotkeys-hook 5                                                             |
 | Toast         | Sonner                                                                           |
 | Formatting    | Prettier (Java + TypeScript), prettier-plugin-java                               |
 | Code Quality  | ESLint, SonarQube / SonarLint                                                    |

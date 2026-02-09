@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useHotkeys } from 'react-hotkeys-hook';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import ERDCanvas from '@/components/erd/ERDCanvas';
 import useCanvasStore from '@/stores/useCanvasStore';
 import { fetchDiagram, saveDiagram } from '@/api/diagramApi';
 import { queryKeys } from '@/constants/query-keys';
+import { KEYBINDINGS } from '@/constants/keybindings';
 import { getErrorMessage } from '@/lib/api-error';
 import { toast } from 'sonner';
 import Spinner from '@/components/ui/spinner';
@@ -57,10 +59,10 @@ export default function DiagramPage() {
   });
 
   /** 다이어그램을 서버에 저장한다. 저장 중이면 중복 실행을 방지한다. */
-  const handleSave = useCallback(() => {
+  const handleSave = () => {
     if (saveMutation.isPending) return;
     saveMutation.mutate(serialize());
-  }, [saveMutation, serialize]);
+  };
 
   useEffect(() => {
     if (!diagram) return;
@@ -74,16 +76,7 @@ export default function DiagramPage() {
     markClean();
   }, [diagram, deserialize, setNodes, setEdges, markClean]);
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        handleSave();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleSave]);
+  useHotkeys(KEYBINDINGS.SAVE, handleSave, { preventDefault: true });
 
   if (isError) {
     return (

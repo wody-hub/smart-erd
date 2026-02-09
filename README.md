@@ -19,6 +19,7 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 | API 문서    | springdoc-openapi (Swagger UI)                                                 |
 | ERD 캔버스  | @xyflow/react 12, Zustand 5                                                    |
 | 에디터      | @monaco-editor/react 4.6                                                       |
+| 단축키      | react-hotkeys-hook 5                                                           |
 | 토스트      | Sonner                                                                         |
 | 포맷팅      | Prettier (Java + TypeScript 통합), prettier-plugin-java                        |
 | 코드 품질   | ESLint, SonarQube / SonarLint                                                  |
@@ -134,6 +135,7 @@ client/
     │   ├── projectApi.ts            # fetchProjects(), createProject(), deleteProject()
     │   └── diagramApi.ts            # fetchDiagrams(), fetchDiagram(), createDiagram(), saveDiagram(), renameDiagram(), deleteDiagram()
     ├── constants/
+    │   ├── keybindings.ts           # KEYBINDINGS — 키보드 단축키 레지스트리
     │   ├── storage.ts               # STORAGE_KEYS — localStorage 키 상수
     │   ├── routes.ts                # ROUTES — 라우트 경로 상수 (정적 + 파라미터)
     │   └── query-keys.ts            # queryKeys — React Query 캐시 키 계층 구조
