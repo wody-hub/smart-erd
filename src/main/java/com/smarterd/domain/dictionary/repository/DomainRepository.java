@@ -1,9 +1,38 @@
 package com.smarterd.domain.dictionary.repository;
 
 import com.smarterd.domain.dictionary.entity.Domain;
+import com.smarterd.domain.team.entity.Team;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
  * {@link Domain} 엔티티의 데이터 접근 레포지토리.
  */
-public interface DomainRepository extends JpaRepository<Domain, Long> {}
+public interface DomainRepository extends JpaRepository<Domain, Long> {
+    /**
+     * 팀에 속한 모든 도메인을 조회한다.
+     *
+     * @param team 팀 엔티티
+     * @return 도메인 목록
+     */
+    List<Domain> findByTeam(Team team);
+
+    /**
+     * 팀 내에 동일한 논리명의 도메인이 존재하는지 확인한다.
+     *
+     * @param team        팀 엔티티
+     * @param logicalName 논리명
+     * @return 존재 여부
+     */
+    boolean existsByTeamAndLogicalName(Team team, String logicalName);
+
+    /**
+     * 팀 내에 동일한 논리명의 도메인이 존재하는지 확인한다 (자기 자신 제외).
+     *
+     * @param team        팀 엔티티
+     * @param logicalName 논리명
+     * @param id          제외할 도메인 ID
+     * @return 존재 여부
+     */
+    boolean existsByTeamAndLogicalNameAndIdNot(Team team, String logicalName, Long id);
+}

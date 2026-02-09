@@ -48,17 +48,36 @@ public class Domain extends BaseTimeEntity {
     @JoinColumn(name = "team_id", nullable = false)
     private Team team;
 
+    /** 설명 (선택) — 최대 500자 */
+    @Column(length = 500)
+    private String description;
+
     /**
      * 도메인 엔티티를 생성한다.
      *
      * @param logicalName  논리명
      * @param physicalType 물리 데이터 타입
      * @param team         소속 팀
+     * @param description  설명 (nullable)
      */
     @Builder
-    public Domain(String logicalName, String physicalType, Team team) {
+    public Domain(String logicalName, String physicalType, Team team, String description) {
         this.logicalName = logicalName;
         this.physicalType = physicalType;
         this.team = team;
+        this.description = description;
+    }
+
+    /**
+     * 도메인 정보를 수정한다.
+     *
+     * @param logicalName  논리명
+     * @param physicalType 물리 데이터 타입
+     * @param description  설명 (nullable)
+     */
+    public void update(String logicalName, String physicalType, String description) {
+        this.logicalName = logicalName;
+        this.physicalType = physicalType;
+        this.description = description;
     }
 }

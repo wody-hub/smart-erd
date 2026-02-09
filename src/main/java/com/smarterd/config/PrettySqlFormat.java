@@ -22,11 +22,6 @@ public class PrettySqlFormat implements MessageFormattingStrategy {
         if (sql == null || sql.isBlank()) {
             return "";
         }
-        return String.format(
-            "\n| %d ms | %s |%s",
-            elapsed,
-            category,
-            FormatStyle.BASIC.getFormatter().format(sql)
-        );
+        return String.format("\n| %d ms | %s |%s", elapsed, category, FormatStyle.BASIC.getFormatter().format(sql));
     }
 }

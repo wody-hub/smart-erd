@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, ArrowLeft, UserPlus, Trash2 } from 'lucide-react';
+import { Plus, FolderOpen, ArrowLeft, UserPlus, Trash2, BookOpen } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import Header from '@/components/layout/Header';
@@ -85,6 +85,10 @@ export default function ProjectsPage() {
               </p>
             </div>
             <div className="flex gap-2">
+              <Button variant="outline" onClick={() => navigate(ROUTES.DICTIONARY(teamId!))}>
+                <BookOpen className="h-4 w-4 mr-2" />
+                {t('project.list.dictionaryButton')}
+              </Button>
               <Button variant="outline" onClick={() => setMembersDialogOpen(true)}>
                 <UserPlus className="h-4 w-4 mr-2" />
                 {t('project.list.membersButton')}

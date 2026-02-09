@@ -14,4 +14,6 @@ export const ROUTES = {
   /** 다이어그램 편집 페이지 */
   DIAGRAM: (teamId: string | number, projectId: string | number, diagramId: string | number) =>
     `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`,
+  /** 데이터 사전 페이지 */
+  DICTIONARY: (teamId: string | number) => `/teams/${teamId}/dictionary`,
 } as const;

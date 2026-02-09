@@ -91,6 +91,7 @@
       "newButton": "New Project",
       "createButton": "Create Project",
       "membersButton": "Members",
+      "dictionaryButton": "Data Dictionary",
       "empty": "No projects yet. Create your first project.",
       "createdAt": "Created: {{date}}"
     },
@@ -205,6 +206,88 @@
         "toggleFk": "Toggle foreign key for {{name}}",
         "toggleNullable": "Toggle nullable for {{name}}",
         "deleteColumn": "Delete column {{name}}"
+      }
+    }
+  },
+  "dictionary": {
+    "title": "Data Dictionary",
+    "backToProjects": "Back to Projects",
+    "tabs": {
+      "domains": "Domains",
+      "terms": "Terms"
+    },
+    "domain": {
+      "table": {
+        "logicalName": "Logical Name",
+        "physicalType": "Physical Type",
+        "description": "Description",
+        "actions": "Actions",
+        "empty": "No domains yet. Add your first domain."
+      },
+      "form": {
+        "createTitle": "Add Domain",
+        "editTitle": "Edit Domain",
+        "logicalName": "Logical Name",
+        "logicalNamePlaceholder": "e.g. Amount",
+        "physicalType": "Physical Type",
+        "physicalTypePlaceholder": "e.g. DECIMAL(15,2)",
+        "description": "Description",
+        "descriptionPlaceholder": "Optional description"
+      },
+      "toast": {
+        "created": "Domain created",
+        "createFailed": "Failed to create domain",
+        "updated": "Domain updated",
+        "updateFailed": "Failed to update domain",
+        "deleted": "Domain deleted",
+        "deleteFailed": "Failed to delete domain"
+      },
+      "delete": {
+        "dialogTitle": "Delete Domain",
+        "dialogDescription": "Are you sure you want to delete this domain?"
+      },
+      "aria": {
+        "editDomain": "Edit domain {{name}}",
+        "deleteDomain": "Delete domain {{name}}"
+      }
+    },
+    "term": {
+      "table": {
+        "logicalName": "Logical Name",
+        "physicalName": "Physical Name",
+        "domain": "Domain",
+        "description": "Description",
+        "actions": "Actions",
+        "empty": "No terms yet. Add your first term.",
+        "noDomain": "-"
+      },
+      "form": {
+        "createTitle": "Add Term",
+        "editTitle": "Edit Term",
+        "logicalName": "Logical Name",
+        "logicalNamePlaceholder": "e.g. Username",
+        "physicalName": "Physical Name",
+        "physicalNamePlaceholder": "e.g. user_name",
+        "domain": "Domain",
+        "domainNone": "None",
+        "description": "Description",
+        "descriptionPlaceholder": "Optional description"
+      },
+      "toast": {
+        "created": "Term created",
+        "createFailed": "Failed to create term",
+        "updated": "Term updated",
+        "updateFailed": "Failed to update term",
+        "deleted": "Term deleted",
+        "deleteFailed": "Failed to delete term"
+      },
+      "delete": {
+        "dialogTitle": "Delete Term",
+        "dialogDescription": "Are you sure you want to delete this term?"
+      },
+      "aria": {
+        "editTerm": "Edit term {{name}}",
+        "deleteTerm": "Delete term {{name}}"
       }
     }
   },

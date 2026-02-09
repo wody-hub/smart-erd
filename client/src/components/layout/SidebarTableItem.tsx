@@ -45,6 +45,7 @@ export default function SidebarTableItem({
           onChange={(e) => setValue(e.target.value)}
           className="h-6 text-xs flex-1"
           autoFocus
+          aria-label={t('erd.sidebar.aria.renameTable', { name: label })}
           onKeyDown={(e) => {
             if (e.key === 'Enter') confirmEdit();
             if (e.key === 'Escape') cancelEdit();

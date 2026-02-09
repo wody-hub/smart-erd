@@ -54,6 +54,10 @@ public class Term extends BaseTimeEntity {
     @JoinColumn(name = "domain_id")
     private Domain domain;
 
+    /** 설명 (선택) — 최대 500자 */
+    @Column(length = 500)
+    private String description;
+
     /**
      * 용어 엔티티를 생성한다.
      *
@@ -61,12 +65,29 @@ public class Term extends BaseTimeEntity {
      * @param physicalName 물리명
      * @param team         소속 팀
      * @param domain       연결된 도메인 (nullable)
+     * @param description  설명 (nullable)
      */
     @Builder
-    public Term(String logicalName, String physicalName, Team team, Domain domain) {
+    public Term(String logicalName, String physicalName, Team team, Domain domain, String description) {
         this.logicalName = logicalName;
         this.physicalName = physicalName;
         this.team = team;
         this.domain = domain;
+        this.description = description;
+    }
+
+    /**
+     * 용어 정보를 수정한다.
+     *
+     * @param logicalName  논리명
+     * @param physicalName 물리명
+     * @param domain       연결된 도메인 (nullable)
+     * @param description  설명 (nullable)
+     */
+    public void update(String logicalName, String physicalName, Domain domain, String description) {
+        this.logicalName = logicalName;
+        this.physicalName = physicalName;
+        this.domain = domain;
+        this.description = description;
     }
 }

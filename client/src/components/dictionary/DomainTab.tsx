@@ -1,0 +1,201 @@
+import { useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { Plus, Pencil, Trash2, Database } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
+import ConfirmDialog from '@/components/ui/confirm-dialog';
+import Spinner from '@/components/ui/spinner';
+import DomainFormDialog from '@/components/dictionary/DomainFormDialog';
+import { fetchDomains, createDomain, updateDomain, deleteDomain } from '@/api/domainApi';
+import { queryKeys } from '@/constants/query-keys';
+import { getErrorMessage } from '@/lib/api-error';
+import type { Domain, DomainFormData } from '@/types/dictionary';
+
+/**
+ * 도메인 사전 탭 컴포넌트.
+ *
+ * 도메인 목록 테이블과 생성/수정/삭제 기능을 제공한다.
+ */
+export default function DomainTab() {
+  const { teamId } = useParams<{ teamId: string }>();
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  /** 폼 다이얼로그 열림 상태 */
+  const [formOpen, setFormOpen] = useState(false);
+  /** 수정 대상 도메인 (null이면 생성 모드) */
+  const [editTarget, setEditTarget] = useState<Domain | null>(null);
+  /** 삭제 확인 대상 도메인 ID */
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+
+  const { data: domains = [], isLoading } = useQuery({
+    queryKey: queryKeys.dictionary.domains(teamId!),
+    queryFn: () => fetchDomains(teamId!),
+    enabled: !!teamId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: DomainFormData) => createDomain(teamId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.domains(teamId!) });
+      toast.success(t('dictionary.domain.toast.created'));
+    },
+    onError: (err) => toast.error(getErrorMessage(err, t('dictionary.domain.toast.createFailed'))),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: DomainFormData }) =>
+      updateDomain(teamId!, id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.domains(teamId!) });
+      toast.success(t('dictionary.domain.toast.updated'));
+    },
+    onError: (err) => toast.error(getErrorMessage(err, t('dictionary.domain.toast.updateFailed'))),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (domainId: number) => deleteDomain(teamId!, domainId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.domains(teamId!) });
+      setDeleteTarget(null);
+      toast.success(t('dictionary.domain.toast.deleted'));
+    },
+    onError: (err) => toast.error(getErrorMessage(err, t('dictionary.domain.toast.deleteFailed'))),
+  });
+
+  /**
+   * 생성 버튼 클릭 핸들러.
+   */
+  const handleCreate = () => {
+    setEditTarget(null);
+    setFormOpen(true);
+  };
+
+  /**
+   * 수정 버튼 클릭 핸들러.
+   *
+   * @param domain 수정 대상 도메인
+   */
+  const handleEdit = (domain: Domain) => {
+    setEditTarget(domain);
+    setFormOpen(true);
+  };
+
+  /**
+   * 폼 제출 핸들러 (생성/수정 분기).
+   *
+   * @param data 폼 데이터
+   */
+  const handleSubmit = async (data: DomainFormData) => {
+    if (editTarget) {
+      await updateMutation.mutateAsync({ id: editTarget.id, data });
+    } else {
+      await createMutation.mutateAsync(data);
+    }
+  };
+
+  if (isLoading) {
+    return <Spinner text={t('common.loading')} />;
+  }
+
+  return (
+    <div>
+      <div className="flex justify-end mb-4">
+        <Button onClick={handleCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          {t('dictionary.domain.form.createTitle')}
+        </Button>
+      </div>
+
+      {domains.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Database className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground mb-4">{t('dictionary.domain.table.empty')}</p>
+            <Button onClick={handleCreate}>
+              <Plus className="h-4 w-4 mr-2" />
+              {t('dictionary.domain.form.createTitle')}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('dictionary.domain.table.logicalName')}</TableHead>
+              <TableHead>{t('dictionary.domain.table.physicalType')}</TableHead>
+              <TableHead>{t('dictionary.domain.table.description')}</TableHead>
+              <TableHead className="w-[100px]">{t('dictionary.domain.table.actions')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {domains.map((domain) => (
+              <TableRow key={domain.id}>
+                <TableCell className="font-medium">{domain.logicalName}</TableCell>
+                <TableCell>{domain.physicalType}</TableCell>
+                <TableCell className="text-muted-foreground">{domain.description ?? ''}</TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleEdit(domain)}
+                      aria-label={t('dictionary.domain.aria.editDomain', {
+                        name: domain.logicalName,
+                      })}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setDeleteTarget(domain.id)}
+                      aria-label={t('dictionary.domain.aria.deleteDomain', {
+                        name: domain.logicalName,
+                      })}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      <DomainFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        onSubmit={handleSubmit}
+        initialData={editTarget}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title={t('dictionary.domain.delete.dialogTitle')}
+        description={t('dictionary.domain.delete.dialogDescription')}
+        onConfirm={() => {
+          if (deleteTarget !== null) deleteMutation.mutate(deleteTarget);
+        }}
+        loading={deleteMutation.isPending}
+      />
+    </div>
+  );
+}

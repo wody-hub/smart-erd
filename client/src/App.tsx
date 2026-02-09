@@ -7,6 +7,7 @@ import TeamsPage from './pages/team/TeamsPage';
 import ProjectsPage from './pages/project/ProjectsPage';
 import DiagramsPage from './pages/diagram/DiagramsPage';
 import DiagramPage from './pages/diagram/DiagramPage';
+import DictionaryPage from './pages/dictionary/DictionaryPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { Toaster } from './components/ui/sonner';
 import { ROUTES } from '@/constants/routes';
@@ -38,6 +39,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ProjectsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teams/:teamId/dictionary"
+            element={
+              <ProtectedRoute>
+                <DictionaryPage />
               </ProtectedRoute>
             }
           />

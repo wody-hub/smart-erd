@@ -1,0 +1,204 @@
+import { useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { Plus, Pencil, Trash2, FileText } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
+import ConfirmDialog from '@/components/ui/confirm-dialog';
+import Spinner from '@/components/ui/spinner';
+import TermFormDialog from '@/components/dictionary/TermFormDialog';
+import { fetchTerms, createTerm, updateTerm, deleteTerm } from '@/api/termApi';
+import { queryKeys } from '@/constants/query-keys';
+import { getErrorMessage } from '@/lib/api-error';
+import type { Term, TermFormData } from '@/types/dictionary';
+
+/**
+ * 용어 사전 탭 컴포넌트.
+ *
+ * 용어 목록 테이블과 생성/수정/삭제 기능을 제공한다.
+ */
+export default function TermTab() {
+  const { teamId } = useParams<{ teamId: string }>();
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  /** 폼 다이얼로그 열림 상태 */
+  const [formOpen, setFormOpen] = useState(false);
+  /** 수정 대상 용어 (null이면 생성 모드) */
+  const [editTarget, setEditTarget] = useState<Term | null>(null);
+  /** 삭제 확인 대상 용어 ID */
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+
+  const { data: terms = [], isLoading } = useQuery({
+    queryKey: queryKeys.dictionary.terms(teamId!),
+    queryFn: () => fetchTerms(teamId!),
+    enabled: !!teamId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: TermFormData) => createTerm(teamId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId!) });
+      toast.success(t('dictionary.term.toast.created'));
+    },
+    onError: (err) => toast.error(getErrorMessage(err, t('dictionary.term.toast.createFailed'))),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: TermFormData }) => updateTerm(teamId!, id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId!) });
+      toast.success(t('dictionary.term.toast.updated'));
+    },
+    onError: (err) => toast.error(getErrorMessage(err, t('dictionary.term.toast.updateFailed'))),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (termId: number) => deleteTerm(teamId!, termId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId!) });
+      setDeleteTarget(null);
+      toast.success(t('dictionary.term.toast.deleted'));
+    },
+    onError: (err) => toast.error(getErrorMessage(err, t('dictionary.term.toast.deleteFailed'))),
+  });
+
+  /**
+   * 생성 버튼 클릭 핸들러.
+   */
+  const handleCreate = () => {
+    setEditTarget(null);
+    setFormOpen(true);
+  };
+
+  /**
+   * 수정 버튼 클릭 핸들러.
+   *
+   * @param term 수정 대상 용어
+   */
+  const handleEdit = (term: Term) => {
+    setEditTarget(term);
+    setFormOpen(true);
+  };
+
+  /**
+   * 폼 제출 핸들러 (생성/수정 분기).
+   *
+   * @param data 폼 데이터
+   */
+  const handleSubmit = async (data: TermFormData) => {
+    if (editTarget) {
+      await updateMutation.mutateAsync({ id: editTarget.id, data });
+    } else {
+      await createMutation.mutateAsync(data);
+    }
+  };
+
+  if (isLoading) {
+    return <Spinner text={t('common.loading')} />;
+  }
+
+  return (
+    <div>
+      <div className="flex justify-end mb-4">
+        <Button onClick={handleCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          {t('dictionary.term.form.createTitle')}
+        </Button>
+      </div>
+
+      {terms.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground mb-4">{t('dictionary.term.table.empty')}</p>
+            <Button onClick={handleCreate}>
+              <Plus className="h-4 w-4 mr-2" />
+              {t('dictionary.term.form.createTitle')}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('dictionary.term.table.logicalName')}</TableHead>
+              <TableHead>{t('dictionary.term.table.physicalName')}</TableHead>
+              <TableHead>{t('dictionary.term.table.domain')}</TableHead>
+              <TableHead>{t('dictionary.term.table.description')}</TableHead>
+              <TableHead className="w-[100px]">{t('dictionary.term.table.actions')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {terms.map((term) => (
+              <TableRow key={term.id}>
+                <TableCell className="font-medium">{term.logicalName}</TableCell>
+                <TableCell>{term.physicalName}</TableCell>
+                <TableCell>
+                  {term.domainLogicalName ?? t('dictionary.term.table.noDomain')}
+                </TableCell>
+                <TableCell className="text-muted-foreground">{term.description ?? ''}</TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleEdit(term)}
+                      aria-label={t('dictionary.term.aria.editTerm', {
+                        name: term.logicalName,
+                      })}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setDeleteTarget(term.id)}
+                      aria-label={t('dictionary.term.aria.deleteTerm', {
+                        name: term.logicalName,
+                      })}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      <TermFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        onSubmit={handleSubmit}
+        initialData={editTarget}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title={t('dictionary.term.delete.dialogTitle')}
+        description={t('dictionary.term.delete.dialogDescription')}
+        onConfirm={() => {
+          if (deleteTarget !== null) deleteMutation.mutate(deleteTarget);
+        }}
+        loading={deleteMutation.isPending}
+      />
+    </div>
+  );
+}

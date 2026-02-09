@@ -151,6 +151,7 @@ export default function DiagramsPage() {
                             onChange={(e) => setRenameValue(e.target.value)}
                             className="h-7 text-sm"
                             autoFocus
+                            aria-label={t('diagram.aria.renameDiagram', { name: diagram.name })}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter')
                                 confirmRename(e as unknown as React.MouseEvent);

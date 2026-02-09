@@ -19,6 +19,13 @@ export const queryKeys = {
     /** 팀별 프로젝트 목록 */
     byTeam: (teamId: string) => ['teams', teamId, 'projects'] as const,
   },
+  /** 데이터 사전 관련 쿼리 키 */
+  dictionary: {
+    /** 팀별 도메인 목록 */
+    domains: (teamId: string) => ['teams', teamId, 'domains'] as const,
+    /** 팀별 용어 목록 */
+    terms: (teamId: string) => ['teams', teamId, 'terms'] as const,
+  },
   /** 다이어그램 관련 쿼리 키 */
   diagrams: {
     /** 프로젝트별 다이어그램 목록 */

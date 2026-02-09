@@ -40,6 +40,7 @@ public class GlobalExceptionHandler {
      * @return 적절한 HTTP 상태 + 다국어 에러 메시지
      */
     @ExceptionHandler(LocalizedException.class)
+    @SuppressWarnings("null")
     public ResponseEntity<Map<String, String>> handleLocalizedException(LocalizedException ex, Locale locale) {
         final var message = messageSource.getMessage(ex.getMessageCode(), ex.getMessageArgs(), locale);
         return ResponseEntity.status(resolveStatus(ex)).body(Map.of("error", message));
