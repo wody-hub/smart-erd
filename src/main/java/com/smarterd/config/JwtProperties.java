@@ -15,6 +15,9 @@ public class JwtProperties {
     /** Base64 인코딩된 HMAC-SHA256 서명 키 */
     private String secret;
 
-    /** 토큰 만료 시간 (밀리초) */
-    private long expiration;
+    /** Access Token 만료 시간 (밀리초) */
+    private long accessExpiration;
+
+    /** Refresh Token 만료 시간 (밀리초) */
+    private long refreshExpiration;
 }

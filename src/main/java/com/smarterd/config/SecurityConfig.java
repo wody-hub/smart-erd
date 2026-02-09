@@ -23,7 +23,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
  *
  * <p>공개 경로:
  * <ul>
- *   <li>{@code /api/auth/**} — 로그인·회원가입</li>
+ *   <li>{@code /api/auth/**} — 로그인·회원가입·토큰 갱신·로그아웃</li>
  *   <li>{@code /swagger-ui/**, /v3/api-docs/**} — Swagger UI 및 OpenAPI 스펙</li>
  * </ul></p>
  */

@@ -3,6 +3,7 @@ package com.smarterd;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Smart ERD 애플리케이션의 진입점.
@@ -12,6 +13,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
  */
 @SpringBootApplication
 @EnableJpaAuditing
+@EnableScheduling
 public class SmartErdApplication {
 
     /**

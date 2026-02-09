@@ -30,7 +30,7 @@ export default function SignupPage() {
 
     try {
       const res = await axiosInstance.post('/auth/signup', { loginId, password, name });
-      login(res.data.token, res.data.loginId, res.data.name);
+      login(res.data.accessToken, res.data.refreshToken, res.data.loginId, res.data.name);
       navigate('/teams');
     } catch {
       setError('Signup failed. Login ID may already exist.');

@@ -29,7 +29,7 @@ export default function LoginPage() {
 
     try {
       const res = await axiosInstance.post('/auth/login', { loginId, password });
-      login(res.data.token, res.data.loginId, res.data.name);
+      login(res.data.accessToken, res.data.refreshToken, res.data.loginId, res.data.name);
       navigate('/teams');
     } catch {
       setError('Login ID or password is incorrect.');
