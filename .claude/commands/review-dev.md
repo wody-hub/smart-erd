@@ -106,7 +106,25 @@
 - [ ] `@/` alias import 사용 여부
 - [ ] ESM 전용 — `require()` 사용 금지
 
-### 8. JSDoc (Medium)
+### 8. 페이지 구조 (MUST)
+
+- [ ] 페이지 파일이 도메인별 서브디렉토리(`pages/auth/`, `pages/team/`, `pages/project/`, `pages/diagram/`)에 위치하는지
+- [ ] 페이지 컴포넌트 내부 코드가 표준 순서를 준수하는지:
+  1. URL 파라미터 (`useParams`)
+  2. 라우터 훅 (`useNavigate`)
+  3. Query Client (`useQueryClient`)
+  4. 로컬 상태 (`useState`)
+  5. 스토어 셀렉터 (`useCanvasStore`, `useAuthStore`)
+  6. 파생값/상수
+  7. 쿼리 (`useQuery`)
+  8. 뮤테이션 (`useMutation`)
+  9. 이벤트 핸들러
+  10. 사이드 이펙트 (`useEffect`)
+  11. 조건부 리턴 (loading/error)
+  12. JSX
+- [ ] `useEffect`가 쿼리/뮤테이션 사이에 끼어들지 않는지
+
+### 9. JSDoc (Medium)
 
 - [ ] 함수/컴포넌트: 멀티라인 JSDoc + `@param`
 - [ ] 인터페이스 필드: 한 줄 `/** 설명 */`

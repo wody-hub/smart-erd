@@ -47,18 +47,6 @@ export default function DiagramPage() {
     enabled: !!teamId && !!projectId && !!diagramId,
   });
 
-  useEffect(() => {
-    if (!diagram) return;
-    setDiagramName(diagram.name);
-    if (diagram.content) {
-      deserialize(diagram.content);
-    } else {
-      setNodes([]);
-      setEdges([]);
-    }
-    markClean();
-  }, [diagram, deserialize, setNodes, setEdges, markClean]);
-
   const saveMutation = useMutation({
     mutationFn: (content: string) => saveDiagram(teamId!, projectId!, diagramId!, content),
     onSuccess: () => {
@@ -73,6 +61,18 @@ export default function DiagramPage() {
     if (saveMutation.isPending) return;
     saveMutation.mutate(serialize());
   }, [saveMutation, serialize]);
+
+  useEffect(() => {
+    if (!diagram) return;
+    setDiagramName(diagram.name);
+    if (diagram.content) {
+      deserialize(diagram.content);
+    } else {
+      setNodes([]);
+      setEdges([]);
+    }
+    markClean();
+  }, [diagram, deserialize, setNodes, setEdges, markClean]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {

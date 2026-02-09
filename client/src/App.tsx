@@ -1,12 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/query-client';
-import LoginPage from './pages/LoginPage';
-import SignupPage from './pages/SignupPage';
-import TeamsPage from './pages/TeamsPage';
-import ProjectsPage from './pages/ProjectsPage';
-import DiagramsPage from './pages/DiagramsPage';
-import DiagramPage from './pages/DiagramPage';
+import LoginPage from './pages/auth/LoginPage';
+import SignupPage from './pages/auth/SignupPage';
+import TeamsPage from './pages/team/TeamsPage';
+import ProjectsPage from './pages/project/ProjectsPage';
+import DiagramsPage from './pages/diagram/DiagramsPage';
+import DiagramPage from './pages/diagram/DiagramPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { Toaster } from './components/ui/sonner';
 import { ROUTES } from '@/constants/routes';

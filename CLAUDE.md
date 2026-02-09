@@ -175,13 +175,17 @@ client/
     │   ├── utils.ts                 # cn() = clsx + tailwind-merge
     │   ├── api-error.ts             # getErrorMessage() — server error message extraction
     │   └── query-client.ts          # QueryClient (staleTime: 30s, retry: 1, refetchOnWindowFocus: false)
-    ├── pages/
-    │   ├── DiagramPage.tsx          # Diagram editor: Header + Sidebar + ERDCanvas (useQuery + useMutation)
-    │   ├── DiagramsPage.tsx         # Diagram list + CRUD + inline rename (useQuery + useMutation)
-    │   ├── LoginPage.tsx            # Login form (authApi, redirects to /teams on success)
-    │   ├── SignupPage.tsx           # Signup form (authApi, auto-login on success)
-    │   ├── TeamsPage.tsx            # Team list + create (useQuery + useMutation + CreateResourceDialog)
-    │   └── ProjectsPage.tsx         # Project list + CRUD + member management (useQuery + useMutation)
+    ├── pages/                       # Domain-based page directories
+    │   ├── auth/
+    │   │   ├── LoginPage.tsx        # Login form (authApi, redirects to /teams on success)
+    │   │   └── SignupPage.tsx       # Signup form (authApi, auto-login on success)
+    │   ├── team/
+    │   │   └── TeamsPage.tsx        # Team list + create (useQuery + useMutation + CreateResourceDialog)
+    │   ├── project/
+    │   │   └── ProjectsPage.tsx     # Project list + CRUD + member management (useQuery + useMutation)
+    │   └── diagram/
+    │       ├── DiagramsPage.tsx     # Diagram list + CRUD + inline rename (useQuery + useMutation)
+    │       └── DiagramPage.tsx      # Diagram editor: Header + Sidebar + ERDCanvas (useQuery + useMutation)
     ├── stores/
     │   ├── useAuthStore.ts          # Zustand: auth state (tokens, loginId, name) + localStorage sync
     │   └── useCanvasStore.ts        # Zustand: nodes, edges, onChange handlers, serialize/deserialize
@@ -204,6 +208,7 @@ client/
 - `components/auth/` — Authentication components (ProtectedRoute).
 - `components/erd/` — ERD domain-specific components.
 - `components/layout/` — Page structure components (Header, Sidebar).
+- `pages/` — Domain-based subdirectories (`auth/`, `team/`, `project/`, `diagram/`). Each page groups code in standard order (see "Page Component Code Ordering").
 - `lib/` — Pure utility functions and configurations (no React dependencies except query-client).
 - Use `@/` alias for imports (`@/components/ui/button`, `@/lib/utils`).
 - State management: Zustand for client-only state (`stores/`), React Query for server state (`useQuery`/`useMutation`).
@@ -427,6 +432,27 @@ text-erd-warning                                              — unsaved 경고
 - **토글 버튼**: `aria-label`에 대상 컨텍스트를 포함한다 (예: `` aria-label={`Toggle PK for ${col.name}`} ``)
 - **form 요소**: `<label>` 연결이 불가능한 경우 `aria-label`을 추가한다
 - shadcn/ui 컴포넌트는 Radix UI가 접근성을 처리하므로 추가 작업 불필요
+
+#### Page Component Code Ordering (MUST follow)
+
+페이지 컴포넌트 내부의 코드는 다음 순서로 그룹핑하여 정렬한다:
+
+| 순번 | 그룹 | 예시 |
+|------|------|------|
+| 1 | URL 파라미터 | `useParams` |
+| 2 | 라우터 훅 | `useNavigate` |
+| 3 | Query Client | `useQueryClient` |
+| 4 | 로컬 상태 | `useState` |
+| 5 | 스토어 셀렉터 | `useCanvasStore`, `useAuthStore` |
+| 6 | 파생값/상수 | computed values |
+| 7 | 쿼리 | `useQuery` |
+| 8 | 뮤테이션 | `useMutation` |
+| 9 | 이벤트 핸들러 | `handleSave`, `handleSubmit` 등 |
+| 10 | 사이드 이펙트 | `useEffect` |
+| 11 | 조건부 리턴 | loading/error early return |
+| 12 | JSX | `return (...)` |
+
+같은 그룹 내에서는 선언 순서를 자유롭게 하되, **그룹 간 순서는 반드시 준수**한다. `useEffect`가 쿼리/뮤테이션 사이에 끼어들지 않도록 주의한다.
 
 #### Loading States
 

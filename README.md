@@ -165,13 +165,17 @@ client/
     │   ├── utils.ts                 # cn() = clsx + tailwind-merge
     │   ├── api-error.ts             # getErrorMessage() — 서버 에러 메시지 추출
     │   └── query-client.ts          # QueryClient 설정 (staleTime: 30s, retry: 1)
-    ├── pages/
-    │   ├── DiagramPage.tsx          # 다이어그램 편집기: Header + Sidebar + ERDCanvas (useQuery + useMutation)
-    │   ├── DiagramsPage.tsx         # 다이어그램 목록 + CRUD + 인라인 이름 변경 (useQuery + useMutation)
-    │   ├── LoginPage.tsx            # 로그인 폼 (authApi, 성공 시 /teams 이동)
-    │   ├── SignupPage.tsx           # 회원가입 폼 (authApi, 성공 시 자동 로그인)
-    │   ├── TeamsPage.tsx            # 팀 목록 + 생성 (useQuery + useMutation + CreateResourceDialog)
-    │   └── ProjectsPage.tsx         # 프로젝트 목록 + CRUD + 멤버 관리 (useQuery + useMutation)
+    ├── pages/                       # 도메인별 페이지 디렉토리
+    │   ├── auth/
+    │   │   ├── LoginPage.tsx        # 로그인 폼 (authApi, 성공 시 /teams 이동)
+    │   │   └── SignupPage.tsx       # 회원가입 폼 (authApi, 성공 시 자동 로그인)
+    │   ├── team/
+    │   │   └── TeamsPage.tsx        # 팀 목록 + 생성 (useQuery + useMutation + CreateResourceDialog)
+    │   ├── project/
+    │   │   └── ProjectsPage.tsx     # 프로젝트 목록 + CRUD + 멤버 관리 (useQuery + useMutation)
+    │   └── diagram/
+    │       ├── DiagramsPage.tsx     # 다이어그램 목록 + CRUD + 인라인 이름 변경 (useQuery + useMutation)
+    │       └── DiagramPage.tsx      # 다이어그램 편집기: Header + Sidebar + ERDCanvas (useQuery + useMutation)
     ├── stores/
     │   ├── useAuthStore.ts          # Zustand: 인증 상태 (tokens, loginId, name) + localStorage 동기화
     │   └── useCanvasStore.ts        # Zustand: nodes, edges, onChange 핸들러, serialize/deserialize
@@ -398,6 +402,27 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 - **하드코딩 색상 금지**: `bg-gray-*`, `text-blue-*`, `#hex` 등 Tailwind 기본 팔레트 직접 사용 금지. `index.css` CSS Variable → `tailwind.config.js` 시맨틱 매핑 → 컴포넌트에서 시맨틱 클래스 사용
 - 아이콘 전용 버튼에 `aria-label` 필수, 로딩 상태는 `Spinner` 컴포넌트 사용
 
+#### 페이지 컴포넌트 코드 정렬
+
+페이지 컴포넌트 내부의 코드는 다음 순서로 그룹핑하여 정렬한다:
+
+| 순번 | 그룹 | 예시 |
+|------|------|------|
+| 1 | URL 파라미터 | `useParams` |
+| 2 | 라우터 훅 | `useNavigate` |
+| 3 | Query Client | `useQueryClient` |
+| 4 | 로컬 상태 | `useState` |
+| 5 | 스토어 셀렉터 | `useCanvasStore`, `useAuthStore` |
+| 6 | 파생값/상수 | computed values |
+| 7 | 쿼리 | `useQuery` |
+| 8 | 뮤테이션 | `useMutation` |
+| 9 | 이벤트 핸들러 | `handleSave`, `handleSubmit` 등 |
+| 10 | 사이드 이펙트 | `useEffect` |
+| 11 | 조건부 리턴 | loading/error early return |
+| 12 | JSX | `return (...)` |
+
+같은 그룹 내에서는 선언 순서를 자유롭게 하되, **그룹 간 순서는 반드시 준수**한다.
+
 #### 데이터 페칭 — React Query
 
 서버 상태는 반드시 React Query로 관리한다. 수동 `useEffect` + `useState(loading)` 패턴 사용 금지.
@@ -470,7 +495,7 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 | `components/auth/`   | 인증 관련 컴포넌트 (ProtectedRoute)                                  |
 | `components/erd/`    | ERD 도메인 전용 컴포넌트                                             |
 | `components/layout/` | 페이지 구조 컴포넌트 (Header, Sidebar)                               |
-| `pages/`             | 페이지 컴포넌트 (라우트 단위, useQuery/useMutation 사용)             |
+| `pages/`             | 도메인별 서브디렉토리(`auth/`, `team/`, `project/`, `diagram/`)로 페이지 관리 |
 | `stores/`            | Zustand 클라이언트 상태 관리 (`use` prefix)                          |
 
 ## 엔티티 관계
