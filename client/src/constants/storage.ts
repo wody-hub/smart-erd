@@ -8,4 +8,6 @@ export const STORAGE_KEYS = {
   LOGIN_ID: 'loginId',
   /** 사용자 표시 이름 */
   NAME: 'name',
+  /** i18next 언어 설정 */
+  LANGUAGE: 'i18nextLng',
 } as const;

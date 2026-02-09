@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -43,6 +44,7 @@ export default function MembersDialog({
   onMembersChanged,
 }: MembersDialogProps) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   /** 초대할 사용자 로그인 ID 입력값 */
   const [inviteLoginId, setInviteLoginId] = useState('');
   /** 초대할 멤버에게 부여할 역할 */
@@ -65,7 +67,7 @@ export default function MembersDialog({
       setInviteLoginId('');
       setInviteError('');
     },
-    onError: (err) => setInviteError(getErrorMessage(err, 'Failed to invite member')),
+    onError: (err) => setInviteError(getErrorMessage(err, t('team.members.inviteFailed'))),
   });
 
   const removeMutation = useMutation({
@@ -73,13 +75,13 @@ export default function MembersDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.teams.members(teamId) });
       onMembersChanged?.();
-      toast.success('Member removed');
+      toast.success(t('team.members.removed'));
     },
-    onError: (err) => toast.error(getErrorMessage(err, 'Failed to remove member')),
+    onError: (err) => toast.error(getErrorMessage(err, t('team.members.removeFailed'))),
   });
 
   /** 멤버 초대 폼 제출 핸들러. @param e 폼 이벤트 */
-  const handleInvite = (e: React.FormEvent) => {
+  const handleInvite = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!inviteLoginId.trim()) return;
     setInviteError('');
@@ -90,18 +92,18 @@ export default function MembersDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Team Members</DialogTitle>
-          <DialogDescription>Manage members of this team.</DialogDescription>
+          <DialogTitle>{t('team.members.dialogTitle')}</DialogTitle>
+          <DialogDescription>{t('team.members.dialogDescription')}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleInvite} className="flex gap-2 items-end">
           <div className="flex-1 space-y-1">
             <Label htmlFor="invite-id" className="text-xs">
-              Login ID
+              {t('team.members.loginIdLabel')}
             </Label>
             <Input
               id="invite-id"
-              placeholder="Login ID"
+              placeholder={t('team.members.loginIdPlaceholder')}
               value={inviteLoginId}
               onChange={(e) => setInviteLoginId(e.target.value)}
               className="h-9"
@@ -109,7 +111,7 @@ export default function MembersDialog({
           </div>
           <div className="space-y-1">
             <Label htmlFor="invite-role" className="text-xs">
-              Role
+              {t('team.members.roleLabel')}
             </Label>
             <select
               id="invite-role"
@@ -117,8 +119,8 @@ export default function MembersDialog({
               onChange={(e) => setInviteRole(e.target.value as 'MEMBER' | 'VIEWER')}
               className="h-9 rounded-md border border-input bg-background px-2 text-sm"
             >
-              <option value="MEMBER">MEMBER</option>
-              <option value="VIEWER">VIEWER</option>
+              <option value="MEMBER">{t('team.members.roleMember')}</option>
+              <option value="VIEWER">{t('team.members.roleViewer')}</option>
             </select>
           </div>
           <Button
@@ -126,7 +128,7 @@ export default function MembersDialog({
             size="sm"
             disabled={inviteMutation.isPending || !inviteLoginId.trim()}
           >
-            {inviteMutation.isPending ? '...' : 'Invite'}
+            {inviteMutation.isPending ? t('common.button.pending') : t('common.button.invite')}
           </Button>
         </form>
         {inviteError && <p className="text-sm text-destructive">{inviteError}</p>}
@@ -151,7 +153,7 @@ export default function MembersDialog({
                     size="icon"
                     className="h-7 w-7"
                     onClick={() => removeMutation.mutate(member.userId)}
-                    aria-label={`Remove member ${member.name}`}
+                    aria-label={t('team.members.aria.removeMember', { name: member.name })}
                   >
                     <Trash2 className="h-3 w-3 text-destructive" />
                   </Button>

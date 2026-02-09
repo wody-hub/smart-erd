@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,7 @@ interface ConfirmDialogProps {
   title: string;
   /** 다이얼로그 설명 문구 */
   description: string;
-  /** 확인 버튼 텍스트 (기본: "Delete") */
+  /** 확인 버튼 텍스트 (미지정 시 t('common.button.delete') 사용) */
   confirmLabel?: string;
   /** 확인 버튼 스타일 변형 (기본: "destructive") */
   confirmVariant?: ButtonProps['variant'];
@@ -36,7 +37,7 @@ interface ConfirmDialogProps {
  * @param props.onOpenChange   다이얼로그 열림 상태 변경 핸들러
  * @param props.title          다이얼로그 제목
  * @param props.description    다이얼로그 설명 문구
- * @param props.confirmLabel   확인 버튼 텍스트 (기본: "Delete")
+ * @param props.confirmLabel   확인 버튼 텍스트 (미지정 시 t('common.button.delete') 사용)
  * @param props.confirmVariant 확인 버튼 스타일 (기본: "destructive")
  * @param props.onConfirm      확인 버튼 클릭 핸들러
  * @param props.loading        로딩 중 여부 (true이면 버튼 비활성화)
@@ -46,11 +47,13 @@ export default function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = 'Delete',
+  confirmLabel,
   confirmVariant = 'destructive',
   onConfirm,
   loading = false,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -60,10 +63,10 @@ export default function ConfirmDialog({
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
-            Cancel
+            {t('common.button.cancel')}
           </Button>
           <Button variant={confirmVariant} onClick={onConfirm} disabled={loading}>
-            {loading ? 'Processing...' : confirmLabel}
+            {loading ? t('common.button.processing') : (confirmLabel ?? t('common.button.delete'))}
           </Button>
         </DialogFooter>
       </DialogContent>

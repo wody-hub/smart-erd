@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Users } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import Header from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +23,7 @@ import Spinner from '@/components/ui/spinner';
 export default function TeamsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   /** 팀 생성 다이얼로그 열림 상태 */
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -34,9 +36,9 @@ export default function TeamsPage() {
     mutationFn: (name: string) => createTeam(name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.teams.all });
-      toast.success('Team created');
+      toast.success(t('team.toast.created'));
     },
-    onError: (err) => toast.error(getErrorMessage(err, 'Failed to create team')),
+    onError: (err) => toast.error(getErrorMessage(err, t('team.toast.createFailed'))),
   });
 
   return (
@@ -45,25 +47,23 @@ export default function TeamsPage() {
       <main className="flex-1 overflow-auto bg-muted p-6">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">My Teams</h2>
+            <h2 className="text-2xl font-bold">{t('team.list.title')}</h2>
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              New Team
+              {t('team.list.newButton')}
             </Button>
           </div>
 
           {isLoading ? (
-            <Spinner text="Loading..." />
+            <Spinner text={t('common.loading')} />
           ) : teams.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Users className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  No teams yet. Create your first team to get started.
-                </p>
+                <p className="text-muted-foreground mb-4">{t('team.list.empty')}</p>
                 <Button onClick={() => setDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Create Team
+                  {t('team.list.createButton')}
                 </Button>
               </CardContent>
             </Card>
@@ -81,11 +81,11 @@ export default function TeamsPage() {
                   <CardContent>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Users className="h-4 w-4" />
-                      <span>
-                        {team.memberCount} member{team.memberCount !== 1 ? 's' : ''}
-                      </span>
+                      <span>{t('team.list.memberCount', { count: team.memberCount })}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">Owner: {team.ownerName}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t('team.list.owner', { name: team.ownerName })}
+                    </p>
                   </CardContent>
                 </Card>
               ))}
@@ -97,9 +97,9 @@ export default function TeamsPage() {
       <CreateResourceDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        title="Create New Team"
-        inputLabel="Team Name"
-        placeholder="Enter team name"
+        title={t('team.create.dialogTitle')}
+        inputLabel={t('team.create.inputLabel')}
+        placeholder={t('team.create.placeholder')}
         onCreate={(name) => createTeamMutation.mutateAsync(name)}
       />
     </div>

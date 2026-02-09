@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, FolderOpen, ArrowLeft, UserPlus, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import Header from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +26,7 @@ export default function ProjectsPage() {
   const { teamId } = useParams<{ teamId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   /** 프로젝트 생성 다이얼로그 열림 상태 */
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
@@ -49,9 +51,9 @@ export default function ProjectsPage() {
     mutationFn: (name: string) => createProject(teamId!, name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.byTeam(teamId!) });
-      toast.success('Project created');
+      toast.success(t('project.toast.created'));
     },
-    onError: (err) => toast.error(getErrorMessage(err, 'Failed to create project')),
+    onError: (err) => toast.error(getErrorMessage(err, t('project.toast.createFailed'))),
   });
 
   const deleteProjectMutation = useMutation({
@@ -59,9 +61,9 @@ export default function ProjectsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.byTeam(teamId!) });
       setDeleteTarget(null);
-      toast.success('Project deleted');
+      toast.success(t('project.toast.deleted'));
     },
-    onError: (err) => toast.error(getErrorMessage(err, 'Failed to delete project')),
+    onError: (err) => toast.error(getErrorMessage(err, t('project.toast.deleteFailed'))),
   });
 
   return (
@@ -71,40 +73,39 @@ export default function ProjectsPage() {
         <div className="max-w-4xl mx-auto">
           <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate(ROUTES.TEAMS)}>
             <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to Teams
+            {t('project.list.backToTeams')}
           </Button>
 
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-bold">{team?.name ?? 'Loading...'}</h2>
+              <h2 className="text-2xl font-bold">{team?.name ?? t('common.loading')}</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {team?.memberCount} member{team?.memberCount !== 1 ? 's' : ''}
+                {team?.memberCount != null &&
+                  t('team.list.memberCount', { count: team.memberCount })}
               </p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setMembersDialogOpen(true)}>
                 <UserPlus className="h-4 w-4 mr-2" />
-                Members
+                {t('project.list.membersButton')}
               </Button>
               <Button onClick={() => setProjectDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                New Project
+                {t('project.list.newButton')}
               </Button>
             </div>
           </div>
 
           {isLoading ? (
-            <Spinner text="Loading..." />
+            <Spinner text={t('common.loading')} />
           ) : projects.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  No projects yet. Create your first project.
-                </p>
+                <p className="text-muted-foreground mb-4">{t('project.list.empty')}</p>
                 <Button onClick={() => setProjectDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Create Project
+                  {t('project.list.createButton')}
                 </Button>
               </CardContent>
             </Card>
@@ -127,7 +128,7 @@ export default function ProjectsPage() {
                           e.stopPropagation();
                           setDeleteTarget(project.id);
                         }}
-                        aria-label={`Delete project ${project.name}`}
+                        aria-label={t('project.aria.deleteProject', { name: project.name })}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -135,7 +136,9 @@ export default function ProjectsPage() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-xs text-muted-foreground">
-                      Created: {new Date(project.createdAt).toLocaleDateString()}
+                      {t('project.list.createdAt', {
+                        date: new Date(project.createdAt).toLocaleDateString(),
+                      })}
                     </p>
                   </CardContent>
                 </Card>
@@ -148,9 +151,9 @@ export default function ProjectsPage() {
       <CreateResourceDialog
         open={projectDialogOpen}
         onOpenChange={setProjectDialogOpen}
-        title="Create New Project"
-        inputLabel="Project Name"
-        placeholder="Enter project name"
+        title={t('project.create.dialogTitle')}
+        inputLabel={t('project.create.inputLabel')}
+        placeholder={t('project.create.placeholder')}
         onCreate={(name) => createProjectMutation.mutateAsync(name)}
       />
 
@@ -168,8 +171,8 @@ export default function ProjectsPage() {
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
-        title="Delete Project"
-        description="Are you sure you want to delete this project?"
+        title={t('project.delete.dialogTitle')}
+        description={t('project.delete.dialogDescription')}
         onConfirm={() => {
           if (deleteTarget !== null) deleteProjectMutation.mutate(deleteTarget);
         }}

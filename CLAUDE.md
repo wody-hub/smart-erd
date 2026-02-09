@@ -137,6 +137,12 @@ client/
     ├── App.tsx                      # QueryClientProvider + BrowserRouter + Routes
     ├── index.css                    # Tailwind directives + CSS variables (light/dark)
     ├── vite-env.d.ts                # Vite type reference
+    ├── i18n/
+    │   ├── index.ts                 # i18next initialization (LanguageDetector + initReactI18next)
+    │   ├── i18next.d.ts             # Type augmentation (translation key autocomplete)
+    │   └── locales/
+    │       ├── en/translation.json  # English translations (~102 keys)
+    │       └── ko/translation.json  # Korean translations (~102 keys)
     ├── api/
     │   ├── axiosInstance.ts         # baseURL: /api, JWT auto-attach + 401 Refresh Token rotation
     │   ├── authApi.ts               # login(), signup()
@@ -158,6 +164,7 @@ client/
     │   │   └── TableNode.tsx        # Custom node: table header + column rows (PK/FK badges, L/R handles)
     │   ├── layout/
     │   │   ├── Header.tsx           # Top header (h-12, bg-header, user name + logout + save)
+    │   │   ├── LanguageSwitcher.tsx  # Language switching dropdown (ko/en)
     │   │   ├── Sidebar.tsx          # Left sidebar (w-56, table list)
     │   │   └── SidebarTableItem.tsx # Individual table item with inline rename
     │   ├── team/
@@ -215,6 +222,7 @@ client/
 - State management: Zustand for client-only state (`stores/`), React Query for server state (`useQuery`/`useMutation`).
 - ESM only (`"type": "module"`) — never use `require()`, use ESM imports.
 - Adding new shadcn/ui components: create file in `components/ui/`, use `cn()`, `ref`는 일반 prop으로 전달 (`forwardRef` 사용 금지 — React 19).
+- **i18n:** All UI text is internationalized with `react-i18next`. Use `const { t } = useTranslation()` and `t('key')` instead of hardcoded strings. Translation files: `i18n/locales/{en,ko}/translation.json`. Key convention: `{domain}.{screen}.{usage}` (e.g., `auth.login.submit`). `useTranslation()` is placed after `useQueryClient` in page component code ordering.
 
 **Routes:** `/login`, `/signup`, `/teams`, `/teams/:teamId/projects`, `/teams/:teamId/projects/:projectId/diagrams`, `/teams/:teamId/projects/:projectId/diagrams/:diagramId`. All routes except `/login` and `/signup` are protected by `ProtectedRoute`.
 
@@ -238,6 +246,7 @@ client/
 | ERD Canvas    | @xyflow/react 12, Zustand 5                                                      |
 | Editor        | @monaco-editor/react 4.6                                                         |
 | Shortcuts     | react-hotkeys-hook 5                                                             |
+| i18n          | i18next, react-i18next, i18next-browser-languagedetector                         |
 | Toast         | Sonner                                                                           |
 | Formatting    | Prettier (Java + TypeScript), prettier-plugin-java                               |
 | Code Quality  | ESLint, SonarQube / SonarLint                                                    |
@@ -444,6 +453,7 @@ text-erd-warning                                              — unsaved 경고
 | 1 | URL 파라미터 | `useParams` |
 | 2 | 라우터 훅 | `useNavigate` |
 | 3 | Query Client | `useQueryClient` |
+| 3.5 | 다국어 | `useTranslation` |
 | 4 | 로컬 상태 | `useState` |
 | 5 | 스토어 셀렉터 | `useCanvasStore`, `useAuthStore` |
 | 6 | 파생값/상수 | computed values |

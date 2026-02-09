@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useAuthStore from '@/stores/useAuthStore';
 import { ROUTES } from '@/constants/routes';
+import LanguageSwitcher from './LanguageSwitcher';
 
 /** Header 컴포넌트의 props. */
 interface HeaderProps {
@@ -30,6 +32,7 @@ interface HeaderProps {
  */
 export default function Header({ diagramName, onSave, saving, isDirty }: HeaderProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { name, isAuthenticated, logout } = useAuthStore();
 
   /** 로그아웃 처리 후 로그인 페이지로 이동한다. */
@@ -41,7 +44,7 @@ export default function Header({ diagramName, onSave, saving, isDirty }: HeaderP
   return (
     <header className="h-12 bg-header text-header-foreground flex items-center px-4 shrink-0">
       <h1 className="text-lg font-bold cursor-pointer" onClick={() => navigate(ROUTES.TEAMS)}>
-        Smart ERD
+        {t('common.appName')}
       </h1>
 
       {diagramName && (
@@ -49,8 +52,8 @@ export default function Header({ diagramName, onSave, saving, isDirty }: HeaderP
           <span className="text-sm text-header-muted">/</span>
           <span className="text-sm font-medium">{diagramName}</span>
           {isDirty && (
-            <span className="text-xs text-erd-warning" title="Unsaved changes">
-              (unsaved)
+            <span className="text-xs text-erd-warning" title={t('diagram.edit.unsavedTitle')}>
+              {t('diagram.edit.unsaved')}
             </span>
           )}
           {onSave && (
@@ -62,25 +65,28 @@ export default function Header({ diagramName, onSave, saving, isDirty }: HeaderP
               className="text-header-muted hover:text-header-foreground hover:bg-header/80 ml-1"
             >
               <Save className="h-4 w-4 mr-1" />
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? t('common.button.saving') : t('common.button.save')}
             </Button>
           )}
         </div>
       )}
 
-      {isAuthenticated && (
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-sm text-header-muted">{name}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-            className="text-header-muted hover:text-header-foreground hover:bg-header/80"
-          >
-            Logout
-          </Button>
-        </div>
-      )}
+      <div className="ml-auto flex items-center gap-3">
+        <LanguageSwitcher />
+        {isAuthenticated && (
+          <>
+            <span className="text-sm text-header-muted">{name}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="text-header-muted hover:text-header-foreground hover:bg-header/80"
+            >
+              {t('auth.logout')}
+            </Button>
+          </>
+        )}
+      </div>
     </header>
   );
 }

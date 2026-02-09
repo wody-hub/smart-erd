@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, FileText, ArrowLeft, Trash2, Pencil, Check, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import Header from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +26,7 @@ export default function DiagramsPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   /** 다이어그램 생성 다이얼로그 열림 상태 */
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -47,9 +49,9 @@ export default function DiagramsPage() {
     mutationFn: (name: string) => createDiagram(teamId!, projectId!, name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
-      toast.success('Diagram created');
+      toast.success(t('diagram.toast.created'));
     },
-    onError: (err) => toast.error(getErrorMessage(err, 'Failed to create diagram')),
+    onError: (err) => toast.error(getErrorMessage(err, t('diagram.toast.createFailed'))),
   });
 
   const deleteMutation = useMutation({
@@ -57,9 +59,9 @@ export default function DiagramsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
       setDeleteTarget(null);
-      toast.success('Diagram deleted');
+      toast.success(t('diagram.toast.deleted'));
     },
-    onError: (err) => toast.error(getErrorMessage(err, 'Failed to delete diagram')),
+    onError: (err) => toast.error(getErrorMessage(err, t('diagram.toast.deleteFailed'))),
   });
 
   const renameMutation = useMutation({
@@ -68,9 +70,9 @@ export default function DiagramsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
       setRenamingId(null);
-      toast.success('Diagram renamed');
+      toast.success(t('diagram.toast.renamed'));
     },
-    onError: (err) => toast.error(getErrorMessage(err, 'Failed to rename diagram')),
+    onError: (err) => toast.error(getErrorMessage(err, t('diagram.toast.renameFailed'))),
   });
 
   /** 다이어그램 이름 변경을 시작한다. @param diagram 대상 다이어그램 @param e 마우스 이벤트 (전파 차단용) */
@@ -105,29 +107,27 @@ export default function DiagramsPage() {
             onClick={() => navigate(ROUTES.PROJECTS(teamId!))}
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to Projects
+            {t('diagram.list.backToProjects')}
           </Button>
 
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">Diagrams</h2>
+            <h2 className="text-2xl font-bold">{t('diagram.list.title')}</h2>
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              New Diagram
+              {t('diagram.list.newButton')}
             </Button>
           </div>
 
           {isLoading ? (
-            <Spinner text="Loading..." />
+            <Spinner text={t('common.loading')} />
           ) : diagrams.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  No diagrams yet. Create your first diagram.
-                </p>
+                <p className="text-muted-foreground mb-4">{t('diagram.list.empty')}</p>
                 <Button onClick={() => setDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Create Diagram
+                  {t('diagram.list.createButton')}
                 </Button>
               </CardContent>
             </Card>
@@ -163,7 +163,7 @@ export default function DiagramsPage() {
                             size="icon"
                             className="h-7 w-7"
                             onClick={confirmRename}
-                            aria-label="Confirm rename"
+                            aria-label={t('common.aria.confirmRename')}
                           >
                             <Check className="h-3 w-3" />
                           </Button>
@@ -172,7 +172,7 @@ export default function DiagramsPage() {
                             size="icon"
                             className="h-7 w-7"
                             onClick={cancelRename}
-                            aria-label="Cancel rename"
+                            aria-label={t('common.aria.cancelRename')}
                           >
                             <X className="h-3 w-3" />
                           </Button>
@@ -186,7 +186,9 @@ export default function DiagramsPage() {
                               size="icon"
                               className="h-8 w-8"
                               onClick={(e) => startRename(diagram, e)}
-                              aria-label={`Rename diagram ${diagram.name}`}
+                              aria-label={t('diagram.aria.renameDiagram', {
+                                name: diagram.name,
+                              })}
                             >
                               <Pencil className="h-4 w-4 text-muted-foreground" />
                             </Button>
@@ -198,7 +200,9 @@ export default function DiagramsPage() {
                                 e.stopPropagation();
                                 setDeleteTarget(diagram.id);
                               }}
-                              aria-label={`Delete diagram ${diagram.name}`}
+                              aria-label={t('diagram.aria.deleteDiagram', {
+                                name: diagram.name,
+                              })}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
@@ -209,7 +213,9 @@ export default function DiagramsPage() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-xs text-muted-foreground">
-                      Updated: {new Date(diagram.updatedAt).toLocaleDateString()}
+                      {t('diagram.list.updatedAt', {
+                        date: new Date(diagram.updatedAt).toLocaleDateString(),
+                      })}
                     </p>
                   </CardContent>
                 </Card>
@@ -222,9 +228,9 @@ export default function DiagramsPage() {
       <CreateResourceDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        title="Create New Diagram"
-        inputLabel="Diagram Name"
-        placeholder="Enter diagram name"
+        title={t('diagram.create.dialogTitle')}
+        inputLabel={t('diagram.create.inputLabel')}
+        placeholder={t('diagram.create.placeholder')}
         onCreate={(name) => createMutation.mutateAsync(name)}
       />
 
@@ -233,8 +239,8 @@ export default function DiagramsPage() {
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
-        title="Delete Diagram"
-        description="Are you sure you want to delete this diagram?"
+        title={t('diagram.delete.dialogTitle')}
+        description={t('diagram.delete.dialogDescription')}
         onConfirm={() => {
           if (deleteTarget !== null) deleteMutation.mutate(deleteTarget);
         }}

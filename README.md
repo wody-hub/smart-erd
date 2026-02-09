@@ -20,6 +20,7 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 | ERD 캔버스  | @xyflow/react 12, Zustand 5                                                    |
 | 에디터      | @monaco-editor/react 4.6                                                       |
 | 단축키      | react-hotkeys-hook 5                                                           |
+| 다국어      | i18next, react-i18next, i18next-browser-languagedetector                       |
 | 토스트      | Sonner                                                                         |
 | 포맷팅      | Prettier (Java + TypeScript 통합), prettier-plugin-java                        |
 | 코드 품질   | ESLint, SonarQube / SonarLint                                                  |
@@ -128,6 +129,12 @@ client/
     ├── App.tsx                      # QueryClientProvider + BrowserRouter + Routes (인증 가드 포함)
     ├── index.css                    # Tailwind directives + CSS 변수 (light/dark)
     ├── vite-env.d.ts                # Vite 타입 참조
+    ├── i18n/
+    │   ├── index.ts                 # i18next 초기화 (LanguageDetector + initReactI18next)
+    │   ├── i18next.d.ts             # 타입 확장 (번역 키 자동완성)
+    │   └── locales/
+    │       ├── en/translation.json  # 영어 번역 (~102 키)
+    │       └── ko/translation.json  # 한국어 번역 (~102 키)
     ├── api/
     │   ├── axiosInstance.ts         # baseURL: /api, JWT 자동 첨부 + 401 Refresh Token 갱신 (큐 패턴)
     │   ├── authApi.ts               # login(), signup()
@@ -149,6 +156,7 @@ client/
     │   │   └── TableNode.tsx        # 커스텀 노드: 테이블 헤더 + 컬럼 행 (PK/FK 뱃지, 좌우 Handle)
     │   ├── layout/
     │   │   ├── Header.tsx           # 상단 고정 헤더 (bg-header, 사용자명, 로그아웃, 다이어그램 Save)
+    │   │   ├── LanguageSwitcher.tsx  # 언어 전환 드롭다운 (ko/en)
     │   │   ├── Sidebar.tsx          # 좌측 사이드바 (w-56, 테이블 목록)
     │   │   └── SidebarTableItem.tsx # 사이드바 개별 테이블 항목 (인라인 이름 변경)
     │   ├── team/
@@ -413,6 +421,7 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 | 1 | URL 파라미터 | `useParams` |
 | 2 | 라우터 훅 | `useNavigate` |
 | 3 | Query Client | `useQueryClient` |
+| 3.5 | 다국어 | `useTranslation` |
 | 4 | 로컬 상태 | `useState` |
 | 5 | 스토어 셀렉터 | `useCanvasStore`, `useAuthStore` |
 | 6 | 파생값/상수 | computed values |

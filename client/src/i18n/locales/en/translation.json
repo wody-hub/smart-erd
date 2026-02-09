@@ -1,0 +1,187 @@
+{
+  "common": {
+    "appName": "Smart ERD",
+    "button": {
+      "cancel": "Cancel",
+      "create": "Create",
+      "creating": "Creating...",
+      "delete": "Delete",
+      "save": "Save",
+      "saving": "Saving...",
+      "invite": "Invite",
+      "processing": "Processing...",
+      "pending": "..."
+    },
+    "loading": "Loading...",
+    "aria": {
+      "confirmRename": "Confirm rename",
+      "cancelRename": "Cancel rename",
+      "language": "Language"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Smart ERD",
+      "loginId": "Login ID",
+      "password": "Password",
+      "loginIdPlaceholder": "Enter your login ID",
+      "passwordPlaceholder": "Enter your password",
+      "submit": "Login",
+      "submitting": "Logging in...",
+      "error": "Login ID or password is incorrect.",
+      "noAccount": "Don't have an account?",
+      "signupLink": "Sign up"
+    },
+    "signup": {
+      "title": "Sign Up",
+      "loginId": "Login ID",
+      "loginIdPlaceholder": "2~50 characters",
+      "name": "Name",
+      "namePlaceholder": "Your display name",
+      "password": "Password",
+      "passwordPlaceholder": "8+ characters",
+      "submit": "Sign Up",
+      "submitting": "Signing up...",
+      "error": "Signup failed. Login ID may already exist.",
+      "hasAccount": "Already have an account?",
+      "loginLink": "Login"
+    },
+    "logout": "Logout"
+  },
+  "team": {
+    "list": {
+      "title": "My Teams",
+      "newButton": "New Team",
+      "createButton": "Create Team",
+      "empty": "No teams yet. Create your first team to get started.",
+      "memberCount_one": "{{count}} member",
+      "memberCount_other": "{{count}} members",
+      "owner": "Owner: {{name}}"
+    },
+    "create": {
+      "dialogTitle": "Create New Team",
+      "inputLabel": "Team Name",
+      "placeholder": "Enter team name"
+    },
+    "toast": {
+      "created": "Team created",
+      "createFailed": "Failed to create team"
+    },
+    "members": {
+      "dialogTitle": "Team Members",
+      "dialogDescription": "Manage members of this team.",
+      "loginIdLabel": "Login ID",
+      "loginIdPlaceholder": "Login ID",
+      "roleLabel": "Role",
+      "roleMember": "MEMBER",
+      "roleViewer": "VIEWER",
+      "inviteFailed": "Failed to invite member",
+      "removed": "Member removed",
+      "removeFailed": "Failed to remove member",
+      "aria": {
+        "removeMember": "Remove member {{name}}"
+      }
+    }
+  },
+  "project": {
+    "list": {
+      "backToTeams": "Back to Teams",
+      "newButton": "New Project",
+      "createButton": "Create Project",
+      "membersButton": "Members",
+      "empty": "No projects yet. Create your first project.",
+      "createdAt": "Created: {{date}}"
+    },
+    "create": {
+      "dialogTitle": "Create New Project",
+      "inputLabel": "Project Name",
+      "placeholder": "Enter project name"
+    },
+    "delete": {
+      "dialogTitle": "Delete Project",
+      "dialogDescription": "Are you sure you want to delete this project?"
+    },
+    "toast": {
+      "created": "Project created",
+      "createFailed": "Failed to create project",
+      "deleted": "Project deleted",
+      "deleteFailed": "Failed to delete project"
+    },
+    "aria": {
+      "deleteProject": "Delete project {{name}}"
+    }
+  },
+  "diagram": {
+    "list": {
+      "title": "Diagrams",
+      "backToProjects": "Back to Projects",
+      "newButton": "New Diagram",
+      "createButton": "Create Diagram",
+      "empty": "No diagrams yet. Create your first diagram.",
+      "updatedAt": "Updated: {{date}}"
+    },
+    "create": {
+      "dialogTitle": "Create New Diagram",
+      "inputLabel": "Diagram Name",
+      "placeholder": "Enter diagram name"
+    },
+    "delete": {
+      "dialogTitle": "Delete Diagram",
+      "dialogDescription": "Are you sure you want to delete this diagram?"
+    },
+    "edit": {
+      "loadError": "Failed to load diagram. Please try again later.",
+      "loadingDiagram": "Loading diagram...",
+      "unsaved": "(unsaved)",
+      "unsavedTitle": "Unsaved changes"
+    },
+    "toast": {
+      "created": "Diagram created",
+      "createFailed": "Failed to create diagram",
+      "deleted": "Diagram deleted",
+      "deleteFailed": "Failed to delete diagram",
+      "renamed": "Diagram renamed",
+      "renameFailed": "Failed to rename diagram",
+      "saved": "Diagram saved",
+      "saveFailed": "Failed to save diagram"
+    },
+    "aria": {
+      "renameDiagram": "Rename diagram {{name}}",
+      "deleteDiagram": "Delete diagram {{name}}"
+    }
+  },
+  "erd": {
+    "sidebar": {
+      "tables": "Tables",
+      "noTables": "No tables yet",
+      "addTable": "Add table",
+      "aria": {
+        "addTable": "Add table",
+        "renameTable": "Rename table {{name}}",
+        "deleteTable": "Delete table {{name}}"
+      }
+    },
+    "tableNode": {
+      "addColumn": "Add Column",
+      "title": {
+        "togglePk": "Toggle PK",
+        "toggleFk": "Toggle FK",
+        "toggleNullable": "Toggle nullable",
+        "deleteColumn": "Delete column"
+      },
+      "aria": {
+        "tableName": "Table name",
+        "columnName": "Column name",
+        "columnType": "Column type",
+        "togglePk": "Toggle primary key for {{name}}",
+        "toggleFk": "Toggle foreign key for {{name}}",
+        "toggleNullable": "Toggle nullable for {{name}}",
+        "deleteColumn": "Delete column {{name}}"
+      }
+    }
+  },
+  "language": {
+    "ko": "한국어",
+    "en": "English"
+  }
+}

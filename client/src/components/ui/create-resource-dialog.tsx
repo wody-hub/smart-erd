@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -44,13 +45,14 @@ export default function CreateResourceDialog({
   placeholder,
   onCreate,
 }: CreateResourceDialogProps) {
+  const { t } = useTranslation();
   /** 리소스 이름 입력값 */
   const [name, setName] = useState('');
   /** 생성 API 호출 진행 중 여부 */
   const [creating, setCreating] = useState(false);
 
   /** 리소스 생성 폼 제출 핸들러. @param e 폼 이벤트 */
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!name.trim()) return;
     setCreating(true);
@@ -91,10 +93,10 @@ export default function CreateResourceDialog({
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
-              Cancel
+              {t('common.button.cancel')}
             </Button>
             <Button type="submit" disabled={creating || !name.trim()}>
-              {creating ? 'Creating...' : 'Create'}
+              {creating ? t('common.button.creating') : t('common.button.create')}
             </Button>
           </DialogFooter>
         </form>

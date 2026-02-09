@@ -1,0 +1,186 @@
+{
+  "common": {
+    "appName": "Smart ERD",
+    "button": {
+      "cancel": "취소",
+      "create": "생성",
+      "creating": "생성 중...",
+      "delete": "삭제",
+      "save": "저장",
+      "saving": "저장 중...",
+      "invite": "초대",
+      "processing": "처리 중...",
+      "pending": "..."
+    },
+    "loading": "로딩 중...",
+    "aria": {
+      "confirmRename": "이름 변경 확인",
+      "cancelRename": "이름 변경 취소",
+      "language": "언어"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Smart ERD",
+      "loginId": "로그인 ID",
+      "password": "비밀번호",
+      "loginIdPlaceholder": "로그인 ID를 입력하세요",
+      "passwordPlaceholder": "비밀번호를 입력하세요",
+      "submit": "로그인",
+      "submitting": "로그인 중...",
+      "error": "로그인 ID 또는 비밀번호가 올바르지 않습니다.",
+      "noAccount": "계정이 없으신가요?",
+      "signupLink": "회원가입"
+    },
+    "signup": {
+      "title": "회원가입",
+      "loginId": "로그인 ID",
+      "loginIdPlaceholder": "2~50자",
+      "name": "이름",
+      "namePlaceholder": "표시 이름을 입력하세요",
+      "password": "비밀번호",
+      "passwordPlaceholder": "8자 이상",
+      "submit": "회원가입",
+      "submitting": "가입 중...",
+      "error": "회원가입에 실패했습니다. 이미 사용 중인 로그인 ID일 수 있습니다.",
+      "hasAccount": "이미 계정이 있으신가요?",
+      "loginLink": "로그인"
+    },
+    "logout": "로그아웃"
+  },
+  "team": {
+    "list": {
+      "title": "내 팀",
+      "newButton": "새 팀",
+      "createButton": "팀 만들기",
+      "empty": "아직 팀이 없습니다. 첫 번째 팀을 만들어 시작하세요.",
+      "memberCount_other": "{{count}}명",
+      "owner": "소유자: {{name}}"
+    },
+    "create": {
+      "dialogTitle": "새 팀 만들기",
+      "inputLabel": "팀 이름",
+      "placeholder": "팀 이름을 입력하세요"
+    },
+    "toast": {
+      "created": "팀이 생성되었습니다",
+      "createFailed": "팀 생성에 실패했습니다"
+    },
+    "members": {
+      "dialogTitle": "팀 멤버",
+      "dialogDescription": "이 팀의 멤버를 관리합니다.",
+      "loginIdLabel": "로그인 ID",
+      "loginIdPlaceholder": "로그인 ID",
+      "roleLabel": "역할",
+      "roleMember": "MEMBER",
+      "roleViewer": "VIEWER",
+      "inviteFailed": "멤버 초대에 실패했습니다",
+      "removed": "멤버가 제거되었습니다",
+      "removeFailed": "멤버 제거에 실패했습니다",
+      "aria": {
+        "removeMember": "멤버 {{name}} 제거"
+      }
+    }
+  },
+  "project": {
+    "list": {
+      "backToTeams": "팀 목록으로",
+      "newButton": "새 프로젝트",
+      "createButton": "프로젝트 만들기",
+      "membersButton": "멤버",
+      "empty": "아직 프로젝트가 없습니다. 첫 번째 프로젝트를 만드세요.",
+      "createdAt": "생성일: {{date}}"
+    },
+    "create": {
+      "dialogTitle": "새 프로젝트 만들기",
+      "inputLabel": "프로젝트 이름",
+      "placeholder": "프로젝트 이름을 입력하세요"
+    },
+    "delete": {
+      "dialogTitle": "프로젝트 삭제",
+      "dialogDescription": "이 프로젝트를 정말 삭제하시겠습니까?"
+    },
+    "toast": {
+      "created": "프로젝트가 생성되었습니다",
+      "createFailed": "프로젝트 생성에 실패했습니다",
+      "deleted": "프로젝트가 삭제되었습니다",
+      "deleteFailed": "프로젝트 삭제에 실패했습니다"
+    },
+    "aria": {
+      "deleteProject": "프로젝트 {{name}} 삭제"
+    }
+  },
+  "diagram": {
+    "list": {
+      "title": "다이어그램",
+      "backToProjects": "프로젝트 목록으로",
+      "newButton": "새 다이어그램",
+      "createButton": "다이어그램 만들기",
+      "empty": "아직 다이어그램이 없습니다. 첫 번째 다이어그램을 만드세요.",
+      "updatedAt": "수정일: {{date}}"
+    },
+    "create": {
+      "dialogTitle": "새 다이어그램 만들기",
+      "inputLabel": "다이어그램 이름",
+      "placeholder": "다이어그램 이름을 입력하세요"
+    },
+    "delete": {
+      "dialogTitle": "다이어그램 삭제",
+      "dialogDescription": "이 다이어그램을 정말 삭제하시겠습니까?"
+    },
+    "edit": {
+      "loadError": "다이어그램을 불러오는 데 실패했습니다. 나중에 다시 시도해 주세요.",
+      "loadingDiagram": "다이어그램 로딩 중...",
+      "unsaved": "(미저장)",
+      "unsavedTitle": "저장하지 않은 변경사항"
+    },
+    "toast": {
+      "created": "다이어그램이 생성되었습니다",
+      "createFailed": "다이어그램 생성에 실패했습니다",
+      "deleted": "다이어그램이 삭제되었습니다",
+      "deleteFailed": "다이어그램 삭제에 실패했습니다",
+      "renamed": "다이어그램 이름이 변경되었습니다",
+      "renameFailed": "다이어그램 이름 변경에 실패했습니다",
+      "saved": "다이어그램이 저장되었습니다",
+      "saveFailed": "다이어그램 저장에 실패했습니다"
+    },
+    "aria": {
+      "renameDiagram": "다이어그램 {{name}} 이름 변경",
+      "deleteDiagram": "다이어그램 {{name}} 삭제"
+    }
+  },
+  "erd": {
+    "sidebar": {
+      "tables": "테이블",
+      "noTables": "아직 테이블이 없습니다",
+      "addTable": "테이블 추가",
+      "aria": {
+        "addTable": "테이블 추가",
+        "renameTable": "테이블 {{name}} 이름 변경",
+        "deleteTable": "테이블 {{name}} 삭제"
+      }
+    },
+    "tableNode": {
+      "addColumn": "컬럼 추가",
+      "title": {
+        "togglePk": "PK 토글",
+        "toggleFk": "FK 토글",
+        "toggleNullable": "널 허용 토글",
+        "deleteColumn": "컬럼 삭제"
+      },
+      "aria": {
+        "tableName": "테이블 이름",
+        "columnName": "컬럼 이름",
+        "columnType": "컬럼 타입",
+        "togglePk": "{{name}} 기본키 토글",
+        "toggleFk": "{{name}} 외래키 토글",
+        "toggleNullable": "{{name}} 널 허용 토글",
+        "deleteColumn": "컬럼 {{name}} 삭제"
+      }
+    }
+  },
+  "language": {
+    "ko": "한국어",
+    "en": "English"
+  }
+}

@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Plus, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { TableNode as TableNodeType } from '@/types/erd';
 import useCanvasStore from '@/stores/useCanvasStore';
 import { useInlineEdit } from '@/hooks/useInlineEdit';
@@ -18,6 +19,7 @@ import { useInlineEdit } from '@/hooks/useInlineEdit';
  * @param props.data 테이블 데이터 (label, columns)
  */
 function TableNode({ id, data }: NodeProps<TableNodeType>) {
+  const { t } = useTranslation();
   const { label, columns } = data;
   const renameTable = useCanvasStore((s) => s.renameTable);
   const addColumn = useCanvasStore((s) => s.addColumn);
@@ -45,7 +47,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
               if (e.key === 'Escape') cancelEdit();
             }}
             autoFocus
-            aria-label="Table name"
+            aria-label={t('erd.tableNode.aria.tableName')}
           />
         </div>
       ) : (
@@ -75,8 +77,8 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
             <button
               className={`nodrag w-5 text-center font-bold text-[10px] cursor-pointer ${col.pk ? 'text-erd-pk' : 'text-muted-foreground/40 hover:text-erd-pk/80'}`}
               onClick={() => updateColumn(id, col.id, { pk: !col.pk })}
-              title="Toggle PK"
-              aria-label={`Toggle primary key for ${col.name}`}
+              title={t('erd.tableNode.title.togglePk')}
+              aria-label={t('erd.tableNode.aria.togglePk', { name: col.name })}
             >
               PK
             </button>
@@ -85,8 +87,8 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
             <button
               className={`nodrag w-5 text-center font-bold text-[10px] cursor-pointer ${col.fk ? 'text-erd-fk' : 'text-muted-foreground/40 hover:text-erd-fk/80'}`}
               onClick={() => updateColumn(id, col.id, { fk: !col.fk })}
-              title="Toggle FK"
-              aria-label={`Toggle foreign key for ${col.name}`}
+              title={t('erd.tableNode.title.toggleFk')}
+              aria-label={t('erd.tableNode.aria.toggleFk', { name: col.name })}
             >
               FK
             </button>
@@ -96,7 +98,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
               className="nodrag flex-1 font-mono bg-transparent outline-none hover:bg-accent focus:bg-accent px-1 rounded min-w-0"
               value={col.name}
               onChange={(e) => updateColumn(id, col.id, { name: e.target.value })}
-              aria-label="Column name"
+              aria-label={t('erd.tableNode.aria.columnName')}
             />
 
             {/* Column type */}
@@ -104,15 +106,15 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
               className="nodrag w-24 font-mono text-muted-foreground bg-transparent outline-none hover:bg-accent focus:bg-accent px-1 rounded text-right"
               value={col.type}
               onChange={(e) => updateColumn(id, col.id, { type: e.target.value })}
-              aria-label="Column type"
+              aria-label={t('erd.tableNode.aria.columnType')}
             />
 
             {/* Nullable toggle */}
             <button
               className={`nodrag text-[10px] cursor-pointer w-4 text-center ${col.nullable ? 'text-erd-nullable' : 'text-muted-foreground/40 hover:text-erd-nullable/80'}`}
               onClick={() => updateColumn(id, col.id, { nullable: !col.nullable })}
-              title="Toggle nullable"
-              aria-label={`Toggle nullable for ${col.name}`}
+              title={t('erd.tableNode.title.toggleNullable')}
+              aria-label={t('erd.tableNode.aria.toggleNullable', { name: col.name })}
             >
               N
             </button>
@@ -121,8 +123,8 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
             <button
               className="nodrag opacity-0 group-hover/col:opacity-100 transition-opacity text-muted-foreground hover:text-destructive cursor-pointer"
               onClick={() => deleteColumn(id, col.id)}
-              title="Delete column"
-              aria-label={`Delete column ${col.name}`}
+              title={t('erd.tableNode.title.deleteColumn')}
+              aria-label={t('erd.tableNode.aria.deleteColumn', { name: col.name })}
             >
               <X className="h-3 w-3" />
             </button>
@@ -144,7 +146,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
           onClick={() => addColumn(id)}
         >
           <Plus className="h-3 w-3" />
-          Add Column
+          {t('erd.tableNode.addColumn')}
         </button>
       </div>
     </div>

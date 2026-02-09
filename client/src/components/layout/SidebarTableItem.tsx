@@ -1,4 +1,5 @@
 import { Trash2, Pencil, Check, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useInlineEdit } from '@/hooks/useInlineEdit';
@@ -33,6 +34,7 @@ export default function SidebarTableItem({
   onRename,
   onDelete,
 }: SidebarTableItemProps) {
+  const { t } = useTranslation();
   const { editing, value, setValue, startEdit, confirmEdit, cancelEdit } = useInlineEdit(onRename);
 
   if (editing) {
@@ -53,7 +55,7 @@ export default function SidebarTableItem({
           size="icon"
           className="h-6 w-6"
           onClick={confirmEdit}
-          aria-label="Confirm rename"
+          aria-label={t('common.aria.confirmRename')}
         >
           <Check className="h-3 w-3" />
         </Button>
@@ -62,7 +64,7 @@ export default function SidebarTableItem({
           size="icon"
           className="h-6 w-6"
           onClick={cancelEdit}
-          aria-label="Cancel rename"
+          aria-label={t('common.aria.cancelRename')}
         >
           <X className="h-3 w-3" />
         </Button>
@@ -85,7 +87,7 @@ export default function SidebarTableItem({
             e.stopPropagation();
             startEdit(label);
           }}
-          aria-label={`Rename table ${label}`}
+          aria-label={t('erd.sidebar.aria.renameTable', { name: label })}
         >
           <Pencil className="h-3 w-3 text-muted-foreground" />
         </Button>
@@ -97,7 +99,7 @@ export default function SidebarTableItem({
             e.stopPropagation();
             onDelete();
           }}
-          aria-label={`Delete table ${label}`}
+          aria-label={t('erd.sidebar.aria.deleteTable', { name: label })}
         >
           <Trash2 className="h-3 w-3 text-destructive" />
         </Button>

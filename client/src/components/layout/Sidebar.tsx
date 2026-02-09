@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react';
 import { useReactFlow } from '@xyflow/react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import useCanvasStore from '@/stores/useCanvasStore';
 import SidebarTableItem from './SidebarTableItem';
@@ -11,6 +12,7 @@ import SidebarTableItem from './SidebarTableItem';
  * 테이블 추가, 삭제, 이름 변경, 클릭 시 캔버스 포커스 기능을 제공한다.
  */
 export default function Sidebar() {
+  const { t } = useTranslation();
   const nodes = useCanvasStore((s) => s.nodes);
   const addTable = useCanvasStore((s) => s.addTable);
   const deleteTable = useCanvasStore((s) => s.deleteTable);
@@ -32,15 +34,15 @@ export default function Sidebar() {
     <aside className="w-56 bg-muted border-r border-border p-4 shrink-0 flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-          Tables
+          {t('erd.sidebar.tables')}
         </h2>
         <Button
           variant="ghost"
           size="icon"
           className="h-6 w-6"
           onClick={() => addTable()}
-          title="Add table"
-          aria-label="Add table"
+          title={t('erd.sidebar.addTable')}
+          aria-label={t('erd.sidebar.aria.addTable')}
         >
           <Plus className="h-4 w-4" />
         </Button>
@@ -48,7 +50,7 @@ export default function Sidebar() {
 
       <div className="flex-1 overflow-auto space-y-0.5">
         {nodes.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No tables yet</p>
+          <p className="text-xs text-muted-foreground">{t('erd.sidebar.noTables')}</p>
         ) : (
           nodes.map((node) => (
             <SidebarTableItem

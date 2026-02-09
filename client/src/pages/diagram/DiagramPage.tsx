@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useHotkeys } from 'react-hotkeys-hook';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
@@ -29,6 +30,8 @@ export default function DiagramPage() {
     diagramId: string;
   }>();
 
+  const { t } = useTranslation();
+
   /** 헤더에 표시할 다이어그램 이름 */
   const [diagramName, setDiagramName] = useState('');
 
@@ -53,9 +56,9 @@ export default function DiagramPage() {
     mutationFn: (content: string) => saveDiagram(teamId!, projectId!, diagramId!, content),
     onSuccess: () => {
       markClean();
-      toast.success('Diagram saved');
+      toast.success(t('diagram.toast.saved'));
     },
-    onError: (err) => toast.error(getErrorMessage(err, 'Failed to save diagram')),
+    onError: (err) => toast.error(getErrorMessage(err, t('diagram.toast.saveFailed'))),
   });
 
   /** 다이어그램을 서버에 저장한다. 저장 중이면 중복 실행을 방지한다. */
@@ -83,7 +86,7 @@ export default function DiagramPage() {
       <div className="h-screen flex flex-col">
         <Header />
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-destructive">Failed to load diagram. Please try again later.</p>
+          <p className="text-destructive">{t('diagram.edit.loadError')}</p>
         </div>
       </div>
     );
@@ -94,7 +97,7 @@ export default function DiagramPage() {
       <div className="h-screen flex flex-col">
         <Header />
         <div className="flex-1 flex items-center justify-center">
-          <Spinner text="Loading diagram..." />
+          <Spinner text={t('diagram.edit.loadingDiagram')} />
         </div>
       </div>
     );
