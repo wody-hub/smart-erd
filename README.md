@@ -78,6 +78,8 @@ src/main/java/com/smarterd/
 │   ├── JwtConfig.java               #   JwtEncoder / JwtDecoder 빈 (NimbusJwtDecoder, HS256)
 │   ├── JwtProperties.java           #   @ConfigurationProperties("smart-erd.jwt") — secret, expiration
 │   ├── CorsConfig.java              #   @ConfigurationProperties("smart-erd.cors") + CorsProperties 내부 클래스
+│   ├── QuerydslConfig.java          #   JPAQueryFactory 빈 (QueryDSL 타입 안전 쿼리 빌더)
+│   ├── BlazeConfig.java             #   CriteriaBuilderFactory 빈 (Blaze-Persistence 고급 쿼리)
 │   └── OpenApiConfig.java           #   Swagger/OpenAPI 설정 (JWT Bearer 인증 스킴)
 └── domain/                          # 도메인 계층 (Service도 여기에 위치)
     ├── common/
@@ -88,12 +90,12 @@ src/main/java/com/smarterd/
     │       ├── DuplicateException.java        # → 409
     │       └── BusinessException.java         # → 400
     ├── user/
-    │   ├── entity/                   #   User (loginId unique, BCrypt password)
-    │   ├── repository/              #   UserRepository (findByLoginId, existsByLoginId)
+    │   ├── entity/                   #   User, RefreshToken (loginId unique, BCrypt password)
+    │   ├── repository/              #   UserRepository, RefreshTokenRepository (+Custom — QueryDSL bulk delete)
     │   └── service/                 #   AuthService, AuthUserDetailsService, JwtTokenService
     ├── team/
     │   ├── entity/                  #   Team, TeamMember (@IdClass), TeamMemberId (record), TeamMemberRole
-    │   ├── repository/             #   TeamRepository, TeamMemberRepository
+    │   ├── repository/             #   TeamRepository (+Custom), TeamMemberRepository (+Custom) — QueryDSL fetch join
     │   └── service/                #   TeamService (팀 CRUD + 멤버 관리, ADMIN 권한 체크)
     ├── project/
     │   ├── entity/                  #   Project (team 소속)
@@ -274,6 +276,53 @@ teamMemberRepository.save(newMember);
 public class TeamService { ... }
 ```
 
+#### QueryDSL Custom Repository 패턴
+
+`@Query` JPQL 대신 QueryDSL `JPAQueryFactory`로 타입 안전한 쿼리를 작성한다. Spring Data의 Custom Repository 컨벤션을 따른다.
+
+**구조:**
+
+```text
+XxxRepository (interface)
+  extends JpaRepository<Xxx, Id>, XxxRepositoryCustom
+
+XxxRepositoryCustom (interface)          — QueryDSL 메서드 시그니처
+XxxRepositoryCustomImpl (class)          — QueryDSL 구현체 (JPAQueryFactory 주입)
+```
+
+**규칙:**
+
+- Impl 클래스에 `@Repository`/`@Component` 붙이지 않음 (Spring Data가 `{Repository이름}Impl` 네이밍으로 자동 감지)
+- `JPAQueryFactory`는 `@RequiredArgsConstructor`로 생성자 주입
+- Q클래스는 static import: `import static com.smarterd.domain.xxx.entity.QXxx.xxx;`
+- Spring Data 파생 쿼리 메서드(`findByUser`, `existsByTeamAndUser` 등)는 그대로 유지
+
+```java
+// Good — QueryDSL fetch join
+@RequiredArgsConstructor
+public class TeamRepositoryCustomImpl implements TeamRepositoryCustom {
+
+    private final JPAQueryFactory queryFactory;
+
+    @Override
+    public Optional<Team> findByIdWithOwner(Long id) {
+        var result = queryFactory.selectFrom(team).join(team.owner).fetchJoin().where(team.id.eq(id)).fetchOne();
+        return Optional.ofNullable(result);
+    }
+}
+
+// Bad — @Query JPQL (타입 안전하지 않음, 리팩토링 시 깨짐)
+@Query("SELECT t FROM Team t JOIN FETCH t.owner WHERE t.id = :id")
+Optional<Team> findByIdWithOwner(@Param("id") Long id);
+```
+
+**Config 빈:**
+
+| 클래스           | 빈                       | 역할                                              |
+| ---------------- | ------------------------ | ------------------------------------------------- |
+| `QuerydslConfig` | `JPAQueryFactory`        | QueryDSL 타입 안전 쿼리 빌더 (EntityManager 주입) |
+| `BlazeConfig`    | `CriteriaBuilderFactory` | CTE, Keyset Pagination 등 고급 쿼리 인프라        |
+
 ### 포맷팅 — Prettier (Java + TypeScript 통합)
 
 프로젝트 루트에 Prettier를 설치하여 Java와 TypeScript 코드를 통합 포맷팅한다.
@@ -392,12 +441,12 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 
 **백엔드:**
 
-| 패키지           | 역할                 | 포함 요소                    |
-| ---------------- | -------------------- | ---------------------------- |
-| `api/`           | HTTP 인터페이스 계층 | Controller, DTO (record)     |
-| `domain/`        | 비즈니스 도메인 계층 | Entity, Repository, Service  |
-| `domain/common/` | 공통 코드            | BaseTimeEntity, 커스텀 예외  |
-| `config/`        | 설정                 | Security, JWT, CORS, OpenAPI |
+| 패키지           | 역할                 | 포함 요소                                     |
+| ---------------- | -------------------- | --------------------------------------------- |
+| `api/`           | HTTP 인터페이스 계층 | Controller, DTO (record)                      |
+| `domain/`        | 비즈니스 도메인 계층 | Entity, Repository, Service                   |
+| `domain/common/` | 공통 코드            | BaseTimeEntity, 커스텀 예외                   |
+| `config/`        | 설정                 | Security, JWT, CORS, OpenAPI, QueryDSL, Blaze |
 
 - DTO는 Java `record`로 작성, `@Valid` 검증 포함
 - `api/` 계층에 비즈니스 로직 금지

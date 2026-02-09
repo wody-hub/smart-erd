@@ -72,6 +72,8 @@ src/main/java/com/smarterd/
 │   ├── JwtConfig.java               #   JwtEncoder / JwtDecoder beans (NimbusJwtDecoder, HS256)
 │   ├── JwtProperties.java           #   @ConfigurationProperties("smart-erd.jwt") — secret, expiration
 │   ├── CorsConfig.java              #   @ConfigurationProperties("smart-erd.cors") + CorsProperties inner class
+│   ├── QuerydslConfig.java          #   JPAQueryFactory bean (QueryDSL type-safe query builder)
+│   ├── BlazeConfig.java             #   CriteriaBuilderFactory bean (Blaze-Persistence advanced queries)
 │   └── OpenApiConfig.java           #   Swagger/OpenAPI config (JWT Bearer auth scheme)
 └── domain/                          # Domain layer (Services live here too)
     ├── common/
@@ -82,12 +84,12 @@ src/main/java/com/smarterd/
     │       ├── DuplicateException.java        # → 409 Conflict
     │       └── BusinessException.java         # → 400 Bad Request
     ├── user/
-    │   ├── entity/                   #   User (loginId unique, BCrypt password)
-    │   ├── repository/              #   UserRepository (findByLoginId, existsByLoginId)
+    │   ├── entity/                   #   User, RefreshToken (loginId unique, BCrypt password)
+    │   ├── repository/              #   UserRepository, RefreshTokenRepository (+Custom — QueryDSL bulk delete)
     │   └── service/                 #   AuthService, AuthUserDetailsService, JwtTokenService
     ├── team/
     │   ├── entity/                  #   Team, TeamMember (@IdClass), TeamMemberId (record), TeamMemberRole
-    │   ├── repository/             #   TeamRepository, TeamMemberRepository (findByUser, findByTeam, existsByTeamAndUser)
+    │   ├── repository/             #   TeamRepository (+Custom), TeamMemberRepository (+Custom) — QueryDSL fetch join
     │   └── service/                #   TeamService (CRUD + member management with ADMIN permission checks)
     ├── project/
     │   ├── entity/                  #   Project (belongs to Team)
@@ -115,7 +117,7 @@ src/main/java/com/smarterd/
 
 **Configuration:** Custom properties are namespaced under `smart-erd.*` in `application.yml`. JWT and CORS settings use `@ConfigurationProperties` for type-safe binding (`smart-erd.jwt.*`, `smart-erd.cors.*`).
 
-**Database:** PostgreSQL 17 (Docker). `spring-boot-docker-compose`가 `compose.yaml`을 자동 감지하여 컨테이너를 시작하고, datasource를 자동 주입한다. `ddl-auto: create-drop`. Docker Desktop이 실행 중이어야 한다.
+**Database:** PostgreSQL 17 (Docker). `spring-boot-docker-compose`가 `compose.yaml`을 자동 감지하여 컨테이너를 시작하고, datasource를 자동 주입한다. `ddl-auto: update`. Docker Desktop이 실행 중이어야 한다.
 
 ### Frontend: Vite 6 + React 18 + TypeScript + shadcn/ui + React Query
 
@@ -277,6 +279,49 @@ member.changeRole(request.role());  // Good — dirty checking
 
 - Root package `@NonNullApi` → non-null by default
 - Service classes: `@SuppressWarnings("null")` to suppress JPA repository null analysis warnings
+
+### QueryDSL Custom Repository Pattern
+
+`@Query` JPQL 대신 QueryDSL `JPAQueryFactory`로 타입 안전한 쿼리를 작성한다. Spring Data의 Custom Repository 컨벤션을 따른다.
+
+**패턴:**
+
+```text
+XxxRepository (interface)
+  extends JpaRepository<Xxx, Id>, XxxRepositoryCustom
+
+XxxRepositoryCustom (interface)          — QueryDSL 메서드 시그니처
+XxxRepositoryCustomImpl (class)          — QueryDSL 구현체 (JPAQueryFactory 주입)
+```
+
+**규칙:**
+
+- Impl 클래스에 `@Repository`/`@Component` 붙이지 않음 (Spring Data가 `{Repository이름}Impl` 네이밍으로 자동 감지)
+- `JPAQueryFactory`는 `@RequiredArgsConstructor`로 생성자 주입
+- Q클래스는 static import로 사용: `import static com.smarterd.domain.xxx.entity.QXxx.xxx;`
+- Bulk DELETE/UPDATE는 영속성 컨텍스트를 우회 (기존 `@Modifying`과 동일 동작)
+- Spring Data 파생 쿼리 메서드(`findByUser`, `existsByTeamAndUser` 등)는 QueryDSL로 전환하지 않음
+
+**예시:**
+
+```java
+@RequiredArgsConstructor
+public class TeamRepositoryCustomImpl implements TeamRepositoryCustom {
+
+    private final JPAQueryFactory queryFactory;
+
+    @Override
+    public Optional<Team> findByIdWithOwner(Long id) {
+        var result = queryFactory.selectFrom(team).join(team.owner).fetchJoin().where(team.id.eq(id)).fetchOne();
+        return Optional.ofNullable(result);
+    }
+}
+```
+
+**Config 빈:**
+
+- `QuerydslConfig` — `JPAQueryFactory` 빈 등록 (`EntityManager` 주입, Spring shared proxy이므로 스레드 안전)
+- `BlazeConfig` — `CriteriaBuilderFactory` 빈 등록 (CTE, Keyset Pagination 등 고급 쿼리 인프라)
 
 ### Frontend Code Standards (MUST follow)
 
