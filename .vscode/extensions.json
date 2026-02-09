@@ -44,6 +44,8 @@
         "formulahendry.code-runner",
         "esbenp.prettier-vscode",
         "editorconfig.editorconfig",
+        // 다국어(i18n) 키/번역 확인
+        "lokalise.i18n-ally",
         // Markdown 지원
         "yzhang.markdown-all-in-one",
         "davidanson.vscode-markdownlint"

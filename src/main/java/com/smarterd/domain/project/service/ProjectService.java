@@ -118,7 +118,7 @@ public class ProjectService {
     public Project findProjectById(Long projectId) {
         return projectRepository
             .findById(projectId)
-            .orElseThrow(() -> new EntityNotFoundException("Project not found: " + projectId));
+            .orElseThrow(() -> new EntityNotFoundException("error.not-found.project", projectId));
     }
 
     /**
@@ -130,7 +130,7 @@ public class ProjectService {
      */
     public void verifyProjectBelongsToTeam(Project project, Long teamId) {
         if (!project.getTeam().getId().equals(teamId)) {
-            throw new BusinessException("Project does not belong to this team");
+            throw new BusinessException("error.business.project-team-mismatch");
         }
     }
 }

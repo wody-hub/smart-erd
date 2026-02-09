@@ -35,7 +35,12 @@ public class SignupRequestValidator implements Validator {
         final var request = (SignupRequest) target;
 
         if (request.loginId() != null && userRepository.existsByLoginId(request.loginId())) {
-            errors.rejectValue("loginId", "duplicate", "Login ID already exists: " + request.loginId());
+            errors.rejectValue(
+                "loginId",
+                "error.duplicate.login-id",
+                new Object[] { request.loginId() },
+                "Login ID already exists"
+            );
         }
     }
 }

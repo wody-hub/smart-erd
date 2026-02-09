@@ -3,6 +3,11 @@ spring:
     compose:
       lifecycle-management: start-only
 
+  messages:
+    basename: messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
+
   jackson:
     time-zone: UTC
     serialization:

@@ -12,7 +12,13 @@ import jakarta.validation.constraints.Size;
  */
 @Schema(description = "로그인 요청")
 public record LoginRequest(
-    @Schema(description = "로그인 ID", example = "hong") @NotBlank @Size(max = 50) String loginId,
+    @Schema(description = "로그인 ID", example = "hong")
+    @NotBlank(message = "{validation.not-blank.login-id}")
+    @Size(max = 50, message = "{validation.size.login-id}")
+    String loginId,
 
-    @Schema(description = "비밀번호", example = "password123") @NotBlank @Size(max = 100) String password
+    @Schema(description = "비밀번호", example = "password123")
+    @NotBlank(message = "{validation.not-blank.password}")
+    @Size(max = 100, message = "{validation.size.password}")
+    String password
 ) {}

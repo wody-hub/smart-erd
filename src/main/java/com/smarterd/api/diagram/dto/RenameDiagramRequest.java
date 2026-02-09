@@ -12,7 +12,7 @@ import jakarta.validation.constraints.Size;
 @Schema(description = "다이어그램 이름 변경 요청")
 public record RenameDiagramRequest(
     @Schema(description = "새 다이어그램 이름 (1~100자)", example = "User ERD")
-    @NotBlank
-    @Size(min = 1, max = 100)
+    @NotBlank(message = "{validation.not-blank.diagram-name}")
+    @Size(min = 1, max = 100, message = "{validation.size.diagram-name}")
     String name
 ) {}

@@ -64,7 +64,7 @@ public class AuthService {
     @Transactional
     public AuthResponse signup(SignupRequest request) {
         if (userRepository.existsByLoginId(request.loginId())) {
-            throw new DuplicateException("Login ID already exists: " + request.loginId());
+            throw new DuplicateException("error.duplicate.login-id", request.loginId());
         }
 
         final var user = User.builder()
@@ -115,7 +115,7 @@ public class AuthService {
     public User findUserByLoginId(String loginId) {
         return userRepository
             .findByLoginId(loginId)
-            .orElseThrow(() -> new EntityNotFoundException("User not found: " + loginId));
+            .orElseThrow(() -> new EntityNotFoundException("error.not-found.user", loginId));
     }
 
     /**

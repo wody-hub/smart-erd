@@ -10,5 +10,5 @@ import jakarta.validation.constraints.NotNull;
  */
 @Schema(description = "다이어그램 저장 요청")
 public record SaveDiagramRequest(
-    @NotNull(message = "content must not be null") @Schema(description = "직렬화된 React Flow JSON") String content
+    @NotNull(message = "{validation.not-null.content}") @Schema(description = "직렬화된 React Flow JSON") String content
 ) {}

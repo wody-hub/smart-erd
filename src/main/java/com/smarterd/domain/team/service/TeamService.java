@@ -5,8 +5,8 @@ import com.smarterd.api.team.dto.CreateTeamRequest;
 import com.smarterd.api.team.dto.TeamMemberResponse;
 import com.smarterd.api.team.dto.TeamResponse;
 import com.smarterd.api.team.dto.UpdateMemberRoleRequest;
-import com.smarterd.domain.common.exception.AccessDeniedException;
 import com.smarterd.domain.common.exception.BusinessException;
+import com.smarterd.domain.common.exception.DomainAccessDeniedException;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.team.entity.Team;
@@ -34,8 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 @SuppressWarnings("null")
 public class TeamService {
-
-    private static final String NOT_A_MEMBER = "User is not a member of this team";
 
     /** 팀 레포지토리 */
     private final TeamRepository teamRepository;
@@ -115,7 +113,7 @@ public class TeamService {
         final var targetUser = authService.findUserByLoginId(request.loginId());
 
         if (teamMemberRepository.existsByTeamAndUser(team, targetUser)) {
-            throw new DuplicateException("User is already a member of this team: " + request.loginId());
+            throw new DuplicateException("error.duplicate.member", request.loginId());
         }
 
         final var member = TeamMember.builder().team(team).user(targetUser).role(request.role()).build();
@@ -140,12 +138,12 @@ public class TeamService {
         final var targetUser = findUserById(userId);
 
         if (team.getOwner().getId().equals(targetUser.getId())) {
-            throw new BusinessException("Cannot remove team owner");
+            throw new BusinessException("error.business.remove-owner");
         }
 
         final var member = teamMemberRepository
             .findByTeamAndUser(team, targetUser)
-            .orElseThrow(() -> new EntityNotFoundException(NOT_A_MEMBER));
+            .orElseThrow(() -> new DomainAccessDeniedException("error.access-denied.not-member"));
         teamMemberRepository.delete(member);
     }
 
@@ -172,12 +170,12 @@ public class TeamService {
         final var targetUser = findUserById(userId);
 
         if (team.getOwner().getId().equals(targetUser.getId())) {
-            throw new BusinessException("Cannot change team owner's role");
+            throw new BusinessException("error.business.change-owner-role");
         }
 
         final var member = teamMemberRepository
             .findByTeamAndUser(team, targetUser)
-            .orElseThrow(() -> new EntityNotFoundException(NOT_A_MEMBER));
+            .orElseThrow(() -> new DomainAccessDeniedException("error.access-denied.not-member"));
         member.changeRole(request.role());
 
         return TeamMemberResponse.from(member);
@@ -207,7 +205,7 @@ public class TeamService {
     public Team findTeamById(Long teamId) {
         return teamRepository
             .findByIdWithOwner(teamId)
-            .orElseThrow(() -> new EntityNotFoundException("Team not found: " + teamId));
+            .orElseThrow(() -> new EntityNotFoundException("error.not-found.team", teamId));
     }
 
     /**
@@ -215,26 +213,26 @@ public class TeamService {
      *
      * @param team 팀 엔티티
      * @param user 사용자 엔티티
-     * @throws AccessDeniedException 팀 멤버가 아닌 경우
+     * @throws DomainAccessDeniedException 팀 멤버가 아닌 경우
      */
     public void verifyMembership(Team team, User user) {
         if (!teamMemberRepository.existsByTeamAndUser(team, user)) {
-            throw new AccessDeniedException(NOT_A_MEMBER);
+            throw new DomainAccessDeniedException("error.access-denied.not-member");
         }
     }
 
     private User findUserById(Long userId) {
         return userRepository
             .findById(userId)
-            .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+            .orElseThrow(() -> new EntityNotFoundException("error.not-found.user", userId));
     }
 
     private void verifyAdmin(Team team, User user) {
         final var member = teamMemberRepository
             .findByTeamAndUser(team, user)
-            .orElseThrow(() -> new AccessDeniedException(NOT_A_MEMBER));
+            .orElseThrow(() -> new DomainAccessDeniedException("error.access-denied.not-member"));
         if (member.getRole() != TeamMemberRole.ADMIN) {
-            throw new AccessDeniedException("Only ADMIN can perform this action");
+            throw new DomainAccessDeniedException("error.access-denied.not-admin");
         }
     }
 }

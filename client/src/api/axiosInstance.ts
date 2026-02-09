@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { STORAGE_KEYS } from '@/constants/storage';
 import { ROUTES } from '@/constants/routes';
+import i18n from '@/i18n';
 
 /**
  * API 통신용 Axios 인스턴스.
@@ -45,8 +46,9 @@ function clearAuthAndRedirect() {
   window.location.href = ROUTES.LOGIN;
 }
 
-/** 요청 인터셉터: localStorage의 Access Token을 Authorization 헤더에 첨부한다. */
+/** 요청 인터셉터: Accept-Language 헤더와 Access Token을 첨부한다. */
 axiosInstance.interceptors.request.use((config) => {
+  config.headers['Accept-Language'] = i18n.language || 'en';
   const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

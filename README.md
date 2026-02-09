@@ -88,7 +88,7 @@ src/main/java/com/smarterd/
     │   ├── entity/                   #   BaseTimeEntity (createdAt, updatedAt UTC Instant 자동 감사)
     │   └── exception/               #   커스텀 예외 계층 (4종)
     │       ├── EntityNotFoundException.java   # → 404
-    │       ├── AccessDeniedException.java     # → 403
+    │       ├── DomainAccessDeniedException.java # → 403
     │       ├── DuplicateException.java        # → 409
     │       └── BusinessException.java         # → 400
     ├── user/
@@ -234,7 +234,7 @@ import jakarta.persistence.Id;
 | 예외 클래스               | HTTP 상태       | 용도                                       |
 | ------------------------- | --------------- | ------------------------------------------ |
 | `EntityNotFoundException` | 404 Not Found   | 엔티티 조회 실패                           |
-| `AccessDeniedException`   | 403 Forbidden   | 권한 부족 (팀 미소속, ADMIN 아님)          |
+| `DomainAccessDeniedException` | 403 Forbidden   | 권한 부족 (팀 미소속, ADMIN 아님)          |
 | `DuplicateException`      | 409 Conflict    | 중복 리소스 (팀 멤버 중복, 로그인 ID 중복) |
 | `BusinessException`       | 400 Bad Request | 비즈니스 규칙 위반 (소유자 제거 시도 등)   |
 

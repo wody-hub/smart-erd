@@ -35,7 +35,7 @@ public class AddMemberRequestValidator implements Validator {
         final var request = (AddMemberRequest) target;
 
         if (request.loginId() != null && !userRepository.existsByLoginId(request.loginId())) {
-            errors.rejectValue("loginId", "notFound", "User not found: " + request.loginId());
+            errors.rejectValue("loginId", "error.not-found.user", new Object[] { request.loginId() }, "User not found");
         }
     }
 }

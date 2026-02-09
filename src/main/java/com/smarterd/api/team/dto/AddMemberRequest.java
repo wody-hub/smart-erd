@@ -14,7 +14,12 @@ import jakarta.validation.constraints.Size;
  */
 @Schema(description = "멤버 초대 요청")
 public record AddMemberRequest(
-    @Schema(description = "초대할 사용자의 로그인 ID", example = "kim") @NotBlank @Size(max = 50) String loginId,
+    @Schema(description = "초대할 사용자의 로그인 ID", example = "kim")
+    @NotBlank(message = "{validation.not-blank.login-id}")
+    @Size(max = 50, message = "{validation.size.login-id}")
+    String loginId,
 
-    @Schema(description = "부여할 역할 (ADMIN, MEMBER, VIEWER)", example = "MEMBER") @NotNull TeamMemberRole role
+    @Schema(description = "부여할 역할 (ADMIN, MEMBER, VIEWER)", example = "MEMBER")
+    @NotNull(message = "{validation.not-null.role}")
+    TeamMemberRole role
 ) {}

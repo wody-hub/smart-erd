@@ -194,6 +194,6 @@ public class DiagramService {
     private Diagram findDiagramByProjectAndId(Project project, Long diagramId) {
         return diagramRepository
             .findByProjectAndId(project, diagramId)
-            .orElseThrow(() -> new EntityNotFoundException("Diagram not found: " + diagramId));
+            .orElseThrow(() -> new EntityNotFoundException("error.not-found.diagram", diagramId));
     }
 }

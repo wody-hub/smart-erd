@@ -81,11 +81,11 @@ public class JwtTokenService {
     public RefreshToken validateRefreshToken(String token) {
         final var refreshToken = refreshTokenRepository
             .findByToken(token)
-            .orElseThrow(() -> new BusinessException("Invalid refresh token"));
+            .orElseThrow(() -> new BusinessException("error.business.refresh-token-invalid"));
 
         if (refreshToken.getExpiresAt().isBefore(Instant.now())) {
             refreshTokenRepository.delete(refreshToken);
-            throw new BusinessException("Refresh token has expired");
+            throw new BusinessException("error.business.refresh-token-expired");
         }
 
         return refreshToken;
