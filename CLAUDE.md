@@ -1,4 +1,4 @@
-# CLAUDE.md
+#    CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -44,6 +44,15 @@ npm run format:check                 # Check formatting (CI)
 | Variable               | Description              | Default                                   |
 | ---------------------- | ------------------------ | ----------------------------------------- |
 | `SMART_ERD_JWT_SECRET` | JWT signing key (Base64) | Dev default embedded in `application.yml` |
+
+## Code Quality — SonarQube 준수
+
+- **SonarQube / SonarLint 규칙을 최대한 준수한다.** 코드 작성 시 SonarQube가 경고하는 코드 스멜, 버그, 취약점을 사전에 방지한다.
+- null 반환 대신 빈 컬렉션/빈 배열 반환 (`Return an empty array instead of null`)
+- 사용하지 않는 변수/import 제거
+- 인라인 조건문 대신 명시적 블록 사용
+- 예외를 무시하지 않고 적절히 처리 또는 로깅
+- Prettier와 충돌하는 S1611(람다 괄호)은 Prettier 우선으로 억제 (`sonar-project.properties`, VS Code `sonarlint.rules`)
 
 ## Architecture
 

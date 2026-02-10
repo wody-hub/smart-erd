@@ -2,6 +2,7 @@ package com.smarterd.domain.diagram.entity;
 
 import com.smarterd.domain.common.entity.BaseTimeEntity;
 import com.smarterd.domain.project.entity.Project;
+import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -48,6 +50,11 @@ public class Diagram extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT")
     private String content;
 
+    /** Yjs CRDT 문서 스냅샷 (바이너리, BYTEA) */
+    @Basic(fetch = FetchType.LAZY)
+    @Column(columnDefinition = "BYTEA")
+    private byte[] ydocSnapshot;
+
     /**
      * 다이어그램 엔티티를 생성한다.
      *
@@ -78,5 +85,14 @@ public class Diagram extends BaseTimeEntity {
      */
     public void updateContent(String content) {
         this.content = content;
+    }
+
+    /**
+     * Y.Doc 스냅샷을 갱신한다.
+     *
+     * @param ydocSnapshot Y.Doc 바이너리 스냅샷
+     */
+    public void updateYdocSnapshot(byte[] ydocSnapshot) {
+        this.ydocSnapshot = ydocSnapshot;
     }
 }

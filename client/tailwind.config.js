@@ -57,6 +57,10 @@ export default {
           handle: "hsl(var(--erd-handle))",
           "handle-border": "hsl(var(--erd-handle-border))",
           warning: "hsl(var(--erd-warning))",
+          "status-connected": "hsl(var(--erd-status-connected))",
+          "status-connecting": "hsl(var(--erd-status-connecting))",
+          "status-disconnected": "hsl(var(--erd-status-disconnected))",
+          "cursor-foreground": "hsl(var(--erd-cursor-foreground))",
         },
       },
       borderRadius: {

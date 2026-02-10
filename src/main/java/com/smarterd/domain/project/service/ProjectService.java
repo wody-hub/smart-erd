@@ -4,6 +4,7 @@ import com.smarterd.api.project.dto.CreateProjectRequest;
 import com.smarterd.api.project.dto.ProjectResponse;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
+import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.repository.ProjectRepository;
 import com.smarterd.domain.team.service.TeamService;
@@ -118,7 +119,7 @@ public class ProjectService {
     public Project findProjectById(Long projectId) {
         return projectRepository
             .findById(projectId)
-            .orElseThrow(() -> new EntityNotFoundException("error.not-found.project", projectId));
+            .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_PROJECT.code(), projectId));
     }
 
     /**
@@ -130,7 +131,7 @@ public class ProjectService {
      */
     public void verifyProjectBelongsToTeam(Project project, Long teamId) {
         if (!project.getTeam().getId().equals(teamId)) {
-            throw new BusinessException("error.business.project-team-mismatch");
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_PROJECT_TEAM_MISMATCH.code());
         }
     }
 }

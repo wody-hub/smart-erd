@@ -6,6 +6,7 @@ import com.smarterd.api.dictionary.dto.UpdateDomainRequest;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
+import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
@@ -54,7 +55,7 @@ public class DomainService {
         teamService.verifyMembership(team, user);
 
         if (domainRepository.existsByTeamAndLogicalName(team, request.logicalName())) {
-            throw new DuplicateException("error.duplicate.domain-logical-name", request.logicalName());
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), request.logicalName());
         }
 
         final var domain = Domain.builder()
@@ -121,7 +122,7 @@ public class DomainService {
         verifyDomainBelongsToTeam(domain, teamId);
 
         if (domainRepository.existsByTeamAndLogicalNameAndIdNot(team, request.logicalName(), domainId)) {
-            throw new DuplicateException("error.duplicate.domain-logical-name", request.logicalName());
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), request.logicalName());
         }
 
         domain.update(request.logicalName(), request.physicalType(), request.description());
@@ -147,7 +148,7 @@ public class DomainService {
 
         final var termCount = termRepository.countByDomain(domain);
         if (termCount > 0) {
-            throw new BusinessException("error.business.domain-in-use", termCount);
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_DOMAIN_IN_USE.code(), termCount);
         }
 
         domainRepository.delete(domain);
@@ -163,7 +164,7 @@ public class DomainService {
     public Domain findDomainById(Long domainId) {
         return domainRepository
             .findById(domainId)
-            .orElseThrow(() -> new EntityNotFoundException("error.not-found.domain", domainId));
+            .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_DOMAIN.code(), domainId));
     }
 
     /**
@@ -175,7 +176,7 @@ public class DomainService {
      */
     private void verifyDomainBelongsToTeam(Domain domain, Long teamId) {
         if (!domain.getTeam().getId().equals(teamId)) {
-            throw new BusinessException("error.business.domain-team-mismatch");
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_DOMAIN_TEAM_MISMATCH.code());
         }
     }
 }

@@ -71,10 +71,12 @@ public class JwtConfig {
     private SecretKey secretKey(JwtProperties jwtProperties) {
         if (jwtProperties.isUsingDefaultSecret()) {
             log.warn(
-                "========================================\n" +
-                    "  [SECURITY] JWT secret이 개발 환경 기본값입니다.\n" +
-                    "  프로덕션 배포 시 반드시 SMART_ERD_JWT_SECRET 환경 변수를 설정하세요.\n" +
-                    "========================================"
+                """
+                ========================================
+                [SECURITY] JWT secret이 개발 환경 기본값입니다.
+                프로덕션 배포 시 반드시 SMART_ERD_JWT_SECRET 환경 변수를 설정하세요.
+                ========================================\
+                """
             );
         }
         final var keyBytes = Base64.getDecoder().decode(jwtProperties.getSecret());

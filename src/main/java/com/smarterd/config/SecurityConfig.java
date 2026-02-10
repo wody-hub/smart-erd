@@ -25,6 +25,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
  * <ul>
  *   <li>{@code /api/auth/**} — 로그인·회원가입·토큰 갱신·로그아웃</li>
  *   <li>{@code /swagger-ui/**, /v3/api-docs/**} — Swagger UI 및 OpenAPI 스펙</li>
+ *   <li>{@code /ws/**} — WebSocket 엔드포인트 (JWT 인증은 핸드셰이크 인터셉터에서 처리)</li>
  * </ul></p>
  */
 @Configuration
@@ -57,6 +58,8 @@ public class SecurityConfig {
                     .requestMatchers("/api/auth/**")
                     .permitAll()
                     .requestMatchers("/swagger-ui/**", "/v3/api-docs/**")
+                    .permitAll()
+                    .requestMatchers("/ws/**")
                     .permitAll()
                     .anyRequest()
                     .authenticated()

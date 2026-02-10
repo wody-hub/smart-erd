@@ -15,7 +15,7 @@ public abstract class LocalizedException extends RuntimeException {
     private final String messageCode;
 
     /** MessageFormat 인자 (예: teamId) */
-    private final Object[] messageArgs;
+    private final transient Object[] messageArgs;
 
     /**
      * @param messageCode 메시지 프로퍼티 키

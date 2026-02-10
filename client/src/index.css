@@ -37,6 +37,12 @@
     --erd-handle: 215 16.3% 46.9%;
     --erd-handle-border: 215.4 16.3% 36.9%;
     --erd-warning: 47.9 95.8% 53.1%;
+
+    --erd-status-connected: 142.1 76.2% 36.3%;
+    --erd-status-connecting: 47.9 95.8% 53.1%;
+    --erd-status-disconnected: 0 84.2% 60.2%;
+
+    --erd-cursor-foreground: 0 0% 100%;
   }
 
   .dark {
@@ -72,6 +78,12 @@
     --erd-handle: 215 20.2% 65.1%;
     --erd-handle-border: 215 20.2% 55.1%;
     --erd-warning: 47.9 95.8% 53.1%;
+
+    --erd-status-connected: 142.1 70.6% 45.3%;
+    --erd-status-connecting: 47.9 95.8% 53.1%;
+    --erd-status-disconnected: 0 62.8% 50.6%;
+
+    --erd-cursor-foreground: 0 0% 100%;
   }
 }
 

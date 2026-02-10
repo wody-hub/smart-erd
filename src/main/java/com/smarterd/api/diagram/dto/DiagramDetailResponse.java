@@ -7,12 +7,15 @@ import java.time.Instant;
 /**
  * 다이어그램 상세용 응답 DTO (content 포함).
  *
- * @param id        다이어그램 ID
- * @param name      다이어그램 이름
- * @param projectId 소속 프로젝트 ID
- * @param content   직렬화된 React Flow JSON (노드 + 엣지)
- * @param createdAt 생성 시각
- * @param updatedAt 수정 시각
+ * <p>Y.Doc 스냅샷은 REST 응답에 포함하지 않고, WebSocket SNAPSHOT_REQUEST로 별도 로딩한다.
+ * 대형 바이너리 스냅샷의 REST 응답 크기 증가를 방지한다.</p>
+ *
+ * @param id             다이어그램 ID
+ * @param name           다이어그램 이름
+ * @param projectId      소속 프로젝트 ID
+ * @param content        직렬화된 React Flow JSON (노드 + 엣지)
+ * @param createdAt      생성 시각
+ * @param updatedAt      수정 시각
  */
 @Schema(description = "다이어그램 상세 응답 (content 포함)")
 public record DiagramDetailResponse(

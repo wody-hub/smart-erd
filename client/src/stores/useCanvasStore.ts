@@ -1,3 +1,4 @@
+import * as Y from 'yjs';
 import { create } from 'zustand';
 import {
   type Edge,
@@ -7,10 +8,19 @@ import {
   type OnConnect,
   applyNodeChanges,
   applyEdgeChanges,
-  addEdge,
-  MarkerType,
 } from '@xyflow/react';
-import type { Column, TableNodeData } from '../types/erd';
+import type { Column, TableNodeData } from '@/types/erd';
+import {
+  yTablesMapToNodes,
+  yEdgesMapToEdges,
+  yDocToJson,
+  createColumnYMap,
+  createEdgeYMap,
+  createTableYMap,
+  deleteColumnFromYArray,
+  getTablesMap,
+  getEdgesMap,
+} from '@/collaboration/yjsBridge';
 
 /**
  * Handle ID에서 컬럼 ID를 추출한다.
@@ -25,6 +35,9 @@ export function extractColId(handleId: string, nodeId: string): string {
 
 /**
  * ERD 캔버스 상태를 관리하는 Zustand 스토어의 상태 인터페이스.
+ *
+ * Y.Doc이 SSOT(Single Source of Truth)이며, Zustand은 읽기 캐시 역할을 한다.
+ * 모든 변이는 Y.Doc을 직접 변경하고, observeDeep으로 자동 갱신된다.
  */
 interface CanvasState {
   /** 캔버스에 표시되는 테이블 노드 목록 */
@@ -67,15 +80,6 @@ interface CanvasState {
   setHighlightedEdge: (id: string | null) => void;
   /** 모든 하이라이트를 해제한다. */
   clearHighlights: () => void;
-  /** 자식 테이블에 FK 컬럼을 추가한다. @param nodeId 대상 노드 ID @param column 추가할 컬럼 */
-  addFkColumn: (nodeId: string, column: Column) => void;
-  /** FK 관계 엣지를 추가한다. @param sourceNodeId 소스 노드 ID @param sourceHandle 소스 Handle ID @param targetNodeId 타겟 노드 ID @param targetHandle 타겟 Handle ID */
-  addFkEdge: (
-    sourceNodeId: string,
-    sourceHandle: string,
-    targetNodeId: string,
-    targetHandle: string,
-  ) => void;
   /** 엣지만 삭제한다 (FK 컬럼 유지). @param edgeId 삭제할 엣지 ID */
   removeEdge: (edgeId: string) => void;
   /** 엣지와 FK 컬럼을 함께 삭제한다. @param edgeId 삭제할 엣지 ID */
@@ -84,149 +88,329 @@ interface CanvasState {
   applyLayout: (nodes: Node<TableNodeData>[]) => void;
   /** 현재 노드·엣지 상태를 JSON 문자열로 직렬화한다. @returns 직렬화된 JSON */
   serialize: () => string;
-  /** JSON 문자열로부터 노드·엣지 상태를 복원한다. @param json 직렬화된 다이어그램 JSON */
-  deserialize: (json: string) => void;
+  /**
+   * FK 관계를 원자적으로 생성한다 (FK 컬럼 + 엣지).
+   *
+   * @param parentNodeId  부모 테이블 노드 ID
+   * @param childNodeId   자식 테이블 노드 ID
+   * @param pkColumns     부모 테이블의 PK 컬럼 배열
+   * @param parentLabel   부모 테이블 이름 (FK 컬럼명 접두사)
+   * @param existingNames 자식 테이블의 기존 컬럼명 배열 (중복 방지용)
+   * @returns 생성된 FK 관계 수
+   */
+  addFkRelation: (
+    parentNodeId: string,
+    childNodeId: string,
+    pkColumns: Column[],
+    parentLabel: string,
+    existingNames: string[],
+  ) => number;
+  /** Y.Doc 참조 (null이면 초기화 전) */
+  ydoc: Y.Doc | null;
+  /** Y.Doc을 초기화하고 observer를 등록한다. @param ydoc Y.Doc 인스턴스 */
+  initYDoc: (ydoc: Y.Doc) => void;
+  /** Y.Doc observer를 해제하고 상태를 초기화한다. */
+  destroyYDoc: () => void;
+}
+
+/**
+ * Y.Doc에서 테이블 Y.Map을 가져오는 헬퍼.
+ *
+ * @param ydoc    Y.Doc
+ * @param tableId 테이블 ID
+ * @returns 테이블 Y.Map 또는 undefined
+ */
+function getTableYMap(ydoc: Y.Doc, tableId: string): Y.Map<unknown> | undefined {
+  const tablesMap = getTablesMap(ydoc);
+  return tablesMap.get(tableId);
+}
+
+/**
+ * 테이블명을 FK 컬럼명 접두사로 사용할 수 있도록 정규화한다.
+ *
+ * @param name 테이블명
+ * @returns 정규화된 문자열
+ */
+function sanitizeTableName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_]/g, '');
+}
+
+/**
+ * 기존 컬럼명 목록에서 중복되지 않는 고유한 이름을 생성한다.
+ *
+ * @param base     기본 컬럼명
+ * @param existing 기존 컬럼명 배열
+ * @returns 고유한 컬럼명
+ */
+function generateUniqueName(base: string, existing: string[]): string {
+  if (!existing.includes(base)) return base;
+  let i = 1;
+  while (existing.includes(`${base}_${i}`)) i++;
+  return `${base}_${i}`;
 }
 
 /**
  * ERD 캔버스 상태 관리 Zustand 스토어.
  *
- * React Flow의 노드·엣지 상태와 변경 핸들러를 관리하며,
- * `serialize()`/`deserialize()`를 통해 다이어그램을 JSON으로 영속화한다.
+ * Y.Doc이 SSOT이며, 모든 변이는 Y.Doc을 직접 변경한다.
+ * observeDeep 콜백에서 Zustand 상태(nodes, edges)가 자동 갱신된다.
  *
  * @remarks
  * `applyNodeChanges()`는 제네릭 `Node[]`를 반환하므로 `Node<TableNodeData>[]`로 타입 단언이 필요하다.
  *
  * 엣지 ID 규칙: `e-{sourceHandle}-{targetHandle}`
  */
-const useCanvasStore = create<CanvasState>((set, get) => ({
-  nodes: [],
-  edges: [],
-  highlightedNodeIds: [],
-  highlightedEdgeId: null,
-  isDirty: false,
+const useCanvasStore = create<CanvasState>((set, get) => {
+  /** observeDeep 콜백 참조 (cleanup용) — 클로저 스코프 */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let tablesObserver: ((events: Y.YEvent<any>[]) => void) | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let edgesObserver: ((events: Y.YEvent<any>[]) => void) | null = null;
+  /** 로컬 position 동기화 트랜잭션 origin 식별자 */
+  const POSITION_SYNC_ORIGIN = 'local-position-sync';
+  /** 노드 드래그 중 여부 (드래그 중 observer 전체 재세팅 방지용) */
+  let isNodeDragging = false;
+  /** 드래그 중 들어온 원격 테이블 변경의 지연 동기화 필요 여부 */
+  let hasDeferredTableSync = false;
+  /** position 업데이트 throttle 타이머 — 클로저 스코프 */
+  let positionThrottleTimer: ReturnType<typeof setTimeout> | null = null;
+  /** throttle 중 누적된 position 변경 — 클로저 스코프 */
+  let pendingPositionChanges: Map<string, { x: number; y: number }> = new Map();
 
-  onNodesChange: (changes) => {
-    set({
-      nodes: applyNodeChanges(changes, get().nodes) as Node<TableNodeData>[],
-      isDirty: true,
-    });
-  },
+  return {
+    nodes: [],
+    edges: [],
+    highlightedNodeIds: [],
+    highlightedEdgeId: null,
+    isDirty: false,
+    ydoc: null,
 
-  onEdgesChange: (changes) => {
-    const filtered = changes.filter((c) => c.type !== 'remove');
-    set({ edges: applyEdgeChanges(filtered, get().edges), isDirty: true });
-  },
+    initYDoc: (ydoc) => {
+      const tablesMap = getTablesMap(ydoc);
+      const edgesMap = getEdgesMap(ydoc);
 
-  onConnect: (connection) => {
-    const edge: Edge = {
-      ...connection,
-      id: `e-${connection.sourceHandle}-${connection.targetHandle}`,
-      type: 'step',
-      markerEnd: { type: MarkerType.ArrowClosed },
-    };
-    set({ edges: addEdge(edge, get().edges), isDirty: true });
-  },
-
-  setNodes: (nodes) => set({ nodes }),
-  setEdges: (edges) => set({ edges }),
-  markClean: () => set({ isDirty: false }),
-
-  setHighlightedNodes: (ids) => set({ highlightedNodeIds: ids }),
-  setHighlightedEdge: (id) => set({ highlightedEdgeId: id }),
-  clearHighlights: () => set({ highlightedNodeIds: [], highlightedEdgeId: null }),
-
-  addFkColumn: (nodeId, column) => {
-    set({
-      nodes: get().nodes.map((n) => {
-        if (n.id !== nodeId) return n;
-        return { ...n, data: { ...n.data, columns: [...n.data.columns, column] } };
-      }),
-      isDirty: true,
-    });
-  },
-
-  addFkEdge: (sourceNodeId, sourceHandle, targetNodeId, targetHandle) => {
-    const edge: Edge = {
-      id: `e-${sourceHandle}-${targetHandle}`,
-      source: sourceNodeId,
-      target: targetNodeId,
-      sourceHandle,
-      targetHandle,
-      type: 'step',
-      markerEnd: { type: MarkerType.ArrowClosed },
-    };
-    set({ edges: addEdge(edge, get().edges), isDirty: true });
-  },
-
-  removeEdge: (edgeId) => {
-    set({
-      edges: get().edges.filter((e) => e.id !== edgeId),
-      highlightedEdgeId: null,
-      highlightedNodeIds: [],
-      isDirty: true,
-    });
-  },
-
-  removeEdgeWithFkColumn: (edgeId) => {
-    const { nodes, edges } = get();
-    const edge = edges.find((e) => e.id === edgeId);
-    if (!edge) return;
-
-    const targetNodeId = edge.target;
-    const targetHandle = edge.targetHandle;
-    if (!targetHandle) {
+      // 초기 렌더링
       set({
-        edges: edges.filter((e) => e.id !== edgeId),
-        highlightedEdgeId: null,
-        highlightedNodeIds: [],
+        nodes: yTablesMapToNodes(tablesMap),
+        edges: yEdgesMapToEdges(edgesMap),
+        ydoc,
+      });
+
+      // observeDeep: Y.Doc 변경 시 자동으로 Zustand 상태 갱신
+      tablesObserver = (events) => {
+        const isLocalPositionSync =
+          events.length > 0 &&
+          events.every((event) => event.transaction.origin === POSITION_SYNC_ORIGIN);
+        if (isLocalPositionSync) {
+          return;
+        }
+        if (isNodeDragging) {
+          hasDeferredTableSync = true;
+          return;
+        }
+        set({ nodes: yTablesMapToNodes(tablesMap) });
+      };
+      edgesObserver = () => {
+        set({ edges: yEdgesMapToEdges(edgesMap) });
+      };
+      tablesMap.observeDeep(tablesObserver);
+      edgesMap.observeDeep(edgesObserver);
+    },
+
+    destroyYDoc: () => {
+      const { ydoc } = get();
+
+      // observer 해제
+      if (ydoc) {
+        const tablesMap = getTablesMap(ydoc);
+        const edgesMap = getEdgesMap(ydoc);
+        if (tablesObserver) tablesMap.unobserveDeep(tablesObserver);
+        if (edgesObserver) edgesMap.unobserveDeep(edgesObserver);
+        ydoc.destroy();
+      }
+
+      tablesObserver = null;
+      edgesObserver = null;
+
+      // throttle 타이머 정리
+      if (positionThrottleTimer) {
+        clearTimeout(positionThrottleTimer);
+        positionThrottleTimer = null;
+      }
+      pendingPositionChanges = new Map();
+      isNodeDragging = false;
+      hasDeferredTableSync = false;
+
+      set({ ydoc: null, nodes: [], edges: [], isDirty: false });
+    },
+
+    onNodesChange: (changes) => {
+      const { ydoc } = get();
+
+      for (const change of changes) {
+        if (change.type === 'position' && 'dragging' in change) {
+          if (change.dragging === true) {
+            isNodeDragging = true;
+          } else if (change.dragging === false) {
+            isNodeDragging = false;
+            const doc = get().ydoc;
+            if (doc && hasDeferredTableSync) {
+              hasDeferredTableSync = false;
+              set({ nodes: yTablesMapToNodes(getTablesMap(doc)) });
+            }
+          }
+        }
+      }
+
+      // position 변경은 throttle하여 Y.Doc에 반영 (드래그 성능)
+      const positionChanges = changes.filter(
+        (c) => c.type === 'position' && 'position' in c && c.position,
+      );
+      if (positionChanges.length > 0 && ydoc) {
+        for (const change of positionChanges) {
+          if (change.type === 'position' && 'position' in change && change.position) {
+            pendingPositionChanges.set(change.id, change.position);
+          }
+        }
+
+        if (!positionThrottleTimer) {
+          positionThrottleTimer = setTimeout(() => {
+            const doc = get().ydoc;
+            if (doc && pendingPositionChanges.size > 0) {
+              doc.transact(() => {
+                const tablesMap = getTablesMap(doc);
+                for (const [nodeId, pos] of pendingPositionChanges) {
+                  const tableYMap = tablesMap.get(nodeId);
+                  if (!tableYMap) continue;
+                  const posYMap = tableYMap.get('position') as Y.Map<number> | undefined;
+                  if (posYMap) {
+                    posYMap.set('x', pos.x);
+                    posYMap.set('y', pos.y);
+                  }
+                }
+              }, POSITION_SYNC_ORIGIN);
+              pendingPositionChanges = new Map();
+            }
+            positionThrottleTimer = null;
+          }, 50);
+        }
+      }
+
+      // select, dimensions 등 비-position 변경은 로컬만 반영
+      set({
+        nodes: applyNodeChanges(changes, get().nodes) as Node<TableNodeData>[],
         isDirty: true,
       });
-      return;
-    }
+    },
 
-    const colId = extractColId(targetHandle, targetNodeId);
+    onEdgesChange: (changes) => {
+      const filtered = changes.filter((c) => c.type !== 'remove');
+      set({ edges: applyEdgeChanges(filtered, get().edges), isDirty: true });
+    },
 
-    set({
-      nodes: nodes.map((n) => {
-        if (n.id !== targetNodeId) return n;
-        return {
-          ...n,
-          data: { ...n.data, columns: n.data.columns.filter((c) => c.id !== colId) },
-        };
-      }),
-      edges: edges.filter((e) => e.id !== edgeId),
-      highlightedEdgeId: null,
-      highlightedNodeIds: [],
-      isDirty: true,
-    });
-  },
+    onConnect: (connection) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
 
-  applyLayout: (nodes) => {
-    set({ nodes, isDirty: true });
-  },
+      const edgeId = `e-${connection.sourceHandle}-${connection.targetHandle}`;
+      ydoc.transact(() => {
+        const edgesMap = getEdgesMap(ydoc);
+        edgesMap.set(
+          edgeId,
+          createEdgeYMap(
+            connection.source!,
+            connection.target!,
+            connection.sourceHandle ?? undefined,
+            connection.targetHandle ?? undefined,
+          ),
+        );
+      });
+    },
 
-  addTable: (name) => {
-    const nodes = get().nodes;
-    const tableId = `table-${crypto.randomUUID()}`;
-    const tableName = name ?? `Table ${nodes.length + 1}`;
+    setNodes: (nodes) => set({ nodes }),
+    setEdges: (edges) => set({ edges }),
+    markClean: () => set({ isDirty: false }),
 
-    // Place new table to the right of existing nodes
-    let x = 100;
-    let y = 100;
-    if (nodes.length > 0) {
-      const maxX = Math.max(...nodes.map((n) => (n.position?.x ?? 0) + 220));
-      x = maxX + 40;
-      y = nodes[0]?.position?.y ?? 100;
-    }
+    setHighlightedNodes: (ids) => set({ highlightedNodeIds: ids }),
+    setHighlightedEdge: (id) => set({ highlightedEdgeId: id }),
+    clearHighlights: () => set({ highlightedNodeIds: [], highlightedEdgeId: null }),
 
-    const newNode: Node<TableNodeData> = {
-      id: tableId,
-      type: 'table',
-      position: { x, y },
-      data: {
-        label: tableName,
-        columns: [
+    removeEdge: (edgeId) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
+
+      const edgesMap = getEdgesMap(ydoc);
+      edgesMap.delete(edgeId);
+      set({ highlightedEdgeId: null, highlightedNodeIds: [] });
+    },
+
+    removeEdgeWithFkColumn: (edgeId) => {
+      const { ydoc, edges } = get();
+      if (!ydoc) return;
+
+      const edge = edges.find((e) => e.id === edgeId);
+      if (!edge) return;
+
+      const targetNodeId = edge.target;
+      const targetHandle = edge.targetHandle;
+
+      ydoc.transact(() => {
+        const edgesMap = getEdgesMap(ydoc);
+        edgesMap.delete(edgeId);
+
+        if (targetHandle) {
+          const colId = extractColId(targetHandle, targetNodeId);
+          const tableYMap = getTableYMap(ydoc, targetNodeId);
+          if (tableYMap) {
+            const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+            if (colsYArray) {
+              deleteColumnFromYArray(colsYArray, colId);
+            }
+          }
+        }
+      });
+      set({ highlightedEdgeId: null, highlightedNodeIds: [] });
+    },
+
+    applyLayout: (nodes) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
+
+      ydoc.transact(() => {
+        const tablesMap = getTablesMap(ydoc);
+        for (const node of nodes) {
+          const tableYMap = tablesMap.get(node.id);
+          if (!tableYMap) continue;
+          const posYMap = tableYMap.get('position') as Y.Map<number> | undefined;
+          if (posYMap) {
+            posYMap.set('x', node.position.x);
+            posYMap.set('y', node.position.y);
+          }
+        }
+      });
+    },
+
+    addTable: (name) => {
+      const { ydoc, nodes } = get();
+      if (!ydoc) return;
+
+      const tableId = `table-${crypto.randomUUID()}`;
+      const tableName = name ?? `Table ${nodes.length + 1}`;
+
+      let x = 100;
+      let y = 100;
+      if (nodes.length > 0) {
+        const maxX = Math.max(...nodes.map((n) => (n.position?.x ?? 0) + 220));
+        x = maxX + 40;
+        y = nodes[0]?.position?.y ?? 100;
+      }
+
+      ydoc.transact(() => {
+        const tablesMap = getTablesMap(ydoc);
+        const tableYMap = createTableYMap(tableName, { x, y }, [
           {
             id: `col-${crypto.randomUUID()}`,
             name: 'id',
@@ -234,97 +418,178 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
             pk: true,
             nullable: false,
           },
-        ],
-      },
-    };
+        ]);
+        tablesMap.set(tableId, tableYMap);
+      });
+    },
 
-    set({ nodes: [...nodes, newNode], isDirty: true });
-  },
+    deleteTable: (nodeId) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
 
-  deleteTable: (nodeId) => {
-    const { nodes, edges } = get();
-    set({
-      nodes: nodes.filter((n) => n.id !== nodeId),
-      edges: edges.filter((e) => e.source !== nodeId && e.target !== nodeId),
-      isDirty: true,
-    });
-  },
+      ydoc.transact(() => {
+        const tablesMap = getTablesMap(ydoc);
+        const edgesMap = getEdgesMap(ydoc);
 
-  renameTable: (nodeId, newName) => {
-    set({
-      nodes: get().nodes.map((n) =>
-        n.id === nodeId ? { ...n, data: { ...n.data, label: newName } } : n,
-      ),
-      isDirty: true,
-    });
-  },
+        tablesMap.delete(nodeId);
 
-  addColumn: (nodeId) => {
-    set({
-      nodes: get().nodes.map((n) => {
-        if (n.id !== nodeId) return n;
-        const newCol: Column = {
+        // 관련 엣지 삭제
+        const edgeIdsToDelete: string[] = [];
+        edgesMap.forEach((edgeYMap, edgeId) => {
+          if (edgeYMap.get('source') === nodeId || edgeYMap.get('target') === nodeId) {
+            edgeIdsToDelete.push(edgeId);
+          }
+        });
+        for (const eid of edgeIdsToDelete) {
+          edgesMap.delete(eid);
+        }
+      });
+    },
+
+    renameTable: (nodeId, newName) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
+
+      const tableYMap = getTableYMap(ydoc, nodeId);
+      if (tableYMap) {
+        tableYMap.set('label', newName);
+      }
+    },
+
+    addColumn: (nodeId) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
+
+      const tableYMap = getTableYMap(ydoc, nodeId);
+      if (!tableYMap) return;
+      const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+      if (!colsYArray) return;
+
+      colsYArray.push([
+        createColumnYMap({
           id: `col-${crypto.randomUUID()}`,
           name: 'column',
           type: 'VARCHAR(255)',
           nullable: true,
-        };
-        return { ...n, data: { ...n.data, columns: [...n.data.columns, newCol] } };
-      }),
-      isDirty: true,
-    });
-  },
+        }),
+      ]);
+    },
 
-  deleteColumn: (nodeId, colId) => {
-    const { nodes, edges } = get();
-    const handlePrefix = `${nodeId}-${colId}`;
-    set({
-      nodes: nodes.map((n) => {
-        if (n.id !== nodeId) return n;
-        return {
-          ...n,
-          data: { ...n.data, columns: n.data.columns.filter((c) => c.id !== colId) },
-        };
-      }),
-      edges: edges.filter(
-        (e) =>
-          !e.sourceHandle?.startsWith(handlePrefix) && !e.targetHandle?.startsWith(handlePrefix),
-      ),
-      isDirty: true,
-    });
-  },
+    deleteColumn: (nodeId, colId) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
 
-  updateColumn: (nodeId, colId, updates) => {
-    set({
-      nodes: get().nodes.map((n) => {
-        if (n.id !== nodeId) return n;
-        return {
-          ...n,
-          data: {
-            ...n.data,
-            columns: n.data.columns.map((c) => (c.id === colId ? { ...c, ...updates } : c)),
-          },
-        };
-      }),
-      isDirty: true,
-    });
-  },
+      const handlePrefix = `${nodeId}-${colId}`;
 
-  serialize: () => {
-    const { nodes, edges } = get();
-    return JSON.stringify({ nodes, edges });
-  },
+      ydoc.transact(() => {
+        const tableYMap = getTableYMap(ydoc, nodeId);
+        if (tableYMap) {
+          const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+          if (colsYArray) {
+            deleteColumnFromYArray(colsYArray, colId);
+          }
+        }
 
-  deserialize: (json: string) => {
-    try {
-      const parsed = JSON.parse(json);
-      const nodes = Array.isArray(parsed.nodes) ? parsed.nodes : [];
-      const edges = Array.isArray(parsed.edges) ? parsed.edges : [];
-      set({ nodes, edges });
-    } catch {
-      console.error('Failed to deserialize diagram JSON');
-    }
-  },
-}));
+        // 관련 엣지 삭제
+        const edgesMap = getEdgesMap(ydoc);
+        const edgeIdsToDelete: string[] = [];
+        edgesMap.forEach((edgeYMap, edgeId) => {
+          const sh = edgeYMap.get('sourceHandle') as string | undefined;
+          const th = edgeYMap.get('targetHandle') as string | undefined;
+          if (sh?.startsWith(handlePrefix) || th?.startsWith(handlePrefix)) {
+            edgeIdsToDelete.push(edgeId);
+          }
+        });
+        for (const eid of edgeIdsToDelete) {
+          edgesMap.delete(eid);
+        }
+      });
+    },
+
+    updateColumn: (nodeId, colId, updates) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
+
+      const tableYMap = getTableYMap(ydoc, nodeId);
+      if (!tableYMap) return;
+      const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+      if (!colsYArray) return;
+
+      for (let i = 0; i < colsYArray.length; i++) {
+        const colYMap = colsYArray.get(i);
+        if (colYMap.get('id') === colId) {
+          ydoc.transact(() => {
+            for (const [key, value] of Object.entries(updates)) {
+              if (value === undefined) {
+                colYMap.delete(key);
+              } else {
+                colYMap.set(key, value);
+              }
+            }
+          });
+          break;
+        }
+      }
+    },
+
+    serialize: () => {
+      const { ydoc } = get();
+      if (ydoc) {
+        return yDocToJson(ydoc);
+      }
+      return JSON.stringify({ nodes: [], edges: [] });
+    },
+
+    addFkRelation: (parentNodeId, childNodeId, pkColumns, parentLabel, existingNames) => {
+      const { ydoc } = get();
+      if (!ydoc) return 0;
+
+      const parentPrefix = sanitizeTableName(parentLabel);
+      const names = [...existingNames];
+      let createdCount = 0;
+
+      ydoc.transact(() => {
+        const tablesMap = getTablesMap(ydoc);
+        const edgesMap = getEdgesMap(ydoc);
+        const childTableYMap = tablesMap.get(childNodeId);
+        if (!childTableYMap) return;
+        const colsYArray = childTableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+        if (!colsYArray) return;
+
+        for (const pkCol of pkColumns) {
+          const baseName = `${parentPrefix}_${pkCol.name}`;
+          const fkName = generateUniqueName(baseName, names);
+          names.push(fkName);
+
+          const fkColId = `col-${crypto.randomUUID()}`;
+
+          // FK 컬럼 추가
+          colsYArray.push([
+            createColumnYMap({
+              id: fkColId,
+              name: fkName,
+              type: pkCol.type,
+              fk: true,
+              nullable: true,
+            }),
+          ]);
+
+          // FK 엣지 추가
+          const sourceHandle = `${parentNodeId}-${pkCol.id}-source`;
+          const targetHandle = `${childNodeId}-${fkColId}-target`;
+          const edgeId = `e-${sourceHandle}-${targetHandle}`;
+          edgesMap.set(
+            edgeId,
+            createEdgeYMap(parentNodeId, childNodeId, sourceHandle, targetHandle),
+          );
+
+          createdCount++;
+        }
+      });
+
+      return createdCount;
+    },
+  };
+});
 
 export default useCanvasStore;

@@ -228,6 +228,16 @@ client/
 
 ## 코드 표준
 
+### 코드 품질 — SonarQube 준수
+
+**SonarQube / SonarLint 규칙을 최대한 준수한다.** 코드 작성 시 SonarQube가 경고하는 코드 스멜, 버그, 취약점을 사전에 방지한다.
+
+- null 반환 대신 빈 컬렉션/빈 배열 반환 (`Return an empty array instead of null`)
+- 사용하지 않는 변수/import 제거
+- 인라인 조건문 대신 명시적 블록 사용
+- 예외를 무시하지 않고 적절히 처리 또는 로깅
+- Prettier와 충돌하는 S1611(람다 괄호)은 Prettier 우선으로 억제 (하단 "Prettier와 SonarQube 충돌 해결" 참고)
+
 ### Java 코딩 스타일
 
 #### 모던 Java 관용구

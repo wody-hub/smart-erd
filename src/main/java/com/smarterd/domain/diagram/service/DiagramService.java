@@ -6,6 +6,7 @@ import com.smarterd.api.diagram.dto.DiagramResponse;
 import com.smarterd.api.diagram.dto.RenameDiagramRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
+import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.project.entity.Project;
@@ -194,6 +195,6 @@ public class DiagramService {
     private Diagram findDiagramByProjectAndId(Project project, Long diagramId) {
         return diagramRepository
             .findByProjectAndId(project, diagramId)
-            .orElseThrow(() -> new EntityNotFoundException("error.not-found.diagram", diagramId));
+            .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_DIAGRAM.code(), diagramId));
     }
 }

@@ -6,6 +6,7 @@ import com.smarterd.api.dictionary.dto.UpdateTermRequest;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
+import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.entity.Term;
 import com.smarterd.domain.dictionary.repository.TermRepository;
@@ -55,7 +56,7 @@ public class TermService {
         teamService.verifyMembership(team, user);
 
         if (termRepository.existsByTeamAndLogicalName(team, request.logicalName())) {
-            throw new DuplicateException("error.duplicate.term-logical-name", request.logicalName());
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_TERM_LOGICAL_NAME.code(), request.logicalName());
         }
 
         final var domain = resolveDomain(request.domainId(), team);
@@ -125,7 +126,7 @@ public class TermService {
         verifyTermBelongsToTeam(term, teamId);
 
         if (termRepository.existsByTeamAndLogicalNameAndIdNot(team, request.logicalName(), termId)) {
-            throw new DuplicateException("error.duplicate.term-logical-name", request.logicalName());
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_TERM_LOGICAL_NAME.code(), request.logicalName());
         }
 
         final var domain = resolveDomain(request.domainId(), team);
@@ -163,7 +164,7 @@ public class TermService {
     private Term findTermById(Long termId) {
         return termRepository
             .findById(termId)
-            .orElseThrow(() -> new EntityNotFoundException("error.not-found.term", termId));
+            .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_TERM.code(), termId));
     }
 
     /**
@@ -175,7 +176,7 @@ public class TermService {
      */
     private void verifyTermBelongsToTeam(Term term, Long teamId) {
         if (!term.getTeam().getId().equals(teamId)) {
-            throw new BusinessException("error.business.term-team-mismatch");
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_TERM_TEAM_MISMATCH.code());
         }
     }
 
@@ -194,7 +195,7 @@ public class TermService {
         }
         final var domain = domainService.findDomainById(domainId);
         if (!domain.getTeam().getId().equals(team.getId())) {
-            throw new BusinessException("error.business.term-domain-team-mismatch");
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_TERM_DOMAIN_TEAM_MISMATCH.code());
         }
         return domain;
     }

@@ -9,6 +9,7 @@ import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.DomainAccessDeniedException;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
+import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.entity.TeamMember;
 import com.smarterd.domain.team.entity.TeamMemberRole;
@@ -113,7 +114,7 @@ public class TeamService {
         final var targetUser = authService.findUserByLoginId(request.loginId());
 
         if (teamMemberRepository.existsByTeamAndUser(team, targetUser)) {
-            throw new DuplicateException("error.duplicate.member", request.loginId());
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_MEMBER.code(), request.loginId());
         }
 
         final var member = TeamMember.builder().team(team).user(targetUser).role(request.role()).build();
@@ -138,12 +139,12 @@ public class TeamService {
         final var targetUser = findUserById(userId);
 
         if (team.getOwner().getId().equals(targetUser.getId())) {
-            throw new BusinessException("error.business.remove-owner");
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_REMOVE_OWNER.code());
         }
 
         final var member = teamMemberRepository
             .findByTeamAndUser(team, targetUser)
-            .orElseThrow(() -> new DomainAccessDeniedException("error.access-denied.not-member"));
+            .orElseThrow(() -> new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
         teamMemberRepository.delete(member);
     }
 
@@ -170,12 +171,12 @@ public class TeamService {
         final var targetUser = findUserById(userId);
 
         if (team.getOwner().getId().equals(targetUser.getId())) {
-            throw new BusinessException("error.business.change-owner-role");
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_CHANGE_OWNER_ROLE.code());
         }
 
         final var member = teamMemberRepository
             .findByTeamAndUser(team, targetUser)
-            .orElseThrow(() -> new DomainAccessDeniedException("error.access-denied.not-member"));
+            .orElseThrow(() -> new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
         member.changeRole(request.role());
 
         return TeamMemberResponse.from(member);
@@ -205,7 +206,7 @@ public class TeamService {
     public Team findTeamById(Long teamId) {
         return teamRepository
             .findByIdWithOwner(teamId)
-            .orElseThrow(() -> new EntityNotFoundException("error.not-found.team", teamId));
+            .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_TEAM.code(), teamId));
     }
 
     /**
@@ -217,22 +218,22 @@ public class TeamService {
      */
     public void verifyMembership(Team team, User user) {
         if (!teamMemberRepository.existsByTeamAndUser(team, user)) {
-            throw new DomainAccessDeniedException("error.access-denied.not-member");
+            throw new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code());
         }
     }
 
     private User findUserById(Long userId) {
         return userRepository
             .findById(userId)
-            .orElseThrow(() -> new EntityNotFoundException("error.not-found.user", userId));
+            .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_USER.code(), userId));
     }
 
     private void verifyAdmin(Team team, User user) {
         final var member = teamMemberRepository
             .findByTeamAndUser(team, user)
-            .orElseThrow(() -> new DomainAccessDeniedException("error.access-denied.not-member"));
+            .orElseThrow(() -> new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
         if (member.getRole() != TeamMemberRole.ADMIN) {
-            throw new DomainAccessDeniedException("error.access-denied.not-admin");
+            throw new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_ADMIN.code());
         }
     }
 }

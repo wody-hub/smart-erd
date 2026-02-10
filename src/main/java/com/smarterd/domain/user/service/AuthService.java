@@ -6,6 +6,7 @@ import com.smarterd.api.auth.dto.RefreshRequest;
 import com.smarterd.api.auth.dto.SignupRequest;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
+import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -64,7 +65,7 @@ public class AuthService {
     @Transactional
     public AuthResponse signup(SignupRequest request) {
         if (userRepository.existsByLoginId(request.loginId())) {
-            throw new DuplicateException("error.duplicate.login-id", request.loginId());
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_LOGIN_ID.code(), request.loginId());
         }
 
         final var user = User.builder()
@@ -115,7 +116,7 @@ public class AuthService {
     public User findUserByLoginId(String loginId) {
         return userRepository
             .findByLoginId(loginId)
-            .orElseThrow(() -> new EntityNotFoundException("error.not-found.user", loginId));
+            .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_USER.code(), loginId));
     }
 
     /**

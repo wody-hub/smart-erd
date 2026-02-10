@@ -1,6 +1,7 @@
 package com.smarterd.api.auth.validator;
 
 import com.smarterd.api.auth.dto.SignupRequest;
+import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -37,7 +38,7 @@ public class SignupRequestValidator implements Validator {
         if (request.loginId() != null && userRepository.existsByLoginId(request.loginId())) {
             errors.rejectValue(
                 "loginId",
-                "error.duplicate.login-id",
+                MessageCode.ERROR_DUPLICATE_LOGIN_ID.code(),
                 new Object[] { request.loginId() },
                 "Login ID already exists"
             );

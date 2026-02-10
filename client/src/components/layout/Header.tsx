@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import useAuthStore from '@/stores/useAuthStore';
 import { ROUTES } from '@/constants/routes';
 import LanguageSwitcher from './LanguageSwitcher';
+import CollaboratorsBar from './CollaboratorsBar';
+import type { ConnectionStatus } from '@/types/collaboration';
 
 /** Header 컴포넌트의 props. */
 interface HeaderProps {
@@ -16,6 +18,8 @@ interface HeaderProps {
   saving?: boolean;
   /** 변경 사항 존재 여부 */
   isDirty?: boolean;
+  /** WebSocket 연결 상태 (다이어그램 편집 화면에서만 전달) */
+  connectionStatus?: ConnectionStatus;
 }
 
 /**
@@ -25,12 +29,19 @@ interface HeaderProps {
  * 사용자 이름, 로그아웃 버튼을 표시한다.
  * 다이어그램 편집 화면에서는 다이어그램 이름과 Save 버튼을 추가로 표시한다.
  *
- * @param props.diagramName 현재 다이어그램 이름 (다이어그램 편집 화면에서만 전달)
- * @param props.onSave      저장 버튼 클릭 핸들러
- * @param props.saving      저장 중 여부
- * @param props.isDirty     변경 사항 존재 여부
+ * @param props.diagramName      현재 다이어그램 이름 (다이어그램 편집 화면에서만 전달)
+ * @param props.onSave           저장 버튼 클릭 핸들러
+ * @param props.saving           저장 중 여부
+ * @param props.isDirty          변경 사항 존재 여부
+ * @param props.connectionStatus WebSocket 연결 상태
  */
-export default function Header({ diagramName, onSave, saving, isDirty }: HeaderProps) {
+export default function Header({
+  diagramName,
+  onSave,
+  saving,
+  isDirty,
+  connectionStatus,
+}: HeaderProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { name, isAuthenticated, logout } = useAuthStore();
@@ -51,6 +62,19 @@ export default function Header({ diagramName, onSave, saving, isDirty }: HeaderP
         <div className="ml-4 flex items-center gap-2">
           <span className="text-sm text-header-muted">/</span>
           <span className="text-sm font-medium">{diagramName}</span>
+          {connectionStatus && (
+            <span
+              className={`inline-block h-2 w-2 rounded-full ${
+                connectionStatus === 'connected'
+                  ? 'bg-erd-status-connected'
+                  : connectionStatus === 'connecting'
+                    ? 'bg-erd-status-connecting animate-pulse'
+                    : 'bg-erd-status-disconnected'
+              }`}
+              title={t(`collaboration.status.${connectionStatus}`)}
+              aria-label={t(`collaboration.status.${connectionStatus}`)}
+            />
+          )}
           {isDirty && (
             <span className="text-xs text-erd-warning" title={t('diagram.edit.unsavedTitle')}>
               {t('diagram.edit.unsaved')}
@@ -72,6 +96,7 @@ export default function Header({ diagramName, onSave, saving, isDirty }: HeaderP
       )}
 
       <div className="ml-auto flex items-center gap-3">
+        {diagramName && <CollaboratorsBar />}
         <LanguageSwitcher />
         {isAuthenticated && (
           <>

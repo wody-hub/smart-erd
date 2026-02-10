@@ -2,6 +2,7 @@ package com.smarterd.domain.user.service;
 
 import com.smarterd.config.JwtProperties;
 import com.smarterd.domain.common.exception.BusinessException;
+import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.user.entity.RefreshToken;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.repository.RefreshTokenRepository;
@@ -81,11 +82,11 @@ public class JwtTokenService {
     public RefreshToken validateRefreshToken(String token) {
         final var refreshToken = refreshTokenRepository
             .findByToken(token)
-            .orElseThrow(() -> new BusinessException("error.business.refresh-token-invalid"));
+            .orElseThrow(() -> new BusinessException(MessageCode.ERROR_BUSINESS_REFRESH_TOKEN_INVALID.code()));
 
         if (refreshToken.getExpiresAt().isBefore(Instant.now())) {
             refreshTokenRepository.delete(refreshToken);
-            throw new BusinessException("error.business.refresh-token-expired");
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_REFRESH_TOKEN_EXPIRED.code());
         }
 
         return refreshToken;

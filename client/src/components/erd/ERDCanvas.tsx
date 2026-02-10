@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -15,15 +15,18 @@ import { useShallow } from 'zustand/react/shallow';
 import { useHotkeys } from 'react-hotkeys-hook';
 import useCanvasStore, { extractColId } from '@/stores/useCanvasStore';
 import type { TableNodeData } from '@/types/erd';
+import type { YjsProvider } from '@/collaboration/YjsProvider';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { applyDagreLayout } from '@/lib/auto-layout';
 import { cn } from '@/lib/utils';
 import { useFkConnectMode } from '@/hooks/useFkConnectMode';
 import { useExportDiagram } from '@/hooks/useExportDiagram';
+import { useAwareness } from '@/hooks/useAwareness';
 import TableNode from './TableNode';
 import CanvasToolbar from './CanvasToolbar';
 import EdgeContextMenu from './EdgeContextMenu';
 import DeleteEdgeDialog from './DeleteEdgeDialog';
+import RemoteCursors from './RemoteCursors';
 
 /** React Flow에 등록할 커스텀 노드 타입 매핑 */
 const nodeTypes: NodeTypes = {
@@ -42,6 +45,8 @@ interface ContextMenuState {
 interface ERDCanvasProps {
   /** 내보내기 시 파일명에 사용할 다이어그램 이름 */
   diagramName?: string;
+  /** YjsProvider 인스턴스 (실시간 협업 시 커서 발행용) */
+  provider?: YjsProvider | null;
 }
 
 /** 삭제 다이얼로그 상태 */
@@ -64,8 +69,12 @@ interface DeleteDialogState {
  * 상태는 {@link useCanvasStore}에서 관리한다.
  *
  * @param props.diagramName 내보내기 시 파일명에 사용할 다이어그램 이름
+ * @param props.provider   YjsProvider 인스턴스 (실시간 협업 시 커서 발행용)
  */
-export default function ERDCanvas({ diagramName = 'diagram' }: ERDCanvasProps) {
+export default function ERDCanvas({ diagramName = 'diagram', provider }: ERDCanvasProps) {
+  /** 캔버스 컨테이너 ref (Awareness 커서 추적용) */
+  const canvasRef = useRef<HTMLDivElement>(null);
+  useAwareness(provider ?? null, canvasRef);
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect } = useCanvasStore(
     useShallow((s) => ({
       nodes: s.nodes,
@@ -94,35 +103,31 @@ export default function ERDCanvas({ diagramName = 'diagram' }: ERDCanvasProps) {
 
   /**
    * 엣지에 대한 삭제 다이얼로그를 여는 공통 함수.
-   * useHotkeys 콜백에서 참조되므로 useCallback 유지.
    *
    * @param edgeId 삭제 대상 엣지 ID
    */
-  const openDeleteDialog = useCallback(
-    (edgeId: string) => {
-      const edge = edges.find((e) => e.id === edgeId);
-      if (!edge) return;
+  const openDeleteDialog = (edgeId: string) => {
+    const edge = edges.find((e) => e.id === edgeId);
+    if (!edge) return;
 
-      const childNode = nodes.find((n) => n.id === edge.target);
-      if (!childNode) return;
+    const childNode = nodes.find((n) => n.id === edge.target);
+    if (!childNode) return;
 
-      let fkColumnsText = '';
-      if (edge.targetHandle) {
-        const colId = extractColId(edge.targetHandle, edge.target);
-        const col = childNode.data.columns.find((c) => c.id === colId);
-        if (col) {
-          fkColumnsText = `${col.name} (${col.type})`;
-        }
+    let fkColumnsText = '';
+    if (edge.targetHandle) {
+      const colId = extractColId(edge.targetHandle, edge.target);
+      const col = childNode.data.columns.find((c) => c.id === colId);
+      if (col) {
+        fkColumnsText = `${col.name} (${col.type})`;
       }
+    }
 
-      setDeleteDialog({
-        edgeId,
-        childTableName: childNode.data.label,
-        fkColumnsText,
-      });
-    },
-    [edges, nodes],
-  );
+    setDeleteDialog({
+      edgeId,
+      childTableName: childNode.data.label,
+      fkColumnsText,
+    });
+  };
 
   /** 엣지 클릭 — 하이라이트 적용 */
   const handleEdgeClick = (_: React.MouseEvent, edge: Edge) => {
@@ -178,7 +183,7 @@ export default function ERDCanvas({ diagramName = 'diagram' }: ERDCanvasProps) {
   }));
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full" ref={canvasRef}>
       <ReactFlow
         nodes={nodes}
         edges={styledEdges}
@@ -217,6 +222,8 @@ export default function ERDCanvas({ diagramName = 'diagram' }: ERDCanvasProps) {
           onExportPdf={exportPdf}
         />
       </ReactFlow>
+
+      <RemoteCursors />
 
       {contextMenu && (
         <EdgeContextMenu

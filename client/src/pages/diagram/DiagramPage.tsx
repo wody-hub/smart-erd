@@ -8,19 +8,21 @@ import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import ERDCanvas from '@/components/erd/ERDCanvas';
 import useCanvasStore from '@/stores/useCanvasStore';
+import useCollaborationStore from '@/stores/useCollaborationStore';
 import { fetchDiagram, saveDiagram } from '@/api/diagramApi';
 import { queryKeys } from '@/constants/query-keys';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { getErrorMessage } from '@/lib/api-error';
 import { toast } from 'sonner';
 import Spinner from '@/components/ui/spinner';
+import { useYjsCollaboration } from '@/hooks/useYjsCollaboration';
 
 /**
  * 다이어그램 편집 페이지.
  *
  * URL 파라미터에서 teamId/projectId/diagramId를 추출하여
- * 다이어그램을 로드하고, 캔버스 편집 후 저장 기능을 제공한다.
- * Ctrl+S(Mac: Cmd+S) 단축키로 저장할 수 있다.
+ * 다이어그램을 로드하고, Y.Doc 기반 실시간 협업 캔버스를 제공한다.
+ * Ctrl+S(Mac: Cmd+S) 단축키로 JSON 백업 저장을 할 수 있다.
  */
 export default function DiagramPage() {
   /** URL 파라미터: teamId, projectId, diagramId */
@@ -35,12 +37,10 @@ export default function DiagramPage() {
   /** 헤더에 표시할 다이어그램 이름 */
   const [diagramName, setDiagramName] = useState('');
 
-  const deserialize = useCanvasStore((s) => s.deserialize);
   const serialize = useCanvasStore((s) => s.serialize);
   const isDirty = useCanvasStore((s) => s.isDirty);
   const markClean = useCanvasStore((s) => s.markClean);
-  const setNodes = useCanvasStore((s) => s.setNodes);
-  const setEdges = useCanvasStore((s) => s.setEdges);
+  const connectionStatus = useCollaborationStore((s) => s.connectionStatus);
 
   const {
     data: diagram,
@@ -61,25 +61,23 @@ export default function DiagramPage() {
     onError: (err) => toast.error(getErrorMessage(err, t('diagram.toast.saveFailed'))),
   });
 
-  /** 다이어그램을 서버에 저장한다. 저장 중이면 중복 실행을 방지한다. */
+  /** 다이어그램을 서버에 저장한다 (JSON 백업). 저장 중이면 중복 실행을 방지한다. */
   const handleSave = () => {
     if (saveMutation.isPending) return;
     saveMutation.mutate(serialize());
   };
 
-  useEffect(() => {
-    if (!diagram) return;
-    setDiagramName(diagram.name);
-    if (diagram.content) {
-      deserialize(diagram.content);
-    } else {
-      setNodes([]);
-      setEdges([]);
-    }
-    markClean();
-  }, [diagram, deserialize, setNodes, setEdges, markClean]);
-
   useHotkeys(KEYBINDINGS.SAVE, handleSave, { preventDefault: true });
+
+  // Y.Doc + YjsProvider 라이프사이클 관리
+  const { providerRef } = useYjsCollaboration(diagram, diagramId);
+
+  // diagram 로드 완료 시 이름 설정
+  useEffect(() => {
+    if (diagram) {
+      setDiagramName(diagram.name);
+    }
+  }, [diagram]);
 
   if (isError) {
     return (
@@ -111,11 +109,12 @@ export default function DiagramPage() {
           onSave={handleSave}
           saving={saveMutation.isPending}
           isDirty={isDirty}
+          connectionStatus={connectionStatus}
         />
         <div className="flex flex-1 overflow-hidden">
           <Sidebar />
           <main className="flex-1">
-            <ERDCanvas diagramName={diagramName || 'diagram'} />
+            <ERDCanvas diagramName={diagramName || 'diagram'} provider={providerRef.current} />
           </main>
         </div>
       </div>
