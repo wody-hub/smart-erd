@@ -93,8 +93,9 @@ public class DiagramService {
     public DiagramDetailResponse getDiagram(String loginId, Long teamId, Long projectId, Long diagramId) {
         final var project = verifyAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
+        final var hasSnapshot = diagramRepository.existsYdocSnapshotById(diagramId);
 
-        return DiagramDetailResponse.from(diagram, project.getId());
+        return DiagramDetailResponse.from(diagram, project.getId(), hasSnapshot);
     }
 
     /**
@@ -105,10 +106,9 @@ public class DiagramService {
      * @param projectId  프로젝트 ID
      * @param diagramId  다이어그램 ID
      * @param request    저장 요청 (content)
-     * @return 다이어그램 상세 응답
      */
     @Transactional
-    public DiagramDetailResponse saveDiagram(
+    public void saveDiagram(
         String loginId,
         Long teamId,
         Long projectId,
@@ -119,8 +119,6 @@ public class DiagramService {
         final var diagram = findDiagramByProjectAndId(project, diagramId);
 
         diagram.updateContent(request.content());
-
-        return DiagramDetailResponse.from(diagram, project.getId());
     }
 
     /**

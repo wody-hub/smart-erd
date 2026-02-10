@@ -8,6 +8,8 @@
       "delete": "Delete",
       "save": "Save",
       "saving": "Saving...",
+      "backup": "Backup",
+      "backingUp": "Backing up...",
       "invite": "Invite",
       "processing": "Processing...",
       "pending": "..."
@@ -134,9 +136,7 @@
     },
     "edit": {
       "loadError": "Failed to load diagram. Please try again later.",
-      "loadingDiagram": "Loading diagram...",
-      "unsaved": "(unsaved)",
-      "unsavedTitle": "Unsaved changes"
+      "loadingDiagram": "Loading diagram..."
     },
     "toast": {
       "created": "Diagram created",
@@ -145,8 +145,9 @@
       "deleteFailed": "Failed to delete diagram",
       "renamed": "Diagram renamed",
       "renameFailed": "Failed to rename diagram",
-      "saved": "Diagram saved",
-      "saveFailed": "Failed to save diagram"
+      "backupSynced": "Backup synced",
+      "noChanges": "No changes to backup",
+      "backupFailed": "Failed to sync backup"
     },
     "aria": {
       "renameDiagram": "Rename diagram {{name}}",

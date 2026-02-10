@@ -17,6 +17,15 @@ public interface DiagramRepositoryCustom {
     Optional<Diagram> findByIdWithProjectAndTeam(Long id);
 
     /**
+     * 다이어그램에 Y.Doc 스냅샷이 존재하는지 확인한다.
+     * REST 응답에서 클라이언트의 JSON 마이그레이션 여부를 결정하기 위해 사용한다.
+     *
+     * @param id 다이어그램 ID
+     * @return 스냅샷 존재 여부
+     */
+    boolean existsYdocSnapshotById(Long id);
+
+    /**
      * 다이어그램의 Y.Doc 스냅샷(BYTEA)만 프로젝션 조회한다.
      * 전체 엔티티 로딩 없이 바이너리 스냅샷만 가져와 불필요한 content TEXT 로딩을 방지한다.
      *

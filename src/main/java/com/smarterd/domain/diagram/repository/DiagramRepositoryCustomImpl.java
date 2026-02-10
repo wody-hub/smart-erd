@@ -29,6 +29,16 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
     }
 
     @Override
+    public boolean existsYdocSnapshotById(Long id) {
+        final var result = queryFactory
+            .select(diagram.ydocSnapshot.isNotNull())
+            .from(diagram)
+            .where(diagram.id.eq(id))
+            .fetchOne();
+        return Boolean.TRUE.equals(result);
+    }
+
+    @Override
     public Optional<byte[]> findYdocSnapshotById(Long id) {
         return Optional.ofNullable(
             queryFactory

@@ -10,6 +10,7 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react';
 import type { Column, TableNodeData } from '@/types/erd';
+import { djb2 } from '@/lib/hash';
 import {
   yTablesMapToNodes,
   yEdgesMapToEdges,
@@ -58,10 +59,17 @@ interface CanvasState {
   setNodes: (nodes: Node<TableNodeData>[]) => void;
   /** 엣지 목록을 직접 설정한다. @param edges 설정할 엣지 배열 */
   setEdges: (edges: Edge[]) => void;
-  /** 마지막 저장 이후 변경 여부 */
-  isDirty: boolean;
-  /** dirty 상태를 초기화한다 (저장 후 호출) */
-  markClean: () => void;
+  /** 마지막 백업 시점의 해시값 */
+  lastBackupHash: string;
+  /** 백업 완료 후 해시를 갱신한다. @param hash 백업된 콘텐츠의 해시 */
+  markBackedUp: (hash: string) => void;
+  /**
+   * 백업이 필요한 경우 콘텐츠와 해시를 반환한다.
+   * 변경이 없으면 null을 반환하여 불필요한 서버 호출을 방지한다.
+   *
+   * @returns { content, hash } 또는 null
+   */
+  prepareBackup: () => { content: string; hash: string } | null;
   /** 새 테이블을 캔버스에 추가한다. @param name 테이블 이름 (미지정 시 자동 생성) */
   addTable: (name?: string) => void;
   /** 테이블을 캔버스에서 삭제한다 (관련 엣지도 제거). @param nodeId 삭제할 노드 ID */
@@ -185,18 +193,19 @@ const useCanvasStore = create<CanvasState>((set, get) => {
     edges: [],
     highlightedNodeIds: [],
     highlightedEdgeId: null,
-    isDirty: false,
+    lastBackupHash: '',
     ydoc: null,
 
     initYDoc: (ydoc) => {
       const tablesMap = getTablesMap(ydoc);
       const edgesMap = getEdgesMap(ydoc);
 
-      // 초기 렌더링
+      // 초기 렌더링 + 초기 해시 설정
       set({
         nodes: yTablesMapToNodes(tablesMap),
         edges: yEdgesMapToEdges(edgesMap),
         ydoc,
+        lastBackupHash: djb2(yDocToJson(ydoc)),
       });
 
       // observeDeep: Y.Doc 변경 시 자동으로 Zustand 상태 갱신
@@ -244,7 +253,7 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       isNodeDragging = false;
       hasDeferredTableSync = false;
 
-      set({ ydoc: null, nodes: [], edges: [], isDirty: false });
+      set({ ydoc: null, nodes: [], edges: [], lastBackupHash: '' });
     },
 
     onNodesChange: (changes) => {
@@ -302,13 +311,12 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       // select, dimensions 등 비-position 변경은 로컬만 반영
       set({
         nodes: applyNodeChanges(changes, get().nodes) as Node<TableNodeData>[],
-        isDirty: true,
       });
     },
 
     onEdgesChange: (changes) => {
       const filtered = changes.filter((c) => c.type !== 'remove');
-      set({ edges: applyEdgeChanges(filtered, get().edges), isDirty: true });
+      set({ edges: applyEdgeChanges(filtered, get().edges) });
     },
 
     onConnect: (connection) => {
@@ -332,7 +340,20 @@ const useCanvasStore = create<CanvasState>((set, get) => {
 
     setNodes: (nodes) => set({ nodes }),
     setEdges: (edges) => set({ edges }),
-    markClean: () => set({ isDirty: false }),
+
+    markBackedUp: (hash) => set({ lastBackupHash: hash }),
+    prepareBackup: () => {
+      const { ydoc, lastBackupHash } = get();
+      if (!ydoc) {
+        return null;
+      }
+      const content = yDocToJson(ydoc);
+      const hash = djb2(content);
+      if (hash === lastBackupHash) {
+        return null;
+      }
+      return { content, hash };
+    },
 
     setHighlightedNodes: (ids) => set({ highlightedNodeIds: ids }),
     setHighlightedEdge: (id) => set({ highlightedEdgeId: id }),

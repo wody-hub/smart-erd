@@ -16,6 +16,7 @@ import { getErrorMessage } from '@/lib/api-error';
 import { toast } from 'sonner';
 import Spinner from '@/components/ui/spinner';
 import { useYjsCollaboration } from '@/hooks/useYjsCollaboration';
+import { useAutoBackup } from '@/hooks/useAutoBackup';
 
 /**
  * 다이어그램 편집 페이지.
@@ -37,9 +38,8 @@ export default function DiagramPage() {
   /** 헤더에 표시할 다이어그램 이름 */
   const [diagramName, setDiagramName] = useState('');
 
-  const serialize = useCanvasStore((s) => s.serialize);
-  const isDirty = useCanvasStore((s) => s.isDirty);
-  const markClean = useCanvasStore((s) => s.markClean);
+  const prepareBackup = useCanvasStore((s) => s.prepareBackup);
+  const markBackedUp = useCanvasStore((s) => s.markBackedUp);
   const connectionStatus = useCollaborationStore((s) => s.connectionStatus);
 
   const {
@@ -54,17 +54,27 @@ export default function DiagramPage() {
 
   const saveMutation = useMutation({
     mutationFn: (content: string) => saveDiagram(teamId!, projectId!, diagramId!, content),
-    onSuccess: () => {
-      markClean();
-      toast.success(t('diagram.toast.saved'));
-    },
-    onError: (err) => toast.error(getErrorMessage(err, t('diagram.toast.saveFailed'))),
   });
 
-  /** 다이어그램을 서버에 저장한다 (JSON 백업). 저장 중이면 중복 실행을 방지한다. */
+  useAutoBackup(saveMutation, teamId!, projectId!, diagramId!);
+
+  /** 다이어그램을 서버에 백업한다. 변경이 없으면 생략하고, 백업 중이면 중복 실행을 방지한다. */
   const handleSave = () => {
-    if (saveMutation.isPending) return;
-    saveMutation.mutate(serialize());
+    if (saveMutation.isPending) {
+      return;
+    }
+    const result = prepareBackup();
+    if (!result) {
+      toast.info(t('diagram.toast.noChanges'));
+      return;
+    }
+    saveMutation.mutate(result.content, {
+      onSuccess: () => {
+        markBackedUp(result.hash);
+        toast.success(t('diagram.toast.backupSynced'));
+      },
+      onError: (err) => toast.error(getErrorMessage(err, t('diagram.toast.backupFailed'))),
+    });
   };
 
   useHotkeys(KEYBINDINGS.SAVE, handleSave, { preventDefault: true });
@@ -108,7 +118,6 @@ export default function DiagramPage() {
           diagramName={diagramName}
           onSave={handleSave}
           saving={saveMutation.isPending}
-          isDirty={isDirty}
           connectionStatus={connectionStatus}
         />
         <div className="flex flex-1 overflow-hidden">

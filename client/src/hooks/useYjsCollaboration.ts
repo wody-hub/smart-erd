@@ -33,7 +33,6 @@ export function useYjsCollaboration(
 
   const initYDoc = useCanvasStore((s) => s.initYDoc);
   const destroyYDoc = useCanvasStore((s) => s.destroyYDoc);
-  const markClean = useCanvasStore((s) => s.markClean);
   const accessToken = useAuthStore((s) => s.accessToken);
   const setConnectionStatus = useCollaborationStore((s) => s.setConnectionStatus);
   const updateAwareness = useCollaborationStore((s) => s.updateAwareness);
@@ -49,13 +48,12 @@ export function useYjsCollaboration(
 
     // 2. 기존 JSON 데이터 마이그레이션 (ydocSnapshot이 없는 레거시 다이어그램용)
     // Y.Doc 스냅샷은 WS 연결 후 SNAPSHOT_REQUEST로 서버에서 로드
-    if (diagram.content) {
+    if (diagram.content && !diagram.hasYdocSnapshot) {
       migrateJsonToYDoc(ydoc, diagram.content);
     }
 
     // 3. Y.Doc → Zustand 연결 (observeDeep 등록)
     initYDoc(ydoc);
-    markClean();
 
     // 4. YjsProvider 연결
     const provider = new YjsProvider(ydoc, {
@@ -86,7 +84,7 @@ export function useYjsCollaboration(
     };
     // 의존성 배열 안전성 근거:
     // - accessToken: 별도 useEffect에서 providerRef.current.updateToken()으로 갱신
-    // - initYDoc, destroyYDoc, markClean: Zustand 셀렉터 — create() 내부 클로저로 참조 안정
+    // - initYDoc, destroyYDoc: Zustand 셀렉터 — create() 내부 클로저로 참조 안정
     // - setConnectionStatus, updateAwareness, removePeerByLoginId, resetCollaboration: 동일
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diagram, diagramId]);

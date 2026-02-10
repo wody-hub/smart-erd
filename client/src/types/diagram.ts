@@ -16,4 +16,6 @@ export interface DiagramSummary {
 export interface DiagramDetail extends DiagramSummary {
   /** 직렬화된 React Flow JSON (노드·엣지). 빈 다이어그램이면 null. */
   content: string | null;
+  /** Y.Doc 스냅샷 존재 여부 (true면 JSON 마이그레이션 불필요) */
+  hasYdocSnapshot: boolean;
 }

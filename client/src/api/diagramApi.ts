@@ -60,19 +60,16 @@ export async function createDiagram(
  * @param projectId 프로젝트 ID
  * @param diagramId 다이어그램 ID
  * @param content   직렬화된 React Flow JSON
- * @returns 저장된 다이어그램 상세
  */
 export async function saveDiagram(
   teamId: string,
   projectId: string,
   diagramId: string,
   content: string,
-): Promise<DiagramDetail> {
-  const res = await axiosInstance.put(
-    `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`,
-    { content },
-  );
-  return res.data;
+): Promise<void> {
+  await axiosInstance.put(`/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`, {
+    content,
+  });
 }
 
 /**

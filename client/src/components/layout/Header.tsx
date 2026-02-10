@@ -12,12 +12,10 @@ import type { ConnectionStatus } from '@/types/collaboration';
 interface HeaderProps {
   /** 현재 다이어그램 이름 (다이어그램 편집 화면에서만 전달) */
   diagramName?: string;
-  /** 저장 버튼 클릭 핸들러 */
+  /** 백업 버튼 클릭 핸들러 */
   onSave?: () => void;
-  /** 저장 중 여부 */
+  /** 백업 중 여부 */
   saving?: boolean;
-  /** 변경 사항 존재 여부 */
-  isDirty?: boolean;
   /** WebSocket 연결 상태 (다이어그램 편집 화면에서만 전달) */
   connectionStatus?: ConnectionStatus;
 }
@@ -30,18 +28,11 @@ interface HeaderProps {
  * 다이어그램 편집 화면에서는 다이어그램 이름과 Save 버튼을 추가로 표시한다.
  *
  * @param props.diagramName      현재 다이어그램 이름 (다이어그램 편집 화면에서만 전달)
- * @param props.onSave           저장 버튼 클릭 핸들러
- * @param props.saving           저장 중 여부
- * @param props.isDirty          변경 사항 존재 여부
+ * @param props.onSave           백업 버튼 클릭 핸들러
+ * @param props.saving           백업 중 여부
  * @param props.connectionStatus WebSocket 연결 상태
  */
-export default function Header({
-  diagramName,
-  onSave,
-  saving,
-  isDirty,
-  connectionStatus,
-}: HeaderProps) {
+export default function Header({ diagramName, onSave, saving, connectionStatus }: HeaderProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { name, isAuthenticated, logout } = useAuthStore();
@@ -75,21 +66,16 @@ export default function Header({
               aria-label={t(`collaboration.status.${connectionStatus}`)}
             />
           )}
-          {isDirty && (
-            <span className="text-xs text-erd-warning" title={t('diagram.edit.unsavedTitle')}>
-              {t('diagram.edit.unsaved')}
-            </span>
-          )}
           {onSave && (
             <Button
               variant="ghost"
               size="sm"
               onClick={onSave}
-              disabled={saving || !isDirty}
+              disabled={saving}
               className="text-header-muted hover:text-header-foreground hover:bg-header/80 ml-1"
             >
               <Save className="h-4 w-4 mr-1" />
-              {saving ? t('common.button.saving') : t('common.button.save')}
+              {saving ? t('common.button.backingUp') : t('common.button.backup')}
             </Button>
           )}
         </div>
