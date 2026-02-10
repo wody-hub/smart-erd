@@ -1,5 +1,6 @@
 package com.smarterd.utils;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.Serial;
 import java.lang.reflect.InvocationTargetException;
@@ -15,8 +16,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -24,7 +25,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
-
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
@@ -44,13 +49,6 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.multipart.MultipartFile;
-
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * <h3>사용 설명서</h3>
@@ -361,12 +359,15 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @return 추출된 데이터
      */
     public ExcelExtract<T> extractData(Class<T> clazz, int titleLine) {
-        if (this.sheet == null)
+        if (this.sheet == null) {
             throw new ExcelException("엑셀 데이터를 처리할 시트 정보가 존재하지 않습니다.");
-        if (clazz == null)
+        }
+        if (clazz == null) {
             throw new ExcelException("엑셀 데이터 생성을 위한 클래스 type이 필요합니다.");
-        if (isEmpty(this.reqMethods))
+        }
+        if (isEmpty(this.reqMethods)) {
             this.reqMethods = this.extractSetterMethod(clazz);
+        }
         try {
             final var dataList = new ArrayList<T>();
             final var rowIterator = this.sheet.rowIterator();
@@ -377,16 +378,18 @@ public class ExcelUtils<T> implements AutoCloseable {
             int rowIndex = 0;
             while (rowIterator.hasNext()) {
                 final var row = rowIterator.next();
-                if (rowIndex++ <= (titleLine - 1))
+                if (rowIndex++ <= (titleLine - 1)) {
                     continue;
+                }
                 final var instance = clazz.getDeclaredConstructor().newInstance();
                 final var index = new AtomicInteger(0);
                 try {
                     for (Method method : reqMethods) {
                         int andIncrement = index.getAndIncrement();
                         final var cell = row.getCell(andIncrement);
-                        if (cell != null)
+                        if (cell != null) {
                             this.setData(instance, method, cell);
+                        }
                     }
                     successCount++;
                 } catch (BadParametersException e) {
@@ -401,8 +404,12 @@ public class ExcelUtils<T> implements AutoCloseable {
                 dataList.add(instance);
             }
             return new ExcelExtract<>(dataList, totalCount, successCount, failCount);
-        } catch (InstantiationException | IllegalAccessException | InvocationTargetException
-                | NoSuchMethodException e) {
+        } catch (
+            InstantiationException
+            | IllegalAccessException
+            | InvocationTargetException
+            | NoSuchMethodException e
+        ) {
             if (log.isErrorEnabled()) {
                 log.error(e.getMessage(), e);
             }
@@ -417,8 +424,9 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @return 셀 타입
      */
     private CellType resolveCellType(Cell cell) {
-        if (cell == null)
+        if (cell == null) {
             return CellType.BLANK;
+        }
         if (cell.getCellType() == CellType.FORMULA) {
             if (formulaEvaluator != null) {
                 return formulaEvaluator.evaluateFormulaCell(cell);
@@ -435,8 +443,9 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @return 문자열 값
      */
     private String readCellText(Cell cell) {
-        if (cell == null)
+        if (cell == null) {
             return "";
+        }
         final var cellType = resolveCellType(cell);
         if (legacyNumericToString && cellType == CellType.NUMERIC && !DateUtil.isCellDateFormatted(cell)) {
             return String.valueOf((long) cell.getNumericCellValue());
@@ -451,15 +460,17 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @return 숫자 값
      */
     private BigDecimal readNumericCell(Cell cell) {
-        if (cell == null)
+        if (cell == null) {
             return null;
+        }
         final var cellType = resolveCellType(cell);
         if (cellType == CellType.NUMERIC) {
             final double numericValue;
             if (cell.getCellType() == CellType.FORMULA && formulaEvaluator != null) {
                 final var evaluated = formulaEvaluator.evaluate(cell);
-                if (evaluated == null)
+                if (evaluated == null) {
                     return null;
+                }
                 numericValue = evaluated.getNumberValue();
             } else {
                 numericValue = cell.getNumericCellValue();
@@ -468,8 +479,9 @@ public class ExcelUtils<T> implements AutoCloseable {
         }
 
         final var text = readCellText(cell).replace(",", "").trim();
-        if (text.isEmpty())
+        if (text.isEmpty()) {
             return null;
+        }
         return new BigDecimal(text);
     }
 
@@ -482,24 +494,24 @@ public class ExcelUtils<T> implements AutoCloseable {
      */
     private LocalDateTime parseDateTime(String text, String preferredFormat) {
         final var formats = new ArrayList<String>();
-        if (StringUtils.isNotBlank(preferredFormat))
+        if (StringUtils.isNotBlank(preferredFormat)) {
             formats.add(preferredFormat);
-        if (StringUtils.isNotBlank(this.defaultDateFormat))
+        }
+        if (StringUtils.isNotBlank(this.defaultDateFormat)) {
             formats.add(this.defaultDateFormat);
+        }
         formats.addAll(this.inputDateFormats);
         formats.addAll(List.of("yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "yyyy/MM/dd", "yyyy.MM.dd"));
 
         for (String format : formats) {
             try {
                 return LocalDateTime.parse(text, DateTimeFormatter.ofPattern(format));
-            } catch (DateTimeParseException | IllegalArgumentException ignored) {
-            }
+            } catch (DateTimeParseException | IllegalArgumentException ignored) {}
         }
         for (String format : formats) {
             try {
                 return LocalDate.parse(text, DateTimeFormatter.ofPattern(format)).atStartOfDay();
-            } catch (DateTimeParseException | IllegalArgumentException ignored) {
-            }
+            } catch (DateTimeParseException | IllegalArgumentException ignored) {}
         }
         return null;
     }
@@ -513,19 +525,25 @@ public class ExcelUtils<T> implements AutoCloseable {
      */
     private void setData(T data, Method method, Cell cell) {
         final var parameters = method.getParameters();
-        if (ArrayUtils.isEmpty(parameters))
+        if (ArrayUtils.isEmpty(parameters)) {
             throw new BadParametersException("세팅 파라미터가 존재하지 않아 데이터를 추출할 수 없습니다.");
+        }
 
         final var cellType = resolveCellType(cell);
-        if (cellType == CellType.BLANK)
+        if (cellType == CellType.BLANK) {
             return;
+        }
 
         final var parameter = parameters[0]; // 세팅 파라미터는 첫번째 파라미터만 사용함.
         final var parameterType = parameter.getType();
         if (!this.allowSetParameterType(cellType, parameterType)) {
             if (log.isErrorEnabled()) {
-                log.error("세팅에 허용된 파라미터 타입이 아닙니다. - cellType : {}, parameterType : {}, value : {}", cellType,
-                        parameterType, cell);
+                log.error(
+                    "세팅에 허용된 파라미터 타입이 아닙니다. - cellType : {}, parameterType : {}, value : {}",
+                    cellType,
+                    parameterType,
+                    cell
+                );
             }
             throw new BadParametersException("세팅에 허용된 파라미터 타입이 아닙니다.");
         }
@@ -536,9 +554,12 @@ public class ExcelUtils<T> implements AutoCloseable {
                 return;
             }
 
-            if (Date.class.isAssignableFrom(parameterType) || LocalDateTime.class.isAssignableFrom(parameterType) ||
-                    LocalDate.class.isAssignableFrom(parameterType) || Calendar.class.isAssignableFrom(parameterType)) {
-
+            if (
+                Date.class.isAssignableFrom(parameterType) ||
+                LocalDateTime.class.isAssignableFrom(parameterType) ||
+                LocalDate.class.isAssignableFrom(parameterType) ||
+                Calendar.class.isAssignableFrom(parameterType)
+            ) {
                 if (cellType == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
                     final var date = cell.getDateCellValue();
                     if (Date.class.isAssignableFrom(parameterType)) {
@@ -556,8 +577,9 @@ public class ExcelUtils<T> implements AutoCloseable {
                 }
 
                 final var text = readCellText(cell).trim();
-                if (text.isEmpty())
+                if (text.isEmpty()) {
                     return;
+                }
                 final var dateTime = parseDateTime(text, null);
                 if (dateTime == null) {
                     throw new MethodInvokeFailException("날짜 파싱에 실패했습니다. value: " + text);
@@ -579,51 +601,58 @@ public class ExcelUtils<T> implements AutoCloseable {
 
             if (int.class.isAssignableFrom(parameterType) || Integer.class.isAssignableFrom(parameterType)) {
                 final var value = readNumericCell(cell);
-                if (value == null)
+                if (value == null) {
                     return;
+                }
                 method.invoke(data, strictNumber ? value.intValueExact() : value.intValue());
                 return;
             }
             if (short.class.isAssignableFrom(parameterType) || Short.class.isAssignableFrom(parameterType)) {
                 final var value = readNumericCell(cell);
-                if (value == null)
+                if (value == null) {
                     return;
+                }
                 method.invoke(data, strictNumber ? value.shortValueExact() : value.shortValue());
                 return;
             }
             if (byte.class.isAssignableFrom(parameterType) || Byte.class.isAssignableFrom(parameterType)) {
                 final var value = readNumericCell(cell);
-                if (value == null)
+                if (value == null) {
                     return;
+                }
                 method.invoke(data, strictNumber ? value.byteValueExact() : value.byteValue());
                 return;
             }
             if (long.class.isAssignableFrom(parameterType) || Long.class.isAssignableFrom(parameterType)) {
                 final var value = readNumericCell(cell);
-                if (value == null)
+                if (value == null) {
                     return;
+                }
                 method.invoke(data, strictNumber ? value.longValueExact() : value.longValue());
                 return;
             }
             if (float.class.isAssignableFrom(parameterType) || Float.class.isAssignableFrom(parameterType)) {
                 final var value = readNumericCell(cell);
-                if (value == null)
+                if (value == null) {
                     return;
+                }
                 method.invoke(data, value.floatValue());
                 return;
             }
             if (double.class.isAssignableFrom(parameterType) || Double.class.isAssignableFrom(parameterType)) {
                 final var value = readNumericCell(cell);
-                if (value == null)
+                if (value == null) {
                     return;
+                }
                 method.invoke(data, value.doubleValue());
                 return;
             }
 
             if (parameterType.isEnum()) {
                 final var value = readCellText(cell).trim();
-                if (value.isEmpty())
+                if (value.isEmpty()) {
                     return;
+                }
                 final var enumConstants = parameterType.getEnumConstants();
 
                 Object enumValue = null;
@@ -640,8 +669,11 @@ public class ExcelUtils<T> implements AutoCloseable {
                 }
 
                 if (log.isErrorEnabled()) {
-                    log.error("데이터를 적용할 수 없습니다. --> 적용 가능한 유형 : CodeGroup({}), 시도한 데이터 값 : {}",
-                            parameterType, value);
+                    log.error(
+                        "데이터를 적용할 수 없습니다. --> 적용 가능한 유형 : CodeGroup({}), 시도한 데이터 값 : {}",
+                        parameterType,
+                        value
+                    );
                 }
                 throw new MethodInvokeFailException("데이터 세팅에 적용할 수 없는 값입니다.");
             }
@@ -668,32 +700,43 @@ public class ExcelUtils<T> implements AutoCloseable {
     private boolean allowSetParameterType(CellType cellType, Class<?> parameterType) {
         switch (cellType) {
             case NUMERIC -> {
-                return parameterType.isPrimitive() || Short.class.isAssignableFrom(parameterType) ||
-                        Integer.class.isAssignableFrom(parameterType) || Long.class.isAssignableFrom(parameterType) ||
-                        Float.class.isAssignableFrom(parameterType) || Double.class.isAssignableFrom(parameterType) ||
-                        String.class.isAssignableFrom(parameterType) ||
-                        Date.class.isAssignableFrom(parameterType) ||
-                        LocalDate.class.isAssignableFrom(parameterType) ||
-                        LocalDateTime.class.isAssignableFrom(parameterType) ||
-                        Calendar.class.isAssignableFrom(parameterType);
+                return (
+                    parameterType.isPrimitive() ||
+                    Short.class.isAssignableFrom(parameterType) ||
+                    Integer.class.isAssignableFrom(parameterType) ||
+                    Long.class.isAssignableFrom(parameterType) ||
+                    Float.class.isAssignableFrom(parameterType) ||
+                    Double.class.isAssignableFrom(parameterType) ||
+                    String.class.isAssignableFrom(parameterType) ||
+                    Date.class.isAssignableFrom(parameterType) ||
+                    LocalDate.class.isAssignableFrom(parameterType) ||
+                    LocalDateTime.class.isAssignableFrom(parameterType) ||
+                    Calendar.class.isAssignableFrom(parameterType)
+                );
             }
             case STRING -> {
-                return parameterType.isEnum() || String.class.isAssignableFrom(parameterType) ||
-                        Date.class.isAssignableFrom(parameterType) ||
-                        LocalDate.class.isAssignableFrom(parameterType) ||
-                        LocalDateTime.class.isAssignableFrom(parameterType) ||
-                        Calendar.class.isAssignableFrom(parameterType);
+                return (
+                    parameterType.isEnum() ||
+                    String.class.isAssignableFrom(parameterType) ||
+                    Date.class.isAssignableFrom(parameterType) ||
+                    LocalDate.class.isAssignableFrom(parameterType) ||
+                    LocalDateTime.class.isAssignableFrom(parameterType) ||
+                    Calendar.class.isAssignableFrom(parameterType)
+                );
             }
             case BOOLEAN -> {
-                return Boolean.class.isAssignableFrom(parameterType) ||
-                        String.class.isAssignableFrom(parameterType);
+                return Boolean.class.isAssignableFrom(parameterType) || String.class.isAssignableFrom(parameterType);
             }
             case BLANK -> {
                 return true;
             }
             default -> {
                 if (log.isErrorEnabled()) {
-                    log.error("처리할 수 없는 파라미터 유형입니다. - cellType : {}, parameterType : {}", cellType, parameterType);
+                    log.error(
+                        "처리할 수 없는 파라미터 유형입니다. - cellType : {}, parameterType : {}",
+                        cellType,
+                        parameterType
+                    );
                 }
                 return false;
             }
@@ -726,8 +769,16 @@ public class ExcelUtils<T> implements AutoCloseable {
      */
     public ExcelData toExcel(List<T> dataList) {
         return this.toExcel(
-                dataList, this.reqMethods, this.titles, this.titleCellStyles, this.dataCellStyles,
-                null, null, this.book, this.fileName);
+            dataList,
+            this.reqMethods,
+            this.titles,
+            this.titleCellStyles,
+            this.dataCellStyles,
+            null,
+            null,
+            this.book,
+            this.fileName
+        );
     }
 
     /**
@@ -740,11 +791,26 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @return 엑셀
      */
     public ExcelData toExcel(
-            List<T> dataList, List<Method> reqMethods, List<String> titles, List<CellStyle> titleCellStyles,
-            List<CellStyle> dataCellStyles,
-            List<String> dateFormats, XSSFWorkbook workBook, String fileName) {
-        return this.toExcel(dataList, reqMethods, titles, titleCellStyles, dataCellStyles, dateFormats, null, workBook,
-                fileName);
+        List<T> dataList,
+        List<Method> reqMethods,
+        List<String> titles,
+        List<CellStyle> titleCellStyles,
+        List<CellStyle> dataCellStyles,
+        List<String> dateFormats,
+        XSSFWorkbook workBook,
+        String fileName
+    ) {
+        return this.toExcel(
+            dataList,
+            reqMethods,
+            titles,
+            titleCellStyles,
+            dataCellStyles,
+            dateFormats,
+            null,
+            workBook,
+            fileName
+        );
     }
 
     /**
@@ -768,12 +834,19 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @return 엑셀
      */
     public ExcelData toExcel(
-            List<T> dataList, List<Method> reqMethods, List<String> titles, List<CellStyle> titleCellStyles,
-            List<CellStyle> dataCellStyles,
-            List<String> dateFormats, List<String> numberFormats, XSSFWorkbook workBook, String fileName) {
-
-        if (isEmpty(dataList))
-            return null;
+        List<T> dataList,
+        List<Method> reqMethods,
+        List<String> titles,
+        List<CellStyle> titleCellStyles,
+        List<CellStyle> dataCellStyles,
+        List<String> dateFormats,
+        List<String> numberFormats,
+        XSSFWorkbook workBook,
+        String fileName
+    ) {
+        if (isEmpty(dataList)) {
+            throw new ExcelException("엑셀 데이터가 비어 있어 파일을 생성할 수 없습니다.");
+        }
 
         final var workbook = workBook == null ? new XSSFWorkbook() : workBook;
         final var sheetSpec = new ExcelSheet<T>();
@@ -786,8 +859,9 @@ public class ExcelUtils<T> implements AutoCloseable {
         sheetSpec.setDateFormats(dateFormats);
         sheetSpec.setNumberFormats(numberFormats);
 
-        if (!writeSheet(workbook, sheetSpec))
-            return null;
+        if (!writeSheet(workbook, sheetSpec)) {
+            throw new ExcelException("엑셀 시트를 생성할 수 없습니다.");
+        }
         return new ExcelData(workbook, fileName);
     }
 
@@ -810,7 +884,7 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @param sheets   시트 구성 목록
      * @param workBook 기존 워크북(없으면 새로 생성)
      * @param fileName 파일명
-     * @return 엑셀 (실패 시 null)
+     * @return 엑셀
      */
     public ExcelData toExcel(List<ExcelSheet<?>> sheets, XSSFWorkbook workBook, String fileName) {
         return this.toExcel(sheets, workBook, fileName, false);
@@ -823,25 +897,31 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @param workBook        기존 워크북(없으면 새로 생성)
      * @param fileName        파일명
      * @param skipFailedSheet 실패 시 시트를 건너뛸지 여부
-     * @return 엑셀 (실패 시 null)
+     * @return 엑셀
      */
-    public ExcelData toExcel(List<ExcelSheet<?>> sheets, XSSFWorkbook workBook, String fileName,
-            boolean skipFailedSheet) {
-        if (isEmpty(sheets))
-            return null;
+    public ExcelData toExcel(
+        List<ExcelSheet<?>> sheets,
+        XSSFWorkbook workBook,
+        String fileName,
+        boolean skipFailedSheet
+    ) {
+        if (isEmpty(sheets)) {
+            throw new ExcelException("엑셀 시트 목록이 비어 있어 파일을 생성할 수 없습니다.");
+        }
         final var workbook = workBook == null ? new XSSFWorkbook() : workBook;
 
         var createdCount = 0;
         for (ExcelSheet<?> sheetSpec : sheets) {
-            if (sheetSpec == null)
+            if (sheetSpec == null) {
                 continue;
+            }
             try {
                 final var created = writeSheet(workbook, sheetSpec);
                 if (!created) {
                     if (skipFailedSheet) {
                         continue;
                     }
-                    return null;
+                    throw new ExcelException("엑셀 시트를 생성할 수 없습니다.");
                 }
                 createdCount++;
             } catch (ExcelException e) {
@@ -854,8 +934,9 @@ public class ExcelUtils<T> implements AutoCloseable {
                 throw e;
             }
         }
-        if (createdCount == 0)
-            return null;
+        if (createdCount == 0) {
+            throw new ExcelException("생성 가능한 엑셀 시트가 없습니다.");
+        }
         return new ExcelData(workbook, fileName);
     }
 
@@ -897,8 +978,8 @@ public class ExcelUtils<T> implements AutoCloseable {
         final var listSheet = workbook.createSheet(resolveSheetName(workbook, sheetSpec.getSheetName()));
         final var rowIndex = new AtomicInteger(0);
 
-        final IntFunction<String> findDateFormat = index -> findFormat(dateFormats, index);
-        final IntFunction<String> findNumberFormat = index -> findFormat(numberFormats, index);
+        final IntFunction<String> findDateFormat = (index) -> findFormat(dateFormats, index);
+        final IntFunction<String> findNumberFormat = (index) -> findFormat(numberFormats, index);
 
         if (isNotEmpty(titles)) {
             final var row = listSheet.createRow(rowIndex.getAndIncrement());
@@ -918,19 +999,20 @@ public class ExcelUtils<T> implements AutoCloseable {
             return true;
         }
 
-        dataList.forEach(data -> {
+        dataList.forEach((data) -> {
             final var row = listSheet.createRow(rowIndex.getAndIncrement());
             var cellIndex = new AtomicInteger(0);
 
-            excelMethod.forEach(method -> {
+            excelMethod.forEach((method) -> {
                 try {
                     final var index = cellIndex.getAndIncrement();
                     this.setCell(
-                            row.createCell(index),
-                            method.invoke(data),
-                            this.findCellStyle(dataStyles, index),
-                            findDateFormat.apply(index),
-                            findNumberFormat.apply(index));
+                        row.createCell(index),
+                        method.invoke(data),
+                        this.findCellStyle(dataStyles, index),
+                        findDateFormat.apply(index),
+                        findNumberFormat.apply(index)
+                    );
                     listSheet.autoSizeColumn(index);
                 } catch (IllegalAccessException | InvocationTargetException e) {
                     if (log.isErrorEnabled()) {
@@ -1005,11 +1087,12 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @return CellStyle
      */
     private CellStyle getOrCreateStyle(CellStyle base, Workbook workbook, String format, Map<String, CellStyle> cache) {
-        if (StringUtils.isBlank(format) || workbook == null)
+        if (StringUtils.isBlank(format) || workbook == null) {
             return base;
+        }
         final var baseKey = (base == null) ? "null" : String.valueOf(base.getIndex());
         final var key = baseKey + ":" + format;
-        return cache.computeIfAbsent(key, k -> {
+        return cache.computeIfAbsent(key, (k) -> {
             final var style = workbook.createCellStyle();
             if (base != null) {
                 style.cloneStyleFrom(base);
@@ -1026,53 +1109,79 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @param reqValue 세팅 요청 데이터
      */
     private void setCell(Cell cell, Object reqValue, CellStyle cellStyle, String dateFormat, String numberFormat) {
-        if (reqValue == null)
+        if (reqValue == null) {
             return;
+        }
 
         if (reqValue instanceof Date value) {
             cell.setCellValue(value);
-            final var style = getOrCreateStyle(cellStyle, cell.getSheet().getWorkbook(),
-                    formatOrDefault(dateFormat, DEFAULT_DATE_CELL_FORMAT), dateStyleCache);
-            if (style != null)
+            final var style = getOrCreateStyle(
+                cellStyle,
+                cell.getSheet().getWorkbook(),
+                formatOrDefault(dateFormat, DEFAULT_DATE_CELL_FORMAT),
+                dateStyleCache
+            );
+            if (style != null) {
                 cell.setCellStyle(style);
+            }
             return;
         }
 
         if (reqValue instanceof LocalDateTime value) {
             final var date = Date.from(value.atZone(zoneId).toInstant());
             cell.setCellValue(date);
-            final var style = getOrCreateStyle(cellStyle, cell.getSheet().getWorkbook(),
-                    formatOrDefault(dateFormat, DEFAULT_DATE_TIME_CELL_FORMAT), dateStyleCache);
-            if (style != null)
+            final var style = getOrCreateStyle(
+                cellStyle,
+                cell.getSheet().getWorkbook(),
+                formatOrDefault(dateFormat, DEFAULT_DATE_TIME_CELL_FORMAT),
+                dateStyleCache
+            );
+            if (style != null) {
                 cell.setCellStyle(style);
+            }
             return;
         }
 
         if (reqValue instanceof LocalDate value) {
             final var date = Date.from(value.atStartOfDay(zoneId).toInstant());
             cell.setCellValue(date);
-            final var style = getOrCreateStyle(cellStyle, cell.getSheet().getWorkbook(),
-                    formatOrDefault(dateFormat, DEFAULT_DATE_CELL_FORMAT), dateStyleCache);
-            if (style != null)
+            final var style = getOrCreateStyle(
+                cellStyle,
+                cell.getSheet().getWorkbook(),
+                formatOrDefault(dateFormat, DEFAULT_DATE_CELL_FORMAT),
+                dateStyleCache
+            );
+            if (style != null) {
                 cell.setCellStyle(style);
+            }
             return;
         }
 
         if (reqValue instanceof Calendar value) {
             cell.setCellValue(value);
-            final var style = getOrCreateStyle(cellStyle, cell.getSheet().getWorkbook(),
-                    formatOrDefault(dateFormat, DEFAULT_DATE_CELL_FORMAT), dateStyleCache);
-            if (style != null)
+            final var style = getOrCreateStyle(
+                cellStyle,
+                cell.getSheet().getWorkbook(),
+                formatOrDefault(dateFormat, DEFAULT_DATE_CELL_FORMAT),
+                dateStyleCache
+            );
+            if (style != null) {
                 cell.setCellStyle(style);
+            }
             return;
         }
 
         if (reqValue instanceof Number value) {
             cell.setCellValue(value.doubleValue());
-            final var style = getOrCreateStyle(cellStyle, cell.getSheet().getWorkbook(), numberFormat,
-                    numberStyleCache);
-            if (style != null)
+            final var style = getOrCreateStyle(
+                cellStyle,
+                cell.getSheet().getWorkbook(),
+                numberFormat,
+                numberStyleCache
+            );
+            if (style != null) {
                 cell.setCellStyle(style);
+            }
             return;
         }
 
@@ -1089,7 +1198,6 @@ public class ExcelUtils<T> implements AutoCloseable {
         if (cellStyle != null) {
             cell.setCellStyle(cellStyle);
         }
-
     }
 
     /**
@@ -1101,13 +1209,13 @@ public class ExcelUtils<T> implements AutoCloseable {
     private List<Method> extractGetterMethod(Object data) {
         final var methods = data.getClass().getMethods();
         return Arrays.stream(methods)
-                .filter(method -> {
-                    final var getterMethod = this.isGetter(method);
-                    final var allow = this.allowedReturnType(method);
-                    return getterMethod && allow;
-                })
-                .sorted(Comparator.comparing(Method::getName))
-                .toList();
+            .filter((method) -> {
+                final var getterMethod = this.isGetter(method);
+                final var allow = this.allowedReturnType(method);
+                return getterMethod && allow;
+            })
+            .sorted(Comparator.comparing(Method::getName))
+            .toList();
     }
 
     /**
@@ -1118,10 +1226,7 @@ public class ExcelUtils<T> implements AutoCloseable {
      */
     private List<Method> extractSetterMethod(Class<T> clazz) {
         final var methods = clazz.getMethods();
-        return Arrays.stream(methods)
-                .filter(this::isSetter)
-                .sorted(Comparator.comparing(Method::getName))
-                .toList();
+        return Arrays.stream(methods).filter(this::isSetter).sorted(Comparator.comparing(Method::getName)).toList();
     }
 
     /**
@@ -1131,8 +1236,9 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @return getter 메서드 여부.
      */
     private boolean isGetter(Method method) {
-        if (method == null)
+        if (method == null) {
             return false;
+        }
         if (!StringUtils.startsWith(method.getName(), "get")) {
             return false;
         }
@@ -1149,8 +1255,9 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @return getter 메서드 여부.
      */
     private boolean isSetter(Method method) {
-        if (method == null)
+        if (method == null) {
             return false;
+        }
         if (!StringUtils.startsWith(method.getName(), "set")) {
             return false;
         }
@@ -1164,27 +1271,32 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @return 사용 가능한 return type 여부
      */
     private boolean allowedReturnType(Method method) {
-        if (method == null)
+        if (method == null) {
             return false;
+        }
 
         final var returnType = method.getReturnType();
-        if (returnType.isPrimitive())
+        if (returnType.isPrimitive()) {
             return true;
-        if (returnType.isEnum())
+        }
+        if (returnType.isEnum()) {
             return true;
+        }
 
-        return String.class.isAssignableFrom(returnType) ||
-                Date.class.isAssignableFrom(returnType) ||
-                LocalDate.class.isAssignableFrom(returnType) ||
-                LocalDateTime.class.isAssignableFrom(returnType) ||
-                Byte.class.isAssignableFrom(returnType) ||
-                Short.class.isAssignableFrom(returnType) ||
-                Integer.class.isAssignableFrom(returnType) ||
-                Long.class.isAssignableFrom(returnType) ||
-                Float.class.isAssignableFrom(returnType) ||
-                Double.class.isAssignableFrom(returnType) ||
-                Boolean.class.isAssignableFrom(returnType) ||
-                Calendar.class.isAssignableFrom(returnType);
+        return (
+            String.class.isAssignableFrom(returnType) ||
+            Date.class.isAssignableFrom(returnType) ||
+            LocalDate.class.isAssignableFrom(returnType) ||
+            LocalDateTime.class.isAssignableFrom(returnType) ||
+            Byte.class.isAssignableFrom(returnType) ||
+            Short.class.isAssignableFrom(returnType) ||
+            Integer.class.isAssignableFrom(returnType) ||
+            Long.class.isAssignableFrom(returnType) ||
+            Float.class.isAssignableFrom(returnType) ||
+            Double.class.isAssignableFrom(returnType) ||
+            Boolean.class.isAssignableFrom(returnType) ||
+            Calendar.class.isAssignableFrom(returnType)
+        );
     }
 
     /**
@@ -1216,12 +1328,14 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @throws IOException e
      */
     public static void download(ExcelData excelData, HttpServletResponse response, String name) throws IOException {
-        if (excelData == null)
+        if (excelData == null) {
             throw new ExcelException("다운로드할 엑셀 데이터가 없습니다.");
+        }
 
         final var workbook = excelData.excelBook;
-        if (workbook == null)
+        if (workbook == null) {
             throw new ExcelException("다운로드할 엑셀 데이터가 없습니다.");
+        }
 
         // 다운로드 파일명 생성.
         final var baseFileName = StringUtils.isNotBlank(name) ? name : excelData.fileName;
@@ -1230,8 +1344,9 @@ public class ExcelUtils<T> implements AutoCloseable {
         // 응답 객체 header 설 정 (엑셀)
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setHeader(
-                HttpHeaders.CONTENT_DISPOSITION,
-                ContentDisposition.attachment().filename(fileName, StandardCharsets.UTF_8).build().toString());
+            HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.attachment().filename(fileName, StandardCharsets.UTF_8).build().toString()
+        );
 
         // 엑셀 다운로드 처리.
         try (final var stream = response.getOutputStream()) {
@@ -1273,8 +1388,7 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @param fileName  파일명
      * @author 정재요
      */
-    public record ExcelData(Workbook excelBook, String fileName) {
-    }
+    public record ExcelData(Workbook excelBook, String fileName) {}
 
     /**
      * 다중 시트 생성을 위한 시트 스펙
@@ -1296,6 +1410,7 @@ public class ExcelUtils<T> implements AutoCloseable {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ExcelSheet<T> {
+
         private String sheetName;
         private List<T> dataList;
         private List<Method> reqMethods;
@@ -1349,6 +1464,7 @@ public class ExcelUtils<T> implements AutoCloseable {
     @Getter
     @Setter
     public static class ExcelDataMethodSet {
+
         private final List<String> titleList;
         private final List<Method> methodList;
         private final List<CellStyle> titleCellStyles;
@@ -1481,6 +1597,7 @@ public class ExcelUtils<T> implements AutoCloseable {
     }
 
     public static class ExcelException extends RuntimeException {
+
         public ExcelException(String message) {
             super(message);
         }
