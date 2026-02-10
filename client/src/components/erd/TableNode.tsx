@@ -102,7 +102,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
             {/* Column name */}
             <input
-              className="nodrag flex-1 font-mono bg-transparent outline-none hover:bg-accent focus:bg-accent px-1 rounded min-w-0"
+              className="nodrag flex-1 font-mono bg-transparent outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring px-1 rounded min-w-0"
               value={col.name}
               onChange={(e) => updateColumn(id, col.id, { name: e.target.value })}
               aria-label={t('erd.tableNode.aria.columnName')}
@@ -110,7 +110,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
             {/* Column type */}
             <input
-              className="nodrag w-24 font-mono text-muted-foreground bg-transparent outline-none hover:bg-accent focus:bg-accent px-1 rounded text-right"
+              className="nodrag w-24 font-mono text-muted-foreground bg-transparent outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring px-1 rounded text-right"
               value={col.type}
               onChange={(e) => updateColumn(id, col.id, { type: e.target.value })}
               aria-label={t('erd.tableNode.aria.columnType')}

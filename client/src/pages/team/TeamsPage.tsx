@@ -79,7 +79,7 @@ export default function TeamsPage() {
                     <CardTitle className="text-lg">{team.name}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Users className="h-4 w-4" />
                       <span>{t('team.list.memberCount', { count: team.memberCount })}</span>
                     </div>

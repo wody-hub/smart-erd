@@ -12,6 +12,8 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
 /** 노드 바운드 주변 여백 (px) */
 const BOUND_PADDING = 50;
+/** 내보내기 이미지 배경색 (인쇄/공유용 고정 흰색) */
+const EXPORT_BACKGROUND = '#ffffff';
 
 /** 캡처 옵션 (뷰포트 요소 + 이미지 크기 + CSS transform) */
 interface CaptureOptions {
@@ -107,7 +109,7 @@ export function useExportDiagram(diagramName: string) {
         width: opts.imageWidth,
         height: opts.imageHeight,
         style: opts.style,
-        backgroundColor: '#ffffff',
+        backgroundColor: EXPORT_BACKGROUND,
       });
       downloadFile(dataUrl, `${diagramName}.png`);
       toast.success(t('erd.export.success'));
@@ -126,7 +128,7 @@ export function useExportDiagram(diagramName: string) {
         width: opts.imageWidth,
         height: opts.imageHeight,
         style: opts.style,
-        backgroundColor: '#ffffff',
+        backgroundColor: EXPORT_BACKGROUND,
         quality: 0.95,
       });
       downloadFile(dataUrl, `${diagramName}.jpg`);
@@ -146,7 +148,7 @@ export function useExportDiagram(diagramName: string) {
         width: opts.imageWidth,
         height: opts.imageHeight,
         style: opts.style,
-        backgroundColor: '#ffffff',
+        backgroundColor: EXPORT_BACKGROUND,
       });
       downloadFile(dataUrl, `${diagramName}.svg`);
       toast.success(t('erd.export.success'));
@@ -165,7 +167,7 @@ export function useExportDiagram(diagramName: string) {
         width: opts.imageWidth,
         height: opts.imageHeight,
         style: opts.style,
-        backgroundColor: '#ffffff',
+        backgroundColor: EXPORT_BACKGROUND,
       });
 
       const orientation = opts.imageWidth > opts.imageHeight ? 'landscape' : 'portrait';

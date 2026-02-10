@@ -143,7 +143,7 @@ export default function TermTab() {
             {terms.map((term) => (
               <TableRow key={term.id}>
                 <TableCell className="font-medium">{term.logicalName}</TableCell>
-                <TableCell>{term.physicalName}</TableCell>
+                <TableCell className="font-mono">{term.physicalName}</TableCell>
                 <TableCell>
                   {term.domainLogicalName ?? t('dictionary.term.table.noDomain')}
                 </TableCell>

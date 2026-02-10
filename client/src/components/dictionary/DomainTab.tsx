@@ -143,7 +143,7 @@ export default function DomainTab() {
             {domains.map((domain) => (
               <TableRow key={domain.id}>
                 <TableCell className="font-medium">{domain.logicalName}</TableCell>
-                <TableCell>{domain.physicalType}</TableCell>
+                <TableCell className="font-mono">{domain.physicalType}</TableCell>
                 <TableCell className="text-muted-foreground">{domain.description ?? ''}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
