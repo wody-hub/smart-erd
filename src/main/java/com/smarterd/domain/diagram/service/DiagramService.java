@@ -108,13 +108,7 @@ public class DiagramService {
      * @param request    저장 요청 (content)
      */
     @Transactional
-    public void saveDiagram(
-        String loginId,
-        Long teamId,
-        Long projectId,
-        Long diagramId,
-        SaveDiagramRequest request
-    ) {
+    public void saveDiagram(String loginId, Long teamId, Long projectId, Long diagramId, SaveDiagramRequest request) {
         final var project = verifyAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
 

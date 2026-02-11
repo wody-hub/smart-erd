@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import * as Y from 'yjs';
 import { YjsProvider } from '@/collaboration/YjsProvider';
 import { migrateJsonToYDoc } from '@/collaboration/yjsBridge';
 import useCanvasStore from '@/stores/useCanvasStore';
-import useAuthStore from '@/stores/useAuthStore';
 import useCollaborationStore from '@/stores/useCollaborationStore';
+import { useSnapshotCompaction } from '@/hooks/useSnapshotCompaction';
+import { requestWsTicket } from '@/api/diagramApi';
 import type { DiagramDetail } from '@/types/diagram';
 import type { ConnectionStatus } from '@/types/collaboration';
 
@@ -33,15 +34,17 @@ export function useYjsCollaboration(
 
   const initYDoc = useCanvasStore((s) => s.initYDoc);
   const destroyYDoc = useCanvasStore((s) => s.destroyYDoc);
-  const accessToken = useAuthStore((s) => s.accessToken);
   const setConnectionStatus = useCollaborationStore((s) => s.setConnectionStatus);
   const updateAwareness = useCollaborationStore((s) => s.updateAwareness);
   const removePeerByLoginId = useCollaborationStore((s) => s.removePeerByLoginId);
   const resetCollaboration = useCollaborationStore((s) => s.reset);
 
+  /** 일회용 ticket 발급 콜백 (diagramId 캡처, 참조 안정) */
+  const getTicket = useCallback(() => requestWsTicket(diagramId!), [diagramId]);
+
   // Y.Doc 생성 + YjsProvider 연결 + 라이프사이클 관리
   useEffect(() => {
-    if (!diagram || !diagramId || !accessToken) return;
+    if (!diagram || !diagramId) return;
 
     // 1. Y.Doc 생성
     const ydoc = new Y.Doc();
@@ -58,7 +61,7 @@ export function useYjsCollaboration(
     // 4. YjsProvider 연결
     const provider = new YjsProvider(ydoc, {
       diagramId,
-      token: accessToken,
+      getTicket,
     });
 
     provider.onConnectionStatusChange = (status: ConnectionStatus) => {
@@ -77,24 +80,25 @@ export function useYjsCollaboration(
     providerRef.current = provider;
 
     return () => {
-      provider.destroy();
-      providerRef.current = null;
-      destroyYDoc();
-      resetCollaboration();
+      try {
+        provider.destroy();
+      } catch (e) {
+        console.error('[useYjsCollaboration] provider.destroy() 실패:', e);
+      } finally {
+        providerRef.current = null;
+        destroyYDoc();
+        resetCollaboration();
+      }
     };
     // 의존성 배열 안전성 근거:
-    // - accessToken: 별도 useEffect에서 providerRef.current.updateToken()으로 갱신
+    // - getTicket: useCallback으로 diagramId 캡처, 참조 안정
     // - initYDoc, destroyYDoc: Zustand 셀렉터 — create() 내부 클로저로 참조 안정
     // - setConnectionStatus, updateAwareness, removePeerByLoginId, resetCollaboration: 동일
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diagram, diagramId]);
 
-  // Access Token 갱신 시 Provider에 새 토큰 전달 (재연결 시 사용)
-  useEffect(() => {
-    if (providerRef.current && accessToken) {
-      providerRef.current.updateToken(accessToken);
-    }
-  }, [accessToken]);
+  // 스냅샷 크기 임계치 초과 + 단독 접속 시 자동 컴팩션
+  useSnapshotCompaction(providerRef, diagramId);
 
   return { providerRef };
 }

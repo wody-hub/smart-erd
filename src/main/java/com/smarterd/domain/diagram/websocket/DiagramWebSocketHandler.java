@@ -31,6 +31,7 @@ import org.springframework.web.socket.handler.BinaryWebSocketHandler;
  *   <li>{@code 0x05} — Snapshot request (서버에 저장된 스냅샷 요청)</li>
  *   <li>{@code 0x06} — Snapshot response (서버 → 클라이언트 스냅샷 전송)</li>
  *   <li>{@code 0x07} — Peer left (서버 → 클라이언트, 사용자 퇴장 알림)</li>
+ *   <li>{@code 0x08} — Compacted snapshot (클라이언트 → 서버, 스냅샷 교체 요청)</li>
  * </ul></p>
  */
 @Component
@@ -61,6 +62,9 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
     /** Peer left (서버 → 클라이언트, 사용자 퇴장 알림) */
     static final byte MSG_PEER_LEFT = 0x07;
 
+    /** Compacted snapshot (클라이언트 → 서버, 스냅샷 교체 요청) */
+    private static final byte MSG_COMPACTED_SNAPSHOT = 0x08;
+
     /** 세션 cleanup 완료 플래그 (attributes 키) — 중복 afterConnectionClosed 방지 */
     private static final String CLEANED_UP_ATTR = "ws.cleanedUp";
 
@@ -87,7 +91,7 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
         session.setBinaryMessageSizeLimit(webSocketProperties.getBinaryMessageSizeLimit());
 
         final var info = getSessionInfo(session);
-        final var joined = roomManager.join(info.diagramId(), session);
+        final var joined = roomManager.join(info.diagramId(), session, info.loginId());
         if (!joined) {
             try {
                 session.close(CloseStatus.POLICY_VIOLATION);
@@ -107,6 +111,17 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
     @Override
     protected void handleBinaryMessage(@NonNull WebSocketSession session, @NonNull BinaryMessage message) {
         final var info = getSessionInfo(session);
+
+        // 세션 만료 체크
+        if (info.isExpired()) {
+            log.info("WebSocket 세션 만료 (세션 {}, loginId={})", session.getId(), info.loginId());
+            try {
+                session.close(CloseStatus.POLICY_VIOLATION);
+            } catch (Exception e) {
+                log.warn("만료 세션 종료 실패 (세션 {})", session.getId(), e);
+            }
+            return;
+        }
 
         // Rate limit 검사
         if (!roomManager.checkRateLimit(session)) {
@@ -128,9 +143,20 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
             case MSG_YJS_UPDATE -> {
                 roomManager.broadcast(info.diagramId(), session, message);
                 // 타입 바이트(0x03) 제외한 순수 Yjs update만 누적
-                roomManager.appendUpdate(info.diagramId(), Arrays.copyOfRange(payload, 1, payload.length));
+                final var accepted = roomManager.appendUpdate(
+                    info.diagramId(),
+                    Arrays.copyOfRange(payload, 1, payload.length)
+                );
+                if (!accepted) {
+                    log.warn(
+                        "누적 update 크기 초과로 저장 거부 (diagramId={}, 세션 {})",
+                        info.diagramId(),
+                        session.getId()
+                    );
+                }
             }
             case MSG_SNAPSHOT_REQUEST -> sendSnapshotToSession(session, info.diagramId());
+            case MSG_COMPACTED_SNAPSHOT -> handleCompaction(info.diagramId(), payload);
             default -> {
                 if (log.isDebugEnabled()) {
                     log.debug("알 수 없는 메시지 타입: 0x{}", String.format("%02x", messageType));
@@ -160,22 +186,18 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
         // PEER_LEFT 메시지 브로드캐스트 (퇴장 전에 전송)
         broadcastPeerLeft(info.diagramId(), session, info.loginId());
 
-        final var roomEmpty = roomManager.leave(info.diagramId(), session);
+        // leave: 방이 비면 원자적으로 누적 update를 drain + 인메모리 리소스 정리
+        final var result = roomManager.leave(info.diagramId(), session, info.loginId());
 
-        if (roomEmpty) {
-            // 마지막 사용자 퇴장 → 누적 update를 drain하여 DB에 저장
-            // @Scheduled flush와 레이스 방지를 위해 다이어그램별 flush 락 사용
-            synchronized (roomManager.getFlushLock(info.diagramId())) {
-                final var merged = roomManager.drainAndMergeUpdates(info.diagramId());
-                if (merged.length > 0) {
-                    snapshotService.saveSnapshotWithUpdates(info.diagramId(), merged);
+        if (result.roomEmpty()) {
+            // 마지막 사용자 퇴장 → drain된 update를 DB에 저장
+            if (result.drainedUpdates().length > 0) {
+                synchronized (roomManager.getFlushLock(info.diagramId())) {
+                    snapshotService.saveSnapshotWithUpdates(info.diagramId(), result.drainedUpdates());
                 }
             }
-            // 방이 다시 생성되지 않았을 때만 인메모리 리소스 정리
-            // flush 중 새 세션이 join하여 appendUpdate한 경우 데이터 유실 방지
-            if (roomManager.getSessionCount(info.diagramId()) == 0) {
-                roomManager.cleanupDiagramResources(info.diagramId());
-            }
+            // flush 완료 후 flush 락 제거
+            roomManager.removeFlushLock(info.diagramId());
         }
     }
 
@@ -258,6 +280,48 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
             roomManager.broadcast(diagramId, sender, new BinaryMessage(payload));
         } catch (Exception e) {
             log.warn("PEER_LEFT 메시지 생성 실패 (loginId={})", loginId, e);
+        }
+    }
+
+    /**
+     * 클라이언트로부터 컴팩션된 스냅샷을 수신하여 교체한다.
+     *
+     * <p>이중 락으로 동시성을 보호한다:
+     * <ul>
+     *   <li>{@code flushLock} — {@code @Scheduled flushDirtySnapshots()}와의 동시 drain 방지</li>
+     *   <li>{@code sessions} 락 ({@link DiagramRoomManager#drainIfAlone} 내부) — {@code join()}과의 TOCTOU 레이스 방지</li>
+     * </ul>
+     * {@code flushLock}이 외부 락이므로 drain부터 {@code restoreUpdates()}까지의 전체 흐름이 보호된다.</p>
+     *
+     * @param diagramId 다이어그램 ID
+     * @param payload   전체 메시지 payload (타입 바이트 포함)
+     */
+    private void handleCompaction(Long diagramId, byte[] payload) {
+        final var compactedUpdate = Arrays.copyOfRange(payload, 1, payload.length);
+        if (compactedUpdate.length == 0) {
+            return;
+        }
+
+        // flushLock: @Scheduled flush의 drainAndMergeUpdates()와 동시 drain 방지
+        synchronized (roomManager.getFlushLock(diagramId)) {
+            // 원자적으로 단독 접속 확인 + 누적 update drain (sessions 락 내부에서 수행)
+            // drainIfAlone()이 null을 반환하면 단독 접속이 아니거나 방이 없음
+            final var mergedUpdates = roomManager.drainIfAlone(diagramId);
+            if (mergedUpdates == null) {
+                log.warn("컴팩션 거부: 단독 접속 아님 (diagramId={})", diagramId);
+                return;
+            }
+
+            try {
+                final var success = snapshotService.replaceSnapshot(diagramId, compactedUpdate);
+                if (!success) {
+                    // 크기 검증 실패 또는 다이어그램 미존재: drain된 update 복원
+                    roomManager.restoreUpdates(diagramId, mergedUpdates);
+                }
+            } catch (Exception e) {
+                roomManager.restoreUpdates(diagramId, mergedUpdates);
+                log.error("컴팩션 실패, drain된 update 복원 (diagramId={})", diagramId, e);
+            }
         }
     }
 

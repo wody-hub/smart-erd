@@ -19,16 +19,18 @@ export const WS_MSG_TYPE = {
   SNAPSHOT_RESPONSE: 0x06,
   /** Peer left (서버 → 클라이언트, 사용자 퇴장 알림) */
   PEER_LEFT: 0x07,
+  /** Compacted snapshot (클라이언트 → 서버, 스냅샷 교체 요청) */
+  COMPACTED_SNAPSHOT: 0x08,
 } as const;
 
-/** Awareness 커서 색상 팔레트 (6색) */
+/** Awareness 커서 색상 팔레트 (6색) — CSS Variable 기반 디자인 토큰 */
 export const CURSOR_COLORS = [
-  'hsl(0, 80%, 60%)',
-  'hsl(210, 80%, 60%)',
-  'hsl(120, 60%, 50%)',
-  'hsl(45, 90%, 55%)',
-  'hsl(280, 70%, 60%)',
-  'hsl(180, 60%, 50%)',
+  'hsl(var(--cursor-color-1))',
+  'hsl(var(--cursor-color-2))',
+  'hsl(var(--cursor-color-3))',
+  'hsl(var(--cursor-color-4))',
+  'hsl(var(--cursor-color-5))',
+  'hsl(var(--cursor-color-6))',
 ] as const;
 
 /** WebSocket 재연결 설정 */

@@ -1,7 +1,5 @@
 import * as Y from 'yjs';
 import { WS_MSG_TYPE, WS_RECONNECT } from '@/constants/ws';
-import { ROUTES } from '@/constants/routes';
-import { clearAuthState, resolveUsableAccessToken } from '@/lib/auth-refresh';
 import type { AwarenessState, ConnectionStatus, YjsProviderOptions } from '@/types/collaboration';
 
 /**
@@ -15,7 +13,7 @@ import type { AwarenessState, ConnectionStatus, YjsProviderOptions } from '@/typ
  * ```ts
  * const provider = new YjsProvider(ydoc, {
  *   diagramId: '123',
- *   token: 'jwt-access-token',
+ *   getTicket: () => requestWsTicket('123'),
  * });
  * provider.connect();
  * // ...
@@ -66,7 +64,7 @@ export class YjsProvider {
    * YjsProvider를 생성한다.
    *
    * @param doc     동기화할 Y.Doc
-   * @param options 연결 옵션 (diagramId, token)
+   * @param options 연결 옵션 (diagramId, getTicket)
    */
   constructor(doc: Y.Doc, options: YjsProviderOptions) {
     this.doc = doc;
@@ -98,28 +96,21 @@ export class YjsProvider {
     this.doc.off('update', this.updateHandler);
     this.clearReconnectTimer();
 
-    // WS 닫기 전 Awareness null 전송 (정상 종료 시 고스트 커서 방지)
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const json = JSON.stringify({ clientId: this.clientId, state: null });
-      const encoder = new TextEncoder();
-      this.sendMessage(WS_MSG_TYPE.AWARENESS, encoder.encode(json));
-      this.ws.close();
-      this.ws = null;
-    } else if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+    try {
+      // WS 닫기 전 Awareness null 전송 (정상 종료 시 고스트 커서 방지)
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        const json = JSON.stringify({ clientId: this.clientId, state: null });
+        const encoder = new TextEncoder();
+        this.sendMessage(WS_MSG_TYPE.AWARENESS, encoder.encode(json));
+        this.ws.close();
+        this.ws = null;
+      } else if (this.ws) {
+        this.ws.close();
+        this.ws = null;
+      }
+    } finally {
+      this.emitConnectionStatus('disconnected');
     }
-
-    this.emitConnectionStatus('disconnected');
-  }
-
-  /**
-   * JWT 토큰을 갱신한다 (Access Token 재발급 시).
-   *
-   * @param newToken 새로운 JWT Access Token
-   */
-  updateToken(newToken: string): void {
-    (this.options as { token: string }).token = newToken;
   }
 
   /**
@@ -136,16 +127,17 @@ export class YjsProvider {
    * WebSocket 인스턴스를 생성하고 이벤트를 바인딩한다.
    */
   private async createWebSocket(): Promise<void> {
-    const accessToken = await resolveUsableAccessToken(this.options.token);
-    if (!accessToken) {
-      clearAuthState();
+    let ticket: string;
+    try {
+      ticket = await this.options.getTicket();
+    } catch (e) {
+      console.error('[YjsProvider] ticket 발급 실패:', e);
       this.emitConnectionStatus('disconnected');
-      window.location.href = ROUTES.LOGIN;
+      this.scheduleReconnect();
       return;
     }
 
-    this.updateToken(accessToken);
-    const serverUrl = this.options.serverUrl ?? this.buildWsUrl();
+    const serverUrl = this.buildWsUrl(ticket);
     this.emitConnectionStatus('connecting');
 
     this.ws = new WebSocket(serverUrl);
@@ -200,7 +192,13 @@ export class YjsProvider {
       case WS_MSG_TYPE.SYNC_STEP2:
       case WS_MSG_TYPE.YJS_UPDATE: {
         // diff 또는 update 수신 → Y.Doc에 적용
-        Y.applyUpdate(this.doc, payload, 'remote');
+        try {
+          Y.applyUpdate(this.doc, payload, 'remote');
+        } catch (e) {
+          console.error('[YjsProvider] Y.applyUpdate 실패 (sync/update):', e);
+          this.reconnectAfterError();
+          return;
+        }
         if (messageType === WS_MSG_TYPE.SYNC_STEP2) {
           this.synced = true;
         }
@@ -212,7 +210,13 @@ export class YjsProvider {
       }
       case WS_MSG_TYPE.SNAPSHOT_RESPONSE: {
         // 서버 스냅샷 수신 → Y.Doc에 적용
-        Y.applyUpdate(this.doc, payload, 'remote');
+        try {
+          Y.applyUpdate(this.doc, payload, 'remote');
+        } catch (e) {
+          console.error('[YjsProvider] Y.applyUpdate 실패 (snapshot):', e);
+          this.reconnectAfterError();
+          return;
+        }
         break;
       }
       case WS_MSG_TYPE.PEER_LEFT: {
@@ -291,8 +295,8 @@ export class YjsProvider {
       if (json.clientId === this.clientId) return;
 
       this.onAwarenessReceived?.(json.clientId, json.state);
-    } catch {
-      // Awareness 메시지 파싱 실패: 무시하고 다음 메시지 대기
+    } catch (e) {
+      console.debug('[YjsProvider] Awareness 메시지 파싱 실패:', e);
     }
   }
 
@@ -308,9 +312,22 @@ export class YjsProvider {
       const json = JSON.parse(decoder.decode(payload)) as { loginId: string };
 
       this.onPeerLeft?.(json.loginId);
-    } catch {
-      // Peer left 메시지 파싱 실패: 무시하고 다음 메시지 대기
+    } catch (e) {
+      console.debug('[YjsProvider] Peer left 메시지 파싱 실패:', e);
     }
+  }
+
+  /**
+   * Y.applyUpdate 실패 등 심각한 오류 시 WebSocket을 닫고 재연결을 시도한다.
+   */
+  private reconnectAfterError(): void {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    this.synced = false;
+    this.emitConnectionStatus('disconnected');
+    this.scheduleReconnect();
   }
 
   /**
@@ -341,12 +358,13 @@ export class YjsProvider {
   /**
    * 현재 환경에 맞는 WebSocket URL을 생성한다.
    *
+   * @param ticket 일회용 WebSocket ticket
    * @returns WebSocket URL
    */
-  private buildWsUrl(): string {
+  private buildWsUrl(ticket: string): string {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
-    return `${protocol}//${host}/ws/diagram/${this.options.diagramId}?token=${this.options.token}`;
+    return `${protocol}//${host}/ws/diagram/${this.options.diagramId}?ticket=${ticket}`;
   }
 
   /**
@@ -356,6 +374,17 @@ export class YjsProvider {
    */
   private emitConnectionStatus(status: ConnectionStatus): void {
     this.onConnectionStatusChange?.(status);
+  }
+
+  /**
+   * 사전 인코딩된 Y.Doc 전체 상태를 서버에 컴팩션 요청으로 전송한다.
+   * 호출 측에서 Y.encodeStateAsUpdate()를 한 번만 실행하여 이중 인코딩을 방지한다.
+   * 서버는 기존 ydocSnapshot을 이 압축 데이터로 교체한다.
+   *
+   * @param encodedState Y.encodeStateAsUpdate()로 사전 인코딩된 바이트 배열
+   */
+  requestCompaction(encodedState: Uint8Array): void {
+    this.sendMessage(WS_MSG_TYPE.COMPACTED_SNAPSHOT, encodedState);
   }
 
   /**

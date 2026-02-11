@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,17 +39,14 @@ public class DiagramRoomManager {
     /** 다이어그램 ID → 누적된 Yjs update 바이트 배열 리스트 */
     private final Map<Long, List<byte[]>> accumulatedUpdates = new ConcurrentHashMap<>();
 
+    /** 다이어그램 ID → 누적 update 총 크기 (바이트) */
+    private final Map<Long, AtomicLong> accumulatedSizes = new ConcurrentHashMap<>();
+
     /** 스냅샷이 변경되었지만 아직 DB에 저장되지 않은 다이어그램 ID 집합 */
     private final Set<Long> dirtyDiagramIds = ConcurrentHashMap.newKeySet();
 
     /** dirty 집합 복합 연산 동기화 전용 락 */
     private final Object dirtyLock = new Object();
-
-    /** 세션별 rate limit 카운터 (세션 ID → 카운터) */
-    private final Map<String, AtomicInteger> rateLimitCounters = new ConcurrentHashMap<>();
-
-    /** 세션별 rate limit 윈도우 시작 시간 (세션 ID → epoch millis) */
-    private final Map<String, AtomicLong> rateLimitWindows = new ConcurrentHashMap<>();
 
     /** 세션별 전송 동기화 락 객체 (세션 ID → 락) */
     private final Map<String, Object> sessionLocks = new ConcurrentHashMap<>();
@@ -56,19 +54,51 @@ public class DiagramRoomManager {
     /** 다이어그램별 flush 동기화 락 (@Scheduled flush와 연결 종료 flush 간 레이스 방지) */
     private final Map<Long, Object> flushLocks = new ConcurrentHashMap<>();
 
+    /** 사용자별 동시 WebSocket 연결 수 (loginId → 카운터) */
+    private final Map<String, AtomicInteger> userSessionCounts = new ConcurrentHashMap<>();
+
+    /**
+     * 세션별 rate limit 윈도우 상태.
+     *
+     * @param startMillis 윈도우 시작 시각 (epoch millis)
+     * @param count       윈도우 내 메시지 수
+     */
+    private record RateLimitWindow(long startMillis, int count) {}
+
+    /** 세션별 rate limit 상태 (세션 ID → 윈도우 AtomicReference) */
+    private final Map<String, AtomicReference<RateLimitWindow>> rateLimitState = new ConcurrentHashMap<>();
+
+    /**
+     * leave() 반환 결과.
+     *
+     * @param roomEmpty      방이 비었는지 여부
+     * @param drainedUpdates 방이 비었으면 원자적으로 drain된 Yjs update (비지 않으면 빈 배열)
+     */
+    public record LeaveResult(boolean roomEmpty, byte[] drainedUpdates) {}
+
     /**
      * 세션을 해당 다이어그램 방에 입장시킨다.
-     * 방당 최대 세션 수를 초과하면 입장을 거부한다.
+     * 사용자별 연결 수 제한 및 방당 최대 세션 수를 초과하면 입장을 거부한다.
      *
      * @param diagramId 다이어그램 ID
      * @param session   WebSocket 세션
-     * @return 입장 성공 여부 (false면 최대 인원 초과)
+     * @param loginId   사용자 로그인 ID
+     * @return 입장 성공 여부 (false면 제한 초과)
      */
-    public boolean join(Long diagramId, WebSocketSession session) {
+    public boolean join(Long diagramId, WebSocketSession session, String loginId) {
+        // 사용자별 연결 수 체크
+        final var userCount = userSessionCounts.computeIfAbsent(loginId, (k) -> new AtomicInteger(0));
+        if (userCount.incrementAndGet() > webSocketProperties.getMaxConnectionsPerUser()) {
+            userCount.decrementAndGet();
+            log.warn("사용자 {} 연결 수 초과 (최대 {})", loginId, webSocketProperties.getMaxConnectionsPerUser());
+            return false;
+        }
+
         final var sessions = rooms.computeIfAbsent(diagramId, (k) -> ConcurrentHashMap.newKeySet());
         // size() + add() 원자성 보장: TOCTOU 레이스 방지
         synchronized (sessions) {
             if (sessions.size() >= webSocketProperties.getMaxSessionsPerRoom()) {
+                userCount.decrementAndGet(); // 롤백
                 log.warn(
                     "다이어그램 {} 방 입장 거부: 최대 인원({}) 초과",
                     diagramId,
@@ -85,31 +115,42 @@ public class DiagramRoomManager {
 
     /**
      * 세션을 해당 다이어그램 방에서 퇴장시킨다.
+     * 방이 비면 누적 update를 원자적으로 drain하여 반환하고 인메모리 리소스를 정리한다.
      *
      * @param diagramId 다이어그램 ID
      * @param session   WebSocket 세션
-     * @return 방이 비었으면 true (마지막 사용자 퇴장)
+     * @param loginId   사용자 로그인 ID
+     * @return 퇴장 결과 (방이 비었는지 여부 + drain된 update)
      */
-    public boolean leave(Long diagramId, WebSocketSession session) {
-        final var sessions = rooms.get(diagramId);
-        if (sessions == null) {
-            return true;
+    public LeaveResult leave(Long diagramId, WebSocketSession session, String loginId) {
+        // 사용자별 연결 수 감소
+        final var userCount = userSessionCounts.get(loginId);
+        if (userCount != null && userCount.decrementAndGet() <= 0) {
+            userSessionCounts.remove(loginId);
         }
 
-        sessionLocks.remove(session.getId());
+        final var sessions = rooms.get(diagramId);
+        if (sessions == null) {
+            return new LeaveResult(true, new byte[0]);
+        }
 
-        // remove + isEmpty + rooms.remove 원자성 보장: join()과의 TOCTOU 레이스 방지
+        // remove + isEmpty + 리소스 정리 원자성 보장: join()과의 TOCTOU 레이스 방지
         synchronized (sessions) {
             sessions.remove(session);
+            sessionLocks.remove(session.getId());
             log.info("다이어그램 {} 방 퇴장: {} (남은 {}명)", diagramId, session.getId(), sessions.size());
 
             if (sessions.isEmpty()) {
-                // CAS: 동일 sessions 인스턴스일 때만 제거 (다른 스레드가 새 Set으로 교체했으면 무시)
+                // CAS: 동일 sessions 인스턴스일 때만 제거
                 rooms.remove(diagramId, sessions);
-                return true;
+                // 원자적으로 누적 update를 drain하고 인메모리 리소스 정리
+                final var drained = drainAndMergeUpdates(diagramId);
+                accumulatedUpdates.remove(diagramId);
+                accumulatedSizes.remove(diagramId);
+                return new LeaveResult(true, drained);
             }
         }
-        return false;
+        return new LeaveResult(false, new byte[0]);
     }
 
     /**
@@ -139,6 +180,7 @@ public class DiagramRoomManager {
 
     /**
      * 세션별 초당 메시지 수 제한을 검사한다.
+     * CAS 루프로 윈도우 전환과 카운터 증가를 원자적으로 수행한다.
      *
      * @param session WebSocket 세션
      * @return 제한 이내이면 true, 초과 시 false
@@ -147,18 +189,27 @@ public class DiagramRoomManager {
         final var sessionId = session.getId();
         final var now = System.currentTimeMillis();
 
-        final var window = rateLimitWindows.computeIfAbsent(sessionId, (k) -> new AtomicLong(now));
-        final var counter = rateLimitCounters.computeIfAbsent(sessionId, (k) -> new AtomicInteger(0));
+        final var ref = rateLimitState.computeIfAbsent(sessionId, (k) ->
+            new AtomicReference<>(new RateLimitWindow(now, 0))
+        );
 
-        // CAS로 윈도우 전환 원자화: 하나의 스레드만 리셋에 성공
-        final var windowStart = window.get();
-        if (now - windowStart > 1000 && window.compareAndSet(windowStart, now)) {
-            counter.set(1);
-            return true;
-            // CAS 실패: 다른 스레드가 이미 리셋 → 리셋 후 카운터로 계속
+        while (true) {
+            final var current = ref.get();
+            RateLimitWindow next;
+            if (now - current.startMillis() > 1000) {
+                // 새 윈도우 시작
+                next = new RateLimitWindow(now, 1);
+            } else {
+                if (current.count() >= webSocketProperties.getMaxMessagesPerSecond()) {
+                    return false;
+                }
+                next = new RateLimitWindow(current.startMillis(), current.count() + 1);
+            }
+            if (ref.compareAndSet(current, next)) {
+                return true;
+            }
+            // CAS 실패: 다른 스레드가 업데이트 → 재시도
         }
-
-        return counter.incrementAndGet() <= webSocketProperties.getMaxMessagesPerSecond();
     }
 
     /**
@@ -184,15 +235,23 @@ public class DiagramRoomManager {
     }
 
     /**
+     * 다이어그램별 flush 락을 제거한다.
+     * 마지막 사용자 퇴장 후 flush 완료 시점에 호출한다.
+     *
+     * @param diagramId 다이어그램 ID
+     */
+    public void removeFlushLock(Long diagramId) {
+        flushLocks.remove(diagramId);
+    }
+
+    /**
      * 세션의 rate limit 상태를 정리한다.
      * 연결 종료 시 호출한다.
      *
      * @param session WebSocket 세션
      */
     public void cleanupRateLimit(WebSocketSession session) {
-        final var sessionId = session.getId();
-        rateLimitCounters.remove(sessionId);
-        rateLimitWindows.remove(sessionId);
+        rateLimitState.remove(session.getId());
     }
 
     /**
@@ -201,13 +260,48 @@ public class DiagramRoomManager {
      *
      * @param diagramId 다이어그램 ID
      * @param update    순수 Yjs update 바이트 배열 (타입 바이트 제외)
+     * @return 추가 성공 여부 (false면 누적 크기 초과)
      */
-    public void appendUpdate(Long diagramId, byte[] update) {
+    public boolean appendUpdate(Long diagramId, byte[] update) {
+        // 누적 크기 체크
+        final var sizeCounter = accumulatedSizes.computeIfAbsent(diagramId, (k) -> new AtomicLong(0));
+        final var newSize = sizeCounter.addAndGet(update.length);
+        if (newSize > webSocketProperties.getMaxAccumulatedUpdatesSize()) {
+            sizeCounter.addAndGet(-update.length);
+            return false;
+        }
+
         accumulatedUpdates
             .computeIfAbsent(diagramId, (k) -> Collections.synchronizedList(new ArrayList<>()))
             .add(update);
         synchronized (dirtyLock) {
             dirtyDiagramIds.add(diagramId);
+        }
+        return true;
+    }
+
+    /**
+     * 단독 접속(세션 1개)일 때만 원자적으로 세션 수 확인 + 누적 update drain을 수행한다.
+     * sessions 락 안에서 수행하여 {@link #join}과의 TOCTOU 레이스를 방지한다.
+     *
+     * <p>컴팩션 시나리오에서 사용: {@code getSessionCount() == 1} 체크와
+     * {@code drainAndMergeUpdates()}를 별도로 호출하면, 그 사이에
+     * 새 세션이 {@code join()} + {@code appendUpdate()}를 수행하여
+     * drain된 update가 컴팩션 후 유실될 수 있다.</p>
+     *
+     * @param diagramId 다이어그램 ID
+     * @return drain된 병합 바이트 배열. 단독 접속이 아니거나 방이 없으면 {@code null}
+     */
+    public byte[] drainIfAlone(Long diagramId) {
+        final var sessions = rooms.get(diagramId);
+        if (sessions == null) {
+            return null;
+        }
+        synchronized (sessions) {
+            if (sessions.size() != 1) {
+                return null;
+            }
+            return drainAndMergeUpdates(diagramId);
         }
     }
 
@@ -228,6 +322,11 @@ public class DiagramRoomManager {
         synchronized (updates) {
             drained = new ArrayList<>(updates);
             updates.clear();
+            // 크기 카운터 리셋: drain~set(0) 사이에 appendUpdate가 끼어드는 것을 방지
+            final var sizeCounter = accumulatedSizes.get(diagramId);
+            if (sizeCounter != null) {
+                sizeCounter.set(0);
+            }
         }
 
         if (drained.isEmpty()) {
@@ -237,14 +336,21 @@ public class DiagramRoomManager {
     }
 
     /**
-     * 다이어그램 방 해산 시 관련 인메모리 리소스를 정리한다.
-     * 마지막 사용자 퇴장 후 flush 완료 시점에 호출한다.
+     * drain된 update를 인메모리 버퍼에 복원한다.
+     * flush 또는 컴팩션 실패 시 데이터 유실을 방지하기 위해 호출한다.
      *
-     * @param diagramId 다이어그램 ID
+     * @param diagramId     다이어그램 ID
+     * @param mergedUpdates drain된 병합 바이트 배열 (null 또는 빈 배열이면 무시)
      */
-    public void cleanupDiagramResources(Long diagramId) {
-        accumulatedUpdates.remove(diagramId);
-        flushLocks.remove(diagramId);
+    public void restoreUpdates(Long diagramId, byte[] mergedUpdates) {
+        if (mergedUpdates == null || mergedUpdates.length == 0) {
+            return;
+        }
+        final var updates = YjsUpdateFormat.decode(mergedUpdates);
+        for (final var update : updates) {
+            appendUpdate(diagramId, update);
+        }
+        log.info("drain된 update {}개 복원 완료 (diagramId={})", updates.size(), diagramId);
     }
 
     /**
@@ -281,6 +387,22 @@ public class DiagramRoomManager {
             dirtyDiagramIds.clear();
             return ids;
         }
+    }
+
+    /**
+     * 누적 update가 존재하는 모든 다이어그램 ID를 반환한다.
+     * 서버 종료 시 남은 update를 일괄 flush하기 위해 사용한다.
+     *
+     * @return 누적 update가 있는 다이어그램 ID 집합
+     */
+    public Set<Long> getAllDiagramIdsWithUpdates() {
+        final var ids = ConcurrentHashMap.<Long>newKeySet();
+        accumulatedUpdates.forEach((diagramId, updates) -> {
+            if (updates != null && !updates.isEmpty()) {
+                ids.add(diagramId);
+            }
+        });
+        return ids;
     }
 
     /**

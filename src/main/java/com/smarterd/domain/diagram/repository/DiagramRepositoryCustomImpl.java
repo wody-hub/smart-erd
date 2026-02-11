@@ -4,6 +4,7 @@ import static com.smarterd.domain.diagram.entity.QDiagram.diagram;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.smarterd.domain.diagram.entity.Diagram;
+import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 
@@ -41,11 +42,7 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
     @Override
     public Optional<byte[]> findYdocSnapshotById(Long id) {
         return Optional.ofNullable(
-            queryFactory
-                .select(diagram.ydocSnapshot)
-                .from(diagram)
-                .where(diagram.id.eq(id))
-                .fetchOne()
+            queryFactory.select(diagram.ydocSnapshot).from(diagram).where(diagram.id.eq(id)).fetchOne()
         );
     }
 
@@ -54,6 +51,7 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
         return queryFactory
             .update(diagram)
             .set(diagram.ydocSnapshot, snapshot)
+            .set(diagram.updatedAt, Instant.now())
             .where(diagram.id.eq(id))
             .execute();
     }

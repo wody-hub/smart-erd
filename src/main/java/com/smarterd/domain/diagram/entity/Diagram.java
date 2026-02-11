@@ -10,7 +10,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -50,9 +49,11 @@ public class Diagram extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT")
     private String content;
 
+    // TODO: Yjs 안정화 후 content 필드는 export 전용으로 전환, ydocSnapshot이 단일 소스가 되는 마이그레이션 전략 수립 필요
     /** Yjs CRDT 문서 스냅샷 (바이너리, BYTEA) */
     @Basic(fetch = FetchType.LAZY)
     @Column(columnDefinition = "BYTEA")
+    @Getter(AccessLevel.NONE)
     private byte[] ydocSnapshot;
 
     /**
@@ -88,10 +89,27 @@ public class Diagram extends BaseTimeEntity {
     }
 
     /**
+     * Y.Doc 스냅샷을 반환한다.
+     *
+     * <p>JPA 엔티티 특성상 영속성 컨텍스트가 배열 참조를 관리하므로
+     * 방어적 복사를 수행하지 않고 직접 참조를 반환한다.</p>
+     *
+     * @return Y.Doc 바이너리 스냅샷 (null 가능)
+     */
+    @SuppressWarnings("java:S2384")
+    public byte[] getYdocSnapshot() {
+        return ydocSnapshot;
+    }
+
+    /**
      * Y.Doc 스냅샷을 갱신한다.
+     *
+     * <p>JPA 엔티티 특성상 영속성 컨텍스트가 배열 참조를 관리하므로
+     * 방어적 복사를 수행하지 않고 직접 참조를 저장한다.</p>
      *
      * @param ydocSnapshot Y.Doc 바이너리 스냅샷
      */
+    @SuppressWarnings("java:S2384")
     public void updateYdocSnapshot(byte[] ydocSnapshot) {
         this.ydocSnapshot = ydocSnapshot;
     }
