@@ -45,6 +45,9 @@ export function yTablesMapToNodes(tablesMap: Y.Map<Y.Map<unknown>>): Node<TableN
           pk: (colYMap.get('pk') as boolean) ?? undefined,
           fk: (colYMap.get('fk') as boolean) ?? undefined,
           nullable: (colYMap.get('nullable') as boolean) ?? undefined,
+          logicalName: (colYMap.get('logicalName') as string) ?? undefined,
+          termId: (colYMap.get('termId') as number) ?? undefined,
+          domainId: (colYMap.get('domainId') as number) ?? undefined,
         });
       });
     }
@@ -132,8 +135,9 @@ export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
         );
       }
     });
-  } catch {
+  } catch (err) {
     // JSON → Y.Doc 마이그레이션 실패: 기존 JSON이 유효하지 않은 경우 빈 Y.Doc으로 시작
+    console.warn('[yjsBridge] migrateJsonToYDoc failed, starting with empty Y.Doc:', err);
   }
 }
 
@@ -151,6 +155,9 @@ export function createColumnYMap(column: Column): Y.Map<unknown> {
   if (column.pk) colYMap.set('pk', true);
   if (column.fk) colYMap.set('fk', true);
   if (column.nullable !== undefined) colYMap.set('nullable', column.nullable);
+  if (column.logicalName) colYMap.set('logicalName', column.logicalName);
+  if (column.termId) colYMap.set('termId', column.termId);
+  if (column.domainId) colYMap.set('domainId', column.domainId);
   return colYMap;
 }
 

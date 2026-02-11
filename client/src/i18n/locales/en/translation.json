@@ -172,7 +172,9 @@
       "fkConnect": "FK Connect",
       "fkConnectActive": "FK Connect (Active)",
       "autoLayout": "Auto Layout",
-      "export": "Export"
+      "export": "Export",
+      "validate": "Validate",
+      "validateActive": "Validate (active)"
     },
     "export": {
       "noNodes": "No tables to export",
@@ -204,13 +206,60 @@
       },
       "aria": {
         "tableName": "Table name",
+        "logicalName": "Column logical name",
         "columnName": "Column name",
         "columnType": "Column type",
         "togglePk": "Toggle primary key for {{name}}",
         "toggleFk": "Toggle foreign key for {{name}}",
         "toggleNullable": "Toggle nullable for {{name}}",
-        "deleteColumn": "Delete column {{name}}"
+        "deleteColumn": "Delete column {{name}}",
+        "validationWarning": "{{name}} dictionary mismatch warning",
+        "domainBadge": "{{colName}} domain: {{domainName}}"
       }
+    },
+    "domain": {
+      "baseTermDomains": "Term Domains",
+      "allDomains": "All Domains",
+      "none": "None",
+      "searchPlaceholder": "Search domains..."
+    },
+    "autocomplete": {
+      "placeholder": "Enter logical name...",
+      "noResults": "No matching terms",
+      "registerNew": "+ Register new term",
+      "compoundHeading": "Compound term",
+      "compoundRegistered": "Compound term registered and applied",
+      "compoundExisting": "Existing term applied",
+      "compoundFailed": "Failed to register compound term",
+      "compoundRetry": "Term already registered. Please select again"
+    },
+    "quickTerm": {
+      "title": "Quick Term Registration",
+      "submit": "Register & Apply",
+      "submitting": "Registering...",
+      "createDomain": "New Domain",
+      "success": "Term registered and applied",
+      "failed": "Failed to register term"
+    },
+    "quickDomain": {
+      "title": "Quick Domain Registration",
+      "success": "Domain registered",
+      "failed": "Failed to register domain"
+    },
+    "validation": {
+      "panelTitle": "Dictionary Validation",
+      "summary": "{{matched}}/{{total}} columns matched",
+      "status": {
+        "matched": "Matched",
+        "nameMismatch": "Name mismatch",
+        "typeMismatch": "Type mismatch",
+        "unregistered": "Not registered",
+        "unchecked": "Unchecked"
+      },
+      "emptyDictionary": "No dictionary data. Register terms in the data dictionary first.",
+      "allMatched": "All columns match the dictionary.",
+      "expected": "Expected: {{value}}",
+      "actual": "Actual: {{value}}"
     }
   },
   "dictionary": {

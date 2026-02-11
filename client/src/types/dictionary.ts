@@ -104,6 +104,32 @@ export interface BulkSaveResponse {
   failedCount: number;
 }
 
+/** 복합 용어 해석 결과 */
+export interface CompoundResolution {
+  /** 원본 입력값 (예: "사용자 아이디") */
+  query: string;
+  /** 해석된 물리명 (예: "user_id") */
+  physicalName: string;
+  /** 매칭된 기본 용어 목록 */
+  baseTerms: CompoundBaseTerm[];
+  /** 상속 도메인 ID (마지막 기본 용어 기준, ERwin class word) */
+  domainId: number | null;
+  /** 상속 도메인의 물리 타입 */
+  physicalType?: string;
+}
+
+/** 복합 용어 분해에 사용된 개별 기본 용어 */
+export interface CompoundBaseTerm {
+  /** 기본 용어 논리명 */
+  logicalName: string;
+  /** 기본 용어 물리명 */
+  physicalName: string;
+  /** 기본 용어 Term ID */
+  termId: number;
+  /** 기본 용어에 연결된 도메인 ID (nullable) */
+  domainId: number | null;
+}
+
 /** 키워드 추천 요청 */
 export interface SuggestRequest {
   /** 한글 키워드 */

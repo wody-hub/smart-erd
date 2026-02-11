@@ -47,6 +47,10 @@ interface ERDCanvasProps {
   diagramName?: string;
   /** YjsProvider 인스턴스 (실시간 협업 시 커서 발행용) */
   provider?: YjsProvider | null;
+  /** 유효성 검사 패널 열림 여부 */
+  validationOpen?: boolean;
+  /** 유효성 검사 패널 토글 핸들러 */
+  onToggleValidation?: () => void;
 }
 
 /** 삭제 다이얼로그 상태 */
@@ -71,7 +75,12 @@ interface DeleteDialogState {
  * @param props.diagramName 내보내기 시 파일명에 사용할 다이어그램 이름
  * @param props.provider   YjsProvider 인스턴스 (실시간 협업 시 커서 발행용)
  */
-export default function ERDCanvas({ diagramName = 'diagram', provider }: ERDCanvasProps) {
+export default function ERDCanvas({
+  diagramName = 'diagram',
+  provider,
+  validationOpen,
+  onToggleValidation,
+}: ERDCanvasProps) {
   /** 캔버스 컨테이너 ref (Awareness 커서 추적용) */
   const canvasRef = useRef<HTMLDivElement>(null);
   useAwareness(provider ?? null, canvasRef);
@@ -108,10 +117,14 @@ export default function ERDCanvas({ diagramName = 'diagram', provider }: ERDCanv
    */
   const openDeleteDialog = (edgeId: string) => {
     const edge = edges.find((e) => e.id === edgeId);
-    if (!edge) return;
+    if (!edge) {
+      return;
+    }
 
     const childNode = nodes.find((n) => n.id === edge.target);
-    if (!childNode) return;
+    if (!childNode) {
+      return;
+    }
 
     let fkColumnsText = '';
     if (edge.targetHandle) {
@@ -220,6 +233,8 @@ export default function ERDCanvas({ diagramName = 'diagram', provider }: ERDCanv
           onExportJpg={exportJpg}
           onExportSvg={exportSvg}
           onExportPdf={exportPdf}
+          validationOpen={validationOpen}
+          onToggleValidation={onToggleValidation}
         />
       </ReactFlow>
 

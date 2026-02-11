@@ -7,6 +7,8 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import ERDCanvas from '@/components/erd/ERDCanvas';
+import ValidationPanel from '@/components/erd/ValidationPanel';
+import { ErdDictionaryProvider } from '@/components/erd/ErdDictionaryContext';
 import useCanvasStore from '@/stores/useCanvasStore';
 import useCollaborationStore from '@/stores/useCollaborationStore';
 import { fetchDiagram, saveDiagram } from '@/api/diagramApi';
@@ -37,6 +39,8 @@ export default function DiagramPage() {
 
   /** 헤더에 표시할 다이어그램 이름 */
   const [diagramName, setDiagramName] = useState('');
+  /** 유효성 검사 패널 열림 상태 */
+  const [validationOpen, setValidationOpen] = useState(false);
 
   const prepareBackup = useCanvasStore((s) => s.prepareBackup);
   const markBackedUp = useCanvasStore((s) => s.markBackedUp);
@@ -75,6 +79,9 @@ export default function DiagramPage() {
     });
   };
 
+  /** 유효성 검사 패널 토글 핸들러 */
+  const handleToggleValidation = () => setValidationOpen((prev) => !prev);
+
   useAutoBackup(saveMutation, teamId!, projectId!, diagramId!);
   useHotkeys(KEYBINDINGS.SAVE, handleSave, { preventDefault: true });
 
@@ -112,20 +119,28 @@ export default function DiagramPage() {
 
   return (
     <ReactFlowProvider>
-      <div className="h-screen flex flex-col">
-        <Header
-          diagramName={diagramName}
-          onSave={handleSave}
-          saving={saveMutation.isPending}
-          connectionStatus={connectionStatus}
-        />
-        <div className="flex flex-1 overflow-hidden">
-          <Sidebar />
-          <main className="flex-1">
-            <ERDCanvas diagramName={diagramName || 'diagram'} provider={providerRef.current} />
-          </main>
+      <ErdDictionaryProvider teamId={teamId!}>
+        <div className="h-screen flex flex-col">
+          <Header
+            diagramName={diagramName}
+            onSave={handleSave}
+            saving={saveMutation.isPending}
+            connectionStatus={connectionStatus}
+          />
+          <div className="flex flex-1 overflow-hidden">
+            <Sidebar />
+            <main className="flex-1">
+              <ERDCanvas
+                diagramName={diagramName || 'diagram'}
+                provider={providerRef.current}
+                validationOpen={validationOpen}
+                onToggleValidation={handleToggleValidation}
+              />
+            </main>
+            {validationOpen && <ValidationPanel onClose={() => setValidationOpen(false)} />}
+          </div>
         </div>
-      </div>
+      </ErdDictionaryProvider>
     </ReactFlowProvider>
   );
 }

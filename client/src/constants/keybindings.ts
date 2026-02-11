@@ -7,3 +7,15 @@ export const KEYBINDINGS = {
   /** 현재 모드를 취소한다 (Escape) */
   ESCAPE: 'escape',
 } as const;
+
+/** DOM KeyboardEvent.key 상수. React onKeyDown 핸들러에서 사용한다. */
+export const KEYS = {
+  /** Escape 키 */
+  ESCAPE: 'Escape',
+  /** Enter 키 */
+  ENTER: 'Enter',
+  /** 위쪽 화살표 */
+  ARROW_UP: 'ArrowUp',
+  /** 아래쪽 화살표 */
+  ARROW_DOWN: 'ArrowDown',
+} as const;

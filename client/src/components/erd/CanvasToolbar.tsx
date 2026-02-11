@@ -1,4 +1,4 @@
-import { Link2, LayoutGrid, Download } from 'lucide-react';
+import { Link2, LayoutGrid, Download, ClipboardCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@xyflow/react';
 import { Button } from '@/components/ui/button';
@@ -26,20 +26,26 @@ interface CanvasToolbarProps {
   onExportSvg: () => void;
   /** PDF 내보내기 핸들러 */
   onExportPdf: () => void;
+  /** 유효성 검사 패널 열림 여부 */
+  validationOpen?: boolean;
+  /** 유효성 검사 패널 토글 핸들러 */
+  onToggleValidation?: () => void;
 }
 
 /**
  * ERD 캔버스 플로팅 툴바.
  *
- * 캔버스 상단 중앙에 FK Connect, Auto Layout, Export 버튼을 표시한다.
+ * 캔버스 상단 중앙에 FK Connect, Auto Layout, Export, Validate 버튼을 표시한다.
  *
- * @param props.fkMode          FK 연결 모드 활성 여부
- * @param props.onToggleFkMode  FK 연결 모드 토글 핸들러
- * @param props.onAutoLayout    자동 배치 실행 핸들러
- * @param props.onExportPng     PNG 내보내기 핸들러
- * @param props.onExportJpg     JPG 내보내기 핸들러
- * @param props.onExportSvg     SVG 내보내기 핸들러
- * @param props.onExportPdf     PDF 내보내기 핸들러
+ * @param props.fkMode              FK 연결 모드 활성 여부
+ * @param props.onToggleFkMode      FK 연결 모드 토글 핸들러
+ * @param props.onAutoLayout        자동 배치 실행 핸들러
+ * @param props.onExportPng         PNG 내보내기 핸들러
+ * @param props.onExportJpg         JPG 내보내기 핸들러
+ * @param props.onExportSvg         SVG 내보내기 핸들러
+ * @param props.onExportPdf         PDF 내보내기 핸들러
+ * @param props.validationOpen      유효성 검사 패널 열림 여부
+ * @param props.onToggleValidation  유효성 검사 패널 토글 핸들러
  */
 export default function CanvasToolbar({
   fkMode,
@@ -49,6 +55,8 @@ export default function CanvasToolbar({
   onExportJpg,
   onExportSvg,
   onExportPdf,
+  validationOpen,
+  onToggleValidation,
 }: CanvasToolbarProps) {
   const { t } = useTranslation();
 
@@ -94,6 +102,20 @@ export default function CanvasToolbar({
             <DropdownMenuItem onClick={onExportPdf}>PDF</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        {onToggleValidation && (
+          <Button
+            variant={validationOpen ? 'default' : 'ghost'}
+            size="sm"
+            onClick={onToggleValidation}
+            className={cn('gap-1.5', validationOpen && 'bg-primary text-primary-foreground')}
+            aria-label={
+              validationOpen ? t('erd.toolbar.validateActive') : t('erd.toolbar.validate')
+            }
+          >
+            <ClipboardCheck className="h-4 w-4" />
+            {t('erd.toolbar.validate')}
+          </Button>
+        )}
       </div>
     </Panel>
   );

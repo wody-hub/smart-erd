@@ -37,6 +37,8 @@
     --erd-handle: 215 16.3% 46.9%;
     --erd-handle-border: 215.4 16.3% 36.9%;
     --erd-warning: 47.9 95.8% 53.1%;
+    --erd-domain: 270 60% 55%;
+    --erd-domain-foreground: 0 0% 100%;
 
     --erd-status-connected: 142.1 76.2% 36.3%;
     --erd-status-connecting: 47.9 95.8% 53.1%;
@@ -53,6 +55,11 @@
 
     --success: 142.1 76.2% 36.3%;
     --success-foreground: 210 40% 98%;
+
+    --erd-validation-matched: 142.1 76.2% 36.3%;
+    --erd-validation-mismatch: 37.7 92.1% 50.2%;
+    --erd-validation-unregistered: 0 84.2% 60.2%;
+    --erd-validation-unchecked: 215.4 16.3% 46.9%;
   }
 
   .dark {
@@ -88,6 +95,8 @@
     --erd-handle: 215 20.2% 65.1%;
     --erd-handle-border: 215 20.2% 55.1%;
     --erd-warning: 47.9 95.8% 53.1%;
+    --erd-domain: 270 50% 65%;
+    --erd-domain-foreground: 0 0% 100%;
 
     --erd-status-connected: 142.1 70.6% 45.3%;
     --erd-status-connecting: 47.9 95.8% 53.1%;
@@ -104,6 +113,11 @@
 
     --success: 142.1 70.6% 45.3%;
     --success-foreground: 210 40% 98%;
+
+    --erd-validation-matched: 142.1 70.6% 45.3%;
+    --erd-validation-mismatch: 37.7 92.1% 50.2%;
+    --erd-validation-unregistered: 0 62.8% 50.6%;
+    --erd-validation-unchecked: 215 20.2% 65.1%;
   }
 }
 

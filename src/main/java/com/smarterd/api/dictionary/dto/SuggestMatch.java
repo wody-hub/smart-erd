@@ -15,5 +15,5 @@ public record SuggestMatch(
     @Schema(description = "입력 토큰", example = "사용자") String keyword,
     @Schema(description = "매칭 여부", example = "true") boolean matched,
     @Schema(description = "매칭된 물리명", example = "user") String physicalName,
-    @Schema(description = "매칭 출처", example = "용어: 사용자 → user") String source
+    @Schema(description = "매칭 출처 (exact, compound, partial)", example = "exact") String source
 ) {}

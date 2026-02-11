@@ -6,8 +6,8 @@ import type { TableNodeData } from '@/types/erd';
 const NODE_WIDTH = 280;
 /** 테이블 노드 헤더 높이 (px) */
 const HEADER_HEIGHT = 40;
-/** 컬럼 행 높이 (px) */
-const ROW_HEIGHT = 28;
+/** 컬럼 행 높이 (px) — 2행 레이아웃 (논리명 + 물리명/타입) */
+const ROW_HEIGHT = 52;
 /** Add Column 버튼 영역 높이 (px) */
 const FOOTER_HEIGHT = 32;
 
@@ -32,7 +32,9 @@ export function applyDagreLayout(
   nodes: Node<TableNodeData>[],
   edges: Edge[],
 ): Node<TableNodeData>[] {
-  if (nodes.length === 0) return nodes;
+  if (nodes.length === 0) {
+    return nodes;
+  }
 
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));

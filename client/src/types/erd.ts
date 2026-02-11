@@ -6,7 +6,7 @@ import type { Node, Edge } from '@xyflow/react';
 export interface Column {
   /** 컬럼 고유 식별자 (Handle ID 구성에 사용: `{nodeId}-{colId}-source/target`) */
   id: string;
-  /** 컬럼 이름 */
+  /** 물리명 (예: "user_name") */
   name: string;
   /** 데이터 타입 (예: "VARCHAR(50)", "BIGINT") */
   type: string;
@@ -16,6 +16,12 @@ export interface Column {
   fk?: boolean;
   /** NULL 허용 여부 */
   nullable?: boolean;
+  /** 논리명 (예: "사용자명") — 데이터 사전 연동용 */
+  logicalName?: string;
+  /** 연결된 Term ID — 데이터 사전 연동용 */
+  termId?: number;
+  /** 연결된 Domain ID — 데이터 사전 연동용 */
+  domainId?: number;
 }
 
 /**

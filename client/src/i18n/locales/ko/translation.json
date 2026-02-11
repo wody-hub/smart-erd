@@ -171,7 +171,9 @@
       "fkConnect": "FK 연결",
       "fkConnectActive": "FK 연결 (활성)",
       "autoLayout": "자동 정렬",
-      "export": "내보내기"
+      "export": "내보내기",
+      "validate": "유효성 검사",
+      "validateActive": "유효성 검사 (활성)"
     },
     "export": {
       "noNodes": "내보낼 테이블이 없습니다",
@@ -203,13 +205,60 @@
       },
       "aria": {
         "tableName": "테이블 이름",
+        "logicalName": "컬럼 논리명",
         "columnName": "컬럼 이름",
         "columnType": "컬럼 타입",
         "togglePk": "{{name}} 기본키 토글",
         "toggleFk": "{{name}} 외래키 토글",
         "toggleNullable": "{{name}} 널 허용 토글",
-        "deleteColumn": "컬럼 {{name}} 삭제"
+        "deleteColumn": "컬럼 {{name}} 삭제",
+        "validationWarning": "{{name}} 사전 불일치 경고",
+        "domainBadge": "{{colName}} 도메인: {{domainName}}"
       }
+    },
+    "domain": {
+      "baseTermDomains": "조합 용어 도메인",
+      "allDomains": "전체 도메인",
+      "none": "없음",
+      "searchPlaceholder": "도메인 검색..."
+    },
+    "autocomplete": {
+      "placeholder": "논리명 입력...",
+      "noResults": "매칭 결과 없음",
+      "registerNew": "+ 신규 용어 등록",
+      "compoundHeading": "복합 용어 조합",
+      "compoundRegistered": "복합 용어가 사전에 등록되고 적용되었습니다",
+      "compoundExisting": "기존 용어가 적용되었습니다",
+      "compoundFailed": "복합 용어 등록에 실패했습니다",
+      "compoundRetry": "용어가 이미 등록되었습니다. 다시 선택해 주세요"
+    },
+    "quickTerm": {
+      "title": "빠른 용어 등록",
+      "submit": "등록 및 적용",
+      "submitting": "등록 중...",
+      "createDomain": "새 도메인",
+      "success": "용어가 등록되고 적용되었습니다",
+      "failed": "용어 등록에 실패했습니다"
+    },
+    "quickDomain": {
+      "title": "빠른 도메인 등록",
+      "success": "도메인이 등록되었습니다",
+      "failed": "도메인 등록에 실패했습니다"
+    },
+    "validation": {
+      "panelTitle": "사전 유효성 검사",
+      "summary": "{{matched}}/{{total}} 컬럼 일치",
+      "status": {
+        "matched": "일치",
+        "nameMismatch": "물리명 불일치",
+        "typeMismatch": "타입 불일치",
+        "unregistered": "사전 미등록",
+        "unchecked": "미검사"
+      },
+      "emptyDictionary": "사전 데이터가 없습니다. 데이터 사전에서 용어를 먼저 등록해 주세요.",
+      "allMatched": "모든 컬럼이 사전과 일치합니다.",
+      "expected": "예상: {{value}}",
+      "actual": "현재: {{value}}"
     }
   },
   "dictionary": {
