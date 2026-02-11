@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Trash2, FileText, Upload } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText, Upload, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,7 +18,13 @@ import ConfirmDialog from '@/components/ui/confirm-dialog';
 import Spinner from '@/components/ui/spinner';
 import TermFormDialog from '@/components/dictionary/TermFormDialog';
 import BulkUploadDialog from '@/components/dictionary/BulkUploadDialog';
-import { fetchTerms, createTerm, updateTerm, deleteTerm } from '@/api/termApi';
+import {
+  fetchTerms,
+  createTerm,
+  updateTerm,
+  deleteTerm,
+  downloadTermTemplate,
+} from '@/api/termApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
 import type { Term, TermFormData } from '@/types/dictionary';
@@ -76,6 +82,12 @@ export default function TermTab() {
     onError: (err) => toast.error(getErrorMessage(err, t('dictionary.term.toast.deleteFailed'))),
   });
 
+  const downloadTemplateMutation = useMutation({
+    mutationFn: () => downloadTermTemplate(teamId!),
+    onError: (err) =>
+      toast.error(getErrorMessage(err, t('dictionary.upload.toast.templateFailed'))),
+  });
+
   /**
    * 생성 버튼 클릭 핸들러.
    */
@@ -107,6 +119,13 @@ export default function TermTab() {
     }
   };
 
+  /**
+   * 용어 업로드 템플릿 다운로드 핸들러.
+   */
+  const handleTemplateDownload = () => {
+    downloadTemplateMutation.mutate();
+  };
+
   if (isLoading) {
     return <Spinner text={t('common.loading')} />;
   }
@@ -114,6 +133,14 @@ export default function TermTab() {
   return (
     <div>
       <div className="flex justify-end gap-2 mb-4">
+        <Button
+          variant="outline"
+          onClick={handleTemplateDownload}
+          disabled={downloadTemplateMutation.isPending}
+        >
+          <Download className="h-4 w-4 mr-2" />
+          {t('dictionary.upload.template')}
+        </Button>
         <Button variant="outline" onClick={() => setUploadOpen(true)}>
           <Upload className="h-4 w-4 mr-2" />
           {t('dictionary.upload.button')}
