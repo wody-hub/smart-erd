@@ -53,7 +53,8 @@
 ### 6. Null Safety (MUST)
 
 - [ ] 루트 패키지 `@NonNullApi` 유지 여부
-- [ ] Service 클래스 `@SuppressWarnings("null")` 적용 여부
+- [ ] `@SuppressWarnings("null")`가 실제 null 분석 경고가 발생하는 곳에만 최소 범위(메서드/파라미터 레벨)로 적용되었는지 확인
+- [ ] 경고 없는 클래스에 관례적으로 `@SuppressWarnings("null")`를 클래스 레벨에 붙이지 않았는지 확인
 
 ### 7. QueryDSL Custom Repository (해당 시)
 

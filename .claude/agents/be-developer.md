@@ -52,7 +52,8 @@ Spring Boot 백엔드 개발 전문 에이전트. Java 25 + Spring Boot 3.5.10 �
 ### Null Safety
 
 - 루트 패키지 `@NonNullApi`
-- Service 클래스: `@SuppressWarnings("null")`
+- `@SuppressWarnings("null")`는 실제 null 분석 경고가 발생하는 곳에만 최소 범위(메서드/파라미터 레벨)로 적용
+- 클래스 레벨에 관례적으로 붙이지 않음
 
 ### Package Convention
 

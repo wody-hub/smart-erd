@@ -325,11 +325,26 @@ teamMemberRepository.save(newMember);
 #### Null Safety
 
 - 루트 패키지에 `@NonNullApi` 선언 → 하위 전체 non-null 기본 정책
-- JPA 리포지토리 호출 시 null 분석 경고를 억제하기 위해 서비스 클래스에 `@SuppressWarnings("null")` 적용
+- `@SuppressWarnings("null")`는 **실제 null 분석 경고가 발생하는 곳에만** 최소 범위로 적용한다
+  - 클래스 레벨 적용 금지 — 메서드 레벨 또는 파라미터 레벨로 범위를 좁힌다
+  - JPA 리포지토리 호출, Spring 프레임워크 인터페이스 구현(`Validator.supports()` 등)에서 주로 발생
+  - 경고가 없는 클래스에 관례적으로 붙이지 않는다
 
 ```java
+// Good — 경고가 발생하는 메서드에만 적용
 @Service
-@SuppressWarnings("null")          // JPA 리포지토리 null 분석 경고 억제
+public class TeamService {
+
+    @SuppressWarnings("null")
+    public Team findById(Long id) {
+        return teamRepository.findByIdWithOwner(id)
+            .orElseThrow(() -> new EntityNotFoundException("error.not-found.team", id));
+    }
+}
+
+// Bad — 클래스 전체에 일괄 적용
+@Service
+@SuppressWarnings("null")
 public class TeamService { ... }
 ```
 

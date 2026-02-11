@@ -487,7 +487,10 @@ member.changeRole(request.role());  // Good — dirty checking
 ### Null Safety
 
 - Root package `@NonNullApi` → non-null by default
-- Service classes: `@SuppressWarnings("null")` to suppress JPA repository null analysis warnings
+- `@SuppressWarnings("null")` is applied **only where actual null analysis warnings occur**, at the narrowest possible scope
+  - Do NOT apply at class level — use method-level or parameter-level suppression instead
+  - Common sources: JPA repository calls, Spring framework interface implementations (`Validator.supports()`, etc.)
+  - Do NOT add this annotation conventionally to classes that have no warnings
 
 ### QueryDSL Custom Repository Pattern
 
