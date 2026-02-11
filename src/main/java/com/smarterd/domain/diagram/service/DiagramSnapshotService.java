@@ -5,7 +5,6 @@ import com.smarterd.domain.diagram.websocket.DiagramRoomManager;
 import com.smarterd.domain.diagram.websocket.YjsUpdateFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;

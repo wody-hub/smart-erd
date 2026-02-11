@@ -36,7 +36,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Slf4j
 @Service
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class DomainBulkService extends AbstractBulkService<DomainBulkService.DomainUploadRow> {
 
     private static final int PHYSICAL_TYPE_MAX = 50;
@@ -224,9 +223,12 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     public ExcelUtils.ExcelData generateTemplate() {
         final var titles = List.of("논리명 (필수)", "물리 타입 (필수)", "설명");
         final var templateData = List.of(new TemplateRow("금액", "DECIMAL(15,2)", "화폐 금액"));
-        final var utils = new ExcelUtils<>(templateData, titles);
-        utils.sheetName("도메인");
-        return utils.toExcel();
+        try (final var utils = new ExcelUtils<>(templateData, titles)) {
+            utils.sheetName("도메인");
+            return utils.toExcel();
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException("엑셀 템플릿 생성 중 리소스 해제 실패", e);
+        }
     }
 
     /**

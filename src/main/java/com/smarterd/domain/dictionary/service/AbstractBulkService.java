@@ -160,6 +160,7 @@ public abstract class AbstractBulkService<R> {
      * @param args   메시지 인자
      * @return 해석된 메시지 문자열
      */
+    @SuppressWarnings("null")
     protected String msg(String code, Locale locale, Object... args) {
         return messageSource.getMessage(code, args, locale);
     }

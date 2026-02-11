@@ -28,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class DictionarySuggestService {
 
     /** 용어 레포지토리 */
