@@ -52,30 +52,30 @@ public class RedisWsTicketStore implements WsTicketStore {
 
     static {
         CONSUME_SCRIPT = new DefaultRedisScript<>();
-        CONSUME_SCRIPT.setScriptText(
-            "local v = redis.call('GET', KEYS[1]); " +
-                "if v then " +
-                "redis.call('DEL', KEYS[1]); " +
-                "redis.call('SREM', KEYS[2], ARGV[1]); " +
-                "redis.call('DEL', KEYS[3]); " +
-                "end; " +
-                "return v;"
-        );
+        CONSUME_SCRIPT.setScriptText("""
+            local v = redis.call('GET', KEYS[1])
+            if v then
+                redis.call('DEL', KEYS[1])
+                redis.call('SREM', KEYS[2], ARGV[1])
+                redis.call('DEL', KEYS[3])
+            end
+            return v
+            """);
         CONSUME_SCRIPT.setResultType(String.class);
 
         COUNT_SCRIPT = new DefaultRedisScript<>();
-        COUNT_SCRIPT.setScriptText(
-            "local members = redis.call('SMEMBERS', KEYS[1]); " +
-                "local count = 0; " +
-                "for _, ticket in ipairs(members) do " +
-                "if redis.call('EXISTS', ARGV[1] .. ticket) == 1 then " +
-                "count = count + 1; " +
-                "else " +
-                "redis.call('SREM', KEYS[1], ticket); " +
-                "end; " +
-                "end; " +
-                "return count;"
-        );
+        COUNT_SCRIPT.setScriptText("""
+            local members = redis.call('SMEMBERS', KEYS[1])
+            local count = 0
+            for _, ticket in ipairs(members) do
+                if redis.call('EXISTS', ARGV[1] .. ticket) == 1 then
+                    count = count + 1
+                else
+                    redis.call('SREM', KEYS[1], ticket)
+                end
+            end
+            return count
+            """);
         COUNT_SCRIPT.setResultType(Long.class);
     }
 
