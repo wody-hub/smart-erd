@@ -17,6 +17,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
  * <p>수평 확장(scale-out) 환경에서 서버 간 ticket 공유를 지원한다.
  * ticket TTL은 Redis EXPIRE로 자동 관리되므로 별도 정리 스케줄러가 불필요하다.</p>
  */
+@SuppressWarnings("null")
 public class RedisWsTicketStore implements WsTicketStore {
 
     private static final Logger log = LoggerFactory.getLogger(RedisWsTicketStore.class);

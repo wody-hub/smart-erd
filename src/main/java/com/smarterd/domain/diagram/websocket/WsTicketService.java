@@ -31,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class WsTicketService {
 
     private static final Logger log = LoggerFactory.getLogger(WsTicketService.class);
