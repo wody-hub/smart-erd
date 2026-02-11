@@ -320,7 +320,8 @@
       },
       "toast": {
         "success": "일괄 업로드가 완료되었습니다",
-        "failed": "일괄 업로드에 실패했습니다"
+        "failed": "일괄 업로드에 실패했습니다",
+        "templateFailed": "템플릿 다운로드에 실패했습니다"
       },
       "error": {
         "unsupportedFormat": "지원하지 않는 파일 형식입니다",

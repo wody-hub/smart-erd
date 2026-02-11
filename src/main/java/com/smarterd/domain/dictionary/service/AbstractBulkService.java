@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.context.MessageSource;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -163,5 +164,79 @@ public abstract class AbstractBulkService<R> {
     @SuppressWarnings("null")
     protected String msg(String code, Locale locale, Object... args) {
         return messageSource.getMessage(code, args, locale);
+    }
+
+    /**
+     * 엑셀 워크북에 가이드 시트를 추가한다.
+     *
+     * <p>템플릿 엑셀 다운로드 시 데이터 시트 옆에 사용 안내 시트를 생성한다.
+     * 가이드 내용은 {@code template.guide.*} 메시지 코드에서 로케일에 맞게 해석된다.</p>
+     *
+     * @param workbook     대상 워크북
+     * @param locale       로케일
+     * @param templateType 템플릿 유형
+     */
+    protected void addGuideSheet(Workbook workbook, Locale locale, TemplateType templateType) {
+        final var sheetName = msg("template.guide.sheet-name", locale);
+        final var guideSheet = workbook.createSheet(sheetName);
+
+        var rowIdx = 0;
+
+        // 타이틀
+        final var titleRow = guideSheet.createRow(rowIdx++);
+        final var titleCell = titleRow.createCell(0);
+        titleCell.setCellValue(msg("template.guide.title", locale));
+        final var font = workbook.createFont();
+        font.setBold(true);
+        font.setFontHeightInPoints((short) 14);
+        final var titleStyle = workbook.createCellStyle();
+        titleStyle.setFont(font);
+        titleCell.setCellStyle(titleStyle);
+
+        rowIdx++; // 빈 행
+
+        // 안내 항목
+        final var prefix = "template.guide." + templateType.key() + ".instruction.";
+        for (var i = 1; i <= templateType.instructionCount(); i++) {
+            final var row = guideSheet.createRow(rowIdx++);
+            row.createCell(0).setCellValue(msg(prefix + i, locale));
+        }
+
+        guideSheet.autoSizeColumn(0);
+    }
+
+    /**
+     * 템플릿 유형 열거형.
+     *
+     * <p>메시지 코드 키와 가이드 항목 수를 캡슐화하여 타입 안전성을 보장한다.</p>
+     */
+    protected enum TemplateType {
+        /** 도메인 템플릿 */
+        DOMAIN("domain", 7),
+
+        /** 용어 템플릿 */
+        TERM("term", 8);
+
+        private final String key;
+        private final int instructionCount;
+
+        TemplateType(String key, int instructionCount) {
+            this.key = key;
+            this.instructionCount = instructionCount;
+        }
+
+        /**
+         * @return 메시지 코드에 사용되는 키 (예: {@code "domain"}, {@code "term"})
+         */
+        public String key() {
+            return key;
+        }
+
+        /**
+         * @return 가이드 시트의 안내 항목 수
+         */
+        public int instructionCount() {
+            return instructionCount;
+        }
     }
 }

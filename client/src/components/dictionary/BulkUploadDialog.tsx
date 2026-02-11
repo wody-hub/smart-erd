@@ -186,11 +186,15 @@ export default function BulkUploadDialog({ open, onOpenChange, mode }: BulkUploa
   };
 
   /** 템플릿 다운로드 */
-  const handleTemplateDownload = () => {
-    if (mode === 'domain') {
-      downloadDomainTemplate(teamId!);
-    } else {
-      downloadTermTemplate(teamId!);
+  const handleTemplateDownload = async () => {
+    try {
+      if (mode === 'domain') {
+        await downloadDomainTemplate(teamId!);
+      } else {
+        await downloadTermTemplate(teamId!);
+      }
+    } catch (err) {
+      toast.error(getErrorMessage(err, t('dictionary.upload.toast.templateFailed')));
     }
   };
 

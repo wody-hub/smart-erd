@@ -1,4 +1,5 @@
 import axiosInstance from './axiosInstance';
+import { downloadBlob } from '@/lib/download';
 import type {
   Term,
   TermFormData,
@@ -98,16 +99,14 @@ export async function bulkSaveTerms(
 /**
  * 용어 템플릿 엑셀을 다운로드한다.
  *
+ * Content-Disposition 헤더에서 서버가 전달한 파일명을 추출하여 사용한다.
+ * Accept-Language 헤더가 자동 전송되므로 선택 언어에 맞는 템플릿이 반환된다.
+ *
  * @param teamId 대상 팀 ID
  */
 export async function downloadTermTemplate(teamId: string): Promise<void> {
   const res = await axiosInstance.get(`/teams/${teamId}/terms/upload/template`, {
     responseType: 'blob',
   });
-  const url = URL.createObjectURL(res.data as Blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'term-template.xlsx';
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(res, 'term-template.xlsx');
 }

@@ -188,6 +188,7 @@ public class DomainController {
      *
      * @param jwt      인증된 JWT 토큰
      * @param teamId   팀 ID
+     * @param locale   요청 로케일 (Accept-Language 헤더에서 해석)
      * @param response HTTP 응답
      * @throws IOException 엑셀 생성 실패 시
      */
@@ -197,9 +198,10 @@ public class DomainController {
     public void downloadTemplate(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        Locale locale,
         HttpServletResponse response
     ) throws IOException {
-        final var excelData = domainBulkService.generateTemplate();
+        final var excelData = domainBulkService.generateTemplate(jwt.getSubject(), teamId, locale);
         ExcelUtils.download(excelData, response, "domain-template");
     }
 

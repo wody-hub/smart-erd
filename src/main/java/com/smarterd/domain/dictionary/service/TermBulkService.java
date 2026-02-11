@@ -39,6 +39,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Slf4j
 @Service
 @Transactional(readOnly = true)
+@SuppressWarnings("null")
 public class TermBulkService extends AbstractBulkService<TermBulkService.TermUploadRow> {
 
     private static final int PHYSICAL_NAME_MAX = 100;
@@ -255,16 +256,37 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
     /**
      * 용어 템플릿 엑셀을 생성한다.
      *
+     * <p>Accept-Language 헤더에 따라 컬럼 헤더, 샘플 데이터, 가이드 시트가 해당 언어로 생성된다.</p>
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId  팀 ID
+     * @param locale  요청 로케일
      * @return 엑셀 데이터
      */
-    public ExcelUtils.ExcelData generateTemplate() {
-        final var titles = List.of("논리명 (필수)", "물리명 (필수)", "도메인 (논리명)", "설명");
-        final var templateData = List.of(new TemplateRow("사용자명", "user_name", "이름", ""));
+    public ExcelUtils.ExcelData generateTemplate(String loginId, Long teamId, Locale locale) {
+        verifyTeamAccess(loginId, teamId);
+
+        final var titles = List.of(
+            msg("template.term.col.logical-name", locale),
+            msg("template.term.col.physical-name", locale),
+            msg("template.term.col.domain-logical-name", locale),
+            msg("template.term.col.description", locale)
+        );
+        final var templateData = List.of(
+            new TemplateRow(
+                msg("template.term.sample.logical-name", locale),
+                msg("template.term.sample.physical-name", locale),
+                msg("template.term.sample.domain-logical-name", locale),
+                msg("template.term.sample.description", locale)
+            )
+        );
         try (final var utils = new ExcelUtils<>(templateData, titles)) {
-            utils.sheetName("용어");
-            return utils.toExcel();
+            utils.sheetName(msg("template.term.sheet-name", locale));
+            final var excelData = utils.toExcel();
+            addGuideSheet(excelData.excelBook(), locale, TemplateType.TERM);
+            return excelData;
         } catch (java.io.IOException e) {
-            throw new java.io.UncheckedIOException("엑셀 템플릿 생성 중 리소스 해제 실패", e);
+            throw new java.io.UncheckedIOException("Failed to release Excel template resources", e);
         }
     }
 

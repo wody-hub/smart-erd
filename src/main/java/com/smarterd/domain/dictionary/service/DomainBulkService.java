@@ -218,16 +218,35 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     /**
      * 도메인 템플릿 엑셀을 생성한다.
      *
+     * <p>Accept-Language 헤더에 따라 컬럼 헤더, 샘플 데이터, 가이드 시트가 해당 언어로 생성된다.</p>
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId  팀 ID
+     * @param locale  요청 로케일
      * @return 엑셀 데이터
      */
-    public ExcelUtils.ExcelData generateTemplate() {
-        final var titles = List.of("논리명 (필수)", "물리 타입 (필수)", "설명");
-        final var templateData = List.of(new TemplateRow("금액", "DECIMAL(15,2)", "화폐 금액"));
+    public ExcelUtils.ExcelData generateTemplate(String loginId, Long teamId, Locale locale) {
+        verifyTeamAccess(loginId, teamId);
+
+        final var titles = List.of(
+            msg("template.domain.col.logical-name", locale),
+            msg("template.domain.col.physical-type", locale),
+            msg("template.domain.col.description", locale)
+        );
+        final var templateData = List.of(
+            new TemplateRow(
+                msg("template.domain.sample.logical-name", locale),
+                msg("template.domain.sample.physical-type", locale),
+                msg("template.domain.sample.description", locale)
+            )
+        );
         try (final var utils = new ExcelUtils<>(templateData, titles)) {
-            utils.sheetName("도메인");
-            return utils.toExcel();
+            utils.sheetName(msg("template.domain.sheet-name", locale));
+            final var excelData = utils.toExcel();
+            addGuideSheet(excelData.excelBook(), locale, TemplateType.DOMAIN);
+            return excelData;
         } catch (java.io.IOException e) {
-            throw new java.io.UncheckedIOException("엑셀 템플릿 생성 중 리소스 해제 실패", e);
+            throw new java.io.UncheckedIOException("Failed to release Excel template resources", e);
         }
     }
 

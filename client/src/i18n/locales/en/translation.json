@@ -321,7 +321,8 @@
       },
       "toast": {
         "success": "Bulk upload completed",
-        "failed": "Bulk upload failed"
+        "failed": "Bulk upload failed",
+        "templateFailed": "Failed to download template"
       },
       "error": {
         "unsupportedFormat": "Unsupported file format",
