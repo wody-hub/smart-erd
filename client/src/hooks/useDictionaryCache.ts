@@ -3,7 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchTerms } from '@/api/termApi';
 import { fetchDomains } from '@/api/domainApi';
 import { queryKeys } from '@/constants/query-keys';
-import type { Term, Domain, CompoundResolution, CompoundBaseTerm } from '@/types/dictionary';
+import type {
+  Term,
+  Domain,
+  CompoundResolution,
+  CompoundBaseTerm,
+  DecomposedSegment,
+  PartialDecomposition,
+} from '@/types/dictionary';
 import type { Column } from '@/types/erd';
 
 /** 단일 그룹 문자열의 greedy longest-match 분해 최대 길이 */
@@ -52,6 +59,63 @@ function decomposeGroup(group: string, termByName: Map<string, Term>): Term[] | 
   }
 
   return result.length >= 2 ? result : null;
+}
+
+/**
+ * 공백 없는 연속 문자열을 greedy longest-match로 분해하되,
+ * 매칭 실패 시 null 반환 대신 미매칭 세그먼트로 기록하고 계속 진행한다.
+ *
+ * @param group      공백 없는 연속 문자열
+ * @param termByName 논리명 → Term 매핑
+ * @returns 분해된 세그먼트 배열 (2개 이상) 또는 null (분해 불가)
+ */
+function partialDecomposeGroup(
+  group: string,
+  termByName: Map<string, Term>,
+): DecomposedSegment[] | null {
+  const segments: DecomposedSegment[] = [];
+  let pos = 0;
+
+  while (pos < group.length) {
+    // greedy longest-match 시도
+    let matched = false;
+    const maxLen = Math.min(group.length - pos, MAX_TERM_LENGTH);
+    for (let len = maxLen; len >= 1; len--) {
+      const substr = group.substring(pos, pos + len);
+      const term = termByName.get(substr);
+      if (term) {
+        segments.push({
+          text: substr,
+          matched: true,
+          term: { id: term.id, physicalName: term.physicalName, domainId: term.domainId ?? null },
+        });
+        pos += len;
+        matched = true;
+        break;
+      }
+    }
+
+    if (!matched) {
+      // 다음 매칭 가능 위치 탐색
+      let unmatchedEnd = pos + 1;
+      while (unmatchedEnd < group.length) {
+        let canMatch = false;
+        const remaining = Math.min(group.length - unmatchedEnd, MAX_TERM_LENGTH);
+        for (let len = remaining; len >= 1; len--) {
+          if (termByName.has(group.substring(unmatchedEnd, unmatchedEnd + len))) {
+            canMatch = true;
+            break;
+          }
+        }
+        if (canMatch) break;
+        unmatchedEnd++;
+      }
+      segments.push({ text: group.substring(pos, unmatchedEnd), matched: false });
+      pos = unmatchedEnd;
+    }
+  }
+
+  return segments.length >= 2 ? segments : null;
 }
 
 /**
@@ -277,6 +341,63 @@ export function useDictionaryCache(teamId: string | undefined) {
     [termByNameMap, domainMap],
   );
 
+  /**
+   * 입력 문자열을 부분 분해한다.
+   *
+   * 매칭 세그먼트 1개 이상 AND 미매칭 세그먼트 1개 이상일 때만 결과를 반환한다.
+   * 모든 세그먼트가 매칭되면 resolveCompound가 처리하므로 null을 반환한다.
+   *
+   * @param query 사용자 입력 문자열
+   * @returns 부분 분해 결과 또는 null
+   */
+  const partialDecompose = useCallback(
+    (query: string): PartialDecomposition | null => {
+      const trimmed = query.trim();
+      if (trimmed.length < 2) {
+        return null;
+      }
+      if (termByNameMap.has(trimmed)) {
+        return null;
+      }
+
+      // 공백이 있으면 각 그룹을 독립 분석
+      const groups = trimmed.split(/\s+/).filter((g) => g.length > 0);
+      const allSegments: DecomposedSegment[] = [];
+
+      for (const group of groups) {
+        const exactTerm = termByNameMap.get(group);
+        if (exactTerm) {
+          allSegments.push({
+            text: group,
+            matched: true,
+            term: {
+              id: exactTerm.id,
+              physicalName: exactTerm.physicalName,
+              domainId: exactTerm.domainId ?? null,
+            },
+          });
+          continue;
+        }
+        const segments = partialDecomposeGroup(group, termByNameMap);
+        if (segments) {
+          allSegments.push(...segments);
+        } else {
+          // 분해 불가능한 단일 그룹 → 미매칭 세그먼트
+          allSegments.push({ text: group, matched: false });
+        }
+      }
+
+      const hasMatched = allSegments.some((s) => s.matched);
+      const hasUnmatched = allSegments.some((s) => !s.matched);
+      if (!hasMatched || !hasUnmatched || allSegments.length < 2) {
+        return null;
+      }
+
+      return { query: trimmed, segments: allSegments };
+    },
+    [termByNameMap],
+  );
+
   return {
     terms,
     domains,
@@ -285,5 +406,6 @@ export function useDictionaryCache(teamId: string | undefined) {
     findDomainById,
     getTermWithType,
     resolveCompound,
+    partialDecompose,
   };
 }

@@ -197,6 +197,7 @@
     },
     "tableNode": {
       "addColumn": "컬럼 추가",
+      "selectDomain": "도메인 선택",
       "title": {
         "togglePk": "PK 토글",
         "toggleFk": "FK 토글",
@@ -213,20 +214,24 @@
         "toggleNullable": "{{name}} 널 허용 토글",
         "deleteColumn": "컬럼 {{name}} 삭제",
         "validationWarning": "{{name}} 사전 불일치 경고",
-        "domainBadge": "{{colName}} 도메인: {{domainName}}"
+        "domainBadge": "{{colName}} 도메인: {{domainName}}",
+        "selectDomain": "{{colName}} 도메인 선택"
       }
     },
     "domain": {
       "baseTermDomains": "조합 용어 도메인",
       "allDomains": "전체 도메인",
       "none": "없음",
-      "searchPlaceholder": "도메인 검색..."
+      "searchPlaceholder": "도메인 검색...",
+      "registerNew": "+ 신규 도메인 등록"
     },
     "autocomplete": {
       "placeholder": "논리명 입력...",
       "noResults": "매칭 결과 없음",
       "registerNew": "+ 신규 용어 등록",
       "compoundHeading": "복합 용어 조합",
+      "partialHeading": "부분 분석",
+      "partialUnregistered": "(미등록)",
       "compoundRegistered": "복합 용어가 사전에 등록되고 적용되었습니다",
       "compoundExisting": "기존 용어가 적용되었습니다",
       "compoundFailed": "복합 용어 등록에 실패했습니다",

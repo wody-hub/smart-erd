@@ -597,13 +597,15 @@ const useCanvasStore = create<CanvasState>((set, get) => {
         if (!colsYArray) return;
 
         for (const pkCol of pkColumns) {
-          const baseName = `${parentPrefix}_${pkCol.name}`;
+          const baseName = parentPrefix
+            ? `${parentPrefix}_${pkCol.name}`
+            : pkCol.name;
           const fkName = generateUniqueName(baseName, names);
           names.push(fkName);
 
           const fkColId = `col-${crypto.randomUUID()}`;
 
-          // FK 컬럼 추가
+          // FK 컬럼 추가 (논리명·도메인은 부모 PK에서 상속)
           colsYArray.push([
             createColumnYMap({
               id: fkColId,
@@ -611,6 +613,8 @@ const useCanvasStore = create<CanvasState>((set, get) => {
               type: pkCol.type,
               fk: true,
               nullable: true,
+              logicalName: pkCol.logicalName,
+              domainId: pkCol.domainId,
             }),
           ]);
 

@@ -104,6 +104,24 @@ export interface BulkSaveResponse {
   failedCount: number;
 }
 
+/** 부분 분해의 개별 세그먼트 */
+export interface DecomposedSegment {
+  /** 논리명 텍스트 */
+  text: string;
+  /** 사전 매칭 여부 */
+  matched: boolean;
+  /** 매칭된 Term 정보 (matched=true일 때) */
+  term?: { id: number; physicalName: string; domainId: number | null };
+}
+
+/** 부분 분해 결과 (일부만 매칭) */
+export interface PartialDecomposition {
+  /** 원본 입력값 */
+  query: string;
+  /** 분해된 세그먼트 목록 */
+  segments: DecomposedSegment[];
+}
+
 /** 복합 용어 해석 결과 */
 export interface CompoundResolution {
   /** 원본 입력값 (예: "사용자 아이디") */

@@ -45,6 +45,7 @@ export function ErdDictionaryProvider({ teamId, children }: ErdDictionaryProvide
  *
  * @returns teamId + useDictionaryCache 반환값
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useErdDictionary(): ErdDictionaryContextValue {
   const ctx = useContext(ErdDictionaryContext);
   if (!ctx) {

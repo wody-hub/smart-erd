@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import {
   Command,
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { useErdDictionary } from './ErdDictionaryContext';
+import QuickDomainDialog from './QuickDomainDialog';
 import type { Domain } from '@/types/dictionary';
 
 /** 조합 용어 기본 용어에서 추출된 추천 도메인 */
@@ -30,6 +31,8 @@ export interface DomainCommandListProps {
   selectedDomainId?: number | null;
   /** 도메인 선택 핸들러 (null = 해제) */
   onSelect: (domainId: number | null) => void;
+  /** 신규 도메인 등록 요청 핸들러 (미제공 시 버튼 미표시) */
+  onRegisterNew?: () => void;
 }
 
 /**
@@ -42,11 +45,13 @@ export interface DomainCommandListProps {
  * @param props.suggestedDomains  우선 표시 도메인 목록
  * @param props.selectedDomainId  현재 선택된 도메인 ID
  * @param props.onSelect          도메인 선택 핸들러
+ * @param props.onRegisterNew     신규 도메인 등록 요청 핸들러
  */
 export function DomainCommandList({
   suggestedDomains = [],
   selectedDomainId,
   onSelect,
+  onRegisterNew,
 }: DomainCommandListProps) {
   const { t } = useTranslation();
   const { domains } = useErdDictionary();
@@ -123,6 +128,12 @@ export function DomainCommandList({
           />
           <span>{t('erd.domain.none')}</span>
         </CommandItem>
+        {onRegisterNew && (
+          <CommandItem onSelect={onRegisterNew} className="cursor-pointer">
+            <Plus className="h-3 w-3 mr-1 shrink-0" />
+            <span>{t('erd.domain.registerNew')}</span>
+          </CommandItem>
+        )}
       </CommandGroup>
     </>
   );
@@ -136,8 +147,8 @@ interface DomainSelectPopoverProps {
   onOpenChange: (open: boolean) => void;
   /** 현재 선택된 도메인 ID */
   selectedDomainId?: number;
-  /** 도메인 선택 핸들러 (null = 해제) */
-  onSelect: (domainId: number | null) => void;
+  /** 도메인 선택 핸들러 (null = 해제, physicalType은 신규 생성 시 캐시 갱신 전 즉시 전달) */
+  onSelect: (domainId: number | null, physicalType?: string) => void;
   /** 우선 표시할 도메인 목록 (복합 용어 기본 용어 도메인) */
   suggestedDomains?: SuggestedDomain[];
   /** Popover 정렬 */
@@ -171,25 +182,40 @@ export default function DomainSelectPopover({
 }: DomainSelectPopoverProps) {
   const { t } = useTranslation();
 
+  /** 빠른 도메인 등록 다이얼로그 열림 상태 */
+  const [quickDomainOpen, setQuickDomainOpen] = useState(false);
+
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent
-        className="w-56 p-0"
-        align={align}
-        onOpenAutoFocus={(e) => e.preventDefault()}
-      >
-        <Command>
-          <CommandInput placeholder={t('erd.domain.searchPlaceholder')} />
-          <CommandList>
-            <DomainCommandList
-              suggestedDomains={suggestedDomains}
-              selectedDomainId={selectedDomainId}
-              onSelect={onSelect}
-            />
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <>
+      <Popover open={open} onOpenChange={onOpenChange}>
+        <PopoverTrigger asChild>{children}</PopoverTrigger>
+        <PopoverContent
+          className="w-56 p-0"
+          align={align}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <Command>
+            <CommandInput placeholder={t('erd.domain.searchPlaceholder')} />
+            <CommandList>
+              <DomainCommandList
+                suggestedDomains={suggestedDomains}
+                selectedDomainId={selectedDomainId}
+                onSelect={onSelect}
+                onRegisterNew={() => {
+                  onOpenChange(false);
+                  setQuickDomainOpen(true);
+                }}
+              />
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      <QuickDomainDialog
+        open={quickDomainOpen}
+        onOpenChange={setQuickDomainOpen}
+        onCreated={(domain) => onSelect(domain.id, domain.physicalType)}
+      />
+    </>
   );
 }

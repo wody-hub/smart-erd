@@ -23,6 +23,8 @@ interface QuickTermTarget {
   colId: string;
   /** 초기 논리명 */
   logicalName: string;
+  /** true이면 등록만 하고 컬럼에 적용하지 않음 (부분 세그먼트 등록용) */
+  partialOnly?: boolean;
 }
 
 /**
@@ -95,14 +97,15 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   /**
    * 도메인 변경 핸들러 — 배지 클릭으로 도메인을 변경한다.
    *
-   * @param colId    컬럼 ID
-   * @param domainId 선택된 도메인 ID (null = 해제)
+   * @param colId        컬럼 ID
+   * @param domainId     선택된 도메인 ID (null = 해제)
+   * @param physicalType 물리 타입 (신규 생성 시 캐시 갱신 전 즉시 전달)
    */
-  const handleDomainChange = (colId: string, domainId: number | null) => {
+  const handleDomainChange = (colId: string, domainId: number | null, physicalType?: string) => {
     const updates: Partial<Column> = { domainId: domainId ?? undefined };
     if (domainId) {
-      const domain = findDomainById(domainId);
-      if (domain) updates.type = domain.physicalType;
+      const resolvedType = physicalType ?? findDomainById(domainId)?.physicalType;
+      if (resolvedType) updates.type = resolvedType;
     }
     updateColumn(id, colId, updates);
   };
@@ -114,7 +117,9 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
    */
   const handleQuickTermApply = (updates: Partial<Column>) => {
     if (quickTermTarget) {
-      updateColumn(quickTermTarget.nodeId, quickTermTarget.colId, updates);
+      if (!quickTermTarget.partialOnly) {
+        updateColumn(quickTermTarget.nodeId, quickTermTarget.colId, updates);
+      }
       setQuickTermTarget(null);
     }
   };
@@ -195,9 +200,10 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                     onChange={(newValue) => handleLogicalNameChange(col.id, newValue)}
                     onSelectTerm={(result) => handleSelectTerm(col.id, result)}
                     onSelectCompound={(resolution) => registerCompound(col.id, resolution)}
-                    onRegisterNew={(logicalName) =>
-                      setQuickTermTarget({ nodeId: id, colId: col.id, logicalName })
+                    onRegisterNew={(logicalName, partialOnly) =>
+                      setQuickTermTarget({ nodeId: id, colId: col.id, logicalName, partialOnly })
                     }
+                    termLinked={!!col.termId}
                   />
 
                   {/* Validation warning icon */}
@@ -249,32 +255,38 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
                 {/* Row 2: 도메인 배지 + 물리명 + 타입 */}
                 <div className="flex items-center gap-1 pl-12 mt-0.5">
-                  {domain && (
-                    <DomainSelectPopover
-                      open={domainPopoverColId === col.id}
-                      onOpenChange={(o) => setDomainPopoverColId(o ? col.id : null)}
-                      selectedDomainId={col.domainId!}
-                      onSelect={(domainId) => handleDomainChange(col.id, domainId)}
-                      align="start"
-                    >
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            className="nodrag text-[10px] px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground hover:bg-erd-domain/80 cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            aria-label={t('erd.tableNode.aria.domainBadge', {
-                              colName: col.name,
-                              domainName: domain.logicalName,
-                            })}
-                          >
-                            {domain.logicalName}
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="text-xs">
-                          {domain.logicalName} ({domain.physicalType})
-                        </TooltipContent>
-                      </Tooltip>
-                    </DomainSelectPopover>
-                  )}
+                  <DomainSelectPopover
+                    open={domainPopoverColId === col.id}
+                    onOpenChange={(o) => setDomainPopoverColId(o ? col.id : null)}
+                    selectedDomainId={col.domainId}
+                    onSelect={(domainId, physicalType) =>
+                      handleDomainChange(col.id, domainId, physicalType)
+                    }
+                    align="start"
+                  >
+                    {domain ? (
+                      <button
+                        className="nodrag text-[10px] px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground hover:bg-erd-domain/80 cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        title={`${domain.logicalName} (${domain.physicalType})`}
+                        aria-label={t('erd.tableNode.aria.domainBadge', {
+                          colName: col.name,
+                          domainName: domain.logicalName,
+                        })}
+                      >
+                        {domain.logicalName}
+                      </button>
+                    ) : (
+                      <button
+                        className="nodrag text-[10px] w-4 h-4 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground/40 opacity-0 group-hover/col:opacity-100 hover:!opacity-100 hover:border-muted-foreground hover:text-muted-foreground cursor-pointer shrink-0 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        title={t('erd.tableNode.selectDomain')}
+                        aria-label={t('erd.tableNode.aria.selectDomain', {
+                          colName: col.name,
+                        })}
+                      >
+                        D
+                      </button>
+                    )}
+                  </DomainSelectPopover>
                   <input
                     className="nodrag flex-1 font-mono text-muted-foreground bg-transparent outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring px-1 rounded min-w-0"
                     value={col.name}

@@ -198,6 +198,7 @@
     },
     "tableNode": {
       "addColumn": "Add Column",
+      "selectDomain": "Select domain",
       "title": {
         "togglePk": "Toggle PK",
         "toggleFk": "Toggle FK",
@@ -214,20 +215,24 @@
         "toggleNullable": "Toggle nullable for {{name}}",
         "deleteColumn": "Delete column {{name}}",
         "validationWarning": "{{name}} dictionary mismatch warning",
-        "domainBadge": "{{colName}} domain: {{domainName}}"
+        "domainBadge": "{{colName}} domain: {{domainName}}",
+        "selectDomain": "Select domain for {{colName}}"
       }
     },
     "domain": {
       "baseTermDomains": "Term Domains",
       "allDomains": "All Domains",
       "none": "None",
-      "searchPlaceholder": "Search domains..."
+      "searchPlaceholder": "Search domains...",
+      "registerNew": "+ Register new domain"
     },
     "autocomplete": {
       "placeholder": "Enter logical name...",
       "noResults": "No matching terms",
       "registerNew": "+ Register new term",
       "compoundHeading": "Compound term",
+      "partialHeading": "Partial analysis",
+      "partialUnregistered": "(unregistered)",
       "compoundRegistered": "Compound term registered and applied",
       "compoundExisting": "Existing term applied",
       "compoundFailed": "Failed to register compound term",
