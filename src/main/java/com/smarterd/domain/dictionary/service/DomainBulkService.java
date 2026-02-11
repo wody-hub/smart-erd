@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -255,67 +257,15 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
      *
      * <p>ExcelUtils의 setter 기반 추출을 위해 필요한 POJO 클래스.</p>
      */
+    @Getter
+    @Setter
     public static class DomainUploadRow {
 
         private String logicalName;
         private String physicalType;
         private String description;
-
-        public String getLogicalName() {
-            return logicalName;
-        }
-
-        public void setLogicalName(String logicalName) {
-            this.logicalName = logicalName;
-        }
-
-        public String getPhysicalType() {
-            return physicalType;
-        }
-
-        public void setPhysicalType(String physicalType) {
-            this.physicalType = physicalType;
-        }
-
-        public String getDescription() {
-            return description;
-        }
-
-        public void setDescription(String description) {
-            this.description = description;
-        }
     }
 
-    /**
-     * 템플릿 엑셀 생성용 행 데이터 클래스.
-     *
-     * <p>ExcelUtils가 getter 메서드명 규칙({@code getXxx()})에 의존하므로
-     * record로 전환할 수 없다. record의 accessor는 {@code xxx()} 형식이기 때문이다.</p>
-     *
-     * // TODO: ExcelUtils가 record accessor를 지원하면 record로 전환
-     */
-    public static class TemplateRow {
-
-        private final String logicalName;
-        private final String physicalType;
-        private final String description;
-
-        public TemplateRow(String logicalName, String physicalType, String description) {
-            this.logicalName = logicalName;
-            this.physicalType = physicalType;
-            this.description = description;
-        }
-
-        public String getLogicalName() {
-            return logicalName;
-        }
-
-        public String getPhysicalType() {
-            return physicalType;
-        }
-
-        public String getDescription() {
-            return description;
-        }
-    }
+    /** 템플릿 엑셀 생성용 행 데이터. */
+    public record TemplateRow(String logicalName, String physicalType, String description) {}
 }

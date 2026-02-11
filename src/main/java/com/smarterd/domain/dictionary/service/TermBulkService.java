@@ -23,6 +23,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -39,7 +41,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Slf4j
 @Service
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class TermBulkService extends AbstractBulkService<TermBulkService.TermUploadRow> {
 
     private static final int PHYSICAL_NAME_MAX = 100;
@@ -295,82 +296,16 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
      *
      * <p>ExcelUtils의 setter 기반 추출을 위해 필요한 POJO 클래스.</p>
      */
+    @Getter
+    @Setter
     public static class TermUploadRow {
 
         private String logicalName;
         private String physicalName;
         private String domainLogicalName;
         private String description;
-
-        public String getLogicalName() {
-            return logicalName;
-        }
-
-        public void setLogicalName(String logicalName) {
-            this.logicalName = logicalName;
-        }
-
-        public String getPhysicalName() {
-            return physicalName;
-        }
-
-        public void setPhysicalName(String physicalName) {
-            this.physicalName = physicalName;
-        }
-
-        public String getDomainLogicalName() {
-            return domainLogicalName;
-        }
-
-        public void setDomainLogicalName(String domainLogicalName) {
-            this.domainLogicalName = domainLogicalName;
-        }
-
-        public String getDescription() {
-            return description;
-        }
-
-        public void setDescription(String description) {
-            this.description = description;
-        }
     }
 
-    /**
-     * 템플릿 엑셀 생성용 행 데이터 클래스.
-     *
-     * <p>ExcelUtils가 getter 메서드명 규칙({@code getXxx()})에 의존하므로
-     * record로 전환할 수 없다. record의 accessor는 {@code xxx()} 형식이기 때문이다.</p>
-     *
-     * // TODO: ExcelUtils가 record accessor를 지원하면 record로 전환
-     */
-    public static class TemplateRow {
-
-        private final String logicalName;
-        private final String physicalName;
-        private final String domainLogicalName;
-        private final String description;
-
-        public TemplateRow(String logicalName, String physicalName, String domainLogicalName, String description) {
-            this.logicalName = logicalName;
-            this.physicalName = physicalName;
-            this.domainLogicalName = domainLogicalName;
-            this.description = description;
-        }
-
-        public String getLogicalName() {
-            return logicalName;
-        }
-
-        public String getPhysicalName() {
-            return physicalName;
-        }
-
-        public String getDomainLogicalName() {
-            return domainLogicalName;
-        }
-
-        public String getDescription() {
-            return description;
-        }
-    }
+    /** 템플릿 엑셀 생성용 행 데이터. */
+    public record TemplateRow(String logicalName, String physicalName, String domainLogicalName, String description) {}
 }

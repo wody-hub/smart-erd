@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.Serial;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.RecordComponent;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -1201,13 +1202,26 @@ public class ExcelUtils<T> implements AutoCloseable {
     }
 
     /**
-     * 사용 가능한 메서드 추출
+     * 사용 가능한 메서드 추출.
+     * record 클래스는 {@link RecordComponent} 선언 순서를 유지하고,
+     * POJO는 기존 알파벳순 정렬을 유지한다.
      *
      * @param data 데이터
      * @return 사용 가능한 메서드
      */
     private List<Method> extractGetterMethod(Object data) {
-        final var methods = data.getClass().getMethods();
+        final var clazz = data.getClass();
+
+        // record: RecordComponent 선언 순서대로 accessor 메서드 반환
+        if (clazz.isRecord()) {
+            return Arrays.stream(clazz.getRecordComponents())
+                .map(RecordComponent::getAccessor)
+                .filter(this::allowedReturnType)
+                .toList();
+        }
+
+        // POJO: 기존 알파벳순 정렬
+        final var methods = clazz.getMethods();
         return Arrays.stream(methods)
             .filter((method) -> {
                 final var getterMethod = this.isGetter(method);
@@ -1231,6 +1245,7 @@ public class ExcelUtils<T> implements AutoCloseable {
 
     /**
      * 메서드 명이 getter 인지 여부 판단.
+     * POJO의 {@code getXxx()} 패턴과 record의 {@code xxx()} accessor를 모두 지원한다.
      *
      * @param method 메서드 명
      * @return getter 메서드 여부.
@@ -1239,13 +1254,27 @@ public class ExcelUtils<T> implements AutoCloseable {
         if (method == null) {
             return false;
         }
-        if (!StringUtils.startsWith(method.getName(), "get")) {
+        if (method.getParameterCount() != 0 || method.getReturnType() == Void.TYPE) {
             return false;
         }
-        if ("getClass".equals(method.getName())) {
-            return false;
+
+        // POJO getter: getXxx() (getClass 제외)
+        if (StringUtils.startsWith(method.getName(), "get") && !"getClass".equals(method.getName())) {
+            return true;
         }
-        return method.getParameterCount() == 0 && method.getReturnType() != Void.TYPE;
+
+        // record accessor: xxx() — RecordComponent 이름과 일치하는 메서드
+        final var declaringClass = method.getDeclaringClass();
+        if (declaringClass.isRecord()) {
+            final var components = declaringClass.getRecordComponents();
+            for (final var component : components) {
+                if (component.getName().equals(method.getName())) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

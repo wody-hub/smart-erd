@@ -52,7 +52,8 @@ public class RedisWsTicketStore implements WsTicketStore {
 
     static {
         CONSUME_SCRIPT = new DefaultRedisScript<>();
-        CONSUME_SCRIPT.setScriptText("""
+        CONSUME_SCRIPT.setScriptText(
+            """
             local v = redis.call('GET', KEYS[1])
             if v then
                 redis.call('DEL', KEYS[1])
@@ -60,11 +61,13 @@ public class RedisWsTicketStore implements WsTicketStore {
                 redis.call('DEL', KEYS[3])
             end
             return v
-            """);
+            """
+        );
         CONSUME_SCRIPT.setResultType(String.class);
 
         COUNT_SCRIPT = new DefaultRedisScript<>();
-        COUNT_SCRIPT.setScriptText("""
+        COUNT_SCRIPT.setScriptText(
+            """
             local members = redis.call('SMEMBERS', KEYS[1])
             local count = 0
             for _, ticket in ipairs(members) do
@@ -75,7 +78,8 @@ public class RedisWsTicketStore implements WsTicketStore {
                 end
             end
             return count
-            """);
+            """
+        );
         COUNT_SCRIPT.setResultType(Long.class);
     }
 
