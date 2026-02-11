@@ -43,6 +43,16 @@
     --erd-status-disconnected: 0 84.2% 60.2%;
 
     --erd-cursor-foreground: 0 0% 100%;
+
+    --cursor-color-1: 0 80% 60%;
+    --cursor-color-2: 210 80% 60%;
+    --cursor-color-3: 120 60% 50%;
+    --cursor-color-4: 45 90% 55%;
+    --cursor-color-5: 280 70% 60%;
+    --cursor-color-6: 180 60% 50%;
+
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 210 40% 98%;
   }
 
   .dark {
@@ -84,6 +94,16 @@
     --erd-status-disconnected: 0 62.8% 50.6%;
 
     --erd-cursor-foreground: 0 0% 100%;
+
+    --cursor-color-1: 0 80% 60%;
+    --cursor-color-2: 210 80% 60%;
+    --cursor-color-3: 120 60% 50%;
+    --cursor-color-4: 45 90% 55%;
+    --cursor-color-5: 280 70% 60%;
+    --cursor-color-6: 180 60% 50%;
+
+    --success: 142.1 70.6% 45.3%;
+    --success-foreground: 210 40% 98%;
   }
 }
 

@@ -2,7 +2,9 @@ package com.smarterd.domain.dictionary.repository;
 
 import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.team.entity.Team;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
@@ -35,4 +37,22 @@ public interface DomainRepository extends JpaRepository<Domain, Long> {
      * @return 존재 여부
      */
     boolean existsByTeamAndLogicalNameAndIdNot(Team team, String logicalName, Long id);
+
+    /**
+     * 팀 내 논리명 목록으로 도메인을 일괄 조회한다 (bulk 검증용).
+     *
+     * @param team         팀 엔티티
+     * @param logicalNames 논리명 목록
+     * @return 매칭된 도메인 목록
+     */
+    List<Domain> findByTeamAndLogicalNameIn(Team team, Collection<String> logicalNames);
+
+    /**
+     * 팀 내 논리명으로 단일 도메인을 조회한다.
+     *
+     * @param team        팀 엔티티
+     * @param logicalName 논리명
+     * @return 도메인 (Optional)
+     */
+    Optional<Domain> findByTeamAndLogicalName(Team team, String logicalName);
 }

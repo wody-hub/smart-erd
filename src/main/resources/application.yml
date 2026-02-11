@@ -3,6 +3,11 @@ logging:
     p6spy: info
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
   docker:
     compose:
       lifecycle-management: start-only
@@ -38,8 +43,11 @@ smart-erd:
     max-messages-per-second: 100
     binary-message-size-limit: 1048576 # 1MB
     snapshot-flush-interval: 30000 # 30초
+    max-connections-per-user: 5
+    max-accumulated-updates-size: 10485760 # 10MB
+    session-max-duration: 1800000 # 30분
   cors:
-    allowed-origins: http://localhost:3000
+    allowed-origins: ${SMART_ERD_CORS_ORIGINS:http://localhost:3000}
     allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
     allowed-headers: '*'
     allow-credentials: true

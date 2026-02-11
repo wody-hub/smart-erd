@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Trash2, Database } from 'lucide-react';
+import { Plus, Pencil, Trash2, Database, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,6 +17,7 @@ import {
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import Spinner from '@/components/ui/spinner';
 import DomainFormDialog from '@/components/dictionary/DomainFormDialog';
+import BulkUploadDialog from '@/components/dictionary/BulkUploadDialog';
 import { fetchDomains, createDomain, updateDomain, deleteDomain } from '@/api/domainApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
@@ -38,6 +39,8 @@ export default function DomainTab() {
   const [editTarget, setEditTarget] = useState<Domain | null>(null);
   /** 삭제 확인 대상 도메인 ID */
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  /** 일괄 업로드 다이얼로그 열림 상태 */
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const { data: domains = [], isLoading } = useQuery({
     queryKey: queryKeys.dictionary.domains(teamId!),
@@ -111,7 +114,11 @@ export default function DomainTab() {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-end gap-2 mb-4">
+        <Button variant="outline" onClick={() => setUploadOpen(true)}>
+          <Upload className="h-4 w-4 mr-2" />
+          {t('dictionary.upload.button')}
+        </Button>
         <Button onClick={handleCreate}>
           <Plus className="h-4 w-4 mr-2" />
           {t('dictionary.domain.form.createTitle')}
@@ -196,6 +203,8 @@ export default function DomainTab() {
         }}
         loading={deleteMutation.isPending}
       />
+
+      <BulkUploadDialog open={uploadOpen} onOpenChange={setUploadOpen} mode="domain" />
     </div>
   );
 }

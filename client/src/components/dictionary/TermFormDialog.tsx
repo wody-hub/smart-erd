@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Lightbulb, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { fetchDomains } from '@/api/domainApi';
 import { queryKeys } from '@/constants/query-keys';
+import { useDictionarySuggest } from '@/hooks/useDictionarySuggest';
 import type { Term, TermFormData } from '@/types/dictionary';
 
 /** "없음" 선택 시 사용하는 센티넬 값 */
@@ -43,6 +45,7 @@ interface TermFormDialogProps {
  *
  * initialData가 있으면 수정 모드, 없으면 생성 모드로 동작한다.
  * 도메인 Select에서 팀의 도메인 목록을 로드한다.
+ * 생성 모드에서는 한글 키워드 자동 추천을 지원한다.
  */
 export default function TermFormDialog({
   open,
@@ -63,6 +66,10 @@ export default function TermFormDialog({
   const [description, setDescription] = useState('');
   /** 제출 중 여부 */
   const [submitting, setSubmitting] = useState(false);
+  /** 물리명 사용자 수동 입력 플래그 */
+  const [physicalNameDirty, setPhysicalNameDirty] = useState(false);
+  /** 도메인 사용자 수동 입력 플래그 */
+  const [domainDirty, setDomainDirty] = useState(false);
 
   const isEdit = !!initialData;
 
@@ -72,14 +79,35 @@ export default function TermFormDialog({
     enabled: open && !!teamId,
   });
 
+  const { suggestion, isLoading: suggestLoading } = useDictionarySuggest(
+    teamId!,
+    logicalName,
+    open && !isEdit && !!teamId,
+  );
+
   useEffect(() => {
     if (open) {
       setLogicalName(initialData?.logicalName ?? '');
       setPhysicalName(initialData?.physicalName ?? '');
       setDomainId(initialData?.domainId != null ? String(initialData.domainId) : NONE_VALUE);
       setDescription(initialData?.description ?? '');
+      setPhysicalNameDirty(!!initialData);
+      setDomainDirty(!!initialData);
     }
   }, [open, initialData]);
+
+  // 추천 결과로 물리명/도메인 자동 채움
+  useEffect(() => {
+    if (!suggestion || isEdit) return;
+
+    if (!physicalNameDirty && suggestion.physicalName) {
+      setPhysicalName(suggestion.physicalName);
+    }
+
+    if (!domainDirty && suggestion.domainId != null) {
+      setDomainId(String(suggestion.domainId));
+    }
+  }, [suggestion, isEdit, physicalNameDirty, domainDirty]);
 
   /**
    * 폼 제출 핸들러.
@@ -102,6 +130,27 @@ export default function TermFormDialog({
     }
   };
 
+  /**
+   * 추천 힌트 텍스트를 생성한다.
+   *
+   * @returns 매칭 근거 텍스트 또는 null
+   */
+  const getSuggestHintText = (): string | null => {
+    if (!suggestion || !suggestion.matches || suggestion.matches.length === 0) return null;
+    const matchedDetails = suggestion.matches
+      .filter((m) => m.matched)
+      .map((m) =>
+        t('dictionary.suggest.matchDetail', {
+          keyword: m.keyword,
+          physical: m.physicalName ?? '',
+        }),
+      );
+    if (matchedDetails.length === 0) return null;
+    return matchedDetails.join(', ');
+  };
+
+  const hintText = getSuggestHintText();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -121,13 +170,31 @@ export default function TermFormDialog({
               required
               maxLength={100}
             />
+            {/* 추천 힌트 */}
+            {!isEdit && logicalName.trim().length >= 2 && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                {suggestLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : hintText ? (
+                  <>
+                    <Lightbulb className="h-3 w-3" />
+                    <span>{t('dictionary.suggest.hint', { details: hintText })}</span>
+                  </>
+                ) : suggestion ? (
+                  <span>{t('dictionary.suggest.noMatch')}</span>
+                ) : null}
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="term-physicalName">{t('dictionary.term.form.physicalName')}</Label>
             <Input
               id="term-physicalName"
               value={physicalName}
-              onChange={(e) => setPhysicalName(e.target.value)}
+              onChange={(e) => {
+                setPhysicalName(e.target.value);
+                setPhysicalNameDirty(true);
+              }}
               placeholder={t('dictionary.term.form.physicalNamePlaceholder')}
               required
               maxLength={100}
@@ -135,7 +202,13 @@ export default function TermFormDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="term-domain">{t('dictionary.term.form.domain')}</Label>
-            <Select value={domainId} onValueChange={setDomainId}>
+            <Select
+              value={domainId}
+              onValueChange={(val) => {
+                setDomainId(val);
+                setDomainDirty(true);
+              }}
+            >
               <SelectTrigger id="term-domain">
                 <SelectValue placeholder={t('dictionary.term.form.domainNone')} />
               </SelectTrigger>

@@ -25,6 +25,9 @@ export const queryKeys = {
     domains: (teamId: string) => ['teams', teamId, 'domains'] as const,
     /** 팀별 용어 목록 */
     terms: (teamId: string) => ['teams', teamId, 'terms'] as const,
+    /** 키워드 추천 */
+    suggest: (teamId: string, keyword: string) =>
+      ['teams', teamId, 'dictionary', 'suggest', keyword] as const,
   },
   /** 다이어그램 관련 쿼리 키 */
   diagrams: {

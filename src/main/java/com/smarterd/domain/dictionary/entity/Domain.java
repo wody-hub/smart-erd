@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,7 +26,7 @@ import lombok.NoArgsConstructor;
  * @see Term
  */
 @Entity
-@Table(name = "domains")
+@Table(name = "domains", uniqueConstraints = @UniqueConstraint(columnNames = { "team_id", "logical_name" }))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Domain extends BaseTimeEntity {

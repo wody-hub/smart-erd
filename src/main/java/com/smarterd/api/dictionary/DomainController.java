@@ -1,17 +1,25 @@
 package com.smarterd.api.dictionary;
 
+import com.smarterd.api.dictionary.dto.BulkDomainSaveRequest;
+import com.smarterd.api.dictionary.dto.BulkSaveResponse;
+import com.smarterd.api.dictionary.dto.BulkValidationResponse;
 import com.smarterd.api.dictionary.dto.CreateDomainRequest;
 import com.smarterd.api.dictionary.dto.DomainResponse;
 import com.smarterd.api.dictionary.dto.UpdateDomainRequest;
+import com.smarterd.domain.dictionary.service.DomainBulkService;
 import com.smarterd.domain.dictionary.service.DomainService;
+import com.smarterd.utils.ExcelUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +32,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 도메인(데이터 타입 사전) 관련 REST 컨트롤러.
@@ -40,6 +50,9 @@ public class DomainController {
 
     /** 도메인 비즈니스 로직 서비스 */
     private final DomainService domainService;
+
+    /** 도메인 일괄 업로드 서비스 */
+    private final DomainBulkService domainBulkService;
 
     /**
      * 도메인을 생성한다.
@@ -127,6 +140,67 @@ public class DomainController {
         @Valid @RequestBody UpdateDomainRequest request
     ) {
         return ResponseEntity.ok(domainService.updateDomain(jwt.getSubject(), teamId, domainId, request));
+    }
+
+    /**
+     * 업로드 파일에서 도메인 데이터를 검증한다.
+     *
+     * @param jwt    인증된 JWT 토큰
+     * @param teamId 팀 ID
+     * @param file   업로드 파일 (.xlsx 또는 .csv)
+     * @return 200 OK + 검증 결과
+     */
+    @Operation(summary = "도메인 업로드 검증", description = "엑셀/CSV 파일의 도메인 데이터를 검증한다.")
+    @ApiResponse(responseCode = "200", description = "검증 완료")
+    @ApiResponse(responseCode = "400", description = "지원하지 않는 형식 또는 빈 파일", content = @Content)
+    @PostMapping("/upload/validate")
+    public ResponseEntity<BulkValidationResponse> validateUpload(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @RequestParam("file") MultipartFile file,
+        Locale locale
+    ) {
+        return ResponseEntity.ok(domainBulkService.validateUpload(jwt.getSubject(), teamId, file, locale));
+    }
+
+    /**
+     * 검증 통과한 도메인을 일괄 저장한다.
+     *
+     * @param jwt     인증된 JWT 토큰
+     * @param teamId  팀 ID
+     * @param request 일괄 저장 요청
+     * @return 200 OK + 저장 결과
+     */
+    @Operation(summary = "도메인 일괄 저장", description = "검증 통과한 도메인을 일괄 저장한다.")
+    @ApiResponse(responseCode = "200", description = "저장 완료")
+    @ApiResponse(responseCode = "400", description = "빈 rows 배열", content = @Content)
+    @PostMapping("/upload")
+    public ResponseEntity<BulkSaveResponse> bulkSave(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Valid @RequestBody BulkDomainSaveRequest request
+    ) {
+        return ResponseEntity.ok(domainBulkService.bulkSave(jwt.getSubject(), teamId, request));
+    }
+
+    /**
+     * 도메인 템플릿 엑셀을 다운로드한다.
+     *
+     * @param jwt      인증된 JWT 토큰
+     * @param teamId   팀 ID
+     * @param response HTTP 응답
+     * @throws IOException 엑셀 생성 실패 시
+     */
+    @Operation(summary = "도메인 템플릿 다운로드", description = "도메인 일괄 업로드용 엑셀 템플릿을 다운로드한다.")
+    @ApiResponse(responseCode = "200", description = "템플릿 다운로드 성공")
+    @GetMapping("/upload/template")
+    public void downloadTemplate(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        HttpServletResponse response
+    ) throws IOException {
+        final var excelData = domainBulkService.generateTemplate();
+        ExcelUtils.download(excelData, response, "domain-template");
     }
 
     /**

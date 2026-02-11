@@ -12,7 +12,10 @@
       "backingUp": "Backing up...",
       "invite": "Invite",
       "processing": "Processing...",
-      "pending": "..."
+      "pending": "...",
+      "next": "Next",
+      "previous": "Previous",
+      "close": "Close"
     },
     "loading": "Loading...",
     "aria": {
@@ -290,6 +293,59 @@
         "editTerm": "Edit term {{name}}",
         "deleteTerm": "Delete term {{name}}"
       }
+    },
+    "upload": {
+      "button": "Upload",
+      "dialogTitle": {
+        "domain": "Bulk Upload Domains",
+        "term": "Bulk Upload Terms"
+      },
+      "dropzone": {
+        "title": "Drag and drop or click to select a file",
+        "formats": "Supports .xlsx, .csv",
+        "selected": "Selected: {{fileName}}"
+      },
+      "template": "Download Template",
+      "preview": {
+        "title": "Preview",
+        "summary": "{{success}} valid, {{error}} errors ({{total}} total)",
+        "row": "Row",
+        "status": "Status",
+        "errorNote": "Rows with errors will be excluded from saving."
+      },
+      "save": "Save ({{count}})",
+      "complete": {
+        "title": "Upload Complete",
+        "success": "{{count}} items successfully registered.",
+        "excluded": "{{count}} items were excluded due to errors."
+      },
+      "toast": {
+        "success": "Bulk upload completed",
+        "failed": "Bulk upload failed"
+      },
+      "error": {
+        "unsupportedFormat": "Unsupported file format",
+        "fileTooLarge": "File size exceeds limit (max 5MB)",
+        "emptyFile": "File contains no data",
+        "tooManyRows": "Maximum {{max}} rows can be uploaded",
+        "missingColumns": "Required columns are missing",
+        "requiredField": "Required field missing",
+        "tooLong": "Cannot exceed {{max}} characters",
+        "duplicateInFile": "Duplicate logical name in file",
+        "duplicateInDb": "Logical name already exists",
+        "domainNotFound": "Domain not found"
+      },
+      "validating": "Validating file...",
+      "aria": {
+        "dropzone": "File upload area",
+        "selectRow": "Select row {{row}}"
+      }
+    },
+    "suggest": {
+      "hint": "Suggestion: {{details}}",
+      "noMatch": "No matching terms found",
+      "matchDetail": "\"{{keyword}}\"→{{physical}}",
+      "autoFilled": "Auto-filled"
     }
   },
   "collaboration": {

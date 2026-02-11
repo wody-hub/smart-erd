@@ -1,5 +1,11 @@
 import axiosInstance from './axiosInstance';
-import type { Term, TermFormData } from '@/types/dictionary';
+import type {
+  Term,
+  TermFormData,
+  BulkTermRow,
+  BulkValidationResponse,
+  BulkSaveResponse,
+} from '@/types/dictionary';
 
 /**
  * 팀의 용어 목록을 조회한다.
@@ -49,4 +55,59 @@ export async function updateTerm(
  */
 export async function deleteTerm(teamId: string, termId: number): Promise<void> {
   await axiosInstance.delete(`/teams/${teamId}/terms/${termId}`);
+}
+
+/**
+ * 용어 업로드 파일을 검증한다.
+ *
+ * @param teamId 대상 팀 ID
+ * @param file   업로드할 파일 (.xlsx 또는 .csv)
+ * @returns 검증 결과
+ */
+export async function validateTermUpload(
+  teamId: string,
+  file: File,
+): Promise<BulkValidationResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await axiosInstance.post<BulkValidationResponse>(
+    `/teams/${teamId}/terms/upload/validate`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return res.data;
+}
+
+/**
+ * 검증 통과한 용어를 일괄 저장한다.
+ *
+ * @param teamId 대상 팀 ID
+ * @param rows   저장할 용어 데이터 목록
+ * @returns 저장 결과
+ */
+export async function bulkSaveTerms(
+  teamId: string,
+  rows: BulkTermRow[],
+): Promise<BulkSaveResponse> {
+  const res = await axiosInstance.post<BulkSaveResponse>(`/teams/${teamId}/terms/upload`, {
+    rows,
+  });
+  return res.data;
+}
+
+/**
+ * 용어 템플릿 엑셀을 다운로드한다.
+ *
+ * @param teamId 대상 팀 ID
+ */
+export async function downloadTermTemplate(teamId: string): Promise<void> {
+  const res = await axiosInstance.get(`/teams/${teamId}/terms/upload/template`, {
+    responseType: 'blob',
+  });
+  const url = URL.createObjectURL(res.data as Blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'term-template.xlsx';
+  a.click();
+  URL.revokeObjectURL(url);
 }

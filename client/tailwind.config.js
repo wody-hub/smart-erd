@@ -43,6 +43,10 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
         header: {
           DEFAULT: "hsl(var(--header-bg))",
           foreground: "hsl(var(--header-foreground))",
@@ -61,6 +65,12 @@ export default {
           "status-connecting": "hsl(var(--erd-status-connecting))",
           "status-disconnected": "hsl(var(--erd-status-disconnected))",
           "cursor-foreground": "hsl(var(--erd-cursor-foreground))",
+          "cursor-1": "hsl(var(--cursor-color-1))",
+          "cursor-2": "hsl(var(--cursor-color-2))",
+          "cursor-3": "hsl(var(--cursor-color-3))",
+          "cursor-4": "hsl(var(--cursor-color-4))",
+          "cursor-5": "hsl(var(--cursor-color-5))",
+          "cursor-6": "hsl(var(--cursor-color-6))",
         },
       },
       borderRadius: {

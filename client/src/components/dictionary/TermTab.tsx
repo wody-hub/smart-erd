@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Trash2, FileText } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,6 +17,7 @@ import {
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import Spinner from '@/components/ui/spinner';
 import TermFormDialog from '@/components/dictionary/TermFormDialog';
+import BulkUploadDialog from '@/components/dictionary/BulkUploadDialog';
 import { fetchTerms, createTerm, updateTerm, deleteTerm } from '@/api/termApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
@@ -38,6 +39,8 @@ export default function TermTab() {
   const [editTarget, setEditTarget] = useState<Term | null>(null);
   /** 삭제 확인 대상 용어 ID */
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  /** 일괄 업로드 다이얼로그 열림 상태 */
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const { data: terms = [], isLoading } = useQuery({
     queryKey: queryKeys.dictionary.terms(teamId!),
@@ -110,7 +113,11 @@ export default function TermTab() {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-end gap-2 mb-4">
+        <Button variant="outline" onClick={() => setUploadOpen(true)}>
+          <Upload className="h-4 w-4 mr-2" />
+          {t('dictionary.upload.button')}
+        </Button>
         <Button onClick={handleCreate}>
           <Plus className="h-4 w-4 mr-2" />
           {t('dictionary.term.form.createTitle')}
@@ -199,6 +206,8 @@ export default function TermTab() {
         }}
         loading={deleteMutation.isPending}
       />
+
+      <BulkUploadDialog open={uploadOpen} onOpenChange={setUploadOpen} mode="term" />
     </div>
   );
 }
