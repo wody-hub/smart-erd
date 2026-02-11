@@ -6,6 +6,14 @@ export const ROUTES = {
   SIGNUP: '/signup',
   /** 팀 목록 페이지 */
   TEAMS: '/teams',
+  /** 프로젝트 목록 페이지 (라우트 패턴) */
+  PROJECTS_PATTERN: '/teams/:teamId/projects',
+  /** 데이터 사전 페이지 (라우트 패턴) */
+  DICTIONARY_PATTERN: '/teams/:teamId/dictionary',
+  /** 다이어그램 목록 페이지 (라우트 패턴) */
+  DIAGRAMS_PATTERN: '/teams/:teamId/projects/:projectId/diagrams',
+  /** 다이어그램 편집 페이지 (라우트 패턴) */
+  DIAGRAM_PATTERN: '/teams/:teamId/projects/:projectId/diagrams/:diagramId',
   /** 프로젝트 목록 페이지 */
   PROJECTS: (teamId: string | number) => `/teams/${teamId}/projects`,
   /** 다이어그램 목록 페이지 */

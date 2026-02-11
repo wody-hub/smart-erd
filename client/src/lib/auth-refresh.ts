@@ -2,7 +2,10 @@ import axios from 'axios';
 import { STORAGE_KEYS } from '@/constants/storage';
 import useAuthStore from '@/stores/useAuthStore';
 
-/** 동시에 발생한 refresh 요청을 단일 실행으로 합치기 위한 in-flight Promise */
+/**
+ * 동시에 발생한 refresh 요청을 단일 실행으로 합치기 위한 in-flight Promise.
+ * 모듈 스코프 — Promise를 Zustand에 저장하면 직렬화 불가 + 셀렉터 안정성 문제로 모듈 스코프에 유지.
+ */
 let refreshInFlight: Promise<string> | null = null;
 
 /**

@@ -56,8 +56,6 @@ export default function DiagramPage() {
     mutationFn: (content: string) => saveDiagram(teamId!, projectId!, diagramId!, content),
   });
 
-  useAutoBackup(saveMutation, teamId!, projectId!, diagramId!);
-
   /** 다이어그램을 서버에 백업한다. 변경이 없으면 생략하고, 백업 중이면 중복 실행을 방지한다. */
   const handleSave = () => {
     if (saveMutation.isPending) {
@@ -77,6 +75,7 @@ export default function DiagramPage() {
     });
   };
 
+  useAutoBackup(saveMutation, teamId!, projectId!, diagramId!);
   useHotkeys(KEYBINDINGS.SAVE, handleSave, { preventDefault: true });
 
   // Y.Doc + YjsProvider 라이프사이클 관리

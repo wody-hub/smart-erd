@@ -12,6 +12,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { fetchMembers, inviteMember, removeMember } from '@/api/teamApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
@@ -50,8 +57,6 @@ export default function MembersDialog({
   const [inviteLoginId, setInviteLoginId] = useState('');
   /** 초대할 멤버에게 부여할 역할 */
   const [inviteRole, setInviteRole] = useState<'MEMBER' | 'VIEWER'>('MEMBER');
-  /** 초대 실패 시 에러 메시지 */
-  const [inviteError, setInviteError] = useState('');
 
   /** 팀 멤버 역할 코드를 현재 언어 라벨로 변환한다. */
   const getRoleLabel = (role: TeamMemberRole) => {
@@ -78,9 +83,8 @@ export default function MembersDialog({
       queryClient.invalidateQueries({ queryKey: queryKeys.teams.members(teamId) });
       onMembersChanged?.();
       setInviteLoginId('');
-      setInviteError('');
     },
-    onError: (err) => setInviteError(getErrorMessage(err, t('team.members.inviteFailed'))),
+    onError: (err) => toast.error(getErrorMessage(err, t('team.members.inviteFailed'))),
   });
 
   const removeMutation = useMutation({
@@ -97,7 +101,6 @@ export default function MembersDialog({
   const handleInvite = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!inviteLoginId.trim()) return;
-    setInviteError('');
     inviteMutation.mutate({ loginId: inviteLoginId.trim(), role: inviteRole });
   };
 
@@ -123,18 +126,19 @@ export default function MembersDialog({
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="invite-role" className="text-xs">
-              {t('team.members.roleLabel')}
-            </Label>
-            <select
-              id="invite-role"
+            <Label className="text-xs">{t('team.members.roleLabel')}</Label>
+            <Select
               value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as 'MEMBER' | 'VIEWER')}
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              onValueChange={(value) => setInviteRole(value as 'MEMBER' | 'VIEWER')}
             >
-              <option value="MEMBER">{t('team.members.roleMember')}</option>
-              <option value="VIEWER">{t('team.members.roleViewer')}</option>
-            </select>
+              <SelectTrigger className="h-9 w-[100px]" aria-label={t('team.members.roleLabel')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MEMBER">{t('team.members.roleMember')}</SelectItem>
+                <SelectItem value="VIEWER">{t('team.members.roleViewer')}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <Button
             type="submit"
@@ -144,7 +148,6 @@ export default function MembersDialog({
             {inviteMutation.isPending ? t('common.button.pending') : t('common.button.invite')}
           </Button>
         </form>
-        {inviteError && <p className="text-sm text-destructive">{inviteError}</p>}
 
         <div className="space-y-2 mt-4 max-h-64 overflow-auto">
           {members.map((member) => (

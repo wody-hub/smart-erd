@@ -35,7 +35,7 @@ export default function App() {
             }
           />
           <Route
-            path="/teams/:teamId/projects"
+            path={ROUTES.PROJECTS_PATTERN}
             element={
               <ProtectedRoute>
                 <ProjectsPage />
@@ -43,7 +43,7 @@ export default function App() {
             }
           />
           <Route
-            path="/teams/:teamId/dictionary"
+            path={ROUTES.DICTIONARY_PATTERN}
             element={
               <ProtectedRoute>
                 <DictionaryPage />
@@ -51,7 +51,7 @@ export default function App() {
             }
           />
           <Route
-            path="/teams/:teamId/projects/:projectId/diagrams"
+            path={ROUTES.DIAGRAMS_PATTERN}
             element={
               <ProtectedRoute>
                 <DiagramsPage />
@@ -59,7 +59,7 @@ export default function App() {
             }
           />
           <Route
-            path="/teams/:teamId/projects/:projectId/diagrams/:diagramId"
+            path={ROUTES.DIAGRAM_PATTERN}
             element={
               <ProtectedRoute>
                 <DiagramPage />

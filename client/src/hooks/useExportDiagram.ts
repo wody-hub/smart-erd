@@ -12,7 +12,10 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
 /** 노드 바운드 주변 여백 (px) */
 const BOUND_PADDING = 50;
-/** 내보내기 이미지 배경색 (인쇄/공유용 고정 흰색) */
+/**
+ * 내보내기 이미지 배경색 — 인쇄/공유용 고정 흰색 배경.
+ * 디자인 토큰 예외: 다크 모드에서도 인쇄 매체 특성상 흰색 고정. 다크 모드 export 지원 시 getComputedStyle로 동적 추출 전환.
+ */
 const EXPORT_BACKGROUND = '#ffffff';
 
 /** 캡처 옵션 (뷰포트 요소 + 이미지 크기 + CSS transform) */

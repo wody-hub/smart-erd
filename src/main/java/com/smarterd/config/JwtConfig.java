@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -34,8 +35,10 @@ public class JwtConfig {
      */
     @Bean
     @ConfigurationProperties(prefix = "smart-erd.jwt")
-    public JwtProperties jwtProperties() {
-        return new JwtProperties();
+    public JwtProperties jwtProperties(Environment environment) {
+        final var properties = new JwtProperties();
+        properties.setEnvironment(environment);
+        return properties;
     }
 
     /**

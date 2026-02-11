@@ -172,20 +172,39 @@ function generateUniqueName(base: string, existing: string[]): string {
  * 엣지 ID 규칙: `e-{sourceHandle}-{targetHandle}`
  */
 const useCanvasStore = create<CanvasState>((set, get) => {
-  /** observeDeep 콜백 참조 (cleanup용) — 클로저 스코프 */
+  /**
+   * observeDeep 콜백 참조 (cleanup용).
+   * Zustand 외부 — 콜백 참조는 직렬화 불가하며, state 저장 시 불필요한 re-render를 유발하므로 클로저 스코프에 유지.
+   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let tablesObserver: ((events: Y.YEvent<any>[]) => void) | null = null;
+  /**
+   * observeDeep 콜백 참조 (cleanup용).
+   * Zustand 외부 — 콜백 참조는 직렬화 불가하며, state 저장 시 불필요한 re-render를 유발하므로 클로저 스코프에 유지.
+   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let edgesObserver: ((events: Y.YEvent<any>[]) => void) | null = null;
   /** 로컬 position 동기화 트랜잭션 origin 식별자 */
   const POSITION_SYNC_ORIGIN = 'local-position-sync';
-  /** 노드 드래그 중 여부 (드래그 중 observer 전체 재세팅 방지용) */
+  /**
+   * 노드 드래그 중 여부 (드래그 중 observer 전체 재세팅 방지용).
+   * Zustand 외부 — 드래그 중 매 mousemove마다 변경되므로 set() 시 과도한 re-render 발생. 클로저 스코프에서 플래그로만 사용.
+   */
   let isNodeDragging = false;
-  /** 드래그 중 들어온 원격 테이블 변경의 지연 동기화 필요 여부 */
+  /**
+   * 드래그 중 들어온 원격 테이블 변경의 지연 동기화 필요 여부.
+   * Zustand 외부 — isNodeDragging과 동기적으로 판단하는 플래그로, re-render 없이 읽기/쓰기가 필요하므로 클로저 스코프에 유지.
+   */
   let hasDeferredTableSync = false;
-  /** position 업데이트 throttle 타이머 — 클로저 스코프 */
+  /**
+   * position 업데이트 throttle 타이머.
+   * Zustand 외부 — setTimeout 반환값(타이머 ID)은 직렬화 불가하며 DevTools에 노출할 필요 없으므로 클로저 스코프에 유지.
+   */
   let positionThrottleTimer: ReturnType<typeof setTimeout> | null = null;
-  /** throttle 중 누적된 position 변경 — 클로저 스코프 */
+  /**
+   * throttle 중 누적된 position 변경.
+   * Zustand 외부 — throttle 윈도우 내 고빈도 position 변경을 누적하며, 매 변경마다 set() 시 re-render 비용이 과도하므로 클로저 스코프에 유지.
+   */
   let pendingPositionChanges: Map<string, { x: number; y: number }> = new Map();
 
   return {
