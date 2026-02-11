@@ -95,6 +95,19 @@ export async function renameDiagram(
 }
 
 /**
+ * WebSocket 연결을 위한 일회용 ticket을 발급받는다.
+ *
+ * @param diagramId 다이어그램 ID
+ * @returns 일회용 ticket 문자열
+ */
+export async function requestWsTicket(diagramId: string): Promise<string> {
+  const res = await axiosInstance.post<{ ticket: string }>('/ws-ticket', {
+    diagramId: Number(diagramId),
+  });
+  return res.data.ticket;
+}
+
+/**
  * 다이어그램을 삭제한다.
  *
  * @param teamId    팀 ID

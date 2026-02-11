@@ -25,4 +25,13 @@ public class WebSocketProperties {
 
     /** dirty 스냅샷 flush 주기 (밀리초) */
     private long snapshotFlushInterval = 30000;
+
+    /** 사용자별 최대 동시 WebSocket 연결 수 */
+    private int maxConnectionsPerUser = 5;
+
+    /** 다이어그램별 누적 update 최대 크기 (바이트) */
+    private long maxAccumulatedUpdatesSize = 10 * 1024 * 1024;
+
+    /** WebSocket 세션 최대 유지 시간 (밀리초) */
+    private long sessionMaxDuration = 1800000;
 }

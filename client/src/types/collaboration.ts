@@ -23,10 +23,8 @@ export interface AwarenessState {
 export interface YjsProviderOptions {
   /** 다이어그램 ID */
   diagramId: string;
-  /** JWT Access Token */
-  token: string;
-  /** WebSocket 서버 URL (기본: 자동 감지) */
-  serverUrl?: string;
+  /** 일회용 WebSocket ticket을 발급받는 콜백 */
+  getTicket: () => Promise<string>;
 }
 
 /**
