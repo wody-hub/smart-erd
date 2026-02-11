@@ -12,5 +12,15 @@ services:
     labels:
       org.springframework.boot.service-connection: postgres
 
+  redis:
+    image: 'redis:7-alpine'
+    container_name: smart-erd-redis
+    ports:
+      - '16379:6379'
+    profiles:
+      - redis
+    labels:
+      org.springframework.boot.service-connection: redis
+
 volumes:
   postgres-data:

@@ -34,4 +34,7 @@ public class WebSocketProperties {
 
     /** WebSocket 세션 최대 유지 시간 (밀리초) */
     private long sessionMaxDuration = 1800000;
+
+    /** ticket 저장소 유형 ({@code in-memory} 또는 {@code redis}) */
+    private String ticketStore = "in-memory";
 }

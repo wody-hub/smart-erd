@@ -39,7 +39,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Slf4j
 @Service
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class TermBulkService extends AbstractBulkService<TermBulkService.TermUploadRow> {
 
     private static final int PHYSICAL_NAME_MAX = 100;
@@ -261,9 +260,12 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
     public ExcelUtils.ExcelData generateTemplate() {
         final var titles = List.of("논리명 (필수)", "물리명 (필수)", "도메인 (논리명)", "설명");
         final var templateData = List.of(new TemplateRow("사용자명", "user_name", "이름", ""));
-        final var utils = new ExcelUtils<>(templateData, titles);
-        utils.sheetName("용어");
-        return utils.toExcel();
+        try (final var utils = new ExcelUtils<>(templateData, titles)) {
+            utils.sheetName("용어");
+            return utils.toExcel();
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException("엑셀 템플릿 생성 중 리소스 해제 실패", e);
+        }
     }
 
     /**

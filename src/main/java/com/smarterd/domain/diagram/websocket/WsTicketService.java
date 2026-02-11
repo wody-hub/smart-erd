@@ -10,14 +10,11 @@ import com.smarterd.domain.team.repository.TeamMemberRepository;
 import com.smarterd.domain.user.repository.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>JWT를 URL query param으로 직접 전달하는 대신, 서버에서 단기 유효(30초)
  * 일회용 ticket을 발급하고 WebSocket 핸드셰이크 시 검증한다.
  * ticket은 한 번 사용되면 즉시 소멸(consume)된다.</p>
+ *
+ * <p>ticket 저장소는 {@link WsTicketStore} 인터페이스를 통해 추상화되어
+ * in-memory / Redis 구현체를 설정으로 전환할 수 있다.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -54,19 +54,8 @@ public class WsTicketService {
     /** 팀 멤버 레포지토리 */
     private final TeamMemberRepository teamMemberRepository;
 
-    // TODO: 수평 확장 시 Redis TTL key로 전환 필요
-    /** ticket → 발급 데이터 저장소 (현재 단일 서버 인메모리) */
-    private final Map<String, TicketData> tickets = new ConcurrentHashMap<>();
-
-    /**
-     * ticket 발급 시 저장되는 데이터.
-     *
-     * @param loginId   사용자 로그인 ID
-     * @param userName  사용자 표시 이름
-     * @param diagramId 대상 다이어그램 ID
-     * @param expiresAt ticket 만료 시각
-     */
-    private record TicketData(String loginId, String userName, Long diagramId, Instant expiresAt) {}
+    /** ticket 저장소 */
+    private final WsTicketStore wsTicketStore;
 
     /**
      * 사용자/다이어그램 검증 후 일회용 WebSocket ticket을 발급한다.
@@ -112,23 +101,17 @@ public class WsTicketService {
      */
     private String issueTicket(String loginId, String userName, Long diagramId) {
         // 동일 (loginId, diagramId) 조합의 기존 ticket 제거
-        tickets
-            .entrySet()
-            .removeIf((e) -> e.getValue().loginId.equals(loginId) && e.getValue().diagramId.equals(diagramId));
+        wsTicketStore.removeByLoginIdAndDiagramId(loginId, diagramId);
 
         // 사용자별 미사용 ticket 수 상한 확인
-        final var outstandingCount = tickets
-            .values()
-            .stream()
-            .filter((d) -> d.loginId.equals(loginId))
-            .count();
+        final var outstandingCount = wsTicketStore.countByLoginId(loginId);
         if (outstandingCount >= MAX_OUTSTANDING_TICKETS_PER_USER) {
             throw new BusinessException(MessageCode.ERROR_BUSINESS_TICKET_LIMIT_EXCEEDED.code());
         }
 
         final var ticket = UUID.randomUUID().toString();
         final var expiresAt = Instant.now().plus(TICKET_TTL);
-        tickets.put(ticket, new TicketData(loginId, userName, diagramId, expiresAt));
+        wsTicketStore.store(ticket, new TicketData(loginId, userName, diagramId, expiresAt), TICKET_TTL);
         log.debug("WebSocket ticket 발급: loginId={}, diagramId={}", loginId, diagramId);
         return ticket;
     }
@@ -143,28 +126,13 @@ public class WsTicketService {
      * @return 검증 성공 시 세션 정보, 실패 시 empty
      */
     public Optional<WebSocketSessionInfo> validateAndConsume(String ticket) {
-        final var data = tickets.remove(ticket);
-        if (data == null) {
-            return Optional.empty();
-        }
-        if (data.expiresAt.isBefore(Instant.now())) {
-            log.debug("WebSocket ticket 만료: loginId={}", data.loginId);
-            return Optional.empty();
-        }
-
-        final var sessionExpiresAt = Instant.now().plus(Duration.ofMillis(webSocketProperties.getSessionMaxDuration()));
-        return Optional.of(new WebSocketSessionInfo(data.loginId, data.userName, data.diagramId, sessionExpiresAt));
-    }
-
-    /**
-     * 만료된 ticket을 주기적으로 정리한다.
-     */
-    @Scheduled(fixedDelay = 60000)
-    public void cleanupExpiredTickets() {
-        final var now = Instant.now();
-        final var removed = tickets.entrySet().removeIf((e) -> e.getValue().expiresAt.isBefore(now));
-        if (removed && log.isDebugEnabled()) {
-            log.debug("만료된 WebSocket ticket 정리 완료");
-        }
+        return wsTicketStore
+            .consume(ticket)
+            .map((data) -> {
+                final var sessionExpiresAt = Instant.now().plus(
+                    Duration.ofMillis(webSocketProperties.getSessionMaxDuration())
+                );
+                return new WebSocketSessionInfo(data.loginId(), data.userName(), data.diagramId(), sessionExpiresAt);
+            });
     }
 }

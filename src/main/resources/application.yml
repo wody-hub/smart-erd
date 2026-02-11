@@ -3,6 +3,11 @@ logging:
     p6spy: info
 
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
   servlet:
     multipart:
       max-file-size: 5MB
@@ -26,9 +31,7 @@ spring:
     hibernate:
       ddl-auto: update
     properties:
-      hibernate:
-        jdbc:
-          time_zone: UTC
+      "[hibernate.jdbc.time_zone]": UTC
 
 decorator:
   datasource:
@@ -46,6 +49,7 @@ smart-erd:
     max-connections-per-user: 5
     max-accumulated-updates-size: 10485760 # 10MB
     session-max-duration: 1800000 # 30분
+    ticket-store: in-memory # in-memory | redis (redis 사용 시: docker compose --profile redis up -d)
   cors:
     allowed-origins: ${SMART_ERD_CORS_ORIGINS:http://localhost:3000}
     allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS

@@ -34,6 +34,7 @@ dependencies {
     // Lombok (must be declared before QueryDSL annotation processor)
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
 
     // QueryDSL 5.1.0 jakarta
     implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
@@ -58,6 +59,9 @@ dependencies {
 
     // SQL 로깅 (p6spy — 개발 전용, 커스텀 포맷터 컴파일에 필요)
     implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.12.1'
+
+    // Redis (WebSocket ticket 저장소 — 선택적 사용)
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
     // Excel import/export
     implementation 'org.apache.poi:poi-ooxml:5.4.1'
