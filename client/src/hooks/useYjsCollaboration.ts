@@ -55,9 +55,10 @@ export function useYjsCollaboration(
     // 1. Y.Doc 생성
     const ydoc = new Y.Doc();
 
-    // 2. 기존 JSON 데이터 마이그레이션 (ydocSnapshot이 없는 레거시 다이어그램용)
-    // Y.Doc 스냅샷은 WS 연결 후 SNAPSHOT_REQUEST로 서버에서 로드
-    if (diagram.content && !diagram.hasYdocSnapshot) {
+    // 2. 기존 JSON 데이터 낙관적 부트스트랩
+    // - hasYdocSnapshot=true여도 content가 있으면 먼저 그려 초기 공백/깜빡임을 줄인다.
+    // - 이후 WS SNAPSHOT_RESPONSE가 authoritative 상태로 보정한다.
+    if (diagram.content) {
       migrateJsonToYDoc(ydoc, diagram.content);
     }
 
@@ -122,7 +123,7 @@ export function useYjsCollaboration(
     // - initYDoc, destroyYDoc: Zustand 셀렉터 — create() 내부 클로저로 참조 안정
     // - setConnectionStatus, updateAwareness, removePeerByLoginId, resetCollaboration: 동일
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [diagram, diagramId]);
+  }, [diagramId, diagram?.id]);
 
   // 스냅샷 크기 임계치 초과 + 단독 접속 시 자동 컴팩션
   useSnapshotCompaction(providerRef, diagramId);
