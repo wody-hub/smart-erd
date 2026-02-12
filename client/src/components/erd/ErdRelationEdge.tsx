@@ -104,7 +104,7 @@ function renderTargetMarker(
 
   // Optional일 때만 원(○) 표시, mandatory일 때는 별도 기호 없음
   if (optional) {
-    const optX = x - direction * (MARKER_OFFSET - 2);
+    const optX = x + direction * (MARKER_OFFSET - 2);
     elements.push(
       <circle
         key="opt"
@@ -119,9 +119,9 @@ function renderTargetMarker(
   }
 
   if (symbol === 'many') {
-    // Crow's foot (<) — 세 갈래
-    const tipX = x;
-    const baseX = x - direction * 12;
+    // Crow's foot — 갈래(spread)가 노드를 향하고, 수렴점(tip)이 엣지 경로를 향함
+    const baseX = x;
+    const tipX = x + direction * 12;
     elements.push(
       <g key="crow">
         <line
@@ -145,7 +145,7 @@ function renderTargetMarker(
     );
   } else {
     // One (|) — 수직선
-    const lineX = x - direction * 8;
+    const lineX = x + direction * 8;
     elements.push(
       <line
         key="one"

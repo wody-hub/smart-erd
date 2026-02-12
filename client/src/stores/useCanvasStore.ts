@@ -582,6 +582,20 @@ const useCanvasStore = create<CanvasState>((set, get) => {
             colYMap.set(key, value);
           }
         }
+
+        // PK 또는 FK 변경 시 연결된 엣지의 relationType 동기화
+        if ('pk' in updates || 'fk' in updates) {
+          const isPk = !!colYMap.get('pk');
+          const isFk = !!colYMap.get('fk');
+          const targetHandleId = `${nodeId}-${colId}-target`;
+          const edgesMap = getEdgesMap(ydoc);
+          edgesMap.forEach((edgeYMap) => {
+            const th = edgeYMap.get('targetHandle') as string | undefined;
+            if (th === targetHandleId) {
+              edgeYMap.set('relationType', isPk && isFk ? 'identifying' : 'non-identifying');
+            }
+          });
+        }
       });
     },
 
