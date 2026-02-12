@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { lazy, Suspense, useMemo, useState, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -28,11 +28,12 @@ import CanvasToolbar from './CanvasToolbar';
 import EdgeContextMenu from './EdgeContextMenu';
 import DeleteEdgeDialog from './DeleteEdgeDialog';
 import DdlExportDialog from './DdlExportDialog';
-import DdlImportDialog from './DdlImportDialog';
 import FkTypeDialog from './FkTypeDialog';
 import ErdRelationEdge from './ErdRelationEdge';
 import RemoteCursors from './RemoteCursors';
 import { ErdFkModeProvider } from './ErdFkModeContext';
+
+const DdlImportDialog = lazy(() => import('./DdlImportDialog'));
 
 /** React Flow에 등록할 커스텀 노드 타입 매핑 */
 const nodeTypes: NodeTypes = {
@@ -44,6 +45,9 @@ const nodeTypes: NodeTypes = {
 const edgeTypes: EdgeTypes = {
   erdRelation: ErdRelationEdge,
 };
+
+/** 노드 수가 임계치를 넘으면 MiniMap을 자동 숨김하여 드래그 성능을 우선한다. */
+const MINIMAP_NODE_LIMIT = 80;
 
 /** 엣지 컨텍스트 메뉴 상태 */
 interface ContextMenuState {
@@ -111,7 +115,7 @@ export default function ERDCanvas({
   );
 
   /** 그룹 노드를 테이블 노드 아래에 합산하여 React Flow에 전달 */
-  const allNodes = [...groupNodes, ...nodes] as Node[];
+  const allNodes = useMemo(() => [...groupNodes, ...nodes] as Node[], [groupNodes, nodes]);
 
   const highlightedEdgeId = useCanvasStore((s) => s.highlightedEdgeId);
   const setHighlightedEdge = useCanvasStore((s) => s.setHighlightedEdge);
@@ -141,6 +145,8 @@ export default function ERDCanvas({
   const [ddlDialogOpen, setDdlDialogOpen] = useState(false);
   /** DDL 가져오기 다이얼로그 열림 상태 */
   const [ddlImportOpen, setDdlImportOpen] = useState(false);
+  /** 노드 드래그 진행 여부 (드래그 중 성능 우선 렌더링 제어용) */
+  const [isDraggingNode, setIsDraggingNode] = useState(false);
 
   /**
    * 엣지에 대한 삭제 다이얼로그를 여는 공통 함수.
@@ -220,11 +226,18 @@ export default function ERDCanvas({
   useHotkeys(KEYBINDINGS.ESCAPE, cancelFkMode, { enabled: fkMode });
 
   /** 엣지에 하이라이트 스타일 적용 */
-  const styledEdges = edges.map((e) => ({
-    ...e,
-    selected: e.id === highlightedEdgeId,
-    animated: e.id === highlightedEdgeId,
-  }));
+  const styledEdges = useMemo(
+    () =>
+      edges.map((e) => ({
+        ...e,
+        selected: e.id === highlightedEdgeId,
+        animated: !isDraggingNode && e.id === highlightedEdgeId,
+      })),
+    [edges, highlightedEdgeId, isDraggingNode],
+  );
+
+  const showOverlayWidgets = !isDraggingNode;
+  const showMiniMap = showOverlayWidgets && allNodes.length <= MINIMAP_NODE_LIMIT;
 
   return (
     <div className="w-full h-full" ref={canvasRef}>
@@ -236,6 +249,8 @@ export default function ERDCanvas({
           onEdgesChange={canEdit ? onEdgesChange : undefined}
           onConnect={canEdit ? handleDragConnect : undefined}
           onNodeClick={handleNodeClick}
+          onNodeDragStart={canEdit ? () => setIsDraggingNode(true) : undefined}
+          onNodeDragStop={canEdit ? () => setIsDraggingNode(false) : undefined}
           onEdgeClick={handleEdgeClick}
           onEdgeContextMenu={canEdit ? handleEdgeContextMenu : undefined}
           onPaneClick={handlePaneClick}
@@ -253,13 +268,15 @@ export default function ERDCanvas({
           fitView
           className={cn(fkMode && 'cursor-crosshair')}
         >
-          <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-          <Controls />
-          <MiniMap
-            nodeStrokeColor="hsl(var(--muted-foreground))"
-            nodeColor="hsl(var(--card))"
-            nodeBorderRadius={4}
-          />
+          {showOverlayWidgets && <Background variant={BackgroundVariant.Dots} gap={16} size={1} />}
+          {showOverlayWidgets && <Controls />}
+          {showMiniMap && (
+            <MiniMap
+              nodeStrokeColor="hsl(var(--muted-foreground))"
+              nodeColor="hsl(var(--card))"
+              nodeBorderRadius={4}
+            />
+          )}
           <CanvasToolbar
             fkMode={fkMode}
             onToggleFkMode={toggleFkMode}
@@ -277,7 +294,7 @@ export default function ERDCanvas({
         </ReactFlow>
       </ErdFkModeProvider>
 
-      <RemoteCursors />
+      {showOverlayWidgets && <RemoteCursors />}
 
       {contextMenu && (
         <EdgeContextMenu
@@ -315,7 +332,11 @@ export default function ERDCanvas({
         diagramName={diagramName}
       />
 
-      <DdlImportDialog open={ddlImportOpen} onOpenChange={setDdlImportOpen} />
+      {ddlImportOpen && (
+        <Suspense fallback={null}>
+          <DdlImportDialog open={ddlImportOpen} onOpenChange={setDdlImportOpen} />
+        </Suspense>
+      )}
 
       <FkTypeDialog
         open={fkTypeDialogOpen}

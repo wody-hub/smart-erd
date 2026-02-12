@@ -306,63 +306,108 @@ const useCanvasStore = create<CanvasState>((set, get) => {
    */
   let hasDeferredTableSync = false;
   /**
-   * position 변경을 50ms throttle로 Y.Doc에 반영하는 컨텍스트.
-   * Zustand 외부 — setTimeout/Map은 직렬화 불가하며 DevTools에 노출할 필요 없으므로 클로저 스코프에 유지.
+   * position 동기화 대기 큐.
+   * 드래그 중에는 Y.Doc 반영을 지연하고, 드래그 종료 시 한 번에 flush한다.
    */
-  interface ThrottleCtx {
-    timer: ReturnType<typeof setTimeout> | null;
+  interface PositionQueueCtx {
     pending: Map<string, { x: number; y: number }>;
   }
-  /** 테이블 position throttle 컨텍스트 */
-  const tableThrottle: ThrottleCtx = { timer: null, pending: new Map() };
-  /** 그룹 position throttle 컨텍스트 */
-  const groupThrottle: ThrottleCtx = { timer: null, pending: new Map() };
+  /** 테이블 position 대기 큐 */
+  const tablePositionQueue: PositionQueueCtx = { pending: new Map() };
+  /** 그룹 position 대기 큐 */
+  const groupPositionQueue: PositionQueueCtx = { pending: new Map() };
 
   /**
-   * position 변경을 누적하고 50ms throttle로 Y.Doc에 반영한다.
+   * position 변경을 동기화 대기 큐에 누적한다.
    *
    * @param changes   position 타입의 NodeChange 배열
-   * @param ctx       throttle 컨텍스트 (테이블 또는 그룹)
-   * @param getYMap   Y.Doc에서 대상 Y.Map을 가져오는 함수
+   * @param ctx       position 대기 큐 컨텍스트 (테이블 또는 그룹)
    */
-  function throttlePositionToYDoc(
-    changes: NodeChange[],
-    ctx: ThrottleCtx,
-    getYMap: (doc: Y.Doc) => Y.Map<Y.Map<unknown>>,
-  ) {
+  function queuePositionToYDoc(changes: NodeChange[], ctx: PositionQueueCtx) {
     const posChanges = changes.filter(
       (c) => c.type === 'position' && 'position' in c && c.position,
     );
-    const ydoc = get().ydoc;
-    if (posChanges.length === 0 || !ydoc) return;
+    if (posChanges.length === 0) return;
 
     for (const change of posChanges) {
       if (change.type === 'position' && 'position' in change && change.position) {
         ctx.pending.set(change.id, change.position);
       }
     }
+  }
 
-    if (!ctx.timer) {
-      ctx.timer = setTimeout(() => {
-        const doc = get().ydoc;
-        if (doc && ctx.pending.size > 0) {
-          doc.transact(() => {
-            const yMap = getYMap(doc);
-            for (const [nodeId, pos] of ctx.pending) {
-              const nodeYMap = yMap.get(nodeId);
-              if (!nodeYMap) continue;
-              const posYMap = nodeYMap.get('position') as Y.Map<number> | undefined;
-              if (posYMap) {
-                posYMap.set('x', pos.x);
-                posYMap.set('y', pos.y);
-              }
-            }
-          }, POSITION_SYNC_ORIGIN);
-          ctx.pending = new Map();
+  /**
+   * 누적된 position 변경을 Y.Doc에 반영한다.
+   *
+   * @param ctx       position 대기 큐 컨텍스트 (테이블 또는 그룹)
+   * @param getYMap   Y.Doc에서 대상 Y.Map을 가져오는 함수
+   */
+  function flushQueuedPositionsToYDoc(
+    ctx: PositionQueueCtx,
+    getYMap: (doc: Y.Doc) => Y.Map<Y.Map<unknown>>,
+  ) {
+    const ydoc = get().ydoc;
+    if (!ydoc || ctx.pending.size === 0) return;
+
+    ydoc.transact(() => {
+      const yMap = getYMap(ydoc);
+      for (const [nodeId, pos] of ctx.pending) {
+        const nodeYMap = yMap.get(nodeId);
+        if (!nodeYMap) continue;
+        const posYMap = nodeYMap.get('position') as Y.Map<number> | undefined;
+        if (posYMap) {
+          posYMap.set('x', pos.x);
+          posYMap.set('y', pos.y);
         }
-        ctx.timer = null;
-      }, 50);
+      }
+    }, POSITION_SYNC_ORIGIN);
+    ctx.pending.clear();
+  }
+
+  /**
+   * position 전용 NodeChange를 경량 경로로 적용한다.
+   *
+   * @returns position 전용이 아니면 null, 전용이면 변경 적용 결과 배열
+   */
+  function applyPositionChangesFast<T extends Node>(current: T[], changes: NodeChange[]): T[] | null {
+    if (changes.length === 0) return current;
+    if (!changes.every((c) => c.type === 'position')) return null;
+
+    const posChangeById = new Map<string, NodeChange>();
+    for (const change of changes) {
+      if ('id' in change && typeof change.id === 'string') {
+        posChangeById.set(change.id, change);
+      }
     }
+    if (posChangeById.size === 0) return current;
+
+    let mutated = false;
+    const next = current.map((node) => {
+      const change = posChangeById.get(node.id);
+      if (!change || change.type !== 'position') return node;
+
+      const nextPosition =
+        'position' in change && change.position ? change.position : node.position;
+      const nextDragging =
+        'dragging' in change ? change.dragging : (node as Node & { dragging?: boolean }).dragging;
+
+      if (
+        nextPosition.x === node.position.x &&
+        nextPosition.y === node.position.y &&
+        nextDragging === (node as Node & { dragging?: boolean }).dragging
+      ) {
+        return node;
+      }
+
+      mutated = true;
+      return {
+        ...node,
+        position: nextPosition,
+        dragging: nextDragging,
+      } as T;
+    });
+
+    return mutated ? next : current;
   }
 
   /** 그룹 노드 ID 셋 (onNodesChange에서 빠른 분기 판별용) */
@@ -439,14 +484,9 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       edgesObserver = null;
       groupsObserver = null;
 
-      // throttle 타이머 정리
-      for (const ctx of [tableThrottle, groupThrottle]) {
-        if (ctx.timer) {
-          clearTimeout(ctx.timer);
-          ctx.timer = null;
-        }
-        ctx.pending = new Map();
-      }
+      // position 동기화 큐 정리
+      tablePositionQueue.pending.clear();
+      groupPositionQueue.pending.clear();
       isNodeDragging = false;
       hasDeferredTableSync = false;
       groupNodeIds = new Set();
@@ -457,40 +497,64 @@ const useCanvasStore = create<CanvasState>((set, get) => {
     onNodesChange: (changes) => {
       // 테이블 변경과 그룹 변경 분리 (C-3 해결)
       // groupNodeIds 동기화 타이밍 방어: 클로저 캐시 miss 시 실제 상태 확인
+      const hasGroups = groupNodeIds.size > 0;
       const isGroupId = (id: string) =>
         groupNodeIds.has(id) || get().groupNodes.some((g) => g.id === id);
-      const tableChanges = changes.filter((c) => !('id' in c && isGroupId(c.id)));
-      const groupChanges = changes.filter((c) => 'id' in c && isGroupId(c.id));
+      const tableChanges = hasGroups
+        ? changes.filter((c) => !('id' in c && isGroupId(c.id)))
+        : changes;
+      const groupChanges = hasGroups
+        ? changes.filter((c) => 'id' in c && isGroupId(c.id))
+        : [];
+      let shouldSyncDeferredTables = false;
 
-      for (const change of tableChanges) {
+      for (const change of changes) {
         if (change.type === 'position' && 'dragging' in change) {
           if (change.dragging === true) {
             isNodeDragging = true;
           } else if (change.dragging === false) {
             isNodeDragging = false;
-            const doc = get().ydoc;
-            if (doc && hasDeferredTableSync) {
+            if (hasDeferredTableSync) {
               hasDeferredTableSync = false;
-              set({ nodes: yTablesMapToNodes(getTablesMap(doc)) });
+              shouldSyncDeferredTables = true;
             }
           }
         }
       }
 
-      // position 변경은 throttle하여 Y.Doc에 반영 (드래그 성능)
-      throttlePositionToYDoc(tableChanges, tableThrottle, getTablesMap);
-      throttlePositionToYDoc(groupChanges, groupThrottle, getGroupsMap);
-
       // 로컬 상태 즉시 반영
       if (tableChanges.length > 0) {
+        const currentNodes = get().nodes;
+        const fastNodes = applyPositionChangesFast(currentNodes, tableChanges);
         set({
-          nodes: applyNodeChanges(tableChanges, get().nodes) as Node<TableNodeData>[],
+          nodes:
+            fastNodes ??
+            (applyNodeChanges(tableChanges, currentNodes) as Node<TableNodeData>[]),
         });
       }
       if (groupChanges.length > 0) {
+        const currentGroupNodes = get().groupNodes;
+        const fastGroupNodes = applyPositionChangesFast(currentGroupNodes, groupChanges);
         set({
-          groupNodes: applyNodeChanges(groupChanges, get().groupNodes) as Node<GroupNodeData>[],
+          groupNodes:
+            fastGroupNodes ??
+            (applyNodeChanges(groupChanges, currentGroupNodes) as Node<GroupNodeData>[]),
         });
+      }
+
+      // position 변경은 큐에 누적하고, 드래그 종료 시에만 Y.Doc에 반영
+      queuePositionToYDoc(tableChanges, tablePositionQueue);
+      queuePositionToYDoc(groupChanges, groupPositionQueue);
+      if (!isNodeDragging) {
+        flushQueuedPositionsToYDoc(tablePositionQueue, getTablesMap);
+        flushQueuedPositionsToYDoc(groupPositionQueue, getGroupsMap);
+      }
+
+      if (shouldSyncDeferredTables) {
+        const doc = get().ydoc;
+        if (doc) {
+          set({ nodes: yTablesMapToNodes(getTablesMap(doc)) });
+        }
       }
     },
 

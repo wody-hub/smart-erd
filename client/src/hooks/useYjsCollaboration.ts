@@ -122,7 +122,7 @@ export function useYjsCollaboration(
     // - initYDoc, destroyYDoc: Zustand 셀렉터 — create() 내부 클로저로 참조 안정
     // - setConnectionStatus, updateAwareness, removePeerByLoginId, resetCollaboration: 동일
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [diagram, diagramId]);
+  }, [diagramId, diagram?.id]);
 
   // 스냅샷 크기 임계치 초과 + 단독 접속 시 자동 컴팩션
   useSnapshotCompaction(providerRef, diagramId);
