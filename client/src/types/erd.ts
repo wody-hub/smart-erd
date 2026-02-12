@@ -26,6 +26,19 @@ export interface Column {
   domainId?: number;
 }
 
+/** 테이블/그룹 헤더 색상 프리셋 (기본 + 9가지 커스텀 색상) */
+export type TableHeaderColor =
+  | 'default'
+  | 'red'
+  | 'orange'
+  | 'amber'
+  | 'green'
+  | 'teal'
+  | 'blue'
+  | 'indigo'
+  | 'purple'
+  | 'pink';
+
 /**
  * 테이블 노드의 데이터 구조.
  *
@@ -33,8 +46,14 @@ export interface Column {
  * 테이블 이름과 컬럼 목록을 포함한다.
  */
 export interface TableNodeData extends Record<string, unknown> {
-  /** 테이블 표시 이름 */
+  /** 테이블 물리명 */
   label: string;
+  /** 테이블 논리명 (Feature 1: 용어사전 연동) */
+  logicalTableName?: string;
+  /** 연결된 Term ID (Feature 1: 용어사전 연동) */
+  tableTermId?: number;
+  /** 헤더 색상 프리셋 (Feature 4a: 테이블 색상) */
+  headerColor?: TableHeaderColor;
   /** 테이블 컬럼 목록 */
   columns: Column[];
 }
@@ -45,6 +64,22 @@ export interface TableNodeData extends Record<string, unknown> {
  * React Flow `Node`에 `TableNodeData`를 바인딩하고 노드 타입을 `'table'`로 지정한다.
  */
 export type TableNode = Node<TableNodeData, 'table'>;
+
+/**
+ * 그룹 노드 데이터 구조 (Feature 4b: 서브영역).
+ *
+ * 여러 테이블을 시각적으로 묶는 그룹 영역의 데이터.
+ * 테이블과의 포함 관계 없이 순수 시각적 그룹으로 동작한다.
+ */
+export interface GroupNodeData extends Record<string, unknown> {
+  /** 그룹 이름 */
+  label: string;
+  /** 그룹 영역 색상 */
+  color?: TableHeaderColor;
+}
+
+/** 그룹 노드 타입 */
+export type GroupNode = Node<GroupNodeData, 'group'>;
 
 /** 관계 유형: 식별(실선) / 비식별(점선) */
 export type RelationType = 'identifying' | 'non-identifying';

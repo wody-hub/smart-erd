@@ -23,10 +23,12 @@ import { useFkConnectMode } from '@/hooks/useFkConnectMode';
 import { useExportDiagram } from '@/hooks/useExportDiagram';
 import { useAwareness } from '@/hooks/useAwareness';
 import TableNode from './TableNode';
+import GroupNode from './GroupNode';
 import CanvasToolbar from './CanvasToolbar';
 import EdgeContextMenu from './EdgeContextMenu';
 import DeleteEdgeDialog from './DeleteEdgeDialog';
 import DdlExportDialog from './DdlExportDialog';
+import DdlImportDialog from './DdlImportDialog';
 import FkTypeDialog from './FkTypeDialog';
 import ErdRelationEdge from './ErdRelationEdge';
 import RemoteCursors from './RemoteCursors';
@@ -35,6 +37,7 @@ import { ErdFkModeProvider } from './ErdFkModeContext';
 /** React Flow에 등록할 커스텀 노드 타입 매핑 */
 const nodeTypes: NodeTypes = {
   table: TableNode,
+  group: GroupNode,
 };
 
 /** React Flow에 등록할 커스텀 엣지 타입 매핑 */
@@ -97,14 +100,18 @@ export default function ERDCanvas({
   /** 캔버스 컨테이너 ref (Awareness 커서 추적용) */
   const canvasRef = useRef<HTMLDivElement>(null);
   useAwareness(provider ?? null, canvasRef);
-  const { nodes, edges, onNodesChange, onEdgesChange } = useCanvasStore(
+  const { nodes, edges, groupNodes, onNodesChange, onEdgesChange } = useCanvasStore(
     useShallow((s) => ({
       nodes: s.nodes,
       edges: s.edges,
+      groupNodes: s.groupNodes,
       onNodesChange: s.onNodesChange,
       onEdgesChange: s.onEdgesChange,
     })),
   );
+
+  /** 그룹 노드를 테이블 노드 아래에 합산하여 React Flow에 전달 */
+  const allNodes = [...groupNodes, ...nodes] as Node[];
 
   const highlightedEdgeId = useCanvasStore((s) => s.highlightedEdgeId);
   const setHighlightedEdge = useCanvasStore((s) => s.setHighlightedEdge);
@@ -132,6 +139,8 @@ export default function ERDCanvas({
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState | null>(null);
   /** DDL 내보내기 다이얼로그 열림 상태 */
   const [ddlDialogOpen, setDdlDialogOpen] = useState(false);
+  /** DDL 가져오기 다이얼로그 열림 상태 */
+  const [ddlImportOpen, setDdlImportOpen] = useState(false);
 
   /**
    * 엣지에 대한 삭제 다이얼로그를 여는 공통 함수.
@@ -171,10 +180,10 @@ export default function ERDCanvas({
     setHighlightedNodes([edge.source, edge.target]);
   };
 
-  /** 노드 클릭 — FK 모드일 때만 FK 핸들러 호출 */
-  const handleNodeClick = (event: React.MouseEvent, node: Node<TableNodeData>) => {
-    if (fkMode) {
-      handleNodeClickInFkMode(event, node);
+  /** 노드 클릭 — FK 모드 + 테이블 노드일 때만 FK 핸들러 호출 */
+  const handleNodeClick = (event: React.MouseEvent, node: Node) => {
+    if (fkMode && node.type === 'table') {
+      handleNodeClickInFkMode(event, node as Node<TableNodeData>);
     }
   };
 
@@ -221,7 +230,7 @@ export default function ERDCanvas({
     <div className="w-full h-full" ref={canvasRef}>
       <ErdFkModeProvider value={fkMode}>
         <ReactFlow
-          nodes={nodes}
+          nodes={allNodes}
           edges={styledEdges}
           onNodesChange={canEdit ? onNodesChange : undefined}
           onEdgesChange={canEdit ? onEdgesChange : undefined}
@@ -260,6 +269,7 @@ export default function ERDCanvas({
             onExportSvg={exportSvg}
             onExportPdf={exportPdf}
             onExportDdl={() => setDdlDialogOpen(true)}
+            onImportDdl={() => setDdlImportOpen(true)}
             validationOpen={validationOpen}
             onToggleValidation={onToggleValidation}
             canEdit={canEdit}
@@ -304,6 +314,8 @@ export default function ERDCanvas({
         onOpenChange={setDdlDialogOpen}
         diagramName={diagramName}
       />
+
+      <DdlImportDialog open={ddlImportOpen} onOpenChange={setDdlImportOpen} />
 
       <FkTypeDialog
         open={fkTypeDialogOpen}

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Copy, Download } from 'lucide-react';
+import { useDarkMode } from '@/hooks/useDarkMode';
 import { toast } from 'sonner';
 import Editor from '@monaco-editor/react';
 import {
@@ -48,11 +49,12 @@ export default function DdlExportDialog({ open, onOpenChange, diagramName }: Ddl
 
   /** 선택된 DBMS 타입 */
   const [dbms, setDbms] = useState<DbmsType>('postgresql');
+  const isDark = useDarkMode();
 
   const nodes = useCanvasStore((s) => s.nodes) as TableNode[];
   const edges = useCanvasStore((s) => s.edges) as ERDEdge[];
 
-  const ddl = useMemo(() => generateDdl(nodes, edges, dbms), [nodes, edges, dbms]);
+  const ddl = generateDdl(nodes, edges, dbms);
 
   /** 클립보드에 DDL을 복사한다. */
   const handleCopy = async () => {
@@ -125,7 +127,7 @@ export default function DdlExportDialog({ open, onOpenChange, diagramName }: Ddl
                   lineNumbers: 'on',
                   wordWrap: 'on',
                 }}
-                theme="vs-dark"
+                theme={isDark ? 'vs-dark' : 'vs'}
               />
             </div>
 

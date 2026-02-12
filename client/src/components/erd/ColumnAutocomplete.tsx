@@ -49,6 +49,8 @@ interface ColumnAutocompleteProps {
   disabled?: boolean;
   /** 용어가 연결된 상태인지 여부 (termId 존재 시 true) */
   termLinked?: boolean;
+  /** 입력창 hover/focus 시 accent 배경 강조 사용 여부 */
+  highlightOnHover?: boolean;
 }
 
 /**
@@ -74,6 +76,7 @@ export default function ColumnAutocomplete({
   onRegisterNew,
   disabled,
   termLinked,
+  highlightOnHover = true,
 }: ColumnAutocompleteProps) {
   const { t } = useTranslation();
   const { searchTerms, getTermWithType, resolveCompound, partialDecompose, findDomainById } =
@@ -325,7 +328,7 @@ export default function ColumnAutocomplete({
       <PopoverAnchor asChild>
         <input
           ref={inputRef}
-          className="nodrag flex-1 bg-transparent outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring px-1 rounded min-w-0 text-xs"
+          className={`nodrag flex-1 bg-transparent outline-none ${highlightOnHover ? 'hover:bg-accent focus:bg-accent' : 'hover:bg-transparent focus:bg-transparent'} focus-visible:ring-1 focus-visible:ring-ring px-1 rounded min-w-0 text-xs`}
           value={localValue}
           onChange={handleInputChange}
           onCompositionStart={handleCompositionStart}

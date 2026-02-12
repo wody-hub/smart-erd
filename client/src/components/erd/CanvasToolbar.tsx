@@ -1,4 +1,4 @@
-import { Link2, LayoutGrid, Download, ClipboardCheck, Database } from 'lucide-react';
+import { Link2, LayoutGrid, Download, ClipboardCheck, Database, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@xyflow/react';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,8 @@ interface CanvasToolbarProps {
   onExportPdf: () => void;
   /** SQL DDL 내보내기 핸들러 */
   onExportDdl?: () => void;
+  /** SQL DDL 가져오기 핸들러 */
+  onImportDdl?: () => void;
   /** 유효성 검사 패널 열림 여부 */
   validationOpen?: boolean;
   /** 유효성 검사 패널 토글 핸들러 */
@@ -49,6 +51,7 @@ interface CanvasToolbarProps {
  * @param props.onExportSvg         SVG 내보내기 핸들러
  * @param props.onExportPdf         PDF 내보내기 핸들러
  * @param props.onExportDdl         SQL DDL 내보내기 핸들러
+ * @param props.onImportDdl         SQL DDL 가져오기 핸들러
  * @param props.validationOpen      유효성 검사 패널 열림 여부
  * @param props.onToggleValidation  유효성 검사 패널 토글 핸들러
  * @param props.canEdit             편집 가능 여부
@@ -62,6 +65,7 @@ export default function CanvasToolbar({
   onExportSvg,
   onExportPdf,
   onExportDdl,
+  onImportDdl,
   validationOpen,
   onToggleValidation,
   canEdit = true,
@@ -124,6 +128,18 @@ export default function CanvasToolbar({
           >
             <Database className="h-4 w-4" />
             {t('erd.toolbar.ddlExport')}
+          </Button>
+        )}
+        {canEdit && onImportDdl && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onImportDdl}
+            className="gap-1.5"
+            aria-label={t('erd.toolbar.ddlImport')}
+          >
+            <Upload className="h-4 w-4" />
+            {t('erd.toolbar.ddlImport')}
           </Button>
         )}
         {onToggleValidation && (

@@ -7,12 +7,16 @@ interface DbmsDialect {
   quote(name: string): string;
   /** 문장 구분자 */
   statementSeparator: string;
-  /** COMMENT 문 생성 (null이면 미지원) */
+  /** 컬럼 COMMENT 문 생성 (null이면 미지원) */
   comment?(table: string, column: string, text: string): string;
+  /** 테이블 COMMENT 문 생성 (COMMENT ON TABLE) */
+  tableComment?(table: string, text: string): string;
   /** 테이블 생성 후 추가 옵션 (예: ENGINE=InnoDB) */
   tableOptions?: string;
-  /** MySQL 인라인 COMMENT 생성 */
+  /** MySQL 인라인 컬럼 COMMENT 생성 */
   inlineComment?(text: string): string;
+  /** MySQL 인라인 테이블 COMMENT 생성 */
+  inlineTableComment?(text: string): string;
   /** 자동증가 토큰 설정 */
   autoIncrement?: {
     /** SQL 토큰 */
@@ -71,6 +75,8 @@ const dialects: Record<DbmsType, DbmsDialect> = {
     statementSeparator: ';',
     comment: (table, column, text) =>
       `COMMENT ON COLUMN "${escapeDoubleQuote(table)}"."${escapeDoubleQuote(column)}" IS '${escapeQuote(text)}'`,
+    tableComment: (table, text) =>
+      `COMMENT ON TABLE "${escapeDoubleQuote(table)}" IS '${escapeQuote(text)}'`,
     autoIncrement: { token: 'GENERATED ALWAYS AS IDENTITY' },
   },
   mysql: {
@@ -78,6 +84,7 @@ const dialects: Record<DbmsType, DbmsDialect> = {
     statementSeparator: ';',
     tableOptions: ' ENGINE=InnoDB',
     inlineComment: (text) => ` COMMENT '${escapeQuote(text)}'`,
+    inlineTableComment: (text) => ` COMMENT='${escapeQuote(text)}'`,
     autoIncrement: { token: 'AUTO_INCREMENT', afterNotNull: true },
   },
   oracle: {
@@ -85,6 +92,8 @@ const dialects: Record<DbmsType, DbmsDialect> = {
     statementSeparator: ';',
     comment: (table, column, text) =>
       `COMMENT ON COLUMN "${escapeDoubleQuote(table)}"."${escapeDoubleQuote(column)}" IS '${escapeQuote(text)}'`,
+    tableComment: (table, text) =>
+      `COMMENT ON TABLE "${escapeDoubleQuote(table)}" IS '${escapeQuote(text)}'`,
     autoIncrement: { token: 'GENERATED ALWAYS AS IDENTITY' },
   },
   sqlserver: {
@@ -285,24 +294,44 @@ export function generateDdl(nodes: TableNode[], edges: ERDEdge[], dbms: DbmsType
 
     const tableBody = lines.join(',\n');
     const tableOptions = dialect.tableOptions ?? '';
+    const inlineTblComment =
+      dialect.inlineTableComment && node.data.logicalTableName
+        ? dialect.inlineTableComment(node.data.logicalTableName)
+        : '';
     statements.push(
-      `CREATE TABLE ${dialect.quote(label)} (\n${tableBody}\n)${tableOptions}${dialect.statementSeparator}`,
+      `CREATE TABLE ${dialect.quote(label)} (\n${tableBody}\n)${tableOptions}${inlineTblComment}${dialect.statementSeparator}`,
     );
     statements.push('');
   }
 
   // COMMENT 문 생성 (MySQL은 인라인이므로 제외)
-  if (dialect.comment) {
+  if (dialect.comment || dialect.tableComment) {
     const commentStatements: string[] = [];
-    for (const node of sortedNodes) {
-      for (const col of node.data.columns) {
-        if (col.logicalName) {
+
+    // 테이블 COMMENT (COMMENT ON TABLE)
+    if (dialect.tableComment) {
+      for (const node of sortedNodes) {
+        if (node.data.logicalTableName) {
           commentStatements.push(
-            `${dialect.comment(node.data.label, col.name, col.logicalName)}${dialect.statementSeparator}`,
+            `${dialect.tableComment(node.data.label, node.data.logicalTableName)}${dialect.statementSeparator}`,
           );
         }
       }
     }
+
+    // 컬럼 COMMENT (COMMENT ON COLUMN)
+    if (dialect.comment) {
+      for (const node of sortedNodes) {
+        for (const col of node.data.columns) {
+          if (col.logicalName) {
+            commentStatements.push(
+              `${dialect.comment(node.data.label, col.name, col.logicalName)}${dialect.statementSeparator}`,
+            );
+          }
+        }
+      }
+    }
+
     if (commentStatements.length > 0) {
       statements.push(...commentStatements);
       statements.push('');

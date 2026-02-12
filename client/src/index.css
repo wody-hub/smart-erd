@@ -57,6 +57,25 @@
     --success: 142.1 76.2% 36.3%;
     --success-foreground: 210 40% 98%;
 
+    --erd-color-red: 0 72% 51%;
+    --erd-color-red-foreground: 0 0% 100%;
+    --erd-color-orange: 25 95% 53%;
+    --erd-color-orange-foreground: 0 0% 0%;
+    --erd-color-amber: 45 93% 47%;
+    --erd-color-amber-foreground: 0 0% 0%;
+    --erd-color-green: 142 76% 36%;
+    --erd-color-green-foreground: 0 0% 0%;
+    --erd-color-teal: 173 80% 40%;
+    --erd-color-teal-foreground: 0 0% 0%;
+    --erd-color-blue: 221 83% 53%;
+    --erd-color-blue-foreground: 0 0% 100%;
+    --erd-color-indigo: 239 84% 67%;
+    --erd-color-indigo-foreground: 0 0% 0%;
+    --erd-color-purple: 270 60% 55%;
+    --erd-color-purple-foreground: 0 0% 100%;
+    --erd-color-pink: 330 81% 60%;
+    --erd-color-pink-foreground: 0 0% 0%;
+
     --erd-validation-matched: 142.1 76.2% 36.3%;
     --erd-validation-mismatch: 37.7 92.1% 50.2%;
     --erd-validation-unregistered: 0 84.2% 60.2%;
@@ -115,6 +134,25 @@
 
     --success: 142.1 70.6% 45.3%;
     --success-foreground: 210 40% 98%;
+
+    --erd-color-red: 0 62% 40%;
+    --erd-color-red-foreground: 0 0% 100%;
+    --erd-color-orange: 25 80% 42%;
+    --erd-color-orange-foreground: 0 0% 0%;
+    --erd-color-amber: 45 80% 38%;
+    --erd-color-amber-foreground: 0 0% 0%;
+    --erd-color-green: 142 60% 32%;
+    --erd-color-green-foreground: 0 0% 100%;
+    --erd-color-teal: 173 65% 35%;
+    --erd-color-teal-foreground: 0 0% 0%;
+    --erd-color-blue: 221 70% 48%;
+    --erd-color-blue-foreground: 0 0% 100%;
+    --erd-color-indigo: 239 65% 55%;
+    --erd-color-indigo-foreground: 0 0% 100%;
+    --erd-color-purple: 270 50% 48%;
+    --erd-color-purple-foreground: 0 0% 100%;
+    --erd-color-pink: 330 65% 50%;
+    --erd-color-pink-foreground: 0 0% 100%;
 
     --erd-validation-matched: 142.1 70.6% 45.3%;
     --erd-validation-mismatch: 37.7 92.1% 50.2%;

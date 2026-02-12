@@ -10,6 +10,10 @@ interface SidebarTableItemProps {
   nodeId: string;
   /** 테이블 표시 이름 */
   label: string;
+  /** 이름 변경 접근성 라벨 */
+  renameAriaLabel: string;
+  /** 삭제 접근성 라벨 */
+  deleteAriaLabel: string;
   /** 테이블 클릭 시 캔버스 포커스 핸들러 */
   onClick: () => void;
   /** 이름 변경 핸들러 */
@@ -33,6 +37,8 @@ interface SidebarTableItemProps {
  */
 export default function SidebarTableItem({
   label,
+  renameAriaLabel,
+  deleteAriaLabel,
   onClick,
   onRename,
   onDelete,
@@ -49,7 +55,7 @@ export default function SidebarTableItem({
           onChange={(e) => setValue(e.target.value)}
           className="h-6 text-xs flex-1"
           autoFocus
-          aria-label={t('erd.sidebar.aria.renameTable', { name: label })}
+          aria-label={renameAriaLabel}
           onKeyDown={(e) => {
             if (e.key === 'Enter') confirmEdit();
             if (e.key === 'Escape') cancelEdit();
@@ -93,7 +99,7 @@ export default function SidebarTableItem({
               e.stopPropagation();
               startEdit(label);
             }}
-            aria-label={t('erd.sidebar.aria.renameTable', { name: label })}
+            aria-label={renameAriaLabel}
           >
             <Pencil className="h-3 w-3 text-muted-foreground" />
           </Button>
@@ -105,7 +111,7 @@ export default function SidebarTableItem({
               e.stopPropagation();
               onDelete();
             }}
-            aria-label={t('erd.sidebar.aria.deleteTable', { name: label })}
+            aria-label={deleteAriaLabel}
           >
             <Trash2 className="h-3 w-3 text-destructive" />
           </Button>
