@@ -71,7 +71,26 @@
     },
     "toast": {
       "created": "Team created",
-      "createFailed": "Failed to create team"
+      "createFailed": "Failed to create team",
+      "updated": "Team name updated",
+      "updateFailed": "Failed to update team name",
+      "deleted": "Team deleted",
+      "deleteFailed": "Failed to delete team"
+    },
+    "settings": {
+      "title": "Team Settings",
+      "description": "Manage team name and deletion settings.",
+      "nameLabel": "Team Name",
+      "save": "Save",
+      "dangerZone": "Danger Zone",
+      "deleteWarning": "This team and all its resources (projects, diagrams, dictionaries) will be permanently deleted.",
+      "deleteButton": "Delete Team",
+      "deleteConfirmTitle": "Confirm Team Deletion",
+      "deleteConfirmDescription": "Type the team name \"{{name}}\" to confirm.",
+      "deleteConfirmPlaceholder": "Type team name"
+    },
+    "aria": {
+      "settings": "Team settings"
     },
     "members": {
       "dialogTitle": "Team Members",
@@ -98,7 +117,8 @@
       "membersButton": "Members",
       "dictionaryButton": "Data Dictionary",
       "empty": "No projects yet. Create your first project.",
-      "createdAt": "Created: {{date}}"
+      "createdAt": "Created: {{date}}",
+      "noDescription": "No description"
     },
     "create": {
       "dialogTitle": "Create New Project",
@@ -113,10 +133,19 @@
       "created": "Project created",
       "createFailed": "Failed to create project",
       "deleted": "Project deleted",
-      "deleteFailed": "Failed to delete project"
+      "deleteFailed": "Failed to delete project",
+      "updated": "Project updated",
+      "updateFailed": "Failed to update project"
+    },
+    "settings": {
+      "title": "Project Settings",
+      "nameLabel": "Project Name",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Enter project description (optional)"
     },
     "aria": {
-      "deleteProject": "Delete project {{name}}"
+      "deleteProject": "Delete project {{name}}",
+      "settingsProject": "Settings for project {{name}}"
     }
   },
   "diagram": {
@@ -174,7 +203,25 @@
       "autoLayout": "Auto Layout",
       "export": "Export",
       "validate": "Validate",
-      "validateActive": "Validate (active)"
+      "validateActive": "Validate (active)",
+      "ddlExport": "SQL DDL"
+    },
+    "ddlExport": {
+      "title": "Export SQL DDL",
+      "dbmsLabel": "Target DBMS",
+      "dbms": {
+        "postgresql": "PostgreSQL",
+        "mysql": "MySQL",
+        "oracle": "Oracle",
+        "sqlserver": "SQL Server",
+        "ansi": "Generic SQL (ANSI)"
+      },
+      "preview": "Preview",
+      "copy": "Copy to Clipboard",
+      "download": "Download File",
+      "copied": "Copied to clipboard",
+      "copyFailed": "Failed to copy to clipboard",
+      "noTables": "No tables to export"
     },
     "export": {
       "noNodes": "No tables to export",
@@ -409,6 +456,9 @@
       "connecting": "Connecting...",
       "disconnected": "Disconnected"
     }
+  },
+  "permission": {
+    "viewerReadonly": "You have view-only access"
   },
   "language": {
     "ko": "한국어",

@@ -26,6 +26,7 @@ import TableNode from './TableNode';
 import CanvasToolbar from './CanvasToolbar';
 import EdgeContextMenu from './EdgeContextMenu';
 import DeleteEdgeDialog from './DeleteEdgeDialog';
+import DdlExportDialog from './DdlExportDialog';
 import RemoteCursors from './RemoteCursors';
 
 /** React Flow에 등록할 커스텀 노드 타입 매핑 */
@@ -51,6 +52,8 @@ interface ERDCanvasProps {
   validationOpen?: boolean;
   /** 유효성 검사 패널 토글 핸들러 */
   onToggleValidation?: () => void;
+  /** 편집 가능 여부 (VIEWER일 때 false) */
+  canEdit?: boolean;
 }
 
 /** 삭제 다이얼로그 상태 */
@@ -74,12 +77,14 @@ interface DeleteDialogState {
  *
  * @param props.diagramName 내보내기 시 파일명에 사용할 다이어그램 이름
  * @param props.provider   YjsProvider 인스턴스 (실시간 협업 시 커서 발행용)
+ * @param props.canEdit    편집 가능 여부 (VIEWER일 때 false)
  */
 export default function ERDCanvas({
   diagramName = 'diagram',
   provider,
   validationOpen,
   onToggleValidation,
+  canEdit = true,
 }: ERDCanvasProps) {
   /** 캔버스 컨테이너 ref (Awareness 커서 추적용) */
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -109,6 +114,8 @@ export default function ERDCanvas({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   /** 엣지 삭제 다이얼로그 상태 */
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState | null>(null);
+  /** DDL 내보내기 다이얼로그 열림 상태 */
+  const [ddlDialogOpen, setDdlDialogOpen] = useState(false);
 
   /**
    * 엣지에 대한 삭제 다이얼로그를 여는 공통 함수.
@@ -181,7 +188,7 @@ export default function ERDCanvas({
         openDeleteDialog(highlightedEdgeId);
       }
     },
-    { enabled: !!highlightedEdgeId },
+    { enabled: canEdit && !!highlightedEdgeId },
   );
 
   /** Escape 키 — FK 모드 해제 */
@@ -200,15 +207,18 @@ export default function ERDCanvas({
       <ReactFlow
         nodes={nodes}
         edges={styledEdges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
+        onNodesChange={canEdit ? onNodesChange : undefined}
+        onEdgesChange={canEdit ? onEdgesChange : undefined}
+        onConnect={canEdit ? onConnect : undefined}
         onNodeClick={handleNodeClick}
         onEdgeClick={handleEdgeClick}
-        onEdgeContextMenu={handleEdgeContextMenu}
+        onEdgeContextMenu={canEdit ? handleEdgeContextMenu : undefined}
         onPaneClick={handlePaneClick}
         nodeTypes={nodeTypes}
         deleteKeyCode={null}
+        nodesDraggable={canEdit}
+        nodesConnectable={canEdit}
+        elementsSelectable={canEdit}
         snapToGrid
         snapGrid={[16, 16]}
         defaultEdgeOptions={{
@@ -233,8 +243,10 @@ export default function ERDCanvas({
           onExportJpg={exportJpg}
           onExportSvg={exportSvg}
           onExportPdf={exportPdf}
+          onExportDdl={() => setDdlDialogOpen(true)}
           validationOpen={validationOpen}
           onToggleValidation={onToggleValidation}
+          canEdit={canEdit}
         />
       </ReactFlow>
 
@@ -269,6 +281,12 @@ export default function ERDCanvas({
           }}
         />
       )}
+
+      <DdlExportDialog
+        open={ddlDialogOpen}
+        onOpenChange={setDdlDialogOpen}
+        diagramName={diagramName}
+      />
     </div>
   );
 }

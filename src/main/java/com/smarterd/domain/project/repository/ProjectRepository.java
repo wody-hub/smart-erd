@@ -16,4 +16,11 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
      * @return 프로젝트 목록
      */
     List<Project> findByTeam(Team team);
+
+    /**
+     * 특정 팀의 프로젝트를 일괄 삭제한다.
+     *
+     * @param team 팀
+     */
+    void deleteByTeam(Team team);
 }

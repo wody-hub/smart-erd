@@ -16,6 +16,8 @@ interface SidebarTableItemProps {
   onRename: (newName: string) => void;
   /** 삭제 핸들러 */
   onDelete: () => void;
+  /** 편집 가능 여부 (VIEWER일 때 false — 이름변경/삭제 버튼 숨김) */
+  canEdit?: boolean;
 }
 
 /**
@@ -27,12 +29,14 @@ interface SidebarTableItemProps {
  * @param props.onClick  테이블 클릭 시 캔버스 포커스 핸들러
  * @param props.onRename 이름 변경 확정 핸들러
  * @param props.onDelete 삭제 핸들러
+ * @param props.canEdit  편집 가능 여부
  */
 export default function SidebarTableItem({
   label,
   onClick,
   onRename,
   onDelete,
+  canEdit = true,
 }: SidebarTableItemProps) {
   const { t } = useTranslation();
   const { editing, value, setValue, startEdit, confirmEdit, cancelEdit } = useInlineEdit(onRename);
@@ -79,32 +83,34 @@ export default function SidebarTableItem({
       onClick={onClick}
     >
       <span className="text-sm truncate flex-1">{label}</span>
-      <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={(e) => {
-            e.stopPropagation();
-            startEdit(label);
-          }}
-          aria-label={t('erd.sidebar.aria.renameTable', { name: label })}
-        >
-          <Pencil className="h-3 w-3 text-muted-foreground" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          aria-label={t('erd.sidebar.aria.deleteTable', { name: label })}
-        >
-          <Trash2 className="h-3 w-3 text-destructive" />
-        </Button>
-      </div>
+      {canEdit && (
+        <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={(e) => {
+              e.stopPropagation();
+              startEdit(label);
+            }}
+            aria-label={t('erd.sidebar.aria.renameTable', { name: label })}
+          >
+            <Pencil className="h-3 w-3 text-muted-foreground" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            aria-label={t('erd.sidebar.aria.deleteTable', { name: label })}
+          >
+            <Trash2 className="h-3 w-3 text-destructive" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

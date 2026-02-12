@@ -37,6 +37,10 @@ public class Project extends BaseTimeEntity {
     @Column(nullable = false, length = 100)
     private String name;
 
+    /** 프로젝트 설명 (최대 500자, nullable) */
+    @Column(length = 500)
+    private String description;
+
     /** 소속 팀 */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "team_id", nullable = false)
@@ -45,12 +49,25 @@ public class Project extends BaseTimeEntity {
     /**
      * 프로젝트 엔티티를 생성한다.
      *
-     * @param name 프로젝트 이름
-     * @param team 소속 팀
+     * @param name        프로젝트 이름
+     * @param description 프로젝트 설명 (nullable)
+     * @param team        소속 팀
      */
     @Builder
-    public Project(String name, Team team) {
+    public Project(String name, String description, Team team) {
         this.name = name;
+        this.description = description;
         this.team = team;
+    }
+
+    /**
+     * 프로젝트 정보를 변경한다.
+     *
+     * @param name        새 프로젝트 이름
+     * @param description 새 프로젝트 설명 (nullable)
+     */
+    public void update(String name, String description) {
+        this.name = name;
+        this.description = description;
     }
 }

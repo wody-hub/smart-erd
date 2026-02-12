@@ -4,6 +4,8 @@ export interface Project {
   id: number;
   /** 프로젝트 이름 */
   name: string;
+  /** 프로젝트 설명 (nullable) */
+  description: string | null;
   /** 소속 팀 ID */
   teamId: number;
   /** 프로젝트 생성 일시 (ISO 8601) */

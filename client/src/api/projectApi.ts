@@ -33,3 +33,20 @@ export async function createProject(teamId: string, name: string): Promise<Proje
 export async function deleteProject(teamId: string, projectId: number): Promise<void> {
   await axiosInstance.delete(`/teams/${teamId}/projects/${projectId}`);
 }
+
+/**
+ * 프로젝트를 수정한다.
+ *
+ * @param teamId    팀 ID
+ * @param projectId 프로젝트 ID
+ * @param data      수정 데이터 (name, description)
+ * @returns 수정된 프로젝트 응답
+ */
+export async function updateProject(
+  teamId: string,
+  projectId: number,
+  data: { name: string; description?: string },
+): Promise<Project> {
+  const res = await axiosInstance.put<Project>(`/teams/${teamId}/projects/${projectId}`, data);
+  return res.data;
+}

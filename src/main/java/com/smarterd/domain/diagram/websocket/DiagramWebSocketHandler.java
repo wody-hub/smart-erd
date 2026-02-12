@@ -3,6 +3,7 @@ package com.smarterd.domain.diagram.websocket;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.config.WebSocketProperties;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
+import java.nio.channels.ClosedChannelException;
 import java.util.Arrays;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -209,7 +210,12 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
      */
     @Override
     public void handleTransportError(@NonNull WebSocketSession session, @NonNull Throwable exception) {
-        log.error("WebSocket 전송 오류 (세션 {})", session.getId(), exception);
+        // 서버 종료 시 Tomcat이 세션을 닫으면서 발생하는 ClosedChannelException은 정상 동작
+        if (isClosedChannelException(exception)) {
+            log.debug("WebSocket 채널 종료 (세션 {})", session.getId());
+        } else {
+            log.error("WebSocket 전송 오류 (세션 {})", session.getId(), exception);
+        }
 
         // 방어적 세션 정리: 세션이 이미 닫혀있으면 afterConnectionClosed가 호출되지 않을 수 있음
         if (!session.isOpen()) {
@@ -219,6 +225,20 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
                 log.warn("전송 오류 후 방어적 세션 정리 실패 (세션 {})", session.getId(), e);
             }
         }
+    }
+
+    /**
+     * 예외가 ClosedChannelException인지 확인한다.
+     * IOException으로 래핑되어 있는 경우도 포함한다.
+     *
+     * @param exception 확인할 예외
+     * @return ClosedChannelException 여부
+     */
+    private boolean isClosedChannelException(Throwable exception) {
+        if (exception instanceof ClosedChannelException) {
+            return true;
+        }
+        return exception.getCause() instanceof ClosedChannelException;
     }
 
     /**

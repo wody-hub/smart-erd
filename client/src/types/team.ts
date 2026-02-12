@@ -26,3 +26,9 @@ export interface TeamMember {
   /** 팀 내 역할 */
   role: TeamMemberRole;
 }
+
+/** 내 팀 역할 응답 */
+export interface MyRoleResponse {
+  /** 팀 내 역할 */
+  role: TeamMemberRole;
+}

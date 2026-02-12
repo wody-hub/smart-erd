@@ -9,12 +9,14 @@ import Sidebar from '@/components/layout/Sidebar';
 import ERDCanvas from '@/components/erd/ERDCanvas';
 import ValidationPanel from '@/components/erd/ValidationPanel';
 import { ErdDictionaryProvider } from '@/components/erd/ErdDictionaryContext';
+import { ErdPermissionProvider } from '@/components/erd/ErdPermissionContext';
 import useCanvasStore from '@/stores/useCanvasStore';
 import useCollaborationStore from '@/stores/useCollaborationStore';
 import { fetchDiagram, saveDiagram } from '@/api/diagramApi';
 import { queryKeys } from '@/constants/query-keys';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { getErrorMessage } from '@/lib/api-error';
+import { useTeamRole } from '@/hooks/useTeamRole';
 import { toast } from 'sonner';
 import Spinner from '@/components/ui/spinner';
 import { useYjsCollaboration } from '@/hooks/useYjsCollaboration';
@@ -41,6 +43,8 @@ export default function DiagramPage() {
   const [diagramName, setDiagramName] = useState('');
   /** 유효성 검사 패널 열림 상태 */
   const [validationOpen, setValidationOpen] = useState(false);
+
+  const { canEdit } = useTeamRole(teamId);
 
   const prepareBackup = useCanvasStore((s) => s.prepareBackup);
   const markBackedUp = useCanvasStore((s) => s.markBackedUp);
@@ -120,26 +124,30 @@ export default function DiagramPage() {
   return (
     <ReactFlowProvider>
       <ErdDictionaryProvider teamId={teamId!}>
-        <div className="h-screen flex flex-col">
-          <Header
-            diagramName={diagramName}
-            onSave={handleSave}
-            saving={saveMutation.isPending}
-            connectionStatus={connectionStatus}
-          />
-          <div className="flex flex-1 overflow-hidden">
-            <Sidebar />
-            <main className="flex-1">
-              <ERDCanvas
-                diagramName={diagramName || 'diagram'}
-                provider={providerRef.current}
-                validationOpen={validationOpen}
-                onToggleValidation={handleToggleValidation}
-              />
-            </main>
-            {validationOpen && <ValidationPanel onClose={() => setValidationOpen(false)} />}
+        <ErdPermissionProvider canEdit={canEdit}>
+          <div className="h-screen flex flex-col">
+            <Header
+              diagramName={diagramName}
+              onSave={canEdit ? handleSave : undefined}
+              saving={saveMutation.isPending}
+              connectionStatus={connectionStatus}
+              canEdit={canEdit}
+            />
+            <div className="flex flex-1 overflow-hidden">
+              <Sidebar canEdit={canEdit} />
+              <main className="flex-1">
+                <ERDCanvas
+                  diagramName={diagramName || 'diagram'}
+                  provider={providerRef.current}
+                  validationOpen={validationOpen}
+                  onToggleValidation={handleToggleValidation}
+                  canEdit={canEdit}
+                />
+              </main>
+              {validationOpen && <ValidationPanel onClose={() => setValidationOpen(false)} />}
+            </div>
           </div>
-        </div>
+        </ErdPermissionProvider>
       </ErdDictionaryProvider>
     </ReactFlowProvider>
   );

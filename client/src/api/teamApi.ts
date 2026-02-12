@@ -1,5 +1,5 @@
 import axiosInstance from './axiosInstance';
-import type { Team, TeamMember } from '@/types/team';
+import type { Team, TeamMember, MyRoleResponse } from '@/types/team';
 
 /**
  * 사용자가 속한 팀 목록을 조회한다.
@@ -63,4 +63,36 @@ export async function inviteMember(teamId: string, loginId: string, role: string
  */
 export async function removeMember(teamId: string, userId: number): Promise<void> {
   await axiosInstance.delete(`/teams/${teamId}/members/${userId}`);
+}
+
+/**
+ * 현재 사용자의 팀 내 역할을 조회한다.
+ *
+ * @param teamId 팀 ID
+ * @returns 내 역할 응답
+ */
+export async function fetchMyRole(teamId: string): Promise<MyRoleResponse> {
+  const res = await axiosInstance.get<MyRoleResponse>(`/teams/${teamId}/me`);
+  return res.data;
+}
+
+/**
+ * 팀 이름을 변경한다.
+ *
+ * @param teamId 팀 ID
+ * @param name   새 팀 이름
+ * @returns 수정된 팀 응답
+ */
+export async function updateTeam(teamId: string, name: string): Promise<Team> {
+  const res = await axiosInstance.put<Team>(`/teams/${teamId}`, { name });
+  return res.data;
+}
+
+/**
+ * 팀을 삭제한다.
+ *
+ * @param teamId 삭제할 팀 ID
+ */
+export async function deleteTeam(teamId: string): Promise<void> {
+  await axiosInstance.delete(`/teams/${teamId}`);
 }

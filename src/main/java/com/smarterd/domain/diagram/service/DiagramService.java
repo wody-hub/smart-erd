@@ -54,7 +54,7 @@ public class DiagramService {
      */
     @Transactional
     public DiagramResponse createDiagram(String loginId, Long teamId, Long projectId, CreateDiagramRequest request) {
-        final var project = verifyAccess(loginId, teamId, projectId);
+        final var project = verifyWriteAccess(loginId, teamId, projectId);
 
         final var diagram = Diagram.builder().name(request.name()).project(project).build();
         diagramRepository.save(diagram);
@@ -71,7 +71,7 @@ public class DiagramService {
      * @return 다이어그램 응답 목록
      */
     public List<DiagramResponse> getDiagrams(String loginId, Long teamId, Long projectId) {
-        final var project = verifyAccess(loginId, teamId, projectId);
+        final var project = verifyReadAccess(loginId, teamId, projectId);
         final var pid = project.getId();
 
         return diagramRepository
@@ -91,7 +91,7 @@ public class DiagramService {
      * @return 다이어그램 상세 응답
      */
     public DiagramDetailResponse getDiagram(String loginId, Long teamId, Long projectId, Long diagramId) {
-        final var project = verifyAccess(loginId, teamId, projectId);
+        final var project = verifyReadAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
         final var hasSnapshot = diagramRepository.existsYdocSnapshotById(diagramId);
 
@@ -109,7 +109,7 @@ public class DiagramService {
      */
     @Transactional
     public void saveDiagram(String loginId, Long teamId, Long projectId, Long diagramId, SaveDiagramRequest request) {
-        final var project = verifyAccess(loginId, teamId, projectId);
+        final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
 
         diagram.updateContent(request.content());
@@ -133,7 +133,7 @@ public class DiagramService {
         Long diagramId,
         RenameDiagramRequest request
     ) {
-        final var project = verifyAccess(loginId, teamId, projectId);
+        final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
 
         diagram.rename(request.name());
@@ -151,24 +151,43 @@ public class DiagramService {
      */
     @Transactional
     public void deleteDiagram(String loginId, Long teamId, Long projectId, Long diagramId) {
-        final var project = verifyAccess(loginId, teamId, projectId);
+        final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
 
         diagramRepository.delete(diagram);
     }
 
     /**
-     * 사용자의 팀 멤버십 및 프로젝트 귀속을 확인하고 프로젝트를 반환한다.
+     * 읽기 전용 접근을 검증한다. 모든 팀 멤버가 접근 가능하다.
      *
      * @param loginId   요청 사용자의 로그인 ID
      * @param teamId    팀 ID
      * @param projectId 프로젝트 ID
      * @return 프로젝트 엔티티
      */
-    private Project verifyAccess(String loginId, Long teamId, Long projectId) {
+    private Project verifyReadAccess(String loginId, Long teamId, Long projectId) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyMembership(team, user);
+
+        final var project = projectService.findProjectById(projectId);
+        projectService.verifyProjectBelongsToTeam(project, teamId);
+
+        return project;
+    }
+
+    /**
+     * 쓰기 접근을 검증한다. ADMIN과 MEMBER만 접근 가능하다.
+     *
+     * @param loginId   요청 사용자의 로그인 ID
+     * @param teamId    팀 ID
+     * @param projectId 프로젝트 ID
+     * @return 프로젝트 엔티티
+     */
+    private Project verifyWriteAccess(String loginId, Long teamId, Long projectId) {
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = teamService.findTeamById(teamId);
+        teamService.verifyEditable(team, user);
 
         final var project = projectService.findProjectById(projectId);
         projectService.verifyProjectBelongsToTeam(project, teamId);

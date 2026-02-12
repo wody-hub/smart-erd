@@ -7,6 +7,7 @@ import useCanvasStore from '@/stores/useCanvasStore';
 import { useInlineEdit } from '@/hooks/useInlineEdit';
 import { useCompoundTermRegister } from '@/hooks/useCompoundTermRegister';
 import { useErdDictionary } from './ErdDictionaryContext';
+import { useErdPermission } from './ErdPermissionContext';
 import { getColumnWarning } from '@/hooks/useColumnValidation';
 import { KEYS } from '@/constants/keybindings';
 import { cn } from '@/lib/utils';
@@ -48,6 +49,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const isHighlighted = useCanvasStore((s) => s.highlightedNodeIds.includes(id));
 
   const { findTermById, findDomainById } = useErdDictionary();
+  const { canEdit } = useErdPermission();
   const registerCompound = useCompoundTermRegister(id);
 
   /** 빠른 용어 등록 대상 */
@@ -133,7 +135,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
         )}
       >
         {/* Table header */}
-        {editing ? (
+        {editing && canEdit ? (
           <div className="bg-erd-table-header px-3 py-2 rounded-t">
             <input
               className="nodrag bg-transparent text-erd-table-header-foreground font-semibold text-sm w-full outline-none focus-visible:ring-1 focus-visible:ring-ring rounded placeholder-erd-table-header-foreground/50"
@@ -151,7 +153,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
         ) : (
           <div
             className="bg-erd-table-header text-erd-table-header-foreground px-3 py-2 rounded-t font-semibold text-sm cursor-pointer select-none"
-            onDoubleClick={() => startEdit(label)}
+            onDoubleClick={canEdit ? () => startEdit(label) : undefined}
           >
             {label}
           </div>
@@ -176,8 +178,8 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
                   {/* PK toggle */}
                   <button
-                    className={`nodrag w-5 text-center font-bold text-[10px] cursor-pointer ${col.pk ? 'text-erd-pk' : 'text-muted-foreground/40 hover:text-erd-pk/80'}`}
-                    onClick={() => updateColumn(id, col.id, { pk: !col.pk })}
+                    className={`nodrag w-5 text-center font-bold text-[10px] ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.pk ? 'text-erd-pk' : 'text-muted-foreground/40 hover:text-erd-pk/80'}`}
+                    onClick={canEdit ? () => updateColumn(id, col.id, { pk: !col.pk }) : undefined}
                     title={t('erd.tableNode.title.togglePk')}
                     aria-label={t('erd.tableNode.aria.togglePk', { name: col.name })}
                   >
@@ -186,8 +188,8 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
                   {/* FK toggle */}
                   <button
-                    className={`nodrag w-5 text-center font-bold text-[10px] cursor-pointer ${col.fk ? 'text-erd-fk' : 'text-muted-foreground/40 hover:text-erd-fk/80'}`}
-                    onClick={() => updateColumn(id, col.id, { fk: !col.fk })}
+                    className={`nodrag w-5 text-center font-bold text-[10px] ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.fk ? 'text-erd-fk' : 'text-muted-foreground/40 hover:text-erd-fk/80'}`}
+                    onClick={canEdit ? () => updateColumn(id, col.id, { fk: !col.fk }) : undefined}
                     title={t('erd.tableNode.title.toggleFk')}
                     aria-label={t('erd.tableNode.aria.toggleFk', { name: col.name })}
                   >
@@ -195,16 +197,20 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                   </button>
 
                   {/* Logical name autocomplete */}
-                  <ColumnAutocomplete
-                    value={col.logicalName ?? ''}
-                    onChange={(newValue) => handleLogicalNameChange(col.id, newValue)}
-                    onSelectTerm={(result) => handleSelectTerm(col.id, result)}
-                    onSelectCompound={(resolution) => registerCompound(col.id, resolution)}
-                    onRegisterNew={(logicalName, partialOnly) =>
-                      setQuickTermTarget({ nodeId: id, colId: col.id, logicalName, partialOnly })
-                    }
-                    termLinked={!!col.termId}
-                  />
+                  {canEdit ? (
+                    <ColumnAutocomplete
+                      value={col.logicalName ?? ''}
+                      onChange={(newValue) => handleLogicalNameChange(col.id, newValue)}
+                      onSelectTerm={(result) => handleSelectTerm(col.id, result)}
+                      onSelectCompound={(resolution) => registerCompound(col.id, resolution)}
+                      onRegisterNew={(logicalName, partialOnly) =>
+                        setQuickTermTarget({ nodeId: id, colId: col.id, logicalName, partialOnly })
+                      }
+                      termLinked={!!col.termId}
+                    />
+                  ) : (
+                    <span className="flex-1 text-xs truncate">{col.logicalName || ''}</span>
+                  )}
 
                   {/* Validation warning icon */}
                   {warning.status && (
@@ -227,8 +233,12 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
                   {/* Nullable toggle */}
                   <button
-                    className={`nodrag text-[10px] cursor-pointer w-4 text-center ${col.nullable ? 'text-erd-nullable' : 'text-muted-foreground/40 hover:text-erd-nullable/80'}`}
-                    onClick={() => updateColumn(id, col.id, { nullable: !col.nullable })}
+                    className={`nodrag text-[10px] ${canEdit ? 'cursor-pointer' : 'cursor-default'} w-4 text-center ${col.nullable ? 'text-erd-nullable' : 'text-muted-foreground/40 hover:text-erd-nullable/80'}`}
+                    onClick={
+                      canEdit
+                        ? () => updateColumn(id, col.id, { nullable: !col.nullable })
+                        : undefined
+                    }
                     title={t('erd.tableNode.title.toggleNullable')}
                     aria-label={t('erd.tableNode.aria.toggleNullable', { name: col.name })}
                   >
@@ -236,14 +246,16 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                   </button>
 
                   {/* Delete column */}
-                  <button
-                    className="nodrag opacity-0 group-hover/col:opacity-100 transition-opacity text-muted-foreground hover:text-destructive cursor-pointer"
-                    onClick={() => deleteColumn(id, col.id)}
-                    title={t('erd.tableNode.title.deleteColumn')}
-                    aria-label={t('erd.tableNode.aria.deleteColumn', { name: col.name })}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
+                  {canEdit && (
+                    <button
+                      className="nodrag opacity-0 group-hover/col:opacity-100 transition-opacity text-muted-foreground hover:text-destructive cursor-pointer"
+                      onClick={() => deleteColumn(id, col.id)}
+                      title={t('erd.tableNode.title.deleteColumn')}
+                      aria-label={t('erd.tableNode.aria.deleteColumn', { name: col.name })}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
 
                   <Handle
                     type="source"
@@ -255,48 +267,61 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
                 {/* Row 2: 도메인 배지 + 물리명 + 타입 */}
                 <div className="flex items-center gap-1 pl-12 mt-0.5">
-                  <DomainSelectPopover
-                    open={domainPopoverColId === col.id}
-                    onOpenChange={(o) => setDomainPopoverColId(o ? col.id : null)}
-                    selectedDomainId={col.domainId}
-                    onSelect={(domainId, physicalType) =>
-                      handleDomainChange(col.id, domainId, physicalType)
-                    }
-                    align="start"
-                  >
-                    {domain ? (
-                      <button
-                        className="nodrag text-[10px] px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground hover:bg-erd-domain/80 cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  {canEdit ? (
+                    <DomainSelectPopover
+                      open={domainPopoverColId === col.id}
+                      onOpenChange={(o) => setDomainPopoverColId(o ? col.id : null)}
+                      selectedDomainId={col.domainId}
+                      onSelect={(domainId, physicalType) =>
+                        handleDomainChange(col.id, domainId, physicalType)
+                      }
+                      align="start"
+                    >
+                      {domain ? (
+                        <button
+                          className="nodrag text-[10px] px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground hover:bg-erd-domain/80 cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          title={`${domain.logicalName} (${domain.physicalType})`}
+                          aria-label={t('erd.tableNode.aria.domainBadge', {
+                            colName: col.name,
+                            domainName: domain.logicalName,
+                          })}
+                        >
+                          {domain.logicalName}
+                        </button>
+                      ) : (
+                        <button
+                          className="nodrag text-[10px] w-4 h-4 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground/40 opacity-0 group-hover/col:opacity-100 hover:!opacity-100 hover:border-muted-foreground hover:text-muted-foreground cursor-pointer shrink-0 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          title={t('erd.tableNode.selectDomain')}
+                          aria-label={t('erd.tableNode.aria.selectDomain', {
+                            colName: col.name,
+                          })}
+                        >
+                          D
+                        </button>
+                      )}
+                    </DomainSelectPopover>
+                  ) : (
+                    domain && (
+                      <span
+                        className="text-[10px] px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground shrink-0"
                         title={`${domain.logicalName} (${domain.physicalType})`}
-                        aria-label={t('erd.tableNode.aria.domainBadge', {
-                          colName: col.name,
-                          domainName: domain.logicalName,
-                        })}
                       >
                         {domain.logicalName}
-                      </button>
-                    ) : (
-                      <button
-                        className="nodrag text-[10px] w-4 h-4 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground/40 opacity-0 group-hover/col:opacity-100 hover:!opacity-100 hover:border-muted-foreground hover:text-muted-foreground cursor-pointer shrink-0 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        title={t('erd.tableNode.selectDomain')}
-                        aria-label={t('erd.tableNode.aria.selectDomain', {
-                          colName: col.name,
-                        })}
-                      >
-                        D
-                      </button>
-                    )}
-                  </DomainSelectPopover>
+                      </span>
+                    )
+                  )}
                   <input
                     className="nodrag flex-1 font-mono text-muted-foreground bg-transparent outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring px-1 rounded min-w-0"
                     value={col.name}
                     onChange={(e) => updateColumn(id, col.id, { name: e.target.value })}
+                    readOnly={!canEdit}
                     aria-label={t('erd.tableNode.aria.columnName')}
                   />
                   <input
                     className="nodrag w-24 font-mono text-muted-foreground bg-transparent outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring px-1 rounded text-right"
                     value={col.type}
                     onChange={(e) => updateColumn(id, col.id, { type: e.target.value })}
+                    readOnly={!canEdit}
                     aria-label={t('erd.tableNode.aria.columnType')}
                   />
                 </div>
@@ -306,15 +331,17 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
         </div>
 
         {/* Add column button */}
-        <div className="border-t border-border">
-          <button
-            className="nodrag w-full px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent flex items-center justify-center gap-1 cursor-pointer"
-            onClick={() => addColumn(id)}
-          >
-            <Plus className="h-3 w-3" />
-            {t('erd.tableNode.addColumn')}
-          </button>
-        </div>
+        {canEdit && (
+          <div className="border-t border-border">
+            <button
+              className="nodrag w-full px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent flex items-center justify-center gap-1 cursor-pointer"
+              onClick={() => addColumn(id)}
+            >
+              <Plus className="h-3 w-3" />
+              {t('erd.tableNode.addColumn')}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Quick Term Dialog */}

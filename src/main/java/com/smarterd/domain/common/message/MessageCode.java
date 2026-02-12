@@ -6,6 +6,7 @@ package com.smarterd.domain.common.message;
 public enum MessageCode {
     ERROR_ACCESS_DENIED_NOT_ADMIN("error.access-denied.not-admin"),
     ERROR_ACCESS_DENIED_NOT_MEMBER("error.access-denied.not-member"),
+    ERROR_ACCESS_DENIED_VIEWER_READONLY("error.access-denied.viewer-readonly"),
     ERROR_BULK_CONCURRENT_DUPLICATE("error.bulk.concurrent-duplicate"),
     ERROR_BULK_EMPTY_FILE("error.bulk.empty-file"),
     ERROR_BULK_MISSING_COLUMNS("error.bulk.missing-columns"),

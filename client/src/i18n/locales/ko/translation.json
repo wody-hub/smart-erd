@@ -70,7 +70,26 @@
     },
     "toast": {
       "created": "팀이 생성되었습니다",
-      "createFailed": "팀 생성에 실패했습니다"
+      "createFailed": "팀 생성에 실패했습니다",
+      "updated": "팀 이름이 변경되었습니다",
+      "updateFailed": "팀 이름 변경에 실패했습니다",
+      "deleted": "팀이 삭제되었습니다",
+      "deleteFailed": "팀 삭제에 실패했습니다"
+    },
+    "settings": {
+      "title": "팀 설정",
+      "description": "팀 이름 변경 및 삭제 설정을 관리합니다.",
+      "nameLabel": "팀 이름",
+      "save": "저장",
+      "dangerZone": "위험 구역",
+      "deleteWarning": "이 팀과 모든 하위 리소스(프로젝트, 다이어그램, 사전)가 영구 삭제됩니다.",
+      "deleteButton": "팀 삭제",
+      "deleteConfirmTitle": "팀 삭제 확인",
+      "deleteConfirmDescription": "확인을 위해 팀 이름 \"{{name}}\"을 정확히 입력하세요.",
+      "deleteConfirmPlaceholder": "팀 이름 입력"
+    },
+    "aria": {
+      "settings": "팀 설정"
     },
     "members": {
       "dialogTitle": "팀 멤버",
@@ -97,7 +116,8 @@
       "membersButton": "멤버",
       "dictionaryButton": "데이터 사전",
       "empty": "아직 프로젝트가 없습니다. 첫 번째 프로젝트를 만드세요.",
-      "createdAt": "생성일: {{date}}"
+      "createdAt": "생성일: {{date}}",
+      "noDescription": "설명 없음"
     },
     "create": {
       "dialogTitle": "새 프로젝트 만들기",
@@ -112,10 +132,19 @@
       "created": "프로젝트가 생성되었습니다",
       "createFailed": "프로젝트 생성에 실패했습니다",
       "deleted": "프로젝트가 삭제되었습니다",
-      "deleteFailed": "프로젝트 삭제에 실패했습니다"
+      "deleteFailed": "프로젝트 삭제에 실패했습니다",
+      "updated": "프로젝트가 수정되었습니다",
+      "updateFailed": "프로젝트 수정에 실패했습니다"
+    },
+    "settings": {
+      "title": "프로젝트 설정",
+      "nameLabel": "프로젝트 이름",
+      "descriptionLabel": "설명",
+      "descriptionPlaceholder": "프로젝트 설명을 입력하세요 (선택)"
     },
     "aria": {
-      "deleteProject": "프로젝트 {{name}} 삭제"
+      "deleteProject": "프로젝트 {{name}} 삭제",
+      "settingsProject": "프로젝트 {{name}} 설정"
     }
   },
   "diagram": {
@@ -173,7 +202,25 @@
       "autoLayout": "자동 정렬",
       "export": "내보내기",
       "validate": "유효성 검사",
-      "validateActive": "유효성 검사 (활성)"
+      "validateActive": "유효성 검사 (활성)",
+      "ddlExport": "SQL DDL"
+    },
+    "ddlExport": {
+      "title": "SQL DDL 내보내기",
+      "dbmsLabel": "대상 DBMS",
+      "dbms": {
+        "postgresql": "PostgreSQL",
+        "mysql": "MySQL",
+        "oracle": "Oracle",
+        "sqlserver": "SQL Server",
+        "ansi": "범용 SQL (ANSI)"
+      },
+      "preview": "미리보기",
+      "copy": "클립보드 복사",
+      "download": "파일 다운로드",
+      "copied": "클립보드에 복사되었습니다",
+      "copyFailed": "클립보드 복사에 실패했습니다",
+      "noTables": "내보낼 테이블이 없습니다"
     },
     "export": {
       "noNodes": "내보낼 테이블이 없습니다",
@@ -408,6 +455,9 @@
       "connecting": "연결 중...",
       "disconnected": "연결 끊김"
     }
+  },
+  "permission": {
+    "viewerReadonly": "조회 권한만 있습니다"
   },
   "language": {
     "ko": "한국어",

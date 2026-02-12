@@ -53,7 +53,7 @@ public class TermService {
     public TermResponse createTerm(String loginId, Long teamId, CreateTermRequest request) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
-        teamService.verifyMembership(team, user);
+        teamService.verifyEditable(team, user);
 
         if (termRepository.existsByTeamAndLogicalName(team, request.logicalName())) {
             throw new DuplicateException(MessageCode.ERROR_DUPLICATE_TERM_LOGICAL_NAME.code(), request.logicalName());
@@ -120,7 +120,7 @@ public class TermService {
     public TermResponse updateTerm(String loginId, Long teamId, Long termId, UpdateTermRequest request) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
-        teamService.verifyMembership(team, user);
+        teamService.verifyEditable(team, user);
 
         final var term = findTermById(termId);
         verifyTermBelongsToTeam(term, teamId);
@@ -146,7 +146,7 @@ public class TermService {
     public void deleteTerm(String loginId, Long teamId, Long termId) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
-        teamService.verifyMembership(team, user);
+        teamService.verifyEditable(team, user);
 
         final var term = findTermById(termId);
         verifyTermBelongsToTeam(term, teamId);

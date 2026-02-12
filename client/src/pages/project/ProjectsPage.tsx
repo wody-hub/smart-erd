@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, ArrowLeft, UserPlus, Trash2, BookOpen } from 'lucide-react';
+import { Plus, FolderOpen, ArrowLeft, UserPlus, Trash2, BookOpen, Settings } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import Header from '@/components/layout/Header';
@@ -9,18 +9,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CreateResourceDialog from '@/components/ui/create-resource-dialog';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import MembersDialog from '@/components/team/MembersDialog';
+import TeamSettingsDialog from '@/components/team/TeamSettingsDialog';
+import ProjectSettingsDialog from '@/components/project/ProjectSettingsDialog';
 import { fetchTeam } from '@/api/teamApi';
 import { fetchProjects, createProject, deleteProject } from '@/api/projectApi';
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
 import { getErrorMessage } from '@/lib/api-error';
+import { useTeamRole } from '@/hooks/useTeamRole';
 import { toast } from 'sonner';
 import Spinner from '@/components/ui/spinner';
+import type { Project } from '@/types/project';
 
 /**
  * 프로젝트 목록 페이지.
  *
  * 선택된 팀의 프로젝트 목록, 프로젝트 생성, 멤버 관리 기능을 제공한다.
+ * 역할에 따라 버튼을 조건부 렌더링한다.
  */
 export default function ProjectsPage() {
   const { teamId } = useParams<{ teamId: string }>();
@@ -34,6 +39,12 @@ export default function ProjectsPage() {
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   /** 삭제 확인 대상 프로젝트 ID (null이면 다이얼로그 닫힘) */
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  /** 팀 설정 다이얼로그 열림 상태 */
+  const [teamSettingsOpen, setTeamSettingsOpen] = useState(false);
+  /** 프로젝트 설정 대상 (null이면 다이얼로그 닫힘) */
+  const [projectSettingsTarget, setProjectSettingsTarget] = useState<Project | null>(null);
+
+  const { isAdmin, canEdit } = useTeamRole(teamId);
 
   const { data: team } = useQuery({
     queryKey: queryKeys.teams.detail(teamId!),
@@ -93,10 +104,22 @@ export default function ProjectsPage() {
                 <UserPlus className="h-4 w-4 mr-2" />
                 {t('project.list.membersButton')}
               </Button>
-              <Button onClick={() => setProjectDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                {t('project.list.newButton')}
-              </Button>
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setTeamSettingsOpen(true)}
+                  aria-label={t('team.aria.settings')}
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              )}
+              {canEdit && (
+                <Button onClick={() => setProjectDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t('project.list.newButton')}
+                </Button>
+              )}
             </div>
           </div>
 
@@ -107,10 +130,12 @@ export default function ProjectsPage() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
                 <p className="text-muted-foreground mb-4">{t('project.list.empty')}</p>
-                <Button onClick={() => setProjectDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t('project.list.createButton')}
-                </Button>
+                {canEdit && (
+                  <Button onClick={() => setProjectDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    {t('project.list.createButton')}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -124,21 +149,40 @@ export default function ProjectsPage() {
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{project.name}</CardTitle>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteTarget(project.id);
-                        }}
-                        aria-label={t('project.aria.deleteProject', { name: project.name })}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {canEdit && (
+                        <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProjectSettingsTarget(project);
+                            }}
+                            aria-label={t('project.aria.settingsProject', { name: project.name })}
+                          >
+                            <Settings className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget(project.id);
+                            }}
+                            aria-label={t('project.aria.deleteProject', { name: project.name })}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      {project.description || t('project.list.noDescription')}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {t('project.list.createdAt', {
                         date: new Date(project.createdAt).toLocaleDateString(
@@ -167,6 +211,7 @@ export default function ProjectsPage() {
         open={membersDialogOpen}
         onOpenChange={setMembersDialogOpen}
         teamId={teamId!}
+        isAdmin={isAdmin}
         onMembersChanged={() => {
           queryClient.invalidateQueries({ queryKey: queryKeys.teams.detail(teamId!) });
         }}
@@ -184,6 +229,26 @@ export default function ProjectsPage() {
         }}
         loading={deleteProjectMutation.isPending}
       />
+
+      {team && (
+        <TeamSettingsDialog
+          open={teamSettingsOpen}
+          onOpenChange={setTeamSettingsOpen}
+          team={team}
+          teamId={teamId!}
+        />
+      )}
+
+      {projectSettingsTarget && (
+        <ProjectSettingsDialog
+          open={!!projectSettingsTarget}
+          onOpenChange={(open) => {
+            if (!open) setProjectSettingsTarget(null);
+          }}
+          project={projectSettingsTarget}
+          teamId={teamId!}
+        />
+      )}
     </div>
   );
 }

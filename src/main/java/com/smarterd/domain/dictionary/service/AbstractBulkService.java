@@ -78,7 +78,7 @@ public abstract class AbstractBulkService<R> {
     protected Team verifyTeamAccess(String loginId, Long teamId) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
-        teamService.verifyMembership(team, user);
+        teamService.verifyEditable(team, user);
         return team;
     }
 

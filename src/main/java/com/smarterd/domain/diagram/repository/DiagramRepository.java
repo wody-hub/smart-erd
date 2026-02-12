@@ -26,4 +26,11 @@ public interface DiagramRepository extends JpaRepository<Diagram, Long>, Diagram
      * @return 다이어그램 Optional
      */
     Optional<Diagram> findByProjectAndId(Project project, Long id);
+
+    /**
+     * 프로젝트 목록에 속한 다이어그램을 일괄 삭제한다.
+     *
+     * @param projects 프로젝트 목록
+     */
+    void deleteByProjectIn(List<Project> projects);
 }

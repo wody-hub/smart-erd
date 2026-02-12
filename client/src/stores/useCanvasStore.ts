@@ -597,9 +597,7 @@ const useCanvasStore = create<CanvasState>((set, get) => {
         if (!colsYArray) return;
 
         for (const pkCol of pkColumns) {
-          const baseName = parentPrefix
-            ? `${parentPrefix}_${pkCol.name}`
-            : pkCol.name;
+          const baseName = parentPrefix ? `${parentPrefix}_${pkCol.name}` : pkCol.name;
           const fkName = generateUniqueName(baseName, names);
           names.push(fkName);
 

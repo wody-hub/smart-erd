@@ -7,16 +7,20 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import DomainTab from '@/components/dictionary/DomainTab';
 import TermTab from '@/components/dictionary/TermTab';
 import { ROUTES } from '@/constants/routes';
+import { useTeamRole } from '@/hooks/useTeamRole';
 
 /**
  * 데이터 사전 페이지.
  *
  * 도메인 사전과 용어 사전을 탭으로 구분하여 관리한다.
+ * 역할에 따라 CRUD 버튼을 조건부 렌더링한다.
  */
 export default function DictionaryPage() {
   const { teamId } = useParams<{ teamId: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
+
+  const { canEdit } = useTeamRole(teamId);
 
   return (
     <div className="h-screen flex flex-col">
@@ -41,10 +45,10 @@ export default function DictionaryPage() {
               <TabsTrigger value="terms">{t('dictionary.tabs.terms')}</TabsTrigger>
             </TabsList>
             <TabsContent value="domains">
-              <DomainTab />
+              <DomainTab canEdit={canEdit} />
             </TabsContent>
             <TabsContent value="terms">
-              <TermTab />
+              <TermTab canEdit={canEdit} />
             </TabsContent>
           </Tabs>
         </div>

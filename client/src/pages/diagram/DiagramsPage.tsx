@@ -14,6 +14,7 @@ import type { DiagramSummary } from '@/types/diagram';
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
 import { getErrorMessage } from '@/lib/api-error';
+import { useTeamRole } from '@/hooks/useTeamRole';
 import { toast } from 'sonner';
 import Spinner from '@/components/ui/spinner';
 
@@ -21,6 +22,7 @@ import Spinner from '@/components/ui/spinner';
  * 다이어그램 목록 페이지.
  *
  * 선택된 프로젝트의 다이어그램 목록, 생성, 삭제, 이름 변경 기능을 제공한다.
+ * 역할에 따라 생성/삭제/이름 변경 버튼을 조건부 렌더링한다.
  */
 export default function DiagramsPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
@@ -36,6 +38,8 @@ export default function DiagramsPage() {
   const [renamingId, setRenamingId] = useState<number | null>(null);
   /** 이름 변경 입력값 */
   const [renameValue, setRenameValue] = useState('');
+
+  const { canEdit } = useTeamRole(teamId);
 
   const diagramsQueryKey = queryKeys.diagrams.byProject(teamId!, projectId!);
 
@@ -112,10 +116,12 @@ export default function DiagramsPage() {
 
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">{t('diagram.list.title')}</h2>
-            <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              {t('diagram.list.newButton')}
-            </Button>
+            {canEdit && (
+              <Button onClick={() => setDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                {t('diagram.list.newButton')}
+              </Button>
+            )}
           </div>
 
           {isLoading ? (
@@ -125,10 +131,12 @@ export default function DiagramsPage() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                 <p className="text-muted-foreground mb-4">{t('diagram.list.empty')}</p>
-                <Button onClick={() => setDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t('diagram.list.createButton')}
-                </Button>
+                {canEdit && (
+                  <Button onClick={() => setDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    {t('diagram.list.createButton')}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -181,33 +189,35 @@ export default function DiagramsPage() {
                       ) : (
                         <>
                           <CardTitle className="text-lg">{diagram.name}</CardTitle>
-                          <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={(e) => startRename(diagram, e)}
-                              aria-label={t('diagram.aria.renameDiagram', {
-                                name: diagram.name,
-                              })}
-                            >
-                              <Pencil className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteTarget(diagram.id);
-                              }}
-                              aria-label={t('diagram.aria.deleteDiagram', {
-                                name: diagram.name,
-                              })}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
+                          {canEdit && (
+                            <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => startRename(diagram, e)}
+                                aria-label={t('diagram.aria.renameDiagram', {
+                                  name: diagram.name,
+                                })}
+                              >
+                                <Pencil className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTarget(diagram.id);
+                                }}
+                                aria-label={t('diagram.aria.deleteDiagram', {
+                                  name: diagram.name,
+                                })}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          )}
                         </>
                       )}
                     </div>

@@ -73,4 +73,11 @@ public interface TermRepository extends JpaRepository<Term, Long>, TermRepositor
      * @return 매칭된 용어 (Optional)
      */
     Optional<Term> findFirstByTeamAndLogicalNameContaining(Team team, String keyword);
+
+    /**
+     * 특정 팀의 용어를 일괄 삭제한다.
+     *
+     * @param team 팀 엔티티
+     */
+    void deleteByTeam(Team team);
 }

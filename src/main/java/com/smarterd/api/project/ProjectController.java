@@ -2,6 +2,7 @@ package com.smarterd.api.project;
 
 import com.smarterd.api.project.dto.CreateProjectRequest;
 import com.smarterd.api.project.dto.ProjectResponse;
+import com.smarterd.api.project.dto.UpdateProjectRequest;
 import com.smarterd.domain.project.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -122,5 +124,33 @@ public class ProjectController {
     ) {
         projectService.deleteProject(jwt.getSubject(), teamId, projectId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 프로젝트를 수정한다.
+     *
+     * @param jwt       인증된 JWT 토큰
+     * @param teamId    팀 ID
+     * @param projectId 프로젝트 ID
+     * @param request   프로젝트 수정 요청
+     * @return 200 OK + ProjectResponse
+     */
+    @Operation(summary = "프로젝트 수정", description = "프로젝트 이름과 설명을 수정한다. ADMIN/MEMBER만 가능.")
+    @ApiResponse(
+        responseCode = "200",
+        description = "수정 성공",
+        content = @Content(schema = @Schema(implementation = ProjectResponse.class))
+    )
+    @ApiResponse(responseCode = "400", description = "유효성 검증 실패", content = @Content)
+    @ApiResponse(responseCode = "403", description = "VIEWER 접근 불가", content = @Content)
+    @ApiResponse(responseCode = "404", description = "팀 또는 프로젝트 미존재", content = @Content)
+    @PutMapping("/{projectId}")
+    public ResponseEntity<ProjectResponse> updateProject(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Valid @RequestBody UpdateProjectRequest request
+    ) {
+        return ResponseEntity.ok(projectService.updateProject(jwt.getSubject(), teamId, projectId, request));
     }
 }

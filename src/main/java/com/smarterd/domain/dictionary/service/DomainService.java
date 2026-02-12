@@ -52,7 +52,7 @@ public class DomainService {
     public DomainResponse createDomain(String loginId, Long teamId, CreateDomainRequest request) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
-        teamService.verifyMembership(team, user);
+        teamService.verifyEditable(team, user);
 
         if (domainRepository.existsByTeamAndLogicalName(team, request.logicalName())) {
             throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), request.logicalName());
@@ -116,7 +116,7 @@ public class DomainService {
     public DomainResponse updateDomain(String loginId, Long teamId, Long domainId, UpdateDomainRequest request) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
-        teamService.verifyMembership(team, user);
+        teamService.verifyEditable(team, user);
 
         final var domain = findDomainById(domainId);
         verifyDomainBelongsToTeam(domain, teamId);
@@ -141,7 +141,7 @@ public class DomainService {
     public void deleteDomain(String loginId, Long teamId, Long domainId) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
-        teamService.verifyMembership(team, user);
+        teamService.verifyEditable(team, user);
 
         final var domain = findDomainById(domainId);
         verifyDomainBelongsToTeam(domain, teamId);

@@ -13,6 +13,8 @@ export const queryKeys = {
     detail: (teamId: string) => ['teams', teamId] as const,
     /** 팀 멤버 목록 */
     members: (teamId: string) => ['teams', teamId, 'members'] as const,
+    /** 내 팀 역할 */
+    myRole: (teamId: string) => ['teams', teamId, 'myRole'] as const,
   },
   /** 프로젝트 관련 쿼리 키 */
   projects: {

@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.BinaryMessage;
+import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
 
 /**
@@ -423,5 +424,63 @@ public class DiagramRoomManager {
      */
     public Set<WebSocketSession> getSessions(Long diagramId) {
         return rooms.getOrDefault(diagramId, Set.of());
+    }
+
+    /**
+     * 해당 다이어그램 방의 모든 세션을 강제로 닫고 인메모리 리소스를 정리한다.
+     * 팀/프로젝트 삭제 시 관련 다이어그램의 WebSocket 연결을 정리하기 위해 사용한다.
+     *
+     * <p>인메모리 리소스를 선제 제거하여, 세션 종료 후 {@code afterConnectionClosed}에서
+     * 불필요한 flush가 발생하지 않도록 한다.</p>
+     *
+     * @param diagramId 다이어그램 ID
+     */
+    public void discardRoom(Long diagramId) {
+        final var sessions = rooms.remove(diagramId);
+        accumulatedUpdates.remove(diagramId);
+        accumulatedSizes.remove(diagramId);
+        flushLocks.remove(diagramId);
+        synchronized (dirtyLock) {
+            dirtyDiagramIds.remove(diagramId);
+        }
+
+        if (sessions == null || sessions.isEmpty()) {
+            return;
+        }
+
+        for (final var session : sessions) {
+            sessionLocks.remove(session.getId());
+            rateLimitState.remove(session.getId());
+
+            // 사용자별 연결 수 감소
+            final var info = extractSessionInfo(session);
+            if (info != null) {
+                final var userCount = userSessionCounts.get(info.loginId());
+                if (userCount != null && userCount.decrementAndGet() <= 0) {
+                    userSessionCounts.remove(info.loginId());
+                }
+            }
+
+            try {
+                if (session.isOpen()) {
+                    session.close(CloseStatus.GOING_AWAY);
+                }
+            } catch (Exception e) {
+                log.warn("방 폐기 시 세션 종료 실패 (세션 {})", session.getId(), e);
+            }
+        }
+        log.info("다이어그램 {} 방 폐기 완료 ({}개 세션)", diagramId, sessions.size());
+    }
+
+    /**
+     * 세션에서 WebSocketSessionInfo를 추출한다.
+     * 세션 속성에 정보가 없으면 null을 반환한다.
+     *
+     * @param session WebSocket 세션
+     * @return 세션 정보 (없으면 null)
+     */
+    @SuppressWarnings("null")
+    private WebSocketSessionInfo extractSessionInfo(WebSocketSession session) {
+        return (WebSocketSessionInfo) session.getAttributes().get(WebSocketSessionInfo.SESSION_ATTR_KEY);
     }
 }

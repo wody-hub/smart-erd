@@ -55,4 +55,11 @@ public interface DomainRepository extends JpaRepository<Domain, Long> {
      * @return 도메인 (Optional)
      */
     Optional<Domain> findByTeamAndLogicalName(Team team, String logicalName);
+
+    /**
+     * 특정 팀의 도메인을 일괄 삭제한다.
+     *
+     * @param team 팀 엔티티
+     */
+    void deleteByTeam(Team team);
 }

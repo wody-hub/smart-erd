@@ -29,12 +29,21 @@ import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
 import type { Term, TermFormData } from '@/types/dictionary';
 
+/** TermTab 컴포넌트의 props. */
+interface TermTabProps {
+  /** 편집 가능 여부 (VIEWER일 때 false — 생성/수정/삭제/업로드 버튼 숨김) */
+  canEdit?: boolean;
+}
+
 /**
  * 용어 사전 탭 컴포넌트.
  *
  * 용어 목록 테이블과 생성/수정/삭제 기능을 제공한다.
+ * 역할에 따라 CRUD/업로드 버튼을 조건부 렌더링한다.
+ *
+ * @param props.canEdit 편집 가능 여부
  */
-export default function TermTab() {
+export default function TermTab({ canEdit = true }: TermTabProps) {
   const { teamId } = useParams<{ teamId: string }>();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -132,34 +141,38 @@ export default function TermTab() {
 
   return (
     <div>
-      <div className="flex justify-end gap-2 mb-4">
-        <Button
-          variant="outline"
-          onClick={handleTemplateDownload}
-          disabled={downloadTemplateMutation.isPending}
-        >
-          <Download className="h-4 w-4 mr-2" />
-          {t('dictionary.upload.template')}
-        </Button>
-        <Button variant="outline" onClick={() => setUploadOpen(true)}>
-          <Upload className="h-4 w-4 mr-2" />
-          {t('dictionary.upload.button')}
-        </Button>
-        <Button onClick={handleCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          {t('dictionary.term.form.createTitle')}
-        </Button>
-      </div>
+      {canEdit && (
+        <div className="flex justify-end gap-2 mb-4">
+          <Button
+            variant="outline"
+            onClick={handleTemplateDownload}
+            disabled={downloadTemplateMutation.isPending}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {t('dictionary.upload.template')}
+          </Button>
+          <Button variant="outline" onClick={() => setUploadOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            {t('dictionary.upload.button')}
+          </Button>
+          <Button onClick={handleCreate}>
+            <Plus className="h-4 w-4 mr-2" />
+            {t('dictionary.term.form.createTitle')}
+          </Button>
+        </div>
+      )}
 
       {terms.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground mb-4">{t('dictionary.term.table.empty')}</p>
-            <Button onClick={handleCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              {t('dictionary.term.form.createTitle')}
-            </Button>
+            {canEdit && (
+              <Button onClick={handleCreate}>
+                <Plus className="h-4 w-4 mr-2" />
+                {t('dictionary.term.form.createTitle')}
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -170,7 +183,9 @@ export default function TermTab() {
               <TableHead>{t('dictionary.term.table.physicalName')}</TableHead>
               <TableHead>{t('dictionary.term.table.domain')}</TableHead>
               <TableHead>{t('dictionary.term.table.description')}</TableHead>
-              <TableHead className="w-[100px]">{t('dictionary.term.table.actions')}</TableHead>
+              {canEdit && (
+                <TableHead className="w-[100px]">{t('dictionary.term.table.actions')}</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -182,32 +197,34 @@ export default function TermTab() {
                   {term.domainLogicalName ?? t('dictionary.term.table.noDomain')}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{term.description ?? ''}</TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleEdit(term)}
-                      aria-label={t('dictionary.term.aria.editTerm', {
-                        name: term.logicalName,
-                      })}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setDeleteTarget(term.id)}
-                      aria-label={t('dictionary.term.aria.deleteTerm', {
-                        name: term.logicalName,
-                      })}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </TableCell>
+                {canEdit && (
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleEdit(term)}
+                        aria-label={t('dictionary.term.aria.editTerm', {
+                          name: term.logicalName,
+                        })}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setDeleteTarget(term.id)}
+                        aria-label={t('dictionary.term.aria.deleteTerm', {
+                          name: term.logicalName,
+                        })}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>

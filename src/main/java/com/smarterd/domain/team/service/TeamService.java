@@ -2,14 +2,21 @@ package com.smarterd.domain.team.service;
 
 import com.smarterd.api.team.dto.AddMemberRequest;
 import com.smarterd.api.team.dto.CreateTeamRequest;
+import com.smarterd.api.team.dto.MyRoleResponse;
 import com.smarterd.api.team.dto.TeamMemberResponse;
 import com.smarterd.api.team.dto.TeamResponse;
 import com.smarterd.api.team.dto.UpdateMemberRoleRequest;
+import com.smarterd.api.team.dto.UpdateTeamRequest;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.DomainAccessDeniedException;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.domain.diagram.repository.DiagramRepository;
+import com.smarterd.domain.diagram.websocket.DiagramRoomManager;
+import com.smarterd.domain.dictionary.repository.DomainRepository;
+import com.smarterd.domain.dictionary.repository.TermRepository;
+import com.smarterd.domain.project.repository.ProjectRepository;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.entity.TeamMember;
 import com.smarterd.domain.team.entity.TeamMemberRole;
@@ -47,6 +54,21 @@ public class TeamService {
 
     /** 인증 서비스 (사용자 조회) */
     private final AuthService authService;
+
+    /** 프로젝트 레포지토리 (팀 삭제 cascade용) */
+    private final ProjectRepository projectRepository;
+
+    /** 다이어그램 레포지토리 (팀 삭제 cascade용) */
+    private final DiagramRepository diagramRepository;
+
+    /** 다이어그램 방 관리자 (팀 삭제 시 WebSocket 세션 정리용) */
+    private final DiagramRoomManager roomManager;
+
+    /** 도메인 레포지토리 (팀 삭제 cascade용) */
+    private final DomainRepository domainRepository;
+
+    /** 용어 레포지토리 (팀 삭제 cascade용) */
+    private final TermRepository termRepository;
 
     /**
      * 새 팀을 생성한다.
@@ -197,6 +219,67 @@ public class TeamService {
     }
 
     /**
+     * 현재 사용자의 팀 내 역할을 조회한다.
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId  팀 ID
+     * @return 역할 응답
+     */
+    public MyRoleResponse getMyRole(String loginId, Long teamId) {
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = findTeamById(teamId);
+        final var member = teamMemberRepository
+            .findByTeamAndUser(team, user)
+            .orElseThrow(() -> new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
+        return new MyRoleResponse(member.getRole());
+    }
+
+    /**
+     * 팀 이름을 변경한다. (ADMIN 전용)
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId  팀 ID
+     * @param request 팀 수정 요청
+     * @return 수정된 팀 응답
+     */
+    @Transactional
+    public TeamResponse updateTeam(String loginId, Long teamId, UpdateTeamRequest request) {
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = findTeamById(teamId);
+        verifyAdmin(team, user);
+        team.rename(request.name());
+        return TeamResponse.from(team);
+    }
+
+    /**
+     * 팀을 삭제한다. 모든 하위 리소스를 함께 삭제한다. (ADMIN 전용)
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId  팀 ID
+     */
+    @Transactional
+    public void deleteTeam(String loginId, Long teamId) {
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = findTeamById(teamId);
+        verifyAdmin(team, user);
+
+        // WebSocket 세션 정리 + CASCADE 삭제: Diagram → Project → Term → Domain → Team(+Members)
+        final var projects = projectRepository.findByTeam(team);
+        if (!projects.isEmpty()) {
+            for (final var project : projects) {
+                for (final var diagram : diagramRepository.findByProject(project)) {
+                    roomManager.discardRoom(diagram.getId());
+                }
+            }
+            diagramRepository.deleteByProjectIn(projects);
+            projectRepository.deleteByTeam(team);
+        }
+        termRepository.deleteByTeam(team);
+        domainRepository.deleteByTeam(team);
+        teamRepository.delete(team); // members는 orphanRemoval
+    }
+
+    /**
      * 팀 ID로 팀을 조회한다.
      *
      * @param teamId 팀 ID
@@ -219,6 +302,23 @@ public class TeamService {
     public void verifyMembership(Team team, User user) {
         if (!teamMemberRepository.existsByTeamAndUser(team, user)) {
             throw new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code());
+        }
+    }
+
+    /**
+     * 사용자가 팀에서 편집 가능한 역할(ADMIN 또는 MEMBER)인지 확인한다.
+     * VIEWER는 읽기 전용이므로 DomainAccessDeniedException을 발생시킨다.
+     *
+     * @param team 팀 엔티티
+     * @param user 사용자 엔티티
+     * @throws DomainAccessDeniedException 팀 멤버가 아니거나 VIEWER인 경우
+     */
+    public void verifyEditable(Team team, User user) {
+        final var member = teamMemberRepository
+            .findByTeamAndUser(team, user)
+            .orElseThrow(() -> new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
+        if (member.getRole() == TeamMemberRole.VIEWER) {
+            throw new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_VIEWER_READONLY.code());
         }
     }
 

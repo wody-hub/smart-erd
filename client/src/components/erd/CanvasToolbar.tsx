@@ -1,4 +1,4 @@
-import { Link2, LayoutGrid, Download, ClipboardCheck } from 'lucide-react';
+import { Link2, LayoutGrid, Download, ClipboardCheck, Database } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@xyflow/react';
 import { Button } from '@/components/ui/button';
@@ -26,10 +26,14 @@ interface CanvasToolbarProps {
   onExportSvg: () => void;
   /** PDF 내보내기 핸들러 */
   onExportPdf: () => void;
+  /** SQL DDL 내보내기 핸들러 */
+  onExportDdl?: () => void;
   /** 유효성 검사 패널 열림 여부 */
   validationOpen?: boolean;
   /** 유효성 검사 패널 토글 핸들러 */
   onToggleValidation?: () => void;
+  /** 편집 가능 여부 (VIEWER일 때 false — FK/자동배치 숨김) */
+  canEdit?: boolean;
 }
 
 /**
@@ -44,8 +48,10 @@ interface CanvasToolbarProps {
  * @param props.onExportJpg         JPG 내보내기 핸들러
  * @param props.onExportSvg         SVG 내보내기 핸들러
  * @param props.onExportPdf         PDF 내보내기 핸들러
+ * @param props.onExportDdl         SQL DDL 내보내기 핸들러
  * @param props.validationOpen      유효성 검사 패널 열림 여부
  * @param props.onToggleValidation  유효성 검사 패널 토글 핸들러
+ * @param props.canEdit             편집 가능 여부
  */
 export default function CanvasToolbar({
   fkMode,
@@ -55,34 +61,40 @@ export default function CanvasToolbar({
   onExportJpg,
   onExportSvg,
   onExportPdf,
+  onExportDdl,
   validationOpen,
   onToggleValidation,
+  canEdit = true,
 }: CanvasToolbarProps) {
   const { t } = useTranslation();
 
   return (
     <Panel position="top-center">
       <div className="bg-card border border-border rounded-lg shadow-md p-1 gap-1 flex">
-        <Button
-          variant={fkMode ? 'default' : 'ghost'}
-          size="sm"
-          onClick={onToggleFkMode}
-          className={cn('gap-1.5', fkMode && 'bg-primary text-primary-foreground')}
-          aria-label={fkMode ? t('erd.toolbar.fkConnectActive') : t('erd.toolbar.fkConnect')}
-        >
-          <Link2 className="h-4 w-4" />
-          {t('erd.toolbar.fkConnect')}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onAutoLayout}
-          className="gap-1.5"
-          aria-label={t('erd.toolbar.autoLayout')}
-        >
-          <LayoutGrid className="h-4 w-4" />
-          {t('erd.toolbar.autoLayout')}
-        </Button>
+        {canEdit && (
+          <Button
+            variant={fkMode ? 'default' : 'ghost'}
+            size="sm"
+            onClick={onToggleFkMode}
+            className={cn('gap-1.5', fkMode && 'bg-primary text-primary-foreground')}
+            aria-label={fkMode ? t('erd.toolbar.fkConnectActive') : t('erd.toolbar.fkConnect')}
+          >
+            <Link2 className="h-4 w-4" />
+            {t('erd.toolbar.fkConnect')}
+          </Button>
+        )}
+        {canEdit && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onAutoLayout}
+            className="gap-1.5"
+            aria-label={t('erd.toolbar.autoLayout')}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            {t('erd.toolbar.autoLayout')}
+          </Button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -102,6 +114,18 @@ export default function CanvasToolbar({
             <DropdownMenuItem onClick={onExportPdf}>PDF</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        {onExportDdl && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onExportDdl}
+            className="gap-1.5"
+            aria-label={t('erd.toolbar.ddlExport')}
+          >
+            <Database className="h-4 w-4" />
+            {t('erd.toolbar.ddlExport')}
+          </Button>
+        )}
         {onToggleValidation && (
           <Button
             variant={validationOpen ? 'default' : 'ghost'}

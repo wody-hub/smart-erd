@@ -33,6 +33,8 @@ interface MembersDialogProps {
   onOpenChange: (open: boolean) => void;
   /** 대상 팀 ID */
   teamId: string;
+  /** ADMIN 권한 여부 (true일 때 초대/제거 기능 표시) */
+  isAdmin?: boolean;
   /** 멤버 변경(초대/제거) 시 호출되는 콜백 (팀 정보 갱신용) */
   onMembersChanged?: () => void;
 }
@@ -43,12 +45,14 @@ interface MembersDialogProps {
  * @param props.open             다이얼로그 열림 상태
  * @param props.onOpenChange     다이얼로그 열림 상태 변경 핸들러
  * @param props.teamId           대상 팀 ID
+ * @param props.isAdmin          ADMIN 권한 여부 (true일 때 초대/제거 기능 표시)
  * @param props.onMembersChanged 멤버 변경 시 호출되는 콜백 (팀 정보 갱신용)
  */
 export default function MembersDialog({
   open,
   onOpenChange,
   teamId,
+  isAdmin = false,
   onMembersChanged,
 }: MembersDialogProps) {
   const queryClient = useQueryClient();
@@ -112,42 +116,44 @@ export default function MembersDialog({
           <DialogDescription>{t('team.members.dialogDescription')}</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleInvite} className="flex gap-2 items-end">
-          <div className="flex-1 space-y-1">
-            <Label htmlFor="invite-id" className="text-xs">
-              {t('team.members.loginIdLabel')}
-            </Label>
-            <Input
-              id="invite-id"
-              placeholder={t('team.members.loginIdPlaceholder')}
-              value={inviteLoginId}
-              onChange={(e) => setInviteLoginId(e.target.value)}
-              className="h-9"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">{t('team.members.roleLabel')}</Label>
-            <Select
-              value={inviteRole}
-              onValueChange={(value) => setInviteRole(value as 'MEMBER' | 'VIEWER')}
+        {isAdmin && (
+          <form onSubmit={handleInvite} className="flex gap-2 items-end">
+            <div className="flex-1 space-y-1">
+              <Label htmlFor="invite-id" className="text-xs">
+                {t('team.members.loginIdLabel')}
+              </Label>
+              <Input
+                id="invite-id"
+                placeholder={t('team.members.loginIdPlaceholder')}
+                value={inviteLoginId}
+                onChange={(e) => setInviteLoginId(e.target.value)}
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t('team.members.roleLabel')}</Label>
+              <Select
+                value={inviteRole}
+                onValueChange={(value) => setInviteRole(value as 'MEMBER' | 'VIEWER')}
+              >
+                <SelectTrigger className="h-9 w-[100px]" aria-label={t('team.members.roleLabel')}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MEMBER">{t('team.members.roleMember')}</SelectItem>
+                  <SelectItem value="VIEWER">{t('team.members.roleViewer')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={inviteMutation.isPending || !inviteLoginId.trim()}
             >
-              <SelectTrigger className="h-9 w-[100px]" aria-label={t('team.members.roleLabel')}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="MEMBER">{t('team.members.roleMember')}</SelectItem>
-                <SelectItem value="VIEWER">{t('team.members.roleViewer')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            type="submit"
-            size="sm"
-            disabled={inviteMutation.isPending || !inviteLoginId.trim()}
-          >
-            {inviteMutation.isPending ? t('common.button.pending') : t('common.button.invite')}
-          </Button>
-        </form>
+              {inviteMutation.isPending ? t('common.button.pending') : t('common.button.invite')}
+            </Button>
+          </form>
+        )}
 
         <div className="space-y-2 mt-4 max-h-64 overflow-auto">
           {members.map((member) => (
@@ -163,7 +169,7 @@ export default function MembersDialog({
                 <span className="text-xs font-medium px-2 py-0.5 rounded bg-background border">
                   {getRoleLabel(member.role)}
                 </span>
-                {member.role !== 'ADMIN' && (
+                {isAdmin && member.role !== 'ADMIN' && (
                   <Button
                     variant="ghost"
                     size="icon"

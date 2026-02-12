@@ -63,4 +63,13 @@ public class Team extends BaseTimeEntity {
         this.name = name;
         this.owner = owner;
     }
+
+    /**
+     * 팀 이름을 변경한다.
+     *
+     * @param name 새 팀 이름
+     */
+    public void rename(String name) {
+        this.name = name;
+    }
 }

@@ -5,13 +5,21 @@ import { Button } from '@/components/ui/button';
 import useCanvasStore from '@/stores/useCanvasStore';
 import SidebarTableItem from './SidebarTableItem';
 
+/** Sidebar 컴포넌트의 props. */
+interface SidebarProps {
+  /** 편집 가능 여부 (VIEWER일 때 false — 테이블 추가/삭제/이름변경 숨김) */
+  canEdit?: boolean;
+}
+
 /**
  * 좌측 사이드바 컴포넌트.
  *
  * 고정 너비(224px)의 테이블 목록 패널을 표시한다.
  * 테이블 추가, 삭제, 이름 변경, 클릭 시 캔버스 포커스 기능을 제공한다.
+ *
+ * @param props.canEdit 편집 가능 여부
  */
-export default function Sidebar() {
+export default function Sidebar({ canEdit = true }: SidebarProps) {
   const { t } = useTranslation();
   const nodes = useCanvasStore((s) => s.nodes);
   const addTable = useCanvasStore((s) => s.addTable);
@@ -36,16 +44,18 @@ export default function Sidebar() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
           {t('erd.sidebar.tables')}
         </h2>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={() => addTable()}
-          title={t('erd.sidebar.addTable')}
-          aria-label={t('erd.sidebar.aria.addTable')}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
+        {canEdit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => addTable()}
+            title={t('erd.sidebar.addTable')}
+            aria-label={t('erd.sidebar.aria.addTable')}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto space-y-0.5">
@@ -60,6 +70,7 @@ export default function Sidebar() {
               onClick={() => handleFocusNode(node.id)}
               onRename={(newName) => renameTable(node.id, newName)}
               onDelete={() => deleteTable(node.id)}
+              canEdit={canEdit}
             />
           ))
         )}

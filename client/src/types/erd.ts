@@ -50,3 +50,6 @@ export type TableNode = Node<TableNodeData, 'table'>;
  * React Flow의 기본 `Edge` 타입을 그대로 사용한다.
  */
 export type ERDEdge = Edge;
+
+/** 지원 DBMS 타입 */
+export type DbmsType = 'postgresql' | 'mysql' | 'oracle' | 'sqlserver' | 'ansi';

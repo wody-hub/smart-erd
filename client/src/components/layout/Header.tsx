@@ -18,6 +18,8 @@ interface HeaderProps {
   saving?: boolean;
   /** WebSocket 연결 상태 (다이어그램 편집 화면에서만 전달) */
   connectionStatus?: ConnectionStatus;
+  /** 편집 가능 여부 (VIEWER일 때 false) */
+  canEdit?: boolean;
 }
 
 /**
@@ -31,8 +33,15 @@ interface HeaderProps {
  * @param props.onSave           백업 버튼 클릭 핸들러
  * @param props.saving           백업 중 여부
  * @param props.connectionStatus WebSocket 연결 상태
+ * @param props.canEdit          편집 가능 여부 (VIEWER일 때 false)
  */
-export default function Header({ diagramName, onSave, saving, connectionStatus }: HeaderProps) {
+export default function Header({
+  diagramName,
+  onSave,
+  saving,
+  connectionStatus,
+  canEdit = true,
+}: HeaderProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { name, isAuthenticated, logout } = useAuthStore();
@@ -66,7 +75,7 @@ export default function Header({ diagramName, onSave, saving, connectionStatus }
               aria-label={t(`collaboration.status.${connectionStatus}`)}
             />
           )}
-          {onSave && (
+          {onSave && canEdit && (
             <Button
               variant="ghost"
               size="sm"
@@ -77,6 +86,9 @@ export default function Header({ diagramName, onSave, saving, connectionStatus }
               <Save className="h-4 w-4 mr-1" />
               {saving ? t('common.button.backingUp') : t('common.button.backup')}
             </Button>
+          )}
+          {!canEdit && (
+            <span className="text-xs text-header-muted ml-2">{t('permission.viewerReadonly')}</span>
           )}
         </div>
       )}
