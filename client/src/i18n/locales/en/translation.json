@@ -191,10 +191,16 @@
       "tables": "Tables",
       "noTables": "No tables yet",
       "addTable": "Add table",
+      "groups": "Groups",
+      "noGroups": "No groups yet",
+      "addGroup": "Add group",
       "aria": {
         "addTable": "Add table",
         "renameTable": "Rename table {{name}}",
-        "deleteTable": "Delete table {{name}}"
+        "deleteTable": "Delete table {{name}}",
+        "addGroup": "Add group",
+        "renameGroup": "Rename group {{name}}",
+        "deleteGroup": "Delete group {{name}}"
       }
     },
     "toolbar": {
@@ -204,7 +210,8 @@
       "export": "Export",
       "validate": "Validate",
       "validateActive": "Validate (active)",
-      "ddlExport": "SQL DDL"
+      "ddlExport": "SQL DDL",
+      "ddlImport": "DDL Import"
     },
     "ddlExport": {
       "title": "Export SQL DDL",
@@ -222,6 +229,20 @@
       "copied": "Copied to clipboard",
       "copyFailed": "Failed to copy to clipboard",
       "noTables": "No tables to export"
+    },
+    "ddlImport": {
+      "title": "Import SQL DDL",
+      "description": "Paste or type SQL DDL to automatically parse tables and relationships.",
+      "dbmsLabel": "Target DBMS",
+      "parsing": "Parsing...",
+      "preview": "{{tables}} tables, {{relations}} relations detected",
+      "warnings": "{{count}} warnings",
+      "parseError": "Failed to parse DDL",
+      "errorDetails": "Parse error details",
+      "moreErrors": "{{count}} more errors",
+      "import": "Import",
+      "success": "Imported {{count}} tables",
+      "failed": "Failed to import DDL"
     },
     "export": {
       "noNodes": "No tables to export",
@@ -251,6 +272,7 @@
     "tableNode": {
       "addColumn": "Add Column",
       "selectDomain": "Select domain",
+      "tableLogicalName": "Enter table logical name...",
       "title": {
         "togglePk": "Toggle PK",
         "toggleFk": "Toggle FK",
@@ -260,6 +282,7 @@
       },
       "aria": {
         "tableName": "Table name",
+        "tableLogicalName": "Table logical name",
         "logicalName": "Column logical name",
         "columnName": "Column name",
         "columnType": "Column type",
@@ -270,7 +293,33 @@
         "deleteColumn": "Delete column {{name}}",
         "validationWarning": "{{name}} dictionary mismatch warning",
         "domainBadge": "{{colName}} domain: {{domainName}}",
-        "selectDomain": "Select domain for {{colName}}"
+        "selectDomain": "Select domain for {{colName}}",
+        "changeColor": "Change table color",
+        "reorderColumn": "Reorder column {{name}}"
+      }
+    },
+    "colorPicker": {
+      "title": "Color picker",
+      "aria": {
+        "selectColor": "Select {{color}} color"
+      }
+    },
+    "color": {
+      "default": "Default",
+      "red": "Red",
+      "orange": "Orange",
+      "amber": "Amber",
+      "green": "Green",
+      "teal": "Teal",
+      "blue": "Blue",
+      "indigo": "Indigo",
+      "purple": "Purple",
+      "pink": "Pink"
+    },
+    "groupNode": {
+      "aria": {
+        "group": "Group: {{name}}",
+        "groupName": "Group name"
       }
     },
     "domain": {
@@ -462,6 +511,11 @@
       "connected": "Connected",
       "connecting": "Connecting...",
       "disconnected": "Disconnected"
+    },
+    "participants": {
+      "title": "Collaborators {{count}}",
+      "online": "Online",
+      "me": "Me"
     }
   },
   "permission": {

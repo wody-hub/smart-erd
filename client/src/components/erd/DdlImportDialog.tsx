@@ -93,9 +93,10 @@ export default function DdlImportDialog({ open, onOpenChange }: DdlImportDialogP
         const result = await parseDdl(text, targetDbms);
         if (seq !== parseSeqRef.current) return;
         setParseResult(result);
-      } catch {
+      } catch (err) {
         if (seq !== parseSeqRef.current) return;
-        setParseResult({ tables: [], relations: [], errors: ['Failed to parse DDL'] });
+        const msg = err instanceof Error ? err.message : 'Failed to parse DDL';
+        setParseResult({ tables: [], relations: [], errors: [msg] });
       } finally {
         if (seq !== parseSeqRef.current) return;
         setParsing(false);
@@ -240,6 +241,22 @@ export default function DdlImportDialog({ open, onOpenChange }: DdlImportDialogP
             </>
           )}
         </div>
+
+        {!parsing && parseResult && parseResult.errors.length > 0 && (
+          <div className="border border-border rounded-md bg-muted/30 px-3 py-2 text-xs space-y-1 max-h-28 overflow-auto">
+            <div className="font-medium">{t('erd.ddlImport.errorDetails')}</div>
+            {parseResult.errors.slice(0, 5).map((error, i) => (
+              <div key={i} className="font-mono text-muted-foreground break-words">
+                {i + 1}. {error}
+              </div>
+            ))}
+            {parseResult.errors.length > 5 && (
+              <div className="text-muted-foreground">
+                {t('erd.ddlImport.moreErrors', { count: parseResult.errors.length - 5 })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 액션 버튼 */}
         <div className="flex justify-end gap-2 mt-1">
