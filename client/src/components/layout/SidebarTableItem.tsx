@@ -8,8 +8,10 @@ import { useInlineEdit } from '@/hooks/useInlineEdit';
 interface SidebarTableItemProps {
   /** 노드 ID */
   nodeId: string;
-  /** 테이블 표시 이름 */
+  /** 항목 기본 이름(편집 시 초기값으로 사용) */
   label: string;
+  /** 목록에 표시할 이름(미지정 시 label 사용) */
+  displayLabel?: string;
   /** 이름 변경 접근성 라벨 */
   renameAriaLabel: string;
   /** 삭제 접근성 라벨 */
@@ -37,6 +39,7 @@ interface SidebarTableItemProps {
  */
 export default function SidebarTableItem({
   label,
+  displayLabel,
   renameAriaLabel,
   deleteAriaLabel,
   onClick,
@@ -46,6 +49,7 @@ export default function SidebarTableItem({
 }: SidebarTableItemProps) {
   const { t } = useTranslation();
   const { editing, value, setValue, startEdit, confirmEdit, cancelEdit } = useInlineEdit(onRename);
+  const rowLabel = displayLabel ?? label;
 
   if (editing) {
     return (
@@ -88,7 +92,7 @@ export default function SidebarTableItem({
       className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-accent cursor-pointer group"
       onClick={onClick}
     >
-      <span className="text-sm truncate flex-1">{label}</span>
+      <span className="text-sm truncate flex-1">{rowLabel}</span>
       {canEdit && (
         <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
           <Button

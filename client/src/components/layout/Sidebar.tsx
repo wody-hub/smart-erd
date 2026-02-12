@@ -90,19 +90,24 @@ export default function Sidebar({ canEdit = true }: SidebarProps) {
           {nodes.length === 0 ? (
             <p className="text-xs text-muted-foreground">{t('erd.sidebar.noTables')}</p>
           ) : (
-            nodes.map((node) => (
-              <SidebarTableItem
-                key={node.id}
-                nodeId={node.id}
-                label={node.data.label}
-                renameAriaLabel={t('erd.sidebar.aria.renameTable', { name: node.data.label })}
-                deleteAriaLabel={t('erd.sidebar.aria.deleteTable', { name: node.data.label })}
-                onClick={() => handleFocusNode(node.id)}
-                onRename={(newName) => renameTable(node.id, newName)}
-                onDelete={() => deleteTable(node.id)}
-                canEdit={canEdit}
-              />
-            ))
+            nodes.map((node) => {
+              const logical = node.data.logicalTableName?.trim();
+              const displayLabel = logical ? `${logical} (${node.data.label})` : node.data.label;
+              return (
+                <SidebarTableItem
+                  key={node.id}
+                  nodeId={node.id}
+                  label={node.data.label}
+                  displayLabel={displayLabel}
+                  renameAriaLabel={t('erd.sidebar.aria.renameTable', { name: node.data.label })}
+                  deleteAriaLabel={t('erd.sidebar.aria.deleteTable', { name: node.data.label })}
+                  onClick={() => handleFocusNode(node.id)}
+                  onRename={(newName) => renameTable(node.id, newName)}
+                  onDelete={() => deleteTable(node.id)}
+                  canEdit={canEdit}
+                />
+              );
+            })
           )}
         </div>
 
