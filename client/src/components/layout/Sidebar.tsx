@@ -9,6 +9,8 @@ import SidebarTableItem from './SidebarTableItem';
 interface SidebarProps {
   /** 편집 가능 여부 (VIEWER일 때 false — 테이블 추가/삭제/이름변경 숨김) */
   canEdit?: boolean;
+  /** 사이드바 너비(px) */
+  width?: number;
 }
 
 /**
@@ -19,7 +21,7 @@ interface SidebarProps {
  *
  * @param props.canEdit 편집 가능 여부
  */
-export default function Sidebar({ canEdit = true }: SidebarProps) {
+export default function Sidebar({ canEdit = true, width = 224 }: SidebarProps) {
   const { t } = useTranslation();
   const nodes = useCanvasStore((s) => s.nodes);
   const groupNodes = useCanvasStore((s) => s.groupNodes);
@@ -65,7 +67,11 @@ export default function Sidebar({ canEdit = true }: SidebarProps) {
   };
 
   return (
-    <aside className="w-56 bg-muted border-r border-border p-4 shrink-0 flex flex-col">
+    <aside
+      id="diagram-sidebar"
+      className="bg-muted border-r border-border p-4 shrink-0 flex flex-col"
+      style={{ width }}
+    >
       <div className="flex-1 overflow-auto">
         {/* 테이블 섹션 */}
         <div className="flex items-center justify-between mb-3">

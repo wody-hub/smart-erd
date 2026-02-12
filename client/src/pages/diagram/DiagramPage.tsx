@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -30,6 +30,10 @@ import { useAutoBackup } from '@/hooks/useAutoBackup';
  * Ctrl+S(Mac: Cmd+S) 단축키로 JSON 백업 저장을 할 수 있다.
  */
 export default function DiagramPage() {
+  const SIDEBAR_MIN_WIDTH = 180;
+  const SIDEBAR_MAX_WIDTH = 480;
+  const SIDEBAR_KEYBOARD_STEP = 16;
+
   /** URL 파라미터: teamId, projectId, diagramId */
   const { teamId, projectId, diagramId } = useParams<{
     teamId: string;
@@ -43,6 +47,10 @@ export default function DiagramPage() {
   const [diagramName, setDiagramName] = useState('');
   /** 유효성 검사 패널 열림 상태 */
   const [validationOpen, setValidationOpen] = useState(false);
+  /** 좌측 사이드바 너비(px) */
+  const [sidebarWidth, setSidebarWidth] = useState(224);
+  /** 진행 중인 사이드바 리사이즈 정리 함수 */
+  const sidebarResizeCleanupRef = useRef<(() => void) | null>(null);
 
   const { canEdit } = useTeamRole(teamId);
 
@@ -86,8 +94,89 @@ export default function DiagramPage() {
   /** 유효성 검사 패널 토글 핸들러 */
   const handleToggleValidation = () => setValidationOpen((prev) => !prev);
 
+  /** 사이드바 너비를 허용 범위로 보정한다. */
+  const clampSidebarWidth = (width: number) =>
+    Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, width));
+
+  /** 현재 진행 중인 사이드바 리사이즈 리스너/전역 스타일을 정리한다. */
+  const cleanupSidebarResize = () => {
+    if (!sidebarResizeCleanupRef.current) return;
+    sidebarResizeCleanupRef.current();
+    sidebarResizeCleanupRef.current = null;
+  };
+
+  /**
+   * 사이드바 리사이즈 시작 핸들러.
+   *
+   * @param e PointerDown 이벤트
+   */
+  const handleSidebarResizeStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.focus();
+    cleanupSidebarResize();
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const handleMove = (ev: PointerEvent) => {
+      setSidebarWidth(clampSidebarWidth(startWidth + (ev.clientX - startX)));
+    };
+
+    const handleEnd = () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleEnd);
+      window.removeEventListener('pointercancel', handleEnd);
+      window.removeEventListener('blur', handleEnd);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      sidebarResizeCleanupRef.current = null;
+    };
+
+    sidebarResizeCleanupRef.current = handleEnd;
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleEnd);
+    window.addEventListener('pointercancel', handleEnd);
+    window.addEventListener('blur', handleEnd);
+  };
+
+  /**
+   * 키보드 기반 사이드바 리사이즈 핸들러.
+   *
+   * ArrowLeft/ArrowRight로 너비를 조절하고, Home/End로 최소/최대로 이동한다.
+   */
+  const handleSidebarResizeKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setSidebarWidth((prev) => clampSidebarWidth(prev - SIDEBAR_KEYBOARD_STEP));
+      return;
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      setSidebarWidth((prev) => clampSidebarWidth(prev + SIDEBAR_KEYBOARD_STEP));
+      return;
+    }
+    if (e.key === 'Home') {
+      e.preventDefault();
+      setSidebarWidth(SIDEBAR_MIN_WIDTH);
+      return;
+    }
+    if (e.key === 'End') {
+      e.preventDefault();
+      setSidebarWidth(SIDEBAR_MAX_WIDTH);
+    }
+  };
+
   useAutoBackup(saveMutation, teamId!, projectId!, diagramId!);
   useHotkeys(KEYBINDINGS.SAVE, handleSave, { preventDefault: true });
+
+  useEffect(() => {
+    return () => {
+      if (!sidebarResizeCleanupRef.current) return;
+      sidebarResizeCleanupRef.current();
+      sidebarResizeCleanupRef.current = null;
+    };
+  }, []);
 
   // Y.Doc + YjsProvider 라이프사이클 관리
   const { providerRef } = useYjsCollaboration(diagram, diagramId);
@@ -134,7 +223,23 @@ export default function DiagramPage() {
               canEdit={canEdit}
             />
             <div className="flex flex-1 overflow-hidden">
-              <Sidebar canEdit={canEdit} />
+              <Sidebar canEdit={canEdit} width={sidebarWidth} />
+              <div
+                className="group w-3 shrink-0 cursor-col-resize flex items-stretch justify-center bg-muted/30 hover:bg-muted/60 active:bg-muted/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                onPointerDown={handleSidebarResizeStart}
+                onKeyDown={handleSidebarResizeKeyDown}
+                role="separator"
+                aria-orientation="vertical"
+                aria-controls="diagram-sidebar"
+                aria-label={t('erd.sidebar.resize')}
+                aria-valuemin={SIDEBAR_MIN_WIDTH}
+                aria-valuemax={SIDEBAR_MAX_WIDTH}
+                aria-valuenow={sidebarWidth}
+                title={t('erd.sidebar.resize')}
+                tabIndex={0}
+              >
+                <div className="w-px h-full bg-border/80 group-hover:bg-primary/80 group-active:bg-primary transition-colors" />
+              </div>
               <main className="flex-1">
                 <ERDCanvas
                   diagramName={diagramName || 'diagram'}

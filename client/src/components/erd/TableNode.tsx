@@ -113,6 +113,7 @@ function SortableColumnRow({ col, canEdit, children }: SortableColumnRowProps) {
  *
  * @param props.id   React Flow 노드 ID
  * @param props.data 테이블 데이터 (label, columns, logicalTableName, headerColor)
+ * @param props.selected 선택 상태
  */
 function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const { t } = useTranslation();

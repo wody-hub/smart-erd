@@ -89,35 +89,37 @@ export default function SidebarTableItem({
 
   return (
     <div
-      className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-accent cursor-pointer group"
+      className="group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer text-foreground hover:bg-accent hover:text-accent-foreground focus-within:bg-accent focus-within:text-accent-foreground"
       onClick={onClick}
     >
-      <span className="text-sm truncate flex-1">{rowLabel}</span>
+      <span className="text-sm truncate flex-1" title={rowLabel}>
+        {rowLabel}
+      </span>
       {canEdit && (
-        <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
             onClick={(e) => {
               e.stopPropagation();
               startEdit(label);
             }}
             aria-label={renameAriaLabel}
           >
-            <Pencil className="h-3 w-3 text-muted-foreground" />
+            <Pencil className="h-3 w-3" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6"
+            className="h-6 w-6 text-muted-foreground hover:text-destructive"
             onClick={(e) => {
               e.stopPropagation();
               onDelete();
             }}
             aria-label={deleteAriaLabel}
           >
-            <Trash2 className="h-3 w-3 text-destructive" />
+            <Trash2 className="h-3 w-3" />
           </Button>
         </div>
       )}
