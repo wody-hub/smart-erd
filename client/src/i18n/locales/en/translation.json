@@ -248,7 +248,9 @@
     "export": {
       "noNodes": "No tables to export",
       "success": "Diagram exported successfully",
-      "failed": "Failed to export diagram"
+      "failed": "Failed to export diagram",
+      "largeDiagramHint": "This diagram is very large, so PNG/JPG quality may be limited. Use SVG or PDF for higher clarity.",
+      "pdfTiled": "Large diagram exported as a tiled PDF ({{count}} pages)"
     },
     "fkMode": {
       "selectParent": "Select parent table (PK source)",

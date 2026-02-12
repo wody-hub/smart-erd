@@ -23,9 +23,14 @@ export function useAwareness(
 ) {
   const { loginId, name } = useAuthStore();
   const { screenToFlowPosition } = useReactFlow();
+  const screenToFlowPositionRef = useRef(screenToFlowPosition);
 
   /** 마지막 발행 시각 */
   const lastEmitRef = useRef(0);
+
+  useEffect(() => {
+    screenToFlowPositionRef.current = screenToFlowPosition;
+  }, [screenToFlowPosition]);
 
   useEffect(() => {
     if (!provider || !canvasRef.current || !loginId || !name) return;
@@ -59,7 +64,7 @@ export function useAwareness(
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
 
-      const flowPos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      const flowPos = screenToFlowPositionRef.current({ x: e.clientX, y: e.clientY });
       emitAwareness(flowPos);
     };
 
@@ -77,5 +82,5 @@ export function useAwareness(
       el.removeEventListener('mouseleave', handleMouseLeave);
       emitAwareness(null);
     };
-  }, [provider, canvasRef, loginId, name, screenToFlowPosition]);
+  }, [provider, canvasRef, loginId, name]);
 }
