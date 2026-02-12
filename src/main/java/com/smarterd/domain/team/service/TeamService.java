@@ -14,6 +14,7 @@ import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.diagram.websocket.DiagramRoomManager;
+import com.smarterd.domain.dictionary.repository.DictionarySetRepository;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
 import com.smarterd.domain.project.repository.ProjectRepository;
@@ -69,6 +70,9 @@ public class TeamService {
 
     /** 용어 레포지토리 (팀 삭제 cascade용) */
     private final TermRepository termRepository;
+
+    /** 사전 세트 레포지토리 (팀 삭제 cascade용) */
+    private final DictionarySetRepository dictionarySetRepository;
 
     /**
      * 새 팀을 생성한다.
@@ -276,6 +280,7 @@ public class TeamService {
         }
         termRepository.deleteByTeam(team);
         domainRepository.deleteByTeam(team);
+        dictionarySetRepository.deleteByTeam(team);
         teamRepository.delete(team); // members는 orphanRemoval
     }
 

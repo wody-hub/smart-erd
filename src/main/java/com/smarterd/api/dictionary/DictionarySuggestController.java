@@ -23,12 +23,12 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 키워드 기반 물리명/도메인 추천 REST 컨트롤러.
  *
- * <p>{@code /api/teams/{teamId}/dictionary/suggest} 경로에 추천 엔드포인트를 제공한다.
+ * <p>{@code /api/teams/{teamId}/dictionary-sets/{setId}/dictionary/suggest} 경로에 추천 엔드포인트를 제공한다.
  * 모든 엔드포인트는 인증이 필요하다.</p>
  */
 @Tag(name = "Dictionary Suggest", description = "키워드 기반 물리명/도메인 추천 API")
 @RestController
-@RequestMapping("/api/teams/{teamId}/dictionary")
+@RequestMapping("/api/teams/{teamId}/dictionary-sets/{setId}/dictionary")
 @RequiredArgsConstructor
 public class DictionarySuggestController {
 
@@ -54,8 +54,9 @@ public class DictionarySuggestController {
     public ResponseEntity<SuggestResponse> suggest(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Valid @RequestBody SuggestRequest request
     ) {
-        return ResponseEntity.ok(dictionarySuggestService.suggest(jwt.getSubject(), teamId, request));
+        return ResponseEntity.ok(dictionarySuggestService.suggest(jwt.getSubject(), teamId, setId, request));
     }
 }

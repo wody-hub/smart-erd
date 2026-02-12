@@ -154,7 +154,8 @@
       "newButton": "새 다이어그램",
       "createButton": "다이어그램 만들기",
       "empty": "아직 다이어그램이 없습니다. 첫 번째 다이어그램을 만드세요.",
-      "updatedAt": "수정일: {{date}}"
+      "updatedAt": "수정일: {{date}}",
+      "selectDictionarySet": "사전 세트 선택"
     },
     "create": {
       "dialogTitle": "새 다이어그램 만들기",
@@ -167,7 +168,8 @@
     },
     "edit": {
       "loadError": "다이어그램을 불러오는 데 실패했습니다. 나중에 다시 시도해 주세요.",
-      "loadingDiagram": "다이어그램 로딩 중..."
+      "loadingDiagram": "다이어그램 로딩 중...",
+      "dictionarySet": "적용 사전 세트: {{name}}"
     },
     "toast": {
       "created": "다이어그램이 생성되었습니다",
@@ -176,6 +178,8 @@
       "deleteFailed": "다이어그램 삭제에 실패했습니다",
       "renamed": "다이어그램 이름이 변경되었습니다",
       "renameFailed": "다이어그램 이름 변경에 실패했습니다",
+      "dictionarySetUpdated": "다이어그램 사전 세트가 변경되었습니다",
+      "dictionarySetUpdateFailed": "다이어그램 사전 세트 변경에 실패했습니다",
       "backupSynced": "백업 동기화 완료",
       "noChanges": "변경 사항 없음",
       "backupFailed": "백업 동기화에 실패했습니다"
@@ -378,6 +382,31 @@
     "tabs": {
       "domains": "도메인 사전",
       "terms": "용어 사전"
+    },
+    "set": {
+      "placeholder": "사전 세트 선택",
+      "defaultBadge": "기본",
+      "newButton": "세트 추가",
+      "renameButton": "이름 변경",
+      "setDefaultButton": "기본 지정",
+      "deleteButton": "세트 삭제",
+      "createTitle": "사전 세트 추가",
+      "inputLabel": "세트 이름",
+      "empty": "사용 가능한 사전 세트가 없습니다.",
+      "prompt": {
+        "rename": "새 세트 이름을 입력하세요.",
+        "delete": "\"{{name}}\" 세트를 삭제하시겠습니까?"
+      },
+      "toast": {
+        "created": "사전 세트가 생성되었습니다",
+        "createFailed": "사전 세트 생성에 실패했습니다",
+        "updated": "사전 세트가 수정되었습니다",
+        "updateFailed": "사전 세트 수정에 실패했습니다",
+        "deleted": "사전 세트가 삭제되었습니다",
+        "deleteFailed": "사전 세트 삭제에 실패했습니다",
+        "defaultUpdated": "기본 사전 세트가 변경되었습니다",
+        "defaultUpdateFailed": "기본 사전 세트 변경에 실패했습니다"
+      }
     },
     "domain": {
       "table": {

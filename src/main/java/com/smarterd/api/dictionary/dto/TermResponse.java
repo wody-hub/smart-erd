@@ -12,6 +12,7 @@ import java.time.Instant;
  * @param physicalName      물리명
  * @param description       설명 (nullable)
  * @param teamId            소속 팀 ID
+ * @param dictionarySetId   소속 사전 세트 ID
  * @param domainId          연결 도메인 ID (nullable)
  * @param domainLogicalName 연결 도메인 논리명 (nullable)
  * @param createdAt         생성 시각
@@ -28,6 +29,8 @@ public record TermResponse(
     @Schema(description = "설명") String description,
 
     @Schema(description = "소속 팀 ID", example = "1") Long teamId,
+
+    @Schema(description = "소속 사전 세트 ID", example = "1") Long dictionarySetId,
 
     @Schema(description = "연결 도메인 ID") Long domainId,
 
@@ -51,6 +54,7 @@ public record TermResponse(
             term.getPhysicalName(),
             term.getDescription(),
             term.getTeam().getId(),
+            term.getDictionarySet() != null ? term.getDictionarySet().getId() : null,
             domain != null ? domain.getId() : null,
             domain != null ? domain.getLogicalName() : null,
             term.getCreatedAt(),

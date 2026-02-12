@@ -6,6 +6,10 @@ export interface DiagramSummary {
   name: string;
   /** 소속 프로젝트 ID */
   projectId: number;
+  /** 적용 사전 세트 ID */
+  dictionarySetId: number | null;
+  /** 적용 사전 세트 이름 */
+  dictionarySetName: string | null;
   /** 생성 일시 (ISO 8601) */
   createdAt: string;
   /** 최종 수정 일시 (ISO 8601) */

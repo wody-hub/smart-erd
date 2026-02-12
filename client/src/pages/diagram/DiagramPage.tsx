@@ -289,9 +289,11 @@ export default function DiagramPage() {
     );
   }
 
+  const dictionarySetId = diagram?.dictionarySetId ? String(diagram.dictionarySetId) : '';
+
   return (
     <ReactFlowProvider>
-      <ErdDictionaryProvider teamId={teamId!}>
+      <ErdDictionaryProvider teamId={teamId!} setId={dictionarySetId}>
         <ErdPermissionProvider canEdit={canEdit}>
           <div className="h-screen flex flex-col">
             <Header
@@ -301,6 +303,11 @@ export default function DiagramPage() {
               connectionStatus={connectionStatus}
               canEdit={canEdit}
             />
+            {diagram?.dictionarySetName && (
+              <div className="px-4 py-1 text-xs text-muted-foreground border-b bg-background">
+                {t('diagram.edit.dictionarySet', { name: diagram.dictionarySetName })}
+              </div>
+            )}
             <div className="flex flex-1 overflow-hidden">
               <div ref={sidebarContainerRef} className="h-full shrink-0" style={{ width: sidebarWidth }}>
                 <Sidebar canEdit={canEdit} />

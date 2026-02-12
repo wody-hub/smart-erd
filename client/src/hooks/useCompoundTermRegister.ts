@@ -22,13 +22,13 @@ import type { CompoundResolution } from '@/types/dictionary';
 export function useCompoundTermRegister(nodeId: string) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { teamId, findDomainById } = useErdDictionary();
+  const { teamId, setId, findDomainById } = useErdDictionary();
   const updateColumn = useCanvasStore((s) => s.updateColumn);
 
   /** 복합 용어 자동 등록 mutation */
   const autoRegisterMutation = useMutation({
     mutationFn: (data: { logicalName: string; physicalName: string; domainId?: number | null }) =>
-      createTerm(teamId, {
+      createTerm(teamId, setId, {
         logicalName: data.logicalName,
         physicalName: data.physicalName,
         domainId: data.domainId ?? null,
@@ -50,15 +50,15 @@ export function useCompoundTermRegister(nodeId: string) {
       },
       {
         onSuccess: (term) => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId, setId) });
           updateColumn(nodeId, colId, buildColumnUpdatesFromTerm(term, findDomainById));
           toast.success(t('erd.autocomplete.compoundRegistered'));
         },
         onError: async (err) => {
           if (isAxiosError(err) && err.response?.status === 409) {
             const freshTerms = await queryClient.fetchQuery({
-              queryKey: queryKeys.dictionary.terms(teamId),
-              queryFn: () => fetchTerms(teamId),
+              queryKey: queryKeys.dictionary.terms(teamId, setId),
+              queryFn: () => fetchTerms(teamId, setId),
             });
             const existing = freshTerms.find((t) => t.logicalName === resolution.query);
             if (existing) {

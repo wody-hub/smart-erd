@@ -1,6 +1,7 @@
 package com.smarterd.api.common;
 
 import com.smarterd.domain.common.exception.BusinessException;
+import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.DomainAccessDeniedException;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
@@ -111,6 +112,7 @@ public class GlobalExceptionHandler {
             case EntityNotFoundException _ -> HttpStatus.NOT_FOUND;
             case DomainAccessDeniedException _ -> HttpStatus.FORBIDDEN;
             case DuplicateException _ -> HttpStatus.CONFLICT;
+            case ConflictException _ -> HttpStatus.CONFLICT;
             case BusinessException _ -> HttpStatus.BAD_REQUEST;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };

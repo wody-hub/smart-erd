@@ -33,6 +33,8 @@ import type { Term, TermFormData } from '@/types/dictionary';
 interface TermTabProps {
   /** 편집 가능 여부 (VIEWER일 때 false — 생성/수정/삭제/업로드 버튼 숨김) */
   canEdit?: boolean;
+  /** 선택된 사전 세트 ID */
+  setId: string;
 }
 
 /**
@@ -43,7 +45,7 @@ interface TermTabProps {
  *
  * @param props.canEdit 편집 가능 여부
  */
-export default function TermTab({ canEdit = true }: TermTabProps) {
+export default function TermTab({ canEdit = true, setId }: TermTabProps) {
   const { teamId } = useParams<{ teamId: string }>();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -58,33 +60,34 @@ export default function TermTab({ canEdit = true }: TermTabProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
 
   const { data: terms = [], isLoading } = useQuery({
-    queryKey: queryKeys.dictionary.terms(teamId!),
-    queryFn: () => fetchTerms(teamId!),
-    enabled: !!teamId,
+    queryKey: queryKeys.dictionary.terms(teamId!, setId),
+    queryFn: () => fetchTerms(teamId!, setId),
+    enabled: !!teamId && !!setId,
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: TermFormData) => createTerm(teamId!, data),
+    mutationFn: (data: TermFormData) => createTerm(teamId!, setId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId!, setId) });
       toast.success(t('dictionary.term.toast.created'));
     },
     onError: (err) => toast.error(getErrorMessage(err, t('dictionary.term.toast.createFailed'))),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: TermFormData }) => updateTerm(teamId!, id, data),
+    mutationFn: ({ id, data }: { id: number; data: TermFormData }) =>
+      updateTerm(teamId!, setId, id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId!, setId) });
       toast.success(t('dictionary.term.toast.updated'));
     },
     onError: (err) => toast.error(getErrorMessage(err, t('dictionary.term.toast.updateFailed'))),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (termId: number) => deleteTerm(teamId!, termId),
+    mutationFn: (termId: number) => deleteTerm(teamId!, setId, termId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId!, setId) });
       setDeleteTarget(null);
       toast.success(t('dictionary.term.toast.deleted'));
     },
@@ -92,7 +95,7 @@ export default function TermTab({ canEdit = true }: TermTabProps) {
   });
 
   const downloadTemplateMutation = useMutation({
-    mutationFn: () => downloadTermTemplate(teamId!),
+    mutationFn: () => downloadTermTemplate(teamId!, setId),
     onError: (err) =>
       toast.error(getErrorMessage(err, t('dictionary.upload.toast.templateFailed'))),
   });
@@ -236,6 +239,7 @@ export default function TermTab({ canEdit = true }: TermTabProps) {
         onOpenChange={setFormOpen}
         onSubmit={handleSubmit}
         initialData={editTarget}
+        setId={setId}
       />
 
       <ConfirmDialog
@@ -251,7 +255,7 @@ export default function TermTab({ canEdit = true }: TermTabProps) {
         loading={deleteMutation.isPending}
       />
 
-      <BulkUploadDialog open={uploadOpen} onOpenChange={setUploadOpen} mode="term" />
+      <BulkUploadDialog open={uploadOpen} onOpenChange={setUploadOpen} mode="term" setId={setId} />
     </div>
   );
 }

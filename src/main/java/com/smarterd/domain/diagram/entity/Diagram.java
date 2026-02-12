@@ -1,6 +1,7 @@
 package com.smarterd.domain.diagram.entity;
 
 import com.smarterd.domain.common.entity.BaseTimeEntity;
+import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.project.entity.Project;
 import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
@@ -45,6 +46,11 @@ public class Diagram extends BaseTimeEntity {
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
 
+    /** 적용된 사전 세트 */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dictionary_set_id")
+    private DictionarySet dictionarySet;
+
     /** 직렬화된 React Flow JSON (노드 + 엣지) */
     @Column(columnDefinition = "TEXT")
     private String content;
@@ -61,13 +67,15 @@ public class Diagram extends BaseTimeEntity {
      *
      * @param name    다이어그램 이름
      * @param project 소속 프로젝트
-     * @param content 직렬화된 React Flow JSON
+     * @param content       직렬화된 React Flow JSON
+     * @param dictionarySet 적용 사전 세트
      */
     @Builder
-    public Diagram(String name, Project project, String content) {
+    public Diagram(String name, Project project, String content, DictionarySet dictionarySet) {
         this.name = name;
         this.project = project;
         this.content = content;
+        this.dictionarySet = dictionarySet;
     }
 
     /**
@@ -77,6 +85,10 @@ public class Diagram extends BaseTimeEntity {
      */
     public void rename(String name) {
         this.name = name;
+    }
+
+    public void changeDictionarySet(DictionarySet dictionarySet) {
+        this.dictionarySet = dictionarySet;
     }
 
     /**

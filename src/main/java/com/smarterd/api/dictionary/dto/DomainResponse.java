@@ -12,6 +12,7 @@ import java.time.Instant;
  * @param physicalType 물리 데이터 타입
  * @param description  설명 (nullable)
  * @param teamId       소속 팀 ID
+ * @param dictionarySetId 소속 사전 세트 ID
  * @param createdAt    생성 시각
  * @param updatedAt    수정 시각
  */
@@ -26,6 +27,8 @@ public record DomainResponse(
     @Schema(description = "설명") String description,
 
     @Schema(description = "소속 팀 ID", example = "1") Long teamId,
+
+    @Schema(description = "소속 사전 세트 ID", example = "1") Long dictionarySetId,
 
     @Schema(description = "생성 시각 (UTC, ISO-8601)") Instant createdAt,
 
@@ -44,6 +47,7 @@ public record DomainResponse(
             domain.getPhysicalType(),
             domain.getDescription(),
             domain.getTeam().getId(),
+            domain.getDictionarySet() != null ? domain.getDictionarySet().getId() : null,
             domain.getCreatedAt(),
             domain.getUpdatedAt()
         );

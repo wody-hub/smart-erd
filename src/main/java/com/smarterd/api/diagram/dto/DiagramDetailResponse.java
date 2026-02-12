@@ -13,6 +13,8 @@ import java.time.Instant;
  * @param id                다이어그램 ID
  * @param name              다이어그램 이름
  * @param projectId         소속 프로젝트 ID
+ * @param dictionarySetId   사전 세트 ID
+ * @param dictionarySetName 사전 세트 이름
  * @param content           직렬화된 React Flow JSON (노드 + 엣지)
  * @param hasYdocSnapshot   Y.Doc 스냅샷 존재 여부 (클라이언트 JSON 마이그레이션 판단용)
  * @param createdAt         생성 시각
@@ -25,6 +27,10 @@ public record DiagramDetailResponse(
     @Schema(description = "다이어그램 이름", example = "Main ERD") String name,
 
     @Schema(description = "소속 프로젝트 ID", example = "1") Long projectId,
+
+    @Schema(description = "사전 세트 ID", example = "1") Long dictionarySetId,
+
+    @Schema(description = "사전 세트 이름", example = "Default") String dictionarySetName,
 
     @Schema(description = "직렬화된 React Flow JSON") String content,
 
@@ -49,6 +55,8 @@ public record DiagramDetailResponse(
             diagram.getId(),
             diagram.getName(),
             projectId,
+            diagram.getDictionarySet() != null ? diagram.getDictionarySet().getId() : null,
+            diagram.getDictionarySet() != null ? diagram.getDictionarySet().getName() : null,
             diagram.getContent(),
             hasYdocSnapshot,
             diagram.getCreatedAt(),

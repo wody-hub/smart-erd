@@ -33,6 +33,8 @@ import type { Domain, DomainFormData } from '@/types/dictionary';
 interface DomainTabProps {
   /** 편집 가능 여부 (VIEWER일 때 false — 생성/수정/삭제/업로드 버튼 숨김) */
   canEdit?: boolean;
+  /** 선택된 사전 세트 ID */
+  setId: string;
 }
 
 /**
@@ -43,7 +45,7 @@ interface DomainTabProps {
  *
  * @param props.canEdit 편집 가능 여부
  */
-export default function DomainTab({ canEdit = true }: DomainTabProps) {
+export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
   const { teamId } = useParams<{ teamId: string }>();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -58,15 +60,15 @@ export default function DomainTab({ canEdit = true }: DomainTabProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
 
   const { data: domains = [], isLoading } = useQuery({
-    queryKey: queryKeys.dictionary.domains(teamId!),
-    queryFn: () => fetchDomains(teamId!),
-    enabled: !!teamId,
+    queryKey: queryKeys.dictionary.domains(teamId!, setId),
+    queryFn: () => fetchDomains(teamId!, setId),
+    enabled: !!teamId && !!setId,
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: DomainFormData) => createDomain(teamId!, data),
+    mutationFn: (data: DomainFormData) => createDomain(teamId!, setId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.domains(teamId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.domains(teamId!, setId) });
       toast.success(t('dictionary.domain.toast.created'));
     },
     onError: (err) => toast.error(getErrorMessage(err, t('dictionary.domain.toast.createFailed'))),
@@ -74,18 +76,18 @@ export default function DomainTab({ canEdit = true }: DomainTabProps) {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: DomainFormData }) =>
-      updateDomain(teamId!, id, data),
+      updateDomain(teamId!, setId, id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.domains(teamId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.domains(teamId!, setId) });
       toast.success(t('dictionary.domain.toast.updated'));
     },
     onError: (err) => toast.error(getErrorMessage(err, t('dictionary.domain.toast.updateFailed'))),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (domainId: number) => deleteDomain(teamId!, domainId),
+    mutationFn: (domainId: number) => deleteDomain(teamId!, setId, domainId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.domains(teamId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.domains(teamId!, setId) });
       setDeleteTarget(null);
       toast.success(t('dictionary.domain.toast.deleted'));
     },
@@ -93,7 +95,7 @@ export default function DomainTab({ canEdit = true }: DomainTabProps) {
   });
 
   const downloadTemplateMutation = useMutation({
-    mutationFn: () => downloadDomainTemplate(teamId!),
+    mutationFn: () => downloadDomainTemplate(teamId!, setId),
     onError: (err) =>
       toast.error(getErrorMessage(err, t('dictionary.upload.toast.templateFailed'))),
   });
@@ -248,7 +250,7 @@ export default function DomainTab({ canEdit = true }: DomainTabProps) {
         loading={deleteMutation.isPending}
       />
 
-      <BulkUploadDialog open={uploadOpen} onOpenChange={setUploadOpen} mode="domain" />
+      <BulkUploadDialog open={uploadOpen} onOpenChange={setUploadOpen} mode="domain" setId={setId} />
     </div>
   );
 }

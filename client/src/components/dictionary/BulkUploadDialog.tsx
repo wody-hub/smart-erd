@@ -46,6 +46,8 @@ interface BulkUploadDialogProps {
   onOpenChange: (open: boolean) => void;
   /** 업로드 모드 (도메인/용어) */
   mode: 'domain' | 'term';
+  /** 선택된 사전 세트 ID */
+  setId: string;
 }
 
 /** 도메인 데이터 컬럼 키 */
@@ -60,7 +62,7 @@ const TERM_COLUMNS = ['logicalName', 'physicalName', 'domainLogicalName', 'descr
  * 파일 선택(Step 1) → 미리보기/검증(Step 2) → 완료(Step 3) 흐름으로 동작한다.
  * mode prop에 따라 도메인/용어 업로드를 구분한다.
  */
-export default function BulkUploadDialog({ open, onOpenChange, mode }: BulkUploadDialogProps) {
+export default function BulkUploadDialog({ open, onOpenChange, mode, setId }: BulkUploadDialogProps) {
   const { teamId } = useParams<{ teamId: string }>();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -101,7 +103,9 @@ export default function BulkUploadDialog({ open, onOpenChange, mode }: BulkUploa
 
   const validateMutation = useMutation({
     mutationFn: (f: File) =>
-      mode === 'domain' ? validateDomainUpload(teamId!, f) : validateTermUpload(teamId!, f),
+      mode === 'domain'
+        ? validateDomainUpload(teamId!, setId, f)
+        : validateTermUpload(teamId!, setId, f),
     onSuccess: (result) => {
       setValidationResult(result);
       const validRowNumbers = new Set(result.rows.filter((r) => r.valid).map((r) => r.rowNumber));
@@ -123,7 +127,7 @@ export default function BulkUploadDialog({ open, onOpenChange, mode }: BulkUploa
           physicalType: d.physicalType,
           description: d.description || undefined,
         }));
-        return bulkSaveDomains(teamId!, rows);
+        return bulkSaveDomains(teamId!, setId, rows);
       } else {
         const rows: BulkTermRow[] = selectedData.map((d) => ({
           logicalName: d.logicalName,
@@ -131,7 +135,7 @@ export default function BulkUploadDialog({ open, onOpenChange, mode }: BulkUploa
           domainLogicalName: d.domainLogicalName || undefined,
           description: d.description || undefined,
         }));
-        return bulkSaveTerms(teamId!, rows);
+        return bulkSaveTerms(teamId!, setId, rows);
       }
     },
     onSuccess: (result) => {
@@ -189,9 +193,9 @@ export default function BulkUploadDialog({ open, onOpenChange, mode }: BulkUploa
   const handleTemplateDownload = async () => {
     try {
       if (mode === 'domain') {
-        await downloadDomainTemplate(teamId!);
+        await downloadDomainTemplate(teamId!, setId);
       } else {
-        await downloadTermTemplate(teamId!);
+        await downloadTermTemplate(teamId!, setId);
       }
     } catch (err) {
       toast.error(getErrorMessage(err, t('dictionary.upload.toast.templateFailed')));
@@ -217,8 +221,8 @@ export default function BulkUploadDialog({ open, onOpenChange, mode }: BulkUploa
     if (step === 3) {
       const key =
         mode === 'domain'
-          ? queryKeys.dictionary.domains(teamId!)
-          : queryKeys.dictionary.terms(teamId!);
+          ? queryKeys.dictionary.domains(teamId!, setId)
+          : queryKeys.dictionary.terms(teamId!, setId);
       queryClient.invalidateQueries({ queryKey: key });
     }
     setTimeout(() => {

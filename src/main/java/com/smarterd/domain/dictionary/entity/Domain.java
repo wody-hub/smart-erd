@@ -26,7 +26,7 @@ import lombok.NoArgsConstructor;
  * @see Term
  */
 @Entity
-@Table(name = "domains", uniqueConstraints = @UniqueConstraint(columnNames = { "team_id", "logical_name" }))
+@Table(name = "domains", uniqueConstraints = @UniqueConstraint(columnNames = { "dictionary_set_id", "logical_name" }))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Domain extends BaseTimeEntity {
@@ -49,6 +49,11 @@ public class Domain extends BaseTimeEntity {
     @JoinColumn(name = "team_id", nullable = false)
     private Team team;
 
+    /** 소속 사전 세트 */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dictionary_set_id")
+    private DictionarySet dictionarySet;
+
     /** 설명 (선택) — 최대 500자 */
     @Column(length = 500)
     private String description;
@@ -59,14 +64,16 @@ public class Domain extends BaseTimeEntity {
      * @param logicalName  논리명
      * @param physicalType 물리 데이터 타입
      * @param team         소속 팀
-     * @param description  설명 (nullable)
+     * @param description   설명 (nullable)
+     * @param dictionarySet 소속 사전 세트
      */
     @Builder
-    public Domain(String logicalName, String physicalType, Team team, String description) {
+    public Domain(String logicalName, String physicalType, Team team, String description, DictionarySet dictionarySet) {
         this.logicalName = logicalName;
         this.physicalType = physicalType;
         this.team = team;
         this.description = description;
+        this.dictionarySet = dictionarySet;
     }
 
     /**

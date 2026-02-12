@@ -1,17 +1,35 @@
 package com.smarterd.domain.dictionary.repository;
 
 import com.smarterd.domain.dictionary.entity.Domain;
+import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.entity.Term;
 import com.smarterd.domain.team.entity.Team;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * {@link Term} 엔티티의 데이터 접근 레포지토리.
  */
 public interface TermRepository extends JpaRepository<Term, Long>, TermRepositoryCustom {
+    List<Term> findByDictionarySet(DictionarySet dictionarySet);
+
+    boolean existsByDictionarySetAndLogicalName(DictionarySet dictionarySet, String logicalName);
+
+    boolean existsByDictionarySetAndLogicalNameAndIdNot(DictionarySet dictionarySet, String logicalName, Long id);
+
+    List<Term> findByDictionarySetAndLogicalNameIn(DictionarySet dictionarySet, Collection<String> logicalNames);
+
+    Optional<Term> findByDictionarySetAndLogicalName(DictionarySet dictionarySet, String logicalName);
+
+    Optional<Term> findFirstByDictionarySetAndLogicalNameContaining(DictionarySet dictionarySet, String keyword);
+
+    long countByDictionarySet(DictionarySet dictionarySet);
+
     /**
      * 팀에 속한 모든 용어를 조회한다.
      *
@@ -80,4 +98,8 @@ public interface TermRepository extends JpaRepository<Term, Long>, TermRepositor
      * @param team 팀 엔티티
      */
     void deleteByTeam(Team team);
+
+    @Modifying
+    @Query("update Term t set t.dictionarySet = :dictionarySet where t.team = :team and t.dictionarySet is null")
+    int backfillNullDictionarySetByTeam(@Param("team") Team team, @Param("dictionarySet") DictionarySet dictionarySet);
 }

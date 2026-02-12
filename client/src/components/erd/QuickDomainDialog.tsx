@@ -45,7 +45,7 @@ export default function QuickDomainDialog({
 }: QuickDomainDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { teamId } = useErdDictionary();
+  const { teamId, setId } = useErdDictionary();
 
   /** 논리명 입력값 */
   const [logicalName, setLogicalName] = useState('');
@@ -64,13 +64,13 @@ export default function QuickDomainDialog({
 
   const mutation = useMutation({
     mutationFn: () =>
-      createDomain(teamId, {
+      createDomain(teamId, setId, {
         logicalName,
         physicalType,
         description: description || undefined,
       }),
     onSuccess: (domain) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.domains(teamId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.domains(teamId, setId) });
       toast.success(t('erd.quickDomain.success'));
       onCreated(domain);
       onOpenChange(false);

@@ -5,6 +5,8 @@ import { useDictionaryCache } from '@/hooks/useDictionaryCache';
 type ErdDictionaryContextValue = ReturnType<typeof useDictionaryCache> & {
   /** 팀 ID (non-null 보장) */
   teamId: string;
+  /** 사전 세트 ID (non-null 보장) */
+  setId: string;
 };
 
 const ErdDictionaryContext = createContext<ErdDictionaryContextValue | null>(null);
@@ -13,6 +15,8 @@ const ErdDictionaryContext = createContext<ErdDictionaryContextValue | null>(nul
 interface ErdDictionaryProviderProps {
   /** 팀 ID (non-null) */
   teamId: string;
+  /** 사전 세트 ID (non-null) */
+  setId: string;
   /** 자식 요소 */
   children: React.ReactNode;
 }
@@ -27,11 +31,11 @@ interface ErdDictionaryProviderProps {
  * @param props.teamId   팀 ID
  * @param props.children 자식 요소
  */
-export function ErdDictionaryProvider({ teamId, children }: ErdDictionaryProviderProps) {
-  const cache = useDictionaryCache(teamId);
+export function ErdDictionaryProvider({ teamId, setId, children }: ErdDictionaryProviderProps) {
+  const cache = useDictionaryCache(teamId, setId);
 
   return (
-    <ErdDictionaryContext.Provider value={{ teamId, ...cache }}>
+    <ErdDictionaryContext.Provider value={{ teamId, setId, ...cache }}>
       {children}
     </ErdDictionaryContext.Provider>
   );

@@ -10,6 +10,7 @@ import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
+import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import java.util.List;
@@ -40,6 +41,9 @@ public class DomainService {
     /** 팀 서비스 (팀 조회, 멤버십 확인) */
     private final TeamService teamService;
 
+    /** 사전 세트 서비스 */
+    private final DictionarySetService dictionarySetService;
+
     /**
      * 도메인을 생성한다.
      *
@@ -49,12 +53,13 @@ public class DomainService {
      * @return 생성된 도메인 응답
      */
     @Transactional
-    public DomainResponse createDomain(String loginId, Long teamId, CreateDomainRequest request) {
+    public DomainResponse createDomain(String loginId, Long teamId, Long setId, CreateDomainRequest request) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyEditable(team, user);
+        final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
 
-        if (domainRepository.existsByTeamAndLogicalName(team, request.logicalName())) {
+        if (domainRepository.existsByDictionarySetAndLogicalName(dictionarySet, request.logicalName())) {
             throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), request.logicalName());
         }
 
@@ -63,6 +68,7 @@ public class DomainService {
             .physicalType(request.physicalType())
             .description(request.description())
             .team(team)
+            .dictionarySet(dictionarySet)
             .build();
         domainRepository.save(domain);
 
@@ -76,12 +82,13 @@ public class DomainService {
      * @param teamId  팀 ID
      * @return 도메인 응답 목록
      */
-    public List<DomainResponse> getDomains(String loginId, Long teamId) {
+    public List<DomainResponse> getDomains(String loginId, Long teamId, Long setId) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyMembership(team, user);
+        final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
 
-        return domainRepository.findByTeam(team).stream().map(DomainResponse::from).toList();
+        return domainRepository.findByDictionarySet(dictionarySet).stream().map(DomainResponse::from).toList();
     }
 
     /**
@@ -92,13 +99,15 @@ public class DomainService {
      * @param domainId 도메인 ID
      * @return 도메인 응답
      */
-    public DomainResponse getDomain(String loginId, Long teamId, Long domainId) {
+    public DomainResponse getDomain(String loginId, Long teamId, Long setId, Long domainId) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyMembership(team, user);
+        dictionarySetService.findByTeamAndId(team, setId);
 
         final var domain = findDomainById(domainId);
         verifyDomainBelongsToTeam(domain, teamId);
+        verifyDomainBelongsToSet(domain, setId);
 
         return DomainResponse.from(domain);
     }
@@ -113,15 +122,17 @@ public class DomainService {
      * @return 수정된 도메인 응답
      */
     @Transactional
-    public DomainResponse updateDomain(String loginId, Long teamId, Long domainId, UpdateDomainRequest request) {
+    public DomainResponse updateDomain(String loginId, Long teamId, Long setId, Long domainId, UpdateDomainRequest request) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyEditable(team, user);
+        final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
 
         final var domain = findDomainById(domainId);
         verifyDomainBelongsToTeam(domain, teamId);
+        verifyDomainBelongsToSet(domain, setId);
 
-        if (domainRepository.existsByTeamAndLogicalNameAndIdNot(team, request.logicalName(), domainId)) {
+        if (domainRepository.existsByDictionarySetAndLogicalNameAndIdNot(dictionarySet, request.logicalName(), domainId)) {
             throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), request.logicalName());
         }
 
@@ -138,13 +149,15 @@ public class DomainService {
      * @param domainId 도메인 ID
      */
     @Transactional
-    public void deleteDomain(String loginId, Long teamId, Long domainId) {
+    public void deleteDomain(String loginId, Long teamId, Long setId, Long domainId) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyEditable(team, user);
+        dictionarySetService.findByTeamAndId(team, setId);
 
         final var domain = findDomainById(domainId);
         verifyDomainBelongsToTeam(domain, teamId);
+        verifyDomainBelongsToSet(domain, setId);
 
         final var termCount = termRepository.countByDomain(domain);
         if (termCount > 0) {
@@ -177,6 +190,12 @@ public class DomainService {
     private void verifyDomainBelongsToTeam(Domain domain, Long teamId) {
         if (!domain.getTeam().getId().equals(teamId)) {
             throw new BusinessException(MessageCode.ERROR_BUSINESS_DOMAIN_TEAM_MISMATCH.code());
+        }
+    }
+
+    private void verifyDomainBelongsToSet(Domain domain, Long setId) {
+        if (domain.getDictionarySet() == null || !domain.getDictionarySet().getId().equals(setId)) {
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_DICTIONARY_SET_TEAM_MISMATCH.code());
         }
     }
 }

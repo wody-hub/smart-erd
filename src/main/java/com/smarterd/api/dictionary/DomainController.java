@@ -39,12 +39,12 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * 도메인(데이터 타입 사전) 관련 REST 컨트롤러.
  *
- * <p>{@code /api/teams/{teamId}/domains} 경로 하위에 도메인 CRUD 엔드포인트를 제공한다.
+ * <p>{@code /api/teams/{teamId}/dictionary-sets/{setId}/domains} 경로 하위에 도메인 CRUD 엔드포인트를 제공한다.
  * 모든 엔드포인트는 인증이 필요하다.</p>
  */
 @Tag(name = "Domain", description = "도메인(데이터 타입 사전) 관리 API")
 @RestController
-@RequestMapping("/api/teams/{teamId}/domains")
+@RequestMapping("/api/teams/{teamId}/dictionary-sets/{setId}/domains")
 @RequiredArgsConstructor
 public class DomainController {
 
@@ -74,10 +74,11 @@ public class DomainController {
     public ResponseEntity<DomainResponse> createDomain(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Valid @RequestBody CreateDomainRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(
-            domainService.createDomain(jwt.getSubject(), teamId, request)
+            domainService.createDomain(jwt.getSubject(), teamId, setId, request)
         );
     }
 
@@ -94,9 +95,10 @@ public class DomainController {
     @GetMapping
     public ResponseEntity<List<DomainResponse>> getDomains(
         @AuthenticationPrincipal Jwt jwt,
-        @Parameter(description = "팀 ID") @PathVariable Long teamId
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId
     ) {
-        return ResponseEntity.ok(domainService.getDomains(jwt.getSubject(), teamId));
+        return ResponseEntity.ok(domainService.getDomains(jwt.getSubject(), teamId, setId));
     }
 
     /**
@@ -114,9 +116,10 @@ public class DomainController {
     public ResponseEntity<DomainResponse> getDomain(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Parameter(description = "도메인 ID") @PathVariable Long domainId
     ) {
-        return ResponseEntity.ok(domainService.getDomain(jwt.getSubject(), teamId, domainId));
+        return ResponseEntity.ok(domainService.getDomain(jwt.getSubject(), teamId, setId, domainId));
     }
 
     /**
@@ -136,10 +139,11 @@ public class DomainController {
     public ResponseEntity<DomainResponse> updateDomain(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Parameter(description = "도메인 ID") @PathVariable Long domainId,
         @Valid @RequestBody UpdateDomainRequest request
     ) {
-        return ResponseEntity.ok(domainService.updateDomain(jwt.getSubject(), teamId, domainId, request));
+        return ResponseEntity.ok(domainService.updateDomain(jwt.getSubject(), teamId, setId, domainId, request));
     }
 
     /**
@@ -157,10 +161,11 @@ public class DomainController {
     public ResponseEntity<BulkValidationResponse> validateUpload(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @RequestParam("file") MultipartFile file,
         Locale locale
     ) {
-        return ResponseEntity.ok(domainBulkService.validateUpload(jwt.getSubject(), teamId, file, locale));
+        return ResponseEntity.ok(domainBulkService.validateUpload(jwt.getSubject(), teamId, setId, file, locale));
     }
 
     /**
@@ -178,9 +183,10 @@ public class DomainController {
     public ResponseEntity<BulkSaveResponse> bulkSave(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Valid @RequestBody BulkDomainSaveRequest request
     ) {
-        return ResponseEntity.ok(domainBulkService.bulkSave(jwt.getSubject(), teamId, request));
+        return ResponseEntity.ok(domainBulkService.bulkSave(jwt.getSubject(), teamId, setId, request));
     }
 
     /**
@@ -198,10 +204,11 @@ public class DomainController {
     public void downloadTemplate(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         Locale locale,
         HttpServletResponse response
     ) throws IOException {
-        final var excelData = domainBulkService.generateTemplate(jwt.getSubject(), teamId, locale);
+        final var excelData = domainBulkService.generateTemplate(jwt.getSubject(), teamId, setId, locale);
         ExcelUtils.download(excelData, response, "domain-template");
     }
 
@@ -220,9 +227,10 @@ public class DomainController {
     public ResponseEntity<Void> deleteDomain(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Parameter(description = "도메인 ID") @PathVariable Long domainId
     ) {
-        domainService.deleteDomain(jwt.getSubject(), teamId, domainId);
+        domainService.deleteDomain(jwt.getSubject(), teamId, setId, domainId);
         return ResponseEntity.noContent().build();
     }
 }

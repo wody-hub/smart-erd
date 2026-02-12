@@ -5,10 +5,15 @@ import com.smarterd.api.diagram.dto.DiagramDetailResponse;
 import com.smarterd.api.diagram.dto.DiagramResponse;
 import com.smarterd.api.diagram.dto.RenameDiagramRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
+import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
+import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetResponse;
+import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
+import com.smarterd.domain.diagram.websocket.DiagramRoomManager;
+import com.smarterd.domain.dictionary.service.DictionarySetService;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.service.ProjectService;
 import com.smarterd.domain.team.service.TeamService;
@@ -43,6 +48,12 @@ public class DiagramService {
     /** 프로젝트 서비스 (프로젝트 조회, 팀 귀속 확인) */
     private final ProjectService projectService;
 
+    /** 사전 세트 서비스 */
+    private final DictionarySetService dictionarySetService;
+
+    /** 다이어그램 방 관리자 */
+    private final DiagramRoomManager roomManager;
+
     /**
      * 다이어그램을 생성한다.
      *
@@ -55,8 +66,9 @@ public class DiagramService {
     @Transactional
     public DiagramResponse createDiagram(String loginId, Long teamId, Long projectId, CreateDiagramRequest request) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
+        final var dictionarySet = dictionarySetService.findByTeamAndId(project.getTeam(), request.dictionarySetId());
 
-        final var diagram = Diagram.builder().name(request.name()).project(project).build();
+        final var diagram = Diagram.builder().name(request.name()).project(project).dictionarySet(dictionarySet).build();
         diagramRepository.save(diagram);
 
         return DiagramResponse.from(diagram, project.getId());
@@ -139,6 +151,36 @@ public class DiagramService {
         diagram.rename(request.name());
 
         return DiagramResponse.from(diagram, project.getId());
+    }
+
+    /**
+     * 다이어그램의 사전 세트를 변경한다.
+     *
+     * @param loginId   요청 사용자 로그인 ID
+     * @param teamId    팀 ID
+     * @param projectId 프로젝트 ID
+     * @param diagramId 다이어그램 ID
+     * @param request   사전 세트 변경 요청
+     * @return 변경 결과
+     */
+    @Transactional
+    public UpdateDiagramDictionarySetResponse updateDiagramDictionarySet(
+        String loginId,
+        Long teamId,
+        Long projectId,
+        Long diagramId,
+        UpdateDiagramDictionarySetRequest request
+    ) {
+        final var project = verifyWriteAccess(loginId, teamId, projectId);
+        final var diagram = findDiagramByProjectAndId(project, diagramId);
+
+        if (roomManager.getSessionCount(diagramId) > 0) {
+            throw new ConflictException(MessageCode.ERROR_BUSINESS_DIAGRAM_DICTIONARY_SET_CHANGE_WHILE_EDITING.code());
+        }
+
+        final var dictionarySet = dictionarySetService.findByTeamAndId(project.getTeam(), request.dictionarySetId());
+        diagram.changeDictionarySet(dictionarySet);
+        return new UpdateDiagramDictionarySetResponse(dictionarySet.getId(), 0, 0);
     }
 
     /**

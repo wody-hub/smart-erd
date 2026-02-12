@@ -1,16 +1,30 @@
 package com.smarterd.domain.dictionary.repository;
 
 import com.smarterd.domain.dictionary.entity.Domain;
+import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.team.entity.Team;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * {@link Domain} 엔티티의 데이터 접근 레포지토리.
  */
 public interface DomainRepository extends JpaRepository<Domain, Long> {
+    List<Domain> findByDictionarySet(DictionarySet dictionarySet);
+
+    boolean existsByDictionarySetAndLogicalName(DictionarySet dictionarySet, String logicalName);
+
+    boolean existsByDictionarySetAndLogicalNameAndIdNot(DictionarySet dictionarySet, String logicalName, Long id);
+
+    List<Domain> findByDictionarySetAndLogicalNameIn(DictionarySet dictionarySet, Collection<String> logicalNames);
+
+    Optional<Domain> findByDictionarySetAndLogicalName(DictionarySet dictionarySet, String logicalName);
+
     /**
      * 팀에 속한 모든 도메인을 조회한다.
      *
@@ -62,4 +76,8 @@ public interface DomainRepository extends JpaRepository<Domain, Long> {
      * @param team 팀 엔티티
      */
     void deleteByTeam(Team team);
+
+    @Modifying
+    @Query("update Domain d set d.dictionarySet = :dictionarySet where d.team = :team and d.dictionarySet is null")
+    int backfillNullDictionarySetByTeam(@Param("team") Team team, @Param("dictionarySet") DictionarySet dictionarySet);
 }

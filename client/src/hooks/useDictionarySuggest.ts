@@ -14,6 +14,7 @@ import type { SuggestResponse } from '@/types/dictionary';
  */
 export function useDictionarySuggest(
   teamId: string,
+  setId: string,
   keyword: string,
   enabled: boolean,
 ): { suggestion: SuggestResponse | undefined; isLoading: boolean } {
@@ -28,8 +29,8 @@ export function useDictionarySuggest(
   }, [keyword]);
 
   const { data: suggestion, isLoading } = useQuery({
-    queryKey: queryKeys.dictionary.suggest(teamId, debouncedKeyword),
-    queryFn: () => fetchSuggestion(teamId, debouncedKeyword),
+    queryKey: queryKeys.dictionary.suggest(teamId, setId, debouncedKeyword),
+    queryFn: () => fetchSuggestion(teamId, setId, debouncedKeyword),
     enabled: enabled && debouncedKeyword.trim().length >= 2,
     placeholderData: (previousData) => previousData,
     staleTime: 60_000,

@@ -1,5 +1,6 @@
 package com.smarterd.domain.dictionary.repository;
 
+import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.entity.Term;
 import com.smarterd.domain.team.entity.Team;
 import java.util.List;
@@ -8,6 +9,8 @@ import java.util.List;
  * {@link Term} QueryDSL 커스텀 쿼리 인터페이스.
  */
 public interface TermRepositoryCustom {
+    List<Term> findByDictionarySetWithDomain(DictionarySet dictionarySet);
+
     /**
      * 팀에 속한 모든 용어를 도메인과 함께 페치 조인하여 조회한다.
      *

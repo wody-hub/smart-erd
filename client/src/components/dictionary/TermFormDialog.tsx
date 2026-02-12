@@ -38,6 +38,8 @@ interface TermFormDialogProps {
   onSubmit: (data: TermFormData) => Promise<void>;
   /** 수정 대상 용어 (없으면 생성 모드) */
   initialData?: Term | null;
+  /** 선택된 사전 세트 ID */
+  setId: string;
 }
 
 /**
@@ -52,6 +54,7 @@ export default function TermFormDialog({
   onOpenChange,
   onSubmit,
   initialData,
+  setId,
 }: TermFormDialogProps) {
   const { teamId } = useParams<{ teamId: string }>();
   const { t } = useTranslation();
@@ -74,15 +77,16 @@ export default function TermFormDialog({
   const isEdit = !!initialData;
 
   const { data: domains = [] } = useQuery({
-    queryKey: queryKeys.dictionary.domains(teamId!),
-    queryFn: () => fetchDomains(teamId!),
-    enabled: open && !!teamId,
+    queryKey: queryKeys.dictionary.domains(teamId!, setId),
+    queryFn: () => fetchDomains(teamId!, setId),
+    enabled: open && !!teamId && !!setId,
   });
 
   const { suggestion, isLoading: suggestLoading } = useDictionarySuggest(
     teamId!,
+    setId,
     logicalName,
-    open && !isEdit && !!teamId,
+    open && !isEdit && !!teamId && !!setId,
   );
 
   useEffect(() => {

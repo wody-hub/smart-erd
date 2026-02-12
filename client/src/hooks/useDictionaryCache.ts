@@ -160,18 +160,18 @@ interface TermWithType extends Term {
  * @param teamId 팀 ID
  * @returns terms, domains, 검색/조회 헬퍼 함수들
  */
-export function useDictionaryCache(teamId: string | undefined) {
+export function useDictionaryCache(teamId: string | undefined, setId: string | undefined) {
   const { data: terms = [] } = useQuery({
-    queryKey: queryKeys.dictionary.terms(teamId!),
-    queryFn: () => fetchTerms(teamId!),
-    enabled: !!teamId,
+    queryKey: queryKeys.dictionary.terms(teamId!, setId!),
+    queryFn: () => fetchTerms(teamId!, setId!),
+    enabled: !!teamId && !!setId,
     staleTime: 2 * 60 * 1000,
   });
 
   const { data: domains = [] } = useQuery({
-    queryKey: queryKeys.dictionary.domains(teamId!),
-    queryFn: () => fetchDomains(teamId!),
-    enabled: !!teamId,
+    queryKey: queryKeys.dictionary.domains(teamId!, setId!),
+    queryFn: () => fetchDomains(teamId!, setId!),
+    enabled: !!teamId && !!setId,
     staleTime: 2 * 60 * 1000,
   });
 

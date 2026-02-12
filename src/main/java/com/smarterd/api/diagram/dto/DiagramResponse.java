@@ -10,6 +10,8 @@ import java.time.Instant;
  * @param id        다이어그램 ID
  * @param name      다이어그램 이름
  * @param projectId 소속 프로젝트 ID
+ * @param dictionarySetId 적용 사전 세트 ID
+ * @param dictionarySetName 적용 사전 세트 이름
  * @param createdAt 생성 시각
  * @param updatedAt 수정 시각
  */
@@ -20,6 +22,10 @@ public record DiagramResponse(
     @Schema(description = "다이어그램 이름", example = "Main ERD") String name,
 
     @Schema(description = "소속 프로젝트 ID", example = "1") Long projectId,
+
+    @Schema(description = "사전 세트 ID", example = "1") Long dictionarySetId,
+
+    @Schema(description = "사전 세트 이름", example = "Default") String dictionarySetName,
 
     @Schema(description = "생성 시각 (UTC, ISO-8601)") Instant createdAt,
 
@@ -39,6 +45,8 @@ public record DiagramResponse(
             diagram.getId(),
             diagram.getName(),
             projectId,
+            diagram.getDictionarySet() != null ? diagram.getDictionarySet().getId() : null,
+            diagram.getDictionarySet() != null ? diagram.getDictionarySet().getName() : null,
             diagram.getCreatedAt(),
             diagram.getUpdatedAt()
         );

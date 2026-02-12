@@ -5,6 +5,8 @@ import com.smarterd.api.diagram.dto.DiagramDetailResponse;
 import com.smarterd.api.diagram.dto.DiagramResponse;
 import com.smarterd.api.diagram.dto.RenameDiagramRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
+import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
+import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetResponse;
 import com.smarterd.domain.diagram.service.DiagramService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -161,6 +163,35 @@ public class DiagramController {
         @Valid @RequestBody RenameDiagramRequest request
     ) {
         return ResponseEntity.ok(diagramService.renameDiagram(jwt.getSubject(), teamId, projectId, diagramId, request));
+    }
+
+    /**
+     * 다이어그램 사전 세트를 변경한다.
+     *
+     * @param jwt        인증된 JWT 토큰
+     * @param teamId     팀 ID
+     * @param projectId  프로젝트 ID
+     * @param diagramId  다이어그램 ID
+     * @param request    사전 세트 변경 요청
+     * @return 200 OK + 변경 결과
+     */
+    @Operation(summary = "다이어그램 사전 세트 변경", description = "다이어그램에 적용된 사전 세트를 변경한다.")
+    @ApiResponse(
+        responseCode = "200",
+        description = "사전 세트 변경 성공",
+        content = @Content(schema = @Schema(implementation = UpdateDiagramDictionarySetResponse.class))
+    )
+    @PatchMapping("/{diagramId}/dictionary-set")
+    public ResponseEntity<UpdateDiagramDictionarySetResponse> updateDictionarySet(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Parameter(description = "다이어그램 ID") @PathVariable Long diagramId,
+        @Valid @RequestBody UpdateDiagramDictionarySetRequest request
+    ) {
+        return ResponseEntity.ok(
+            diagramService.updateDiagramDictionarySet(jwt.getSubject(), teamId, projectId, diagramId, request)
+        );
     }
 
     /**

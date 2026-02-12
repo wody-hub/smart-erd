@@ -8,6 +8,7 @@ import com.smarterd.api.dictionary.dto.BulkValidationRow;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.dictionary.entity.Domain;
+import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
@@ -45,6 +46,9 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     /** 도메인 레포지토리 */
     private final DomainRepository domainRepository;
 
+    /** 사전 세트 서비스 */
+    private final DictionarySetService dictionarySetService;
+
     /**
      * @param domainRepository 도메인 레포지토리
      * @param authService      인증 서비스
@@ -53,12 +57,14 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
      */
     public DomainBulkService(
         DomainRepository domainRepository,
+        DictionarySetService dictionarySetService,
         AuthService authService,
         TeamService teamService,
         MessageSource messageSource
     ) {
         super(authService, teamService, messageSource);
         this.domainRepository = domainRepository;
+        this.dictionarySetService = dictionarySetService;
     }
 
     @Override
@@ -93,8 +99,15 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
      * @param locale  요청 로케일
      * @return 검증 결과 응답
      */
-    public BulkValidationResponse validateUpload(String loginId, Long teamId, MultipartFile file, Locale locale) {
+    public BulkValidationResponse validateUpload(
+        String loginId,
+        Long teamId,
+        Long setId,
+        MultipartFile file,
+        Locale locale
+    ) {
         final var team = verifyTeamAccess(loginId, teamId);
+        final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
 
         final var fileName = file.getOriginalFilename();
         final var rawRows = parseFile(file, fileName);
@@ -107,7 +120,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
             .map((row) -> row.getOrDefault("logicalName", ""))
             .toList();
         final var existingNames = domainRepository
-            .findByTeamAndLogicalNameIn(team, logicalNames)
+            .findByDictionarySetAndLogicalNameIn(dictionarySet, logicalNames)
             .stream()
             .map(Domain::getLogicalName)
             .collect(Collectors.toSet());
@@ -181,12 +194,13 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
      * @return 저장 결과 응답
      */
     @Transactional
-    public BulkSaveResponse bulkSave(String loginId, Long teamId, BulkDomainSaveRequest request) {
+    public BulkSaveResponse bulkSave(String loginId, Long teamId, Long setId, BulkDomainSaveRequest request) {
         final var team = verifyTeamAccess(loginId, teamId);
+        final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
 
         // 기존 논리명 일괄 조회 (N+1 방지)
         final var existingNames = domainRepository
-            .findByTeamAndLogicalNameIn(team, request.rows().stream().map(BulkDomainRow::logicalName).toList())
+            .findByDictionarySetAndLogicalNameIn(dictionarySet, request.rows().stream().map(BulkDomainRow::logicalName).toList())
             .stream()
             .map(Domain::getLogicalName)
             .collect(Collectors.toSet());
@@ -205,6 +219,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
                     .physicalType(row.physicalType())
                     .description(row.description())
                     .team(team)
+                    .dictionarySet(dictionarySet)
                     .build()
             );
         }
@@ -227,8 +242,9 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
      * @param locale  요청 로케일
      * @return 엑셀 데이터
      */
-    public ExcelUtils.ExcelData generateTemplate(String loginId, Long teamId, Locale locale) {
-        verifyTeamAccess(loginId, teamId);
+    public ExcelUtils.ExcelData generateTemplate(String loginId, Long teamId, Long setId, Locale locale) {
+        final var team = verifyTeamAccess(loginId, teamId);
+        dictionarySetService.findByTeamAndId(team, setId);
 
         final var titles = List.of(
             msg("template.domain.col.logical-name", locale),

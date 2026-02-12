@@ -65,7 +65,7 @@ export default function QuickTermDialog({
 }: QuickTermDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { teamId, domains, findDomainById } = useErdDictionary();
+  const { teamId, setId, domains, findDomainById } = useErdDictionary();
 
   /** 논리명 입력값 */
   const [logicalName, setLogicalName] = useState('');
@@ -82,7 +82,7 @@ export default function QuickTermDialog({
   /** 빠른 도메인 등록 다이얼로그 열림 상태 */
   const [quickDomainOpen, setQuickDomainOpen] = useState(false);
 
-  const { suggestion, isLoading: suggestLoading } = useDictionarySuggest(teamId, logicalName, open);
+  const { suggestion, isLoading: suggestLoading } = useDictionarySuggest(teamId, setId, logicalName, open);
 
   useEffect(() => {
     if (open) {
@@ -112,14 +112,14 @@ export default function QuickTermDialog({
 
   const mutation = useMutation({
     mutationFn: () =>
-      createTerm(teamId, {
+      createTerm(teamId, setId, {
         logicalName,
         physicalName,
         domainId: domainId !== NONE_VALUE ? Number(domainId) : null,
         description: description || undefined,
       }),
     onSuccess: (term) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId, setId) });
       onApply(buildColumnUpdatesFromTerm(term, findDomainById));
       toast.success(t('erd.quickTerm.success'));
       onOpenChange(false);

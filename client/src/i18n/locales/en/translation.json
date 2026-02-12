@@ -155,7 +155,8 @@
       "newButton": "New Diagram",
       "createButton": "Create Diagram",
       "empty": "No diagrams yet. Create your first diagram.",
-      "updatedAt": "Updated: {{date}}"
+      "updatedAt": "Updated: {{date}}",
+      "selectDictionarySet": "Select dictionary set"
     },
     "create": {
       "dialogTitle": "Create New Diagram",
@@ -168,7 +169,8 @@
     },
     "edit": {
       "loadError": "Failed to load diagram. Please try again later.",
-      "loadingDiagram": "Loading diagram..."
+      "loadingDiagram": "Loading diagram...",
+      "dictionarySet": "Applied dictionary set: {{name}}"
     },
     "toast": {
       "created": "Diagram created",
@@ -177,6 +179,8 @@
       "deleteFailed": "Failed to delete diagram",
       "renamed": "Diagram renamed",
       "renameFailed": "Failed to rename diagram",
+      "dictionarySetUpdated": "Diagram dictionary set updated",
+      "dictionarySetUpdateFailed": "Failed to update diagram dictionary set",
       "backupSynced": "Backup synced",
       "noChanges": "No changes to backup",
       "backupFailed": "Failed to sync backup"
@@ -379,6 +383,31 @@
     "tabs": {
       "domains": "Domains",
       "terms": "Terms"
+    },
+    "set": {
+      "placeholder": "Select dictionary set",
+      "defaultBadge": "Default",
+      "newButton": "Add Set",
+      "renameButton": "Rename",
+      "setDefaultButton": "Set Default",
+      "deleteButton": "Delete Set",
+      "createTitle": "Add Dictionary Set",
+      "inputLabel": "Set name",
+      "empty": "No dictionary sets available.",
+      "prompt": {
+        "rename": "Enter a new set name.",
+        "delete": "Delete \"{{name}}\" set?"
+      },
+      "toast": {
+        "created": "Dictionary set created",
+        "createFailed": "Failed to create dictionary set",
+        "updated": "Dictionary set updated",
+        "updateFailed": "Failed to update dictionary set",
+        "deleted": "Dictionary set deleted",
+        "deleteFailed": "Failed to delete dictionary set",
+        "defaultUpdated": "Default dictionary set updated",
+        "defaultUpdateFailed": "Failed to update default dictionary set"
+      }
     },
     "domain": {
       "table": {

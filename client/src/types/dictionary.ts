@@ -1,3 +1,21 @@
+/** 사전 세트 정보. 한 팀이 여러 개 보유할 수 있다. */
+export interface DictionarySet {
+  /** 세트 고유 ID */
+  id: number;
+  /** 세트 이름 */
+  name: string;
+  /** 설명 (nullable) */
+  description: string | null;
+  /** 소속 팀 ID */
+  teamId: number;
+  /** 기본 세트 여부 */
+  isDefault: boolean;
+  /** 생성 일시 (ISO 8601) */
+  createdAt: string;
+  /** 수정 일시 (ISO 8601) */
+  updatedAt: string;
+}
+
 /** 도메인(데이터 타입 사전) 정보. 팀에 속하며 논리명-물리 타입 매핑을 정의한다. */
 export interface Domain {
   /** 도메인 고유 ID */
@@ -10,6 +28,8 @@ export interface Domain {
   description: string | null;
   /** 소속 팀 ID */
   teamId: number;
+  /** 소속 사전 세트 ID */
+  dictionarySetId: number | null;
   /** 생성 일시 (ISO 8601) */
   createdAt: string;
   /** 수정 일시 (ISO 8601) */
@@ -28,6 +48,8 @@ export interface Term {
   description: string | null;
   /** 소속 팀 ID */
   teamId: number;
+  /** 소속 사전 세트 ID */
+  dictionarySetId: number | null;
   /** 연결 도메인 ID (nullable) */
   domainId: number | null;
   /** 연결 도메인 논리명 (nullable) */

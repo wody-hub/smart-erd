@@ -3,6 +3,7 @@ package com.smarterd.domain.dictionary.service;
 import com.smarterd.api.dictionary.dto.SuggestMatch;
 import com.smarterd.api.dictionary.dto.SuggestRequest;
 import com.smarterd.api.dictionary.dto.SuggestResponse;
+import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.entity.Term;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
@@ -43,6 +44,9 @@ public class DictionarySuggestService {
     /** 팀 서비스 (팀 조회, 멤버십 확인) */
     private final TeamService teamService;
 
+    /** 사전 세트 서비스 */
+    private final DictionarySetService dictionarySetService;
+
     /** 토큰 수 최대 제한 */
     private static final int MAX_TOKENS = 10;
 
@@ -57,10 +61,11 @@ public class DictionarySuggestService {
      * @param request 추천 요청
      * @return 추천 응답
      */
-    public SuggestResponse suggest(String loginId, Long teamId, SuggestRequest request) {
+    public SuggestResponse suggest(String loginId, Long teamId, Long setId, SuggestRequest request) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyMembership(team, user);
+        final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
 
         final var keyword = request.keyword().trim();
         if (keyword.length() < 2) {
@@ -78,14 +83,16 @@ public class DictionarySuggestService {
         }
 
         // 1. 배치 완전 일치 조회 (1회 쿼리)
-        final var exactMatchMap = buildExactMatchMap(team, tokens);
+        final var exactMatchMap = buildExactMatchMap(dictionarySet, tokens);
 
         // 2. 완전 일치 실패 토큰 → 팀 전체 용어 조회 (greedy 분해 + 부분 매칭용, 필요 시 1회 쿼리)
         final var unmatchedTokens = tokens
             .stream()
             .filter((t) -> !exactMatchMap.containsKey(t))
             .toList();
-        final var allTerms = unmatchedTokens.isEmpty() ? List.<Term>of() : termRepository.findByTeamWithDomain(team);
+        final var allTerms = unmatchedTokens.isEmpty()
+            ? List.<Term>of()
+            : termRepository.findByDictionarySetWithDomain(dictionarySet);
 
         // 논리명 → Term 매핑 (greedy 분해용 O(1) 조회)
         final var termByNameMap = new HashMap<String, Term>();
@@ -142,7 +149,7 @@ public class DictionarySuggestService {
 
         final var lastToken = tokens.getLast().trim();
         final var domainSearchKeys = lastToken.equals(keyword) ? List.of(keyword) : List.of(lastToken, keyword);
-        final var domainMatches = domainRepository.findByTeamAndLogicalNameIn(team, domainSearchKeys);
+        final var domainMatches = domainRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, domainSearchKeys);
 
         if (!domainMatches.isEmpty()) {
             // 마지막 토큰 우선, 없으면 전체 키워드 매칭
@@ -165,9 +172,9 @@ public class DictionarySuggestService {
      * @param tokens 토큰 목록
      * @return 논리명 → 용어 맵
      */
-    private Map<String, Term> buildExactMatchMap(Team team, List<String> tokens) {
+    private Map<String, Term> buildExactMatchMap(DictionarySet dictionarySet, List<String> tokens) {
         return termRepository
-            .findByTeamAndLogicalNameIn(team, tokens)
+            .findByDictionarySetAndLogicalNameIn(dictionarySet, tokens)
             .stream()
             .collect(Collectors.toMap(Term::getLogicalName, Function.identity()));
     }

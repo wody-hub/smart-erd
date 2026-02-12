@@ -47,9 +47,11 @@ export async function createDiagram(
   teamId: string,
   projectId: string,
   name: string,
+  dictionarySetId: number,
 ): Promise<DiagramSummary> {
   const res = await axiosInstance.post(`/teams/${teamId}/projects/${projectId}/diagrams`, {
     name,
+    dictionarySetId,
   });
   return res.data;
 }
@@ -93,6 +95,25 @@ export async function renameDiagram(
     { name },
   );
   return res.data;
+}
+
+/**
+ * 다이어그램 적용 사전 세트를 변경한다.
+ *
+ * @param teamId          팀 ID
+ * @param projectId       프로젝트 ID
+ * @param diagramId       다이어그램 ID
+ * @param dictionarySetId 변경할 사전 세트 ID
+ */
+export async function updateDiagramDictionarySet(
+  teamId: string,
+  projectId: string,
+  diagramId: string,
+  dictionarySetId: number,
+): Promise<void> {
+  await axiosInstance.patch(`/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/dictionary-set`, {
+    dictionarySetId,
+  });
 }
 
 /**

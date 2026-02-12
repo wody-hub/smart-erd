@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, FileText, ArrowLeft, Trash2, Pencil, Check, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -9,7 +9,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import CreateResourceDialog from '@/components/ui/create-resource-dialog';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
-import { fetchDiagrams, createDiagram, deleteDiagram, renameDiagram } from '@/api/diagramApi';
+import {
+  fetchDiagrams,
+  createDiagram,
+  deleteDiagram,
+  renameDiagram,
+  updateDiagramDictionarySet,
+} from '@/api/diagramApi';
+import { fetchDictionarySets } from '@/api/dictionarySetApi';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { DiagramSummary } from '@/types/diagram';
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
@@ -38,10 +52,32 @@ export default function DiagramsPage() {
   const [renamingId, setRenamingId] = useState<number | null>(null);
   /** 이름 변경 입력값 */
   const [renameValue, setRenameValue] = useState('');
+  /** 생성 시 사용할 사전 세트 ID */
+  const [createSetId, setCreateSetId] = useState('');
 
   const { canEdit } = useTeamRole(teamId);
 
   const diagramsQueryKey = queryKeys.diagrams.byProject(teamId!, projectId!);
+
+  const { data: dictionarySets = [] } = useQuery({
+    queryKey: queryKeys.dictionary.sets(teamId!),
+    queryFn: () => fetchDictionarySets(teamId!),
+    enabled: !!teamId,
+  });
+
+  useEffect(() => {
+    if (dictionarySets.length === 0) {
+      setCreateSetId('');
+      return;
+    }
+    const defaultSet = dictionarySets.find((set) => set.isDefault);
+    setCreateSetId((prev) => {
+      if (prev && dictionarySets.some((set) => String(set.id) === prev)) {
+        return prev;
+      }
+      return String(defaultSet?.id ?? dictionarySets[0]!.id);
+    });
+  }, [dictionarySets]);
 
   const { data: diagrams = [], isLoading } = useQuery({
     queryKey: diagramsQueryKey,
@@ -50,7 +86,7 @@ export default function DiagramsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (name: string) => createDiagram(teamId!, projectId!, name),
+    mutationFn: (name: string) => createDiagram(teamId!, projectId!, name, Number(createSetId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
       toast.success(t('diagram.toast.created'));
@@ -77,6 +113,17 @@ export default function DiagramsPage() {
       toast.success(t('diagram.toast.renamed'));
     },
     onError: (err) => toast.error(getErrorMessage(err, t('diagram.toast.renameFailed'))),
+  });
+
+  const updateDiagramSetMutation = useMutation({
+    mutationFn: ({ diagramId, dictionarySetId }: { diagramId: number; dictionarySetId: number }) =>
+      updateDiagramDictionarySet(teamId!, projectId!, String(diagramId), dictionarySetId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
+      toast.success(t('diagram.toast.dictionarySetUpdated'));
+    },
+    onError: (err) =>
+      toast.error(getErrorMessage(err, t('diagram.toast.dictionarySetUpdateFailed'))),
   });
 
   /** 다이어그램 이름 변경을 시작한다. @param diagram 대상 다이어그램 @param e 마우스 이벤트 (전파 차단용) */
@@ -117,10 +164,24 @@ export default function DiagramsPage() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">{t('diagram.list.title')}</h2>
             {canEdit && (
-              <Button onClick={() => setDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                {t('diagram.list.newButton')}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Select value={createSetId} onValueChange={setCreateSetId}>
+                  <SelectTrigger className="w-[220px]">
+                    <SelectValue placeholder={t('diagram.list.selectDictionarySet')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dictionarySets.map((set) => (
+                      <SelectItem key={set.id} value={String(set.id)}>
+                        {set.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button onClick={() => setDialogOpen(true)} disabled={!createSetId}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t('diagram.list.newButton')}
+                </Button>
+              </div>
             )}
           </div>
 
@@ -132,7 +193,7 @@ export default function DiagramsPage() {
                 <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                 <p className="text-muted-foreground mb-4">{t('diagram.list.empty')}</p>
                 {canEdit && (
-                  <Button onClick={() => setDialogOpen(true)}>
+                  <Button onClick={() => setDialogOpen(true)} disabled={!createSetId}>
                     <Plus className="h-4 w-4 mr-2" />
                     {t('diagram.list.createButton')}
                   </Button>
@@ -223,6 +284,30 @@ export default function DiagramsPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
+                    {canEdit && dictionarySets.length > 0 && (
+                      <div className="mb-2" onClick={(e) => e.stopPropagation()}>
+                        <Select
+                          value={diagram.dictionarySetId != null ? String(diagram.dictionarySetId) : ''}
+                          onValueChange={(value) =>
+                            updateDiagramSetMutation.mutate({
+                              diagramId: diagram.id,
+                              dictionarySetId: Number(value),
+                            })
+                          }
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder={t('diagram.list.selectDictionarySet')} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {dictionarySets.map((set) => (
+                              <SelectItem key={set.id} value={String(set.id)}>
+                                {set.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {t('diagram.list.updatedAt', {
                         date: new Date(diagram.updatedAt).toLocaleDateString(

@@ -39,12 +39,12 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * 용어(이름 사전) 관련 REST 컨트롤러.
  *
- * <p>{@code /api/teams/{teamId}/terms} 경로 하위에 용어 CRUD 엔드포인트를 제공한다.
+ * <p>{@code /api/teams/{teamId}/dictionary-sets/{setId}/terms} 경로 하위에 용어 CRUD 엔드포인트를 제공한다.
  * 모든 엔드포인트는 인증이 필요하다.</p>
  */
 @Tag(name = "Term", description = "용어(이름 사전) 관리 API")
 @RestController
-@RequestMapping("/api/teams/{teamId}/terms")
+@RequestMapping("/api/teams/{teamId}/dictionary-sets/{setId}/terms")
 @RequiredArgsConstructor
 public class TermController {
 
@@ -74,10 +74,11 @@ public class TermController {
     public ResponseEntity<TermResponse> createTerm(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Valid @RequestBody CreateTermRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(
-            termService.createTerm(jwt.getSubject(), teamId, request)
+            termService.createTerm(jwt.getSubject(), teamId, setId, request)
         );
     }
 
@@ -94,9 +95,10 @@ public class TermController {
     @GetMapping
     public ResponseEntity<List<TermResponse>> getTerms(
         @AuthenticationPrincipal Jwt jwt,
-        @Parameter(description = "팀 ID") @PathVariable Long teamId
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId
     ) {
-        return ResponseEntity.ok(termService.getTerms(jwt.getSubject(), teamId));
+        return ResponseEntity.ok(termService.getTerms(jwt.getSubject(), teamId, setId));
     }
 
     /**
@@ -114,9 +116,10 @@ public class TermController {
     public ResponseEntity<TermResponse> getTerm(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Parameter(description = "용어 ID") @PathVariable Long termId
     ) {
-        return ResponseEntity.ok(termService.getTerm(jwt.getSubject(), teamId, termId));
+        return ResponseEntity.ok(termService.getTerm(jwt.getSubject(), teamId, setId, termId));
     }
 
     /**
@@ -136,10 +139,11 @@ public class TermController {
     public ResponseEntity<TermResponse> updateTerm(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Parameter(description = "용어 ID") @PathVariable Long termId,
         @Valid @RequestBody UpdateTermRequest request
     ) {
-        return ResponseEntity.ok(termService.updateTerm(jwt.getSubject(), teamId, termId, request));
+        return ResponseEntity.ok(termService.updateTerm(jwt.getSubject(), teamId, setId, termId, request));
     }
 
     /**
@@ -157,10 +161,11 @@ public class TermController {
     public ResponseEntity<BulkValidationResponse> validateUpload(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @RequestParam("file") MultipartFile file,
         Locale locale
     ) {
-        return ResponseEntity.ok(termBulkService.validateUpload(jwt.getSubject(), teamId, file, locale));
+        return ResponseEntity.ok(termBulkService.validateUpload(jwt.getSubject(), teamId, setId, file, locale));
     }
 
     /**
@@ -178,9 +183,10 @@ public class TermController {
     public ResponseEntity<BulkSaveResponse> bulkSave(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Valid @RequestBody BulkTermSaveRequest request
     ) {
-        return ResponseEntity.ok(termBulkService.bulkSave(jwt.getSubject(), teamId, request));
+        return ResponseEntity.ok(termBulkService.bulkSave(jwt.getSubject(), teamId, setId, request));
     }
 
     /**
@@ -198,10 +204,11 @@ public class TermController {
     public void downloadTemplate(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         Locale locale,
         HttpServletResponse response
     ) throws IOException {
-        final var excelData = termBulkService.generateTemplate(jwt.getSubject(), teamId, locale);
+        final var excelData = termBulkService.generateTemplate(jwt.getSubject(), teamId, setId, locale);
         ExcelUtils.download(excelData, response, "term-template");
     }
 
@@ -220,9 +227,10 @@ public class TermController {
     public ResponseEntity<Void> deleteTerm(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Parameter(description = "용어 ID") @PathVariable Long termId
     ) {
-        termService.deleteTerm(jwt.getSubject(), teamId, termId);
+        termService.deleteTerm(jwt.getSubject(), teamId, setId, termId);
         return ResponseEntity.noContent().build();
     }
 }
