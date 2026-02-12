@@ -3,23 +3,29 @@ import { create } from 'zustand';
 import {
   type Edge,
   type Node,
+  type NodeChange,
   type OnNodesChange,
   type OnEdgesChange,
   applyNodeChanges,
   applyEdgeChanges,
 } from '@xyflow/react';
-import type { Column, RelationType, TableNodeData } from '@/types/erd';
+import type { Column, GroupNodeData, RelationType, TableNodeData } from '@/types/erd';
+import type { DdlParseResult } from '@/lib/ddl-parser';
 import { djb2 } from '@/lib/hash';
 import {
   yTablesMapToNodes,
   yEdgesMapToEdges,
+  yGroupsMapToNodes,
   yDocToJson,
   createColumnYMap,
   createEdgeYMap,
   createTableYMap,
+  createGroupYMap,
   deleteColumnFromYArray,
+  moveColumnInYArray,
   getTablesMap,
   getEdgesMap,
+  getGroupsMap,
 } from '@/collaboration/yjsBridge';
 
 /**
@@ -42,6 +48,8 @@ export function extractColId(handleId: string, nodeId: string): string {
 interface CanvasState {
   /** 캔버스에 표시되는 테이블 노드 목록 */
   nodes: Node<TableNodeData>[];
+  /** 그룹 노드 목록 (테이블 노드와 분리 관리) */
+  groupNodes: Node<GroupNodeData>[];
   /** 테이블 간 관계를 나타내는 엣지 목록 */
   edges: Edge[];
   /** 하이라이트할 노드 ID 배열 */
@@ -73,12 +81,32 @@ interface CanvasState {
   deleteTable: (nodeId: string) => void;
   /** 테이블 이름을 변경한다. @param nodeId 대상 노드 ID @param newName 새 이름 */
   renameTable: (nodeId: string, newName: string) => void;
+  /**
+   * 테이블 메타데이터를 업데이트한다 (논리명, termId, 색상 등).
+   *
+   * @param nodeId  대상 노드 ID
+   * @param updates 변경할 속성
+   */
+  updateTableMeta: (
+    nodeId: string,
+    updates: Partial<
+      Pick<TableNodeData, 'label' | 'logicalTableName' | 'tableTermId' | 'headerColor'>
+    >,
+  ) => void;
   /** 테이블에 새 컬럼을 추가한다. @param nodeId 대상 노드 ID */
   addColumn: (nodeId: string) => void;
   /** 테이블에서 컬럼을 삭제한다. @param nodeId 대상 노드 ID @param colId 삭제할 컬럼 ID */
   deleteColumn: (nodeId: string, colId: string) => void;
   /** 컬럼 속성을 업데이트한다. @param nodeId 대상 노드 ID @param colId 대상 컬럼 ID @param updates 변경할 속성 */
   updateColumn: (nodeId: string, colId: string, updates: Partial<Column>) => void;
+  /**
+   * 컬럼 위치를 이동한다 (드래그 앤 드롭).
+   *
+   * @param nodeId    대상 노드 ID
+   * @param fromIndex 이동 전 인덱스
+   * @param toIndex   이동 후 인덱스
+   */
+  moveColumn: (nodeId: string, fromIndex: number, toIndex: number) => void;
   /** 노드 하이라이트를 설정한다. @param ids 하이라이트할 노드 ID 배열 */
   setHighlightedNodes: (ids: string[]) => void;
   /** 엣지 하이라이트를 설정한다. @param id 하이라이트할 엣지 ID (null이면 해제) */
@@ -128,6 +156,33 @@ interface CanvasState {
     targetHandle: string | undefined,
     relationType: RelationType,
   ) => void;
+  /**
+   * DDL 파싱 결과를 ERD에 임포트한다.
+   *
+   * @param result DDL 파싱 결과
+   */
+  importDdl: (result: DdlParseResult) => void;
+  /** 그룹 노드를 추가한다. @param label 그룹 이름 (미지정 시 자동 생성) */
+  addGroup: (label?: string) => void;
+  /** 그룹 노드를 삭제한다. @param groupId 삭제할 그룹 ID */
+  deleteGroup: (groupId: string) => void;
+  /** 그룹 이름을 변경한다. @param groupId 대상 그룹 ID @param newName 새 이름 */
+  renameGroup: (groupId: string, newName: string) => void;
+  /**
+   * 그룹 크기를 변경한다.
+   *
+   * @param groupId 대상 그룹 ID
+   * @param width   새 너비
+   * @param height  새 높이
+   */
+  resizeGroup: (groupId: string, width: number, height: number) => void;
+  /**
+   * 그룹 메타데이터를 업데이트한다 (색상 등).
+   *
+   * @param groupId 대상 그룹 ID
+   * @param updates 변경할 속성
+   */
+  updateGroupMeta: (groupId: string, updates: Partial<Pick<GroupNodeData, 'color'>>) => void;
   /** Y.Doc 참조 (null이면 초기화 전) */
   ydoc: Y.Doc | null;
   /** Y.Doc을 초기화하고 observer를 등록한다. @param ydoc Y.Doc 인스턴스 */
@@ -196,10 +251,24 @@ function generateUniqueName(base: string, existing: string[]): string {
 }
 
 /**
+ * 기존 테이블명 목록에서 중복되지 않는 고유한 테이블명을 생성한다.
+ *
+ * @param base     기본 테이블명
+ * @param existing 기존 테이블명 배열
+ * @returns 고유한 테이블명
+ */
+function generateUniqueTableName(base: string, existing: string[]): string {
+  if (!existing.includes(base)) return base;
+  let i = 1;
+  while (existing.includes(`${base}_${i}`)) i++;
+  return `${base}_${i}`;
+}
+
+/**
  * ERD 캔버스 상태 관리 Zustand 스토어.
  *
  * Y.Doc이 SSOT이며, 모든 변이는 Y.Doc을 직접 변경한다.
- * observeDeep 콜백에서 Zustand 상태(nodes, edges)가 자동 갱신된다.
+ * observeDeep 콜백에서 Zustand 상태(nodes, edges, groupNodes)가 자동 갱신된다.
  *
  * @remarks
  * `applyNodeChanges()`는 제네릭 `Node[]`를 반환하므로 `Node<TableNodeData>[]`로 타입 단언이 필요하다.
@@ -219,6 +288,11 @@ const useCanvasStore = create<CanvasState>((set, get) => {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let edgesObserver: ((events: Y.YEvent<any>[]) => void) | null = null;
+  /**
+   * groups observeDeep 콜백 참조 (cleanup용).
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let groupsObserver: ((events: Y.YEvent<any>[]) => void) | null = null;
   /** 로컬 position 동기화 트랜잭션 origin 식별자 */
   const POSITION_SYNC_ORIGIN = 'local-position-sync';
   /**
@@ -232,18 +306,71 @@ const useCanvasStore = create<CanvasState>((set, get) => {
    */
   let hasDeferredTableSync = false;
   /**
-   * position 업데이트 throttle 타이머.
-   * Zustand 외부 — setTimeout 반환값(타이머 ID)은 직렬화 불가하며 DevTools에 노출할 필요 없으므로 클로저 스코프에 유지.
+   * position 변경을 50ms throttle로 Y.Doc에 반영하는 컨텍스트.
+   * Zustand 외부 — setTimeout/Map은 직렬화 불가하며 DevTools에 노출할 필요 없으므로 클로저 스코프에 유지.
    */
-  let positionThrottleTimer: ReturnType<typeof setTimeout> | null = null;
+  interface ThrottleCtx {
+    timer: ReturnType<typeof setTimeout> | null;
+    pending: Map<string, { x: number; y: number }>;
+  }
+  /** 테이블 position throttle 컨텍스트 */
+  const tableThrottle: ThrottleCtx = { timer: null, pending: new Map() };
+  /** 그룹 position throttle 컨텍스트 */
+  const groupThrottle: ThrottleCtx = { timer: null, pending: new Map() };
+
   /**
-   * throttle 중 누적된 position 변경.
-   * Zustand 외부 — throttle 윈도우 내 고빈도 position 변경을 누적하며, 매 변경마다 set() 시 re-render 비용이 과도하므로 클로저 스코프에 유지.
+   * position 변경을 누적하고 50ms throttle로 Y.Doc에 반영한다.
+   *
+   * @param changes   position 타입의 NodeChange 배열
+   * @param ctx       throttle 컨텍스트 (테이블 또는 그룹)
+   * @param getYMap   Y.Doc에서 대상 Y.Map을 가져오는 함수
    */
-  let pendingPositionChanges: Map<string, { x: number; y: number }> = new Map();
+  function throttlePositionToYDoc(
+    changes: NodeChange[],
+    ctx: ThrottleCtx,
+    getYMap: (doc: Y.Doc) => Y.Map<Y.Map<unknown>>,
+  ) {
+    const posChanges = changes.filter(
+      (c) => c.type === 'position' && 'position' in c && c.position,
+    );
+    const ydoc = get().ydoc;
+    if (posChanges.length === 0 || !ydoc) return;
+
+    for (const change of posChanges) {
+      if (change.type === 'position' && 'position' in change && change.position) {
+        ctx.pending.set(change.id, change.position);
+      }
+    }
+
+    if (!ctx.timer) {
+      ctx.timer = setTimeout(() => {
+        const doc = get().ydoc;
+        if (doc && ctx.pending.size > 0) {
+          doc.transact(() => {
+            const yMap = getYMap(doc);
+            for (const [nodeId, pos] of ctx.pending) {
+              const nodeYMap = yMap.get(nodeId);
+              if (!nodeYMap) continue;
+              const posYMap = nodeYMap.get('position') as Y.Map<number> | undefined;
+              if (posYMap) {
+                posYMap.set('x', pos.x);
+                posYMap.set('y', pos.y);
+              }
+            }
+          }, POSITION_SYNC_ORIGIN);
+          ctx.pending = new Map();
+        }
+        ctx.timer = null;
+      }, 50);
+    }
+  }
+
+  /** 그룹 노드 ID 셋 (onNodesChange에서 빠른 분기 판별용) */
+  let groupNodeIds: Set<string> = new Set();
 
   return {
     nodes: [],
+    groupNodes: [],
     edges: [],
     highlightedNodeIds: [],
     highlightedEdgeId: null,
@@ -253,11 +380,16 @@ const useCanvasStore = create<CanvasState>((set, get) => {
     initYDoc: (ydoc) => {
       const tablesMap = getTablesMap(ydoc);
       const edgesMap = getEdgesMap(ydoc);
+      const groupsMap = getGroupsMap(ydoc);
+
+      const initialGroupNodes = yGroupsMapToNodes(groupsMap);
+      groupNodeIds = new Set(initialGroupNodes.map((g) => g.id));
 
       // 초기 렌더링 + 초기 해시 설정
       set({
         nodes: yTablesMapToNodes(tablesMap),
         edges: yEdgesMapToEdges(edgesMap),
+        groupNodes: initialGroupNodes,
         ydoc,
         lastBackupHash: djb2(yDocToJson(ydoc)),
       });
@@ -279,8 +411,14 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       edgesObserver = () => {
         set({ edges: yEdgesMapToEdges(edgesMap) });
       };
+      groupsObserver = () => {
+        const newGroupNodes = yGroupsMapToNodes(groupsMap);
+        groupNodeIds = new Set(newGroupNodes.map((g) => g.id));
+        set({ groupNodes: newGroupNodes });
+      };
       tablesMap.observeDeep(tablesObserver);
       edgesMap.observeDeep(edgesObserver);
+      groupsMap.observeDeep(groupsObserver);
     },
 
     destroyYDoc: () => {
@@ -290,30 +428,41 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       if (ydoc) {
         const tablesMap = getTablesMap(ydoc);
         const edgesMap = getEdgesMap(ydoc);
+        const groupsMap = getGroupsMap(ydoc);
         if (tablesObserver) tablesMap.unobserveDeep(tablesObserver);
         if (edgesObserver) edgesMap.unobserveDeep(edgesObserver);
+        if (groupsObserver) groupsMap.unobserveDeep(groupsObserver);
         ydoc.destroy();
       }
 
       tablesObserver = null;
       edgesObserver = null;
+      groupsObserver = null;
 
       // throttle 타이머 정리
-      if (positionThrottleTimer) {
-        clearTimeout(positionThrottleTimer);
-        positionThrottleTimer = null;
+      for (const ctx of [tableThrottle, groupThrottle]) {
+        if (ctx.timer) {
+          clearTimeout(ctx.timer);
+          ctx.timer = null;
+        }
+        ctx.pending = new Map();
       }
-      pendingPositionChanges = new Map();
       isNodeDragging = false;
       hasDeferredTableSync = false;
+      groupNodeIds = new Set();
 
-      set({ ydoc: null, nodes: [], edges: [], lastBackupHash: '' });
+      set({ ydoc: null, nodes: [], edges: [], groupNodes: [], lastBackupHash: '' });
     },
 
     onNodesChange: (changes) => {
-      const { ydoc } = get();
+      // 테이블 변경과 그룹 변경 분리 (C-3 해결)
+      // groupNodeIds 동기화 타이밍 방어: 클로저 캐시 miss 시 실제 상태 확인
+      const isGroupId = (id: string) =>
+        groupNodeIds.has(id) || get().groupNodes.some((g) => g.id === id);
+      const tableChanges = changes.filter((c) => !('id' in c && isGroupId(c.id)));
+      const groupChanges = changes.filter((c) => 'id' in c && isGroupId(c.id));
 
-      for (const change of changes) {
+      for (const change of tableChanges) {
         if (change.type === 'position' && 'dragging' in change) {
           if (change.dragging === true) {
             isNodeDragging = true;
@@ -329,43 +478,20 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       }
 
       // position 변경은 throttle하여 Y.Doc에 반영 (드래그 성능)
-      const positionChanges = changes.filter(
-        (c) => c.type === 'position' && 'position' in c && c.position,
-      );
-      if (positionChanges.length > 0 && ydoc) {
-        for (const change of positionChanges) {
-          if (change.type === 'position' && 'position' in change && change.position) {
-            pendingPositionChanges.set(change.id, change.position);
-          }
-        }
+      throttlePositionToYDoc(tableChanges, tableThrottle, getTablesMap);
+      throttlePositionToYDoc(groupChanges, groupThrottle, getGroupsMap);
 
-        if (!positionThrottleTimer) {
-          positionThrottleTimer = setTimeout(() => {
-            const doc = get().ydoc;
-            if (doc && pendingPositionChanges.size > 0) {
-              doc.transact(() => {
-                const tablesMap = getTablesMap(doc);
-                for (const [nodeId, pos] of pendingPositionChanges) {
-                  const tableYMap = tablesMap.get(nodeId);
-                  if (!tableYMap) continue;
-                  const posYMap = tableYMap.get('position') as Y.Map<number> | undefined;
-                  if (posYMap) {
-                    posYMap.set('x', pos.x);
-                    posYMap.set('y', pos.y);
-                  }
-                }
-              }, POSITION_SYNC_ORIGIN);
-              pendingPositionChanges = new Map();
-            }
-            positionThrottleTimer = null;
-          }, 50);
-        }
+      // 로컬 상태 즉시 반영
+      if (tableChanges.length > 0) {
+        set({
+          nodes: applyNodeChanges(tableChanges, get().nodes) as Node<TableNodeData>[],
+        });
       }
-
-      // select, dimensions 등 비-position 변경은 로컬만 반영
-      set({
-        nodes: applyNodeChanges(changes, get().nodes) as Node<TableNodeData>[],
-      });
+      if (groupChanges.length > 0) {
+        set({
+          groupNodes: applyNodeChanges(groupChanges, get().groupNodes) as Node<GroupNodeData>[],
+        });
+      }
     },
 
     onEdgesChange: (changes) => {
@@ -512,6 +638,26 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       }
     },
 
+    updateTableMeta: (nodeId, updates) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
+
+      const tableYMap = getTableYMap(ydoc, nodeId);
+      if (!tableYMap) return;
+
+      ydoc.transact(() => {
+        for (const [key, value] of Object.entries(updates)) {
+          if (value === undefined || value === null) {
+            tableYMap.delete(key);
+          } else if (key === 'headerColor' && value === 'default') {
+            tableYMap.delete('headerColor');
+          } else {
+            tableYMap.set(key, value);
+          }
+        }
+      });
+    },
+
     addColumn: (nodeId) => {
       const { ydoc } = get();
       if (!ydoc) return;
@@ -599,12 +745,27 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       });
     },
 
+    moveColumn: (nodeId, fromIndex, toIndex) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
+      if (fromIndex === toIndex) return;
+
+      const tableYMap = getTableYMap(ydoc, nodeId);
+      if (!tableYMap) return;
+      const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+      if (!colsYArray) return;
+
+      ydoc.transact(() => {
+        moveColumnInYArray(colsYArray, fromIndex, toIndex);
+      });
+    },
+
     serialize: () => {
       const { ydoc } = get();
       if (ydoc) {
         return yDocToJson(ydoc);
       }
-      return JSON.stringify({ nodes: [], edges: [] });
+      return JSON.stringify({ nodes: [], edges: [], groups: [] });
     },
 
     addFkRelation: (
@@ -698,6 +859,172 @@ const useCanvasStore = create<CanvasState>((set, get) => {
                 }
               }
             }
+          }
+        }
+      });
+    },
+
+    importDdl: (result) => {
+      const { ydoc, nodes } = get();
+      if (!ydoc || result.tables.length === 0) return;
+
+      const existingTableNames = nodes.map((n) => n.data.label);
+      const assignedTableNames = new Set(existingTableNames);
+
+      ydoc.transact(() => {
+        const tablesMap = getTablesMap(ydoc);
+        const edgesMap = getEdgesMap(ydoc);
+
+        // tableName → { nodeId, columns: Map<colName, colId> } 매핑 (C-5 해결)
+        const tableMap = new Map<string, { nodeId: string; colMap: Map<string, string> }>();
+
+        // 1. 테이블 생성 — 그리드 배치로 겹침 방지
+        const GRID_COLS = 4;
+        const GRID_X_GAP = 300;
+        const GRID_Y_GAP = 250;
+        const startX = 100;
+        let startY = 100;
+        if (nodes.length > 0) {
+          startY = Math.max(...nodes.map((n) => n.position?.y ?? 0)) + 300;
+        }
+        let tableIndex = 0;
+        for (const table of result.tables) {
+          const uniqueName = generateUniqueTableName(table.name, [...assignedTableNames]);
+          assignedTableNames.add(uniqueName);
+          const nodeId = `table-${crypto.randomUUID()}`;
+          const colMap = new Map<string, string>();
+
+          const columns: Column[] = table.columns.map((col) => {
+            const colId = `col-${crypto.randomUUID()}`;
+            colMap.set(col.name, colId);
+            return {
+              id: colId,
+              name: col.name,
+              type: col.type,
+              pk: col.pk || undefined,
+              fk: undefined,
+              nullable: col.nullable,
+              autoIncrement: col.autoIncrement || undefined,
+              logicalName: col.comment || undefined,
+            };
+          });
+
+          const gridCol = tableIndex % GRID_COLS;
+          const gridRow = Math.floor(tableIndex / GRID_COLS);
+          const tableYMap = createTableYMap(
+            uniqueName,
+            { x: startX + gridCol * GRID_X_GAP, y: startY + gridRow * GRID_Y_GAP },
+            columns,
+            {
+              logicalTableName: table.comment || undefined,
+            },
+          );
+          tablesMap.set(nodeId, tableYMap);
+          tableMap.set(table.name, { nodeId, colMap });
+          tableIndex++;
+        }
+
+        // 2. FK 관계 생성
+        for (const rel of result.relations) {
+          const parentEntry = tableMap.get(rel.parentTable);
+          const childEntry = tableMap.get(rel.childTable);
+          if (!parentEntry || !childEntry) continue;
+
+          const parentColId = parentEntry.colMap.get(rel.parentColumn);
+          const childColId = childEntry.colMap.get(rel.childColumn);
+          if (!parentColId || !childColId) continue;
+
+          // 자식 컬럼에 FK 마킹
+          const childTableYMap = tablesMap.get(childEntry.nodeId);
+          if (childTableYMap) {
+            const colsYArray = childTableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+            if (colsYArray) {
+              const colYMap = findColumnYMap(colsYArray, childColId);
+              if (colYMap) {
+                colYMap.set('fk', true);
+              }
+            }
+          }
+
+          // 엣지 생성
+          const sourceHandle = `${parentEntry.nodeId}-${parentColId}-source`;
+          const targetHandle = `${childEntry.nodeId}-${childColId}-target`;
+          const edgeId = `e-${sourceHandle}-${targetHandle}`;
+          edgesMap.set(
+            edgeId,
+            createEdgeYMap(
+              parentEntry.nodeId,
+              childEntry.nodeId,
+              sourceHandle,
+              targetHandle,
+              'non-identifying',
+            ),
+          );
+        }
+      });
+    },
+
+    addGroup: (label) => {
+      const { ydoc, groupNodes } = get();
+      if (!ydoc) return;
+
+      const groupId = `group-${crypto.randomUUID()}`;
+      const groupLabel = label ?? `Group ${groupNodes.length + 1}`;
+
+      ydoc.transact(() => {
+        const groupsMap = getGroupsMap(ydoc);
+        const groupYMap = createGroupYMap(groupLabel, { x: 100, y: 100 }, 400, 300);
+        groupsMap.set(groupId, groupYMap);
+      });
+    },
+
+    deleteGroup: (groupId) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
+
+      const groupsMap = getGroupsMap(ydoc);
+      groupsMap.delete(groupId);
+    },
+
+    renameGroup: (groupId, newName) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
+
+      const groupsMap = getGroupsMap(ydoc);
+      const groupYMap = groupsMap.get(groupId);
+      if (groupYMap) {
+        groupYMap.set('label', newName);
+      }
+    },
+
+    resizeGroup: (groupId, width, height) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
+
+      const groupsMap = getGroupsMap(ydoc);
+      const groupYMap = groupsMap.get(groupId);
+      if (groupYMap) {
+        ydoc.transact(() => {
+          groupYMap.set('width', width);
+          groupYMap.set('height', height);
+        });
+      }
+    },
+
+    updateGroupMeta: (groupId, updates) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
+
+      const groupsMap = getGroupsMap(ydoc);
+      const groupYMap = groupsMap.get(groupId);
+      if (!groupYMap) return;
+
+      ydoc.transact(() => {
+        for (const [key, value] of Object.entries(updates)) {
+          if (value === undefined || value === null || (key === 'color' && value === 'default')) {
+            groupYMap.delete(key);
+          } else {
+            groupYMap.set(key, value);
           }
         }
       });

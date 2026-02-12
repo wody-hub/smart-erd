@@ -1,6 +1,13 @@
 import * as Y from 'yjs';
 import { type Edge, type Node } from '@xyflow/react';
-import type { Column, ERDEdgeData, RelationType, TableNodeData } from '@/types/erd';
+import type {
+  Column,
+  ERDEdgeData,
+  GroupNodeData,
+  RelationType,
+  TableHeaderColor,
+  TableNodeData,
+} from '@/types/erd';
 
 /**
  * Y.Doc에서 테이블 Y.Map을 반환한다.
@@ -20,6 +27,16 @@ export function getTablesMap(doc: Y.Doc): Y.Map<Y.Map<unknown>> {
  */
 export function getEdgesMap(doc: Y.Doc): Y.Map<Y.Map<unknown>> {
   return doc.getMap('edges') as Y.Map<Y.Map<unknown>>;
+}
+
+/**
+ * Y.Doc에서 그룹 Y.Map을 반환한다.
+ *
+ * @param doc Y.Doc
+ * @returns groups Y.Map
+ */
+export function getGroupsMap(doc: Y.Doc): Y.Map<Y.Map<unknown>> {
+  return doc.getMap('groups') as Y.Map<Y.Map<unknown>>;
 }
 
 /**
@@ -62,6 +79,9 @@ export function yTablesMapToNodes(tablesMap: Y.Map<Y.Map<unknown>>): Node<TableN
       },
       data: {
         label: (tableYMap.get('label') as string) ?? 'Untitled',
+        logicalTableName: (tableYMap.get('logicalTableName') as string) ?? undefined,
+        tableTermId: (tableYMap.get('tableTermId') as number) ?? undefined,
+        headerColor: (tableYMap.get('headerColor') as TableHeaderColor) ?? undefined,
         columns,
       },
     });
@@ -97,7 +117,40 @@ export function yEdgesMapToEdges(edgesMap: Y.Map<Y.Map<unknown>>): Edge<ERDEdgeD
 }
 
 /**
- * 기존 React Flow JSON (nodes + edges)을 Y.Doc으로 마이그레이션한다.
+ * Y.Map으로 표현된 그룹들을 React Flow Node 배열로 변환한다.
+ *
+ * @param groupsMap Y.Map<groupId, Y.Map>
+ * @returns React Flow 그룹 노드 배열
+ */
+export function yGroupsMapToNodes(groupsMap: Y.Map<Y.Map<unknown>>): Node<GroupNodeData>[] {
+  const nodes: Node<GroupNodeData>[] = [];
+
+  groupsMap.forEach((groupYMap, groupId) => {
+    const positionYMap = groupYMap.get('position') as Y.Map<number> | undefined;
+
+    nodes.push({
+      id: groupId,
+      type: 'group',
+      position: {
+        x: positionYMap?.get('x') ?? 100,
+        y: positionYMap?.get('y') ?? 100,
+      },
+      style: {
+        width: (groupYMap.get('width') as number) ?? 400,
+        height: (groupYMap.get('height') as number) ?? 300,
+      },
+      data: {
+        label: (groupYMap.get('label') as string) ?? 'Group',
+        color: (groupYMap.get('color') as TableHeaderColor) ?? undefined,
+      },
+    });
+  });
+
+  return nodes;
+}
+
+/**
+ * 기존 React Flow JSON (nodes + edges + groups)을 Y.Doc으로 마이그레이션한다.
  * content(JSON)은 있지만 ydocSnapshot이 없는 기존 다이어그램을 변환할 때 사용한다.
  *
  * @param doc  대상 Y.Doc
@@ -108,20 +161,28 @@ export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
     const parsed = JSON.parse(json) as {
       nodes?: Node<TableNodeData>[];
       edges?: Edge[];
+      groups?: Node<GroupNodeData>[];
     };
 
     const nodesArray = Array.isArray(parsed.nodes) ? parsed.nodes : [];
     const edgesArray = Array.isArray(parsed.edges) ? parsed.edges : [];
+    const groupsArray = Array.isArray(parsed.groups) ? parsed.groups : [];
 
     doc.transact(() => {
       const tablesMap = getTablesMap(doc);
       const edgesMap = getEdgesMap(doc);
+      const groupsMap = getGroupsMap(doc);
 
       for (const node of nodesArray) {
         const tableYMap = createTableYMap(
           node.data?.label ?? 'Untitled',
           { x: node.position?.x ?? 100, y: node.position?.y ?? 100 },
           node.data?.columns ?? [],
+          {
+            logicalTableName: node.data?.logicalTableName,
+            tableTermId: node.data?.tableTermId,
+            headerColor: node.data?.headerColor,
+          },
         );
         tablesMap.set(node.id, tableYMap);
       }
@@ -136,6 +197,17 @@ export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
             edge.targetHandle ?? undefined,
           ),
         );
+      }
+
+      for (const group of groupsArray) {
+        const groupYMap = createGroupYMap(
+          group.data?.label ?? 'Group',
+          { x: group.position?.x ?? 100, y: group.position?.y ?? 100 },
+          (group.style?.width as number) ?? 400,
+          (group.style?.height as number) ?? 300,
+          group.data?.color,
+        );
+        groupsMap.set(group.id, groupYMap);
       }
     });
   } catch (err) {
@@ -191,18 +263,30 @@ export function createEdgeYMap(
   return edgeYMap;
 }
 
+/** 테이블 Y.Map 생성 옵션 */
+interface CreateTableOptions {
+  /** 테이블 논리명 */
+  logicalTableName?: string;
+  /** 연결된 Term ID */
+  tableTermId?: number;
+  /** 헤더 색상 프리셋 */
+  headerColor?: TableHeaderColor;
+}
+
 /**
  * 테이블 데이터를 Y.Map으로 변환한다.
  *
- * @param label    테이블 이름
+ * @param label    테이블 이름 (물리명)
  * @param position 위치 좌표
  * @param columns  컬럼 배열
+ * @param options  추가 옵션 (논리명, termId, 색상)
  * @returns Y.Map 인스턴스
  */
 export function createTableYMap(
   label: string,
   position: { x: number; y: number },
   columns: Column[],
+  options?: CreateTableOptions,
 ): Y.Map<unknown> {
   const tableYMap = new Y.Map<unknown>();
   tableYMap.set('label', label);
@@ -218,7 +302,45 @@ export function createTableYMap(
   }
   tableYMap.set('columns', colsYArray);
 
+  if (options?.logicalTableName) tableYMap.set('logicalTableName', options.logicalTableName);
+  if (options?.tableTermId != null) tableYMap.set('tableTermId', options.tableTermId);
+  if (options?.headerColor && options.headerColor !== 'default') {
+    tableYMap.set('headerColor', options.headerColor);
+  }
+
   return tableYMap;
+}
+
+/**
+ * 그룹 데이터를 Y.Map으로 변환한다.
+ *
+ * @param label    그룹 이름
+ * @param position 위치 좌표
+ * @param width    너비
+ * @param height   높이
+ * @param color    색상 (옵션)
+ * @returns Y.Map 인스턴스
+ */
+export function createGroupYMap(
+  label: string,
+  position: { x: number; y: number },
+  width: number,
+  height: number,
+  color?: TableHeaderColor,
+): Y.Map<unknown> {
+  const groupYMap = new Y.Map<unknown>();
+  groupYMap.set('label', label);
+
+  const posYMap = new Y.Map<number>();
+  posYMap.set('x', position.x);
+  posYMap.set('y', position.y);
+  groupYMap.set('position', posYMap);
+
+  groupYMap.set('width', width);
+  groupYMap.set('height', height);
+  if (color && color !== 'default') groupYMap.set('color', color);
+
+  return groupYMap;
 }
 
 /**
@@ -243,6 +365,40 @@ export function deleteColumnFromYArray(
 }
 
 /**
+ * Y.Map의 모든 primitive 값을 새 Y.Map으로 복제한다.
+ * Shallow clone — primitive values only.
+ *
+ * @param source 원본 Y.Map
+ * @returns 복제된 Y.Map
+ */
+export function cloneYMap(source: Y.Map<unknown>): Y.Map<unknown> {
+  const clone = new Y.Map<unknown>();
+  source.forEach((value, key) => clone.set(key, value));
+  return clone;
+}
+
+/**
+ * Y.Array 내 컬럼 위치를 이동한다.
+ * Y.Map은 한 번 detach된 후 다시 attach할 수 없으므로 새 Y.Map을 복제하여 삽입한다.
+ *
+ * @param colsYArray 컬럼 Y.Array
+ * @param fromIndex  이동 전 인덱스
+ * @param toIndex    이동 후 인덱스
+ */
+export function moveColumnInYArray(
+  colsYArray: Y.Array<Y.Map<unknown>>,
+  fromIndex: number,
+  toIndex: number,
+): void {
+  if (fromIndex === toIndex) return;
+  const sourceMap = colsYArray.get(fromIndex);
+  const cloned = cloneYMap(sourceMap);
+  colsYArray.delete(fromIndex, 1);
+  const insertAt = Math.max(0, Math.min(toIndex, colsYArray.length));
+  colsYArray.insert(insertAt, [cloned]);
+}
+
+/**
  * Y.Doc의 현재 상태를 React Flow JSON 문자열로 직렬화한다.
  * 기존 REST API 호환을 위한 백업/내보내기 용도.
  *
@@ -252,9 +408,11 @@ export function deleteColumnFromYArray(
 export function yDocToJson(doc: Y.Doc): string {
   const tablesMap = getTablesMap(doc);
   const edgesMap = getEdgesMap(doc);
+  const groupsMap = getGroupsMap(doc);
 
   const nodes = yTablesMapToNodes(tablesMap);
   const edges = yEdgesMapToEdges(edgesMap);
+  const groups = yGroupsMapToNodes(groupsMap);
 
-  return JSON.stringify({ nodes, edges });
+  return JSON.stringify({ nodes, edges, groups });
 }

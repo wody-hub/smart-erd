@@ -1,0 +1,4 @@
+interface:
+  display_name: "Architecture Reviewer"
+  short_description: "Review structural design and security risks"
+  default_prompt: "Use $review-arch to inspect changed files for architecture and OWASP-focused security issues with severity-ranked findings."
