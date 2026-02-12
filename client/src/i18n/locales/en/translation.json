@@ -255,6 +255,7 @@
         "togglePk": "Toggle PK",
         "toggleFk": "Toggle FK",
         "toggleNullable": "Toggle nullable",
+        "toggleAutoIncrement": "Toggle auto increment",
         "deleteColumn": "Delete column"
       },
       "aria": {
@@ -265,6 +266,7 @@
         "togglePk": "Toggle primary key for {{name}}",
         "toggleFk": "Toggle foreign key for {{name}}",
         "toggleNullable": "Toggle nullable for {{name}}",
+        "toggleAutoIncrement": "Toggle auto increment for {{name}}",
         "deleteColumn": "Delete column {{name}}",
         "validationWarning": "{{name}} dictionary mismatch warning",
         "domainBadge": "{{colName}} domain: {{domainName}}",

@@ -13,6 +13,13 @@ interface DbmsDialect {
   tableOptions?: string;
   /** MySQL 인라인 COMMENT 생성 */
   inlineComment?(text: string): string;
+  /** 자동증가 토큰 설정 */
+  autoIncrement?: {
+    /** SQL 토큰 */
+    token: string;
+    /** true: NOT NULL 뒤에 배치 (MySQL), false: 타입 뒤에 배치 (기본) */
+    afterNotNull?: boolean;
+  };
 }
 
 /** FK 관계 정보 */
@@ -64,26 +71,31 @@ const dialects: Record<DbmsType, DbmsDialect> = {
     statementSeparator: ';',
     comment: (table, column, text) =>
       `COMMENT ON COLUMN "${escapeDoubleQuote(table)}"."${escapeDoubleQuote(column)}" IS '${escapeQuote(text)}'`,
+    autoIncrement: { token: 'GENERATED ALWAYS AS IDENTITY' },
   },
   mysql: {
     quote: (name) => `\`${escapeBacktick(name)}\``,
     statementSeparator: ';',
     tableOptions: ' ENGINE=InnoDB',
     inlineComment: (text) => ` COMMENT '${escapeQuote(text)}'`,
+    autoIncrement: { token: 'AUTO_INCREMENT', afterNotNull: true },
   },
   oracle: {
     quote: (name) => `"${escapeDoubleQuote(name)}"`,
     statementSeparator: ';',
     comment: (table, column, text) =>
       `COMMENT ON COLUMN "${escapeDoubleQuote(table)}"."${escapeDoubleQuote(column)}" IS '${escapeQuote(text)}'`,
+    autoIncrement: { token: 'GENERATED ALWAYS AS IDENTITY' },
   },
   sqlserver: {
     quote: (name) => `[${escapeBracket(name)}]`,
     statementSeparator: ';\nGO',
+    autoIncrement: { token: 'IDENTITY(1,1)' },
   },
   ansi: {
     quote: (name) => `"${escapeDoubleQuote(name)}"`,
     statementSeparator: ';',
+    autoIncrement: { token: 'GENERATED ALWAYS AS IDENTITY' },
   },
 };
 
@@ -156,8 +168,18 @@ function topologicalSort(tableNames: string[], fkRelations: FkRelation[]): strin
 function buildColumnDef(col: Column, dialect: DbmsDialect): string {
   const parts = [dialect.quote(col.name), col.type || 'VARCHAR(255)'];
 
+  // 자동증가: NOT NULL 앞 (기본 위치 — PostgreSQL, Oracle, SQL Server, ANSI)
+  if (col.pk && col.autoIncrement && dialect.autoIncrement && !dialect.autoIncrement.afterNotNull) {
+    parts.push(dialect.autoIncrement.token);
+  }
+
   if (!col.nullable) {
     parts.push('NOT NULL');
+  }
+
+  // 자동증가: NOT NULL 뒤 (MySQL)
+  if (col.pk && col.autoIncrement && dialect.autoIncrement?.afterNotNull) {
+    parts.push(dialect.autoIncrement.token);
   }
 
   if (dialect.inlineComment && col.logicalName) {

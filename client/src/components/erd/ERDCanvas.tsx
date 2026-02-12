@@ -97,13 +97,12 @@ export default function ERDCanvas({
   /** 캔버스 컨테이너 ref (Awareness 커서 추적용) */
   const canvasRef = useRef<HTMLDivElement>(null);
   useAwareness(provider ?? null, canvasRef);
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect } = useCanvasStore(
+  const { nodes, edges, onNodesChange, onEdgesChange } = useCanvasStore(
     useShallow((s) => ({
       nodes: s.nodes,
       edges: s.edges,
       onNodesChange: s.onNodesChange,
       onEdgesChange: s.onEdgesChange,
-      onConnect: s.onConnect,
     })),
   );
 
@@ -120,9 +119,10 @@ export default function ERDCanvas({
     toggleFkMode,
     cancelFkMode,
     handleNodeClickInFkMode,
+    handleDragConnect,
     fkTypeDialogOpen,
-    setFkTypeDialogOpen,
     handleFkTypeSelect,
+    handleFkTypeDialogClose,
   } = useFkConnectMode();
   const { exportPng, exportJpg, exportSvg, exportPdf } = useExportDiagram(diagramName);
 
@@ -225,7 +225,7 @@ export default function ERDCanvas({
           edges={styledEdges}
           onNodesChange={canEdit ? onNodesChange : undefined}
           onEdgesChange={canEdit ? onEdgesChange : undefined}
-          onConnect={canEdit ? onConnect : undefined}
+          onConnect={canEdit ? handleDragConnect : undefined}
           onNodeClick={handleNodeClick}
           onEdgeClick={handleEdgeClick}
           onEdgeContextMenu={canEdit ? handleEdgeContextMenu : undefined}
@@ -309,7 +309,7 @@ export default function ERDCanvas({
         open={fkTypeDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
-            setFkTypeDialogOpen(false);
+            handleFkTypeDialogClose();
           }
         }}
         onSelect={handleFkTypeSelect}

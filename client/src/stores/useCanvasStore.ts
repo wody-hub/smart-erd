@@ -5,7 +5,6 @@ import {
   type Node,
   type OnNodesChange,
   type OnEdgesChange,
-  type OnConnect,
   applyNodeChanges,
   applyEdgeChanges,
 } from '@xyflow/react';
@@ -53,8 +52,6 @@ interface CanvasState {
   onNodesChange: OnNodesChange;
   /** 엣지 변경(선택 등) 이벤트 핸들러 — remove 타입은 필터링하여 커스텀 삭제만 허용 */
   onEdgesChange: OnEdgesChange;
-  /** 노드 간 새로운 연결 생성 이벤트 핸들러 */
-  onConnect: OnConnect;
   /** 노드 목록을 직접 설정한다. @param nodes 설정할 노드 배열 */
   setNodes: (nodes: Node<TableNodeData>[]) => void;
   /** 엣지 목록을 직접 설정한다. @param edges 설정할 엣지 배열 */
@@ -115,6 +112,22 @@ interface CanvasState {
     existingNames: string[],
     relationType: RelationType,
   ) => number;
+  /**
+   * Handle 드래그로 FK 관계를 생성한다 (엣지 + 대상 컬럼 FK 마킹).
+   *
+   * @param source       부모 노드 ID
+   * @param target       자식 노드 ID
+   * @param sourceHandle 부모 Handle ID
+   * @param targetHandle 자식 Handle ID
+   * @param relationType 관계 유형 (식별/비식별)
+   */
+  connectWithRelationType: (
+    source: string,
+    target: string,
+    sourceHandle: string | undefined,
+    targetHandle: string | undefined,
+    relationType: RelationType,
+  ) => void;
   /** Y.Doc 참조 (null이면 초기화 전) */
   ydoc: Y.Doc | null;
   /** Y.Doc을 초기화하고 observer를 등록한다. @param ydoc Y.Doc 인스턴스 */
@@ -133,6 +146,26 @@ interface CanvasState {
 function getTableYMap(ydoc: Y.Doc, tableId: string): Y.Map<unknown> | undefined {
   const tablesMap = getTablesMap(ydoc);
   return tablesMap.get(tableId);
+}
+
+/**
+ * Y.Array에서 컬럼 ID로 Y.Map을 찾는다.
+ *
+ * @param colsYArray 컬럼 Y.Array
+ * @param colId      검색할 컬럼 ID
+ * @returns 해당 컬럼의 Y.Map 또는 undefined
+ */
+function findColumnYMap(
+  colsYArray: Y.Array<Y.Map<unknown>>,
+  colId: string,
+): Y.Map<unknown> | undefined {
+  for (let i = 0; i < colsYArray.length; i++) {
+    const colYMap = colsYArray.get(i);
+    if (colYMap.get('id') === colId) {
+      return colYMap;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -340,25 +373,6 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       set({ edges: applyEdgeChanges(filtered, get().edges) });
     },
 
-    onConnect: (connection) => {
-      const { ydoc } = get();
-      if (!ydoc) return;
-
-      const edgeId = `e-${connection.sourceHandle}-${connection.targetHandle}`;
-      ydoc.transact(() => {
-        const edgesMap = getEdgesMap(ydoc);
-        edgesMap.set(
-          edgeId,
-          createEdgeYMap(
-            connection.source!,
-            connection.target!,
-            connection.sourceHandle ?? undefined,
-            connection.targetHandle ?? undefined,
-          ),
-        );
-      });
-    },
-
     setNodes: (nodes) => set({ nodes }),
     setEdges: (edges) => set({ edges }),
 
@@ -557,21 +571,18 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
       if (!colsYArray) return;
 
-      for (let i = 0; i < colsYArray.length; i++) {
-        const colYMap = colsYArray.get(i);
-        if (colYMap.get('id') === colId) {
-          ydoc.transact(() => {
-            for (const [key, value] of Object.entries(updates)) {
-              if (value === undefined) {
-                colYMap.delete(key);
-              } else {
-                colYMap.set(key, value);
-              }
-            }
-          });
-          break;
+      const colYMap = findColumnYMap(colsYArray, colId);
+      if (!colYMap) return;
+
+      ydoc.transact(() => {
+        for (const [key, value] of Object.entries(updates)) {
+          if (value === undefined) {
+            colYMap.delete(key);
+          } else {
+            colYMap.set(key, value);
+          }
         }
-      }
+      });
     },
 
     serialize: () => {
@@ -641,6 +652,41 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       });
 
       return createdCount;
+    },
+
+    connectWithRelationType: (source, target, sourceHandle, targetHandle, relationType) => {
+      const { ydoc } = get();
+      if (!ydoc) return;
+
+      const edgeId = `e-${sourceHandle}-${targetHandle}`;
+      const isIdentifying = relationType === 'identifying';
+
+      ydoc.transact(() => {
+        const edgesMap = getEdgesMap(ydoc);
+        edgesMap.set(
+          edgeId,
+          createEdgeYMap(source, target, sourceHandle, targetHandle, relationType),
+        );
+
+        // 대상 컬럼 FK 마킹
+        if (targetHandle) {
+          const colId = extractColId(targetHandle, target);
+          const tableYMap = getTableYMap(ydoc, target);
+          if (tableYMap) {
+            const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+            if (colsYArray) {
+              const colYMap = findColumnYMap(colsYArray, colId);
+              if (colYMap) {
+                colYMap.set('fk', true);
+                if (isIdentifying) {
+                  colYMap.set('pk', true);
+                  colYMap.set('nullable', false);
+                }
+              }
+            }
+          }
+        }
+      });
     },
   };
 });

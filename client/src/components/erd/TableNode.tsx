@@ -201,7 +201,16 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                   {/* PK toggle */}
                   <button
                     className={`nodrag w-5 text-center font-bold text-[10px] ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.pk ? 'text-erd-pk' : 'text-muted-foreground/40 hover:text-erd-pk/80'}`}
-                    onClick={canEdit ? () => updateColumn(id, col.id, { pk: !col.pk }) : undefined}
+                    onClick={
+                      canEdit
+                        ? () =>
+                            updateColumn(
+                              id,
+                              col.id,
+                              col.pk ? { pk: false, autoIncrement: undefined } : { pk: true },
+                            )
+                        : undefined
+                    }
                     title={t('erd.tableNode.title.togglePk')}
                     aria-label={t('erd.tableNode.aria.togglePk', { name: col.name })}
                   >
@@ -217,6 +226,27 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                   >
                     FK
                   </button>
+
+                  {/* AI (Auto Increment) toggle — PK 컬럼에서만 표시 */}
+                  {col.pk && (
+                    <button
+                      className={`nodrag w-5 text-center font-bold text-[10px] ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.autoIncrement ? 'text-erd-ai' : 'text-muted-foreground/40 hover:text-erd-ai/80'}`}
+                      onClick={
+                        canEdit
+                          ? () =>
+                              updateColumn(id, col.id, {
+                                autoIncrement: col.autoIncrement ? undefined : true,
+                              })
+                          : undefined
+                      }
+                      title={t('erd.tableNode.title.toggleAutoIncrement')}
+                      aria-label={t('erd.tableNode.aria.toggleAutoIncrement', {
+                        name: col.name,
+                      })}
+                    >
+                      AI
+                    </button>
+                  )}
 
                   {/* Logical name autocomplete */}
                   {canEdit ? (

@@ -14,6 +14,8 @@ export interface Column {
   pk?: boolean;
   /** Foreign Key 여부 */
   fk?: boolean;
+  /** 자동증가 여부 (PK 컬럼에서만 유효) */
+  autoIncrement?: boolean;
   /** NULL 허용 여부 */
   nullable?: boolean;
   /** 논리명 (예: "사용자명") — 데이터 사전 연동용 */

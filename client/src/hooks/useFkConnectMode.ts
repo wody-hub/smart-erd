@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { Node } from '@xyflow/react';
+import type { Node, Connection } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import useCanvasStore from '@/stores/useCanvasStore';
@@ -22,8 +22,12 @@ export function useFkConnectMode() {
   /** 관계 유형 선택 다이얼로그 열림 여부 */
   const [fkTypeDialogOpen, setFkTypeDialogOpen] = useState(false);
 
+  /** Handle 드래그에서 대기 중인 연결 정보 */
+  const [pendingConnection, setPendingConnection] = useState<Connection | null>(null);
+
   const nodes = useCanvasStore((s) => s.nodes);
   const addFkRelation = useCanvasStore((s) => s.addFkRelation);
+  const connectWithRelationType = useCanvasStore((s) => s.connectWithRelationType);
   const setHighlightedNodes = useCanvasStore((s) => s.setHighlightedNodes);
   const clearHighlights = useCanvasStore((s) => s.clearHighlights);
 
@@ -32,6 +36,7 @@ export function useFkConnectMode() {
     setFkMode(false);
     setParentNodeId(null);
     setPendingChildId(null);
+    setPendingConnection(null);
     setFkTypeDialogOpen(false);
     clearHighlights();
   }, [clearHighlights]);
@@ -81,11 +86,38 @@ export function useFkConnectMode() {
   };
 
   /**
+   * Handle 드래그 연결 시 호출되는 핸들러.
+   * 연결 정보를 저장하고 관계 유형 선택 다이얼로그를 표시한다.
+   *
+   * @param connection React Flow 연결 정보
+   */
+  const handleDragConnect = (connection: Connection) => {
+    setPendingConnection(connection);
+    setFkTypeDialogOpen(true);
+  };
+
+  /**
    * 관계 유형 선택 후 FK 관계를 생성한다.
+   * Handle 드래그와 FK Connect 모드 두 경로를 모두 처리한다.
    *
    * @param relationType 선택된 관계 유형
    */
   const handleFkTypeSelect = (relationType: RelationType) => {
+    // Handle 드래그 연결
+    if (pendingConnection) {
+      connectWithRelationType(
+        pendingConnection.source!,
+        pendingConnection.target!,
+        pendingConnection.sourceHandle ?? undefined,
+        pendingConnection.targetHandle ?? undefined,
+        relationType,
+      );
+      setPendingConnection(null);
+      setFkTypeDialogOpen(false);
+      return;
+    }
+
+    // FK Connect 모드 (2-클릭)
     if (!parentNodeId || !pendingChildId) return;
 
     const parentNode = nodes.find((n) => n.id === parentNodeId);
@@ -111,13 +143,23 @@ export function useFkConnectMode() {
     resetFkMode();
   };
 
+  /**
+   * 관계 유형 다이얼로그가 닫힐 때 대기 상태를 정리한다.
+   */
+  const handleFkTypeDialogClose = () => {
+    setPendingConnection(null);
+    setPendingChildId(null);
+    setFkTypeDialogOpen(false);
+  };
+
   return {
     fkMode,
     toggleFkMode,
     cancelFkMode,
     handleNodeClickInFkMode,
+    handleDragConnect,
     fkTypeDialogOpen,
-    setFkTypeDialogOpen,
     handleFkTypeSelect,
+    handleFkTypeDialogClose,
   };
 }
