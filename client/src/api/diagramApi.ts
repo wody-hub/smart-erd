@@ -1,5 +1,6 @@
 import axiosInstance from './axiosInstance';
 import type { DiagramSummary, DiagramDetail } from '@/types/diagram';
+import type { WsTicketIssueResponse } from '@/types/collaboration';
 
 export type { DiagramSummary, DiagramDetail };
 
@@ -98,13 +99,13 @@ export async function renameDiagram(
  * WebSocket 연결을 위한 일회용 ticket을 발급받는다.
  *
  * @param diagramId 다이어그램 ID
- * @returns 일회용 ticket 문자열
+ * @returns 티켓 + presence 프로토콜 메타데이터
  */
-export async function requestWsTicket(diagramId: string): Promise<string> {
-  const res = await axiosInstance.post<{ ticket: string }>('/ws-ticket', {
+export async function requestWsTicket(diagramId: string): Promise<WsTicketIssueResponse> {
+  const res = await axiosInstance.post<WsTicketIssueResponse>('/ws-ticket', {
     diagramId: Number(diagramId),
   });
-  return res.data.ticket;
+  return res.data;
 }
 
 /**

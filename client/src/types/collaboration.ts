@@ -4,6 +4,8 @@
 export interface AwarenessState {
   /** 사용자 정보 */
   user: {
+    /** 사용자 ID (불변 식별자) */
+    userId: string | null;
     /** 사용자 이름 */
     name: string;
     /** 로그인 ID */
@@ -24,10 +26,71 @@ export interface YjsProviderOptions {
   /** 다이어그램 ID */
   diagramId: string;
   /** 일회용 WebSocket ticket을 발급받는 콜백 */
-  getTicket: () => Promise<string>;
+  getTicket: () => Promise<WsTicketIssueResponse>;
 }
 
 /**
  * WebSocket 연결 상태.
  */
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
+
+/** Presence 모드. */
+export type PresenceMode = 'active' | 'degraded';
+
+/** 웹소켓 티켓 발급 응답. */
+export interface WsTicketIssueResponse {
+  /** 일회용 ticket 문자열 */
+  ticket: string;
+  /** 사용자 ID (불변 식별자) */
+  userId: string;
+  /** presence 프로토콜 버전 (0이면 미지원) */
+  presenceProtocolVersion: number;
+}
+
+/** Presence 참여자 정보. */
+export interface PresenceParticipant {
+  /** 사용자 ID */
+  userId: string;
+  /** 표시 이름 */
+  displayName: string;
+  /** 입장 순서 */
+  joinSeq: number;
+}
+
+/** Presence snapshot 메시지 payload. */
+export interface PresenceSnapshotPayload {
+  /** 다이어그램 ID */
+  diagramId: string;
+  /** room 세대 식별자 */
+  roomEpoch: string;
+  /** room 단위 버전 */
+  presenceVersion: number;
+  /** 참여자 목록 */
+  participants: PresenceParticipant[];
+  /** self 포함 총원 */
+  totalIncludingSelf: number;
+}
+
+/** Presence peer joined 메시지 payload. */
+export interface PresencePeerJoinedPayload {
+  /** 다이어그램 ID */
+  diagramId: string;
+  /** room 세대 식별자 */
+  roomEpoch: string;
+  /** room 단위 버전 */
+  presenceVersion: number;
+  /** 신규 입장 참여자 */
+  participant: PresenceParticipant;
+}
+
+/** Presence peer left 메시지 payload. */
+export interface PresencePeerLeftPayload {
+  /** 다이어그램 ID */
+  diagramId: string;
+  /** room 세대 식별자 */
+  roomEpoch: string;
+  /** room 단위 버전 */
+  presenceVersion: number;
+  /** 완전 퇴장 사용자 ID */
+  userId: string;
+}

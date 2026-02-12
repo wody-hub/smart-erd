@@ -40,12 +40,15 @@ export function useAwareness(
      */
     const emitAwareness = (cursor: { x: number; y: number } | null) => {
       const state: AwarenessState = {
-        user: { name, loginId, color },
+        user: { userId: provider.userId, name, loginId, color },
         cursor,
         selectedNodeId: null,
       };
       provider.setLocalAwareness(state);
     };
+
+    // 입장 직후에도 사용자 목록이 즉시 동기화되도록 초기 Awareness를 즉시 전송한다.
+    emitAwareness(null);
 
     /** 마우스 이동 핸들러 (throttle 적용) */
     const handleMouseMove = (e: MouseEvent) => {

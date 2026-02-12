@@ -35,7 +35,13 @@ export function useYjsCollaboration(
   const initYDoc = useCanvasStore((s) => s.initYDoc);
   const destroyYDoc = useCanvasStore((s) => s.destroyYDoc);
   const setConnectionStatus = useCollaborationStore((s) => s.setConnectionStatus);
+  const setPresenceMode = useCollaborationStore((s) => s.setPresenceMode);
+  const setSelfUserId = useCollaborationStore((s) => s.setSelfUserId);
+  const applyPresenceSnapshot = useCollaborationStore((s) => s.applyPresenceSnapshot);
+  const applyPeerJoined = useCollaborationStore((s) => s.applyPeerJoined);
+  const applyPeerLeft = useCollaborationStore((s) => s.applyPeerLeft);
   const updateAwareness = useCollaborationStore((s) => s.updateAwareness);
+  const removePeerByUserId = useCollaborationStore((s) => s.removePeerByUserId);
   const removePeerByLoginId = useCollaborationStore((s) => s.removePeerByLoginId);
   const resetCollaboration = useCollaborationStore((s) => s.reset);
 
@@ -66,6 +72,27 @@ export function useYjsCollaboration(
 
     provider.onConnectionStatusChange = (status: ConnectionStatus) => {
       setConnectionStatus(status);
+    };
+
+    provider.onIdentityResolved = (userId) => {
+      setSelfUserId(userId);
+    };
+
+    provider.onPresenceModeChange = (mode) => {
+      setPresenceMode(mode);
+    };
+
+    provider.onPresenceSnapshot = (payload) => {
+      applyPresenceSnapshot(payload);
+    };
+
+    provider.onPresencePeerJoined = (payload) => {
+      applyPeerJoined(payload);
+    };
+
+    provider.onPresencePeerLeft = (payload) => {
+      applyPeerLeft(payload);
+      removePeerByUserId(payload.userId);
     };
 
     provider.onAwarenessReceived = (clientId, state) => {

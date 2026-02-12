@@ -1,6 +1,17 @@
 import * as Y from 'yjs';
-import { WS_MSG_TYPE, WS_RECONNECT } from '@/constants/ws';
-import type { AwarenessState, ConnectionStatus, YjsProviderOptions } from '@/types/collaboration';
+import { WS_MSG_TYPE, WS_PRESENCE, WS_RECONNECT } from '@/constants/ws';
+import type {
+  AwarenessState,
+  ConnectionStatus,
+  PresenceMode,
+  PresencePeerJoinedPayload,
+  PresencePeerLeftPayload,
+  PresenceSnapshotPayload,
+  YjsProviderOptions,
+} from '@/types/collaboration';
+
+/** snapshot 재요청 rate limit (분당 최대 횟수) */
+const MAX_SNAPSHOT_REQUESTS_PER_MINUTE = 6;
 
 /**
  * Raw WebSocket 기반 Yjs sync provider.
@@ -8,17 +19,6 @@ import type { AwarenessState, ConnectionStatus, YjsProviderOptions } from '@/typ
  * 서버와 바이너리 프로토콜로 Y.Doc update를 주고받는다.
  * 서버는 relay만 담당하며, 클라이언트 간 sync protocol로 상태를 동기화한다.
  * Awareness(커서/선택 상태) 메시지도 같은 연결로 전송한다.
- *
- * @example
- * ```ts
- * const provider = new YjsProvider(ydoc, {
- *   diagramId: '123',
- *   getTicket: () => requestWsTicket('123'),
- * });
- * provider.connect();
- * // ...
- * provider.destroy();
- * ```
  */
 export class YjsProvider {
   /** Yjs 문서 */
@@ -33,6 +33,9 @@ export class YjsProvider {
   /** 재연결 타이머 */
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** presence bootstrap 타이머 */
+  private presenceBootstrapTimer: ReturnType<typeof setTimeout> | null = null;
+
   /** 현재 재연결 대기 시간 */
   private reconnectDelay: number = WS_RECONNECT.INITIAL_DELAY;
 
@@ -45,20 +48,53 @@ export class YjsProvider {
   /** 연결 상태 변경 콜백 */
   onConnectionStatusChange: ((status: ConnectionStatus) => void) | null = null;
 
+  /** presence 모드 변경 콜백 */
+  onPresenceModeChange: ((mode: PresenceMode) => void) | null = null;
+
+  /** ticket 해석 후 현재 사용자 userId 확정 콜백 */
+  onIdentityResolved: ((userId: string) => void) | null = null;
+
   /** 개별 Awareness 수신 콜백 (clientId + state, state null이면 해당 클라이언트 제거) */
   onAwarenessReceived: ((clientId: number, state: AwarenessState | null) => void) | null = null;
 
-  /** Peer left 콜백 (loginId 기반 커서 제거) */
+  /** legacy peer-left 콜백 (loginId 기반) */
   onPeerLeft: ((loginId: string) => void) | null = null;
+
+  /** presence snapshot 수신 콜백 */
+  onPresenceSnapshot: ((payload: PresenceSnapshotPayload) => void) | null = null;
+
+  /** presence peer joined 수신 콜백 */
+  onPresencePeerJoined: ((payload: PresencePeerJoinedPayload) => void) | null = null;
+
+  /** presence peer left 수신 콜백 */
+  onPresencePeerLeft: ((payload: PresencePeerLeftPayload) => void) | null = null;
 
   /** 로컬 Awareness 상태 */
   private localAwareness: AwarenessState | null = null;
+
+  /** 사용자 ID (불변 식별자) */
+  private selfUserId: string | null = null;
+
+  /** presence 프로토콜 버전 (0이면 미지원) */
+  private presenceProtocolVersion = 0;
+
+  /** 마지막 room epoch */
+  private lastRoomEpoch: string | null = null;
+
+  /** 마지막 presence version */
+  private lastPresenceVersion = 0;
+
+  /** snapshot 재요청 타임스탬프 (ms) */
+  private snapshotRequestTimestamps: number[] = [];
 
   /** 고유 클라이언트 ID */
   readonly clientId: number;
 
   /** 초기 sync 완료 여부 */
   private synced = false;
+
+  /** 현재 presence 모드 */
+  private presenceMode: PresenceMode = 'active';
 
   /**
    * YjsProvider를 생성한다.
@@ -71,13 +107,18 @@ export class YjsProvider {
     this.options = options;
     this.clientId = doc.clientID;
 
-    // Y.Doc update 이벤트 → 'remote' origin이 아닌 경우만 WebSocket 전송
+    // Y.Doc update 이벤트 -> 'remote' origin이 아닌 경우만 WebSocket 전송
     this.updateHandler = (update: Uint8Array, origin: unknown) => {
       if (origin === 'remote') return;
       this.sendMessage(WS_MSG_TYPE.YJS_UPDATE, update);
     };
 
     this.doc.on('update', this.updateHandler);
+  }
+
+  /** 사용자 ID를 반환한다. */
+  get userId(): string | null {
+    return this.selfUserId;
   }
 
   /**
@@ -95,6 +136,7 @@ export class YjsProvider {
     this.intentionalClose = true;
     this.doc.off('update', this.updateHandler);
     this.clearReconnectTimer();
+    this.clearPresenceBootstrapTimer();
 
     try {
       // WS 닫기 전 Awareness null 전송 (정상 종료 시 고스트 커서 방지)
@@ -110,6 +152,7 @@ export class YjsProvider {
       }
     } finally {
       this.emitConnectionStatus('disconnected');
+      this.emitPresenceMode('active');
     }
   }
 
@@ -119,7 +162,14 @@ export class YjsProvider {
    * @param state Awareness 상태
    */
   setLocalAwareness(state: AwarenessState): void {
-    this.localAwareness = state;
+    const mergedUser = {
+      ...state.user,
+      userId: state.user.userId ?? this.selfUserId,
+    };
+    this.localAwareness = {
+      ...state,
+      user: mergedUser,
+    };
     this.sendAwareness();
   }
 
@@ -127,9 +177,9 @@ export class YjsProvider {
    * WebSocket 인스턴스를 생성하고 이벤트를 바인딩한다.
    */
   private async createWebSocket(): Promise<void> {
-    let ticket: string;
+    let ticketData;
     try {
-      ticket = await this.options.getTicket();
+      ticketData = await this.options.getTicket();
     } catch (e) {
       console.error('[YjsProvider] ticket 발급 실패:', e);
       this.emitConnectionStatus('disconnected');
@@ -137,7 +187,22 @@ export class YjsProvider {
       return;
     }
 
-    const serverUrl = this.buildWsUrl(ticket);
+    this.selfUserId = ticketData.userId;
+    this.presenceProtocolVersion = ticketData.presenceProtocolVersion ?? 0;
+    this.onIdentityResolved?.(ticketData.userId);
+
+    // 티켓 응답 수신 후 userId를 알게 되므로, 기존 로컬 awareness에 병합한다.
+    if (this.localAwareness && !this.localAwareness.user.userId) {
+      this.localAwareness = {
+        ...this.localAwareness,
+        user: {
+          ...this.localAwareness.user,
+          userId: this.selfUserId,
+        },
+      };
+    }
+
+    const serverUrl = this.buildWsUrl(ticketData.ticket);
     this.emitConnectionStatus('connecting');
 
     this.ws = new WebSocket(serverUrl);
@@ -145,7 +210,17 @@ export class YjsProvider {
 
     this.ws.onopen = () => {
       this.reconnectDelay = WS_RECONNECT.INITIAL_DELAY;
+      this.lastRoomEpoch = null;
+      this.lastPresenceVersion = 0;
+      this.snapshotRequestTimestamps = [];
       this.emitConnectionStatus('connected');
+
+      if (this.presenceProtocolVersion >= 1) {
+        this.startPresenceBootstrapTimer();
+      } else {
+        this.emitPresenceMode('degraded');
+      }
+
       this.requestSnapshot();
       this.requestSync();
     };
@@ -159,6 +234,7 @@ export class YjsProvider {
     this.ws.onclose = () => {
       this.ws = null;
       this.synced = false;
+      this.clearPresenceBootstrapTimer();
       this.emitConnectionStatus('disconnected');
       if (!this.intentionalClose) {
         this.scheduleReconnect();
@@ -183,7 +259,7 @@ export class YjsProvider {
 
     switch (messageType) {
       case WS_MSG_TYPE.SYNC_STEP1: {
-        // 상대방의 state vector 수신 → diff를 SYNC_STEP2로 응답
+        // 상대방의 state vector 수신 -> diff를 SYNC_STEP2로 응답
         const stateVector = payload;
         const diff = Y.encodeStateAsUpdate(this.doc, stateVector);
         this.sendMessage(WS_MSG_TYPE.SYNC_STEP2, diff);
@@ -191,7 +267,7 @@ export class YjsProvider {
       }
       case WS_MSG_TYPE.SYNC_STEP2:
       case WS_MSG_TYPE.YJS_UPDATE: {
-        // diff 또는 update 수신 → Y.Doc에 적용
+        // diff 또는 update 수신 -> Y.Doc에 적용
         try {
           Y.applyUpdate(this.doc, payload, 'remote');
         } catch (e) {
@@ -209,7 +285,7 @@ export class YjsProvider {
         break;
       }
       case WS_MSG_TYPE.SNAPSHOT_RESPONSE: {
-        // 서버 스냅샷 수신 → Y.Doc에 적용
+        // 서버 스냅샷 수신 -> Y.Doc에 적용
         try {
           Y.applyUpdate(this.doc, payload, 'remote');
         } catch (e) {
@@ -219,8 +295,20 @@ export class YjsProvider {
         }
         break;
       }
+      case WS_MSG_TYPE.PRESENCE_SNAPSHOT: {
+        this.handlePresenceSnapshot(payload);
+        break;
+      }
+      case WS_MSG_TYPE.PEER_JOINED: {
+        this.handlePresencePeerJoined(payload);
+        break;
+      }
       case WS_MSG_TYPE.PEER_LEFT: {
-        this.handlePeerLeftMessage(payload);
+        this.handlePresencePeerLeft(payload);
+        break;
+      }
+      case WS_MSG_TYPE.PEER_LEFT_LEGACY: {
+        this.handleLegacyPeerLeftMessage(payload);
         break;
       }
     }
@@ -265,6 +353,25 @@ export class YjsProvider {
   }
 
   /**
+   * Presence snapshot 재요청을 전송한다.
+   * capability 미지원 또는 요청 rate limit 초과 시 전송하지 않는다.
+   */
+  private requestPresenceSnapshot(): void {
+    if (this.presenceProtocolVersion < 1) {
+      return;
+    }
+
+    const now = Date.now();
+    this.snapshotRequestTimestamps = this.snapshotRequestTimestamps.filter((ts) => now - ts < 60000);
+    if (this.snapshotRequestTimestamps.length >= MAX_SNAPSHOT_REQUESTS_PER_MINUTE) {
+      return;
+    }
+
+    this.snapshotRequestTimestamps.push(now);
+    this.sendMessage(WS_MSG_TYPE.PRESENCE_SNAPSHOT_REQUEST, new Uint8Array(0));
+  }
+
+  /**
    * Awareness 상태를 서버로 전송한다.
    */
   private sendAwareness(): void {
@@ -280,7 +387,6 @@ export class YjsProvider {
 
   /**
    * 수신된 Awareness 메시지를 파싱하여 콜백으로 전달한다.
-   * Provider는 상태를 보관하지 않고, Store가 SSOT로 관리한다.
    *
    * @param payload Awareness JSON 페이로드
    */
@@ -301,19 +407,117 @@ export class YjsProvider {
   }
 
   /**
-   * 수신된 Peer left 메시지를 처리한다.
-   * 해당 loginId의 원격 커서를 제거한다.
-   *
-   * @param payload Peer left JSON 페이로드
+   * Presence snapshot 메시지를 처리한다.
    */
-  private handlePeerLeftMessage(payload: Uint8Array): void {
+  private handlePresenceSnapshot(payload: Uint8Array): void {
+    try {
+      const decoder = new TextDecoder();
+      const json = JSON.parse(decoder.decode(payload)) as PresenceSnapshotPayload;
+
+      const epochChanged = this.lastRoomEpoch !== json.roomEpoch;
+      if (epochChanged || json.presenceVersion > this.lastPresenceVersion) {
+        this.lastRoomEpoch = json.roomEpoch;
+        this.lastPresenceVersion = json.presenceVersion;
+        this.onPresenceSnapshot?.(json);
+      }
+
+      this.clearPresenceBootstrapTimer();
+      this.emitPresenceMode('active');
+    } catch (e) {
+      console.debug('[YjsProvider] Presence snapshot 파싱 실패:', e);
+    }
+  }
+
+  /**
+   * Presence peer joined 메시지를 처리한다.
+   */
+  private handlePresencePeerJoined(payload: Uint8Array): void {
+    try {
+      const decoder = new TextDecoder();
+      const json = JSON.parse(decoder.decode(payload)) as PresencePeerJoinedPayload;
+
+      if (!this.lastRoomEpoch) {
+        this.requestPresenceSnapshot();
+        return;
+      }
+      if (json.roomEpoch !== this.lastRoomEpoch) {
+        return;
+      }
+      if (json.presenceVersion <= this.lastPresenceVersion) {
+        return;
+      }
+      if (json.presenceVersion > this.lastPresenceVersion + 1) {
+        this.requestPresenceSnapshot();
+        return;
+      }
+
+      this.lastPresenceVersion = json.presenceVersion;
+      this.onPresencePeerJoined?.(json);
+    } catch (e) {
+      console.debug('[YjsProvider] Presence peer joined 파싱 실패:', e);
+    }
+  }
+
+  /**
+   * Presence peer left 메시지를 처리한다.
+   */
+  private handlePresencePeerLeft(payload: Uint8Array): void {
+    try {
+      const decoder = new TextDecoder();
+      const json = JSON.parse(decoder.decode(payload)) as PresencePeerLeftPayload;
+
+      if (!this.lastRoomEpoch) {
+        this.requestPresenceSnapshot();
+        return;
+      }
+      if (json.roomEpoch !== this.lastRoomEpoch) {
+        return;
+      }
+      if (json.presenceVersion <= this.lastPresenceVersion) {
+        return;
+      }
+      if (json.presenceVersion > this.lastPresenceVersion + 1) {
+        this.requestPresenceSnapshot();
+        return;
+      }
+
+      this.lastPresenceVersion = json.presenceVersion;
+      this.onPresencePeerLeft?.(json);
+    } catch (e) {
+      console.debug('[YjsProvider] Presence peer left 파싱 실패:', e);
+    }
+  }
+
+  /**
+   * 수신된 Legacy peer-left 메시지를 처리한다.
+   *
+   * @param payload Legacy peer-left JSON 페이로드
+   */
+  private handleLegacyPeerLeftMessage(payload: Uint8Array): void {
     try {
       const decoder = new TextDecoder();
       const json = JSON.parse(decoder.decode(payload)) as { loginId: string };
-
       this.onPeerLeft?.(json.loginId);
     } catch (e) {
-      console.debug('[YjsProvider] Peer left 메시지 파싱 실패:', e);
+      console.debug('[YjsProvider] Legacy peer left 메시지 파싱 실패:', e);
+    }
+  }
+
+  /**
+   * presence bootstrap 타이머를 시작한다.
+   */
+  private startPresenceBootstrapTimer(): void {
+    this.clearPresenceBootstrapTimer();
+    this.presenceBootstrapTimer = setTimeout(() => {
+      this.emitPresenceMode('degraded');
+    }, WS_PRESENCE.BOOTSTRAP_TIMEOUT_MS);
+  }
+
+  /** presence bootstrap 타이머를 해제한다. */
+  private clearPresenceBootstrapTimer(): void {
+    if (this.presenceBootstrapTimer) {
+      clearTimeout(this.presenceBootstrapTimer);
+      this.presenceBootstrapTimer = null;
     }
   }
 
@@ -326,6 +530,7 @@ export class YjsProvider {
       this.ws = null;
     }
     this.synced = false;
+    this.clearPresenceBootstrapTimer();
     this.emitConnectionStatus('disconnected');
     this.scheduleReconnect();
   }
@@ -377,9 +582,20 @@ export class YjsProvider {
   }
 
   /**
+   * presence 모드 변경을 콜백으로 알린다.
+   *
+   * @param mode presence 모드
+   */
+  private emitPresenceMode(mode: PresenceMode): void {
+    if (this.presenceMode === mode) {
+      return;
+    }
+    this.presenceMode = mode;
+    this.onPresenceModeChange?.(mode);
+  }
+
+  /**
    * 사전 인코딩된 Y.Doc 전체 상태를 서버에 컴팩션 요청으로 전송한다.
-   * 호출 측에서 Y.encodeStateAsUpdate()를 한 번만 실행하여 이중 인코딩을 방지한다.
-   * 서버는 기존 ydocSnapshot을 이 압축 데이터로 교체한다.
    *
    * @param encodedState Y.encodeStateAsUpdate()로 사전 인코딩된 바이트 배열
    */
