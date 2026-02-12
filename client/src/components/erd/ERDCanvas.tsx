@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState, useRef } from 'react';
+import { lazy, memo, Suspense, useMemo, useState, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -69,6 +69,8 @@ interface ERDCanvasProps {
   onToggleValidation?: () => void;
   /** 편집 가능 여부 (VIEWER일 때 false) */
   canEdit?: boolean;
+  /** 사이드바 리사이즈 진행 여부 (성능 최적화용) */
+  isSidebarResizing?: boolean;
 }
 
 /** 삭제 다이얼로그 상태 */
@@ -94,12 +96,13 @@ interface DeleteDialogState {
  * @param props.provider   YjsProvider 인스턴스 (실시간 협업 시 커서 발행용)
  * @param props.canEdit    편집 가능 여부 (VIEWER일 때 false)
  */
-export default function ERDCanvas({
+function ERDCanvas({
   diagramName = 'diagram',
   provider,
   validationOpen,
   onToggleValidation,
   canEdit = true,
+  isSidebarResizing = false,
 }: ERDCanvasProps) {
   /** 캔버스 컨테이너 ref (Awareness 커서 추적용) */
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -237,7 +240,8 @@ export default function ERDCanvas({
   );
 
   const showOverlayWidgets = !isDraggingNode;
-  const showMiniMap = showOverlayWidgets && allNodes.length <= MINIMAP_NODE_LIMIT;
+  const showPerformanceOverlays = showOverlayWidgets && !isSidebarResizing;
+  const showMiniMap = showPerformanceOverlays && allNodes.length <= MINIMAP_NODE_LIMIT;
 
   return (
     <div className="w-full h-full" ref={canvasRef}>
@@ -268,8 +272,8 @@ export default function ERDCanvas({
           fitView
           className={cn(fkMode && 'cursor-crosshair')}
         >
-          {showOverlayWidgets && <Background variant={BackgroundVariant.Dots} gap={16} size={1} />}
-          {showOverlayWidgets && <Controls />}
+          {showPerformanceOverlays && <Background variant={BackgroundVariant.Dots} gap={16} size={1} />}
+          {showPerformanceOverlays && <Controls />}
           {showMiniMap && (
             <MiniMap
               nodeStrokeColor="hsl(var(--muted-foreground))"
@@ -294,7 +298,7 @@ export default function ERDCanvas({
         </ReactFlow>
       </ErdFkModeProvider>
 
-      {showOverlayWidgets && <RemoteCursors />}
+      {showPerformanceOverlays && <RemoteCursors />}
 
       {contextMenu && (
         <EdgeContextMenu
@@ -350,3 +354,5 @@ export default function ERDCanvas({
     </div>
   );
 }
+
+export default memo(ERDCanvas);

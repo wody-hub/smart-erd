@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -49,8 +49,22 @@ export default function DiagramPage() {
   const [validationOpen, setValidationOpen] = useState(false);
   /** 좌측 사이드바 너비(px) */
   const [sidebarWidth, setSidebarWidth] = useState(224);
+  /** 사이드바 리사이즈 진행 여부 */
+  const [isSidebarResizing, setIsSidebarResizing] = useState(false);
   /** 진행 중인 사이드바 리사이즈 정리 함수 */
   const sidebarResizeCleanupRef = useRef<(() => void) | null>(null);
+  /** 언마운트 진행 여부 */
+  const isUnmountingRef = useRef(false);
+  /** 사이드바 래퍼 DOM ref (리사이즈 중 직접 width 반영) */
+  const sidebarContainerRef = useRef<HTMLDivElement | null>(null);
+  /** 사이드바 리사이즈 핸들 ref (접근성 값 실시간 반영) */
+  const sidebarResizeHandleRef = useRef<HTMLDivElement | null>(null);
+  /** 최신 사이드바 너비 ref */
+  const sidebarWidthRef = useRef(224);
+  /** 사이드바 리사이즈 rAF ID */
+  const sidebarResizeRafRef = useRef<number | null>(null);
+  /** rAF 틱에서 반영할 사이드바 너비 */
+  const pendingSidebarWidthRef = useRef<number | null>(null);
 
   const { canEdit } = useTeamRole(teamId);
 
@@ -92,11 +106,23 @@ export default function DiagramPage() {
   };
 
   /** 유효성 검사 패널 토글 핸들러 */
-  const handleToggleValidation = () => setValidationOpen((prev) => !prev);
+  const handleToggleValidation = useCallback(() => setValidationOpen((prev) => !prev), []);
 
   /** 사이드바 너비를 허용 범위로 보정한다. */
   const clampSidebarWidth = (width: number) =>
     Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, width));
+
+  /** 사이드바 DOM 너비를 즉시 반영한다. */
+  const applySidebarWidth = useCallback((width: number) => {
+    const sidebarEl = sidebarContainerRef.current;
+    if (sidebarEl) {
+      sidebarEl.style.width = `${width}px`;
+    }
+    const resizeHandle = sidebarResizeHandleRef.current;
+    if (resizeHandle) {
+      resizeHandle.setAttribute('aria-valuenow', String(Math.round(width)));
+    }
+  }, []);
 
   /** 현재 진행 중인 사이드바 리사이즈 리스너/전역 스타일을 정리한다. */
   const cleanupSidebarResize = () => {
@@ -115,12 +141,49 @@ export default function DiagramPage() {
     e.currentTarget.focus();
     cleanupSidebarResize();
     const startX = e.clientX;
-    const startWidth = sidebarWidth;
+    const startWidth = sidebarWidthRef.current;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
+    setIsSidebarResizing(true);
+
+    const flushPendingWidth = () => {
+      if (sidebarResizeRafRef.current !== null) {
+        cancelAnimationFrame(sidebarResizeRafRef.current);
+        sidebarResizeRafRef.current = null;
+      }
+      const nextWidth = pendingSidebarWidthRef.current;
+      pendingSidebarWidthRef.current = null;
+      if (nextWidth === null) {
+        if (!isUnmountingRef.current) {
+          setSidebarWidth((prev) => (prev === sidebarWidthRef.current ? prev : sidebarWidthRef.current));
+        }
+        return;
+      }
+      sidebarWidthRef.current = nextWidth;
+      applySidebarWidth(nextWidth);
+      if (!isUnmountingRef.current) {
+        setSidebarWidth((prev) => (prev === nextWidth ? prev : nextWidth));
+      }
+    };
 
     const handleMove = (ev: PointerEvent) => {
-      setSidebarWidth(clampSidebarWidth(startWidth + (ev.clientX - startX)));
+      pendingSidebarWidthRef.current = clampSidebarWidth(startWidth + (ev.clientX - startX));
+      if (sidebarResizeRafRef.current !== null) {
+        return;
+      }
+      sidebarResizeRafRef.current = requestAnimationFrame(() => {
+        sidebarResizeRafRef.current = null;
+        const nextWidth = pendingSidebarWidthRef.current;
+        pendingSidebarWidthRef.current = null;
+        if (nextWidth === null) {
+          return;
+        }
+        if (nextWidth === sidebarWidthRef.current) {
+          return;
+        }
+        sidebarWidthRef.current = nextWidth;
+        applySidebarWidth(nextWidth);
+      });
     };
 
     const handleEnd = () => {
@@ -128,8 +191,12 @@ export default function DiagramPage() {
       window.removeEventListener('pointerup', handleEnd);
       window.removeEventListener('pointercancel', handleEnd);
       window.removeEventListener('blur', handleEnd);
+      flushPendingWidth();
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      if (!isUnmountingRef.current) {
+        setIsSidebarResizing(false);
+      }
       sidebarResizeCleanupRef.current = null;
     };
 
@@ -171,10 +238,22 @@ export default function DiagramPage() {
   useHotkeys(KEYBINDINGS.SAVE, handleSave, { preventDefault: true });
 
   useEffect(() => {
+    sidebarWidthRef.current = sidebarWidth;
+    applySidebarWidth(sidebarWidth);
+  }, [sidebarWidth, applySidebarWidth]);
+
+  useEffect(() => {
     return () => {
-      if (!sidebarResizeCleanupRef.current) return;
-      sidebarResizeCleanupRef.current();
-      sidebarResizeCleanupRef.current = null;
+      isUnmountingRef.current = true;
+      if (sidebarResizeCleanupRef.current) {
+        sidebarResizeCleanupRef.current();
+        sidebarResizeCleanupRef.current = null;
+      }
+      if (sidebarResizeRafRef.current !== null) {
+        cancelAnimationFrame(sidebarResizeRafRef.current);
+        sidebarResizeRafRef.current = null;
+      }
+      pendingSidebarWidthRef.current = null;
     };
   }, []);
 
@@ -223,8 +302,11 @@ export default function DiagramPage() {
               canEdit={canEdit}
             />
             <div className="flex flex-1 overflow-hidden">
-              <Sidebar canEdit={canEdit} width={sidebarWidth} />
+              <div ref={sidebarContainerRef} className="h-full shrink-0" style={{ width: sidebarWidth }}>
+                <Sidebar canEdit={canEdit} />
+              </div>
               <div
+                ref={sidebarResizeHandleRef}
                 className="group w-3 shrink-0 cursor-col-resize flex items-stretch justify-center bg-muted/30 hover:bg-muted/60 active:bg-muted/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                 onPointerDown={handleSidebarResizeStart}
                 onKeyDown={handleSidebarResizeKeyDown}
@@ -247,6 +329,7 @@ export default function DiagramPage() {
                   validationOpen={validationOpen}
                   onToggleValidation={handleToggleValidation}
                   canEdit={canEdit}
+                  isSidebarResizing={isSidebarResizing}
                 />
               </main>
               {validationOpen && <ValidationPanel onClose={() => setValidationOpen(false)} />}

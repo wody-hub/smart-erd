@@ -112,8 +112,8 @@ class DiagramRoomManagerTest {
         final var session2 = createMockSession("session-2");
 
         // when
-        roomManager.join(diagramId, session1, "user1");
-        roomManager.join(diagramId, session2, "user2");
+        roomManager.join(diagramId, session1, "user1", "User 1");
+        roomManager.join(diagramId, session2, "user2", "User 2");
 
         // then
         assertThat(roomManager.getSessionCount(diagramId)).isEqualTo(2);
@@ -133,8 +133,8 @@ class DiagramRoomManagerTest {
         final var diagramId = 1L;
         final var session1 = createMockSession("session-1");
         final var session2 = createMockSession("session-2");
-        roomManager.join(diagramId, session1, "user1");
-        roomManager.join(diagramId, session2, "user2");
+        roomManager.join(diagramId, session1, "user1", "User 1");
+        roomManager.join(diagramId, session2, "user2", "User 2");
 
         // when
         roomManager.leave(diagramId, session1, "user1");

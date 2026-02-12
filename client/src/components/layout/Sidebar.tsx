@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Plus } from 'lucide-react';
 import { useReactFlow } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
@@ -10,8 +11,6 @@ import SidebarTableItem from './SidebarTableItem';
 interface SidebarProps {
   /** 편집 가능 여부 (VIEWER일 때 false — 테이블 추가/삭제/이름변경 숨김) */
   canEdit?: boolean;
-  /** 사이드바 너비(px) */
-  width?: number;
 }
 const SIDEBAR_ENTRY_SEPARATOR = '\u001f';
 
@@ -23,7 +22,7 @@ const SIDEBAR_ENTRY_SEPARATOR = '\u001f';
  *
  * @param props.canEdit 편집 가능 여부
  */
-export default function Sidebar({ canEdit = true, width = 224 }: SidebarProps) {
+function Sidebar({ canEdit = true }: SidebarProps) {
   const { t } = useTranslation();
   const tableEntries = useCanvasStore(
     useShallow((state) =>
@@ -80,11 +79,7 @@ export default function Sidebar({ canEdit = true, width = 224 }: SidebarProps) {
   };
 
   return (
-    <aside
-      id="diagram-sidebar"
-      className="bg-muted border-r border-border p-4 shrink-0 flex flex-col"
-      style={{ width }}
-    >
+    <aside id="diagram-sidebar" className="h-full w-full bg-muted border-r border-border p-4 shrink-0 flex flex-col">
       <div className="flex-1 overflow-auto">
         {/* 테이블 섹션 */}
         <div className="flex items-center justify-between mb-3">
@@ -176,3 +171,5 @@ export default function Sidebar({ canEdit = true, width = 224 }: SidebarProps) {
     </aside>
   );
 }
+
+export default memo(Sidebar);
