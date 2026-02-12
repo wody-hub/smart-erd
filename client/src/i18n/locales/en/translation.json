@@ -233,7 +233,12 @@
       "selectChild": "Select child table (FK target)",
       "noPk": "Selected table has no primary key columns",
       "success": "FK relationship created ({{count}} columns)",
-      "cancelled": "FK connection cancelled"
+      "cancelled": "FK connection cancelled",
+      "fkTypeTitle": "Select Relationship Type",
+      "identifying": "Identifying",
+      "identifyingDesc": "Parent PK becomes part of child's composite key. Child cannot exist without parent.",
+      "nonIdentifying": "Non-identifying",
+      "nonIdentifyingDesc": "Parent PK is added as a regular FK column in child. Child can exist independently."
     },
     "edge": {
       "deleteTitle": "Delete Connection",

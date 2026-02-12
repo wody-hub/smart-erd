@@ -1,5 +1,5 @@
 import { memo, useState } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import { Plus, X, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TableNode as TableNodeType, Column } from '@/types/erd';
@@ -8,6 +8,7 @@ import { useInlineEdit } from '@/hooks/useInlineEdit';
 import { useCompoundTermRegister } from '@/hooks/useCompoundTermRegister';
 import { useErdDictionary } from './ErdDictionaryContext';
 import { useErdPermission } from './ErdPermissionContext';
+import { useErdFkMode } from './ErdFkModeContext';
 import { getColumnWarning } from '@/hooks/useColumnValidation';
 import { KEYS } from '@/constants/keybindings';
 import { cn } from '@/lib/utils';
@@ -50,7 +51,25 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
   const { findTermById, findDomainById } = useErdDictionary();
   const { canEdit } = useErdPermission();
+  const fkMode = useErdFkMode();
   const registerCompound = useCompoundTermRegister(id);
+
+  /** 연결된 Handle ID 셋 (FK 연결이 있는 핸들만 표시용) */
+  const connectedHandles = useStore(
+    (s) => {
+      const set = new Set<string>();
+      for (const edge of s.edges) {
+        if (edge.sourceHandle) set.add(edge.sourceHandle);
+        if (edge.targetHandle) set.add(edge.targetHandle);
+      }
+      return set;
+    },
+    (a, b) => a.size === b.size && [...a].every((v) => b.has(v)),
+  );
+
+  /** 해당 컬럼이 엣지에 연결되어 있는지 확인한다. */
+  const isConnected = (colId: string) =>
+    connectedHandles.has(`${id}-${colId}-source`) || connectedHandles.has(`${id}-${colId}-target`);
 
   /** 빠른 용어 등록 대상 */
   const [quickTermTarget, setQuickTermTarget] = useState<QuickTermTarget | null>(null);
@@ -173,7 +192,10 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                     type="target"
                     position={Position.Left}
                     id={`${id}-${col.id}-target`}
-                    className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+                    className={cn(
+                      '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
+                      !(isConnected(col.id) || fkMode) && '!opacity-0',
+                    )}
                   />
 
                   {/* PK toggle */}
@@ -261,7 +283,10 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                     type="source"
                     position={Position.Right}
                     id={`${id}-${col.id}-source`}
-                    className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+                    className={cn(
+                      '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
+                      !(isConnected(col.id) || fkMode) && '!opacity-0',
+                    )}
                   />
                 </div>
 

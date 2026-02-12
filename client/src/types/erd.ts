@@ -44,12 +44,21 @@ export interface TableNodeData extends Record<string, unknown> {
  */
 export type TableNode = Node<TableNodeData, 'table'>;
 
+/** 관계 유형: 식별(실선) / 비식별(점선) */
+export type RelationType = 'identifying' | 'non-identifying';
+
+/** ERD 엣지 데이터 */
+export interface ERDEdgeData extends Record<string, unknown> {
+  /** 관계 유형: 식별(실선) / 비식별(점선) */
+  relationType: RelationType;
+}
+
 /**
  * ERD 관계 엣지 타입.
  *
- * React Flow의 기본 `Edge` 타입을 그대로 사용한다.
+ * `ERDEdgeData`를 포함하여 관계 유형 정보를 전달한다.
  */
-export type ERDEdge = Edge;
+export type ERDEdge = Edge<ERDEdgeData>;
 
 /** 지원 DBMS 타입 */
 export type DbmsType = 'postgresql' | 'mysql' | 'oracle' | 'sqlserver' | 'ansi';

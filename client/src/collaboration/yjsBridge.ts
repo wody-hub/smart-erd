@@ -1,6 +1,6 @@
 import * as Y from 'yjs';
-import { MarkerType, type Edge, type Node } from '@xyflow/react';
-import type { Column, TableNodeData } from '@/types/erd';
+import { type Edge, type Node } from '@xyflow/react';
+import type { Column, ERDEdgeData, RelationType, TableNodeData } from '@/types/erd';
 
 /**
  * Y.Doc에서 테이블 Y.Map을 반환한다.
@@ -75,8 +75,8 @@ export function yTablesMapToNodes(tablesMap: Y.Map<Y.Map<unknown>>): Node<TableN
  * @param edgesMap Y.Map<edgeId, Y.Map>
  * @returns React Flow 엣지 배열
  */
-export function yEdgesMapToEdges(edgesMap: Y.Map<Y.Map<unknown>>): Edge[] {
-  const edges: Edge[] = [];
+export function yEdgesMapToEdges(edgesMap: Y.Map<Y.Map<unknown>>): Edge<ERDEdgeData>[] {
+  const edges: Edge<ERDEdgeData>[] = [];
 
   edgesMap.forEach((edgeYMap, edgeId) => {
     edges.push({
@@ -85,8 +85,10 @@ export function yEdgesMapToEdges(edgesMap: Y.Map<Y.Map<unknown>>): Edge[] {
       target: edgeYMap.get('target') as string,
       sourceHandle: (edgeYMap.get('sourceHandle') as string) ?? undefined,
       targetHandle: (edgeYMap.get('targetHandle') as string) ?? undefined,
-      type: 'step',
-      markerEnd: { type: MarkerType.ArrowClosed },
+      type: 'erdRelation',
+      data: {
+        relationType: (edgeYMap.get('relationType') as RelationType) ?? 'non-identifying',
+      },
     });
   });
 
@@ -168,6 +170,7 @@ export function createColumnYMap(column: Column): Y.Map<unknown> {
  * @param target       타겟 노드 ID
  * @param sourceHandle 소스 Handle ID (옵션)
  * @param targetHandle 타겟 Handle ID (옵션)
+ * @param relationType 관계 유형 (옵션)
  * @returns Y.Map 인스턴스
  */
 export function createEdgeYMap(
@@ -175,12 +178,14 @@ export function createEdgeYMap(
   target: string,
   sourceHandle?: string,
   targetHandle?: string,
+  relationType?: RelationType,
 ): Y.Map<unknown> {
   const edgeYMap = new Y.Map<unknown>();
   edgeYMap.set('source', source);
   edgeYMap.set('target', target);
   if (sourceHandle) edgeYMap.set('sourceHandle', sourceHandle);
   if (targetHandle) edgeYMap.set('targetHandle', targetHandle);
+  if (relationType) edgeYMap.set('relationType', relationType);
   return edgeYMap;
 }
 

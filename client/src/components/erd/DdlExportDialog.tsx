@@ -21,8 +21,7 @@ import {
 } from '@/components/ui/select';
 import useCanvasStore from '@/stores/useCanvasStore';
 import { generateDdl } from '@/lib/ddl-generator';
-import type { DbmsType, TableNode } from '@/types/erd';
-import type { Edge } from '@xyflow/react';
+import type { DbmsType, ERDEdge, TableNode } from '@/types/erd';
 
 /** DdlExportDialog 컴포넌트의 props. */
 interface DdlExportDialogProps {
@@ -51,7 +50,7 @@ export default function DdlExportDialog({ open, onOpenChange, diagramName }: Ddl
   const [dbms, setDbms] = useState<DbmsType>('postgresql');
 
   const nodes = useCanvasStore((s) => s.nodes) as TableNode[];
-  const edges = useCanvasStore((s) => s.edges) as Edge[];
+  const edges = useCanvasStore((s) => s.edges) as ERDEdge[];
 
   const ddl = useMemo(() => generateDdl(nodes, edges, dbms), [nodes, edges, dbms]);
 

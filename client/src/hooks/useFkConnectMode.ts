@@ -3,12 +3,12 @@ import type { Node } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import useCanvasStore from '@/stores/useCanvasStore';
-import type { TableNodeData } from '@/types/erd';
+import type { RelationType, TableNodeData } from '@/types/erd';
 
 /**
  * FK 연결 모드 상태와 로직을 캡슐화하는 훅.
  *
- * @returns FK 모드 상태, 토글 함수, 노드 클릭 핸들러
+ * @returns FK 모드 상태, 토글 함수, 노드 클릭 핸들러, 다이얼로그 상태
  */
 export function useFkConnectMode() {
   const { t } = useTranslation();
@@ -17,18 +17,29 @@ export function useFkConnectMode() {
   const [fkMode, setFkMode] = useState(false);
   /** 선택된 부모 노드 ID */
   const [parentNodeId, setParentNodeId] = useState<string | null>(null);
+  /** 대기 중인 자식 노드 ID (다이얼로그 표시용) */
+  const [pendingChildId, setPendingChildId] = useState<string | null>(null);
+  /** 관계 유형 선택 다이얼로그 열림 여부 */
+  const [fkTypeDialogOpen, setFkTypeDialogOpen] = useState(false);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const addFkRelation = useCanvasStore((s) => s.addFkRelation);
   const setHighlightedNodes = useCanvasStore((s) => s.setHighlightedNodes);
   const clearHighlights = useCanvasStore((s) => s.clearHighlights);
 
+  /** FK 모드 상태를 초기화하고 하이라이트를 해제한다. */
+  const resetFkMode = useCallback(() => {
+    setFkMode(false);
+    setParentNodeId(null);
+    setPendingChildId(null);
+    setFkTypeDialogOpen(false);
+    clearHighlights();
+  }, [clearHighlights]);
+
   /** FK 연결 모드를 토글한다. 해제 시 상태를 초기화한다. */
   const toggleFkMode = () => {
     if (fkMode) {
-      setFkMode(false);
-      setParentNodeId(null);
-      clearHighlights();
+      resetFkMode();
     } else {
       setFkMode(true);
       toast.info(t('erd.fkMode.selectParent'));
@@ -40,15 +51,13 @@ export function useFkConnectMode() {
    * useHotkeys 콜백에서 참조되므로 useCallback 유지.
    */
   const cancelFkMode = useCallback(() => {
-    setFkMode(false);
-    setParentNodeId(null);
-    clearHighlights();
+    resetFkMode();
     toast.info(t('erd.fkMode.cancelled'));
-  }, [clearHighlights, t]);
+  }, [resetFkMode, t]);
 
   /**
    * FK 연결 모드에서 노드 클릭 시 호출되는 핸들러.
-   * 첫 번째 클릭: 부모 테이블 선택, 두 번째 클릭: FK 관계 생성.
+   * 첫 번째 클릭: 부모 테이블 선택, 두 번째 클릭: 관계 유형 다이얼로그 표시.
    *
    * @param _event 마우스 이벤트
    * @param node   클릭된 노드
@@ -65,29 +74,41 @@ export function useFkConnectMode() {
       setHighlightedNodes([node.id]);
       toast.info(t('erd.fkMode.selectChild'));
     } else {
-      // 두 번째 클릭: 자식 선택 → FK 생성
-      const parentNode = nodes.find((n) => n.id === parentNodeId);
-      if (!parentNode) return;
-
-      const childNode = node;
-      const pkColumns = parentNode.data.columns.filter((c) => c.pk);
-      const existingNames = childNode.data.columns.map((c) => c.name);
-
-      const createdCount = addFkRelation(
-        parentNode.id,
-        childNode.id,
-        pkColumns,
-        parentNode.data.label,
-        existingNames,
-      );
-
-      if (createdCount > 0) {
-        toast.success(t('erd.fkMode.success', { count: createdCount }));
-      }
-      setFkMode(false);
-      setParentNodeId(null);
-      clearHighlights();
+      // 두 번째 클릭: 자식 선택 → 다이얼로그 표시
+      setPendingChildId(node.id);
+      setFkTypeDialogOpen(true);
     }
+  };
+
+  /**
+   * 관계 유형 선택 후 FK 관계를 생성한다.
+   *
+   * @param relationType 선택된 관계 유형
+   */
+  const handleFkTypeSelect = (relationType: RelationType) => {
+    if (!parentNodeId || !pendingChildId) return;
+
+    const parentNode = nodes.find((n) => n.id === parentNodeId);
+    const childNode = nodes.find((n) => n.id === pendingChildId);
+    if (!parentNode || !childNode) return;
+
+    const pkColumns = parentNode.data.columns.filter((c) => c.pk);
+    const existingNames = childNode.data.columns.map((c) => c.name);
+
+    const createdCount = addFkRelation(
+      parentNode.id,
+      childNode.id,
+      pkColumns,
+      parentNode.data.label,
+      existingNames,
+      relationType,
+    );
+
+    if (createdCount > 0) {
+      toast.success(t('erd.fkMode.success', { count: createdCount }));
+    }
+
+    resetFkMode();
   };
 
   return {
@@ -95,5 +116,8 @@ export function useFkConnectMode() {
     toggleFkMode,
     cancelFkMode,
     handleNodeClickInFkMode,
+    fkTypeDialogOpen,
+    setFkTypeDialogOpen,
+    handleFkTypeSelect,
   };
 }

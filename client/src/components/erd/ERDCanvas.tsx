@@ -5,8 +5,8 @@ import {
   Controls,
   MiniMap,
   BackgroundVariant,
-  MarkerType,
   type NodeTypes,
+  type EdgeTypes,
   type Edge,
   type Node,
 } from '@xyflow/react';
@@ -27,11 +27,19 @@ import CanvasToolbar from './CanvasToolbar';
 import EdgeContextMenu from './EdgeContextMenu';
 import DeleteEdgeDialog from './DeleteEdgeDialog';
 import DdlExportDialog from './DdlExportDialog';
+import FkTypeDialog from './FkTypeDialog';
+import ErdRelationEdge from './ErdRelationEdge';
 import RemoteCursors from './RemoteCursors';
+import { ErdFkModeProvider } from './ErdFkModeContext';
 
 /** React Flow에 등록할 커스텀 노드 타입 매핑 */
 const nodeTypes: NodeTypes = {
   table: TableNode,
+};
+
+/** React Flow에 등록할 커스텀 엣지 타입 매핑 */
+const edgeTypes: EdgeTypes = {
+  erdRelation: ErdRelationEdge,
 };
 
 /** 엣지 컨텍스트 메뉴 상태 */
@@ -107,7 +115,15 @@ export default function ERDCanvas({
   const removeEdgeWithFkColumn = useCanvasStore((s) => s.removeEdgeWithFkColumn);
   const applyLayout = useCanvasStore((s) => s.applyLayout);
 
-  const { fkMode, toggleFkMode, cancelFkMode, handleNodeClickInFkMode } = useFkConnectMode();
+  const {
+    fkMode,
+    toggleFkMode,
+    cancelFkMode,
+    handleNodeClickInFkMode,
+    fkTypeDialogOpen,
+    setFkTypeDialogOpen,
+    handleFkTypeSelect,
+  } = useFkConnectMode();
   const { exportPng, exportJpg, exportSvg, exportPdf } = useExportDiagram(diagramName);
 
   /** 엣지 컨텍스트 메뉴 상태 */
@@ -197,58 +213,59 @@ export default function ERDCanvas({
   /** 엣지에 하이라이트 스타일 적용 */
   const styledEdges = edges.map((e) => ({
     ...e,
-    style:
-      e.id === highlightedEdgeId ? { stroke: 'hsl(var(--primary))', strokeWidth: 2.5 } : undefined,
+    selected: e.id === highlightedEdgeId,
     animated: e.id === highlightedEdgeId,
   }));
 
   return (
     <div className="w-full h-full" ref={canvasRef}>
-      <ReactFlow
-        nodes={nodes}
-        edges={styledEdges}
-        onNodesChange={canEdit ? onNodesChange : undefined}
-        onEdgesChange={canEdit ? onEdgesChange : undefined}
-        onConnect={canEdit ? onConnect : undefined}
-        onNodeClick={handleNodeClick}
-        onEdgeClick={handleEdgeClick}
-        onEdgeContextMenu={canEdit ? handleEdgeContextMenu : undefined}
-        onPaneClick={handlePaneClick}
-        nodeTypes={nodeTypes}
-        deleteKeyCode={null}
-        nodesDraggable={canEdit}
-        nodesConnectable={canEdit}
-        elementsSelectable={canEdit}
-        snapToGrid
-        snapGrid={[16, 16]}
-        defaultEdgeOptions={{
-          type: 'step',
-          markerEnd: { type: MarkerType.ArrowClosed },
-        }}
-        fitView
-        className={cn(fkMode && 'cursor-crosshair')}
-      >
-        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-        <Controls />
-        <MiniMap
-          nodeStrokeColor="hsl(var(--muted-foreground))"
-          nodeColor="hsl(var(--card))"
-          nodeBorderRadius={4}
-        />
-        <CanvasToolbar
-          fkMode={fkMode}
-          onToggleFkMode={toggleFkMode}
-          onAutoLayout={handleAutoLayout}
-          onExportPng={exportPng}
-          onExportJpg={exportJpg}
-          onExportSvg={exportSvg}
-          onExportPdf={exportPdf}
-          onExportDdl={() => setDdlDialogOpen(true)}
-          validationOpen={validationOpen}
-          onToggleValidation={onToggleValidation}
-          canEdit={canEdit}
-        />
-      </ReactFlow>
+      <ErdFkModeProvider value={fkMode}>
+        <ReactFlow
+          nodes={nodes}
+          edges={styledEdges}
+          onNodesChange={canEdit ? onNodesChange : undefined}
+          onEdgesChange={canEdit ? onEdgesChange : undefined}
+          onConnect={canEdit ? onConnect : undefined}
+          onNodeClick={handleNodeClick}
+          onEdgeClick={handleEdgeClick}
+          onEdgeContextMenu={canEdit ? handleEdgeContextMenu : undefined}
+          onPaneClick={handlePaneClick}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          deleteKeyCode={null}
+          nodesDraggable={canEdit}
+          nodesConnectable={canEdit}
+          elementsSelectable={canEdit}
+          snapToGrid
+          snapGrid={[16, 16]}
+          defaultEdgeOptions={{
+            type: 'erdRelation',
+          }}
+          fitView
+          className={cn(fkMode && 'cursor-crosshair')}
+        >
+          <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+          <Controls />
+          <MiniMap
+            nodeStrokeColor="hsl(var(--muted-foreground))"
+            nodeColor="hsl(var(--card))"
+            nodeBorderRadius={4}
+          />
+          <CanvasToolbar
+            fkMode={fkMode}
+            onToggleFkMode={toggleFkMode}
+            onAutoLayout={handleAutoLayout}
+            onExportPng={exportPng}
+            onExportJpg={exportJpg}
+            onExportSvg={exportSvg}
+            onExportPdf={exportPdf}
+            onExportDdl={() => setDdlDialogOpen(true)}
+            validationOpen={validationOpen}
+            onToggleValidation={onToggleValidation}
+            canEdit={canEdit}
+          />
+        </ReactFlow>
+      </ErdFkModeProvider>
 
       <RemoteCursors />
 
@@ -286,6 +303,16 @@ export default function ERDCanvas({
         open={ddlDialogOpen}
         onOpenChange={setDdlDialogOpen}
         diagramName={diagramName}
+      />
+
+      <FkTypeDialog
+        open={fkTypeDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setFkTypeDialogOpen(false);
+          }
+        }}
+        onSelect={handleFkTypeSelect}
       />
     </div>
   );

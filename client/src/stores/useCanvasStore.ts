@@ -9,7 +9,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@xyflow/react';
-import type { Column, TableNodeData } from '@/types/erd';
+import type { Column, RelationType, TableNodeData } from '@/types/erd';
 import { djb2 } from '@/lib/hash';
 import {
   yTablesMapToNodes,
@@ -104,6 +104,7 @@ interface CanvasState {
    * @param pkColumns     부모 테이블의 PK 컬럼 배열
    * @param parentLabel   부모 테이블 이름 (FK 컬럼명 접두사)
    * @param existingNames 자식 테이블의 기존 컬럼명 배열 (중복 방지용)
+   * @param relationType  관계 유형 (식별/비식별)
    * @returns 생성된 FK 관계 수
    */
   addFkRelation: (
@@ -112,6 +113,7 @@ interface CanvasState {
     pkColumns: Column[],
     parentLabel: string,
     existingNames: string[],
+    relationType: RelationType,
   ) => number;
   /** Y.Doc 참조 (null이면 초기화 전) */
   ydoc: Y.Doc | null;
@@ -580,12 +582,20 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       return JSON.stringify({ nodes: [], edges: [] });
     },
 
-    addFkRelation: (parentNodeId, childNodeId, pkColumns, parentLabel, existingNames) => {
+    addFkRelation: (
+      parentNodeId,
+      childNodeId,
+      pkColumns,
+      parentLabel,
+      existingNames,
+      relationType,
+    ) => {
       const { ydoc } = get();
       if (!ydoc) return 0;
 
       const parentPrefix = sanitizeTableName(parentLabel);
       const names = [...existingNames];
+      const isIdentifying = relationType === 'identifying';
       let createdCount = 0;
 
       ydoc.transact(() => {
@@ -609,8 +619,9 @@ const useCanvasStore = create<CanvasState>((set, get) => {
               id: fkColId,
               name: fkName,
               type: pkCol.type,
+              pk: isIdentifying ? true : undefined,
               fk: true,
-              nullable: true,
+              nullable: isIdentifying ? false : true,
               logicalName: pkCol.logicalName,
               domainId: pkCol.domainId,
             }),
@@ -622,7 +633,7 @@ const useCanvasStore = create<CanvasState>((set, get) => {
           const edgeId = `e-${sourceHandle}-${targetHandle}`;
           edgesMap.set(
             edgeId,
-            createEdgeYMap(parentNodeId, childNodeId, sourceHandle, targetHandle),
+            createEdgeYMap(parentNodeId, childNodeId, sourceHandle, targetHandle, relationType),
           );
 
           createdCount++;
