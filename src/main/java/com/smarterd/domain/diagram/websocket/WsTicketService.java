@@ -41,6 +41,9 @@ public class WsTicketService {
     /** 사용자당 최대 미사용 ticket 수 */
     private static final int MAX_OUTSTANDING_TICKETS_PER_USER = 10;
 
+    /** Presence 프로토콜 버전 */
+    private static final int PRESENCE_PROTOCOL_VERSION = 1;
+
     /** WebSocket 설정 프로퍼티 */
     private final WebSocketProperties webSocketProperties;
 
@@ -67,7 +70,7 @@ public class WsTicketService {
      * @param diagramId 접속 대상 다이어그램 ID
      * @return 발급된 ticket 문자열
      */
-    public String issueVerifiedTicket(String loginId, Long diagramId) {
+    public TicketIssueResult issueVerifiedTicket(String loginId, Long diagramId) {
         // 사용자 조회
         final var user = userRepository
             .findByLoginId(loginId)
@@ -83,7 +86,7 @@ public class WsTicketService {
             throw new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code());
         }
 
-        return issueTicket(loginId, user.getName(), diagramId);
+        return issueTicket(String.valueOf(user.getId()), loginId, user.getName(), diagramId);
     }
 
     /**
@@ -93,12 +96,13 @@ public class WsTicketService {
      * 사용자당 미사용 ticket 수가 상한({@value MAX_OUTSTANDING_TICKETS_PER_USER})을
      * 초과하면 {@link BusinessException}을 발생시킨다.</p>
      *
+     * @param userId    사용자 ID (불변 식별자)
      * @param loginId   사용자 로그인 ID
      * @param userName  사용자 표시 이름
      * @param diagramId 접속 대상 다이어그램 ID
-     * @return 발급된 ticket 문자열
+     * @return 발급된 ticket + 메타데이터
      */
-    private String issueTicket(String loginId, String userName, Long diagramId) {
+    private TicketIssueResult issueTicket(String userId, String loginId, String userName, Long diagramId) {
         // 동일 (loginId, diagramId) 조합의 기존 ticket 제거
         wsTicketStore.removeByLoginIdAndDiagramId(loginId, diagramId);
 
@@ -110,9 +114,9 @@ public class WsTicketService {
 
         final var ticket = UUID.randomUUID().toString();
         final var expiresAt = Instant.now().plus(TICKET_TTL);
-        wsTicketStore.store(ticket, new TicketData(loginId, userName, diagramId, expiresAt), TICKET_TTL);
+        wsTicketStore.store(ticket, new TicketData(userId, loginId, userName, diagramId, expiresAt), TICKET_TTL);
         log.debug("WebSocket ticket 발급: loginId={}, diagramId={}", loginId, diagramId);
-        return ticket;
+        return new TicketIssueResult(ticket, userId, PRESENCE_PROTOCOL_VERSION);
     }
 
     /**
@@ -131,7 +135,22 @@ public class WsTicketService {
                 final var sessionExpiresAt = Instant.now().plus(
                     Duration.ofMillis(webSocketProperties.getSessionMaxDuration())
                 );
-                return new WebSocketSessionInfo(data.loginId(), data.userName(), data.diagramId(), sessionExpiresAt);
+                return new WebSocketSessionInfo(
+                    data.userId(),
+                    data.loginId(),
+                    data.userName(),
+                    data.diagramId(),
+                    sessionExpiresAt
+                );
             });
     }
+
+    /**
+     * ticket 발급 결과.
+     *
+     * @param ticket                  발급된 일회용 ticket
+     * @param userId                  사용자 ID (불변 식별자)
+     * @param presenceProtocolVersion presence 프로토콜 버전
+     */
+    public record TicketIssueResult(String ticket, String userId, int presenceProtocolVersion) {}
 }

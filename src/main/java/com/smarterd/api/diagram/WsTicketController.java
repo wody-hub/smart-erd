@@ -36,7 +36,7 @@ public class WsTicketController {
     @PostMapping
     public WsTicketResponse issueTicket(@AuthenticationPrincipal Jwt jwt, @RequestBody @Valid WsTicketRequest request) {
         final var loginId = jwt.getSubject();
-        final var ticket = wsTicketService.issueVerifiedTicket(loginId, request.diagramId());
-        return new WsTicketResponse(ticket);
+        final var result = wsTicketService.issueVerifiedTicket(loginId, request.diagramId());
+        return new WsTicketResponse(result.ticket(), result.userId(), result.presenceProtocolVersion());
     }
 }

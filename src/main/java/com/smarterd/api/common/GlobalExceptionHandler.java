@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -65,6 +66,21 @@ public class GlobalExceptionHandler {
             .map((e) -> e.getField() + ": " + messageSource.getMessage(e, locale))
             .orElse("Validation failed");
         return ResponseEntity.badRequest().body(Map.of("error", message));
+    }
+
+    /**
+     * 인증 실패 예외를 401 Unauthorized로 반환한다.
+     *
+     * <p>로그인 시 잘못된 자격 증명(BadCredentialsException 포함)으로 발생한
+     * {@link AuthenticationException}을 처리한다.</p>
+     *
+     * @param locale 요청 로케일
+     * @return 401 응답 (다국어 인증 실패 메시지)
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Map<String, String>> handleAuthenticationException(Locale locale) {
+        final var message = messageSource.getMessage(MessageCode.ERROR_AUTH_BAD_CREDENTIALS.code(), null, locale);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", message));
     }
 
     /**

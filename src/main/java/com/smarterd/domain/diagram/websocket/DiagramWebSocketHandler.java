@@ -22,18 +22,6 @@ import org.springframework.web.socket.handler.BinaryWebSocketHandler;
  * <p>Yjs CRDT 바이너리 프로토콜을 기반으로 동작한다.
  * 서버는 Yjs 메시지를 해석하지 않고, 같은 방의 다른 클라이언트에 relay만 수행한다.
  * 클라이언트 간 직접 sync protocol로 상태를 동기화한다.</p>
- *
- * <p>메시지 프로토콜 (첫 바이트 = 타입 코드):
- * <ul>
- *   <li>{@code 0x01} — Yjs sync step 1 (state vector 요청)</li>
- *   <li>{@code 0x02} — Yjs sync step 2 (diff 응답)</li>
- *   <li>{@code 0x03} — Yjs update (실시간 변경)</li>
- *   <li>{@code 0x04} — Awareness update (커서/선택 상태)</li>
- *   <li>{@code 0x05} — Snapshot request (서버에 저장된 스냅샷 요청)</li>
- *   <li>{@code 0x06} — Snapshot response (서버 → 클라이언트 스냅샷 전송)</li>
- *   <li>{@code 0x07} — Peer left (서버 → 클라이언트, 사용자 퇴장 알림)</li>
- *   <li>{@code 0x08} — Compacted snapshot (클라이언트 → 서버, 스냅샷 교체 요청)</li>
- * </ul></p>
  */
 @Component
 @RequiredArgsConstructor
@@ -60,11 +48,23 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
     /** Snapshot response (서버 → 클라이언트) */
     private static final byte MSG_SNAPSHOT_RESPONSE = 0x06;
 
-    /** Peer left (서버 → 클라이언트, 사용자 퇴장 알림) */
-    static final byte MSG_PEER_LEFT = 0x07;
+    /** Legacy peer left (서버 → 클라이언트, loginId 기반) */
+    private static final byte MSG_PEER_LEFT_LEGACY = 0x07;
 
     /** Compacted snapshot (클라이언트 → 서버, 스냅샷 교체 요청) */
     private static final byte MSG_COMPACTED_SNAPSHOT = 0x08;
+
+    /** Presence snapshot (서버 → 클라이언트) */
+    private static final byte MSG_PRESENCE_SNAPSHOT = 0x09;
+
+    /** Presence peer joined (서버 → 클라이언트) */
+    private static final byte MSG_PEER_JOINED = 0x0A;
+
+    /** Presence peer left (서버 → 클라이언트, userId 기반) */
+    private static final byte MSG_PEER_LEFT = 0x0B;
+
+    /** Presence snapshot 재요청 (클라이언트 → 서버) */
+    private static final byte MSG_PRESENCE_SNAPSHOT_REQUEST = 0x0C;
 
     /** 세션 cleanup 완료 플래그 (attributes 키) — 중복 afterConnectionClosed 방지 */
     private static final String CLEANED_UP_ATTR = "ws.cleanedUp";
@@ -78,7 +78,7 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
     /** 스냅샷 저장 서비스 */
     private final DiagramSnapshotService snapshotService;
 
-    /** JSON 파서 (Awareness 검증, PEER_LEFT 메시지 생성용) */
+    /** JSON 파서 */
     private final ObjectMapper objectMapper;
 
     /**
@@ -92,13 +92,26 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
         session.setBinaryMessageSizeLimit(webSocketProperties.getBinaryMessageSizeLimit());
 
         final var info = getSessionInfo(session);
-        final var joined = roomManager.join(info.diagramId(), session, info.loginId());
-        if (!joined) {
+        final var joinResult = roomManager.join(info.diagramId(), session, info.userId(), info.userName());
+        if (!joinResult.accepted()) {
             try {
                 session.close(CloseStatus.POLICY_VIOLATION);
             } catch (Exception e) {
                 log.warn("방 입장 거부 후 세션 종료 실패", e);
             }
+            return;
+        }
+
+        sendPresenceSnapshotToSession(session, info.diagramId(), joinResult.snapshot());
+
+        if (joinResult.joinedParticipant() != null && joinResult.snapshot() != null) {
+            broadcastPeerJoined(
+                info.diagramId(),
+                session,
+                joinResult.snapshot().roomEpoch(),
+                joinResult.joinedPresenceVersion(),
+                joinResult.joinedParticipant()
+            );
         }
     }
 
@@ -158,6 +171,7 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
             }
             case MSG_SNAPSHOT_REQUEST -> sendSnapshotToSession(session, info.diagramId());
             case MSG_COMPACTED_SNAPSHOT -> handleCompaction(info.diagramId(), payload);
+            case MSG_PRESENCE_SNAPSHOT_REQUEST -> handlePresenceSnapshotRequest(session, info.diagramId());
             default -> {
                 if (log.isDebugEnabled()) {
                     log.debug("알 수 없는 메시지 타입: 0x{}", String.format("%02x", messageType));
@@ -169,7 +183,6 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
     /**
      * WebSocket 연결 종료 후 호출된다.
      * 세션을 방에서 퇴장시키고, 마지막 사용자인 경우 누적 update를 DB에 저장한다.
-     * 다른 사용자에게 퇴장 알림(PEER_LEFT)을 브로드캐스트한다.
      *
      * @param session WebSocket 세션
      * @param status  종료 상태
@@ -184,11 +197,15 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
         final var info = getSessionInfo(session);
         roomManager.cleanupRateLimit(session);
 
-        // PEER_LEFT 메시지 브로드캐스트 (퇴장 전에 전송)
-        broadcastPeerLeft(info.diagramId(), session, info.loginId());
-
         // leave: 방이 비면 원자적으로 누적 update를 drain + 인메모리 리소스 정리
-        final var result = roomManager.leave(info.diagramId(), session, info.loginId());
+        final var result = roomManager.leave(info.diagramId(), session, info.userId());
+
+        // 사용자 완전 퇴장(1 -> 0)일 때만 presence peer-left 브로드캐스트
+        if (result.leftUserId() != null && result.roomEpoch() != null) {
+            broadcastPeerLeft(info.diagramId(), session, result.roomEpoch(), result.leftPresenceVersion(), result.leftUserId());
+            // 구버전 클라이언트의 원격 커서 정리를 위해 loginId 기반 peer-left도 함께 전송
+            broadcastPeerLeftLegacy(info.diagramId(), session, info.loginId());
+        }
 
         if (result.roomEmpty()) {
             // 마지막 사용자 퇴장 → drain된 update를 DB에 저장
@@ -228,6 +245,20 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
     }
 
     /**
+     * presence snapshot 재요청을 처리한다.
+     *
+     * @param session   요청 세션
+     * @param diagramId 다이어그램 ID
+     */
+    private void handlePresenceSnapshotRequest(WebSocketSession session, Long diagramId) {
+        if (!roomManager.allowPresenceSnapshotRequest(session)) {
+            log.warn("Presence snapshot request rate limit 초과 (세션 {})", session.getId());
+            return;
+        }
+        sendPresenceSnapshotToSession(session, diagramId, null);
+    }
+
+    /**
      * 예외가 ClosedChannelException인지 확인한다.
      * IOException으로 래핑되어 있는 경우도 포함한다.
      *
@@ -255,19 +286,20 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
         BinaryMessage message,
         byte[] payload
     ) {
-        if (isAwarenessValid(payload, info.loginId())) {
+        if (isAwarenessValid(payload, info.loginId(), info.userId())) {
             roomManager.broadcast(info.diagramId(), session, message);
         }
     }
 
     /**
-     * Awareness 메시지의 loginId가 세션의 loginId와 일치하는지 검증한다.
+     * Awareness 메시지의 loginId/userId가 세션 정보와 일치하는지 검증한다.
      *
-     * @param payload 전체 메시지 payload (타입 바이트 포함)
+     * @param payload         전체 메시지 payload (타입 바이트 포함)
      * @param expectedLoginId 세션에서 인증된 loginId
+     * @param expectedUserId  세션에서 인증된 userId
      * @return 검증 통과 여부
      */
-    private boolean isAwarenessValid(byte[] payload, String expectedLoginId) {
+    private boolean isAwarenessValid(byte[] payload, String expectedLoginId, String expectedUserId) {
         try {
             final var jsonBytes = Arrays.copyOfRange(payload, 1, payload.length);
             final var tree = objectMapper.readTree(jsonBytes);
@@ -276,8 +308,18 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
                 // Awareness null 전송 (정상 종료 시): 검증 통과
                 return true;
             }
-            final var loginIdNode = stateNode.path("user").path("loginId");
-            return loginIdNode.isTextual() && loginIdNode.textValue().equals(expectedLoginId);
+            final var userNode = stateNode.path("user");
+            final var loginIdNode = userNode.path("loginId");
+            if (!loginIdNode.isTextual() || !loginIdNode.textValue().equals(expectedLoginId)) {
+                return false;
+            }
+
+            // userId가 함께 전송된 경우에는 userId까지 검증한다.
+            final var userIdNode = userNode.path("userId");
+            if (userIdNode.isTextual() && !userIdNode.textValue().equals(expectedUserId)) {
+                return false;
+            }
+            return true;
         } catch (Exception e) {
             log.debug("Awareness 검증 실패", e);
             return false;
@@ -285,36 +327,115 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
     }
 
     /**
-     * PEER_LEFT 메시지를 같은 방의 다른 세션에 브로드캐스트한다.
-     *
-     * @param diagramId 다이어그램 ID
-     * @param sender    퇴장하는 세션
-     * @param loginId   퇴장하는 사용자의 loginId
+     * Presence snapshot을 특정 세션에 전송한다.
      */
-    private void broadcastPeerLeft(Long diagramId, WebSocketSession sender, String loginId) {
+    private void sendPresenceSnapshotToSession(
+        WebSocketSession session,
+        Long diagramId,
+        DiagramRoomManager.PresenceSnapshot snapshotOverride
+    ) {
         try {
-            final var jsonBytes = objectMapper.writeValueAsBytes(Map.of("loginId", loginId));
-            final var payload = new byte[jsonBytes.length + 1];
-            payload[0] = MSG_PEER_LEFT;
-            System.arraycopy(jsonBytes, 0, payload, 1, jsonBytes.length);
+            final var snapshot = snapshotOverride != null ? snapshotOverride : roomManager.getPresenceSnapshot(diagramId);
+            if (snapshot == null) {
+                return;
+            }
+
+            final var payloadMap = Map.of(
+                "diagramId",
+                String.valueOf(diagramId),
+                "roomEpoch",
+                snapshot.roomEpoch(),
+                "presenceVersion",
+                snapshot.presenceVersion(),
+                "participants",
+                snapshot.participants(),
+                "totalIncludingSelf",
+                snapshot.participants().size()
+            );
+            final var payload = wrapJsonMessage(MSG_PRESENCE_SNAPSHOT, objectMapper.writeValueAsBytes(payloadMap));
+            final var lock = roomManager.getSessionLock(session);
+            synchronized (lock) {
+                session.sendMessage(new BinaryMessage(payload));
+            }
+        } catch (Exception e) {
+            log.warn("Presence snapshot 전송 실패 (diagramId={}, session={})", diagramId, session.getId(), e);
+        }
+    }
+
+    /**
+     * Presence peer joined 메시지를 브로드캐스트한다.
+     */
+    private void broadcastPeerJoined(
+        Long diagramId,
+        WebSocketSession sender,
+        String roomEpoch,
+        long presenceVersion,
+        DiagramRoomManager.PresenceParticipant participant
+    ) {
+        try {
+            final var payloadMap = Map.of(
+                "diagramId",
+                String.valueOf(diagramId),
+                "roomEpoch",
+                roomEpoch,
+                "presenceVersion",
+                presenceVersion,
+                "participant",
+                participant
+            );
+            final var payload = wrapJsonMessage(MSG_PEER_JOINED, objectMapper.writeValueAsBytes(payloadMap));
             roomManager.broadcast(diagramId, sender, new BinaryMessage(payload));
         } catch (Exception e) {
-            log.warn("PEER_LEFT 메시지 생성 실패 (loginId={})", loginId, e);
+            log.warn("PEER_JOINED 메시지 생성 실패 (diagramId={})", diagramId, e);
         }
+    }
+
+    /**
+     * Presence peer left 메시지를 브로드캐스트한다.
+     */
+    private void broadcastPeerLeft(Long diagramId, WebSocketSession sender, String roomEpoch, long presenceVersion, String userId) {
+        try {
+            final var payloadMap = Map.of(
+                "diagramId",
+                String.valueOf(diagramId),
+                "roomEpoch",
+                roomEpoch,
+                "presenceVersion",
+                presenceVersion,
+                "userId",
+                userId
+            );
+            final var payload = wrapJsonMessage(MSG_PEER_LEFT, objectMapper.writeValueAsBytes(payloadMap));
+            roomManager.broadcast(diagramId, sender, new BinaryMessage(payload));
+        } catch (Exception e) {
+            log.warn("PEER_LEFT 메시지 생성 실패 (diagramId={}, userId={})", diagramId, userId, e);
+        }
+    }
+
+    /**
+     * 구버전 클라이언트 호환을 위한 loginId 기반 peer-left 브로드캐스트.
+     */
+    private void broadcastPeerLeftLegacy(Long diagramId, WebSocketSession sender, String loginId) {
+        try {
+            final var payloadMap = Map.of("loginId", loginId);
+            final var payload = wrapJsonMessage(MSG_PEER_LEFT_LEGACY, objectMapper.writeValueAsBytes(payloadMap));
+            roomManager.broadcast(diagramId, sender, new BinaryMessage(payload));
+        } catch (Exception e) {
+            log.warn("Legacy PEER_LEFT 메시지 생성 실패 (loginId={})", loginId, e);
+        }
+    }
+
+    private byte[] wrapJsonMessage(byte messageType, byte[] jsonBytes) {
+        final var payload = new byte[jsonBytes.length + 1];
+        payload[0] = messageType;
+        System.arraycopy(jsonBytes, 0, payload, 1, jsonBytes.length);
+        return payload;
     }
 
     /**
      * 클라이언트로부터 컴팩션된 스냅샷을 수신하여 교체한다.
      *
-     * <p>이중 락으로 동시성을 보호한다:
-     * <ul>
-     *   <li>{@code flushLock} — {@code @Scheduled flushDirtySnapshots()}와의 동시 drain 방지</li>
-     *   <li>{@code sessions} 락 ({@link DiagramRoomManager#drainIfAlone} 내부) — {@code join()}과의 TOCTOU 레이스 방지</li>
-     * </ul>
-     * {@code flushLock}이 외부 락이므로 drain부터 {@code restoreUpdates()}까지의 전체 흐름이 보호된다.</p>
-     *
-     * @param diagramId 다이어그램 ID
-     * @param payload   전체 메시지 payload (타입 바이트 포함)
+     * <p>이중 락으로 동시성을 보호한다:</p>
      */
     private void handleCompaction(Long diagramId, byte[] payload) {
         final var compactedUpdate = Arrays.copyOfRange(payload, 1, payload.length);
@@ -325,7 +446,6 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
         // flushLock: @Scheduled flush의 drainAndMergeUpdates()와 동시 drain 방지
         synchronized (roomManager.getFlushLock(diagramId)) {
             // 원자적으로 단독 접속 확인 + 누적 update drain (sessions 락 내부에서 수행)
-            // drainIfAlone()이 null을 반환하면 단독 접속이 아니거나 방이 없음
             final var mergedUpdates = roomManager.drainIfAlone(diagramId);
             if (mergedUpdates == null) {
                 log.warn("컴팩션 거부: 단독 접속 아님 (diagramId={})", diagramId);
