@@ -155,7 +155,9 @@ export default function DiagramPage() {
       pendingSidebarWidthRef.current = null;
       if (nextWidth === null) {
         if (!isUnmountingRef.current) {
-          setSidebarWidth((prev) => (prev === sidebarWidthRef.current ? prev : sidebarWidthRef.current));
+          setSidebarWidth((prev) =>
+            prev === sidebarWidthRef.current ? prev : sidebarWidthRef.current,
+          );
         }
         return;
       }
@@ -309,7 +311,11 @@ export default function DiagramPage() {
               </div>
             )}
             <div className="flex flex-1 overflow-hidden">
-              <div ref={sidebarContainerRef} className="h-full shrink-0" style={{ width: sidebarWidth }}>
+              <div
+                ref={sidebarContainerRef}
+                className="h-full shrink-0"
+                style={{ width: sidebarWidth }}
+              >
                 <Sidebar canEdit={canEdit} />
               </div>
               <div

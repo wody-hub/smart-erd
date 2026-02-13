@@ -250,7 +250,12 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
         loading={deleteMutation.isPending}
       />
 
-      <BulkUploadDialog open={uploadOpen} onOpenChange={setUploadOpen} mode="domain" setId={setId} />
+      <BulkUploadDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        mode="domain"
+        setId={setId}
+      />
     </div>
   );
 }

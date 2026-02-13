@@ -329,7 +329,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
           {/* PK toggle */}
           <button
-            className={`nodrag w-5 text-center font-bold text-[10px] ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.pk ? 'text-erd-pk' : 'text-muted-foreground/40 hover:text-erd-pk/80'}`}
+            className={`nodrag w-5 text-center font-bold text-2xs ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.pk ? 'text-erd-pk' : 'text-muted-foreground/40 hover:text-erd-pk/80'}`}
             onClick={
               canEdit
                 ? () =>
@@ -348,7 +348,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
           {/* FK toggle */}
           <button
-            className={`nodrag w-5 text-center font-bold text-[10px] ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.fk ? 'text-erd-fk' : 'text-muted-foreground/40 hover:text-erd-fk/80'}`}
+            className={`nodrag w-5 text-center font-bold text-2xs ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.fk ? 'text-erd-fk' : 'text-muted-foreground/40 hover:text-erd-fk/80'}`}
             onClick={canEdit ? () => updateColumn(id, col.id, { fk: !col.fk }) : undefined}
             title={t('erd.tableNode.title.toggleFk')}
             aria-label={t('erd.tableNode.aria.toggleFk', { name: col.name })}
@@ -359,7 +359,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
           {/* AI (Auto Increment) toggle — PK 컬럼에서만 표시 */}
           {col.pk && (
             <button
-              className={`nodrag w-5 text-center font-bold text-[10px] ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.autoIncrement ? 'text-erd-ai' : 'text-muted-foreground/40 hover:text-erd-ai/80'}`}
+              className={`nodrag w-5 text-center font-bold text-2xs ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.autoIncrement ? 'text-erd-ai' : 'text-muted-foreground/40 hover:text-erd-ai/80'}`}
               onClick={
                 canEdit
                   ? () =>
@@ -414,7 +414,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
           {/* Nullable toggle */}
           <button
-            className={`nodrag text-[10px] ${canEdit ? 'cursor-pointer' : 'cursor-default'} w-4 text-center ${col.nullable ? 'text-erd-nullable' : 'text-muted-foreground/40 hover:text-erd-nullable/80'}`}
+            className={`nodrag text-2xs ${canEdit ? 'cursor-pointer' : 'cursor-default'} w-4 text-center ${col.nullable ? 'text-erd-nullable' : 'text-muted-foreground/40 hover:text-erd-nullable/80'}`}
             onClick={
               canEdit ? () => updateColumn(id, col.id, { nullable: !col.nullable }) : undefined
             }
@@ -464,7 +464,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
             >
               {domain ? (
                 <button
-                  className="nodrag text-[10px] px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground hover:bg-erd-domain/80 cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className="nodrag text-2xs px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground hover:bg-erd-domain/80 cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   title={`${domain.logicalName} (${domain.physicalType})`}
                   aria-label={t('erd.tableNode.aria.domainBadge', {
                     colName: col.name,
@@ -475,7 +475,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                 </button>
               ) : (
                 <button
-                  className="nodrag text-[10px] w-4 h-4 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground/40 opacity-0 group-hover/col:opacity-100 hover:!opacity-100 hover:border-muted-foreground hover:text-muted-foreground cursor-pointer shrink-0 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className="nodrag text-2xs w-4 h-4 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground/40 opacity-0 group-hover/col:opacity-100 hover:!opacity-100 hover:border-muted-foreground hover:text-muted-foreground cursor-pointer shrink-0 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   title={t('erd.tableNode.selectDomain')}
                   aria-label={t('erd.tableNode.aria.selectDomain', {
                     colName: col.name,
@@ -488,7 +488,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
           ) : (
             domain && (
               <span
-                className="text-[10px] px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground shrink-0"
+                className="text-2xs px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground shrink-0"
                 title={`${domain.logicalName} (${domain.physicalType})`}
               >
                 {domain.logicalName}
@@ -568,7 +568,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                   highlightOnHover={false}
                 />
               ) : logicalTableName ? (
-                <div className="text-[11px] opacity-80 truncate" title={logicalTableName}>
+                <div className="text-2xs opacity-80 truncate" title={logicalTableName}>
                   {logicalTableName}
                 </div>
               ) : null}

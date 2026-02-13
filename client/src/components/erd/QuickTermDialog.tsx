@@ -82,7 +82,12 @@ export default function QuickTermDialog({
   /** 빠른 도메인 등록 다이얼로그 열림 상태 */
   const [quickDomainOpen, setQuickDomainOpen] = useState(false);
 
-  const { suggestion, isLoading: suggestLoading } = useDictionarySuggest(teamId, setId, logicalName, open);
+  const { suggestion, isLoading: suggestLoading } = useDictionarySuggest(
+    teamId,
+    setId,
+    logicalName,
+    open,
+  );
 
   useEffect(() => {
     if (open) {

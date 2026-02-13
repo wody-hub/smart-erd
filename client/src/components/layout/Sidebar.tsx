@@ -79,7 +79,10 @@ function Sidebar({ canEdit = true }: SidebarProps) {
   };
 
   return (
-    <aside id="diagram-sidebar" className="h-full w-full bg-muted border-r border-border p-4 shrink-0 flex flex-col">
+    <aside
+      id="diagram-sidebar"
+      className="h-full w-full bg-muted border-r border-border p-4 shrink-0 flex flex-col"
+    >
       <div className="flex-1 overflow-auto">
         {/* 테이블 섹션 */}
         <div className="flex items-center justify-between mb-3">

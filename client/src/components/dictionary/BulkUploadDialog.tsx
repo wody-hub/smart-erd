@@ -62,7 +62,12 @@ const TERM_COLUMNS = ['logicalName', 'physicalName', 'domainLogicalName', 'descr
  * 파일 선택(Step 1) → 미리보기/검증(Step 2) → 완료(Step 3) 흐름으로 동작한다.
  * mode prop에 따라 도메인/용어 업로드를 구분한다.
  */
-export default function BulkUploadDialog({ open, onOpenChange, mode, setId }: BulkUploadDialogProps) {
+export default function BulkUploadDialog({
+  open,
+  onOpenChange,
+  mode,
+  setId,
+}: BulkUploadDialogProps) {
   const { teamId } = useParams<{ teamId: string }>();
   const queryClient = useQueryClient();
   const { t } = useTranslation();

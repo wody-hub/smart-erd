@@ -426,7 +426,7 @@ export default function ColumnAutocomplete({
                             {compoundResult.physicalType && ` (${compoundResult.physicalType})`}
                           </span>
                         </div>
-                        <div className="text-[10px] text-muted-foreground">
+                        <div className="text-2xs text-muted-foreground">
                           {compoundResult.baseTerms
                             .map((bt) => `${bt.logicalName}→${bt.physicalName}`)
                             .join(' + ')}

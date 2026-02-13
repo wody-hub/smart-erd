@@ -272,7 +272,9 @@ function ERDCanvas({
           fitView
           className={cn(fkMode && 'cursor-crosshair')}
         >
-          {showPerformanceOverlays && <Background variant={BackgroundVariant.Dots} gap={16} size={1} />}
+          {showPerformanceOverlays && (
+            <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+          )}
           {showPerformanceOverlays && <Controls />}
           {showMiniMap && (
             <MiniMap

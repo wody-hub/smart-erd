@@ -178,7 +178,9 @@ export default function DictionaryPage() {
                     <Button
                       variant="outline"
                       onClick={handleSetDefault}
-                      disabled={!selectedSet || selectedSet.isDefault || setDefaultMutation.isPending}
+                      disabled={
+                        !selectedSet || selectedSet.isDefault || setDefaultMutation.isPending
+                      }
                     >
                       <Star className="h-4 w-4 mr-1" />
                       {t('dictionary.set.setDefaultButton')}
@@ -227,4 +229,3 @@ export default function DictionaryPage() {
     </div>
   );
 }
-

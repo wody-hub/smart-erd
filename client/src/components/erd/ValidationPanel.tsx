@@ -66,7 +66,7 @@ function ColumnRow({ result }: { result: ColumnValidationResult }) {
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium truncate">{result.logicalName || result.name}</div>
         {result.status !== 'matched' && result.status !== 'unchecked' && (
-          <div className="text-[10px] text-muted-foreground">
+          <div className="text-2xs text-muted-foreground">
             {t(`erd.validation.status.${statusKey}`)}
             {result.expectedName && (
               <span className="block">

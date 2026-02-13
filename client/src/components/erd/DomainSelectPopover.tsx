@@ -85,9 +85,7 @@ export function DomainCommandList({
                     {s.domain.logicalName}{' '}
                     <span className="text-muted-foreground">{s.domain.physicalType}</span>
                   </span>
-                  <span className="text-[10px] text-muted-foreground truncate">
-                    {s.fromTermName}
-                  </span>
+                  <span className="text-2xs text-muted-foreground truncate">{s.fromTermName}</span>
                 </div>
               </CommandItem>
             ))}

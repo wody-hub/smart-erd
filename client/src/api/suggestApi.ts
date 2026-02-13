@@ -17,7 +17,7 @@ export async function fetchSuggestion(
   const res = await axiosInstance.post<SuggestResponse>(
     `/teams/${teamId}/dictionary-sets/${setId}/dictionary/suggest`,
     {
-    keyword,
+      keyword,
     },
   );
   return res.data;

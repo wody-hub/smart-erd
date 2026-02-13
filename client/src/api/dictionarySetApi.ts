@@ -28,7 +28,10 @@ export async function updateDictionarySet(
   setId: number,
   data: { name: string; description?: string },
 ): Promise<DictionarySet> {
-  const res = await axiosInstance.put<DictionarySet>(`/teams/${teamId}/dictionary-sets/${setId}`, data);
+  const res = await axiosInstance.put<DictionarySet>(
+    `/teams/${teamId}/dictionary-sets/${setId}`,
+    data,
+  );
   return res.data;
 }
 
@@ -42,8 +45,12 @@ export async function deleteDictionarySet(teamId: string, setId: number): Promis
 /**
  * 기본 사전 세트를 지정한다.
  */
-export async function setDefaultDictionarySet(teamId: string, setId: number): Promise<DictionarySet> {
-  const res = await axiosInstance.patch<DictionarySet>(`/teams/${teamId}/dictionary-sets/${setId}/default`);
+export async function setDefaultDictionarySet(
+  teamId: string,
+  setId: number,
+): Promise<DictionarySet> {
+  const res = await axiosInstance.patch<DictionarySet>(
+    `/teams/${teamId}/dictionary-sets/${setId}/default`,
+  );
   return res.data;
 }
-

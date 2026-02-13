@@ -29,7 +29,10 @@ export async function fetchTerms(teamId: string, setId: string): Promise<Term[]>
  * @returns 생성된 용어
  */
 export async function createTerm(teamId: string, setId: string, data: TermFormData): Promise<Term> {
-  const res = await axiosInstance.post<Term>(`/teams/${teamId}/dictionary-sets/${setId}/terms`, data);
+  const res = await axiosInstance.post<Term>(
+    `/teams/${teamId}/dictionary-sets/${setId}/terms`,
+    data,
+  );
   return res.data;
 }
 
@@ -48,7 +51,10 @@ export async function updateTerm(
   termId: number,
   data: TermFormData,
 ): Promise<Term> {
-  const res = await axiosInstance.put<Term>(`/teams/${teamId}/dictionary-sets/${setId}/terms/${termId}`, data);
+  const res = await axiosInstance.put<Term>(
+    `/teams/${teamId}/dictionary-sets/${setId}/terms/${termId}`,
+    data,
+  );
   return res.data;
 }
 
@@ -99,9 +105,12 @@ export async function bulkSaveTerms(
   setId: string,
   rows: BulkTermRow[],
 ): Promise<BulkSaveResponse> {
-  const res = await axiosInstance.post<BulkSaveResponse>(`/teams/${teamId}/dictionary-sets/${setId}/terms/upload`, {
-    rows,
-  });
+  const res = await axiosInstance.post<BulkSaveResponse>(
+    `/teams/${teamId}/dictionary-sets/${setId}/terms/upload`,
+    {
+      rows,
+    },
+  );
   return res.data;
 }
 
@@ -115,8 +124,11 @@ export async function bulkSaveTerms(
  * @param setId  대상 사전 세트 ID
  */
 export async function downloadTermTemplate(teamId: string, setId: string): Promise<void> {
-  const res = await axiosInstance.get(`/teams/${teamId}/dictionary-sets/${setId}/terms/upload/template`, {
-    responseType: 'blob',
-  });
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/dictionary-sets/${setId}/terms/upload/template`,
+    {
+      responseType: 'blob',
+    },
+  );
   downloadBlob(res, 'term-template.xlsx');
 }

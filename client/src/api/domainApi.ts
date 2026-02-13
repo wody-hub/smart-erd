@@ -15,7 +15,9 @@ import type {
  * @returns 도메인 목록
  */
 export async function fetchDomains(teamId: string, setId: string): Promise<Domain[]> {
-  const res = await axiosInstance.get<Domain[]>(`/teams/${teamId}/dictionary-sets/${setId}/domains`);
+  const res = await axiosInstance.get<Domain[]>(
+    `/teams/${teamId}/dictionary-sets/${setId}/domains`,
+  );
   return res.data;
 }
 
@@ -27,8 +29,15 @@ export async function fetchDomains(teamId: string, setId: string): Promise<Domai
  * @param data   도메인 생성 데이터
  * @returns 생성된 도메인
  */
-export async function createDomain(teamId: string, setId: string, data: DomainFormData): Promise<Domain> {
-  const res = await axiosInstance.post<Domain>(`/teams/${teamId}/dictionary-sets/${setId}/domains`, data);
+export async function createDomain(
+  teamId: string,
+  setId: string,
+  data: DomainFormData,
+): Promise<Domain> {
+  const res = await axiosInstance.post<Domain>(
+    `/teams/${teamId}/dictionary-sets/${setId}/domains`,
+    data,
+  );
   return res.data;
 }
 
@@ -104,7 +113,7 @@ export async function bulkSaveDomains(
   const res = await axiosInstance.post<BulkSaveResponse>(
     `/teams/${teamId}/dictionary-sets/${setId}/domains/upload`,
     {
-    rows,
+      rows,
     },
   );
   return res.data;
@@ -120,8 +129,11 @@ export async function bulkSaveDomains(
  * @param setId  대상 사전 세트 ID
  */
 export async function downloadDomainTemplate(teamId: string, setId: string): Promise<void> {
-  const res = await axiosInstance.get(`/teams/${teamId}/dictionary-sets/${setId}/domains/upload/template`, {
-    responseType: 'blob',
-  });
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/dictionary-sets/${setId}/domains/upload/template`,
+    {
+      responseType: 'blob',
+    },
+  );
   downloadBlob(res, 'domain-template.xlsx');
 }

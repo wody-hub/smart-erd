@@ -287,7 +287,9 @@ export default function DiagramsPage() {
                     {canEdit && dictionarySets.length > 0 && (
                       <div className="mb-2" onClick={(e) => e.stopPropagation()}>
                         <Select
-                          value={diagram.dictionarySetId != null ? String(diagram.dictionarySetId) : ''}
+                          value={
+                            diagram.dictionarySetId != null ? String(diagram.dictionarySetId) : ''
+                          }
                           onValueChange={(value) =>
                             updateDiagramSetMutation.mutate({
                               diagramId: diagram.id,

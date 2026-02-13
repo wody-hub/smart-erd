@@ -5,7 +5,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import useCollaborationStore from '@/stores/useCollaborationStore';
 import useAuthStore from '@/stores/useAuthStore';
 import type { PresenceParticipant } from '@/types/collaboration';
-import CollaboratorsPopover, { getInitial, getPresenceColor } from './CollaboratorsPopover';
+import CollaboratorsPopover from './CollaboratorsPopover';
+import { getInitial, getPresenceColor } from './collaboratorsUtils';
 
 const MAX_PREVIEW_AVATARS = 3;
 
@@ -26,14 +27,15 @@ export default function CollaboratorsBar() {
   const selfName = useAuthStore((s) => s.name);
 
   const presenceParticipants = useMemo(() => {
-    return Array.from(participantsByUserId.values())
-      .sort((a: PresenceParticipant, b: PresenceParticipant) => {
+    return Array.from(participantsByUserId.values()).sort(
+      (a: PresenceParticipant, b: PresenceParticipant) => {
         if (a.joinSeq !== b.joinSeq) {
           return a.joinSeq - b.joinSeq;
         }
         return a.displayName.localeCompare(b.displayName);
-      });
-  }, [participantsByUserId, selfUserId]);
+      },
+    );
+  }, [participantsByUserId]);
 
   const fallbackParticipants = useMemo(() => {
     const byKey = new Map<string, PresenceParticipant>();

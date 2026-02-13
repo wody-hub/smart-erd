@@ -89,17 +89,19 @@ export default function DdlImportDialog({ open, onOpenChange }: DdlImportDialogP
 
     setParsing(true);
     debounceTimerRef.current = setTimeout(async () => {
+      const isCurrentRequest = () => seq === parseSeqRef.current;
       try {
         const result = await parseDdl(text, targetDbms);
-        if (seq !== parseSeqRef.current) return;
+        if (!isCurrentRequest()) return;
         setParseResult(result);
       } catch (err) {
-        if (seq !== parseSeqRef.current) return;
+        if (!isCurrentRequest()) return;
         const msg = err instanceof Error ? err.message : 'Failed to parse DDL';
         setParseResult({ tables: [], relations: [], errors: [msg] });
       } finally {
-        if (seq !== parseSeqRef.current) return;
-        setParsing(false);
+        if (isCurrentRequest()) {
+          setParsing(false);
+        }
       }
     }, 500);
   };
