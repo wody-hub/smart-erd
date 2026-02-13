@@ -4,8 +4,7 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import java.util.Base64;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,9 +23,8 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
  * Spring Security OAuth2 Resource Server의 {@link JwtDecoder}로 토큰 검증이 자동 수행된다.</p>
  */
 @Configuration
+@Slf4j
 public class JwtConfig {
-
-    private static final Logger log = LoggerFactory.getLogger(JwtConfig.class);
 
     /**
      * JWT 프로퍼티를 {@code application.yml}의 {@code smart-erd.jwt} 접두사로 바인딩한다.

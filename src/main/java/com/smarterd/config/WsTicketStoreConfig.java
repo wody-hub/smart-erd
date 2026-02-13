@@ -1,9 +1,9 @@
 package com.smarterd.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smarterd.domain.diagram.websocket.InMemoryWsTicketStore;
-import com.smarterd.domain.diagram.websocket.RedisWsTicketStore;
-import com.smarterd.domain.diagram.websocket.WsTicketStore;
+import com.smarterd.domain.diagram.websocket.ticket.InMemoryWsTicketStore;
+import com.smarterd.domain.diagram.websocket.ticket.RedisWsTicketStore;
+import com.smarterd.domain.diagram.websocket.ticket.WsTicketStore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
 import org.springframework.context.annotation.Bean;

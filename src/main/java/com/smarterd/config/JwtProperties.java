@@ -3,8 +3,7 @@ package com.smarterd.config;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
 
 /**
@@ -14,9 +13,8 @@ import org.springframework.core.env.Environment;
  */
 @Getter
 @Setter
+@Slf4j
 public class JwtProperties {
-
-    private static final Logger log = LoggerFactory.getLogger(JwtProperties.class);
 
     /** 개발 환경 전용 기본 시크릿 (프로덕션에서는 반드시 환경 변수로 대체해야 한다) */
     static final String DEV_DEFAULT_SECRET =

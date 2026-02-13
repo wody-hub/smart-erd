@@ -8,8 +8,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.smarterd.domain.diagram.repository.DiagramRepository;
-import com.smarterd.domain.diagram.websocket.DiagramRoomManager;
-import com.smarterd.domain.diagram.websocket.YjsUpdateFormat;
+import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
+import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -113,5 +113,49 @@ class DiagramSnapshotServiceTest {
         // then
         assertThat(result).isTrue();
         verify(diagramRepository).updateYdocSnapshotById(eq(diagramId), any(byte[].class));
+    }
+
+    @Test
+    @DisplayName("isCompactionInCoolDown - 성공 직후에는 쿨다운 상태여야 한다")
+    void isCompactionInCoolDown_justAfterSuccess_returnsTrue() {
+        // given
+        final var diagramId = 1L;
+        final var compactedUpdate = new byte[50];
+        when(diagramRepository.findYdocSnapshotById(diagramId)).thenReturn(Optional.of(new byte[0]));
+        when(diagramRepository.updateYdocSnapshotById(eq(diagramId), any(byte[].class))).thenReturn(1L);
+
+        // when
+        diagramSnapshotService.replaceSnapshot(diagramId, compactedUpdate);
+
+        // then
+        assertThat(diagramSnapshotService.isCompactionInCoolDown(diagramId)).isTrue();
+    }
+
+    @Test
+    @DisplayName("setCompactionRejectCoolDown - 호출 시 쿨다운 상태여야 한다")
+    void setCompactionRejectCoolDown_afterCall_returnsTrue() {
+        // given
+        final var diagramId = 2L;
+
+        // when
+        diagramSnapshotService.setCompactionRejectCoolDown(diagramId);
+
+        // then
+        assertThat(diagramSnapshotService.isCompactionInCoolDown(diagramId)).isTrue();
+    }
+
+    @Test
+    @DisplayName("clearCompactionCoolDown - 호출 시 쿨다운이 해제되어야 한다")
+    void clearCompactionCoolDown_afterCall_returnsFalse() {
+        // given
+        final var diagramId = 3L;
+        diagramSnapshotService.setCompactionRejectCoolDown(diagramId);
+        assertThat(diagramSnapshotService.isCompactionInCoolDown(diagramId)).isTrue();
+
+        // when
+        diagramSnapshotService.clearCompactionCoolDown(diagramId);
+
+        // then
+        assertThat(diagramSnapshotService.isCompactionInCoolDown(diagramId)).isFalse();
     }
 }

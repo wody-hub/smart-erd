@@ -1,7 +1,7 @@
 package com.smarterd.config;
 
-import com.smarterd.domain.diagram.websocket.DiagramWebSocketHandler;
-import com.smarterd.domain.diagram.websocket.WsTicketHandshakeInterceptor;
+import com.smarterd.domain.diagram.websocket.transport.DiagramWebSocketHandler;
+import com.smarterd.domain.diagram.websocket.transport.WsTicketHandshakeInterceptor;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

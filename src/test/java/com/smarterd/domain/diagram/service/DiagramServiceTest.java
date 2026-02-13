@@ -12,7 +12,7 @@ import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
-import com.smarterd.domain.diagram.websocket.DiagramRoomManager;
+import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.entity.Term;

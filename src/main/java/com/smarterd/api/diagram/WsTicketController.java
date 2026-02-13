@@ -2,7 +2,7 @@ package com.smarterd.api.diagram;
 
 import com.smarterd.api.diagram.dto.WsTicketRequest;
 import com.smarterd.api.diagram.dto.WsTicketResponse;
-import com.smarterd.domain.diagram.websocket.WsTicketService;
+import com.smarterd.domain.diagram.websocket.ticket.WsTicketService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

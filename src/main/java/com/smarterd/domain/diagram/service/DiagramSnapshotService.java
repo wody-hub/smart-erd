@@ -1,16 +1,19 @@
 package com.smarterd.domain.diagram.service;
 
 import com.smarterd.domain.diagram.repository.DiagramRepository;
-import com.smarterd.domain.diagram.websocket.DiagramRoomManager;
-import com.smarterd.domain.diagram.websocket.YjsUpdateFormat;
+import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
+import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.lang.NonNull;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,9 +34,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class DiagramSnapshotService implements SmartLifecycle {
-
-    private static final Logger log = LoggerFactory.getLogger(DiagramSnapshotService.class);
 
     /** 서버 종료 시 flush 타임아웃 (초) */
     private static final long SHUTDOWN_FLUSH_TIMEOUT_SECONDS = 10;
@@ -43,6 +45,15 @@ public class DiagramSnapshotService implements SmartLifecycle {
 
     /** 컴팩션 크기 허용 비율 (10% 여유) */
     private static final double COMPACTION_SIZE_TOLERANCE = 1.1;
+
+    /** 다이어그램별 다음 컴팩션 허용 시각 (diagramId -> blockedUntil) */
+    private final Map<Long, Instant> compactionBlockedUntil = new ConcurrentHashMap<>();
+
+    /** 컴팩션 성공 시 최소 대기 시간 (1분) */
+    private static final Duration COMPACTION_COOL_DOWN = Duration.ofMinutes(1);
+
+    /** 컴팩션 거부 시 대기 시간 (30초) */
+    private static final Duration COMPACTION_REJECT_COOL_DOWN = Duration.ofSeconds(30);
 
     /** 다이어그램 레포지토리 */
     private final DiagramRepository diagramRepository;
@@ -126,7 +137,52 @@ public class DiagramSnapshotService implements SmartLifecycle {
             compactedSnapshot.length,
             existingSize > 0 ? (100 - (compactedSnapshot.length * 100) / existingSize) : 0
         );
+
+        // 성공 시 쿨다운 업데이트
+        compactionBlockedUntil.put(diagramId, Instant.now().plus(COMPACTION_COOL_DOWN));
         return true;
+    }
+
+    /**
+     * 해당 다이어그램이 컴팩션 쿨다운 상태인지 확인한다.
+     *
+     * @param diagramId 다이어그램 ID
+     * @return 쿨다운 중이면 true
+     */
+    public boolean isCompactionInCoolDown(Long diagramId) {
+        final var blockedUntil = compactionBlockedUntil.get(diagramId);
+        if (blockedUntil == null) {
+            return false;
+        }
+
+        final var now = Instant.now();
+        if (now.isBefore(blockedUntil)) {
+            return true;
+        }
+
+        // 만료된 엔트리는 조회 시점에 정리한다.
+        compactionBlockedUntil.remove(diagramId, blockedUntil);
+        return false;
+    }
+
+    /**
+     * 해당 다이어그램의 컴팩션 쿨다운 상태를 초기화한다.
+     * 방 폐기 시 호출한다.
+     *
+     * @param diagramId 다이어그램 ID
+     */
+    public void clearCompactionCoolDown(Long diagramId) {
+        compactionBlockedUntil.remove(diagramId);
+    }
+
+    /**
+     * 컴팩션 거부 시 쿨다운을 설정한다.
+     * 동일 사용자 멀티 탭 등 단독 접속이 아닌 경우 반복 요청을 방지하기 위해 사용한다.
+     *
+     * @param diagramId 다이어그램 ID
+     */
+    public void setCompactionRejectCoolDown(Long diagramId) {
+        compactionBlockedUntil.put(diagramId, Instant.now().plus(COMPACTION_REJECT_COOL_DOWN));
     }
 
     /**
@@ -199,7 +255,10 @@ public class DiagramSnapshotService implements SmartLifecycle {
             } catch (Exception e) {
                 log.error("주기적 스냅샷 저장 실패 (diagramId={})", id, e);
                 // drain 후 DB 저장 실패: drain된 데이터를 개별 update로 디코딩 후 재삽입
-                roomManager.restoreUpdates(id, mergedUpdates);
+                final var restored = roomManager.restoreUpdates(id, mergedUpdates);
+                if (!restored) {
+                    log.error("주기적 스냅샷 저장 실패 후 update 복원 실패 (diagramId={})", id);
+                }
                 return false;
             }
         }
@@ -273,6 +332,7 @@ public class DiagramSnapshotService implements SmartLifecycle {
         }
 
         log.info("서버 종료: Y.Doc 스냅샷 일괄 flush 완료 ({}개 저장)", savedCount);
+        compactionBlockedUntil.clear();
         running = false;
     }
 

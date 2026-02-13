@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.smarterd.TestcontainersConfiguration;
+import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
+import com.smarterd.domain.diagram.websocket.ticket.TicketData;
+import com.smarterd.domain.diagram.websocket.ticket.WsTicketStore;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;

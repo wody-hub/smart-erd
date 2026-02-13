@@ -13,7 +13,8 @@ import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
-import com.smarterd.domain.diagram.websocket.DiagramRoomManager;
+import com.smarterd.domain.diagram.service.DiagramSnapshotService;
+import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.dictionary.repository.DictionarySetRepository;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
@@ -64,6 +65,9 @@ public class TeamService {
 
     /** 다이어그램 방 관리자 (팀 삭제 시 WebSocket 세션 정리용) */
     private final DiagramRoomManager roomManager;
+
+    /** 다이어그램 스냅샷 서비스 (팀 삭제 시 컴팩션 쿨다운 정리용) */
+    private final DiagramSnapshotService diagramSnapshotService;
 
     /** 도메인 레포지토리 (팀 삭제 cascade용) */
     private final DomainRepository domainRepository;
@@ -272,7 +276,9 @@ public class TeamService {
         if (!projects.isEmpty()) {
             for (final var project : projects) {
                 for (final var diagram : diagramRepository.findByProject(project)) {
-                    roomManager.discardRoom(Objects.requireNonNull(diagram.getId()));
+                    final var diagramId = Objects.requireNonNull(diagram.getId());
+                    roomManager.discardRoom(diagramId);
+                    diagramSnapshotService.clearCompactionCoolDown(diagramId);
                 }
             }
             diagramRepository.deleteByProjectIn(projects);
