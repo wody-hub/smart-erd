@@ -1,4 +1,4 @@
-# ERD TableNode 렌더링 성능 최적화 계획
+# ERD TableNode 렌더링 성능 최적화 계획 (v4 - Final Implementation Spec)
 
 ## 1. 개요
 현재 ERD 캔버스는 초기 로딩과 줌/팬 동작 시 성능 저하가 발생하고 있습니다. 주 원인은 모든 테이블 노드가 비선택 상태에서도 `DndContext`, `Popover`, `Autocomplete` 등 무거운 인터랙티브 컴포넌트를 렌더링하고 있기 때문입니다.
@@ -14,145 +14,131 @@
 | `DomainSelectPopover` | `canEdit`이면 항상 렌더링 | 위와 동일. 수백 개의 팝업 트리거 생성 |
 | `input` (물리명, 타입) | `canEdit`이면 항상 렌더링 | 단순 텍스트 표시에 비해 `input` 요소는 렌더링 비용이 높음 |
 
-## 3. 수정 전략: 조건부 렌더링 (`selected` prop 활용)
+## 3. 핵심 아키텍처 결정: `activeEditNodeId` 도입
 
-React Flow에서 제공하는 `selected` prop을 활용하여 렌더링 모드를 분기합니다.
+### 3.1. 문제점: `selected` prop의 한계
+1.  **Yjs 상태 유실**: 협업 중 다른 사용자의 변경으로 Yjs 업데이트가 수신되면, `useCanvasStore`가 노드 배열을 재생성하면서 로컬의 `selected` 상태가 초기화되어 편집 모드가 강제 종료될 위험이 큼.
+2.  **다중 선택 이슈**: React Flow의 드래그 선택으로 20개 노드를 선택하면 20개가 동시에 무거운 편집 모드로 전환되어 성능 악화.
 
-- **Static View (`!selected`)**: 가벼운 HTML 요소(`div`, `span`) 위주로 렌더링. 정보 확인에 필요한 필수 요소만 표시.
-- **Interactive View (`selected`)**: 현재의 편집 가능한 UI 렌더링.
+### 3.2. 해결책: 별도 편집 상태 관리
+React Flow의 시각적 선택(`selected`)과 논리적 편집 모드(`activeEditNodeId`)를 분리합니다.
 
-### 3.1. 필수 표시 항목 (Static View에서도 유지)
-사용자 요청에 따라 다음 항목은 항상 표시되어야 합니다.
-- 테이블 헤더 (논리명, 물리명)
-- 컬럼 리스트 (논리명, 물리명, 타입)
-- 상태 아이콘/뱃지 (PK, FK, AI, NotNull)
-- 매칭 오류 아이콘 (`AlertTriangle`)
-- 관계선 (`Handle`)
-
-### 3.2. 최적화 대상 (Interactive View로 지연)
-
-1.  **컬럼 드래그 앤 드롭 (DnD)**
-    - **변경 전**: `canEdit`이면 항상 `DndContext` > `SortableContext` 렌더링
-    - **변경 후**: `canEdit && selected`일 때만 `DndContext` 렌더링. 아닐 경우 단순 `div` 리스트 렌더링.
-
-2.  **논리명 입력 (`ColumnAutocomplete`)**
-    - **변경 전**: `ColumnAutocomplete` 컴포넌트 렌더링
-    - **변경 후**:
-        - `!selected`: 단순 `<span>{col.logicalName}</span>` 렌더링. (긴 텍스트 `truncate` 처리)
-        - `selected`: 기존 `ColumnAutocomplete` 렌더링.
-
-3.  **도메인 선택 (`DomainSelectPopover`)**
-    - **변경 전**: `DomainSelectPopover` 렌더링
-    - **변경 후**:
-        - `!selected`: 도메인 이름이 담긴 단순 `<span>` 뱃지 렌더링.
-        - `selected`: 기존 `DomainSelectPopover` 렌더링.
-
-4.  **물리명 / 타입 입력 (`input`)**
-    - **변경 전**: `<input>` 요소 렌더링
-    - **변경 후**:
-        - `!selected`: `<span>{col.name}</span>`, `<span>{col.type}</span>` 렌더링.
-        - `selected`: 기존 `<input>` 렌더링.
-
-5.  **테이블 헤더 편집**
-    - **변경 전**: 논리명 `ColumnAutocomplete` + 물리명 `useInlineEdit` 항상 활성
-    - **변경 후**:
-        - `!selected`: 단순 텍스트 표시.
-        - `selected`: 편집 컴포넌트 활성화.
+- **Store**: `activeEditNodeId: string | null` 상태 추가.
+- **Policy**: 오직 **하나의 노드만** 편집 모드 진입 가능.
+- **Persistence**: Yjs 업데이트와 무관하게 Zustand에서 독립적으로 관리되므로 편집 상태 유지됨.
+- **Lifecycle**: 노드 삭제 시, 다이어그램 전환(`destroyYDoc`) 시 `null`로 초기화하여 stale ID 방지.
 
 ## 4. 상세 구현 가이드
 
-### 4.1. `TableNode` 컴포넌트 구조 변경
-
-```tsx
-function TableNode({ id, selected, data }: NodeProps<TableNodeData>) {
-  // ... hook 호출 ...
-
-  // 편집 모드 조건: 권한이 있고(canEdit) AND 노드가 선택되었을 때(selected)
-  const isEditing = canEdit && selected; 
-
-  // ... 렌더링 로직 ...
-
-  return (
-    // ...
-        {/* Columns 섹션 분기 */}
-        {isEditing ? (
-          <DndContext ...>
-            <SortableContext ...>
-              {columns.map(col => (
-                <SortableColumnRow ...>
-                  {renderColumnRow(col, true)} {/* isEditing=true 전달 */}
-                </SortableColumnRow>
-              ))}
-            </SortableContext>
-          </DndContext>
-        ) : (
-          <div className="divide-y divide-border">
-            {columns.map(col => (
-              <div key={col.id}>
-                {renderColumnRow(col, false)} {/* isEditing=false 전달 */}
-              </div>
-            ))}
-          </div>
-        )}
-    // ...
-  );
+### 4.1. `useCanvasStore.ts`
+```typescript
+interface CanvasState {
+  // ...
+  activeEditNodeId: string | null;
+  setActiveEditNodeId: (id: string | null) => void;
 }
+
+// create() 내부
+return {
+  // ...
+  activeEditNodeId: null,
+  setActiveEditNodeId: (id) => set({ activeEditNodeId: id }),
+  
+  deleteTable: (nodeId) => {
+    // ... 기존 로직 ...
+    // 삭제된 노드가 편집 중이었다면 편집 모드 해제
+    if (get().activeEditNodeId === nodeId) {
+      set({ activeEditNodeId: null });
+    }
+  },
+  
+  destroyYDoc: () => {
+    // ... 기존 로직 ...
+    set({ ..., activeEditNodeId: null });
+  }
+};
 ```
 
-### 4.2. `renderColumnRow` 함수 수정
+### 4.2. `ERDCanvas.tsx` (이벤트 연동)
+기존 핸들러에 로직을 통합합니다.
 
+```typescript
+// 기존 handleNodeClick에 통합
+const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+  // ... 기존 하이라이트 로직 ...
+  
+  // [중요] FK 모드일 때는 편집 활성화 안 함 (관계 연결 우선)
+  if (fkConnectMode) {
+    onNodeClickForFk(event, node); // 기존 로직
+    return;
+  }
+  
+  // 편집 모드 진입
+  setActiveEditNodeId(node.id);
+}, [fkConnectMode, ...]);
+
+// 기존 handlePaneClick에 통합
+const handlePaneClick = useCallback(() => {
+  // ... 기존 하이라이트/FK 해제 로직 ...
+  
+  // 편집 모드 해제
+  setActiveEditNodeId(null);
+}, []);
+```
+
+### 4.3. `TableNode.tsx` (구독 최적화 및 렌더링)
 ```tsx
-const renderColumnRow = (col: Column, isEditing: boolean) => {
-  // ...
+function TableNode({ id, data }: NodeProps<TableNodeData>) {
+  // [최적화] 내 노드의 편집 상태가 바뀔 때만 리렌더링 (primitive boolean 비교이므로 useShallow 불필요)
+  const isEditingState = useCanvasStore(s => s.activeEditNodeId === id);
+  const { canEdit } = useErdPermission();
+  
+  // 편집 모드 조건: 권한 있음 AND 현재 노드가 활성 편집 대상임
+  const isEditing = canEdit && isEditingState;
+
   return (
-    <div className="...">
-      {/* ... Handle, PK, FK 등 버튼은 유지하되 onClick은 isEditing일 때만 동작하도록 가드하거나 
-          View 모드에서도 토글을 허용할지는 선택 사항 (일관성을 위해 isEditing에서만 허용 권장) */}
+    <div className={cn("...", isEditing && "ring-2 ...")}>
+      <TableHeader ... />
       
-      {/* 논리명 영역 */}
       {isEditing ? (
-        <ColumnAutocomplete ... />
+        <DndContext ...>
+          <SortableContext ...>
+            {columns.map(col => <EditableColumnRow key={col.id} col={col} ... />)}
+          </SortableContext>
+        </DndContext>
       ) : (
-        <span className="flex-1 text-xs truncate" title={col.logicalName}>
-          {col.logicalName || ''}
-        </span>
+        <div className="divide-y">
+          {columns.map(col => <StaticColumnRow key={col.id} col={col} ... />)}
+        </div>
       )}
-
-      {/* 도메인 영역 */}
-      {isEditing ? (
-        <DomainSelectPopover ...>...</DomainSelectPopover>
-      ) : (
-        domain && (
-          <span className="text-2xs px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground shrink-0">
-            {domain.logicalName}
-          </span>
-        )
-      )}
-
-      {/* 물리명/타입 영역 */}
-      {isEditing ? (
-        <>
-          <input value={col.name} ... />
-          <input value={col.type} ... />
-        </>
-      ) : (
-        <>
-          <span className="flex-1 font-mono text-muted-foreground px-1 truncate">{col.name}</span>
-          <span className="w-24 font-mono text-muted-foreground px-1 text-right truncate">{col.type}</span>
-        </>
-      )}
+      
+      {isEditing && <AddColumnButton ... />}
     </div>
   );
 }
 ```
 
-## 5. 기대 효과
+### 4.4. `StaticColumnRow` (신규 컴포넌트 - `memo` 적용)
+- `input` 대신 `span` 사용.
+- **Layout Shift 방지**: `h-8`, `px-2` 등 Tailwind 클래스를 `EditableColumnRow`와 동일하게 적용.
+- `Button` 대신 `Badge` 사용 (PK/FK/AI/N).
+- `Popover` 로직 제거.
+- `Handle`은 항상 렌더링 (위치 고정 필수).
 
-1.  **초기 로딩 속도 향상**: 수백 개의 Popover, Input, DnD 리스너가 제거되어 초기 렌더링 시간이 단축됩니다.
-2.  **줌/팬 프레임드랍 감소**: DOM 노드 수가 줄어들어 브라우저 리플로우/리페인트 비용이 감소합니다.
-3.  **메모리 사용량 감소**: 이벤트 리스너와 컴포넌트 인스턴스 수가 줄어듭니다.
-4.  **사용성 유지**: 정보를 확인하는 데 필요한 모든 시각적 요소(텍스트, 색상, 아이콘, 연결선)는 그대로 유지되므로 "보는" 경험은 동일합니다.
+## 5. QA 및 검증 계획
 
-## 6. 검토 사항
-- `Handle` (연결점)은 React Flow의 엣지 연결을 위해 View/Edit 모드 상관없이 항상 렌더링되어야 합니다. (계획에 포함됨)
-- `selected` 상태 변경 시 리렌더링이 발생하지만, 이는 단일 노드에 국한되므로 성능에 큰 영향을 주지 않습니다.
+### 5.1. 시나리오 검증
+- [ ] **편집 진입**: 노드 클릭 시 즉시 입력창/버튼이 나타나는가?
+- [ ] **FK 모드**: FK 연결 모드에서 노드 클릭 시 편집 모드로 진입하지 않고 관계가 연결되는가? (필수)
+- [ ] **편집 유지**: 내가 편집 중일 때 다른 브라우저에서 컬럼을 추가해도 내 편집 모드가 유지되는가? (핵심 검증)
+- [ ] **편집 종료**: 캔버스 빈 곳을 클릭하면 Static View로 돌아가는가?
+- [ ] **다중 선택**: Shift+클릭으로 여러 개를 선택해도, 마지막 클릭한 1개만 편집 모드가 되는가?
+- [ ] **뷰어 권한**: VIEWER 권한으로 접속 시 노드를 클릭해도 항상 Static View를 유지하는가?
+
+### 5.2. UX 품질
+- [ ] **Layout Shift**: 선택/해제 시 테이블 크기가 덜컥거리거나 컬럼 높이가 변하지 않는가?
+- [ ] **입력 보존**: 편집 중 빈 곳을 클릭하여 편집 모드를 종료할 때, 입력 중이던 내용이 저장(commit)되는가? (`onBlur` 동작 확인)
+
+### 5.3. 성능 측정
+- [ ] **초기 렌더링**: 노드 50개 이상 로딩 시 Scripting 시간 비교 (React DevTools Profiler).
+- [ ] **인터랙션**: 줌/팬 시 프레임 드랍(Jank) 발생 여부.
