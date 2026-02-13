@@ -9,6 +9,7 @@ import com.smarterd.domain.common.exception.LocalizedException;
 import com.smarterd.domain.common.message.MessageCode;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +27,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * <p>컨트롤러에서 발생하는 공통 예외를 잡아 적절한 HTTP 응답으로 변환한다.
  * {@link MessageSource}를 통해 요청 로케일에 맞는 다국어 에러 메시지를 반환한다.</p>
  */
-@SuppressWarnings("null")
 @RestControllerAdvice
 @RequiredArgsConstructor
 public class GlobalExceptionHandler {
@@ -45,8 +45,12 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(LocalizedException.class)
     public ResponseEntity<Map<String, String>> handleLocalizedException(LocalizedException ex, Locale locale) {
-        final var message = messageSource.getMessage(ex.getMessageCode(), ex.getMessageArgs(), locale);
-        return ResponseEntity.status(resolveStatus(ex)).body(Map.of("error", message));
+        final var message = messageSource.getMessage(
+            Objects.requireNonNull(ex.getMessageCode()),
+            ex.getMessageArgs(),
+            locale
+        );
+        return ResponseEntity.status(Objects.requireNonNull(resolveStatus(ex))).body(Map.of("error", message));
     }
 
     /**
@@ -80,7 +84,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<Map<String, String>> handleAuthenticationException(Locale locale) {
-        final var message = messageSource.getMessage(MessageCode.ERROR_AUTH_BAD_CREDENTIALS.code(), null, locale);
+        final var message = messageSource.getMessage(
+            Objects.requireNonNull(MessageCode.ERROR_AUTH_BAD_CREDENTIALS.code()),
+            null,
+            locale
+        );
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", message));
     }
 
@@ -97,7 +105,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleUnexpected(Exception ex, Locale locale) {
         log.error("Unexpected error", ex);
-        final var message = messageSource.getMessage(MessageCode.ERROR_UNEXPECTED.code(), null, locale);
+        final var message = messageSource.getMessage(
+            Objects.requireNonNull(MessageCode.ERROR_UNEXPECTED.code()),
+            null,
+            locale
+        );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", message));
     }
 

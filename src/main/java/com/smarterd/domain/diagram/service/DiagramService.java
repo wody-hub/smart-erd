@@ -1,5 +1,10 @@
 package com.smarterd.domain.diagram.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.smarterd.api.diagram.dto.CreateDiagramRequest;
 import com.smarterd.api.diagram.dto.DiagramDetailResponse;
 import com.smarterd.api.diagram.dto.DiagramResponse;
@@ -7,19 +12,27 @@ import com.smarterd.api.diagram.dto.RenameDiagramRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetResponse;
+import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.diagram.websocket.DiagramRoomManager;
+import com.smarterd.domain.dictionary.entity.DictionarySet;
+import com.smarterd.domain.dictionary.repository.DomainRepository;
+import com.smarterd.domain.dictionary.repository.TermRepository;
 import com.smarterd.domain.dictionary.service.DictionarySetService;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.service.ProjectService;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,9 +44,9 @@ import org.springframework.transaction.annotation.Transactional;
  * </p>
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class DiagramService {
 
     /** 다이어그램 레포지토리 */
@@ -54,6 +67,15 @@ public class DiagramService {
     /** 다이어그램 방 관리자 */
     private final DiagramRoomManager roomManager;
 
+    /** 용어 레포지토리 */
+    private final TermRepository termRepository;
+
+    /** 도메인 레포지토리 */
+    private final DomainRepository domainRepository;
+
+    /** JSON 파서 */
+    private final ObjectMapper objectMapper;
+
     /**
      * 다이어그램을 생성한다.
      *
@@ -68,8 +90,12 @@ public class DiagramService {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var dictionarySet = dictionarySetService.findByTeamAndId(project.getTeam(), request.dictionarySetId());
 
-        final var diagram = Diagram.builder().name(request.name()).project(project).dictionarySet(dictionarySet).build();
-        diagramRepository.save(diagram);
+        final var diagram = Diagram.builder()
+            .name(request.name())
+            .project(project)
+            .dictionarySet(dictionarySet)
+            .build();
+        diagramRepository.save(Objects.requireNonNull(diagram));
 
         return DiagramResponse.from(diagram, project.getId());
     }
@@ -179,8 +205,14 @@ public class DiagramService {
         }
 
         final var dictionarySet = dictionarySetService.findByTeamAndId(project.getTeam(), request.dictionarySetId());
+        final var invalidationCounts = invalidateDictionaryBindings(diagram, dictionarySet);
         diagram.changeDictionarySet(dictionarySet);
-        return new UpdateDiagramDictionarySetResponse(dictionarySet.getId(), 0, 0);
+        diagram.updateYdocSnapshot(null);
+        return new UpdateDiagramDictionarySetResponse(
+            dictionarySet.getId(),
+            invalidationCounts.invalidatedTermBindingCount(),
+            invalidationCounts.invalidatedDomainBindingCount()
+        );
     }
 
     /**
@@ -196,7 +228,7 @@ public class DiagramService {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
 
-        diagramRepository.delete(diagram);
+        diagramRepository.delete(Objects.requireNonNull(diagram));
     }
 
     /**
@@ -249,5 +281,123 @@ public class DiagramService {
         return diagramRepository
             .findByProjectAndId(project, diagramId)
             .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_DIAGRAM.code(), diagramId));
+    }
+
+    /**
+     * 다이어그램 content의 term/domain 바인딩을 대상 세트 기준으로 정리한다.
+     *
+     * <p>
+     * 세트에 존재하지 않는 termId/domainId는 제거한다.
+     * </p>
+     *
+     * @param diagram        대상 다이어그램
+     * @param targetSet      변경 대상 사전 세트
+     * @return 무효화 카운트
+     */
+    private InvalidationCounts invalidateDictionaryBindings(Diagram diagram, DictionarySet targetSet) {
+        final var content = diagram.getContent();
+        if (content == null || content.isBlank()) {
+            return InvalidationCounts.empty();
+        }
+
+        final Set<Long> validTermIds = termRepository
+            .findByDictionarySet(targetSet)
+            .stream()
+            .map((term) -> term.getId())
+            .collect(Collectors.toSet());
+        final Set<Long> validDomainIds = domainRepository
+            .findByDictionarySet(targetSet)
+            .stream()
+            .map((domain) -> domain.getId())
+            .collect(Collectors.toSet());
+
+        try {
+            final var rootNode = objectMapper.readTree(content);
+            if (!(rootNode instanceof ObjectNode rootObject)) {
+                return InvalidationCounts.empty();
+            }
+
+            var invalidatedTermBindingCount = 0;
+            var invalidatedDomainBindingCount = 0;
+
+            final var tableTermIdNode = rootObject.path("tableTermId");
+            final var tableTermId = toLongValue(tableTermIdNode);
+            if (tableTermId != null && !validTermIds.contains(tableTermId)) {
+                rootObject.remove("tableTermId");
+                invalidatedTermBindingCount++;
+            }
+
+            final var nodesNode = rootObject.get("nodes");
+            if (nodesNode instanceof ArrayNode nodesArray) {
+                for (final var node : nodesArray) {
+                    if (!(node instanceof ObjectNode nodeObject)) {
+                        continue;
+                    }
+                    final var dataNode = nodeObject.get("data");
+                    if (!(dataNode instanceof ObjectNode dataObject)) {
+                        continue;
+                    }
+
+                    final var tableTermIdInNode = toLongValue(dataObject.get("tableTermId"));
+                    if (tableTermIdInNode != null && !validTermIds.contains(tableTermIdInNode)) {
+                        dataObject.remove("tableTermId");
+                        invalidatedTermBindingCount++;
+                    }
+
+                    final var columnsNode = dataObject.get("columns");
+                    if (!(columnsNode instanceof ArrayNode columnsArray)) {
+                        continue;
+                    }
+                    for (final var columnNode : columnsArray) {
+                        if (!(columnNode instanceof ObjectNode columnObject)) {
+                            continue;
+                        }
+
+                        final var termId = toLongValue(columnObject.get("termId"));
+                        if (termId != null && !validTermIds.contains(termId)) {
+                            columnObject.remove("termId");
+                            invalidatedTermBindingCount++;
+                        }
+
+                        final var domainId = toLongValue(columnObject.get("domainId"));
+                        if (domainId != null && !validDomainIds.contains(domainId)) {
+                            columnObject.remove("domainId");
+                            invalidatedDomainBindingCount++;
+                        }
+                    }
+                }
+            }
+
+            if (invalidatedTermBindingCount > 0 || invalidatedDomainBindingCount > 0) {
+                diagram.updateContent(objectMapper.writeValueAsString(rootObject));
+            }
+            return new InvalidationCounts(invalidatedTermBindingCount, invalidatedDomainBindingCount);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to invalidate dictionary bindings for diagramId={}", diagram.getId(), e);
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_DIAGRAM_CONTENT_INVALID_JSON.code());
+        }
+    }
+
+    private Long toLongValue(JsonNode valueNode) {
+        if (valueNode == null || valueNode.isNull()) {
+            return null;
+        }
+        if (valueNode.canConvertToLong()) {
+            return valueNode.longValue();
+        }
+        if (valueNode.isTextual()) {
+            try {
+                return Long.parseLong(valueNode.textValue());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private record InvalidationCounts(int invalidatedTermBindingCount, int invalidatedDomainBindingCount) {
+        private static InvalidationCounts empty() {
+            return new InvalidationCounts(0, 0);
+        }
     }
 }

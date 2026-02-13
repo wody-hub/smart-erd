@@ -7,7 +7,6 @@ import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.entity.Term;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
-import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import java.util.ArrayList;

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +18,6 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
  * <p>수평 확장(scale-out) 환경에서 서버 간 ticket 공유를 지원한다.
  * ticket TTL은 Redis EXPIRE로 자동 관리되므로 별도 정리 스케줄러가 불필요하다.</p>
  */
-@SuppressWarnings("null")
 public class RedisWsTicketStore implements WsTicketStore {
 
     private static final Logger log = LoggerFactory.getLogger(RedisWsTicketStore.class);
@@ -104,11 +104,11 @@ public class RedisWsTicketStore implements WsTicketStore {
         final var diagramKey = DIAGRAM_KEY_PREFIX + data.loginId() + ":" + data.diagramId();
 
         try {
-            final var json = objectMapper.writeValueAsString(data);
-            redisTemplate.opsForValue().set(ticketKey, json, ttl);
+            final var json = Objects.requireNonNull(objectMapper.writeValueAsString(data));
+            redisTemplate.opsForValue().set(ticketKey, json, Objects.requireNonNull(ttl));
             redisTemplate.opsForSet().add(userSetKey, ticket);
-            redisTemplate.expire(userSetKey, USER_SET_TTL);
-            redisTemplate.opsForValue().set(diagramKey, ticket, ttl);
+            redisTemplate.expire(userSetKey, Objects.requireNonNull(USER_SET_TTL));
+            redisTemplate.opsForValue().set(diagramKey, Objects.requireNonNull(ticket), ttl);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("TicketData JSON 직렬화 실패", e);
         }
@@ -131,7 +131,11 @@ public class RedisWsTicketStore implements WsTicketStore {
             final var diagramKey = DIAGRAM_KEY_PREFIX + data.loginId() + ":" + data.diagramId();
 
             // Lua 스크립트로 원자적 DEL + SREM + DEL (보조 인덱스 포함)
-            redisTemplate.execute(CONSUME_SCRIPT, List.of(ticketKey, userSetKey, diagramKey), ticket);
+            redisTemplate.execute(
+                Objects.requireNonNull(CONSUME_SCRIPT),
+                Objects.requireNonNull(List.of(ticketKey, userSetKey, diagramKey)),
+                ticket
+            );
 
             if (data.expiresAt().isBefore(Instant.now())) {
                 log.debug("WebSocket ticket 만료: loginId={}", data.loginId());
@@ -160,7 +164,11 @@ public class RedisWsTicketStore implements WsTicketStore {
     @Override
     public long countByLoginId(String loginId) {
         final var userSetKey = USER_SET_KEY_PREFIX + loginId;
-        final var result = redisTemplate.execute(COUNT_SCRIPT, List.of(userSetKey), TICKET_KEY_PREFIX);
+        final var result = redisTemplate.execute(
+            Objects.requireNonNull(COUNT_SCRIPT),
+            Objects.requireNonNull(List.of(userSetKey)),
+            TICKET_KEY_PREFIX
+        );
         return result != null ? result : 0;
     }
 }

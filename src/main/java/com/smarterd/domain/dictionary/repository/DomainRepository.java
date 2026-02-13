@@ -77,6 +77,8 @@ public interface DomainRepository extends JpaRepository<Domain, Long> {
      */
     void deleteByTeam(Team team);
 
+    void deleteByDictionarySet(DictionarySet dictionarySet);
+
     @Modifying
     @Query("update Domain d set d.dictionarySet = :dictionarySet where d.team = :team and d.dictionarySet is null")
     int backfillNullDictionarySetByTeam(@Param("team") Team team, @Param("dictionarySet") DictionarySet dictionarySet);

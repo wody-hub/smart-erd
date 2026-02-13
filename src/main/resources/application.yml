@@ -1,3 +1,6 @@
+server:
+  port: 8190
+
 logging:
   level:
     p6spy: info
@@ -57,5 +60,5 @@ smart-erd:
     allow-credentials: true
   jwt:
     secret: ${SMART_ERD_JWT_SECRET:c21hcnQtZXJkLWp3dC1zZWNyZXQta2V5LXRoYXQtaXMtbG9uZy1lbm91Z2gtZm9yLWhtYWMtc2hhMjU2}
-    access-expiration: 1800000
-    refresh-expiration: 86400000
+    access-expiration: ${SMART_ERD_JWT_ACCESS_EXPIRATION:1800000}
+    refresh-expiration: ${SMART_ERD_JWT_REFRESH_EXPIRATION:86400000}

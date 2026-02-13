@@ -7,7 +7,9 @@
     "format": "prettier --write \"src/**/*.java\" \"client/src/**/*.{ts,tsx}\" \"src/**/*.yml\"",
     "format:check": "prettier --check \"src/**/*.java\" \"client/src/**/*.{ts,tsx}\" \"src/**/*.yml\"",
     "format:java": "prettier --write \"src/**/*.java\"",
-    "format:client": "cd client && prettier --write \"src/**/*.{ts,tsx}\""
+    "format:client": "cd client && prettier --write \"src/**/*.{ts,tsx}\"",
+    "perf:k6:ws:load": "k6 run scripts/perf/k6/websocket-load.js",
+    "perf:k6:ws:soak": "k6 run scripts/perf/k6/websocket-soak.js"
   },
   "devDependencies": {
     "prettier": "^3.8.1",

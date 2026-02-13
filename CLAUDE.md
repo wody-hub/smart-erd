@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Backend (Spring Boot)
 
 ```bash
-./gradlew bootRun                    # Start backend on :8080 (Docker PostgreSQL auto-start)
+./gradlew bootRun                    # Start backend on :8190 (Docker PostgreSQL auto-start)
 ./gradlew build                      # Full build (compile + test)
 ./gradlew test                       # Run all tests
 ./gradlew test --tests "com.smarterd.SomeTest.methodName"  # Single test
@@ -23,7 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 cd client
-npm run dev                          # Dev server on :3000, proxies /api → :8080
+npm run dev                          # Dev server on :3000, proxies /api → :8190
 npm run build                        # Production build (tsc + vite)
 npm run lint                         # ESLint
 ```
@@ -149,7 +149,7 @@ client/
 ├── package.json                     # "type": "module" (ESM)
 ├── tailwind.config.js               # CSS variable colors, darkMode: ["class"], tailwindcss-animate
 ├── postcss.config.js                # tailwindcss + autoprefixer
-├── vite.config.ts                   # @/ alias → ./src, proxy /api → :8080
+├── vite.config.ts                   # @/ alias → ./src, proxy /api → :8190
 ├── tsconfig.app.json                # paths: { "@/*": ["./src/*"] }
 ├── .prettierrc.json                 # Prettier config
 ├── .prettierignore                  # Prettier ignore
@@ -271,7 +271,7 @@ client/
 ### Axios Instance
 
 ```text
-baseURL: /api  →  Vite 프록시  →  localhost:8080
+baseURL: /api  →  Vite 프록시  →  localhost:8190
 요청 인터셉터: Accept-Language (i18n.language) + localStorage Access Token → Authorization: Bearer <token>
 응답 인터셉터: 401 → Refresh Token으로 갱신 시도 (큐 패턴) → 실패 시 로그인 리다이렉트
 ```
@@ -361,7 +361,7 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 | PUT    | `/api/teams/{teamId}/terms/{termId}`   | 용어 수정 | `{ logicalName, physicalName, domainId?, description? }` |
 | DELETE | `/api/teams/{teamId}/terms/{termId}`   | 용어 삭제 | —                                                      |
 
-Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+Swagger UI: `http://localhost:8190/swagger-ui/index.html`
 
 ### Authentication Flow
 
@@ -487,10 +487,9 @@ member.changeRole(request.role());  // Good — dirty checking
 ### Null Safety
 
 - Root package `@NonNullApi` → non-null by default
-- `@SuppressWarnings("null")` is applied **only where actual null analysis warnings occur**, at the narrowest possible scope
-  - Do NOT apply at class level — use method-level or parameter-level suppression instead
-  - Common sources: JPA repository calls, Spring framework interface implementations (`Validator.supports()`, etc.)
-  - Do NOT add this annotation conventionally to classes that have no warnings
+- `@SuppressWarnings("null")` is forbidden in `src/main/**`; test code in `src/test/**` may use it when needed
+- Method parameters must use Spring `@NonNull` (`org.springframework.lang.NonNull`)
+- If SonarQube still reports null-related warnings even with `@NonNull`, add explicit guard with `Objects.requireNonNull(...)` at method entry
 
 ### QueryDSL Custom Repository Pattern
 

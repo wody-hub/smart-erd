@@ -38,7 +38,7 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 ### 백엔드
 
 ```bash
-./gradlew bootRun          # http://localhost:8080 (Docker PostgreSQL 자동 시작)
+./gradlew bootRun          # http://localhost:8190 (Docker PostgreSQL 자동 시작)
 ```
 
 ### 프론트엔드
@@ -46,7 +46,7 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 ```bash
 cd client
 npm install
-npm run dev                # http://localhost:3000 (프록시 /api → :8080)
+npm run dev                # http://localhost:3000 (프록시 /api → :8190)
 ```
 
 ### 환경변수
@@ -130,7 +130,7 @@ client/
 ├── package.json                     # "type": "module" (ESM)
 ├── tailwind.config.js               # CSS 변수 기반 색상, darkMode: ["class"], tailwindcss-animate
 ├── postcss.config.js                # tailwindcss + autoprefixer
-├── vite.config.ts                   # @/ alias → ./src, 프록시 /api → :8080
+├── vite.config.ts                   # @/ alias → ./src, 프록시 /api → :8190
 ├── tsconfig.app.json                # paths: { "@/*": ["./src/*"] }
 ├── .prettierrc.json                 # Prettier 설정
 ├── .prettierignore                  # Prettier 무시 파일
@@ -257,6 +257,13 @@ client/
 - **와일드카드 import (`.*`) 사용 금지** — 모든 import는 명시적으로 선언한다
 - Prettier가 저장 시 자동 포맷, VS Code `organizeImports`가 import 정리를 수행한다
 
+#### Null 처리 규칙 (필수)
+
+- `@SuppressWarnings("null")` 사용 금지 (`src/main/**` 기준). 단, 테스트 코드(`src/test/**`)에서는 필요 시 사용 허용
+- 메서드 파라미터에는 Spring의 `@NonNull` (`org.springframework.lang.NonNull`) 사용
+- `@NonNull`이 있어도 SonarQube 경고가 발생하는 경우 `Objects.requireNonNull(...)`으로 명시 처리
+- 신규 코드뿐 아니라 수정 touched 코드에도 동일 규칙 적용
+
 ```java
 // Good
 // Bad
@@ -325,27 +332,17 @@ teamMemberRepository.save(newMember);
 #### Null Safety
 
 - 루트 패키지에 `@NonNullApi` 선언 → 하위 전체 non-null 기본 정책
-- `@SuppressWarnings("null")`는 **실제 null 분석 경고가 발생하는 곳에만** 최소 범위로 적용한다
-  - 클래스 레벨 적용 금지 — 메서드 레벨 또는 파라미터 레벨로 범위를 좁힌다
-  - JPA 리포지토리 호출, Spring 프레임워크 인터페이스 구현(`Validator.supports()` 등)에서 주로 발생
-  - 경고가 없는 클래스에 관례적으로 붙이지 않는다
+- `@SuppressWarnings("null")` 사용 금지 (`src/main/**` 기준). 단, 테스트 코드(`src/test/**`)에서는 필요 시 사용 허용
+- 메서드 파라미터는 Spring `@NonNull` (`org.springframework.lang.NonNull`)을 기본으로 사용
+- `@NonNull`이 있어도 SonarQube 경고가 남으면 메서드 시작부에서 `Objects.requireNonNull(...)`으로 명시 검증
 
 ```java
-// Good — 경고가 발생하는 메서드에만 적용
-@Service
-public class TeamService {
-
-    @SuppressWarnings("null")
-    public Team findById(Long id) {
-        return teamRepository.findByIdWithOwner(id)
-            .orElseThrow(() -> new EntityNotFoundException("error.not-found.team", id));
-    }
+// Good — @NonNull + Objects.requireNonNull
+public Team findById(@NonNull Long id) {
+    final var nonNullId = Objects.requireNonNull(id, "id must not be null");
+    return teamRepository.findByIdWithOwner(nonNullId)
+        .orElseThrow(() -> new EntityNotFoundException("error.not-found.team", nonNullId));
 }
-
-// Bad — 클래스 전체에 일괄 적용
-@Service
-@SuppressWarnings("null")
-public class TeamService { ... }
 ```
 
 #### QueryDSL Custom Repository 패턴
@@ -639,7 +636,7 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 
 ### Swagger UI
 
-`http://localhost:8080/swagger-ui/index.html`
+`http://localhost:8190/swagger-ui/index.html`
 
 모든 컨트롤러에 `@Operation`, `@ApiResponse`, `@Parameter`, `@Schema` 어노테이션 적용됨. JWT Bearer 인증이 필요한 엔드포인트는 Swagger UI에서 Authorize 버튼으로 토큰 설정 후 테스트 가능.
 
@@ -851,7 +848,7 @@ ERD 편집기 영역(Header, Sidebar, TableNode, ERDCanvas)에서 사용하는 �
 ### Axios 인스턴스
 
 ```text
-baseURL: /api  →  Vite 프록시  →  localhost:8080
+baseURL: /api  →  Vite 프록시  →  localhost:8190
 요청 인터셉터: Accept-Language (i18n.language) + localStorage Access Token → Authorization: Bearer <token>
 응답 인터셉터: 401 → Refresh Token으로 갱신 시도 (큐 패턴) → 실패 시 로그인 리다이렉트
 ```
@@ -925,14 +922,14 @@ annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
 
 ```bash
 # 백엔드
-./gradlew bootRun            # 개발 서버 기동 (:8080, Docker PostgreSQL 자동 시작)
+./gradlew bootRun            # 개발 서버 기동 (:8190, Docker PostgreSQL 자동 시작)
 ./gradlew build              # 전체 빌드 (컴파일 + 테스트)
 ./gradlew test               # 테스트 실행
 ./gradlew compileJava        # 컴파일만 (QueryDSL/Lombok AP 트리거)
 
 # 프론트엔드
 cd client
-npm run dev                  # 개발 서버 기동 (:3000, 프록시 /api → :8080)
+npm run dev                  # 개발 서버 기동 (:3000, 프록시 /api → :8190)
 npm run build                # 프로덕션 빌드 (tsc + vite)
 npm run lint                 # ESLint
 

@@ -23,3 +23,13 @@ export interface DiagramDetail extends DiagramSummary {
   /** Y.Doc 스냅샷 존재 여부 (true면 JSON 마이그레이션 불필요) */
   hasYdocSnapshot: boolean;
 }
+
+/** 다이어그램 사전 세트 변경 결과 */
+export interface UpdateDiagramDictionarySetResult {
+  /** 변경된 사전 세트 ID */
+  dictionarySetId: number;
+  /** 무효화된 term 바인딩 수 */
+  invalidatedTermBindingCount: number;
+  /** 무효화된 domain 바인딩 수 */
+  invalidatedDomainBindingCount: number;
+}

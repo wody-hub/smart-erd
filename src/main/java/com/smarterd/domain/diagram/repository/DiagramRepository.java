@@ -37,6 +37,10 @@ public interface DiagramRepository extends JpaRepository<Diagram, Long>, Diagram
 
     long countByDictionarySet(DictionarySet dictionarySet);
 
+    @Modifying
+    @Query("update Diagram d set d.dictionarySet = null where d.dictionarySet = :dictionarySet")
+    int clearDictionarySetReferences(@Param("dictionarySet") DictionarySet dictionarySet);
+
     /**
      * 프로젝트 목록에 속한 다이어그램을 일괄 삭제한다.
      *

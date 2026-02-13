@@ -27,6 +27,7 @@ import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.repository.UserRepository;
 import com.smarterd.domain.user.service.AuthService;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,7 +42,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class TeamService {
 
     /** 팀 레포지토리 */
@@ -86,10 +86,10 @@ public class TeamService {
         final var user = authService.findUserByLoginId(loginId);
 
         final var team = Team.builder().name(request.name()).owner(user).build();
-        teamRepository.save(team);
+        teamRepository.save(Objects.requireNonNull(team));
 
         final var member = TeamMember.builder().team(team).user(user).role(TeamMemberRole.ADMIN).build();
-        teamMemberRepository.save(member);
+        teamMemberRepository.save(Objects.requireNonNull(member));
 
         return TeamResponse.from(team);
     }
@@ -144,7 +144,7 @@ public class TeamService {
         }
 
         final var member = TeamMember.builder().team(team).user(targetUser).role(request.role()).build();
-        teamMemberRepository.save(member);
+        teamMemberRepository.save(Objects.requireNonNull(member));
 
         return TeamMemberResponse.from(member);
     }
@@ -171,7 +171,7 @@ public class TeamService {
         final var member = teamMemberRepository
             .findByTeamAndUser(team, targetUser)
             .orElseThrow(() -> new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
-        teamMemberRepository.delete(member);
+        teamMemberRepository.delete(Objects.requireNonNull(member));
     }
 
     /**
@@ -264,7 +264,7 @@ public class TeamService {
     @Transactional
     public void deleteTeam(String loginId, Long teamId) {
         final var user = authService.findUserByLoginId(loginId);
-        final var team = findTeamById(teamId);
+        final var team = Objects.requireNonNull(findTeamById(teamId));
         verifyAdmin(team, user);
 
         // WebSocket 세션 정리 + CASCADE 삭제: Diagram → Project → Term → Domain → Team(+Members)
@@ -272,7 +272,7 @@ public class TeamService {
         if (!projects.isEmpty()) {
             for (final var project : projects) {
                 for (final var diagram : diagramRepository.findByProject(project)) {
-                    roomManager.discardRoom(diagram.getId());
+                    roomManager.discardRoom(Objects.requireNonNull(diagram.getId()));
                 }
             }
             diagramRepository.deleteByProjectIn(projects);
@@ -294,6 +294,21 @@ public class TeamService {
     public Team findTeamById(Long teamId) {
         return teamRepository
             .findByIdWithOwner(teamId)
+            .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_TEAM.code(), teamId));
+    }
+
+    /**
+     * 팀 ID로 팀을 비관적 락과 함께 조회한다.
+     *
+     * <p>동일 팀 범위의 동시 쓰기 경쟁을 직렬화해야 할 때 사용한다.</p>
+     *
+     * @param teamId 팀 ID
+     * @return 팀 엔티티
+     * @throws EntityNotFoundException 팀이 존재하지 않는 경우
+     */
+    public Team findTeamByIdForUpdate(Long teamId) {
+        return teamRepository
+            .findByIdForUpdate(teamId)
             .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_TEAM.code(), teamId));
     }
 
@@ -329,7 +344,7 @@ public class TeamService {
 
     private User findUserById(Long userId) {
         return userRepository
-            .findById(userId)
+            .findById(Objects.requireNonNull(userId))
             .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_USER.code(), userId));
     }
 

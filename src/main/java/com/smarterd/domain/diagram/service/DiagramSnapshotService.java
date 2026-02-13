@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
+import org.springframework.lang.NonNull;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -30,7 +31,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class DiagramSnapshotService implements SmartLifecycle {
 
     private static final Logger log = LoggerFactory.getLogger(DiagramSnapshotService.class);
@@ -304,7 +304,7 @@ public class DiagramSnapshotService implements SmartLifecycle {
      * @param callback 종료 완료 콜백
      */
     @Override
-    public void stop(Runnable callback) {
+    public void stop(@NonNull Runnable callback) {
         final ExecutorService executor = Executors.newSingleThreadExecutor();
         executor.submit((Runnable) this::stop);
         executor.shutdown();

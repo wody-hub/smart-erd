@@ -8,7 +8,6 @@ import com.smarterd.api.dictionary.dto.BulkValidationRow;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.dictionary.entity.Domain;
-import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.entity.Term;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
@@ -230,7 +229,10 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
 
         // 기존 논리명 일괄 조회 (N+1 방지)
         final var existingNames = termRepository
-            .findByDictionarySetAndLogicalNameIn(dictionarySet, request.rows().stream().map(BulkTermRow::logicalName).toList())
+            .findByDictionarySetAndLogicalNameIn(
+                dictionarySet,
+                request.rows().stream().map(BulkTermRow::logicalName).toList()
+            )
             .stream()
             .map(Term::getLogicalName)
             .collect(Collectors.toSet());

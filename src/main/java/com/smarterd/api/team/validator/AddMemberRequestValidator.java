@@ -3,7 +3,9 @@ package com.smarterd.api.team.validator;
 import com.smarterd.api.team.dto.AddMemberRequest;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.user.repository.UserRepository;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.Errors;
 import org.springframework.validation.Validator;
@@ -26,19 +28,18 @@ public class AddMemberRequestValidator implements Validator {
     private final UserRepository userRepository;
 
     @Override
-    public boolean supports(@SuppressWarnings("null") Class<?> clazz) {
+    public boolean supports(@NonNull Class<?> clazz) {
         return AddMemberRequest.class.isAssignableFrom(clazz);
     }
 
     @Override
-    @SuppressWarnings("null")
-    public void validate(Object target, Errors errors) {
+    public void validate(@NonNull Object target, @NonNull Errors errors) {
         final var request = (AddMemberRequest) target;
 
         if (request.loginId() != null && !userRepository.existsByLoginId(request.loginId())) {
             errors.rejectValue(
                 "loginId",
-                MessageCode.ERROR_NOT_FOUND_USER.code(),
+                Objects.requireNonNull(MessageCode.ERROR_NOT_FOUND_USER.code()),
                 new Object[] { request.loginId() },
                 "User not found"
             );

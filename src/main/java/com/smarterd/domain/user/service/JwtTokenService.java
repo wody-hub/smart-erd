@@ -7,6 +7,7 @@ import com.smarterd.domain.user.entity.RefreshToken;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.repository.RefreshTokenRepository;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -27,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class JwtTokenService {
 
     /** JWT 인코더 */
@@ -99,6 +99,6 @@ public class JwtTokenService {
      */
     @Transactional
     public void deleteRefreshToken(RefreshToken refreshToken) {
-        refreshTokenRepository.delete(refreshToken);
+        refreshTokenRepository.delete(Objects.requireNonNull(refreshToken));
     }
 }

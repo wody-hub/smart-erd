@@ -1,5 +1,9 @@
 import axiosInstance from './axiosInstance';
-import type { DiagramSummary, DiagramDetail } from '@/types/diagram';
+import type {
+  DiagramSummary,
+  DiagramDetail,
+  UpdateDiagramDictionarySetResult,
+} from '@/types/diagram';
 import type { WsTicketIssueResponse } from '@/types/collaboration';
 
 export type { DiagramSummary, DiagramDetail };
@@ -110,10 +114,14 @@ export async function updateDiagramDictionarySet(
   projectId: string,
   diagramId: string,
   dictionarySetId: number,
-): Promise<void> {
-  await axiosInstance.patch(`/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/dictionary-set`, {
-    dictionarySetId,
-  });
+): Promise<UpdateDiagramDictionarySetResult> {
+  const res = await axiosInstance.patch<UpdateDiagramDictionarySetResult>(
+    `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/dictionary-set`,
+    {
+      dictionarySetId,
+    },
+  );
+  return res.data;
 }
 
 /**

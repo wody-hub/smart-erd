@@ -7,14 +7,15 @@ import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.entity.Term;
-import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.repository.TermRepository;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class TermService {
 
     /** 용어 레포지토리 */
@@ -74,7 +74,7 @@ public class TermService {
             .dictionarySet(dictionarySet)
             .domain(domain)
             .build();
-        termRepository.save(term);
+        termRepository.save(Objects.requireNonNull(term));
 
         return TermResponse.from(term);
     }
@@ -160,7 +160,7 @@ public class TermService {
         teamService.verifyEditable(team, user);
         dictionarySetService.findByTeamAndId(team, setId);
 
-        final var term = findTermById(termId);
+        final var term = Objects.requireNonNull(findTermById(termId));
         verifyTermBelongsToTeam(term, teamId);
         verifyTermBelongsToSet(term, setId);
 
@@ -176,7 +176,7 @@ public class TermService {
      */
     private Term findTermById(Long termId) {
         return termRepository
-            .findById(termId)
+            .findById(Objects.requireNonNull(termId))
             .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_TERM.code(), termId));
     }
 

@@ -99,6 +99,8 @@ public interface TermRepository extends JpaRepository<Term, Long>, TermRepositor
      */
     void deleteByTeam(Team team);
 
+    void deleteByDictionarySet(DictionarySet dictionarySet);
+
     @Modifying
     @Query("update Term t set t.dictionarySet = :dictionarySet where t.team = :team and t.dictionarySet is null")
     int backfillNullDictionarySetByTeam(@Param("team") Team team, @Param("dictionarySet") DictionarySet dictionarySet);

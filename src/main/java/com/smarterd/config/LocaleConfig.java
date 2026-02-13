@@ -2,6 +2,8 @@ package com.smarterd.config;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.LocaleResolver;
@@ -21,11 +23,10 @@ public class LocaleConfig {
      * @return AcceptHeaderLocaleResolver 빈
      */
     @Bean
-    @SuppressWarnings("null")
     public LocaleResolver localeResolver() {
         final var resolver = new AcceptHeaderLocaleResolver();
         resolver.setDefaultLocale(Locale.ENGLISH);
-        resolver.setSupportedLocales(List.of(Locale.KOREAN, Locale.ENGLISH));
+        resolver.setSupportedLocales(Objects.requireNonNull(List.of(Locale.KOREAN, Locale.ENGLISH)));
         return resolver;
     }
 }

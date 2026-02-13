@@ -9,6 +9,7 @@ import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.repository.UserRepository;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -26,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class AuthService {
 
     /** Spring Security 인증 관리자 */
@@ -75,7 +75,7 @@ public class AuthService {
             .name(request.name())
             .build();
 
-        userRepository.save(user);
+        userRepository.save(Objects.requireNonNull(user));
 
         return issueTokens(user);
     }

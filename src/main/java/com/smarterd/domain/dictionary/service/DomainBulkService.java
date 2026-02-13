@@ -8,7 +8,6 @@ import com.smarterd.api.dictionary.dto.BulkValidationRow;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.dictionary.entity.Domain;
-import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
@@ -26,6 +25,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -200,7 +200,10 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
 
         // 기존 논리명 일괄 조회 (N+1 방지)
         final var existingNames = domainRepository
-            .findByDictionarySetAndLogicalNameIn(dictionarySet, request.rows().stream().map(BulkDomainRow::logicalName).toList())
+            .findByDictionarySetAndLogicalNameIn(
+                dictionarySet,
+                request.rows().stream().map(BulkDomainRow::logicalName).toList()
+            )
             .stream()
             .map(Domain::getLogicalName)
             .collect(Collectors.toSet());
@@ -242,7 +245,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
      * @param locale  요청 로케일
      * @return 엑셀 데이터
      */
-    public ExcelUtils.ExcelData generateTemplate(String loginId, Long teamId, Long setId, Locale locale) {
+    public ExcelUtils.ExcelData generateTemplate(String loginId, Long teamId, Long setId, @NonNull Locale locale) {
         final var team = verifyTeamAccess(loginId, teamId);
         dictionarySetService.findByTeamAndId(team, setId);
 

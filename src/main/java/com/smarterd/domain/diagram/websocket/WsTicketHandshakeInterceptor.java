@@ -1,6 +1,7 @@
 package com.smarterd.domain.diagram.websocket;
 
 import java.util.Map;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,16 +48,18 @@ public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
      * @return 검증 성공 시 true, 실패 시 false
      */
     @Override
-    @SuppressWarnings("null")
     public boolean beforeHandshake(
         @NonNull ServerHttpRequest request,
         @NonNull ServerHttpResponse response,
         @NonNull WebSocketHandler wsHandler,
         @NonNull Map<String, Object> attributes
     ) {
+        final var nonNullRequest = Objects.requireNonNull(request, "request must not be null");
+        final var nonNullAttributes = Objects.requireNonNull(attributes, "attributes must not be null");
+
         try {
             // 1. URL에서 ticket과 diagramId 추출
-            final var uri = request.getURI();
+            final var uri = nonNullRequest.getURI();
             final var queryParams = UriComponentsBuilder.fromUri(uri).build().getQueryParams();
             final var ticket = queryParams.getFirst("ticket");
             if (ticket == null || ticket.isBlank()) {
@@ -65,7 +68,7 @@ public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
             }
 
             // URL 경로에서 diagramId 추출 (/ws/diagram/{diagramId})
-            final var path = uri.getPath();
+            final var path = Objects.requireNonNull(uri.getPath());
             if (!pathMatcher.match("/ws/diagram/{diagramId}", path)) {
                 log.warn("WebSocket 핸드셰이크 실패: 잘못된 경로 {}", path);
                 return false;
@@ -92,7 +95,7 @@ public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
             }
 
             // 4. 세션 attributes에 메타데이터 저장
-            attributes.put(WebSocketSessionInfo.SESSION_ATTR_KEY, sessionInfo);
+            nonNullAttributes.put(WebSocketSessionInfo.SESSION_ATTR_KEY, sessionInfo);
 
             log.info("WebSocket 핸드셰이크 성공: loginId={}, diagramId={}", sessionInfo.loginId(), diagramId);
             return true;

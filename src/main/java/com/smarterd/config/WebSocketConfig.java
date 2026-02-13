@@ -2,6 +2,7 @@ package com.smarterd.config;
 
 import com.smarterd.domain.diagram.websocket.DiagramWebSocketHandler;
 import com.smarterd.domain.diagram.websocket.WsTicketHandshakeInterceptor;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -38,11 +39,19 @@ public class WebSocketConfig implements WebSocketConfigurer {
      * @param registry WebSocket 핸들러 레지스트리
      */
     @Override
-    @SuppressWarnings("null")
     public void registerWebSocketHandlers(@NonNull WebSocketHandlerRegistry registry) {
-        registry
-            .addHandler(diagramWebSocketHandler, "/ws/diagram/*")
+        final var nonNullRegistry = Objects.requireNonNull(registry, "registry must not be null");
+        final var nonNullDiagramWebSocketHandler = Objects.requireNonNull(
+            diagramWebSocketHandler,
+            "diagramWebSocketHandler must not be null"
+        );
+        final var nonNullAllowedOrigins = Objects.requireNonNull(
+            corsProperties.getAllowedOrigins().toArray(String[]::new)
+        );
+
+        nonNullRegistry
+            .addHandler(nonNullDiagramWebSocketHandler, "/ws/diagram/*")
             .addInterceptors(wsTicketHandshakeInterceptor)
-            .setAllowedOrigins(corsProperties.getAllowedOrigins().toArray(String[]::new));
+            .setAllowedOrigins(nonNullAllowedOrigins);
     }
 }

@@ -20,6 +20,7 @@ import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -208,7 +209,12 @@ public class DomainController {
         Locale locale,
         HttpServletResponse response
     ) throws IOException {
-        final var excelData = domainBulkService.generateTemplate(jwt.getSubject(), teamId, setId, locale);
+        final var excelData = domainBulkService.generateTemplate(
+            jwt.getSubject(),
+            teamId,
+            setId,
+            Objects.requireNonNull(locale)
+        );
         ExcelUtils.download(excelData, response, "domain-template");
     }
 

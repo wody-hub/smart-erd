@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.context.MessageSource;
@@ -161,9 +162,10 @@ public abstract class AbstractBulkService<R> {
      * @param args   메시지 인자
      * @return 해석된 메시지 문자열
      */
-    @SuppressWarnings("null")
     protected String msg(String code, Locale locale, Object... args) {
-        return messageSource.getMessage(code, args, locale);
+        final var nonNullCode = Objects.requireNonNull(code, "code must not be null");
+        final var nonNullLocale = Objects.requireNonNull(locale, "locale must not be null");
+        return messageSource.getMessage(nonNullCode, args, nonNullLocale);
     }
 
     /**

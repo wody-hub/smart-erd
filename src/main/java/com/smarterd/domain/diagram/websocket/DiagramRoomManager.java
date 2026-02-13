@@ -1,25 +1,19 @@
 package com.smarterd.domain.diagram.websocket;
 
-import com.smarterd.config.WebSocketProperties;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import lombok.RequiredArgsConstructor;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
+
+import com.smarterd.config.WebSocketProperties;
 
 /**
  * 다이어그램 ID별 WebSocket 세션 방(room)을 관리한다.
@@ -29,7 +23,6 @@ import org.springframework.web.socket.WebSocketSession;
  * Yjs update를 누적 저장하여 주기적/퇴장 시 DB에 병합 저장한다.</p>
  */
 @Component
-@RequiredArgsConstructor
 public class DiagramRoomManager {
 
     private static final Logger log = LoggerFactory.getLogger(DiagramRoomManager.class);
@@ -40,71 +33,49 @@ public class DiagramRoomManager {
     /** WebSocket 설정 프로퍼티 */
     private final WebSocketProperties webSocketProperties;
 
-    /** 다이어그램 ID → 접속 중인 WebSocket 세션 집합 */
-    private final Map<Long, Set<WebSocketSession>> rooms = new ConcurrentHashMap<>();
+    /** 세션/room/락/사용자 연결 수 저장소 */
+    private final DiagramSessionRegistry sessionRegistry;
 
-    /** 다이어그램 ID → room 단위 presence 상태 */
-    private final Map<Long, PresenceRoomState> presenceRooms = new ConcurrentHashMap<>();
+    /** presence 상태 저장소 */
+    private final DiagramPresenceManager presenceManager;
 
-    /** 다이어그램 ID → 누적된 Yjs update 바이트 배열 리스트 */
-    private final Map<Long, List<byte[]>> accumulatedUpdates = new ConcurrentHashMap<>();
+    /** update 누적 버퍼 저장소 */
+    private final DiagramUpdateBuffer updateBuffer;
 
-    /** 다이어그램 ID → 누적 update 총 크기 (바이트) */
-    private final Map<Long, AtomicLong> accumulatedSizes = new ConcurrentHashMap<>();
-
-    /** 스냅샷이 변경되었지만 아직 DB에 저장되지 않은 다이어그램 ID 집합 */
-    private final Set<Long> dirtyDiagramIds = ConcurrentHashMap.newKeySet();
-
-    /** dirty 집합 복합 연산 동기화 전용 락 */
-    private final Object dirtyLock = new Object();
-
-    /** 세션별 전송 동기화 락 객체 (세션 ID → 락) */
-    private final Map<String, Object> sessionLocks = new ConcurrentHashMap<>();
-
-    /** 다이어그램별 flush 동기화 락 (@Scheduled flush와 연결 종료 flush 간 레이스 방지) */
-    private final Map<Long, Object> flushLocks = new ConcurrentHashMap<>();
-
-    /** 사용자별 동시 WebSocket 연결 수 (userId → 카운터) */
-    private final Map<String, AtomicInteger> userSessionCounts = new ConcurrentHashMap<>();
-
-    /** 세션별 presence snapshot 재요청 rate limit 상태 */
-    private final Map<String, AtomicReference<MinuteWindow>> snapshotRequestState = new ConcurrentHashMap<>();
+    /** 세션 rate limiter 저장소 */
+    private final DiagramSessionRateLimiter rateLimiter;
 
     /**
-     * 세션별 rate limit 윈도우 상태.
+     * 기본 생성자.
      *
-     * @param startMillis 윈도우 시작 시각 (epoch millis)
-     * @param count       윈도우 내 메시지 수
+     * @param webSocketProperties WebSocket 설정
      */
-    private record RateLimitWindow(long startMillis, int count) {}
-
-    /** 세션별 rate limit 상태 (세션 ID → 윈도우 AtomicReference) */
-    private final Map<String, AtomicReference<RateLimitWindow>> rateLimitState = new ConcurrentHashMap<>();
-
-    /** minute 윈도우 상태 (snapshot 재요청 rate limit 전용). */
-    private record MinuteWindow(long startMillis, int count) {}
-
-    /** room 내부 사용자 presence 엔트리. sessions 락에서만 접근한다. */
-    private static final class PresenceEntry {
-        private final String userId;
-        private String displayName;
-        private final long joinSeq;
-        private int sessionCount;
-
-        private PresenceEntry(String userId, String displayName, long joinSeq) {
-            this.userId = userId;
-            this.displayName = displayName;
-            this.joinSeq = joinSeq;
-            this.sessionCount = 1;
-        }
+    @Autowired
+    public DiagramRoomManager(WebSocketProperties webSocketProperties) {
+        this(
+            webSocketProperties,
+            new DiagramSessionRegistry(),
+            new DiagramPresenceManager(),
+            new DiagramUpdateBuffer(),
+            new DiagramSessionRateLimiter(MAX_SNAPSHOT_REQUESTS_PER_MINUTE)
+        );
     }
 
-    /** room presence 상태. sessions 락에서만 접근한다. */
-    private static final class PresenceRoomState {
-        private final String roomEpoch = UUID.randomUUID().toString();
-        private final AtomicLong presenceVersion = new AtomicLong(0);
-        private final AtomicLong joinSeqGenerator = new AtomicLong(0);
-        private final Map<String, PresenceEntry> entries = new HashMap<>();
+    /**
+     * 테스트/확장 포인트를 위한 내부 생성자.
+     */
+    DiagramRoomManager(
+        WebSocketProperties webSocketProperties,
+        DiagramSessionRegistry sessionRegistry,
+        DiagramPresenceManager presenceManager,
+        DiagramUpdateBuffer updateBuffer,
+        DiagramSessionRateLimiter rateLimiter
+    ) {
+        this.webSocketProperties = webSocketProperties;
+        this.sessionRegistry = sessionRegistry;
+        this.presenceManager = presenceManager;
+        this.updateBuffer = updateBuffer;
+        this.rateLimiter = rateLimiter;
     }
 
     /** 참여자 정보 payload. */
@@ -150,22 +121,20 @@ public class DiagramRoomManager {
      */
     public JoinResult join(Long diagramId, WebSocketSession session, String userId, String displayName) {
         // 사용자별 연결 수 체크
-        final var userCount = userSessionCounts.computeIfAbsent(userId, (k) -> new AtomicInteger(0));
-        if (userCount.incrementAndGet() > webSocketProperties.getMaxConnectionsPerUser()) {
-            userCount.decrementAndGet();
+        final var acquired =
+            sessionRegistry.tryAcquireUserConnection(userId, webSocketProperties.getMaxConnectionsPerUser());
+        if (!acquired) {
             log.warn("사용자 {} 연결 수 초과 (최대 {})", userId, webSocketProperties.getMaxConnectionsPerUser());
             return new JoinResult(false, null, null, 0);
         }
 
-        final var sessions = rooms.computeIfAbsent(diagramId, (k) -> ConcurrentHashMap.newKeySet());
-        PresenceSnapshot snapshot;
-        PresenceParticipant joinedParticipant = null;
-        long joinedPresenceVersion = 0;
+        final var sessions = sessionRegistry.getOrCreateSessions(diagramId);
+        DiagramPresenceManager.PresenceJoinResult presenceJoinResult;
 
         // size() + add() + presence 업데이트 원자성 보장
         synchronized (sessions) {
             if (sessions.size() >= webSocketProperties.getMaxSessionsPerRoom()) {
-                userCount.decrementAndGet(); // 롤백
+                sessionRegistry.releaseUserConnection(userId); // 롤백
                 log.warn(
                     "다이어그램 {} 방 입장 거부: 최대 인원({}) 초과",
                     diagramId,
@@ -175,24 +144,18 @@ public class DiagramRoomManager {
             }
 
             sessions.add(session);
-            final var roomState = presenceRooms.computeIfAbsent(diagramId, (k) -> new PresenceRoomState());
-            final var entry = roomState.entries.get(userId);
-            if (entry == null) {
-                final var joinSeq = roomState.joinSeqGenerator.incrementAndGet();
-                final var newEntry = new PresenceEntry(userId, displayName, joinSeq);
-                roomState.entries.put(userId, newEntry);
-                joinedParticipant = new PresenceParticipant(newEntry.userId, newEntry.displayName, newEntry.joinSeq);
-                joinedPresenceVersion = roomState.presenceVersion.incrementAndGet();
-            } else {
-                entry.sessionCount++;
-                entry.displayName = displayName;
-            }
-            snapshot = buildPresenceSnapshot(roomState);
+            presenceJoinResult = presenceManager.onJoin(sessions, diagramId, userId, displayName);
         }
 
-        sessionLocks.computeIfAbsent(session.getId(), (k) -> new Object());
+        sessionRegistry.ensureSessionLock(session.getId());
         log.info("다이어그램 {} 방 입장: {} (현재 {}명)", diagramId, session.getId(), sessions.size());
-        return new JoinResult(true, snapshot, joinedParticipant, joinedPresenceVersion);
+
+        return new JoinResult(
+            true,
+            presenceJoinResult.snapshot(),
+            presenceJoinResult.joinedParticipant(),
+            presenceJoinResult.joinedPresenceVersion()
+        );
     }
 
     /**
@@ -205,10 +168,10 @@ public class DiagramRoomManager {
      * @return 퇴장 결과
      */
     public LeaveResult leave(Long diagramId, WebSocketSession session, String userId) {
-        final var sessions = rooms.get(diagramId);
+        final var sessions = sessionRegistry.getSessions(diagramId);
         if (sessions == null) {
             // 방이 이미 정리된 경우: 실제 퇴장 처리 없이 no-op
-            sessionLocks.remove(session.getId());
+            sessionRegistry.removeSessionLock(session.getId());
             return new LeaveResult(false, new byte[0], null, null, 0);
         }
 
@@ -224,38 +187,25 @@ public class DiagramRoomManager {
                 return new LeaveResult(false, new byte[0], null, null, 0);
             }
 
-            sessionLocks.remove(session.getId());
+            sessionRegistry.removeSessionLock(session.getId());
             log.info("다이어그램 {} 방 퇴장: {} (남은 {}명)", diagramId, session.getId(), sessions.size());
 
             // 실제로 room에서 제거된 경우에만 사용자별 연결 수를 감소시킨다.
-            final var userCount = userSessionCounts.get(userId);
-            if (userCount != null && userCount.decrementAndGet() <= 0) {
-                userSessionCounts.remove(userId);
-            }
+            sessionRegistry.releaseUserConnection(userId);
 
-            final var roomState = presenceRooms.get(diagramId);
-            if (roomState != null) {
-                final var entry = roomState.entries.get(userId);
-                if (entry != null) {
-                    entry.sessionCount--;
-                    if (entry.sessionCount <= 0) {
-                        roomState.entries.remove(userId);
-                        roomEpoch = roomState.roomEpoch;
-                        leftUserId = userId;
-                        leftPresenceVersion = roomState.presenceVersion.incrementAndGet();
-                    }
-                }
-            }
+            final var presenceLeaveResult = presenceManager.onLeave(sessions, diagramId, userId);
+            roomEpoch = presenceLeaveResult.roomEpoch();
+            leftUserId = presenceLeaveResult.leftUserId();
+            leftPresenceVersion = presenceLeaveResult.leftPresenceVersion();
 
             if (sessions.isEmpty()) {
                 // CAS: 동일 sessions 인스턴스일 때만 제거
-                rooms.remove(diagramId, sessions);
-                presenceRooms.remove(diagramId);
+                sessionRegistry.removeRoomIfSame(diagramId, sessions);
+                presenceManager.removeRoom(diagramId);
 
                 // 원자적으로 누적 update를 drain하고 인메모리 리소스 정리
-                final var drained = drainAndMergeUpdates(diagramId);
-                accumulatedUpdates.remove(diagramId);
-                accumulatedSizes.remove(diagramId);
+                final var drained = updateBuffer.drainAndMergeUpdates(diagramId);
+                updateBuffer.removeDiagram(diagramId);
                 return new LeaveResult(true, drained, roomEpoch, leftUserId, leftPresenceVersion);
             }
         }
@@ -269,27 +219,13 @@ public class DiagramRoomManager {
      * @return snapshot (방이 없으면 null)
      */
     public PresenceSnapshot getPresenceSnapshot(Long diagramId) {
-        final var sessions = rooms.get(diagramId);
+        final var sessions = sessionRegistry.getSessions(diagramId);
         if (sessions == null) {
             return null;
         }
         synchronized (sessions) {
-            final var roomState = presenceRooms.get(diagramId);
-            if (roomState == null) {
-                return null;
-            }
-            return buildPresenceSnapshot(roomState);
+            return presenceManager.getPresenceSnapshot(sessions, diagramId);
         }
-    }
-
-    private PresenceSnapshot buildPresenceSnapshot(PresenceRoomState roomState) {
-        final var participants = roomState.entries
-            .values()
-            .stream()
-            .sorted(Comparator.comparingLong((PresenceEntry e) -> e.joinSeq))
-            .map((e) -> new PresenceParticipant(e.userId, e.displayName, e.joinSeq))
-            .toList();
-        return new PresenceSnapshot(roomState.roomEpoch, roomState.presenceVersion.get(), participants);
     }
 
     /**
@@ -299,17 +235,20 @@ public class DiagramRoomManager {
      * @param sender    발신 세션 (자신에게는 전송하지 않음)
      * @param message   전송할 바이너리 메시지
      */
-    @SuppressWarnings("null")
-    public void broadcast(Long diagramId, WebSocketSession sender, BinaryMessage message) {
-        final var sessions = rooms.getOrDefault(diagramId, Set.of());
+    public void broadcast(@NonNull Long diagramId, @NonNull WebSocketSession sender, @NonNull BinaryMessage message) {
+        final var nonNullDiagramId = Objects.requireNonNull(diagramId, "diagramId must not be null");
+        final var nonNullSender = Objects.requireNonNull(sender, "sender must not be null");
+        final var nonNullMessage = Objects.requireNonNull(message, "message must not be null");
+
+        final var sessions = sessionRegistry.getSessionsOrEmpty(nonNullDiagramId);
         for (final var session : sessions) {
-            if (session.equals(sender) || !session.isOpen()) {
+            if (session.equals(nonNullSender) || !session.isOpen()) {
                 continue;
             }
             try {
                 final var lock = getSessionLock(session);
                 synchronized (lock) {
-                    session.sendMessage(message);
+                    session.sendMessage(nonNullMessage);
                 }
             } catch (Exception e) {
                 log.warn("메시지 전송 실패 (세션 {})", session.getId(), e);
@@ -319,36 +258,12 @@ public class DiagramRoomManager {
 
     /**
      * 세션별 초당 메시지 수 제한을 검사한다.
-     * CAS 루프로 윈도우 전환과 카운터 증가를 원자적으로 수행한다.
      *
      * @param session WebSocket 세션
      * @return 제한 이내이면 true, 초과 시 false
      */
     public boolean checkRateLimit(WebSocketSession session) {
-        final var sessionId = session.getId();
-        final var now = System.currentTimeMillis();
-
-        final var ref = rateLimitState.computeIfAbsent(sessionId, (k) ->
-            new AtomicReference<>(new RateLimitWindow(now, 0))
-        );
-
-        while (true) {
-            final var current = ref.get();
-            RateLimitWindow next;
-            if (now - current.startMillis() > 1000) {
-                // 새 윈도우 시작
-                next = new RateLimitWindow(now, 1);
-            } else {
-                if (current.count() >= webSocketProperties.getMaxMessagesPerSecond()) {
-                    return false;
-                }
-                next = new RateLimitWindow(current.startMillis(), current.count() + 1);
-            }
-            if (ref.compareAndSet(current, next)) {
-                return true;
-            }
-            // CAS 실패: 다른 스레드가 업데이트 → 재시도
-        }
+        return rateLimiter.checkRateLimit(session.getId(), webSocketProperties.getMaxMessagesPerSecond());
     }
 
     /**
@@ -358,28 +273,7 @@ public class DiagramRoomManager {
      * @return 허용 여부
      */
     public boolean allowPresenceSnapshotRequest(WebSocketSession session) {
-        final var sessionId = session.getId();
-        final var now = System.currentTimeMillis();
-
-        final var ref = snapshotRequestState.computeIfAbsent(sessionId, (k) ->
-            new AtomicReference<>(new MinuteWindow(now, 0))
-        );
-
-        while (true) {
-            final var current = ref.get();
-            MinuteWindow next;
-            if (now - current.startMillis() > 60000) {
-                next = new MinuteWindow(now, 1);
-            } else {
-                if (current.count() >= MAX_SNAPSHOT_REQUESTS_PER_MINUTE) {
-                    return false;
-                }
-                next = new MinuteWindow(current.startMillis(), current.count() + 1);
-            }
-            if (ref.compareAndSet(current, next)) {
-                return true;
-            }
-        }
+        return rateLimiter.allowPresenceSnapshotRequest(session.getId());
     }
 
     /**
@@ -390,7 +284,7 @@ public class DiagramRoomManager {
      * @return 해당 세션의 전용 락 객체
      */
     public Object getSessionLock(WebSocketSession session) {
-        return sessionLocks.computeIfAbsent(session.getId(), (k) -> new Object());
+        return sessionRegistry.getSessionLock(session);
     }
 
     /**
@@ -401,7 +295,7 @@ public class DiagramRoomManager {
      * @return 해당 다이어그램의 전용 flush 락 객체
      */
     public Object getFlushLock(Long diagramId) {
-        return flushLocks.computeIfAbsent(diagramId, (k) -> new Object());
+        return sessionRegistry.getFlushLock(diagramId);
     }
 
     /**
@@ -411,7 +305,7 @@ public class DiagramRoomManager {
      * @param diagramId 다이어그램 ID
      */
     public void removeFlushLock(Long diagramId) {
-        flushLocks.remove(diagramId);
+        sessionRegistry.removeFlushLock(diagramId);
     }
 
     /**
@@ -421,8 +315,7 @@ public class DiagramRoomManager {
      * @param session WebSocket 세션
      */
     public void cleanupRateLimit(WebSocketSession session) {
-        rateLimitState.remove(session.getId());
-        snapshotRequestState.remove(session.getId());
+        rateLimiter.cleanup(session.getId());
     }
 
     /**
@@ -434,21 +327,7 @@ public class DiagramRoomManager {
      * @return 추가 성공 여부 (false면 누적 크기 초과)
      */
     public boolean appendUpdate(Long diagramId, byte[] update) {
-        // 누적 크기 체크
-        final var sizeCounter = accumulatedSizes.computeIfAbsent(diagramId, (k) -> new AtomicLong(0));
-        final var newSize = sizeCounter.addAndGet(update.length);
-        if (newSize > webSocketProperties.getMaxAccumulatedUpdatesSize()) {
-            sizeCounter.addAndGet(-update.length);
-            return false;
-        }
-
-        accumulatedUpdates
-            .computeIfAbsent(diagramId, (k) -> Collections.synchronizedList(new ArrayList<>()))
-            .add(update);
-        synchronized (dirtyLock) {
-            dirtyDiagramIds.add(diagramId);
-        }
-        return true;
+        return updateBuffer.appendUpdate(diagramId, update, webSocketProperties.getMaxAccumulatedUpdatesSize());
     }
 
     /**
@@ -464,7 +343,7 @@ public class DiagramRoomManager {
      * @return drain된 병합 바이트 배열. 단독 접속이 아니거나 방이 없으면 {@code null}
      */
     public byte[] drainIfAlone(Long diagramId) {
-        final var sessions = rooms.get(diagramId);
+        final var sessions = sessionRegistry.getSessions(diagramId);
         if (sessions == null) {
             return null;
         }
@@ -472,7 +351,7 @@ public class DiagramRoomManager {
             if (sessions.size() != 1) {
                 return null;
             }
-            return drainAndMergeUpdates(diagramId);
+            return updateBuffer.drainAndMergeUpdates(diagramId);
         }
     }
 
@@ -484,26 +363,7 @@ public class DiagramRoomManager {
      * @return 병합된 바이트 배열, 누적 데이터가 없으면 빈 배열
      */
     public byte[] drainAndMergeUpdates(Long diagramId) {
-        final var updates = accumulatedUpdates.get(diagramId);
-        if (updates == null || updates.isEmpty()) {
-            return new byte[0];
-        }
-
-        final List<byte[]> drained;
-        synchronized (updates) {
-            drained = new ArrayList<>(updates);
-            updates.clear();
-            // 크기 카운터 리셋: drain~set(0) 사이에 appendUpdate가 끼어드는 것을 방지
-            final var sizeCounter = accumulatedSizes.get(diagramId);
-            if (sizeCounter != null) {
-                sizeCounter.set(0);
-            }
-        }
-
-        if (drained.isEmpty()) {
-            return new byte[0];
-        }
-        return YjsUpdateFormat.encode(drained);
+        return updateBuffer.drainAndMergeUpdates(diagramId);
     }
 
     /**
@@ -514,14 +374,7 @@ public class DiagramRoomManager {
      * @param mergedUpdates drain된 병합 바이트 배열 (null 또는 빈 배열이면 무시)
      */
     public void restoreUpdates(Long diagramId, byte[] mergedUpdates) {
-        if (mergedUpdates == null || mergedUpdates.length == 0) {
-            return;
-        }
-        final var updates = YjsUpdateFormat.decode(mergedUpdates);
-        for (final var update : updates) {
-            appendUpdate(diagramId, update);
-        }
-        log.info("drain된 update {}개 복원 완료 (diagramId={})", updates.size(), diagramId);
+        updateBuffer.restoreUpdates(diagramId, mergedUpdates, webSocketProperties.getMaxAccumulatedUpdatesSize());
     }
 
     /**
@@ -531,8 +384,7 @@ public class DiagramRoomManager {
      * @return 누적 update 존재 여부
      */
     public boolean hasUpdates(Long diagramId) {
-        final var updates = accumulatedUpdates.get(diagramId);
-        return updates != null && !updates.isEmpty();
+        return updateBuffer.hasUpdates(diagramId);
     }
 
     /**
@@ -542,9 +394,7 @@ public class DiagramRoomManager {
      * @param diagramId 다이어그램 ID
      */
     public void reDirty(Long diagramId) {
-        synchronized (dirtyLock) {
-            dirtyDiagramIds.add(diagramId);
-        }
+        updateBuffer.reDirty(diagramId);
     }
 
     /**
@@ -553,11 +403,7 @@ public class DiagramRoomManager {
      * @return dirty 다이어그램 ID 집합
      */
     public Set<Long> getDirtyIdsAndClear() {
-        synchronized (dirtyLock) {
-            final var ids = Set.copyOf(dirtyDiagramIds);
-            dirtyDiagramIds.clear();
-            return ids;
-        }
+        return updateBuffer.getDirtyIdsAndClear();
     }
 
     /**
@@ -567,13 +413,7 @@ public class DiagramRoomManager {
      * @return 누적 update가 있는 다이어그램 ID 집합
      */
     public Set<Long> getAllDiagramIdsWithUpdates() {
-        final var ids = ConcurrentHashMap.<Long>newKeySet();
-        accumulatedUpdates.forEach((diagramId, updates) -> {
-            if (updates != null && !updates.isEmpty()) {
-                ids.add(diagramId);
-            }
-        });
-        return ids;
+        return updateBuffer.getAllDiagramIdsWithUpdates();
     }
 
     /**
@@ -583,7 +423,7 @@ public class DiagramRoomManager {
      * @return 접속자 수
      */
     public int getSessionCount(Long diagramId) {
-        return rooms.getOrDefault(diagramId, Set.of()).size();
+        return sessionRegistry.getSessionCount(diagramId);
     }
 
     /**
@@ -593,7 +433,7 @@ public class DiagramRoomManager {
      * @return 세션 집합 (없으면 빈 집합)
      */
     public Set<WebSocketSession> getSessions(Long diagramId) {
-        return rooms.getOrDefault(diagramId, Set.of());
+        return sessionRegistry.getSessionsOrEmpty(diagramId);
     }
 
     /**
@@ -605,44 +445,37 @@ public class DiagramRoomManager {
      *
      * @param diagramId 다이어그램 ID
      */
-    @SuppressWarnings("null")
-    public void discardRoom(Long diagramId) {
-        final var sessions = rooms.remove(diagramId);
-        presenceRooms.remove(diagramId);
-        accumulatedUpdates.remove(diagramId);
-        accumulatedSizes.remove(diagramId);
-        flushLocks.remove(diagramId);
-        synchronized (dirtyLock) {
-            dirtyDiagramIds.remove(diagramId);
-        }
+    public void discardRoom(@NonNull Long diagramId) {
+        final var nonNullDiagramId = Objects.requireNonNull(diagramId, "diagramId must not be null");
+
+        final var sessions = sessionRegistry.removeRoom(nonNullDiagramId);
+        presenceManager.removeRoom(nonNullDiagramId);
+        updateBuffer.removeDiagram(nonNullDiagramId);
+        sessionRegistry.removeFlushLock(nonNullDiagramId);
 
         if (sessions == null || sessions.isEmpty()) {
             return;
         }
 
         for (final var session : sessions) {
-            sessionLocks.remove(session.getId());
-            rateLimitState.remove(session.getId());
-            snapshotRequestState.remove(session.getId());
+            sessionRegistry.removeSessionLock(session.getId());
+            rateLimiter.cleanup(session.getId());
 
             // 사용자별 연결 수 감소
             final var info = extractSessionInfo(session);
             if (info != null) {
-                final var userCount = userSessionCounts.get(info.userId());
-                if (userCount != null && userCount.decrementAndGet() <= 0) {
-                    userSessionCounts.remove(info.userId());
-                }
+                sessionRegistry.releaseUserConnection(info.userId());
             }
 
             try {
                 if (session.isOpen()) {
-                    session.close(CloseStatus.GOING_AWAY);
+                    session.close(Objects.requireNonNull(CloseStatus.GOING_AWAY));
                 }
             } catch (Exception e) {
                 log.warn("방 폐기 시 세션 종료 실패 (세션 {})", session.getId(), e);
             }
         }
-        log.info("다이어그램 {} 방 폐기 완료 ({}개 세션)", diagramId, sessions.size());
+        log.info("다이어그램 {} 방 폐기 완료 ({}개 세션)", nonNullDiagramId, sessions.size());
     }
 
     /**

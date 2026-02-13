@@ -12,6 +12,7 @@ import com.smarterd.domain.project.repository.ProjectRepository;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class ProjectService {
 
     /** 프로젝트 레포지토리 */
@@ -56,7 +56,7 @@ public class ProjectService {
         teamService.verifyEditable(team, user);
 
         final var project = Project.builder().name(request.name()).team(team).build();
-        projectRepository.save(project);
+        projectRepository.save(Objects.requireNonNull(project));
 
         return ProjectResponse.from(project);
     }
@@ -108,7 +108,7 @@ public class ProjectService {
         final var team = teamService.findTeamById(teamId);
         teamService.verifyEditable(team, user);
 
-        final var project = findProjectById(projectId);
+        final var project = Objects.requireNonNull(findProjectById(projectId));
         verifyProjectBelongsToTeam(project, teamId);
 
         diagramRepository.deleteByProjectIn(List.of(project));
@@ -146,7 +146,7 @@ public class ProjectService {
      */
     public Project findProjectById(Long projectId) {
         return projectRepository
-            .findById(projectId)
+            .findById(Objects.requireNonNull(projectId))
             .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_PROJECT.code(), projectId));
     }
 

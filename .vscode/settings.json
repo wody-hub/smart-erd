@@ -2,6 +2,7 @@
     "java.compile.nullAnalysis.mode": "automatic",
     "java.autobuild.enabled": true,
     "cSpell.words": [
+        "assertj",
         "baeldung",
         "blazebit",
         "bundlephobia",

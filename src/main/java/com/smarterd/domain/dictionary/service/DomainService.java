@@ -10,10 +10,10 @@ import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
-import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class DomainService {
 
     /** 도메인 레포지토리 */
@@ -49,6 +48,7 @@ public class DomainService {
      *
      * @param loginId 요청 사용자의 로그인 ID
      * @param teamId  팀 ID
+     * @param setId   사전 세트 ID
      * @param request 도메인 생성 요청
      * @return 생성된 도메인 응답
      */
@@ -70,7 +70,7 @@ public class DomainService {
             .team(team)
             .dictionarySet(dictionarySet)
             .build();
-        domainRepository.save(domain);
+        domainRepository.save(Objects.requireNonNull(domain));
 
         return DomainResponse.from(domain);
     }
@@ -80,6 +80,7 @@ public class DomainService {
      *
      * @param loginId 요청 사용자의 로그인 ID
      * @param teamId  팀 ID
+     * @param setId   사전 세트 ID
      * @return 도메인 응답 목록
      */
     public List<DomainResponse> getDomains(String loginId, Long teamId, Long setId) {
@@ -96,6 +97,7 @@ public class DomainService {
      *
      * @param loginId  요청 사용자의 로그인 ID
      * @param teamId   팀 ID
+     * @param setId    사전 세트 ID
      * @param domainId 도메인 ID
      * @return 도메인 응답
      */
@@ -117,12 +119,19 @@ public class DomainService {
      *
      * @param loginId  요청 사용자의 로그인 ID
      * @param teamId   팀 ID
+     * @param setId    사전 세트 ID
      * @param domainId 도메인 ID
      * @param request  도메인 수정 요청
      * @return 수정된 도메인 응답
      */
     @Transactional
-    public DomainResponse updateDomain(String loginId, Long teamId, Long setId, Long domainId, UpdateDomainRequest request) {
+    public DomainResponse updateDomain(
+        String loginId,
+        Long teamId,
+        Long setId,
+        Long domainId,
+        UpdateDomainRequest request
+    ) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyEditable(team, user);
@@ -132,7 +141,9 @@ public class DomainService {
         verifyDomainBelongsToTeam(domain, teamId);
         verifyDomainBelongsToSet(domain, setId);
 
-        if (domainRepository.existsByDictionarySetAndLogicalNameAndIdNot(dictionarySet, request.logicalName(), domainId)) {
+        if (
+            domainRepository.existsByDictionarySetAndLogicalNameAndIdNot(dictionarySet, request.logicalName(), domainId)
+        ) {
             throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), request.logicalName());
         }
 
@@ -146,6 +157,7 @@ public class DomainService {
      *
      * @param loginId  요청 사용자의 로그인 ID
      * @param teamId   팀 ID
+     * @param setId    사전 세트 ID
      * @param domainId 도메인 ID
      */
     @Transactional
@@ -155,7 +167,7 @@ public class DomainService {
         teamService.verifyEditable(team, user);
         dictionarySetService.findByTeamAndId(team, setId);
 
-        final var domain = findDomainById(domainId);
+        final var domain = Objects.requireNonNull(findDomainById(domainId));
         verifyDomainBelongsToTeam(domain, teamId);
         verifyDomainBelongsToSet(domain, setId);
 
@@ -175,8 +187,11 @@ public class DomainService {
      * @throws EntityNotFoundException 도메인이 존재하지 않는 경우
      */
     public Domain findDomainById(Long domainId) {
+        if (domainId == null) {
+            new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_DOMAIN.code(), domainId);
+        }
         return domainRepository
-            .findById(domainId)
+            .findById(Objects.requireNonNull(domainId))
             .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_DOMAIN.code(), domainId));
     }
 
@@ -193,6 +208,13 @@ public class DomainService {
         }
     }
 
+    /**
+     * 도메인이 요청한 사전 세트에 소속되어 있는지 확인한다.
+     *
+     * @param domain 도메인 엔티티
+     * @param setId  사전 세트 ID
+     * @throws BusinessException 도메인이 해당 사전 세트에 소속되지 않은 경우
+     */
     private void verifyDomainBelongsToSet(Domain domain, Long setId) {
         if (domain.getDictionarySet() == null || !domain.getDictionarySet().getId().equals(setId)) {
             throw new BusinessException(MessageCode.ERROR_BUSINESS_DICTIONARY_SET_TEAM_MISMATCH.code());

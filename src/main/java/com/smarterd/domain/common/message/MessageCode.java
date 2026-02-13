@@ -28,7 +28,10 @@ public enum MessageCode {
     ERROR_BUSINESS_DOMAIN_TEAM_MISMATCH("error.business.domain-team-mismatch"),
     ERROR_BUSINESS_DICTIONARY_SET_TEAM_MISMATCH("error.business.dictionary-set-team-mismatch"),
     ERROR_BUSINESS_DIAGRAM_DICTIONARY_SET_IN_USE("error.business.diagram-dictionary-set-in-use"),
-    ERROR_BUSINESS_DIAGRAM_DICTIONARY_SET_CHANGE_WHILE_EDITING("error.business.diagram-dictionary-set-change-while-editing"),
+    ERROR_BUSINESS_DIAGRAM_DICTIONARY_SET_CHANGE_WHILE_EDITING(
+        "error.business.diagram-dictionary-set-change-while-editing"
+    ),
+    ERROR_BUSINESS_DIAGRAM_CONTENT_INVALID_JSON("error.business.diagram-content-invalid-json"),
     ERROR_BUSINESS_DICTIONARY_SET_DEFAULT_DELETE_FORBIDDEN("error.business.dictionary-set-default-delete-forbidden"),
     ERROR_BUSINESS_PROJECT_TEAM_MISMATCH("error.business.project-team-mismatch"),
     ERROR_BUSINESS_REFRESH_TOKEN_EXPIRED("error.business.refresh-token-expired"),
