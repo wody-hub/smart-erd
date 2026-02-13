@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { create } from 'zustand';
 import { STORAGE_KEYS } from '@/constants/storage';
+import { getApiBaseUrl } from '@/lib/platform';
 
 /**
  * 인증 상태를 관리하는 Zustand 스토어의 상태 인터페이스.
@@ -53,7 +54,7 @@ const useAuthStore = create<AuthState>((set) => ({
   logout: () => {
     const rt = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
     if (rt) {
-      axios.post('/api/auth/logout', { refreshToken: rt }).catch(() => {});
+      axios.post(`${getApiBaseUrl()}/auth/logout`, { refreshToken: rt }).catch(() => {});
     }
     localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
     localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);

@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { getWsBaseUrl } from '@/lib/platform';
 import { WS_MSG_TYPE, WS_PRESENCE, WS_RECONNECT } from '@/constants/ws';
 import type {
   AwarenessState,
@@ -362,7 +363,9 @@ export class YjsProvider {
     }
 
     const now = Date.now();
-    this.snapshotRequestTimestamps = this.snapshotRequestTimestamps.filter((ts) => now - ts < 60000);
+    this.snapshotRequestTimestamps = this.snapshotRequestTimestamps.filter(
+      (ts) => now - ts < 60000,
+    );
     if (this.snapshotRequestTimestamps.length >= MAX_SNAPSHOT_REQUESTS_PER_MINUTE) {
       return;
     }
@@ -567,9 +570,7 @@ export class YjsProvider {
    * @returns WebSocket URL
    */
   private buildWsUrl(ticket: string): string {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    return `${protocol}//${host}/ws/diagram/${this.options.diagramId}?ticket=${ticket}`;
+    return `${getWsBaseUrl()}/ws/diagram/${this.options.diagramId}?ticket=${ticket}`;
   }
 
   /**

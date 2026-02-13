@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { STORAGE_KEYS } from '@/constants/storage';
 import useAuthStore from '@/stores/useAuthStore';
+import { getApiBaseUrl } from '@/lib/platform';
 
 /**
  * 동시에 발생한 refresh 요청을 단일 실행으로 합치기 위한 in-flight Promise.
@@ -103,7 +104,7 @@ export async function refreshAccessToken(): Promise<string> {
     }
 
     const res = await axios.post<{ accessToken: string; refreshToken: string }>(
-      '/api/auth/refresh',
+      `${getApiBaseUrl()}/auth/refresh`,
       {
         refreshToken,
       },

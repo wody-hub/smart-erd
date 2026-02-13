@@ -24,4 +24,6 @@ export const ROUTES = {
     `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`,
   /** 데이터 사전 페이지 */
   DICTIONARY: (teamId: string | number) => `/teams/${teamId}/dictionary`,
+  /** 서버 설정 페이지 (Electron 전용) */
+  SETTINGS: '/settings',
 } as const;

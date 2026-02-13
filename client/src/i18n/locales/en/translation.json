@@ -553,6 +553,23 @@
   "permission": {
     "viewerReadonly": "You have view-only access"
   },
+  "settings": {
+    "title": "Server Settings",
+    "description": "Configure the backend server URL for Smart ERD.",
+    "serverUrlLabel": "Server URL",
+    "serverUrlPlaceholder": "e.g. http://localhost:8190",
+    "testConnection": "Test Connection",
+    "testing": "Testing...",
+    "testSuccess": "Connection successful",
+    "testFailed": "Connection failed",
+    "testFailedDetail": "Could not reach the server. Please check the URL.",
+    "testServerError": "Server responded with an error ({{status}})",
+    "save": "Save & Continue",
+    "saved": "Server URL saved",
+    "aria": {
+      "settings": "Server settings"
+    }
+  },
   "language": {
     "ko": "한국어",
     "en": "English"

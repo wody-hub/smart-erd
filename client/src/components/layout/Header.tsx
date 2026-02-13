@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Save } from 'lucide-react';
+import { Save, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useAuthStore from '@/stores/useAuthStore';
 import { ROUTES } from '@/constants/routes';
+import { isElectron } from '@/lib/platform';
 import LanguageSwitcher from './LanguageSwitcher';
 import CollaboratorsBar from './CollaboratorsBar';
 import type { ConnectionStatus } from '@/types/collaboration';
@@ -96,6 +97,17 @@ export default function Header({
       <div className="ml-auto flex items-center gap-3">
         {diagramName && <CollaboratorsBar />}
         <LanguageSwitcher />
+        {isElectron() && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(ROUTES.SETTINGS)}
+            className="text-header-muted hover:text-header-foreground hover:bg-header/80"
+            aria-label={t('settings.aria.settings')}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        )}
         {isAuthenticated && (
           <>
             <span className="text-sm text-header-muted">{name}</span>

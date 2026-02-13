@@ -552,6 +552,23 @@
   "permission": {
     "viewerReadonly": "조회 권한만 있습니다"
   },
+  "settings": {
+    "title": "서버 설정",
+    "description": "Smart ERD 백엔드 서버 URL을 설정합니다.",
+    "serverUrlLabel": "서버 URL",
+    "serverUrlPlaceholder": "예: http://localhost:8190",
+    "testConnection": "연결 테스트",
+    "testing": "테스트 중...",
+    "testSuccess": "연결 성공",
+    "testFailed": "연결 실패",
+    "testFailedDetail": "서버에 연결할 수 없습니다. URL을 확인해 주세요.",
+    "testServerError": "서버가 오류를 반환했습니다 ({{status}})",
+    "save": "저장 후 계속",
+    "saved": "서버 URL이 저장되었습니다",
+    "aria": {
+      "settings": "서버 설정"
+    }
+  },
   "language": {
     "ko": "한국어",
     "en": "English"
