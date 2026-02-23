@@ -1,5 +1,6 @@
 import type { DdlParseResult, ParsedColumn, ParsedRelation, ParsedTable } from '@/lib/ddl-parser';
 import type { Term, Domain } from '@/types/dictionary';
+import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
 
 /** DSL 파싱에 필요한 사전 데이터 */
 export interface DslDictionary {
@@ -84,6 +85,15 @@ interface RawColumn {
 /** 파서 상태 머신 */
 type ParserState = 'IDLE' | 'IN_TABLE';
 
+/** Table 선언 감지 정규식 */
+const TABLE_DECL_REGEX = new RegExp(`^(\\s*)${DSL_TABLE_KEYWORD}\\s+(\\S+)\\s*\\{?\\s*$`);
+
+/** Table 키워드 + 공백 접두사 길이 (위치 계산용) */
+const TABLE_PREFIX_LENGTH = `${DSL_TABLE_KEYWORD} `.length;
+
+/** 옵션 키워드 해체 */
+const [OPT_PK, OPT_AI, OPT_NN] = DSL_COLUMN_OPTIONS;
+
 /**
  * 논리명 DSL을 파싱하여 ERD 생성용 데이터를 반환한다.
  *
@@ -119,10 +129,10 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
 
     if (state === 'IDLE') {
       // Table 선언 감지
-      const tableMatch = effective.match(/^(\s*)Table\s+(\S+)\s*\{?\s*$/);
+      const tableMatch = effective.match(TABLE_DECL_REGEX);
       if (tableMatch) {
         const prefix = tableMatch[1].length;
-        const nameStart = prefix + 'Table '.length;
+        const nameStart = prefix + TABLE_PREFIX_LENGTH;
         const logicalName = tableMatch[2];
         currentTable = {
           logicalName,
@@ -264,9 +274,9 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
 
       // 옵션 파싱
       const options = new Set(rawCol.options.map((o) => o.toUpperCase().trim()));
-      const isPk = options.has('PK');
-      const isAI = options.has('AI');
-      const isNN = options.has('NN');
+      const isPk = options.has(OPT_PK);
+      const isAI = options.has(OPT_AI);
+      const isNN = options.has(OPT_NN);
 
       parsedColumns.push({
         name: physicalName,

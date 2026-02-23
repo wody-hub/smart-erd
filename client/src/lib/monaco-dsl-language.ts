@@ -1,8 +1,16 @@
 import type * as Monaco from 'monaco-editor';
 import type { Term, Domain } from '@/types/dictionary';
+import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
 
 /** DSL 커스텀 언어 ID */
 export const DSL_LANGUAGE_ID = 'smart-erd-dsl';
+
+/** `Table ` 뒤 컨텍스트 감지 정규식 */
+const TABLE_AFTER_REGEX = new RegExp(`^\\s*${DSL_TABLE_KEYWORD}\\s+\\S*$`);
+/** Table 키워드 행 시작 감지 정규식 (블록 판정용) */
+const TABLE_LINE_REGEX = new RegExp(`^${DSL_TABLE_KEYWORD}\\s+`);
+/** Table 키워드 소문자 (자동완성 필터링용) */
+const TABLE_KEYWORD_LOWER = DSL_TABLE_KEYWORD.toLowerCase();
 
 /**
  * Monaco에 smart-erd-dsl 커스텀 언어를 등록한다.
@@ -19,11 +27,13 @@ export function registerDslLanguage(monaco: typeof Monaco): void {
 
   monaco.languages.register({ id: DSL_LANGUAGE_ID });
 
+  /** Table 키워드 정규식 (상태 전환 트리거) */
+  const tableKeywordRegex = new RegExp(`\\b${DSL_TABLE_KEYWORD}\\b`);
+  /** 옵션 키워드 정규식 (PK|AI|NN) */
+  const optionsRegex = new RegExp(DSL_COLUMN_OPTIONS.join('|'));
+
   monaco.languages.setMonarchTokensProvider(DSL_LANGUAGE_ID, {
     defaultToken: 'identifier',
-
-    keywords: ['Table'],
-    options: ['PK', 'AI', 'NN'],
 
     tokenizer: {
       root: [
@@ -31,7 +41,7 @@ export function registerDslLanguage(monaco: typeof Monaco): void {
         [/\/\/.*$/, 'comment'],
         // Table 키워드
         [
-          /\bTable\b/,
+          tableKeywordRegex,
           {
             token: 'keyword',
             next: '@tableName',
@@ -55,7 +65,7 @@ export function registerDslLanguage(monaco: typeof Monaco): void {
       ],
 
       options: [
-        [/PK|AI|NN/, 'keyword.option'],
+        [optionsRegex, 'keyword.option'],
         [/,/, 'delimiter'],
         [/\s+/, ''],
         [/\]/, { token: 'delimiter.square', next: '@pop' }],
@@ -88,7 +98,7 @@ export function createDslCompletionProvider(
   tablesRef: React.RefObject<DslParsedTableRef[]>,
 ): Monaco.languages.CompletionItemProvider {
   return {
-    triggerCharacters: ['[', ':', '>', ',', ' '],
+    triggerCharacters: ['[', ':', '>', ','],
 
     provideCompletionItems(
       model: Monaco.editor.ITextModel,
@@ -106,13 +116,28 @@ export function createDslCompletionProvider(
 
       const suggestions: Monaco.languages.CompletionItem[] = [];
 
+      // 0. 행 시작 + 테이블 블록 외부 → Table 키워드 자동완성
+      if (/^\s*\S*$/.test(textUntilPosition) && !isInsideTableBlock(model, position.lineNumber)) {
+        const typed = word.word.toLowerCase();
+        if (typed.length > 0 && TABLE_KEYWORD_LOWER.startsWith(typed)) {
+          suggestions.push({
+            label: DSL_TABLE_KEYWORD,
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            detail: `${DSL_TABLE_KEYWORD} 테이블명 { ... }`,
+            insertText: `${DSL_TABLE_KEYWORD} `,
+            range,
+          });
+          return { suggestions };
+        }
+      }
+
       // 1. `[` 또는 `,` 뒤 → PK, AI, NN 옵션
       if (/\[\s*$/.test(textUntilPosition) || /,\s*$/.test(textUntilPosition)) {
         // 이미 사용된 옵션 감지
         const bracketIdx = lineContent.lastIndexOf('[');
         const optionsUsed = bracketIdx >= 0 ? lineContent.substring(bracketIdx).toUpperCase() : '';
 
-        for (const opt of ['PK', 'AI', 'NN']) {
+        for (const opt of DSL_COLUMN_OPTIONS) {
           if (!optionsUsed.includes(opt)) {
             suggestions.push({
               label: opt,
@@ -187,7 +212,7 @@ export function createDslCompletionProvider(
       }
 
       // 4. `Table ` 뒤 → Term 검색
-      if (/^\s*Table\s+\S*$/.test(textUntilPosition)) {
+      if (TABLE_AFTER_REGEX.test(textUntilPosition)) {
         for (const term of terms) {
           suggestions.push({
             label: term.logicalName,
@@ -231,7 +256,7 @@ function isInsideTableBlock(model: Monaco.editor.ITextModel, lineNum: number): b
   for (let i = lineNum - 1; i >= 1; i--) {
     const text = model.getLineContent(i).trim();
     if (text === '}') depth--;
-    if (text.endsWith('{') || /^Table\s+/.test(text)) {
+    if (text.endsWith('{') || TABLE_LINE_REGEX.test(text)) {
       depth++;
       if (depth > 0) return true;
     }
