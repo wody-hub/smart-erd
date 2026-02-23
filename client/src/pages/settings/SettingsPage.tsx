@@ -159,9 +159,7 @@ export default function SettingsPage() {
               {testResult === true && (
                 <span className="text-success">{t('settings.testSuccess')}</span>
               )}
-              {testResult === false && (
-                <span className="text-destructive">{testError}</span>
-              )}
+              {testResult === false && <span className="text-destructive">{testError}</span>}
             </span>
           </div>
 
