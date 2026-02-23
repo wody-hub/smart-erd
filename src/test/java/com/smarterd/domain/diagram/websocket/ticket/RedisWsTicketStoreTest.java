@@ -46,17 +46,16 @@ class RedisWsTicketStoreTest {
 
         // then
         assertThat(issued).isTrue();
-        verify(redisTemplate)
-            .execute(
-                org.mockito.ArgumentMatchers.<RedisScript<Long>>any(),
-                eq(List.of("ws:ticket:ticket-1", "ws:tickets:user:login-1", "ws:tickets:diagram:login-1:100")),
-                eq("ticket-1"),
-                any(),
-                eq("30"),
-                eq("10"),
-                eq("ws:ticket:"),
-                eq("300")
-            );
+        verify(redisTemplate).execute(
+            org.mockito.ArgumentMatchers.<RedisScript<Long>>any(),
+            eq(List.of("ws:ticket:ticket-1", "ws:tickets:user:login-1", "ws:tickets:diagram:login-1:100")),
+            eq("ticket-1"),
+            any(),
+            eq("30"),
+            eq("10"),
+            eq("ws:ticket:"),
+            eq("300")
+        );
     }
 
     @Test

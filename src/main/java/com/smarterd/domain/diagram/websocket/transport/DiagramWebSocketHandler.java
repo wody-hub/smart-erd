@@ -7,8 +7,8 @@ import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
 import com.smarterd.domain.diagram.websocket.relay.DiagramPresenceNotifier;
-import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
+import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
 import jakarta.annotation.PostConstruct;
 import java.nio.channels.ClosedChannelException;
 import java.util.HashMap;
@@ -91,7 +91,9 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
             for (final var type : handler.supportedTypes()) {
                 if (!REQUIRED_INBOUND_MESSAGE_TYPES.contains(type)) {
                     throw new IllegalStateException(
-                        "등록 불가 메시지 타입 감지: " + formatMessageTypes(Set.of(type)) + ", handler=" +
+                        "등록 불가 메시지 타입 감지: " +
+                            formatMessageTypes(Set.of(type)) +
+                            ", handler=" +
                             handler.getClass().getSimpleName()
                     );
                 }
@@ -110,8 +112,7 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
         }
 
         if (!map.keySet().containsAll(REQUIRED_INBOUND_MESSAGE_TYPES)) {
-            final var missingTypes = REQUIRED_INBOUND_MESSAGE_TYPES
-                .stream()
+            final var missingTypes = REQUIRED_INBOUND_MESSAGE_TYPES.stream()
                 .filter((type) -> !map.containsKey(type))
                 .collect(Collectors.toSet());
             throw new IllegalStateException("필수 메시지 핸들러 누락: " + formatMessageTypes(missingTypes));
@@ -297,11 +298,7 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
                             if (!restored) {
                                 log.error("연결 종료 flush 실패 후 update 복원 실패 (diagramId={})", diagramId);
                             }
-                            log.error(
-                                "연결 종료 flush 실패, drain된 update 복원 (diagramId={})",
-                                diagramId,
-                                e
-                            );
+                            log.error("연결 종료 flush 실패, drain된 update 복원 (diagramId={})", diagramId, e);
                         }
                     }
                 }

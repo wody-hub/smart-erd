@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -38,7 +37,9 @@ final class DiagramUpdateBuffer {
      * @return 추가 성공 여부 (false면 누적 크기 초과)
      */
     boolean appendUpdate(Long diagramId, byte[] update, long maxBufferBytes) {
-        final var updates = accumulatedUpdates.computeIfAbsent(diagramId, (k) -> Collections.synchronizedList(new ArrayList<>()));
+        final var updates = accumulatedUpdates.computeIfAbsent(diagramId, (k) ->
+            Collections.synchronizedList(new ArrayList<>())
+        );
         final var sizeCounter = accumulatedSizes.computeIfAbsent(diagramId, (k) -> new AtomicLong(0));
 
         // sizeCounter와 updates 리스트 상태를 원자적으로 관리하기 위해 updates 락 사용

@@ -3,7 +3,6 @@ package com.smarterd.config;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.LocaleResolver;

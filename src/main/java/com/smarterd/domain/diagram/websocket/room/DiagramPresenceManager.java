@@ -87,11 +87,7 @@ final class DiagramPresenceManager {
             final var joinSeq = roomState.joinSeqGenerator.incrementAndGet();
             final var newEntry = new PresenceEntry(userId, displayName, joinSeq);
             roomState.entries.put(userId, newEntry);
-            joinedParticipant = new PresenceParticipant(
-                newEntry.userId,
-                newEntry.displayName,
-                newEntry.joinSeq
-            );
+            joinedParticipant = new PresenceParticipant(newEntry.userId, newEntry.displayName, newEntry.joinSeq);
             joinedPresenceVersion = roomState.presenceVersion.incrementAndGet();
         } else {
             entry.sessionCount++;
@@ -170,10 +166,6 @@ final class DiagramPresenceManager {
             .sorted(Comparator.comparingLong((PresenceEntry e) -> e.joinSeq))
             .map((e) -> new PresenceParticipant(e.userId, e.displayName, e.joinSeq))
             .toList();
-        return new PresenceSnapshot(
-            roomState.roomEpoch,
-            roomState.presenceVersion.get(),
-            participants
-        );
+        return new PresenceSnapshot(roomState.roomEpoch, roomState.presenceVersion.get(), participants);
     }
 }

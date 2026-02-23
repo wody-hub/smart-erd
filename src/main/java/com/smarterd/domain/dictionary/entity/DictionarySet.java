@@ -60,4 +60,3 @@ public class DictionarySet extends BaseTimeEntity {
         this.isDefault = isDefault;
     }
 }
-

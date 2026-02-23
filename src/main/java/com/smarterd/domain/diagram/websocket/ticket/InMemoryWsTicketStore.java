@@ -26,7 +26,12 @@ public class InMemoryWsTicketStore implements WsTicketStore {
     }
 
     @Override
-    public synchronized boolean issueTicketAtomically(String ticket, TicketData data, Duration ttl, int maxOutstanding) {
+    public synchronized boolean issueTicketAtomically(
+        String ticket,
+        TicketData data,
+        Duration ttl,
+        int maxOutstanding
+    ) {
         Objects.requireNonNull(ticket, "ticket must not be null");
         Objects.requireNonNull(data, "data must not be null");
         Objects.requireNonNull(ttl, "ttl must not be null");

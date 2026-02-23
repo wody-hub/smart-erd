@@ -9,4 +9,3 @@ public class ConflictException extends LocalizedException {
         super(messageCode, messageArgs);
     }
 }
-

@@ -21,4 +21,3 @@ public record CreateDictionarySetRequest(
     @Size(max = 500, message = "{validation.size.description}")
     String description
 ) {}
-

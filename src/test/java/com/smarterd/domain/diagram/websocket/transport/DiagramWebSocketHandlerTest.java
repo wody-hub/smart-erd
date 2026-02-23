@@ -9,6 +9,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.smarterd.config.WebSocketProperties;
+import com.smarterd.domain.diagram.service.DiagramSnapshotService;
+import com.smarterd.domain.diagram.websocket.model.LeaveResult;
+import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
+import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
+import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
+import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
+import com.smarterd.domain.diagram.websocket.relay.DiagramPresenceNotifier;
+import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
+import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,15 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
-import com.smarterd.domain.diagram.service.DiagramSnapshotService;
-import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
-import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
-import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
-import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
-import com.smarterd.domain.diagram.websocket.relay.DiagramPresenceNotifier;
-import com.smarterd.domain.diagram.websocket.model.LeaveResult;
-import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
-import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 
 /**
  * {@link DiagramWebSocketHandler} 단위 테스트.
@@ -38,9 +38,7 @@ class DiagramWebSocketHandlerTest {
     @DisplayName("initHandlerMap - 필수 메시지 타입 핸들러가 누락되면 예외가 발생한다")
     void initHandlerMap_missingRequiredTypes_throwsException() {
         // given
-        final var fixture = createFixture(
-            List.of(new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_SYNC_STEP1)))
-        );
+        final var fixture = createFixture(List.of(new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_SYNC_STEP1))));
 
         // when & then
         assertThatThrownBy(fixture.handler()::initHandlerMap)
@@ -86,8 +84,9 @@ class DiagramWebSocketHandlerTest {
         when(session.getId()).thenReturn("session-1");
         when(session.getAttributes()).thenReturn(attributes);
         when(fixture.roomManager().checkRateLimit(session)).thenReturn(true);
-        when(fixture.messageSender().extractPayload(any(BinaryMessage.class)))
-            .thenReturn(new byte[] { DiagramMessageTypes.MSG_YJS_UPDATE, 0x01 });
+        when(fixture.messageSender().extractPayload(any(BinaryMessage.class))).thenReturn(
+            new byte[] { DiagramMessageTypes.MSG_YJS_UPDATE, 0x01 }
+        );
 
         // when
         fixture.handler().handleBinaryMessage(session, new BinaryMessage(new byte[] { 0x00 }));
@@ -116,7 +115,9 @@ class DiagramWebSocketHandlerTest {
         when(session.getId()).thenReturn("session-1");
         when(session.getAttributes()).thenReturn(attributes);
         when(fixture.roomManager().checkRateLimit(session)).thenReturn(true);
-        when(fixture.messageSender().extractPayload(any(BinaryMessage.class))).thenReturn(new byte[] { (byte) 0x7F, 0x01 });
+        when(fixture.messageSender().extractPayload(any(BinaryMessage.class))).thenReturn(
+            new byte[] { (byte) 0x7F, 0x01 }
+        );
 
         // when
         fixture.handler().handleBinaryMessage(session, new BinaryMessage(new byte[] { 0x00 }));
@@ -211,8 +212,9 @@ class DiagramWebSocketHandlerTest {
         when(session.getAttributes()).thenReturn(new HashMap<>());
         when(fixture.roomManager().findDiagramIdBySession(session)).thenReturn(100L);
         when(fixture.roomManager().findUserIdBySession(session)).thenReturn("user-1");
-        when(fixture.roomManager().leave(100L, session, "user-1"))
-            .thenReturn(new LeaveResult(false, new byte[0], null, null, 0));
+        when(fixture.roomManager().leave(100L, session, "user-1")).thenReturn(
+            new LeaveResult(false, new byte[0], null, null, 0)
+        );
 
         // when
         fixture.handler().afterConnectionClosed(session, CloseStatus.NORMAL);
@@ -241,13 +243,13 @@ class DiagramWebSocketHandlerTest {
     private List<TestMessageHandler> createRequiredHandlers() {
         return new ArrayList<>(
             List.of(
-            new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_SYNC_STEP1)),
-            new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_SYNC_STEP2)),
-            new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_YJS_UPDATE)),
-            new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_AWARENESS)),
-            new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_SNAPSHOT_REQUEST)),
-            new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_COMPACTED_SNAPSHOT)),
-            new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_PRESENCE_SNAPSHOT_REQUEST))
+                new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_SYNC_STEP1)),
+                new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_SYNC_STEP2)),
+                new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_YJS_UPDATE)),
+                new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_AWARENESS)),
+                new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_SNAPSHOT_REQUEST)),
+                new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_COMPACTED_SNAPSHOT)),
+                new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_PRESENCE_SNAPSHOT_REQUEST))
             )
         );
     }

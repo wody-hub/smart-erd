@@ -88,8 +88,10 @@ public class DiagramRoomManager {
      */
     public JoinResult join(Long diagramId, WebSocketSession session, String userId, String displayName) {
         // 사용자별 연결 수 체크
-        final var acquired =
-            sessionRegistry.tryAcquireUserConnection(userId, webSocketProperties.getMaxConnectionsPerUser());
+        final var acquired = sessionRegistry.tryAcquireUserConnection(
+            userId,
+            webSocketProperties.getMaxConnectionsPerUser()
+        );
         if (!acquired) {
             log.warn("사용자 {} 연결 수 초과 (최대 {})", userId, webSocketProperties.getMaxConnectionsPerUser());
             return new JoinResult(false, null, null, 0);

@@ -15,4 +15,3 @@ public record UpdateDiagramDictionarySetResponse(
     @Schema(description = "무효화된 term 바인딩 수", example = "0") int invalidatedTermBindingCount,
     @Schema(description = "무효화된 domain 바인딩 수", example = "0") int invalidatedDomainBindingCount
 ) {}
-

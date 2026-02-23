@@ -20,8 +20,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class PresenceSnapshotRequestMessageHandler implements DiagramMessageHandler {
 
-    private static final Set<Byte> SUPPORTED_TYPES =
- Set.of(DiagramMessageTypes.MSG_PRESENCE_SNAPSHOT_REQUEST);
+    private static final Set<Byte> SUPPORTED_TYPES = Set.of(DiagramMessageTypes.MSG_PRESENCE_SNAPSHOT_REQUEST);
 
     private final DiagramRoomManager roomManager;
     private final DiagramPresenceNotifier presenceNotifier;

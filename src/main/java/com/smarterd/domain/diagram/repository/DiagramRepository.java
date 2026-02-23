@@ -49,6 +49,8 @@ public interface DiagramRepository extends JpaRepository<Diagram, Long>, Diagram
     void deleteByProjectIn(List<Project> projects);
 
     @Modifying
-    @Query("update Diagram d set d.dictionarySet = :dictionarySet where d.project.team = :team and d.dictionarySet is null")
+    @Query(
+        "update Diagram d set d.dictionarySet = :dictionarySet where d.project.team = :team and d.dictionarySet is null"
+    )
     int backfillNullDictionarySetByTeam(@Param("team") Team team, @Param("dictionarySet") DictionarySet dictionarySet);
 }

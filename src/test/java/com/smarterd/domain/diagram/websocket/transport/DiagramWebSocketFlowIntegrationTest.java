@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.config.WebSocketProperties;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
+import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
@@ -19,9 +20,8 @@ import com.smarterd.domain.diagram.websocket.relay.handler.PresenceSnapshotReque
 import com.smarterd.domain.diagram.websocket.relay.handler.SnapshotRequestMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.handler.SyncRelayMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.handler.YjsUpdateMessageHandler;
-import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
-import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
+import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.List;

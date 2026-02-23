@@ -106,4 +106,3 @@ public class DictionarySetController {
         return ResponseEntity.ok(dictionarySetService.setDefaultDictionarySet(jwt.getSubject(), teamId, setId));
     }
 }
-

@@ -15,8 +15,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class SyncRelayMessageHandler implements DiagramMessageHandler {
 
-    private static final Set<Byte> SUPPORTED_TYPES =
-        Set.of(DiagramMessageTypes.MSG_SYNC_STEP1, DiagramMessageTypes.MSG_SYNC_STEP2);
+    private static final Set<Byte> SUPPORTED_TYPES = Set.of(
+        DiagramMessageTypes.MSG_SYNC_STEP1,
+        DiagramMessageTypes.MSG_SYNC_STEP2
+    );
 
     private final DiagramMessageSender messageSender;
 

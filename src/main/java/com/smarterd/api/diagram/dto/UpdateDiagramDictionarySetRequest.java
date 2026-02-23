@@ -14,4 +14,3 @@ public record UpdateDiagramDictionarySetRequest(
     @NotNull(message = "{validation.not-null.dictionary-set-id}")
     Long dictionarySetId
 ) {}
-

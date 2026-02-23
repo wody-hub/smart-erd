@@ -1,7 +1,7 @@
 package com.smarterd.domain.dictionary.repository;
 
-import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.entity.DictionarySet;
+import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.team.entity.Team;
 import java.util.Collection;
 import java.util.List;
