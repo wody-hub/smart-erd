@@ -127,6 +127,7 @@ function ERDCanvas({
   const removeEdge = useCanvasStore((s) => s.removeEdge);
   const removeEdgeWithFkColumn = useCanvasStore((s) => s.removeEdgeWithFkColumn);
   const applyLayout = useCanvasStore((s) => s.applyLayout);
+  const setActiveEditNodeId = useCanvasStore((s) => s.setActiveEditNodeId);
 
   const {
     fkMode,
@@ -189,17 +190,22 @@ function ERDCanvas({
     setHighlightedNodes([edge.source, edge.target]);
   };
 
-  /** 노드 클릭 — FK 모드 + 테이블 노드일 때만 FK 핸들러 호출 */
+  /** 노드 클릭 — FK 모드일 때 FK 핸들러 호출, 일반 클릭 시 편집 모드 진입 */
   const handleNodeClick = (event: React.MouseEvent, node: Node) => {
     if (fkMode && node.type === 'table') {
       handleNodeClickInFkMode(event, node as Node<TableNodeData>);
+      return;
+    }
+    if (node.type === 'table') {
+      setActiveEditNodeId(node.id);
     }
   };
 
-  /** 캔버스 빈 영역 클릭 — 하이라이트 해제 */
+  /** 캔버스 빈 영역 클릭 — 하이라이트 해제 + 편집 모드 해제 */
   const handlePaneClick = () => {
     clearHighlights();
     setContextMenu(null);
+    setActiveEditNodeId(null);
   };
 
   /** 엣지 우클릭 — 컨텍스트 메뉴 표시 */

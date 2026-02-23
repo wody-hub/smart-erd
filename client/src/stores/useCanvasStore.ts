@@ -63,6 +63,10 @@ interface CanvasState {
   edges: Edge[];
   highlightedNodeIds: string[];
   highlightedEdgeId: string | null;
+  /** 현재 편집 모드로 활성화된 노드 ID (null이면 모든 노드가 정적 뷰) */
+  activeEditNodeId: string | null;
+  /** 편집 모드 노드를 설정한다. */
+  setActiveEditNodeId: (id: string | null) => void;
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   setNodes: (nodes: Node<TableNodeData>[]) => void;
@@ -225,6 +229,8 @@ const useCanvasStore = create<CanvasState>((set, get) => {
     edges: [],
     highlightedNodeIds: [],
     highlightedEdgeId: null,
+    activeEditNodeId: null,
+    setActiveEditNodeId: (id) => set({ activeEditNodeId: id }),
     lastBackupHash: '',
     ydoc: null,
     internal: {
@@ -297,7 +303,14 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       internal.isNodeDragging = false;
       internal.hasDeferredTableSync = false;
       internal.groupNodeIds = new Set();
-      set({ ydoc: null, nodes: [], edges: [], groupNodes: [], lastBackupHash: '' });
+      set({
+        ydoc: null,
+        nodes: [],
+        edges: [],
+        groupNodes: [],
+        lastBackupHash: '',
+        activeEditNodeId: null,
+      });
     },
 
     onNodesChange: (changes) => {
@@ -457,6 +470,9 @@ const useCanvasStore = create<CanvasState>((set, get) => {
         });
         toDelete.forEach((eid) => edgesMap.delete(eid));
       });
+      if (get().activeEditNodeId === nodeId) {
+        set({ activeEditNodeId: null });
+      }
     },
     renameTable: (nodeId, newName) => {
       const { ydoc } = get();

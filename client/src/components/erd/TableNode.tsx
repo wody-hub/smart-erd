@@ -35,6 +35,7 @@ import ColumnAutocomplete, { type TermSelectResult } from './ColumnAutocomplete'
 import DomainSelectPopover from './DomainSelectPopover';
 import QuickTermDialog from './QuickTermDialog';
 import TableColorPicker from './TableColorPicker';
+import StaticColumnRow from './StaticColumnRow';
 
 /** 빠른 용어 등록 대상 정보 */
 interface QuickTermTarget {
@@ -128,6 +129,10 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
   const { findTermById, findDomainById } = useErdDictionary();
   const { canEdit } = useErdPermission();
+  /** 이 노드가 현재 편집 모드인지 여부 (파생 boolean으로 전환 시 최대 2개 노드만 리렌더링) */
+  const isEditingState = useCanvasStore((s) => s.activeEditNodeId === id);
+  /** 편집 권한이 있고, 이 노드가 편집 모드로 활성화된 상태 */
+  const isEditing = canEdit && isEditingState;
   const fkMode = useErdFkMode();
   const registerCompound = useCompoundTermRegister(id);
 
@@ -532,7 +537,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
         >
           <div className="flex items-start gap-1">
             {/* 색상 선택기 트리거 (hover/focus 시 표시, M-1: 터치 대응 추가) */}
-            {canEdit && (
+            {isEditing && (
               <Popover>
                 <PopoverTrigger asChild>
                   <button
@@ -554,7 +559,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
             <div className="flex-1 min-w-0">
               {/* 논리명 행 (있으면 표시, 없으면 더블클릭으로 추가) */}
-              {canEdit ? (
+              {isEditing ? (
                 <ColumnAutocomplete
                   value={logicalTableName ?? ''}
                   onChange={handleTableLogicalNameChange}
@@ -574,7 +579,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
               ) : null}
 
               {/* 물리명 행 */}
-              {editing && canEdit ? (
+              {editing && isEditing ? (
                 <input
                   className="nodrag bg-transparent font-semibold text-sm w-full outline-none focus-visible:ring-1 focus-visible:ring-ring rounded placeholder-current/50"
                   value={value}
@@ -590,7 +595,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
               ) : (
                 <div
                   className="font-semibold text-sm cursor-pointer select-none truncate"
-                  onDoubleClick={canEdit ? () => startEdit(label) : undefined}
+                  onDoubleClick={isEditing ? () => startEdit(label) : undefined}
                 >
                   {label}
                 </div>
@@ -599,8 +604,8 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
           </div>
         </div>
 
-        {/* Columns — DnD 래핑 */}
-        {canEdit ? (
+        {/* Columns — 편집 모드: DnD 래핑, 정적 모드: StaticColumnRow */}
+        {isEditing ? (
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -628,14 +633,25 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
           </DndContext>
         ) : (
           <div className="divide-y divide-border">
-            {columns.map((col) => (
-              <div key={col.id}>{renderColumnRow(col)}</div>
-            ))}
+            {columns.map((col) => {
+              const domain = col.domainId != null ? findDomainById(col.domainId) : undefined;
+              return (
+                <StaticColumnRow
+                  key={col.id}
+                  col={col}
+                  nodeId={id}
+                  connected={isConnected(col.id)}
+                  warning={getColumnWarning(col, findTermById, findDomainById)}
+                  domainLogicalName={domain?.logicalName}
+                  domainPhysicalType={domain?.physicalType}
+                />
+              );
+            })}
           </div>
         )}
 
         {/* Add column button */}
-        {canEdit && (
+        {isEditing && (
           <div className="border-t border-border">
             <button
               className="nodrag w-full px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent flex items-center justify-center gap-1 cursor-pointer"
