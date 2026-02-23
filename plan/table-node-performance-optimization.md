@@ -25,6 +25,7 @@ React Flow의 시각적 선택(`selected`)과 논리적 편집 모드(`activeEdi
 
 - **Store**: `activeEditNodeId: string | null` 상태 추가.
 - **Policy**: 오직 **하나의 노드만** 편집 모드 진입 가능.
+- **UX 규칙**: `selected`는 시각적 선택(테두리 표시), `activeEditNodeId`는 편집 모드 진입. 드래그 다중 선택만으로는 편집 모드에 진입하지 않으며, 마지막으로 **직접 클릭한** 노드 1개만 편집 대상이 된다.
 - **Persistence**: Yjs 업데이트와 무관하게 Zustand에서 독립적으로 관리되므로 편집 상태 유지됨.
 - **Lifecycle**: 노드 삭제 시, 다이어그램 전환(`destroyYDoc`) 시 `null`로 초기화하여 stale ID 방지.
 
@@ -87,9 +88,26 @@ const handlePaneClick = useCallback(() => {
 ```
 
 ### 4.3. `TableNode.tsx` (구독 최적화 및 렌더링)
+
+> **구현 주의사항 — Zustand selector 최적화**
+>
+> `activeEditNodeId`를 직접 구독하면 값이 바뀔 때마다 **전체 노드**가 리렌더링됩니다.
+> 반드시 파생 boolean을 반환하는 selector를 사용하세요. Zustand 기본 비교(`Object.is`)가
+> primitive boolean에 대해 정확히 동작하므로 `useShallow`는 불필요합니다.
+> 이 패턴으로 편집 노드를 전환할 때 리렌더링되는 노드는 **최대 2개**(이전 편집 노드 + 새 편집 노드)입니다.
+>
+> ```tsx
+> // Bad: activeEditNodeId 문자열이 바뀔 때마다 전체 노드 리렌더링
+> const activeId = useCanvasStore(s => s.activeEditNodeId);
+> const isEditing = activeId === id;
+>
+> // Good: boolean 결과가 변하는 노드(최대 2개)만 리렌더링
+> const isEditing = useCanvasStore(s => s.activeEditNodeId === id);
+> ```
+
 ```tsx
 function TableNode({ id, data }: NodeProps<TableNodeData>) {
-  // [최적화] 내 노드의 편집 상태가 바뀔 때만 리렌더링 (primitive boolean 비교이므로 useShallow 불필요)
+  // [최적화] 내 노드의 편집 상태가 바뀔 때만 리렌더링
   const isEditingState = useCanvasStore(s => s.activeEditNodeId === id);
   const { canEdit } = useErdPermission();
   
@@ -139,6 +157,8 @@ function TableNode({ id, data }: NodeProps<TableNodeData>) {
 - [ ] **Layout Shift**: 선택/해제 시 테이블 크기가 덜컥거리거나 컬럼 높이가 변하지 않는가?
 - [ ] **입력 보존**: 편집 중 빈 곳을 클릭하여 편집 모드를 종료할 때, 입력 중이던 내용이 저장(commit)되는가? (`onBlur` 동작 확인)
 
-### 5.3. 성능 측정
-- [ ] **초기 렌더링**: 노드 50개 이상 로딩 시 Scripting 시간 비교 (React DevTools Profiler).
-- [ ] **인터랙션**: 줌/팬 시 프레임 드랍(Jank) 발생 여부.
+### 5.3. 성능 측정 (최적화 전후 비교)
+
+- [ ] **초기 렌더링**: 노드 50개 / 100개 로딩 시 Scripting 시간 비교 (React DevTools Profiler).
+- [ ] **인터랙션**: 노드 100개 상태에서 줌/팬 시 프레임 드랍 발생 여부 (DevTools Performance 탭).
+- [ ] **메모리**: 노드 100개 상태에서 힙 스냅샷 크기 비교 (DevTools Memory 탭).
