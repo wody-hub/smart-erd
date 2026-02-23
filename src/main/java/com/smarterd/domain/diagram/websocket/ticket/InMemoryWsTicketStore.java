@@ -21,11 +21,6 @@ public class InMemoryWsTicketStore implements WsTicketStore {
     private final Map<String, TicketData> tickets = new ConcurrentHashMap<>();
 
     @Override
-    public void store(String ticket, TicketData data, Duration ttl) {
-        tickets.put(ticket, data);
-    }
-
-    @Override
     public synchronized boolean issueTicketAtomically(
         String ticket,
         TicketData data,

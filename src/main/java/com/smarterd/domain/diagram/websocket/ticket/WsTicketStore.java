@@ -10,15 +10,6 @@ import java.util.Optional;
  */
 public interface WsTicketStore {
     /**
-     * ticket을 저장한다.
-     *
-     * @param ticket 티켓 문자열
-     * @param data   티켓 데이터
-     * @param ttl    유효 기간
-     */
-    void store(String ticket, TicketData data, Duration ttl);
-
-    /**
      * 기존 (loginId, diagramId) ticket을 대체하면서 사용자별 미사용 ticket 상한을 원자적으로 검사한다.
      *
      * <p>수평 확장 환경에서도 발급 상한이 깨지지 않도록 저장소 구현체가 단일 원자 연산으로 처리해야 한다.</p>

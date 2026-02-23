@@ -8,8 +8,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.lang.Nullable;
 
 /**
  * Redis 기반 ticket 저장소.
@@ -32,13 +34,26 @@ public class RedisWsTicketStore implements WsTicketStore {
     /** 사용자별 ticket 집합 TTL (ticket TTL보다 충분히 긴 값) */
     private static final Duration USER_SET_TTL = Duration.ofMinutes(5);
 
+    /** consume Lua 스크립트 classpath 경로 */
+    private static final String CONSUME_SCRIPT_PATH = "lua/ws-ticket-consume.lua";
+
+    /** count Lua 스크립트 classpath 경로 */
+    private static final String COUNT_SCRIPT_PATH = "lua/ws-ticket-count.lua";
+
+    /** issue Lua 스크립트 classpath 경로 */
+    private static final String ISSUE_SCRIPT_PATH = "lua/ws-ticket-issue.lua";
+
+    /** remove Lua 스크립트 classpath 경로 */
+    private static final String REMOVE_SCRIPT_PATH = "lua/ws-ticket-remove.lua";
+
     /**
      * 원자적 consume Lua 스크립트.
      *
-     * <p>KEYS[1]=ticket키, KEYS[2]=userSet키, KEYS[3]=diagram키, ARGV[1]=ticket ID.
-     * ticket 삭제 + user SET에서 제거 + diagram 역인덱스 삭제를 원자적으로 수행한다.</p>
+     * <p>KEYS[1]=ticket키, ARGV[1]=ticket ID, ARGV[2]=userSet키 접두사, ARGV[3]=diagram키 접두사.
+     * ticket JSON을 cjson.decode로 파싱하여 보조 인덱스 키를 내부에서 산출한 뒤,
+     * ticket 삭제 + user SET에서 제거 + diagram 역인덱스 삭제를 원자적으로 수행하고 JSON을 반환한다.</p>
      */
-    private static final DefaultRedisScript<String> CONSUME_SCRIPT;
+    private static final DefaultRedisScript<String> CONSUME_SCRIPT = loadScript(CONSUME_SCRIPT_PATH, String.class);
 
     /**
      * user SET에서 만료된 ticket을 정리하고 유효 수를 반환하는 Lua 스크립트.
@@ -46,7 +61,7 @@ public class RedisWsTicketStore implements WsTicketStore {
      * <p>KEYS[1]=userSet키, ARGV[1]=ticket키 접두사.
      * SET 멤버를 순회하며 primary key 존재 여부를 검증하고, 만료된 엔트리를 제거한 뒤 유효 수를 반환한다.</p>
      */
-    private static final DefaultRedisScript<Long> COUNT_SCRIPT;
+    private static final DefaultRedisScript<Long> COUNT_SCRIPT = loadScript(COUNT_SCRIPT_PATH, Long.class);
 
     /**
      * (loginId, diagramId) 교체 + 상한 검사 + 신규 저장을 원자적으로 수행하는 Lua 스크립트.
@@ -55,72 +70,15 @@ public class RedisWsTicketStore implements WsTicketStore {
      * ARGV[1]=newTicketId, ARGV[2]=ticketJson, ARGV[3]=ttlSec, ARGV[4]=maxOutstanding,
      * ARGV[5]=ticketKeyPrefix, ARGV[6]=userSetTtlSec.</p>
      */
-    private static final DefaultRedisScript<Long> ISSUE_SCRIPT;
+    private static final DefaultRedisScript<Long> ISSUE_SCRIPT = loadScript(ISSUE_SCRIPT_PATH, Long.class);
 
-    static {
-        CONSUME_SCRIPT = new DefaultRedisScript<>();
-        CONSUME_SCRIPT.setScriptText(
-            """
-            local v = redis.call('GET', KEYS[1])
-            if v then
-                redis.call('DEL', KEYS[1])
-                redis.call('SREM', KEYS[2], ARGV[1])
-                redis.call('DEL', KEYS[3])
-            end
-            return v
-            """
-        );
-        CONSUME_SCRIPT.setResultType(String.class);
-
-        COUNT_SCRIPT = new DefaultRedisScript<>();
-        COUNT_SCRIPT.setScriptText(
-            """
-            local members = redis.call('SMEMBERS', KEYS[1])
-            local count = 0
-            for _, ticket in ipairs(members) do
-                if redis.call('EXISTS', ARGV[1] .. ticket) == 1 then
-                    count = count + 1
-                else
-                    redis.call('SREM', KEYS[1], ticket)
-                end
-            end
-            return count
-            """
-        );
-        COUNT_SCRIPT.setResultType(Long.class);
-
-        ISSUE_SCRIPT = new DefaultRedisScript<>();
-        ISSUE_SCRIPT.setScriptText(
-            """
-            local oldTicket = redis.call('GET', KEYS[3])
-            if oldTicket then
-                redis.call('DEL', ARGV[5] .. oldTicket)
-                redis.call('SREM', KEYS[2], oldTicket)
-            end
-
-            local members = redis.call('SMEMBERS', KEYS[2])
-            local count = 0
-            for _, ticket in ipairs(members) do
-                if redis.call('EXISTS', ARGV[5] .. ticket) == 1 then
-                    count = count + 1
-                else
-                    redis.call('SREM', KEYS[2], ticket)
-                end
-            end
-
-            if count >= tonumber(ARGV[4]) then
-                return 0
-            end
-
-            redis.call('SET', KEYS[1], ARGV[2], 'EX', tonumber(ARGV[3]))
-            redis.call('SADD', KEYS[2], ARGV[1])
-            redis.call('EXPIRE', KEYS[2], tonumber(ARGV[6]))
-            redis.call('SET', KEYS[3], ARGV[1], 'EX', tonumber(ARGV[3]))
-            return 1
-            """
-        );
-        ISSUE_SCRIPT.setResultType(Long.class);
-    }
+    /**
+     * (loginId, diagramId) 역인덱스 기반 ticket 제거를 원자적으로 수행하는 Lua 스크립트.
+     *
+     * <p>KEYS[1]=diagramKey, KEYS[2]=userSetKey, ARGV[1]=ticketKeyPrefix.
+     * diagram 역인덱스에서 ticket ID를 읽고, ticket primary key + user SET에서 원자적으로 제거한다.</p>
+     */
+    private static final DefaultRedisScript<Long> REMOVE_SCRIPT = loadScript(REMOVE_SCRIPT_PATH, Long.class);
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -136,21 +94,19 @@ public class RedisWsTicketStore implements WsTicketStore {
         this.objectMapper = objectMapper;
     }
 
-    @Override
-    public void store(String ticket, TicketData data, Duration ttl) {
-        final var ticketKey = TICKET_KEY_PREFIX + ticket;
-        final var userSetKey = USER_SET_KEY_PREFIX + data.loginId();
-        final var diagramKey = DIAGRAM_KEY_PREFIX + data.loginId() + ":" + data.diagramId();
-
-        try {
-            final var json = Objects.requireNonNull(objectMapper.writeValueAsString(data));
-            redisTemplate.opsForValue().set(ticketKey, json, Objects.requireNonNull(ttl));
-            redisTemplate.opsForSet().add(userSetKey, ticket);
-            redisTemplate.expire(userSetKey, Objects.requireNonNull(USER_SET_TTL));
-            redisTemplate.opsForValue().set(diagramKey, Objects.requireNonNull(ticket), ttl);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("TicketData JSON 직렬화 실패", e);
-        }
+    /**
+     * classpath의 Lua 파일을 읽어 {@link DefaultRedisScript} 객체를 생성한다.
+     *
+     * @param path       classpath 기준 Lua 파일 경로
+     * @param resultType 스크립트 반환 타입
+     * @param <T>        스크립트 반환 제네릭 타입
+     * @return 로드된 Redis Lua 스크립트 객체
+     */
+    private static <T> DefaultRedisScript<T> loadScript(String path, Class<T> resultType) {
+        final var script = new DefaultRedisScript<T>();
+        script.setLocation(new ClassPathResource(Objects.requireNonNull(path)));
+        script.setResultType(Objects.requireNonNull(resultType));
+        return script;
     }
 
     @Override
@@ -181,51 +137,60 @@ public class RedisWsTicketStore implements WsTicketStore {
     public Optional<TicketData> consume(String ticket) {
         final var ticketKey = TICKET_KEY_PREFIX + ticket;
 
-        // 역직렬화를 위해 먼저 GET으로 데이터를 읽어 loginId/diagramId를 추출해야
-        // Lua 스크립트에 보조 인덱스 키를 전달할 수 있다.
-        final var rawJson = redisTemplate.opsForValue().get(ticketKey);
-        if (rawJson == null) {
+        // Lua 스크립트로 원자적 GET + DEL + cjson.decode + SREM + DEL 수행.
+        // Lua 내부에서 ticket JSON을 파싱하여 보조 인덱스 키를 산출하므로
+        // Java 측 사전 GET이 불필요하며, 동시 consume 경쟁 시 하나만 성공한다.
+        final var consumedJson = executeConsumeScript(ticketKey, ticket);
+        if (consumedJson == null) {
             return Optional.empty();
         }
 
+        final TicketData data;
         try {
-            final var data = objectMapper.readValue(rawJson, TicketData.class);
-            final var userSetKey = USER_SET_KEY_PREFIX + data.loginId();
-            final var diagramKey = DIAGRAM_KEY_PREFIX + data.loginId() + ":" + data.diagramId();
-
-            // Lua 스크립트로 원자적 DEL + SREM + DEL (보조 인덱스 포함)
-            final var consumedJson = redisTemplate.execute(
-                Objects.requireNonNull(CONSUME_SCRIPT),
-                Objects.requireNonNull(List.of(ticketKey, userSetKey, diagramKey)),
-                ticket
-            );
-            if (consumedJson == null) {
-                // 동시 consume 경쟁에서 이미 다른 요청이 선점한 경우
-                return Optional.empty();
-            }
-
-            if (data.expiresAt().isBefore(Instant.now())) {
-                log.debug("WebSocket ticket 만료: loginId={}", data.loginId());
-                return Optional.empty();
-            }
-
-            return Optional.of(data);
+            data = objectMapper.readValue(consumedJson, TicketData.class);
         } catch (JsonProcessingException e) {
             log.warn("TicketData JSON 역직렬화 실패: ticket={}", ticket, e);
-            // 파싱 실패한 ticket은 정리
-            redisTemplate.delete(ticketKey);
             return Optional.empty();
         }
+
+        if (data.expiresAt().isBefore(Instant.now())) {
+            log.debug("WebSocket ticket 만료: loginId={}", data.loginId());
+            return Optional.empty();
+        }
+
+        return Optional.of(data);
+    }
+
+    /**
+     * consume Lua 스크립트를 실행하고 결과 JSON을 반환한다.
+     *
+     * <p>{@code @NonNullApi} 패키지에서 {@code redisTemplate.execute()} 반환값이
+     * non-null로 추론되는 것을 방지하기 위해 {@code @Nullable} 반환 타입으로 감싼다.</p>
+     *
+     * @param ticketKey Redis ticket 키
+     * @param ticket    ticket ID
+     * @return ticket JSON 문자열, ticket이 없으면 {@code null}
+     */
+    @Nullable
+    private String executeConsumeScript(String ticketKey, String ticket) {
+        return redisTemplate.execute(
+            Objects.requireNonNull(CONSUME_SCRIPT),
+            Objects.requireNonNull(List.of(ticketKey)),
+            ticket,
+            USER_SET_KEY_PREFIX,
+            DIAGRAM_KEY_PREFIX
+        );
     }
 
     @Override
     public void removeByLoginIdAndDiagramId(String loginId, Long diagramId) {
         final var diagramKey = DIAGRAM_KEY_PREFIX + loginId + ":" + diagramId;
-        final var oldTicket = redisTemplate.opsForValue().getAndDelete(diagramKey);
-        if (oldTicket != null) {
-            redisTemplate.delete(TICKET_KEY_PREFIX + oldTicket);
-            redisTemplate.opsForSet().remove(USER_SET_KEY_PREFIX + loginId, oldTicket);
-        }
+        final var userSetKey = USER_SET_KEY_PREFIX + loginId;
+        redisTemplate.execute(
+            Objects.requireNonNull(REMOVE_SCRIPT),
+            Objects.requireNonNull(List.of(diagramKey, userSetKey)),
+            TICKET_KEY_PREFIX
+        );
     }
 
     @Override
