@@ -202,6 +202,15 @@ export function useDictionaryCache(teamId: string | undefined, setId: string | u
     return map;
   }, [terms]);
 
+  /** 논리명 → Domain 매핑 (DSL 파서 도메인 명시 지정용) */
+  const domainByNameMap = useMemo(() => {
+    const map = new Map<string, Domain>();
+    for (const d of domains) {
+      map.set(d.logicalName, d);
+    }
+    return map;
+  }, [domains]);
+
   /**
    * 논리명으로 Term을 클라이언트 사이드 필터링한다.
    *
@@ -401,6 +410,9 @@ export function useDictionaryCache(teamId: string | undefined, setId: string | u
   return {
     terms,
     domains,
+    termByNameMap,
+    domainByNameMap,
+    domainMap,
     searchTerms,
     findTermById,
     findDomainById,

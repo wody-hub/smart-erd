@@ -14,6 +14,12 @@ export interface ParsedColumn {
   autoIncrement: boolean;
   /** COMMENT → logicalName */
   comment?: string;
+  /** 논리명 (DSL: 입력 논리명, SQL DDL: COMMENT와 동일) */
+  logicalName?: string;
+  /** DSL 파서에서 해석된 Term ID */
+  termId?: number;
+  /** DSL 파서에서 해석된 Domain ID */
+  domainId?: number;
 }
 
 /** DDL 파싱된 테이블 정보 */
@@ -22,6 +28,10 @@ export interface ParsedTable {
   name: string;
   /** 테이블 COMMENT → logicalTableName */
   comment?: string;
+  /** 테이블 논리명 (DSL: 입력 논리명) */
+  logicalTableName?: string;
+  /** DSL 파서에서 해석된 테이블 Term ID */
+  tableTermId?: number;
   /** 컬럼 목록 */
   columns: ParsedColumn[];
 }

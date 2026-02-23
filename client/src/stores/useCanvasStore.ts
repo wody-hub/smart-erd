@@ -194,7 +194,9 @@ function populateFromDdl(
         fk: undefined,
         nullable: col.nullable,
         autoIncrement: col.autoIncrement || undefined,
-        logicalName: col.comment || undefined,
+        logicalName: col.logicalName || col.comment || undefined,
+        termId: col.termId,
+        domainId: col.domainId,
       };
     });
     tablesMap.set(
@@ -203,7 +205,10 @@ function populateFromDdl(
         name,
         { x: SX + (idx % G_COLS) * G_X, y: SY + Math.floor(idx / G_COLS) * G_Y },
         cols,
-        { logicalTableName: table.comment || undefined },
+        {
+          logicalTableName: table.logicalTableName || table.comment || undefined,
+          tableTermId: table.tableTermId,
+        },
       ),
     );
     tMap.set(table.name, { nodeId: nid, colMap: cMap });

@@ -373,6 +373,21 @@
       "success": "Domain registered",
       "failed": "Failed to register domain"
     },
+    "dsl": {
+      "tabLabel": "Logical DSL",
+      "errorCount": "{{count}} errors",
+      "warningCount": "{{count}} warnings",
+      "noTables": "No table declarations found",
+      "error": {
+        "unknownTerm": "Unknown term: {{name}}",
+        "unknownDomain": "Unknown domain: {{name}}",
+        "unknownFkTable": "Undeclared table: {{name}}",
+        "unknownFkColumn": "Undeclared column: {{table}}.{{column}}"
+      },
+      "warning": {
+        "noDomain": "No domain linked: {{name}}"
+      }
+    },
     "validation": {
       "panelTitle": "Dictionary Validation",
       "summary": "{{matched}}/{{total}} columns matched",

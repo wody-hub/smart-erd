@@ -372,6 +372,21 @@
       "success": "도메인이 등록되었습니다",
       "failed": "도메인 등록에 실패했습니다"
     },
+    "dsl": {
+      "tabLabel": "논리명 DSL",
+      "errorCount": "에러 {{count}}건",
+      "warningCount": "경고 {{count}}건",
+      "noTables": "테이블 선언이 없습니다",
+      "error": {
+        "unknownTerm": "사전에 없는 논리명: {{name}}",
+        "unknownDomain": "사전에 없는 도메인: {{name}}",
+        "unknownFkTable": "선언되지 않은 테이블: {{name}}",
+        "unknownFkColumn": "선언되지 않은 컬럼: {{table}}.{{column}}"
+      },
+      "warning": {
+        "noDomain": "도메인 미연결: {{name}}"
+      }
+    },
     "validation": {
       "panelTitle": "사전 유효성 검사",
       "summary": "{{matched}}/{{total}} 컬럼 일치",
