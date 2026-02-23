@@ -37,8 +37,9 @@ export default function LoginPage() {
   });
 
   /** 로그인 폼 제출 핸들러. @param e 폼 이벤트 */
-  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!loginId.trim() || !password) return;
     loginMutation.mutate();
   };
 
@@ -70,7 +71,11 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loginMutation.isPending || !loginId.trim() || !password}
+            >
               {loginMutation.isPending ? t('auth.login.submitting') : t('auth.login.submit')}
             </Button>
           </form>

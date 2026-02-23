@@ -17,6 +17,8 @@ import {
 import DomainTab from '@/components/dictionary/DomainTab';
 import TermTab from '@/components/dictionary/TermTab';
 import CreateResourceDialog from '@/components/ui/create-resource-dialog';
+import ConfirmDialog from '@/components/ui/confirm-dialog';
+import TextInputDialog from '@/components/ui/text-input-dialog';
 import Spinner from '@/components/ui/spinner';
 import { ROUTES } from '@/constants/routes';
 import { queryKeys } from '@/constants/query-keys';
@@ -45,6 +47,10 @@ export default function DictionaryPage() {
 
   const [selectedSetId, setSelectedSetId] = useState<string>('');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  /** 이름 변경 다이얼로그 열림 상태 */
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  /** 삭제 확인 다이얼로그 열림 상태 */
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const { data: dictionarySets = [], isLoading } = useQuery({
     queryKey: queryKeys.dictionary.sets(teamId!),
@@ -57,11 +63,14 @@ export default function DictionaryPage() {
       setSelectedSetId('');
       return;
     }
-    if (!selectedSetId || !dictionarySets.some((set) => String(set.id) === selectedSetId)) {
+    setSelectedSetId((prev) => {
+      if (prev && dictionarySets.some((set) => String(set.id) === prev)) {
+        return prev;
+      }
       const defaultSet = dictionarySets.find((set) => set.isDefault);
-      setSelectedSetId(String(defaultSet?.id ?? dictionarySets[0]!.id));
-    }
-  }, [dictionarySets, selectedSetId]);
+      return String(defaultSet?.id ?? dictionarySets[0]!.id);
+    });
+  }, [dictionarySets]);
 
   const createSetMutation = useMutation({
     mutationFn: (name: string) => createDictionarySet(teamId!, { name }),
@@ -78,6 +87,7 @@ export default function DictionaryPage() {
       updateDictionarySet(teamId!, setId, { name }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.sets(teamId!) });
+      setRenameDialogOpen(false);
       toast.success(t('dictionary.set.toast.updated'));
     },
     onError: (err) => toast.error(getErrorMessage(err, t('dictionary.set.toast.updateFailed'))),
@@ -87,7 +97,7 @@ export default function DictionaryPage() {
     mutationFn: (setId: number) => deleteDictionarySet(teamId!, setId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.sets(teamId!) });
-      queryClient.invalidateQueries({ queryKey: ['teams', teamId!, 'dictionary-sets'] });
+      setDeleteDialogOpen(false);
       toast.success(t('dictionary.set.toast.deleted'));
     },
     onError: (err) => toast.error(getErrorMessage(err, t('dictionary.set.toast.deleteFailed'))),
@@ -106,19 +116,6 @@ export default function DictionaryPage() {
   const selectedSet: DictionarySet | undefined = dictionarySets.find(
     (set) => String(set.id) === selectedSetId,
   );
-
-  const handleRenameSelectedSet = () => {
-    if (!selectedSet) return;
-    const nextName = window.prompt(t('dictionary.set.prompt.rename'), selectedSet.name);
-    if (!nextName || !nextName.trim() || nextName.trim() === selectedSet.name) return;
-    renameSetMutation.mutate({ setId: selectedSet.id, name: nextName.trim() });
-  };
-
-  const handleDeleteSelectedSet = () => {
-    if (!selectedSet) return;
-    if (!window.confirm(t('dictionary.set.prompt.delete', { name: selectedSet.name }))) return;
-    deleteSetMutation.mutate(selectedSet.id);
-  };
 
   const handleSetDefault = () => {
     if (!selectedSet || selectedSet.isDefault) return;
@@ -169,7 +166,7 @@ export default function DictionaryPage() {
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={handleRenameSelectedSet}
+                      onClick={() => setRenameDialogOpen(true)}
                       disabled={!selectedSet || renameSetMutation.isPending}
                     >
                       <Pencil className="h-4 w-4 mr-1" />
@@ -187,7 +184,7 @@ export default function DictionaryPage() {
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={handleDeleteSelectedSet}
+                      onClick={() => setDeleteDialogOpen(true)}
                       disabled={!selectedSet || deleteSetMutation.isPending}
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
@@ -225,6 +222,33 @@ export default function DictionaryPage() {
         inputLabel={t('dictionary.set.inputLabel')}
         placeholder={t('dictionary.set.placeholder')}
         onCreate={(name) => createSetMutation.mutateAsync(name)}
+      />
+
+      <TextInputDialog
+        open={renameDialogOpen}
+        onOpenChange={setRenameDialogOpen}
+        title={t('dictionary.set.renameButton')}
+        description={t('dictionary.set.prompt.rename')}
+        inputLabel={t('dictionary.set.inputLabel')}
+        defaultValue={selectedSet?.name ?? ''}
+        confirmLabel={t('dictionary.set.renameButton')}
+        onConfirm={(name) => {
+          if (selectedSet && name !== selectedSet.name) {
+            renameSetMutation.mutate({ setId: selectedSet.id, name });
+          }
+        }}
+        loading={renameSetMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={t('dictionary.set.deleteButton')}
+        description={t('dictionary.set.prompt.delete', { name: selectedSet?.name })}
+        onConfirm={() => {
+          if (selectedSet) deleteSetMutation.mutate(selectedSet.id);
+        }}
+        loading={deleteSetMutation.isPending}
       />
     </div>
   );

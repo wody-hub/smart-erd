@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -27,14 +27,19 @@ interface EdgeContextMenuProps {
 export default function EdgeContextMenu({ position, onDelete, onClose }: EdgeContextMenuProps) {
   const { t } = useTranslation();
 
+  /** 최신 onClose 콜백을 추적하여 리스너 재등록 없이 안정적으로 호출한다. */
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useHotkeys(KEYBINDINGS.ESCAPE, onClose);
 
   useEffect(() => {
-    document.addEventListener('click', onClose);
+    const handler = () => onCloseRef.current();
+    document.addEventListener('click', handler);
     return () => {
-      document.removeEventListener('click', onClose);
+      document.removeEventListener('click', handler);
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div

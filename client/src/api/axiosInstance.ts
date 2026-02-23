@@ -48,6 +48,8 @@ const processQueue = (error: unknown, token: string | null = null) => {
       prom.reject(error);
     } else if (token) {
       prom.resolve(token);
+    } else {
+      prom.reject(new Error('Token refresh failed'));
     }
   });
   failedQueue = [];

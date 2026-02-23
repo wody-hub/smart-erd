@@ -15,7 +15,8 @@
       "pending": "...",
       "next": "다음",
       "previous": "이전",
-      "close": "닫기"
+      "close": "닫기",
+      "confirm": "확인"
     },
     "loading": "로딩 중...",
     "aria": {

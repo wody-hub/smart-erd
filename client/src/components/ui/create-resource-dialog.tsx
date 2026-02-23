@@ -52,7 +52,7 @@ export default function CreateResourceDialog({
   const [creating, setCreating] = useState(false);
 
   /** 리소스 생성 폼 제출 핸들러. @param e 폼 이벤트 */
-  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!name.trim()) return;
     setCreating(true);

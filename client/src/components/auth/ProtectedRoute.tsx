@@ -11,7 +11,7 @@ import { ROUTES } from '@/constants/routes';
  * @param props.children 인증 시 렌더링할 자식 컴포넌트
  */
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isAuthenticated = useAuthStore((s) => !!s.accessToken);
 
   if (!isAuthenticated) {
     return <Navigate to={ROUTES.LOGIN} replace />;

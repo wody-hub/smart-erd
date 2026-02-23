@@ -136,17 +136,24 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const fkMode = useErdFkMode();
   const registerCompound = useCompoundTermRegister(id);
 
-  /** 연결된 Handle ID 셋 (FK 연결이 있는 핸들만 표시용) */
+  /** 연결된 Handle ID 셋 (이 노드에 연결된 핸들만 수집) */
   const connectedHandles = useStore(
     (s) => {
       const set = new Set<string>();
+      const prefix = `${id}-`;
       for (const edge of s.edges) {
-        if (edge.sourceHandle) set.add(edge.sourceHandle);
-        if (edge.targetHandle) set.add(edge.targetHandle);
+        if (edge.sourceHandle?.startsWith(prefix)) set.add(edge.sourceHandle);
+        if (edge.targetHandle?.startsWith(prefix)) set.add(edge.targetHandle);
       }
       return set;
     },
-    (a, b) => a.size === b.size && [...a].every((v) => b.has(v)),
+    (a, b) => {
+      if (a.size !== b.size) return false;
+      for (const v of a) {
+        if (!b.has(v)) return false;
+      }
+      return true;
+    },
   );
 
   /** 해당 컬럼이 엣지에 연결되어 있는지 확인한다. */

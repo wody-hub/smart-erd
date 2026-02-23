@@ -22,7 +22,6 @@ function setAuthTokens(accessToken: string, refreshToken: string): void {
     ...prev,
     accessToken,
     refreshToken,
-    isAuthenticated: true,
   }));
 }
 
@@ -40,7 +39,6 @@ export function clearAuthState(): void {
     refreshToken: null,
     loginId: null,
     name: null,
-    isAuthenticated: false,
   }));
 }
 

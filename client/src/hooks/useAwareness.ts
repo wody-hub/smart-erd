@@ -21,7 +21,8 @@ export function useAwareness(
   provider: YjsProvider | null,
   canvasRef: React.RefObject<HTMLDivElement | null>,
 ) {
-  const { loginId, name } = useAuthStore();
+  const loginId = useAuthStore((s) => s.loginId);
+  const name = useAuthStore((s) => s.name);
   const { screenToFlowPosition } = useReactFlow();
   const screenToFlowPositionRef = useRef(screenToFlowPosition);
 

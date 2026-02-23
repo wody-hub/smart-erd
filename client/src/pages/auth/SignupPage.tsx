@@ -39,8 +39,9 @@ export default function SignupPage() {
   });
 
   /** 회원가입 폼 제출 핸들러. @param e 폼 이벤트 */
-  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!loginId.trim() || !name.trim() || password.length < 8) return;
     signupMutation.mutate();
   };
 
@@ -82,7 +83,13 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={signupMutation.isPending}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={
+                signupMutation.isPending || !loginId.trim() || !name.trim() || password.length < 8
+              }
+            >
               {signupMutation.isPending ? t('auth.signup.submitting') : t('auth.signup.submit')}
             </Button>
           </form>

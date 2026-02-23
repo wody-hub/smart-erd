@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { create } from 'zustand';
 import { STORAGE_KEYS } from '@/constants/storage';
+import { clearAuthState } from '@/lib/auth-refresh';
 import { getApiBaseUrl } from '@/lib/platform';
 
 /**
@@ -15,8 +16,6 @@ interface AuthState {
   loginId: string | null;
   /** 사용자 표시 이름 */
   name: string | null;
-  /** 인증 여부 */
-  isAuthenticated: boolean;
   /**
    * 로그인 성공 시 상태를 갱신한다.
    *
@@ -41,14 +40,13 @@ const useAuthStore = create<AuthState>((set) => ({
   refreshToken: localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
   loginId: localStorage.getItem(STORAGE_KEYS.LOGIN_ID),
   name: localStorage.getItem(STORAGE_KEYS.NAME),
-  isAuthenticated: !!localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN),
 
   login: (accessToken, refreshToken, loginId, name) => {
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
     localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
     localStorage.setItem(STORAGE_KEYS.LOGIN_ID, loginId);
     localStorage.setItem(STORAGE_KEYS.NAME, name);
-    set({ accessToken, refreshToken, loginId, name, isAuthenticated: true });
+    set({ accessToken, refreshToken, loginId, name });
   },
 
   logout: () => {
@@ -56,17 +54,7 @@ const useAuthStore = create<AuthState>((set) => ({
     if (rt) {
       axios.post(`${getApiBaseUrl()}/auth/logout`, { refreshToken: rt }).catch(() => {});
     }
-    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.LOGIN_ID);
-    localStorage.removeItem(STORAGE_KEYS.NAME);
-    set({
-      accessToken: null,
-      refreshToken: null,
-      loginId: null,
-      name: null,
-      isAuthenticated: false,
-    });
+    clearAuthState();
   },
 }));
 

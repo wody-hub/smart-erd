@@ -148,13 +148,6 @@ function generateUniqueName(base: string, existing: string[]): string {
   return `${base}_${i}`;
 }
 
-function generateUniqueTableName(base: string, existing: string[]): string {
-  if (!existing.includes(base)) return base;
-  let i = 1;
-  while (existing.includes(`${base}_${i}`)) i++;
-  return `${base}_${i}`;
-}
-
 // --- Store ---
 
 const useCanvasStore = create<CanvasState>((set, get) => {
@@ -657,7 +650,7 @@ const useCanvasStore = create<CanvasState>((set, get) => {
           SX = 100;
         const SY = nodes.length > 0 ? Math.max(...nodes.map((n) => n.position?.y ?? 0)) + 300 : 100;
         result.tables.forEach((table, idx) => {
-          const uName = generateUniqueTableName(table.name, [...assigned]);
+          const uName = generateUniqueName(table.name, [...assigned]);
           assigned.add(uName);
           const nid = `table-${crypto.randomUUID()}`,
             cMap = new Map<string, string>();

@@ -102,7 +102,7 @@ export default function MembersDialog({
   });
 
   /** 멤버 초대 폼 제출 핸들러. @param e 폼 이벤트 */
-  const handleInvite = (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleInvite = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!inviteLoginId.trim()) return;
     inviteMutation.mutate({ loginId: inviteLoginId.trim(), role: inviteRole });
