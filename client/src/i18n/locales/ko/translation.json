@@ -216,7 +216,9 @@
       "validate": "유효성 검사",
       "validateActive": "유효성 검사 (활성)",
       "ddlExport": "SQL DDL",
-      "ddlImport": "DDL 가져오기"
+      "ddlImport": "DDL 가져오기",
+      "codeEditor": "코드",
+      "codeEditorActive": "코드 에디터 닫기"
     },
     "ddlExport": {
       "title": "SQL DDL 내보내기",
@@ -234,6 +236,15 @@
       "copied": "클립보드에 복사되었습니다",
       "copyFailed": "클립보드 복사에 실패했습니다",
       "noTables": "내보낼 테이블이 없습니다"
+    },
+    "codeEditor": {
+      "placeholder": "-- SQL DDL을 입력하세요...\n-- 예시:\n-- CREATE TABLE users (\n--   id SERIAL PRIMARY KEY,\n--   name VARCHAR(100) NOT NULL\n-- );",
+      "applyButton": "ERD에 적용",
+      "applying": "적용 중...",
+      "confirmTitle": "ERD 교체",
+      "confirmDescription": "DDL을 적용하면 기존의 모든 테이블과 관계가 교체됩니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?",
+      "success": "{{count}}개 테이블이 ERD에 적용되었습니다",
+      "failed": "DDL 적용에 실패했습니다"
     },
     "ddlImport": {
       "title": "SQL DDL 가져오기",

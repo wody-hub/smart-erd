@@ -1,4 +1,3 @@
-import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Upload, Loader2, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,8 +19,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import useCanvasStore from '@/stores/useCanvasStore';
-import { parseDdl, type DdlParseResult } from '@/lib/ddl-parser';
 import { useDarkMode } from '@/hooks/useDarkMode';
+import { useDdlParse } from '@/hooks/useDdlParse';
 import type { DbmsType } from '@/types/erd';
 
 /** DdlImportDialog 컴포넌트의 props */
@@ -45,85 +44,8 @@ export default function DdlImportDialog({ open, onOpenChange }: DdlImportDialogP
   const { t } = useTranslation();
   const importDdl = useCanvasStore((s) => s.importDdl);
 
-  /** 선택된 DBMS 타입 */
-  const [dbms, setDbms] = useState<DbmsType>('postgresql');
-  /** DDL 텍스트 */
-  const [ddlText, setDdlText] = useState('');
-  /** 파싱 결과 */
-  const [parseResult, setParseResult] = useState<DdlParseResult | null>(null);
-  /** 파싱 중 여부 */
-  const [parsing, setParsing] = useState(false);
-
-  /** 디바운스 타이머 ref (C-1 해결: 기존 useRef+setTimeout 패턴 사용) */
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** 최신 파싱 요청 시퀀스. 닫기/재파싱 시 이전 응답 무효화에 사용 */
-  const parseSeqRef = useRef(0);
-
-  // 컴포넌트 언마운트 시 디바운스 타이머 정리
-  useEffect(() => {
-    return () => {
-      parseSeqRef.current += 1;
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, []);
-
-  /**
-   * DDL 텍스트 변경 시 디바운스 파싱을 수행한다.
-   *
-   * @param text 새 DDL 텍스트
-   * @param targetDbms 대상 DBMS
-   */
-  const debouncedParse = (text: string, targetDbms: DbmsType) => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    const seq = ++parseSeqRef.current;
-
-    if (!text.trim()) {
-      setParseResult(null);
-      setParsing(false);
-      return;
-    }
-
-    setParsing(true);
-    debounceTimerRef.current = setTimeout(async () => {
-      const isCurrentRequest = () => seq === parseSeqRef.current;
-      try {
-        const result = await parseDdl(text, targetDbms);
-        if (!isCurrentRequest()) return;
-        setParseResult(result);
-      } catch (err) {
-        if (!isCurrentRequest()) return;
-        const msg = err instanceof Error ? err.message : 'Failed to parse DDL';
-        setParseResult({ tables: [], relations: [], errors: [msg] });
-      } finally {
-        if (isCurrentRequest()) {
-          setParsing(false);
-        }
-      }
-    }, 500);
-  };
-
-  /** DDL 텍스트 변경 핸들러. @param value 새 DDL 텍스트 */
-  const handleDdlChange = (value: string | undefined) => {
-    const text = value ?? '';
-    setDdlText(text);
-    debouncedParse(text, dbms);
-  };
-
-  /**
-   * DBMS 변경 핸들러.
-   *
-   * @param newDbms 새 DBMS 타입
-   */
-  const handleDbmsChange = (newDbms: DbmsType) => {
-    setDbms(newDbms);
-    if (ddlText.trim()) {
-      debouncedParse(ddlText, newDbms);
-    }
-  };
+  const { dbms, ddlText, parseResult, parsing, handleDdlChange, handleDbmsChange, resetParse } =
+    useDdlParse();
 
   /** Import 실행 핸들러 */
   const handleImport = () => {
@@ -141,14 +63,8 @@ export default function DdlImportDialog({ open, onOpenChange }: DdlImportDialogP
 
   /** 다이얼로그 닫기 + 상태 초기화 */
   const handleClose = () => {
-    parseSeqRef.current += 1;
     onOpenChange(false);
-    setDdlText('');
-    setParseResult(null);
-    setParsing(false);
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
+    resetParse();
   };
 
   /** Import 버튼 활성화 여부 */

@@ -217,7 +217,9 @@
       "validate": "Validate",
       "validateActive": "Validate (active)",
       "ddlExport": "SQL DDL",
-      "ddlImport": "DDL Import"
+      "ddlImport": "DDL Import",
+      "codeEditor": "Code",
+      "codeEditorActive": "Close code editor"
     },
     "ddlExport": {
       "title": "Export SQL DDL",
@@ -235,6 +237,15 @@
       "copied": "Copied to clipboard",
       "copyFailed": "Failed to copy to clipboard",
       "noTables": "No tables to export"
+    },
+    "codeEditor": {
+      "placeholder": "-- Enter SQL DDL here...\n-- Example:\n-- CREATE TABLE users (\n--   id SERIAL PRIMARY KEY,\n--   name VARCHAR(100) NOT NULL\n-- );",
+      "applyButton": "Apply to ERD",
+      "applying": "Applying...",
+      "confirmTitle": "Replace ERD",
+      "confirmDescription": "Applying DDL will replace all existing tables and relationships. This action cannot be undone. Do you want to continue?",
+      "success": "Applied {{count}} tables to ERD",
+      "failed": "Failed to apply DDL"
     },
     "ddlImport": {
       "title": "Import SQL DDL",

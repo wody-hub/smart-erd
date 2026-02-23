@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -10,6 +10,7 @@ import ERDCanvas from '@/components/erd/ERDCanvas';
 import ValidationPanel from '@/components/erd/ValidationPanel';
 import { ErdDictionaryProvider } from '@/components/erd/ErdDictionaryContext';
 import { ErdPermissionProvider } from '@/components/erd/ErdPermissionContext';
+import Spinner from '@/components/ui/spinner';
 import useCanvasStore from '@/stores/useCanvasStore';
 import useCollaborationStore from '@/stores/useCollaborationStore';
 import { fetchDiagram, saveDiagram } from '@/api/diagramApi';
@@ -18,9 +19,10 @@ import { KEYBINDINGS } from '@/constants/keybindings';
 import { getErrorMessage } from '@/lib/api-error';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { toast } from 'sonner';
-import Spinner from '@/components/ui/spinner';
 import { useYjsCollaboration } from '@/hooks/useYjsCollaboration';
 import { useAutoBackup } from '@/hooks/useAutoBackup';
+
+const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPanel'));
 
 /**
  * 다이어그램 편집 페이지.
@@ -47,6 +49,8 @@ export default function DiagramPage() {
   const [diagramName, setDiagramName] = useState('');
   /** 유효성 검사 패널 열림 상태 */
   const [validationOpen, setValidationOpen] = useState(false);
+  /** 좌측 패널 모드 ('sidebar' | 'code') */
+  const [leftPanel, setLeftPanel] = useState<'sidebar' | 'code'>('sidebar');
   /** 좌측 사이드바 너비(px) */
   const [sidebarWidth, setSidebarWidth] = useState(224);
   /** 사이드바 리사이즈 진행 여부 */
@@ -107,6 +111,12 @@ export default function DiagramPage() {
 
   /** 유효성 검사 패널 토글 핸들러 */
   const handleToggleValidation = useCallback(() => setValidationOpen((prev) => !prev), []);
+
+  /** 코드 에디터 토글 핸들러 */
+  const handleToggleCodeEditor = useCallback(
+    () => setLeftPanel((prev) => (prev === 'code' ? 'sidebar' : 'code')),
+    [],
+  );
 
   /** 사이드바 너비를 허용 범위로 보정한다. */
   const clampSidebarWidth = (width: number) =>
@@ -316,7 +326,13 @@ export default function DiagramPage() {
                 className="h-full shrink-0"
                 style={{ width: sidebarWidth }}
               >
-                <Sidebar canEdit={canEdit} />
+                {leftPanel === 'sidebar' ? (
+                  <Sidebar canEdit={canEdit} />
+                ) : (
+                  <Suspense fallback={<Spinner />}>
+                    <DdlCodeEditorPanel canEdit={canEdit} />
+                  </Suspense>
+                )}
               </div>
               <div
                 ref={sidebarResizeHandleRef}
@@ -342,6 +358,8 @@ export default function DiagramPage() {
                   validationOpen={validationOpen}
                   onToggleValidation={handleToggleValidation}
                   canEdit={canEdit}
+                  codeEditorActive={leftPanel === 'code'}
+                  onToggleCodeEditor={canEdit ? handleToggleCodeEditor : undefined}
                   isSidebarResizing={isSidebarResizing}
                 />
               </main>

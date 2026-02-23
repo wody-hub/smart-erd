@@ -110,6 +110,7 @@ interface CanvasState {
     relationType: RelationType,
   ) => void;
   importDdl: (result: DdlParseResult) => void;
+  replaceFromDdl: (result: DdlParseResult) => void;
   addGroup: (label?: string) => void;
   deleteGroup: (groupId: string) => void;
   renameGroup: (groupId: string, newName: string) => void;
@@ -146,6 +147,86 @@ function generateUniqueName(base: string, existing: string[]): string {
   let i = 1;
   while (existing.includes(`${base}_${i}`)) i++;
   return `${base}_${i}`;
+}
+
+/** DDL 파싱 결과를 Y.Map에 반영할 때의 옵션 */
+interface PopulateDdlOptions {
+  /** 테이블 이름 변환 함수 (중복 회피 등) */
+  resolveTableName: (original: string) => string;
+  /** 테이블 배치 시작 Y 좌표 */
+  startY: number;
+}
+
+/**
+ * DDL 파싱 결과를 Y.Map(tablesMap, edgesMap)에 테이블/엣지로 반영한다.
+ *
+ * importDdl(APPEND)과 replaceFromDdl(REPLACE) 공통 로직.
+ *
+ * @param tablesMap Y.Map 테이블 맵
+ * @param edgesMap  Y.Map 엣지 맵
+ * @param result    DDL 파싱 결과
+ * @param options   테이블 이름 변환 함수, 시작 Y 좌표
+ */
+function populateFromDdl(
+  tablesMap: Y.Map<Y.Map<unknown>>,
+  edgesMap: Y.Map<Y.Map<unknown>>,
+  result: DdlParseResult,
+  options: PopulateDdlOptions,
+) {
+  const tMap = new Map<string, { nodeId: string; colMap: Map<string, string> }>();
+  const G_COLS = 4,
+    G_X = 300,
+    G_Y = 250,
+    SX = 100;
+  const { resolveTableName, startY: SY } = options;
+  result.tables.forEach((table, idx) => {
+    const name = resolveTableName(table.name);
+    const nid = `table-${crypto.randomUUID()}`,
+      cMap = new Map<string, string>();
+    const cols = table.columns.map((col) => {
+      const cid = `col-${crypto.randomUUID()}`;
+      cMap.set(col.name, cid);
+      return {
+        id: cid,
+        name: col.name,
+        type: col.type,
+        pk: col.pk || undefined,
+        fk: undefined,
+        nullable: col.nullable,
+        autoIncrement: col.autoIncrement || undefined,
+        logicalName: col.comment || undefined,
+      };
+    });
+    tablesMap.set(
+      nid,
+      createTableYMap(
+        name,
+        { x: SX + (idx % G_COLS) * G_X, y: SY + Math.floor(idx / G_COLS) * G_Y },
+        cols,
+        { logicalTableName: table.comment || undefined },
+      ),
+    );
+    tMap.set(table.name, { nodeId: nid, colMap: cMap });
+  });
+  result.relations.forEach((rel) => {
+    const p = tMap.get(rel.parentTable),
+      c = tMap.get(rel.childTable);
+    if (!p || !c) return;
+    const pcid = p.colMap.get(rel.parentColumn),
+      ccid = c.colMap.get(rel.childColumn);
+    if (!pcid || !ccid) return;
+    const cTable = tablesMap.get(c.nodeId);
+    if (cTable) {
+      const cols = cTable.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+      if (cols) {
+        const cy = findColumnYMap(cols, ccid);
+        if (cy) cy.set('fk', true);
+      }
+    }
+    const sh = `${p.nodeId}-${pcid}-source`,
+      th = `${c.nodeId}-${ccid}-target`;
+    edgesMap.set(`e-${sh}-${th}`, createEdgeYMap(p.nodeId, c.nodeId, sh, th, 'non-identifying'));
+  });
 }
 
 // --- Store ---
@@ -643,63 +724,35 @@ const useCanvasStore = create<CanvasState>((set, get) => {
       ydoc.transact(() => {
         const tablesMap = getTablesMap(ydoc);
         const edgesMap = getEdgesMap(ydoc);
-        const tMap = new Map<string, { nodeId: string; colMap: Map<string, string> }>();
-        const G_COLS = 4,
-          G_X = 300,
-          G_Y = 250,
-          SX = 100;
-        const SY = nodes.length > 0 ? Math.max(...nodes.map((n) => n.position?.y ?? 0)) + 300 : 100;
-        result.tables.forEach((table, idx) => {
-          const uName = generateUniqueName(table.name, [...assigned]);
-          assigned.add(uName);
-          const nid = `table-${crypto.randomUUID()}`,
-            cMap = new Map<string, string>();
-          const cols = table.columns.map((col) => {
-            const cid = `col-${crypto.randomUUID()}`;
-            cMap.set(col.name, cid);
-            return {
-              id: cid,
-              name: col.name,
-              type: col.type,
-              pk: col.pk || undefined,
-              fk: undefined,
-              nullable: col.nullable,
-              autoIncrement: col.autoIncrement || undefined,
-              logicalName: col.comment || undefined,
-            };
-          });
-          tablesMap.set(
-            nid,
-            createTableYMap(
-              uName,
-              { x: SX + (idx % G_COLS) * G_X, y: SY + Math.floor(idx / G_COLS) * G_Y },
-              cols,
-              { logicalTableName: table.comment || undefined },
-            ),
-          );
-          tMap.set(table.name, { nodeId: nid, colMap: cMap });
+        const startY =
+          nodes.length > 0 ? Math.max(...nodes.map((n) => n.position?.y ?? 0)) + 300 : 100;
+        populateFromDdl(tablesMap, edgesMap, result, {
+          resolveTableName: (name) => {
+            const unique = generateUniqueName(name, [...assigned]);
+            assigned.add(unique);
+            return unique;
+          },
+          startY,
         });
-        result.relations.forEach((rel) => {
-          const p = tMap.get(rel.parentTable),
-            c = tMap.get(rel.childTable);
-          if (!p || !c) return;
-          const pcid = p.colMap.get(rel.parentColumn),
-            ccid = c.colMap.get(rel.childColumn);
-          if (!pcid || !ccid) return;
-          const cTable = tablesMap.get(c.nodeId);
-          if (cTable) {
-            const cols = cTable.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-            if (cols) {
-              const cy = findColumnYMap(cols, ccid);
-              if (cy) cy.set('fk', true);
-            }
-          }
-          const sh = `${p.nodeId}-${pcid}-source`,
-            th = `${c.nodeId}-${ccid}-target`;
-          edgesMap.set(
-            `e-${sh}-${th}`,
-            createEdgeYMap(p.nodeId, c.nodeId, sh, th, 'non-identifying'),
-          );
+      });
+    },
+    replaceFromDdl: (result) => {
+      const { ydoc } = get();
+      if (!ydoc || result.tables.length === 0) return;
+      const assigned = new Set<string>();
+      ydoc.transact(() => {
+        const tablesMap = getTablesMap(ydoc);
+        const edgesMap = getEdgesMap(ydoc);
+        // 기존 테이블/엣지 전체 삭제 (그룹 노드는 보존)
+        for (const key of [...tablesMap.keys()]) tablesMap.delete(key);
+        for (const key of [...edgesMap.keys()]) edgesMap.delete(key);
+        populateFromDdl(tablesMap, edgesMap, result, {
+          resolveTableName: (name) => {
+            const unique = generateUniqueName(name, [...assigned]);
+            assigned.add(unique);
+            return unique;
+          },
+          startY: 100,
         });
       });
     },

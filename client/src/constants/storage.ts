@@ -10,4 +10,6 @@ export const STORAGE_KEYS = {
   NAME: 'name',
   /** i18next 언어 설정 */
   LANGUAGE: 'i18nextLng',
+  /** DDL 코드 에디터 DBMS 설정 */
+  DDL_DBMS: 'smart-erd-ddl-dbms',
 } as const;

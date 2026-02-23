@@ -69,6 +69,10 @@ interface ERDCanvasProps {
   onToggleValidation?: () => void;
   /** 편집 가능 여부 (VIEWER일 때 false) */
   canEdit?: boolean;
+  /** 코드 에디터 활성 여부 */
+  codeEditorActive?: boolean;
+  /** 코드 에디터 토글 핸들러 */
+  onToggleCodeEditor?: () => void;
   /** 사이드바 리사이즈 진행 여부 (성능 최적화용) */
   isSidebarResizing?: boolean;
 }
@@ -102,6 +106,8 @@ function ERDCanvas({
   validationOpen,
   onToggleValidation,
   canEdit = true,
+  codeEditorActive,
+  onToggleCodeEditor,
   isSidebarResizing = false,
 }: ERDCanvasProps) {
   /** 캔버스 컨테이너 ref (Awareness 커서 추적용) */
@@ -299,6 +305,8 @@ function ERDCanvas({
             onExportPdf={exportPdf}
             onExportDdl={() => setDdlDialogOpen(true)}
             onImportDdl={() => setDdlImportOpen(true)}
+            codeEditorActive={codeEditorActive}
+            onToggleCodeEditor={onToggleCodeEditor}
             validationOpen={validationOpen}
             onToggleValidation={onToggleValidation}
             canEdit={canEdit}

@@ -1,4 +1,4 @@
-import { Link2, LayoutGrid, Download, ClipboardCheck, Database, Upload } from 'lucide-react';
+import { Link2, LayoutGrid, Download, ClipboardCheck, Database, Upload, Code2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@xyflow/react';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,10 @@ interface CanvasToolbarProps {
   onExportDdl?: () => void;
   /** SQL DDL 가져오기 핸들러 */
   onImportDdl?: () => void;
+  /** 코드 에디터 활성 여부 */
+  codeEditorActive?: boolean;
+  /** 코드 에디터 토글 핸들러 */
+  onToggleCodeEditor?: () => void;
   /** 유효성 검사 패널 열림 여부 */
   validationOpen?: boolean;
   /** 유효성 검사 패널 토글 핸들러 */
@@ -52,6 +56,8 @@ interface CanvasToolbarProps {
  * @param props.onExportPdf         PDF 내보내기 핸들러
  * @param props.onExportDdl         SQL DDL 내보내기 핸들러
  * @param props.onImportDdl         SQL DDL 가져오기 핸들러
+ * @param props.codeEditorActive    코드 에디터 활성 여부
+ * @param props.onToggleCodeEditor  코드 에디터 토글 핸들러
  * @param props.validationOpen      유효성 검사 패널 열림 여부
  * @param props.onToggleValidation  유효성 검사 패널 토글 핸들러
  * @param props.canEdit             편집 가능 여부
@@ -66,6 +72,8 @@ export default function CanvasToolbar({
   onExportPdf,
   onExportDdl,
   onImportDdl,
+  codeEditorActive,
+  onToggleCodeEditor,
   validationOpen,
   onToggleValidation,
   canEdit = true,
@@ -85,6 +93,20 @@ export default function CanvasToolbar({
           >
             <Link2 className="h-4 w-4" />
             {t('erd.toolbar.fkConnect')}
+          </Button>
+        )}
+        {canEdit && onToggleCodeEditor && (
+          <Button
+            variant={codeEditorActive ? 'default' : 'ghost'}
+            size="sm"
+            onClick={onToggleCodeEditor}
+            className={cn('gap-1.5', codeEditorActive && 'bg-primary text-primary-foreground')}
+            aria-label={
+              codeEditorActive ? t('erd.toolbar.codeEditorActive') : t('erd.toolbar.codeEditor')
+            }
+          >
+            <Code2 className="h-4 w-4" />
+            {t('erd.toolbar.codeEditor')}
           </Button>
         )}
         {canEdit && (
