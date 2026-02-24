@@ -58,7 +58,12 @@ export interface DdlParseResult {
   errors: string[];
 }
 
-/** node-sql-parser 모듈 캐시 (최초 1회만 로드) */
+/**
+ * node-sql-parser 모듈 캐시 (최초 1회만 동적 import하여 저장).
+ *
+ * 모듈 스코프 — 비직렬화 가능한 모듈 참조이므로 Zustand에 저장할 수 없다.
+ * JavaScript 단일 스레드 특성상 race condition은 발생하지 않는다.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let parserModule: any = null;
 

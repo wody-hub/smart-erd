@@ -1,5 +1,5 @@
 import type { TableNode, ERDEdge, DbmsType, Column } from '@/types/erd';
-import { extractColId } from '@/stores/useCanvasStore';
+import { extractColId } from '@/lib/handle-id';
 
 /** DBMS별 방언 설정 */
 interface DbmsDialect {

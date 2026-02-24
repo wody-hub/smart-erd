@@ -7,7 +7,7 @@ import {
   type Position,
 } from '@xyflow/react';
 import type { TableNodeData, RelationType } from '@/types/erd';
-import { extractColId } from '@/stores/useCanvasStore';
+import { extractColId } from '@/lib/handle-id';
 
 /** 카디널리티 기호 유형 */
 type CardinalitySymbol = 'one' | 'many';

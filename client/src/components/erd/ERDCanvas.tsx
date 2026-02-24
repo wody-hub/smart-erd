@@ -13,7 +13,8 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useShallow } from 'zustand/react/shallow';
 import { useHotkeys } from 'react-hotkeys-hook';
-import useCanvasStore, { extractColId } from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/useCanvasStore';
+import { extractColId } from '@/lib/handle-id';
 import type { TableNodeData } from '@/types/erd';
 import type { YjsProvider } from '@/collaboration/YjsProvider';
 import { KEYBINDINGS } from '@/constants/keybindings';

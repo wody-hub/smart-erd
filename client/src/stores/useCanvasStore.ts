@@ -12,6 +12,7 @@ import {
 import type { Column, GroupNodeData, RelationType, TableNodeData } from '@/types/erd';
 import type { DdlParseResult } from '@/lib/ddl-parser';
 import { djb2 } from '@/lib/hash';
+import { extractColId } from '@/lib/handle-id';
 import {
   yTablesMapToNodes,
   yEdgesMapToEdges,
@@ -28,13 +29,6 @@ import {
   getGroupsMap,
 } from '@/collaboration/yjsBridge';
 
-/**
- * Handle ID에서 컬럼 ID를 추출한다.
- */
-export function extractColId(handleId: string, nodeId: string): string {
-  return handleId.replace(`${nodeId}-`, '').replace(/-(?:source|target)$/, '');
-}
-
 /** 드래그 중인 position 대기 큐 컨텍스트 */
 interface PositionQueueCtx {
   pending: Map<string, { x: number; y: number }>;
@@ -42,6 +36,11 @@ interface PositionQueueCtx {
 
 /**
  * 렌더링과 무관한 스토어 내부 상태.
+ *
+ * 이 객체의 필드들은 Zustand `set()`을 거치지 않고 직접 변이(mutate)한다.
+ * 이는 의도적인 설계로, React 리렌더링을 트리거하지 않아야 하는 상태
+ * (드래그 중 플래그, Observer 참조, 위치 대기 큐 등)를 Zustand 구독 범위 밖에서 관리한다.
+ * Zustand DevTools에는 추적되지 않으므로 디버깅 시 유의한다.
  */
 interface InternalState {
   tablesObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null;

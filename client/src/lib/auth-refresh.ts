@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { STORAGE_KEYS } from '@/constants/storage';
-import useAuthStore from '@/stores/useAuthStore';
 import { getApiBaseUrl } from '@/lib/platform';
 
 /**
@@ -8,6 +7,33 @@ import { getApiBaseUrl } from '@/lib/platform';
  * 모듈 스코프 — Promise를 Zustand에 저장하면 직렬화 불가 + 셀렉터 안정성 문제로 모듈 스코프에 유지.
  */
 let refreshInFlight: Promise<string> | null = null;
+
+/**
+ * Zustand 스토어 상태 갱신 콜백.
+ *
+ * lib/ 레이어가 stores/에 직접 의존하지 않도록 DI(의존성 역전)로 주입받는다.
+ * {@link initAuthRefresh}에서 1회 설정된다.
+ */
+let storeSetTokens: ((accessToken: string, refreshToken: string) => void) | null = null;
+/** Zustand 스토어 상태 초기화 콜백 */
+let storeClearState: (() => void) | null = null;
+
+/**
+ * auth-refresh 모듈을 초기화한다.
+ *
+ * Zustand 스토어에 직접 의존하지 않고, 호출부(api/axiosInstance.ts)에서
+ * 스토어 갱신 콜백을 주입받아 의존성 방향(lib/ → stores/)을 역전시킨다.
+ *
+ * @param setTokens  Access/Refresh Token을 스토어에 반영하는 콜백
+ * @param clearState 스토어 인증 상태를 초기화하는 콜백
+ */
+export function initAuthRefresh(
+  setTokens: (accessToken: string, refreshToken: string) => void,
+  clearState: () => void,
+): void {
+  storeSetTokens = setTokens;
+  storeClearState = clearState;
+}
 
 /**
  * 인증 토큰을 localStorage와 Zustand 스토어에 동기화한다.
@@ -18,11 +44,7 @@ let refreshInFlight: Promise<string> | null = null;
 function setAuthTokens(accessToken: string, refreshToken: string): void {
   localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
   localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
-  useAuthStore.setState((prev) => ({
-    ...prev,
-    accessToken,
-    refreshToken,
-  }));
+  storeSetTokens?.(accessToken, refreshToken);
 }
 
 /**
@@ -33,13 +55,7 @@ export function clearAuthState(): void {
   localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
   localStorage.removeItem(STORAGE_KEYS.LOGIN_ID);
   localStorage.removeItem(STORAGE_KEYS.NAME);
-  useAuthStore.setState((prev) => ({
-    ...prev,
-    accessToken: null,
-    refreshToken: null,
-    loginId: null,
-    name: null,
-  }));
+  storeClearState?.();
 }
 
 /**

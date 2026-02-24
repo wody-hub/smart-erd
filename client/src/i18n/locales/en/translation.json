@@ -245,7 +245,10 @@
       "confirmTitle": "Replace ERD",
       "confirmDescription": "Applying DDL will replace all existing tables and relationships. This action cannot be undone. Do you want to continue?",
       "success": "Applied {{count}} tables to ERD",
-      "failed": "Failed to apply DDL"
+      "failed": "Failed to apply DDL",
+      "refreshButton": "Refresh from ERD",
+      "refreshConfirmTitle": "Refresh Code",
+      "refreshConfirmDescription": "Current edits will be replaced with code generated from the ERD. Continue?"
     },
     "ddlImport": {
       "title": "Import SQL DDL",

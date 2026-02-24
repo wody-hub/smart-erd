@@ -1,8 +1,7 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, CheckCircle2, AlertTriangle, XCircle, Play } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import Editor from '@monaco-editor/react';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -11,13 +10,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import ConfirmDialog from '@/components/ui/confirm-dialog';
 import Spinner from '@/components/ui/spinner';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import { useDdlParse } from '@/hooks/useDdlParse';
 import { useApplyToErd } from '@/hooks/useApplyToErd';
+import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
 import { cn } from '@/lib/utils';
-import type { DbmsType } from '@/types/erd';
+import { generateDdl } from '@/lib/ddl-generator';
+import CodeEditorFooter from './CodeEditorFooter';
+import type { DbmsType, TableNode, ERDEdge } from '@/types/erd';
 
 /** DSL 패널 lazy import (Monaco 번들 분리) */
 const DslCodeEditorPanel = lazy(() => import('./DslCodeEditorPanel'));
@@ -107,6 +108,19 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
     parsing,
   });
 
+  /** ERD → SQL DDL 생성 함수 (useCodeEditorRefresh에 전달) */
+  const generate = useCallback(
+    (nodes: TableNode[], edges: ERDEdge[]) => generateDdl(nodes, edges, dbms),
+    [dbms],
+  );
+
+  const { executeRefresh, handleRefresh, hasNodes, refreshConfirmOpen, setRefreshConfirmOpen } =
+    useCodeEditorRefresh({
+      generate,
+      onGenerated: handleDdlChange,
+      currentText: ddlText,
+    });
+
   /** 다크 모드 감지 (반응형) */
   const isDark = useDarkMode();
 
@@ -152,9 +166,19 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
         />
       </div>
 
-      {/* 파싱 결과 프리뷰 + Apply 버튼 */}
-      <div className="px-3 py-2 border-t border-border shrink-0 space-y-2">
-        {/* 파싱 상태 */}
+      {/* 파싱 결과 프리뷰 + Apply/Refresh 버튼 */}
+      <CodeEditorFooter
+        onApply={handleApply}
+        canApply={canApply}
+        executeApply={executeApply}
+        confirmOpen={confirmOpen}
+        setConfirmOpen={setConfirmOpen}
+        onRefresh={handleRefresh}
+        executeRefresh={executeRefresh}
+        hasNodes={hasNodes}
+        refreshConfirmOpen={refreshConfirmOpen}
+        setRefreshConfirmOpen={setRefreshConfirmOpen}
+      >
         <div className="flex items-center gap-2 text-xs min-h-[20px]">
           {parsing && (
             <span className="flex items-center gap-1 text-muted-foreground">
@@ -191,22 +215,7 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
             </>
           )}
         </div>
-
-        {/* Apply 버튼 */}
-        <Button className="w-full gap-1.5" size="sm" onClick={handleApply} disabled={!canApply}>
-          <Play className="h-3.5 w-3.5" />
-          {t('erd.codeEditor.applyButton')}
-        </Button>
-      </div>
-
-      {/* 교체 확인 다이얼로그 */}
-      <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title={t('erd.codeEditor.confirmTitle')}
-        description={t('erd.codeEditor.confirmDescription')}
-        onConfirm={executeApply}
-      />
+      </CodeEditorFooter>
     </div>
   );
 }

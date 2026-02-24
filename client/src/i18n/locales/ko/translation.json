@@ -244,7 +244,10 @@
       "confirmTitle": "ERD 교체",
       "confirmDescription": "DDL을 적용하면 기존의 모든 테이블과 관계가 교체됩니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?",
       "success": "{{count}}개 테이블이 ERD에 적용되었습니다",
-      "failed": "DDL 적용에 실패했습니다"
+      "failed": "DDL 적용에 실패했습니다",
+      "refreshButton": "ERD에서 새로고침",
+      "refreshConfirmTitle": "코드 새로고침",
+      "refreshConfirmDescription": "현재 편집 내용을 버리고 ERD에서 코드를 다시 생성합니다. 계속하시겠습니까?"
     },
     "ddlImport": {
       "title": "SQL DDL 가져오기",

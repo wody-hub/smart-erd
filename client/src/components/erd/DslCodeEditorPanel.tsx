@@ -1,14 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, CheckCircle2, AlertTriangle, XCircle, Play } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
-import { Button } from '@/components/ui/button';
-import ConfirmDialog from '@/components/ui/confirm-dialog';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import { useDslParse } from '@/hooks/useDslParse';
 import { useApplyToErd } from '@/hooks/useApplyToErd';
+import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
 import { useErdDictionary } from './ErdDictionaryContext';
+import CodeEditorFooter from './CodeEditorFooter';
 import {
   DSL_LANGUAGE_ID,
   registerDslLanguage,
@@ -16,6 +16,8 @@ import {
   type DslParsedTableRef,
 } from '@/lib/monaco-dsl-language';
 import type { DslDictionary } from '@/lib/dsl-parser';
+import { generateDsl } from '@/lib/dsl-generator';
+import type { TableNode, ERDEdge } from '@/types/erd';
 
 /** DslCodeEditorPanel 컴포넌트의 props */
 interface DslCodeEditorPanelProps {
@@ -34,7 +36,15 @@ interface DslCodeEditorPanelProps {
 export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPanelProps) {
   const { t } = useTranslation();
 
-  const { terms, domains, termByNameMap, domainByNameMap, domainMap } = useErdDictionary();
+  const {
+    terms,
+    domains,
+    termByNameMap,
+    domainByNameMap,
+    domainMap,
+    findTermById,
+    findDomainById,
+  } = useErdDictionary();
 
   /** 사전 데이터 객체 (SSOT — Ref 대입만 하므로 참조 동일성 불필요) */
   const dictionary: DslDictionary = {
@@ -50,6 +60,24 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     parseResult: parseResult?.result ?? null,
     parsing,
   });
+
+  /** 사전 데이터 로딩 완료 여부 (초기화 시 사전 없이 생성하면 빈 결과) */
+  const hasDictionary = terms.length > 0 || domains.length > 0;
+
+  /** ERD → DSL 생성 함수 (useCodeEditorRefresh에 전달) */
+  const generate = useCallback(
+    (nodes: TableNode[], edges: ERDEdge[]) =>
+      generateDsl(nodes, edges, { findTermById, findDomainById }),
+    [findTermById, findDomainById],
+  );
+
+  const { executeRefresh, handleRefresh, hasNodes, refreshConfirmOpen, setRefreshConfirmOpen } =
+    useCodeEditorRefresh({
+      generate,
+      onGenerated: handleDslChange,
+      currentText: dslText,
+      ready: hasDictionary,
+    });
 
   /** Monaco 인스턴스 ref */
   const monacoRef = useRef<typeof Monaco | null>(null);
@@ -160,9 +188,19 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
         />
       </div>
 
-      {/* 파싱 결과 프리뷰 + Apply 버튼 */}
-      <div className="px-3 py-2 border-t border-border shrink-0 space-y-2">
-        {/* 파싱 상태 */}
+      {/* 파싱 결과 프리뷰 + Apply/Refresh 버튼 */}
+      <CodeEditorFooter
+        onApply={handleApply}
+        canApply={canApply}
+        executeApply={executeApply}
+        confirmOpen={confirmOpen}
+        setConfirmOpen={setConfirmOpen}
+        onRefresh={handleRefresh}
+        executeRefresh={executeRefresh}
+        hasNodes={hasNodes}
+        refreshConfirmOpen={refreshConfirmOpen}
+        setRefreshConfirmOpen={setRefreshConfirmOpen}
+      >
         <div className="flex items-center gap-2 text-xs min-h-[20px] flex-wrap">
           {parsing && (
             <span className="flex items-center gap-1 text-muted-foreground">
@@ -205,22 +243,7 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
             </>
           )}
         </div>
-
-        {/* Apply 버튼 */}
-        <Button className="w-full gap-1.5" size="sm" onClick={handleApply} disabled={!canApply}>
-          <Play className="h-3.5 w-3.5" />
-          {t('erd.codeEditor.applyButton')}
-        </Button>
-      </div>
-
-      {/* 교체 확인 다이얼로그 */}
-      <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title={t('erd.codeEditor.confirmTitle')}
-        description={t('erd.codeEditor.confirmDescription')}
-        onConfirm={executeApply}
-      />
+      </CodeEditorFooter>
     </div>
   );
 }

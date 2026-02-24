@@ -1,8 +1,9 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { STORAGE_KEYS } from '@/constants/storage';
 import i18n from '@/i18n';
-import { clearAuthState, refreshAccessToken } from '@/lib/auth-refresh';
+import { clearAuthState, initAuthRefresh, refreshAccessToken } from '@/lib/auth-refresh';
 import { getApiBaseUrl, redirectToLogin } from '@/lib/platform';
+import useAuthStore from '@/stores/useAuthStore';
 
 /**
  * API 통신용 Axios 인스턴스.
@@ -15,6 +16,21 @@ import { getApiBaseUrl, redirectToLogin } from '@/lib/platform';
  * 401 응답 시 Refresh Token으로 자동 갱신을 시도한다 (큐 패턴).
  */
 const axiosInstance = axios.create();
+
+// auth-refresh 모듈에 Zustand 스토어 콜백을 주입한다 (DI).
+// lib/ 레이어가 stores/에 직접 의존하지 않도록 api/ 레이어에서 연결한다.
+initAuthRefresh(
+  (accessToken, refreshToken) =>
+    useAuthStore.setState((prev) => ({ ...prev, accessToken, refreshToken })),
+  () =>
+    useAuthStore.setState((prev) => ({
+      ...prev,
+      accessToken: null,
+      refreshToken: null,
+      loginId: null,
+      name: null,
+    })),
+);
 
 /** 인증 정보를 삭제하고 로그인 페이지로 이동한다. */
 function clearAuthAndRedirect() {
