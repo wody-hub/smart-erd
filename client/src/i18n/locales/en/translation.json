@@ -413,6 +413,101 @@
         "invalidTitle": "4) Common Syntax Errors",
         "invalidRule1": "'Table User' without a block is invalid. Always write '{' and '}' together.",
         "invalidRule2": "Unclosed blocks or standalone '{' are marked as syntax errors."
+      },
+      "errorGuide": {
+        "openButton": "Error Guide",
+        "ariaOpen": "Open DSL error guide",
+        "title": "DSL Error Explanation & Fix Guide",
+        "description": "Select a diagnostic to see the cause and recommended fixes step by step.",
+        "summaryTotal": "Total {{count}}",
+        "summaryError": "Errors {{count}}",
+        "summaryWarning": "Warnings {{count}}",
+        "filter": {
+          "all": "All",
+          "error": "Error",
+          "warning": "Warning"
+        },
+        "parsing": "Calculating parse diagnostics...",
+        "emptyNoIssues": "No diagnostics for the current filter.",
+        "emptyNoInput": "Enter DSL code to see diagnostic guidance.",
+        "selectHint": "Select a diagnostic item from the left list.",
+        "severity": {
+          "error": "ERROR",
+          "warning": "WARNING"
+        },
+        "lineLabel": "Line {{line}}",
+        "sectionCause": "Cause",
+        "sectionFix": "How to fix",
+        "sectionExample": "Example",
+        "sectionRule": "Related rule",
+        "badExample": "Bad example",
+        "goodExample": "Fixed example",
+        "moveToLine": "Move to this line",
+        "guides": {
+          "syntaxError": {
+            "cause": "The parser could not read the line because the DSL syntax format (table block, column expression, braces/symbols) is invalid.",
+            "action1": "Check if table declaration follows 'Table TableName {' and has a closing '}'.",
+            "action2": "Check each column line matches one of: 'LogicalName', 'LogicalName :Domain', 'LogicalName > Table.Column', '[PK, AI, NN]'.",
+            "action3": "Remove typos/unnecessary symbols, then re-check line by line.",
+            "badExample": "Table User\n  Id [PK]\n}",
+            "goodExample": "Table User {\n  Id [PK, AI]\n}",
+            "rule": "In strict mode, a Table declaration must always include both '{' and '}'."
+          },
+          "unknownTerm": {
+            "cause": "The logical name is not registered in the term dictionary, so physical name/domain cannot be resolved.",
+            "action1": "Register the term first in the data dictionary.",
+            "action2": "If it already exists, verify spelling, spaces, and casing.",
+            "action3": "For quick progress, replace it with an already registered logical term.",
+            "badExample": "Table User {\n  ResidentNumber\n}",
+            "goodExample": "Table User {\n  UserIdentifier\n}",
+            "rule": "DSL logical names should match dictionary terms for stable physical/domain mapping."
+          },
+          "unknownDomain": {
+            "cause": "The domain logical name specified on the column does not exist in the dictionary.",
+            "action1": "Check whether the domain exists in the domain dictionary.",
+            "action2": "Fix the domain name to an existing exact logical name.",
+            "action3": "If missing, create the domain first and parse again.",
+            "badExample": "Table User {\n  Email :EmailFormat\n}",
+            "goodExample": "Table User {\n  Email :EmailDomain\n}",
+            "rule": "':DomainName' only accepts domain logical names that exist in the dictionary."
+          },
+          "unknownFkTable": {
+            "cause": "The parent table in the FK expression is not declared in the current DSL document.",
+            "action1": "Declare the referenced table in the DSL first.",
+            "action2": "Verify the parent table logical name spelling.",
+            "action3": "If FK is not needed, remove '>' and keep it as a regular column.",
+            "badExample": "Table User {\n  TeamId > Team.Id\n}",
+            "goodExample": "Table Team {\n  Id [PK]\n}\n\nTable User {\n  TeamId > Team.Id\n}",
+            "rule": "FK parent tables must be declared in the same DSL document."
+          },
+          "unknownFkColumn": {
+            "cause": "The referenced parent table exists, but the referenced parent column is not declared in that table.",
+            "action1": "Check whether the target column exists in the parent table block.",
+            "action2": "Fix typo in the referenced column logical name.",
+            "action3": "Add the missing column to parent table if needed, then parse again.",
+            "badExample": "Table Team {\n  Id [PK]\n}\n\nTable User {\n  TeamId > Team.Code\n}",
+            "goodExample": "Table Team {\n  Id [PK]\n}\n\nTable User {\n  TeamId > Team.Id\n}",
+            "rule": "FK requires both 'ParentTable.ParentColumn' to exactly match declared names."
+          },
+          "noDomainWarning": {
+            "cause": "No domain is linked to this term, so a default physical type is used.",
+            "action1": "Link a domain to the term in dictionary to keep type consistency.",
+            "action2": "Or explicitly assign ':DomainName' in DSL for deterministic type mapping.",
+            "rule": "Warnings do not block apply, but resolving them improves schema quality."
+          },
+          "genericError": {
+            "cause": "An unclassified parser error occurred.",
+            "action1": "Reduce surrounding syntax to isolate the smallest failing fragment.",
+            "action2": "Compare with syntax guide examples and fix differences.",
+            "rule": "When unsure, narrow down input and validate incrementally."
+          },
+          "genericWarning": {
+            "cause": "This is a recommended check warning.",
+            "action1": "You may proceed first and clean up later if not blocking.",
+            "action2": "Align dictionary/reference rules when possible to remove warnings.",
+            "rule": "Fewer warnings generally improve team-level DSL quality and reuse."
+          }
+        }
       }
     },
     "validation": {

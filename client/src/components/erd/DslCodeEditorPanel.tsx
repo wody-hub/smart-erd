@@ -9,6 +9,7 @@ import { useApplyToErd } from '@/hooks/useApplyToErd';
 import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
 import { useErdDictionary } from './ErdDictionaryContext';
 import CodeEditorFooter from './CodeEditorFooter';
+import DslDiagnosticGuideDialog from './DslDiagnosticGuideDialog';
 import {
   DSL_LANGUAGE_ID,
   registerDslLanguage,
@@ -102,6 +103,36 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     setMonacoReady(true);
   };
 
+  /**
+   * 진단 항목 위치로 에디터 포커스를 이동한다.
+   *
+   * @param diagnostic 선택된 진단 정보
+   */
+  const handleMoveToDiagnostic = useCallback(
+    (diagnostic: { line: number; startColumn: number }) => {
+      const editor = editorRef.current;
+      if (!editor) {
+        return;
+      }
+
+      const model = editor.getModel();
+      if (!model) {
+        return;
+      }
+
+      const safeLine = Math.min(Math.max(diagnostic.line, 1), model.getLineCount());
+      const safeColumn = Math.min(
+        Math.max(diagnostic.startColumn, 1),
+        Math.max(1, model.getLineMaxColumn(safeLine)),
+      );
+
+      editor.focus();
+      editor.setPosition({ lineNumber: safeLine, column: safeColumn });
+      editor.revealLineInCenter(safeLine);
+    },
+    [],
+  );
+
   /** 다크 모드 감지 (반응형) */
   const isDark = useDarkMode();
 
@@ -177,6 +208,17 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
 
   return (
     <div className="h-full flex flex-col">
+      <div className="border-b border-border px-3 py-2">
+        <div className="flex items-center justify-end">
+          <DslDiagnosticGuideDialog
+            diagnostics={parseResult?.diagnostics ?? []}
+            parsing={parsing}
+            hasInput={dslText.trim().length > 0}
+            onMoveToDiagnostic={handleMoveToDiagnostic}
+          />
+        </div>
+      </div>
+
       {/* Monaco Editor */}
       <div className="flex-1 min-h-0">
         <Editor
