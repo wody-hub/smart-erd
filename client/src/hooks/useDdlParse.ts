@@ -94,12 +94,16 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
       const isCurrentRequest = () => seq === parseSeqRef.current;
       try {
         const result = await parseDdl(text, targetDbms);
-        if (!isCurrentRequest()) return;
+        if (!isCurrentRequest()) {
+          return;
+        }
         setParseResult(result);
       } catch (err) {
-        if (!isCurrentRequest()) return;
+        if (!isCurrentRequest()) {
+          return;
+        }
         const msg = err instanceof Error ? err.message : 'Failed to parse DDL';
-        setParseResult({ tables: [], relations: [], errors: [msg] });
+        setParseResult({ diagnostics: [], tables: [], relations: [], errors: [msg] });
       } finally {
         if (isCurrentRequest()) {
           setParsing(false);

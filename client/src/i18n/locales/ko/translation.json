@@ -257,6 +257,7 @@
       "preview": "테이블 {{tables}}개, 관계 {{relations}}개 감지됨",
       "warnings": "경고 {{count}}건",
       "parseError": "DDL 파싱에 실패했습니다",
+      "parseErrorDetails": "DDL 파싱 오류: {{details}}",
       "errorDetails": "파싱 오류 상세",
       "moreErrors": "추가 오류 {{count}}건",
       "import": "가져오기",
@@ -381,6 +382,7 @@
       "warningCount": "경고 {{count}}건",
       "noTables": "테이블 선언이 없습니다",
       "error": {
+        "syntaxError": "문법 오류",
         "unknownTerm": "사전에 없는 논리명: {{name}}",
         "unknownDomain": "사전에 없는 도메인: {{name}}",
         "unknownFkTable": "선언되지 않은 테이블: {{name}}",
@@ -388,6 +390,28 @@
       },
       "warning": {
         "noDomain": "도메인 미연결: {{name}}"
+      },
+      "syntaxGuide": {
+        "openButton": "문법 가이드",
+        "ariaOpen": "DSL 문법 가이드 열기",
+        "title": "논리명 DSL 문법 가이드",
+        "description": "DSL은 Table 블록 단위로 작성합니다. 중괄호 블록 누락/불일치는 문법 오류로 처리됩니다.",
+        "structureTitle": "1) 기본 구조",
+        "structureRule1": "테이블은 '{{tableKeyword}} 논리테이블명' 선언과 중괄호 블록으로 작성해야 합니다.",
+        "structureRule2": "컬럼은 블록 내부에 한 줄씩 작성합니다.",
+        "structureRule3": "주석은 '//' 뒤에 작성할 수 있습니다.",
+        "columnTitle": "2) 컬럼 문법",
+        "columnRule1": "옵션은 대괄호로 지정합니다. '{{pk}}' 기본키, '{{ai}}' 자동증가, '{{nn}}' NOT NULL",
+        "columnRule2": "도메인 지정: '컬럼논리명 :도메인논리명'",
+        "columnRule3": "FK 지정: '컬럼논리명 > 부모테이블논리명.부모컬럼논리명'",
+        "examplesTitle": "3) 예시",
+        "exampleBasicLabel": "기본 예시",
+        "exampleBasicCode": "{{tableKeyword}} 사용자 {\n  아이디 [{{pk}}, {{ai}}]\n  이름 [{{nn}}]\n  이메일 :이메일도메인\n}",
+        "exampleRelationLabel": "도메인 + FK 예시",
+        "exampleRelationCode": "{{tableKeyword}} 팀 {\n  아이디 [{{pk}}, {{ai}}]\n  팀명 [{{nn}}]\n}\n\n{{tableKeyword}} 사용자 {\n  아이디 [{{pk}}, {{ai}}]\n  팀아이디 > 팀.아이디 [{{nn}}]\n}",
+        "invalidTitle": "4) 자주 나는 문법 오류",
+        "invalidRule1": "'Table 사용자'처럼 블록 없이 선언하면 오류입니다. '{'와 '}'를 함께 작성하세요.",
+        "invalidRule2": "열린 블록을 닫지 않거나(}) 단독 '{'를 쓰면 오류로 표시됩니다."
       }
     },
     "validation": {

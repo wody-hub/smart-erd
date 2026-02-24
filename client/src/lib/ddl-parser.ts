@@ -50,12 +50,30 @@ export interface ParsedRelation {
 
 /** DDL 파싱 결과 */
 export interface DdlParseResult {
+  /** 위치/심각도 포함 진단 목록 (UI 어댑터에서 Monaco 마커로 변환) */
+  diagnostics: DdlDiagnostic[];
   /** 파싱된 테이블 목록 */
   tables: ParsedTable[];
   /** 파싱된 FK 관계 목록 */
   relations: ParsedRelation[];
   /** 파싱 중 발생한 에러 메시지 목록 */
   errors: string[];
+}
+
+/** DDL 진단 정보 (i18n 키 + 선택적 위치 정보) */
+export interface DdlDiagnostic {
+  /** i18n 키 */
+  messageKey: string;
+  /** i18n 보간 인자 */
+  messageArgs?: Record<string, string>;
+  /** 심각도 */
+  severity: 'error' | 'warning';
+  /** 선택적 위치 정보 (1-based, endColumn exclusive) */
+  location?: {
+    line: number;
+    startColumn: number;
+    endColumn: number;
+  };
 }
 
 /**
@@ -468,7 +486,7 @@ function normalizeDdlForParser(ddl: string, dbms: DbmsType): string {
   // parser 미지원 ALTER IDENTITY ADD 구문 제거
   normalized = normalized.replace(
     /\bALTER\s+TABLE\s+[^;]*?\bALTER\s+COLUMN\b[^;]*?\bADD\s+GENERATED\s+(?:ALWAYS|BY\s+DEFAULT)\s+AS\s+IDENTITY(?:\s*\([^;]*?\))?\s*;/gi,
-    '',
+    (matched) => matched.replace(/[^\n]/g, ' '),
   );
 
   return normalized;
@@ -480,6 +498,50 @@ interface SqlStatementChunk {
   index: number;
   /** 문장 SQL */
   sql: string;
+  /** 원본 SQL 기준 시작 오프셋 (0-based) */
+  startOffset: number;
+  /** 원본 SQL 기준 시작 라인 (1-based) */
+  startLine: number;
+}
+
+/**
+ * 원본 문자열의 각 라인 시작 오프셋을 만든다.
+ *
+ * @param text 원본 문자열
+ * @returns 라인 시작 오프셋 배열 (0-based)
+ */
+function buildLineStartOffsets(text: string): number[] {
+  const lineStarts: number[] = [0];
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '\n' && i + 1 < text.length) {
+      lineStarts.push(i + 1);
+    }
+  }
+  return lineStarts;
+}
+
+/**
+ * 라인 시작 오프셋 배열을 이용해 1-based 라인 번호를 계산한다.
+ *
+ * @param lineStarts 라인 시작 오프셋 배열
+ * @param offset     0-based 오프셋
+ * @returns 1-based 라인 번호
+ */
+function getLineFromLineStarts(lineStarts: number[], offset: number): number {
+  const target = Math.max(0, offset);
+
+  let left = 0;
+  let right = lineStarts.length - 1;
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+    if (lineStarts[mid] <= target) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
+  }
+
+  return Math.max(1, right + 1);
 }
 
 /**
@@ -492,6 +554,7 @@ interface SqlStatementChunk {
  */
 function splitSqlStatements(ddl: string): SqlStatementChunk[] {
   const chunks: SqlStatementChunk[] = [];
+  const lineStarts = buildLineStartOffsets(ddl);
   let start = 0;
   let inSingleQuote = false;
   let inDoubleQuote = false;
@@ -500,9 +563,17 @@ function splitSqlStatements(ddl: string): SqlStatementChunk[] {
   let inBlockComment = false;
 
   const pushChunk = (end: number) => {
-    const sql = ddl.slice(start, end).trim();
+    const raw = ddl.slice(start, end);
+    const leadingWhitespaceLength = raw.length - raw.trimStart().length;
+    const sql = raw.trim();
     if (sql) {
-      chunks.push({ index: chunks.length + 1, sql });
+      const startOffset = start + leadingWhitespaceLength;
+      chunks.push({
+        index: chunks.length + 1,
+        sql,
+        startOffset,
+        startLine: getLineFromLineStarts(lineStarts, startOffset),
+      });
     }
   };
 
@@ -580,6 +651,96 @@ function splitSqlStatements(ddl: string): SqlStatementChunk[] {
 }
 
 /**
+ * node-sql-parser SyntaxError 위치를 DdlDiagnostic 위치 스키마로 변환한다.
+ *
+ * @param error 파서 오류 객체
+ * @returns 위치 정보 또는 undefined
+ */
+function extractParserErrorLocation(error: unknown): DdlDiagnostic['location'] | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+
+  const locationRaw = (error as { location?: unknown }).location;
+  if (!locationRaw || typeof locationRaw !== 'object') {
+    return undefined;
+  }
+
+  const start = (locationRaw as { start?: unknown }).start;
+  const end = (locationRaw as { end?: unknown }).end;
+  if (!start || typeof start !== 'object') {
+    return undefined;
+  }
+
+  const lineRaw = (start as { line?: unknown }).line;
+  const startColumnRaw = (start as { column?: unknown }).column;
+  const endColumnRaw =
+    end && typeof end === 'object' ? (end as { column?: unknown }).column : undefined;
+
+  const line = Number(lineRaw);
+  const startColumn = Number(startColumnRaw);
+  const endColumn = Number(endColumnRaw);
+
+  if (!Number.isFinite(line) || line < 1) {
+    return undefined;
+  }
+
+  const normalizedStartColumn =
+    Number.isFinite(startColumn) && startColumn >= 1 ? Math.floor(startColumn) : 1;
+  const normalizedEndColumn =
+    Number.isFinite(endColumn) && endColumn > normalizedStartColumn
+      ? Math.floor(endColumn)
+      : normalizedStartColumn + 1;
+
+  return {
+    line: Math.floor(line),
+    startColumn: normalizedStartColumn,
+    endColumn: normalizedEndColumn,
+  };
+}
+
+/**
+ * 문장 단위(local) 위치를 원본 SQL 기준(global) 위치로 변환한다.
+ *
+ * @param location  local 위치
+ * @param startLine 문장 시작 라인 (1-based)
+ * @returns global 위치
+ */
+function toGlobalLocation(
+  location: DdlDiagnostic['location'] | undefined,
+  startLine: number,
+): DdlDiagnostic['location'] | undefined {
+  if (!location) {
+    return undefined;
+  }
+
+  return {
+    line: startLine + location.line - 1,
+    startColumn: location.startColumn,
+    endColumn: location.endColumn,
+  };
+}
+
+/**
+ * DDL 파싱 오류 메시지를 진단 객체로 만든다.
+ *
+ * @param details  에러 상세 문자열
+ * @param location 선택적 위치 정보
+ * @returns DdlDiagnostic
+ */
+function createParseDiagnostic(
+  details: string,
+  location?: DdlDiagnostic['location'],
+): DdlDiagnostic {
+  return {
+    messageKey: 'erd.ddlImport.parseErrorDetails',
+    messageArgs: { details },
+    severity: 'error',
+    location,
+  };
+}
+
+/**
  * 문장 단위 파싱 오류를 사용자 표시용 문자열로 정규화한다.
  *
  * @param index 문장 인덱스 (1-based)
@@ -604,12 +765,13 @@ function formatStatementParseError(index: number, sql: string, error: unknown): 
  * @returns 파싱 결과 (Promise)
  */
 export async function parseDdl(ddl: string, dbms: DbmsType): Promise<DdlParseResult> {
+  const diagnostics: DdlDiagnostic[] = [];
   const tables: ParsedTable[] = [];
   const relations: ParsedRelation[] = [];
   const errors: string[] = [];
 
   if (!ddl.trim()) {
-    return { tables, relations, errors };
+    return { diagnostics, tables, relations, errors };
   }
 
   const normalizedDdl = normalizeDdlForParser(ddl, dbms);
@@ -633,7 +795,9 @@ export async function parseDdl(ddl: string, dbms: DbmsType): Promise<DdlParseRes
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        errors.push(`${context}: ${msg}`);
+        const details = `${context}: ${msg}`;
+        errors.push(details);
+        diagnostics.push(createParseDiagnostic(details));
       }
     };
 
@@ -648,7 +812,10 @@ export async function parseDdl(ddl: string, dbms: DbmsType): Promise<DdlParseRes
     } catch (fullParseError) {
       const fullMessage =
         fullParseError instanceof Error ? fullParseError.message : String(fullParseError);
-      errors.push(`Full script parse failed: ${fullMessage}`);
+      const fullDetails = `Full script parse failed: ${fullMessage}`;
+      const fullLocation = extractParserErrorLocation(fullParseError);
+      const statementErrors: string[] = [];
+      const statementDiagnostics: DdlDiagnostic[] = [];
 
       // 전체 스크립트 파싱 실패 시 문장 단위로 재시도하여 원인 위치를 좁힌다.
       const chunks = splitSqlStatements(normalizedDdl);
@@ -661,9 +828,22 @@ export async function parseDdl(ddl: string, dbms: DbmsType): Promise<DdlParseRes
               processAstSafely(ast, `Statement ${chunk.index}`);
             }
           } catch (statementError) {
-            errors.push(formatStatementParseError(chunk.index, chunk.sql, statementError));
+            const details = formatStatementParseError(chunk.index, chunk.sql, statementError);
+            statementErrors.push(details);
+            const localLocation = extractParserErrorLocation(statementError);
+            statementDiagnostics.push(
+              createParseDiagnostic(details, toGlobalLocation(localLocation, chunk.startLine)),
+            );
           }
         }
+      }
+
+      if (statementDiagnostics.length > 0) {
+        errors.push(...statementErrors);
+        diagnostics.push(...statementDiagnostics);
+      } else {
+        errors.push(fullDetails);
+        diagnostics.push(createParseDiagnostic(fullDetails, fullLocation));
       }
     }
 
@@ -684,8 +864,10 @@ export async function parseDdl(ddl: string, dbms: DbmsType): Promise<DdlParseRes
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    errors.push(`DDL parser load failed: ${msg}`);
+    const details = `DDL parser load failed: ${msg}`;
+    errors.push(details);
+    diagnostics.push(createParseDiagnostic(details));
   }
 
-  return { tables, relations, errors };
+  return { diagnostics, tables, relations, errors };
 }

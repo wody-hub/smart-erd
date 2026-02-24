@@ -125,7 +125,9 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
   // Monaco mount + terms/domains 변경 시 CompletionProvider 등록/재생성
   useEffect(() => {
     const monaco = monacoRef.current;
-    if (!monaco) return;
+    if (!monaco) {
+      return;
+    }
 
     completionDisposableRef.current?.dispose();
     completionDisposableRef.current = monaco.languages.registerCompletionItemProvider(
@@ -140,28 +142,37 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
   useEffect(() => {
     const monaco = monacoRef.current;
     const editor = editorRef.current;
-    if (!monaco || !editor) return;
-
-    const model = editor.getModel();
-    if (!model) return;
-
-    if (!parseResult || parseResult.diagnostics.length === 0) {
-      monaco.editor.setModelMarkers(model, 'dsl', []);
+    if (!monaco || !editor) {
       return;
     }
 
-    const markers: Monaco.editor.IMarkerData[] = parseResult.diagnostics.map((diag) => ({
-      severity:
-        diag.severity === 'error' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      message: t(diag.messageKey as any, diag.messageArgs),
-      startLineNumber: diag.line,
-      startColumn: diag.startColumn,
-      endLineNumber: diag.line,
-      endColumn: diag.endColumn,
-    }));
+    const model = editor.getModel();
+    if (!model) {
+      return;
+    }
 
-    monaco.editor.setModelMarkers(model, 'dsl', markers);
+    if (!parseResult || parseResult.diagnostics.length === 0) {
+      monaco.editor.setModelMarkers(model, 'dsl', []);
+    } else {
+      const markers: Monaco.editor.IMarkerData[] = parseResult.diagnostics.map((diag) => ({
+        severity:
+          diag.severity === 'error' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        message: t(diag.messageKey as any, diag.messageArgs),
+        startLineNumber: diag.line,
+        startColumn: diag.startColumn,
+        endLineNumber: diag.line,
+        endColumn: diag.endColumn,
+      }));
+
+      monaco.editor.setModelMarkers(model, 'dsl', markers);
+    }
+
+    return () => {
+      if (!model.isDisposed()) {
+        monaco.editor.setModelMarkers(model, 'dsl', []);
+      }
+    };
   }, [parseResult, t]);
 
   return (

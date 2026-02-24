@@ -258,6 +258,7 @@
       "preview": "{{tables}} tables, {{relations}} relations detected",
       "warnings": "{{count}} warnings",
       "parseError": "Failed to parse DDL",
+      "parseErrorDetails": "DDL parse error: {{details}}",
       "errorDetails": "Parse error details",
       "moreErrors": "{{count}} more errors",
       "import": "Import",
@@ -382,6 +383,7 @@
       "warningCount": "{{count}} warnings",
       "noTables": "No table declarations found",
       "error": {
+        "syntaxError": "Syntax error",
         "unknownTerm": "Unknown term: {{name}}",
         "unknownDomain": "Unknown domain: {{name}}",
         "unknownFkTable": "Undeclared table: {{name}}",
@@ -389,6 +391,28 @@
       },
       "warning": {
         "noDomain": "No domain linked: {{name}}"
+      },
+      "syntaxGuide": {
+        "openButton": "Syntax Guide",
+        "ariaOpen": "Open DSL syntax guide",
+        "title": "Logical DSL Syntax Guide",
+        "description": "DSL is written in Table blocks. Missing or mismatched braces are treated as syntax errors.",
+        "structureTitle": "1) Basic Structure",
+        "structureRule1": "A table must be declared as '{{tableKeyword}} logicalTableName' with a brace block.",
+        "structureRule2": "Write one column per line inside the block.",
+        "structureRule3": "Use '//' for inline comments.",
+        "columnTitle": "2) Column Syntax",
+        "columnRule1": "Use options in brackets: '{{pk}}' primary key, '{{ai}}' auto increment, '{{nn}}' NOT NULL.",
+        "columnRule2": "Domain mapping: 'columnLogicalName :domainLogicalName'",
+        "columnRule3": "FK reference: 'columnLogicalName > parentTableLogicalName.parentColumnLogicalName'",
+        "examplesTitle": "3) Examples",
+        "exampleBasicLabel": "Basic example",
+        "exampleBasicCode": "{{tableKeyword}} User {\n  Id [{{pk}}, {{ai}}]\n  Name [{{nn}}]\n  Email :EmailDomain\n}",
+        "exampleRelationLabel": "Domain + FK example",
+        "exampleRelationCode": "{{tableKeyword}} Team {\n  Id [{{pk}}, {{ai}}]\n  TeamName [{{nn}}]\n}\n\n{{tableKeyword}} User {\n  Id [{{pk}}, {{ai}}]\n  TeamId > Team.Id [{{nn}}]\n}",
+        "invalidTitle": "4) Common Syntax Errors",
+        "invalidRule1": "'Table User' without a block is invalid. Always write '{' and '}' together.",
+        "invalidRule2": "Unclosed blocks or standalone '{' are marked as syntax errors."
       }
     },
     "validation": {

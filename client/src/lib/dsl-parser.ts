@@ -83,7 +83,7 @@ interface RawColumn {
 }
 
 /** 파서 상태 머신 */
-type ParserState = 'IDLE' | 'IN_TABLE';
+type ParserState = 'IDLE' | 'EXPECT_TABLE_BLOCK' | 'IN_TABLE';
 
 /** Table 선언 감지 정규식 */
 const TABLE_DECL_REGEX = new RegExp(`^(\\s*)${DSL_TABLE_KEYWORD}\\s+(\\S+)\\s*\\{?\\s*$`);
@@ -93,6 +93,17 @@ const TABLE_PREFIX_LENGTH = `${DSL_TABLE_KEYWORD} `.length;
 
 /** 옵션 키워드 해체 */
 const [OPT_PK, OPT_AI, OPT_NN] = DSL_COLUMN_OPTIONS;
+
+/**
+ * 행 전체를 강조하기 위한 1-based 컬럼 범위를 계산한다.
+ *
+ * @param line 원본 행 텍스트
+ * @returns 시작/끝 컬럼 (end exclusive)
+ */
+function getLineColumns(line: string): { startColumn: number; endColumn: number } {
+  const endColumn = Math.max(2, line.replace(/\r$/, '').length + 1);
+  return { startColumn: 1, endColumn };
+}
 
 /**
  * 논리명 DSL을 파싱하여 ERD 생성용 데이터를 반환한다.
@@ -108,11 +119,31 @@ const [OPT_PK, OPT_AI, OPT_NN] = DSL_COLUMN_OPTIONS;
 export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult {
   const diagnostics: DslError[] = [];
   const rawTables: RawTable[] = [];
+  const errors: string[] = [];
+
+  /**
+   * 문법 오류를 diagnostics/errors에 동기 반영한다.
+   *
+   * @param line        행 번호 (1-based)
+   * @param sourceLine  오류 대상 원본 행
+   */
+  const pushSyntaxError = (line: number, sourceLine: string) => {
+    const { startColumn, endColumn } = getLineColumns(sourceLine);
+    diagnostics.push({
+      messageKey: 'erd.dsl.error.syntaxError',
+      line,
+      startColumn,
+      endColumn,
+      severity: 'error',
+    });
+    errors.push(`Syntax error: line ${line}`);
+  };
 
   // === Pass 1: 구조 파싱 ===
   const lines = dsl.split('\n');
   let state: ParserState = 'IDLE';
   let currentTable: RawTable | null = null;
+  let pendingTable: RawTable | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const lineNum = i + 1;
@@ -127,6 +158,27 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
       continue;
     }
 
+    if (state === 'EXPECT_TABLE_BLOCK') {
+      if (trimmed === '{' && pendingTable) {
+        currentTable = pendingTable;
+        rawTables.push(currentTable);
+        pendingTable = null;
+        state = 'IN_TABLE';
+        continue;
+      }
+
+      if (pendingTable) {
+        const pendingLineRaw = lines[pendingTable.line - 1] ?? '';
+        pushSyntaxError(pendingTable.line, pendingLineRaw);
+      }
+      pendingTable = null;
+      state = 'IDLE';
+
+      // 현재 라인을 IDLE 상태에서 다시 파싱하여 유효한 다음 선언을 놓치지 않는다.
+      i -= 1;
+      continue;
+    }
+
     if (state === 'IDLE') {
       // Table 선언 감지
       const tableMatch = effective.match(TABLE_DECL_REGEX);
@@ -134,26 +186,35 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
         const prefix = tableMatch[1].length;
         const nameStart = prefix + TABLE_PREFIX_LENGTH;
         const logicalName = tableMatch[2];
-        currentTable = {
+        const nextTable: RawTable = {
           logicalName,
           line: lineNum,
           nameStartCol: nameStart + 1,
           nameEndCol: nameStart + logicalName.length + 1,
           columns: [],
         };
-        rawTables.push(currentTable);
-        // { 가 같은 행에 있으면 IN_TABLE 전환
+
+        // { 가 같은 행에 있으면 즉시 테이블 블록 시작
         if (trimmed.endsWith('{')) {
+          currentTable = nextTable;
+          rawTables.push(currentTable);
           state = 'IN_TABLE';
+        } else {
+          // 엄격 문법: 다음 유효 라인에서 반드시 { 가 와야 한다.
+          pendingTable = nextTable;
+          state = 'EXPECT_TABLE_BLOCK';
         }
         continue;
       }
 
-      // { 만 단독으로 있는 행 (Table 다음 행에 { 가 오는 경우)
-      if (trimmed === '{' && currentTable) {
-        state = 'IN_TABLE';
+      // 단독 { 는 직전 Table 선언이 없는 경우 문법 오류
+      if (trimmed === '{') {
+        pushSyntaxError(lineNum, effective);
         continue;
       }
+
+      pushSyntaxError(lineNum, effective);
+      continue;
     }
 
     if (state === 'IN_TABLE') {
@@ -169,15 +230,26 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
         const col = parseColumnLine(effective, lineNum);
         if (col) {
           currentTable.columns.push(col);
+        } else {
+          pushSyntaxError(lineNum, effective);
         }
       }
     }
   }
 
+  if (state === 'EXPECT_TABLE_BLOCK' && pendingTable) {
+    const pendingLineRaw = lines[pendingTable.line - 1] ?? '';
+    pushSyntaxError(pendingTable.line, pendingLineRaw);
+  }
+
+  if (state === 'IN_TABLE' && currentTable) {
+    const tableLineRaw = lines[currentTable.line - 1] ?? '';
+    pushSyntaxError(currentTable.line, tableLineRaw);
+  }
+
   // === Pass 2: 사전 해석 + FK 참조 ===
   const tables: ParsedTable[] = [];
   const relations: ParsedRelation[] = [];
-  const errors: string[] = [];
 
   // 논리명 → 물리 테이블명 매핑 (FK 참조 해석용)
   const tablePhysicalMap = new Map<string, string>();
@@ -364,7 +436,7 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
   }
 
   return {
-    result: { tables, relations, errors },
+    result: { diagnostics: [], tables, relations, errors },
     diagnostics,
   };
 }
