@@ -160,7 +160,10 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
             wordWrap: 'on',
             tabSize: 2,
             renderLineHighlight: 'gutter',
-            placeholder: undefined,
+            quickSuggestions: false,
+            wordBasedSuggestions: 'off',
+            suggestOnTriggerCharacters: true,
+            acceptSuggestionOnCommitCharacter: false,
           }}
           theme={isDark ? 'vs-dark' : 'vs'}
         />

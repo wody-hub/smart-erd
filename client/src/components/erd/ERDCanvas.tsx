@@ -274,6 +274,7 @@ function ERDCanvas({
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           deleteKeyCode={null}
+          panActivationKeyCode={null}
           nodesDraggable={canEdit}
           nodesConnectable={canEdit}
           elementsSelectable={canEdit}

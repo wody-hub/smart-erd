@@ -183,6 +183,10 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
             wordWrap: 'on',
             tabSize: 2,
             renderLineHighlight: 'gutter',
+            quickSuggestions: false,
+            wordBasedSuggestions: 'off',
+            suggestOnTriggerCharacters: true,
+            acceptSuggestionOnCommitCharacter: false,
           }}
           theme={isDark ? 'vs-dark' : 'vs'}
         />
