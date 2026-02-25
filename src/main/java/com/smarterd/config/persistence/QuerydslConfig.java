@@ -1,4 +1,4 @@
-package com.smarterd.config;
+package com.smarterd.config.persistence;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;

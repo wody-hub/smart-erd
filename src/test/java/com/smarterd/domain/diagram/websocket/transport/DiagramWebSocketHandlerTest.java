@@ -8,7 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.smarterd.config.WebSocketProperties;
+import com.smarterd.config.websocket.WebSocketProperties;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
 import com.smarterd.domain.diagram.websocket.model.LeaveResult;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;

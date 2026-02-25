@@ -1,4 +1,4 @@
-package com.smarterd.config;
+package com.smarterd.config.i18n;
 
 import java.util.List;
 import java.util.Locale;

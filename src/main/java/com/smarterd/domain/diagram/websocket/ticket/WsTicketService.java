@@ -1,6 +1,6 @@
 package com.smarterd.domain.diagram.websocket.ticket;
 
-import com.smarterd.config.WebSocketProperties;
+import com.smarterd.config.websocket.WebSocketProperties;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.DomainAccessDeniedException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;

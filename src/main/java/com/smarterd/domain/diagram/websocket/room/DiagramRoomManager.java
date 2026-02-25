@@ -1,6 +1,6 @@
 package com.smarterd.domain.diagram.websocket.room;
 
-import com.smarterd.config.WebSocketProperties;
+import com.smarterd.config.websocket.WebSocketProperties;
 import com.smarterd.domain.diagram.websocket.model.JoinResult;
 import com.smarterd.domain.diagram.websocket.model.LeaveResult;
 import com.smarterd.domain.diagram.websocket.model.PresenceSnapshot;

@@ -1,4 +1,4 @@
-package com.smarterd.config;
+package com.smarterd.config.security;
 
 import java.util.List;
 import lombok.Getter;

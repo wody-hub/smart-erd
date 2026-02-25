@@ -6,12 +6,15 @@ import com.smarterd.api.auth.dto.RefreshRequest;
 import com.smarterd.api.auth.dto.SignupRequest;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
+import com.smarterd.domain.common.exception.TooManyRequestsException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.repository.UserRepository;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class AuthService {
 
@@ -40,18 +44,37 @@ public class AuthService {
 
     /** 비밀번호 인코더 */
     private final PasswordEncoder passwordEncoder;
+    /** 로그인 실패 기반 Rate Limiting 서비스 */
+    private final LoginRateLimitService loginRateLimitService;
 
     /**
      * 사용자 로그인을 수행한다.
      *
      * @param request 로그인 요청 DTO
+     * @param clientIp 클라이언트 IP
      * @return 인증 응답 (Access Token, Refresh Token, 로그인 ID, 이름)
      */
     @Transactional
-    public AuthResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-            new UsernamePasswordAuthenticationToken(request.loginId(), request.password())
-        );
+    public AuthResponse login(LoginRequest request, String clientIp) {
+        if (loginRateLimitService.isBlocked(request.loginId(), clientIp)) {
+            throw new TooManyRequestsException(MessageCode.ERROR_AUTH_LOGIN_RATE_LIMITED.code());
+        }
+
+        try {
+            authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.loginId(), request.password())
+            );
+        } catch (AuthenticationException e) {
+            try {
+                loginRateLimitService.recordFailure(request.loginId(), clientIp);
+            } catch (RuntimeException rateLimitException) {
+                // rate-limit 기록 실패가 인증 실패 응답을 500으로 바꾸지 않도록 방어한다.
+                log.warn("Failed to record login rate-limit state. loginId={}", request.loginId(), rateLimitException);
+            }
+            throw e;
+        }
+
+        loginRateLimitService.reset(request.loginId(), clientIp);
 
         final var user = findUserByLoginId(request.loginId());
         return issueTokens(user);
@@ -88,10 +111,10 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse refresh(RefreshRequest request) {
-        final var refreshToken = jwtTokenService.validateRefreshToken(request.refreshToken());
+        final var refreshToken = jwtTokenService.validateRefreshTokenForRefresh(request.refreshToken());
         final var user = refreshToken.getUser();
 
-        jwtTokenService.deleteRefreshToken(refreshToken);
+        jwtTokenService.consumeRefreshToken(refreshToken);
 
         return issueTokens(user);
     }
@@ -103,7 +126,7 @@ public class AuthService {
      */
     @Transactional
     public void logout(RefreshRequest request) {
-        final var refreshToken = jwtTokenService.validateRefreshToken(request.refreshToken());
+        final var refreshToken = jwtTokenService.validateRefreshTokenForLogout(request.refreshToken());
         jwtTokenService.deleteRefreshToken(refreshToken);
     }
 

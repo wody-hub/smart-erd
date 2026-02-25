@@ -1,5 +1,6 @@
-package com.smarterd.config;
+package com.smarterd.config.security;
 
+import com.smarterd.config.support.EnvironmentProfile;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
@@ -39,15 +40,12 @@ public class JwtProperties {
     @PostConstruct
     void validateSecret() {
         if (isUsingDefaultSecret()) {
-            final var profiles = environment.getActiveProfiles();
-            for (final var profile : profiles) {
-                if ("prod".equalsIgnoreCase(profile) || "production".equalsIgnoreCase(profile)) {
-                    log.warn(
-                        "프로덕션 환경에서 기본 JWT 시크릿을 사용하고 있습니다. " +
-                            "SMART_ERD_JWT_SECRET 환경 변수를 반드시 설정하세요."
-                    );
-                    return;
-                }
+            if (EnvironmentProfile.hasProductionProfile(environment)) {
+                log.warn(
+                    "프로덕션 환경에서 기본 JWT 시크릿을 사용하고 있습니다. " +
+                        "SMART_ERD_JWT_SECRET 환경 변수를 반드시 설정하세요."
+                );
+                return;
             }
             log.info("개발 환경 기본 JWT 시크릿을 사용 중입니다.");
         }

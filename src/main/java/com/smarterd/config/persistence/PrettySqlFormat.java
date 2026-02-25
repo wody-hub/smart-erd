@@ -1,4 +1,4 @@
-package com.smarterd.config;
+package com.smarterd.config.persistence;
 
 import com.p6spy.engine.spy.appender.MessageFormattingStrategy;
 import org.hibernate.engine.jdbc.internal.FormatStyle;

@@ -1,4 +1,4 @@
-package com.smarterd.config;
+package com.smarterd.config.security;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import java.util.Base64;

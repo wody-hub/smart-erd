@@ -1,4 +1,4 @@
-package com.smarterd.config;
+package com.smarterd.config.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.domain.diagram.websocket.ticket.InMemoryWsTicketStore;

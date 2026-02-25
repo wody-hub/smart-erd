@@ -1,4 +1,4 @@
-package com.smarterd.config;
+package com.smarterd.config.persistence;
 
 import com.blazebit.persistence.Criteria;
 import com.blazebit.persistence.CriteriaBuilderFactory;

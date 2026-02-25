@@ -36,8 +36,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class DictionarySetController {
 
+    /** 사전 세트 도메인 서비스 */
     private final DictionarySetService dictionarySetService;
 
+    /**
+     * 사전 세트를 생성한다.
+     *
+     * @param jwt 인증된 사용자 JWT
+     * @param teamId 팀 ID
+     * @param request 사전 세트 생성 요청
+     * @return 생성된 사전 세트 응답
+     */
     @Operation(summary = "사전 세트 생성")
     @ApiResponse(
         responseCode = "201",
@@ -55,6 +64,13 @@ public class DictionarySetController {
         );
     }
 
+    /**
+     * 팀의 사전 세트 목록을 조회한다.
+     *
+     * @param jwt 인증된 사용자 JWT
+     * @param teamId 팀 ID
+     * @return 사전 세트 목록 응답
+     */
     @Operation(summary = "사전 세트 목록 조회")
     @GetMapping
     public ResponseEntity<List<DictionarySetResponse>> getDictionarySets(
@@ -64,6 +80,14 @@ public class DictionarySetController {
         return ResponseEntity.ok(dictionarySetService.getDictionarySets(jwt.getSubject(), teamId));
     }
 
+    /**
+     * 사전 세트 단건을 조회한다.
+     *
+     * @param jwt 인증된 사용자 JWT
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @return 사전 세트 단건 응답
+     */
     @Operation(summary = "사전 세트 단건 조회")
     @GetMapping("/{setId}")
     public ResponseEntity<DictionarySetResponse> getDictionarySet(
@@ -74,6 +98,15 @@ public class DictionarySetController {
         return ResponseEntity.ok(dictionarySetService.getDictionarySet(jwt.getSubject(), teamId, setId));
     }
 
+    /**
+     * 사전 세트를 수정한다.
+     *
+     * @param jwt 인증된 사용자 JWT
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @param request 사전 세트 수정 요청
+     * @return 수정된 사전 세트 응답
+     */
     @Operation(summary = "사전 세트 수정")
     @PutMapping("/{setId}")
     public ResponseEntity<DictionarySetResponse> updateDictionarySet(
@@ -85,6 +118,14 @@ public class DictionarySetController {
         return ResponseEntity.ok(dictionarySetService.updateDictionarySet(jwt.getSubject(), teamId, setId, request));
     }
 
+    /**
+     * 사전 세트를 삭제한다.
+     *
+     * @param jwt 인증된 사용자 JWT
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @return 본문 없는 204 응답
+     */
     @Operation(summary = "사전 세트 삭제")
     @DeleteMapping("/{setId}")
     public ResponseEntity<Void> deleteDictionarySet(
@@ -96,6 +137,14 @@ public class DictionarySetController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * 기본 사전 세트를 지정한다.
+     *
+     * @param jwt 인증된 사용자 JWT
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @return 기본 사전 세트로 지정된 응답
+     */
     @Operation(summary = "기본 사전 세트 지정")
     @PatchMapping("/{setId}/default")
     public ResponseEntity<DictionarySetResponse> setDefaultDictionarySet(

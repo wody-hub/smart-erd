@@ -1,4 +1,4 @@
-package com.smarterd.config;
+package com.smarterd.config.websocket;
 
 import lombok.Getter;
 import lombok.Setter;

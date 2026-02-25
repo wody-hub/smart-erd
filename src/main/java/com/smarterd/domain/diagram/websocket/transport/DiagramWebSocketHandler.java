@@ -1,6 +1,6 @@
 package com.smarterd.domain.diagram.websocket.transport;
 
-import com.smarterd.config.WebSocketProperties;
+import com.smarterd.config.websocket.WebSocketProperties;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;

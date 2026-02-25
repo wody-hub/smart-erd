@@ -1,6 +1,6 @@
 package com.smarterd.domain.user.service;
 
-import com.smarterd.config.JwtProperties;
+import com.smarterd.config.security.JwtProperties;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.user.entity.RefreshToken;
@@ -72,16 +72,45 @@ public class JwtTokenService {
     }
 
     /**
-     * Refresh Token을 검증하고 해당 엔티티를 반환한다.
+     * 토큰 갱신(rotate) 용도로 Refresh Token을 검증하고 해당 엔티티를 반환한다.
      *
      * @param token Refresh Token 문자열
      * @return 유효한 RefreshToken 엔티티
      * @throws BusinessException 토큰이 존재하지 않거나 만료된 경우
      */
     @Transactional
-    public RefreshToken validateRefreshToken(String token) {
+    public RefreshToken validateRefreshTokenForRefresh(String token) {
         final var refreshToken = refreshTokenRepository
-            .findByToken(token)
+            .findByTokenForUpdate(token)
+            .orElseThrow(() -> new BusinessException(MessageCode.ERROR_BUSINESS_REFRESH_TOKEN_INVALID.code()));
+
+        if (refreshToken.isConsumed()) {
+            refreshTokenRepository.deleteByUser(refreshToken.getUser());
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_REFRESH_TOKEN_REUSED.code());
+        }
+
+        if (refreshToken.getExpiresAt().isBefore(Instant.now())) {
+            refreshTokenRepository.delete(refreshToken);
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_REFRESH_TOKEN_EXPIRED.code());
+        }
+
+        return refreshToken;
+    }
+
+    /**
+     * 로그아웃 용도로 Refresh Token을 검증하고 해당 엔티티를 반환한다.
+     *
+     * <p>로그아웃은 보안 이벤트 탐지 목적의 전역 revoke 트리거가 아니므로,
+     * consumed 토큰이라도 사용자 전체 토큰 무효화는 수행하지 않는다.</p>
+     *
+     * @param token Refresh Token 문자열
+     * @return 유효한 RefreshToken 엔티티
+     * @throws BusinessException 토큰이 존재하지 않거나 만료된 경우
+     */
+    @Transactional
+    public RefreshToken validateRefreshTokenForLogout(String token) {
+        final var refreshToken = refreshTokenRepository
+            .findByTokenForUpdate(token)
             .orElseThrow(() -> new BusinessException(MessageCode.ERROR_BUSINESS_REFRESH_TOKEN_INVALID.code()));
 
         if (refreshToken.getExpiresAt().isBefore(Instant.now())) {
@@ -90,6 +119,16 @@ public class JwtTokenService {
         }
 
         return refreshToken;
+    }
+
+    /**
+     * Refresh Token을 consume 처리한다.
+     *
+     * @param refreshToken consume할 Refresh Token 엔티티
+     */
+    @Transactional
+    public void consumeRefreshToken(RefreshToken refreshToken) {
+        Objects.requireNonNull(refreshToken, "refreshToken must not be null").consume(Instant.now());
     }
 
     /**

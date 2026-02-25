@@ -62,3 +62,19 @@ smart-erd:
     secret: ${SMART_ERD_JWT_SECRET:c21hcnQtZXJkLWp3dC1zZWNyZXQta2V5LXRoYXQtaXMtbG9uZy1lbm91Z2gtZm9yLWhtYWMtc2hhMjU2}
     access-expiration: ${SMART_ERD_JWT_ACCESS_EXPIRATION:1800000}
     refresh-expiration: ${SMART_ERD_JWT_REFRESH_EXPIRATION:86400000}
+  auth:
+    csp:
+      connect-sources: []
+    client-ip:
+      trusted-proxy-cidrs:
+        - 127.0.0.1/32
+        - ::1/128
+    login-rate-limit:
+      max-failed-attempts: 5
+      window-seconds: 60
+      block-seconds: 300
+      cleanup-interval-millis: 600000
+      stale-retention-seconds: 3600
+    refresh-token-cleanup:
+      cleanup-interval-millis: 3600000
+      consumed-retention-seconds: 86400

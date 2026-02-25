@@ -1,5 +1,6 @@
-package com.smarterd.config;
+package com.smarterd.config.websocket;
 
+import com.smarterd.config.security.CorsConfig;
 import com.smarterd.domain.diagram.websocket.transport.DiagramWebSocketHandler;
 import com.smarterd.domain.diagram.websocket.transport.WsTicketHandshakeInterceptor;
 import java.util.Objects;

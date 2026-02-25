@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.smarterd.config.WebSocketProperties;
+import com.smarterd.config.websocket.WebSocketProperties;
 import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

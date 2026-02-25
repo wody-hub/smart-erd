@@ -6,6 +6,7 @@ import com.smarterd.domain.common.exception.DomainAccessDeniedException;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.exception.LocalizedException;
+import com.smarterd.domain.common.exception.TooManyRequestsException;
 import com.smarterd.domain.common.message.MessageCode;
 import java.util.Locale;
 import java.util.Map;
@@ -67,7 +68,13 @@ public class GlobalExceptionHandler {
             .stream()
             .findFirst()
             .map((e) -> e.getField() + ": " + messageSource.getMessage(e, locale))
-            .orElse("Validation failed");
+            .orElseGet(() ->
+                messageSource.getMessage(
+                    Objects.requireNonNull(MessageCode.ERROR_VALIDATION_FAILED.code()),
+                    null,
+                    locale
+                )
+            );
         return ResponseEntity.badRequest().body(Map.of("error", message));
     }
 
@@ -124,6 +131,7 @@ public class GlobalExceptionHandler {
             case DuplicateException _ -> HttpStatus.CONFLICT;
             case ConflictException _ -> HttpStatus.CONFLICT;
             case BusinessException _ -> HttpStatus.BAD_REQUEST;
+            case TooManyRequestsException _ -> HttpStatus.TOO_MANY_REQUESTS;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
     }

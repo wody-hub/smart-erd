@@ -48,6 +48,14 @@ public class RefreshToken {
     @Column(nullable = false, columnDefinition = "TIMESTAMP WITH TIME ZONE")
     private Instant expiresAt;
 
+    /** 토큰 사용(consume) 여부 */
+    @Column(nullable = false, columnDefinition = "boolean not null default false")
+    private boolean consumed;
+
+    /** 토큰 사용 시각 */
+    @Column(columnDefinition = "TIMESTAMP WITH TIME ZONE")
+    private Instant consumedAt;
+
     /**
      * Refresh Token을 생성한다.
      *
@@ -59,5 +67,17 @@ public class RefreshToken {
         this.user = user;
         this.token = token;
         this.expiresAt = expiresAt;
+        this.consumed = false;
+        this.consumedAt = null;
+    }
+
+    /**
+     * 토큰을 사용 완료 상태로 표시한다.
+     *
+     * @param consumedTime 토큰 사용 시각
+     */
+    public void consume(Instant consumedTime) {
+        this.consumed = true;
+        this.consumedAt = consumedTime;
     }
 }

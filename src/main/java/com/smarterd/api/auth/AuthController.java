@@ -6,12 +6,14 @@ import com.smarterd.api.auth.dto.RefreshRequest;
 import com.smarterd.api.auth.dto.SignupRequest;
 import com.smarterd.api.auth.validator.SignupRequestValidator;
 import com.smarterd.domain.user.service.AuthService;
+import com.smarterd.utils.ClientIpUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -36,6 +38,8 @@ public class AuthController {
 
     /** 인증 비즈니스 로직 서비스 */
     private final AuthService authService;
+    /** 클라이언트 IP 추출 유틸리티 */
+    private final ClientIpUtils clientIpUtils;
 
     /** 회원가입 요청 유효성 검사기 */
     private final SignupRequestValidator signupRequestValidator;
@@ -56,6 +60,7 @@ public class AuthController {
      * 사용자 로그인을 처리한다.
      *
      * @param request 로그인 요청 (loginId, password)
+     * @param httpServletRequest HTTP 요청
      * @return 200 OK + AuthResponse (Access Token, Refresh Token 포함)
      */
     @Operation(
@@ -69,10 +74,11 @@ public class AuthController {
     )
     @ApiResponse(responseCode = "400", description = "잘못된 요청 (유효성 검증 실패)", content = @Content)
     @ApiResponse(responseCode = "401", description = "인증 실패 (잘못된 자격 증명)", content = @Content)
+    @ApiResponse(responseCode = "429", description = "로그인 시도 제한 초과", content = @Content)
     @SecurityRequirements
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpServletRequest) {
+        return ResponseEntity.ok(authService.login(request, clientIpUtils.resolveClientIp(httpServletRequest)));
     }
 
     /**

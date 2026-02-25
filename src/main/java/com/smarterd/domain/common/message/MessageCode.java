@@ -5,6 +5,7 @@ package com.smarterd.domain.common.message;
  */
 public enum MessageCode {
     ERROR_AUTH_BAD_CREDENTIALS("error.auth.bad-credentials"),
+    ERROR_AUTH_LOGIN_RATE_LIMITED("error.auth.login-rate-limited"),
     ERROR_ACCESS_DENIED_NOT_ADMIN("error.access-denied.not-admin"),
     ERROR_ACCESS_DENIED_NOT_MEMBER("error.access-denied.not-member"),
     ERROR_ACCESS_DENIED_VIEWER_READONLY("error.access-denied.viewer-readonly"),
@@ -36,6 +37,7 @@ public enum MessageCode {
     ERROR_BUSINESS_PROJECT_TEAM_MISMATCH("error.business.project-team-mismatch"),
     ERROR_BUSINESS_REFRESH_TOKEN_EXPIRED("error.business.refresh-token-expired"),
     ERROR_BUSINESS_REFRESH_TOKEN_INVALID("error.business.refresh-token-invalid"),
+    ERROR_BUSINESS_REFRESH_TOKEN_REUSED("error.business.refresh-token-reused"),
     ERROR_BUSINESS_REMOVE_OWNER("error.business.remove-owner"),
     ERROR_BUSINESS_TERM_DOMAIN_SET_MISMATCH("error.business.term-domain-set-mismatch"),
     ERROR_BUSINESS_TERM_DOMAIN_TEAM_MISMATCH("error.business.term-domain-team-mismatch"),
@@ -53,6 +55,7 @@ public enum MessageCode {
     ERROR_NOT_FOUND_TEAM("error.not-found.team"),
     ERROR_NOT_FOUND_TERM("error.not-found.term"),
     ERROR_NOT_FOUND_USER("error.not-found.user"),
+    ERROR_VALIDATION_FAILED("error.validation.failed"),
     ERROR_UNEXPECTED("error.unexpected");
 
     private final String code;
