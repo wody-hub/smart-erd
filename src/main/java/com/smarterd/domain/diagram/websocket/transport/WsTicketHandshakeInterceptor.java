@@ -2,6 +2,7 @@ package com.smarterd.domain.diagram.websocket.transport;
 
 import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
 import com.smarterd.domain.diagram.websocket.ticket.WsTicketService;
+import com.smarterd.utils.AppStringUtils;
 import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -62,7 +63,7 @@ public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
             final var uri = nonNullRequest.getURI();
             final var queryParams = UriComponentsBuilder.fromUri(uri).build().getQueryParams();
             final var ticket = queryParams.getFirst("ticket");
-            if (ticket == null || ticket.isBlank()) {
+            if (AppStringUtils.isBlank(ticket)) {
                 log.warn("WebSocket 핸드셰이크 실패: ticket 파라미터 없음");
                 return false;
             }

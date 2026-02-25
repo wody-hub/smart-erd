@@ -9,6 +9,7 @@ import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
+import com.smarterd.utils.AppStringUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -66,14 +67,14 @@ public class DictionarySuggestService {
         teamService.verifyMembership(team, user);
         final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
 
-        final var keyword = request.keyword().trim();
+        final var keyword = AppStringUtils.trimToEmpty(request.keyword());
         if (keyword.length() < 2) {
             return new SuggestResponse(null, null, null, List.of());
         }
 
         // 토큰 분리 (최대 MAX_TOKENS개)
         final var tokens = Arrays.stream(keyword.split("\\s+"))
-            .filter((t) -> !t.isBlank())
+            .filter(AppStringUtils::isNotBlank)
             .limit(MAX_TOKENS)
             .toList();
 
@@ -146,7 +147,7 @@ public class DictionarySuggestService {
         Long domainId = null;
         String domainLogicalName = null;
 
-        final var lastToken = tokens.getLast().trim();
+        final var lastToken = tokens.getLast();
         final var domainSearchKeys = lastToken.equals(keyword) ? List.of(keyword) : List.of(lastToken, keyword);
         final var domainMatches = domainRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, domainSearchKeys);
 

@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.lang.Nullable;
 import org.springframework.core.env.Environment;
+import org.springframework.lang.Nullable;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.stereotype.Component;
 
@@ -45,8 +45,8 @@ public class ClientIpUtils {
             .getClientIp()
             .getTrustedProxyCidrs()
             .stream()
-            .filter((cidr) -> cidr != null && !cidr.isBlank())
-            .map(String::trim)
+            .map(AppStringUtils::trimToNull)
+            .filter(Objects::nonNull)
             .collect(Collectors.toUnmodifiableList());
         validateTrustedProxyConfiguration(nonNullEnvironment, trustedProxyCidrs);
         final var invalidCidrs = new ArrayList<String>();
@@ -67,7 +67,7 @@ public class ClientIpUtils {
      */
     public String resolveClientIp(HttpServletRequest request) {
         final var nonNullRequest = Objects.requireNonNull(request, "request must not be null");
-        final var remoteAddr = trimToNull(nonNullRequest.getRemoteAddr());
+        final var remoteAddr = AppStringUtils.trimToNull(nonNullRequest.getRemoteAddr());
         if (remoteAddr == null) {
             return "unknown";
         }
@@ -79,7 +79,7 @@ public class ClientIpUtils {
                 return forwardedFor;
             }
 
-            final var realIp = trimToNull(nonNullRequest.getHeader(X_REAL_IP_HEADER));
+            final var realIp = AppStringUtils.trimToNull(nonNullRequest.getHeader(X_REAL_IP_HEADER));
             if (realIp != null) {
                 return realIp;
             }
@@ -96,27 +96,7 @@ public class ClientIpUtils {
      */
     @Nullable
     private String extractFirstIp(@Nullable String forwardedFor) {
-        final var headerValue = trimToNull(forwardedFor);
-        if (headerValue == null) {
-            return null;
-        }
-        final var first = headerValue.split(",")[0];
-        return trimToNull(first);
-    }
-
-    /**
-     * 문자열을 trim 후 비어 있으면 {@code null}로 변환한다.
-     *
-     * @param value 원본 문자열
-     * @return trim된 문자열 또는 {@code null}
-     */
-    @Nullable
-    private String trimToNull(@Nullable String value) {
-        if (value == null) {
-            return null;
-        }
-        final var trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
+        return AppStringUtils.firstCsvTokenToNull(forwardedFor);
     }
 
     /**
@@ -159,7 +139,11 @@ public class ClientIpUtils {
         if (trustedProxyCidrs.isEmpty()) {
             throw new IllegalStateException("trusted-proxy-cidrs must be configured in production profile");
         }
-        if (new HashSet<>(trustedProxyCidrs).equals(new HashSet<>(AuthSecurityProperties.ClientIp.DEFAULT_TRUSTED_PROXY_CIDRS))) {
+        if (
+            new HashSet<>(trustedProxyCidrs).equals(
+                new HashSet<>(AuthSecurityProperties.ClientIp.DEFAULT_TRUSTED_PROXY_CIDRS)
+            )
+        ) {
             throw new IllegalStateException("default trusted-proxy-cidrs are not allowed in production profile");
         }
     }
@@ -175,7 +159,9 @@ public class ClientIpUtils {
             return;
         }
         if (!invalidCidrs.isEmpty()) {
-            throw new IllegalStateException("invalid trusted-proxy-cidrs configured in production profile: " + invalidCidrs);
+            throw new IllegalStateException(
+                "invalid trusted-proxy-cidrs configured in production profile: " + invalidCidrs
+            );
         }
         if (trustedProxyMatchers.isEmpty()) {
             throw new IllegalStateException("trusted-proxy-cidrs resolved to empty matcher set in production profile");

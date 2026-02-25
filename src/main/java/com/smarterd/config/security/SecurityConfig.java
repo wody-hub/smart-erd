@@ -1,5 +1,6 @@
 package com.smarterd.config.security;
 
+import com.smarterd.utils.AppStringUtils;
 import java.util.LinkedHashSet;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -120,7 +121,10 @@ public class SecurityConfig {
     private String resolveCspPolicy() {
         final var connectSources = new LinkedHashSet<String>();
         connectSources.add("'self'");
-        authSecurityProperties.getCsp().getConnectSources().forEach((origin) -> addConnectSource(connectSources, origin));
+        authSecurityProperties
+            .getCsp()
+            .getConnectSources()
+            .forEach((origin) -> addConnectSource(connectSources, origin));
         return (
             "default-src 'self'; " +
             "script-src 'self'; " +
@@ -141,9 +145,10 @@ public class SecurityConfig {
      * @param source connect source 문자열
      */
     private void addConnectSource(LinkedHashSet<String> connectSources, String source) {
-        if (source == null || source.isBlank()) {
+        final var normalizedSource = AppStringUtils.trimToNull(source);
+        if (normalizedSource == null) {
             return;
         }
-        connectSources.add(source.trim());
+        connectSources.add(normalizedSource);
     }
 }

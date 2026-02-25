@@ -1,5 +1,6 @@
 package com.smarterd.config.persistence;
 
+import com.smarterd.utils.AppStringUtils;
 import com.p6spy.engine.spy.appender.MessageFormattingStrategy;
 import org.hibernate.engine.jdbc.internal.FormatStyle;
 
@@ -19,7 +20,7 @@ public class PrettySqlFormat implements MessageFormattingStrategy {
         String sql,
         String url
     ) {
-        if (sql == null || sql.isBlank()) {
+        if (AppStringUtils.isBlank(sql)) {
             return "";
         }
         return String.format("%n| %d ms | %s |%s", elapsed, category, FormatStyle.BASIC.getFormatter().format(sql));

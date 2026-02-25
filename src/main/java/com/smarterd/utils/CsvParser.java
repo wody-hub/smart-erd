@@ -53,7 +53,7 @@ public final class CsvParser {
                     continue;
                 }
 
-                if (line.isBlank()) {
+                if (AppStringUtils.isBlank(line)) {
                     continue;
                 }
 
@@ -140,14 +140,14 @@ public final class CsvParser {
                 if (c == '"') {
                     inQuotes = true;
                 } else if (c == ',') {
-                    fields.add(sanitize(sb.toString().trim()));
+                    fields.add(sanitize(AppStringUtils.trimToEmpty(sb.toString())));
                     sb.setLength(0);
                 } else {
                     sb.append(c);
                 }
             }
         }
-        fields.add(sanitize(sb.toString().trim()));
+        fields.add(sanitize(AppStringUtils.trimToEmpty(sb.toString())));
 
         return fields.toArray(new String[0]);
     }
@@ -162,7 +162,7 @@ public final class CsvParser {
      * @return 위험 접두사가 제거된 안전한 값
      */
     private static String sanitize(String value) {
-        if (value == null || value.isEmpty()) {
+        if (AppStringUtils.isBlank(value)) {
             return value;
         }
         // 음수 숫자 패턴 (예: "-123", "-45.6")은 sanitize하지 않음

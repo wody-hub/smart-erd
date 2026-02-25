@@ -65,6 +65,8 @@ dependencies {
 
     // Excel import/export
     implementation 'org.apache.poi:poi-ooxml:5.4.1'
+    implementation 'org.apache.commons:commons-lang3:3.17.0'
+    implementation 'org.apache.commons:commons-collections4:4.4'
 
     // Spring Boot Docker Compose (개발 전용 — JAR에 포함 안 됨)
     developmentOnly 'org.springframework.boot:spring-boot-docker-compose'

@@ -5,6 +5,7 @@ import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
+import com.smarterd.utils.AppStringUtils;
 import com.smarterd.utils.CsvParser;
 import com.smarterd.utils.ExcelUtils;
 import java.io.IOException;
@@ -91,10 +92,11 @@ public abstract class AbstractBulkService<R> {
      * @return 행별 데이터 Map 목록
      */
     protected List<Map<String, String>> parseFile(MultipartFile file, String fileName) {
-        if (fileName == null || (!fileName.endsWith(".xlsx") && !fileName.endsWith(".csv"))) {
+        final var normalizedFileName = AppStringUtils.trimToNull(fileName);
+        if (!AppStringUtils.endsWithAnyIgnoreCase(normalizedFileName, ".xlsx", ".csv")) {
             throw new BusinessException(MessageCode.ERROR_BULK_UNSUPPORTED_FORMAT.code());
         }
-        return fileName.endsWith(".xlsx") ? parseExcel(file) : parseCsv(file);
+        return AppStringUtils.endsWithIgnoreCase(normalizedFileName, ".xlsx") ? parseExcel(file) : parseCsv(file);
     }
 
     /**

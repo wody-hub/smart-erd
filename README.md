@@ -273,6 +273,19 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 ```
 
+#### 문자열 처리 규칙 (필수)
+
+- `src/main/java`에서 문자열 검증/정규화는 `AppStringUtils`를 우선 사용한다
+- Apache Commons `StringUtils`, `ArrayUtils`는 각각 `AppStringUtils`, `AppArrayUtils` 내부에서만 직접 사용한다
+- `trim()`, `toLowerCase(Locale.ROOT)`, `x == null || x.isBlank()` 같은 직접 패턴은 지양하고 `AppStringUtils` 메서드로 통일한다
+- 외부 입력(HTTP 파라미터, 헤더, 파일명, CSV/Excel 텍스트)의 검증은 `AppStringUtils.isBlank/trimToNull` 기준으로 처리한다
+
+점검 명령:
+
+```bash
+./scripts/check-string-utils.sh
+```
+
 #### 예외 처리 체계
 
 `IllegalArgumentException` 등 범용 예외 대신 도메인별 커스텀 예외를 사용한다.

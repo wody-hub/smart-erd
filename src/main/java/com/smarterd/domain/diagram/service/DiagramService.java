@@ -27,6 +27,7 @@ import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.service.ProjectService;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
+import com.smarterd.utils.AppStringUtils;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -296,7 +297,7 @@ public class DiagramService {
      */
     private InvalidationCounts invalidateDictionaryBindings(Diagram diagram, DictionarySet targetSet) {
         final var content = diagram.getContent();
-        if (content == null || content.isBlank()) {
+        if (AppStringUtils.isBlank(content)) {
             return InvalidationCounts.empty();
         }
 

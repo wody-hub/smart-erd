@@ -1,7 +1,7 @@
 package com.smarterd.config.support;
 
+import com.smarterd.utils.AppStringUtils;
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.Optional;
 import org.springframework.core.env.Environment;
 import org.springframework.lang.Nullable;
@@ -63,7 +63,10 @@ public enum EnvironmentProfile {
      * @return 매핑된 enum (미일치 시 empty)
      */
     public static Optional<EnvironmentProfile> from(String profileName) {
-        final var normalized = profileName.toLowerCase(Locale.ROOT);
+        final var normalized = AppStringUtils.lowerTrimToNull(profileName);
+        if (normalized == null) {
+            return Optional.empty();
+        }
         return Arrays.stream(values())
             .filter((profile) -> profile.value.equals(normalized))
             .findFirst();

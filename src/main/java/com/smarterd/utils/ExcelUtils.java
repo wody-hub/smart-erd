@@ -31,8 +31,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.openxml4j.opc.OPCPackage;
 import org.apache.poi.ss.usermodel.Cell;
@@ -125,7 +123,7 @@ public class ExcelUtils<T> implements AutoCloseable {
     }
 
     private static String formatOrDefault(String format, String defaultFormat) {
-        if (StringUtils.isBlank(format)) {
+        if (AppStringUtils.isBlank(format)) {
             return defaultFormat;
         }
         return format;
@@ -312,7 +310,7 @@ public class ExcelUtils<T> implements AutoCloseable {
             this.fileName = excelDataMethodSet.getFileName();
             this.book = excelDataMethodSet.getBook();
             this.sheetName = excelDataMethodSet.getSheetName();
-            if (StringUtils.isNotBlank(excelDataMethodSet.getDateFormat())) {
+            if (AppStringUtils.isNotBlank(excelDataMethodSet.getDateFormat())) {
                 this.defaultDateFormat = excelDataMethodSet.getDateFormat();
             }
         }
@@ -479,8 +477,8 @@ public class ExcelUtils<T> implements AutoCloseable {
             return new BigDecimal(NumberToTextConverter.toText(numericValue));
         }
 
-        final var text = readCellText(cell).replace(",", "").trim();
-        if (text.isEmpty()) {
+        final var text = AppStringUtils.trimToNull(readCellText(cell).replace(",", ""));
+        if (text == null) {
             return null;
         }
         return new BigDecimal(text);
@@ -495,10 +493,10 @@ public class ExcelUtils<T> implements AutoCloseable {
      */
     private LocalDateTime parseDateTime(String text, String preferredFormat) {
         final var formats = new ArrayList<String>();
-        if (StringUtils.isNotBlank(preferredFormat)) {
+        if (AppStringUtils.isNotBlank(preferredFormat)) {
             formats.add(preferredFormat);
         }
-        if (StringUtils.isNotBlank(this.defaultDateFormat)) {
+        if (AppStringUtils.isNotBlank(this.defaultDateFormat)) {
             formats.add(this.defaultDateFormat);
         }
         formats.addAll(this.inputDateFormats);
@@ -526,7 +524,7 @@ public class ExcelUtils<T> implements AutoCloseable {
      */
     private void setData(T data, Method method, Cell cell) {
         final var parameters = method.getParameters();
-        if (ArrayUtils.isEmpty(parameters)) {
+        if (AppArrayUtils.isEmpty(parameters)) {
             throw new BadParametersException("세팅 파라미터가 존재하지 않아 데이터를 추출할 수 없습니다.");
         }
 
@@ -577,8 +575,8 @@ public class ExcelUtils<T> implements AutoCloseable {
                     return;
                 }
 
-                final var text = readCellText(cell).trim();
-                if (text.isEmpty()) {
+                final var text = AppStringUtils.trimToNull(readCellText(cell));
+                if (text == null) {
                     return;
                 }
                 final var dateTime = parseDateTime(text, null);
@@ -650,8 +648,8 @@ public class ExcelUtils<T> implements AutoCloseable {
             }
 
             if (parameterType.isEnum()) {
-                final var value = readCellText(cell).trim();
-                if (value.isEmpty()) {
+                final var value = AppStringUtils.trimToNull(readCellText(cell));
+                if (value == null) {
                     return;
                 }
                 final var enumConstants = parameterType.getEnumConstants();
@@ -1035,10 +1033,10 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @return 최종 시트명
      */
     private String resolveSheetName(Workbook workbook, String requestedName) {
-        if (StringUtils.isNotBlank(requestedName) && requestedName.length() > MAX_SHEET_NAME_LENGTH) {
+        if (AppStringUtils.isNotBlank(requestedName) && requestedName.length() > MAX_SHEET_NAME_LENGTH) {
             throw new ExcelException("시트명 길이가 초과되었습니다. (최대 31자)");
         }
-        final var base = StringUtils.defaultIfBlank(requestedName, "list");
+        final var base = AppStringUtils.defaultIfBlank(requestedName, "list");
         final var safeBase = WorkbookUtil.createSafeSheetName(base);
         var name = safeBase;
         var suffix = 1;
@@ -1088,7 +1086,7 @@ public class ExcelUtils<T> implements AutoCloseable {
      * @return CellStyle
      */
     private CellStyle getOrCreateStyle(CellStyle base, Workbook workbook, String format, Map<String, CellStyle> cache) {
-        if (StringUtils.isBlank(format) || workbook == null) {
+        if (AppStringUtils.isBlank(format) || workbook == null) {
             return base;
         }
         final var baseKey = (base == null) ? "null" : String.valueOf(base.getIndex());
@@ -1259,7 +1257,7 @@ public class ExcelUtils<T> implements AutoCloseable {
         }
 
         // POJO getter: getXxx() (getClass 제외)
-        if (StringUtils.startsWith(method.getName(), "get") && !"getClass".equals(method.getName())) {
+        if (AppStringUtils.startsWith(method.getName(), "get") && !"getClass".equals(method.getName())) {
             return true;
         }
 
@@ -1287,7 +1285,7 @@ public class ExcelUtils<T> implements AutoCloseable {
         if (method == null) {
             return false;
         }
-        if (!StringUtils.startsWith(method.getName(), "set")) {
+        if (!AppStringUtils.startsWith(method.getName(), "set")) {
             return false;
         }
         return method.getParameterCount() == 1 && method.getReturnType() == Void.TYPE;
@@ -1367,8 +1365,8 @@ public class ExcelUtils<T> implements AutoCloseable {
         }
 
         // 다운로드 파일명 생성.
-        final var baseFileName = StringUtils.isNotBlank(name) ? name : excelData.fileName;
-        final var fileName = StringUtils.defaultIfBlank(baseFileName, "excel") + ".xlsx";
+        final var baseFileName = AppStringUtils.isNotBlank(name) ? name : excelData.fileName;
+        final var fileName = AppStringUtils.defaultIfBlank(baseFileName, "excel") + ".xlsx";
 
         // 응답 객체 header 설 정 (엑셀)
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");

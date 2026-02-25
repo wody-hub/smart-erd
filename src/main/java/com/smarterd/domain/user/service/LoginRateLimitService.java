@@ -3,10 +3,10 @@ package com.smarterd.domain.user.service;
 import com.smarterd.config.security.AuthSecurityProperties;
 import com.smarterd.domain.user.entity.LoginRateLimitAttempt;
 import com.smarterd.domain.user.repository.LoginRateLimitAttemptRepository;
-import java.util.Locale;
+import com.smarterd.utils.AppStringUtils;
 import java.util.Objects;
-import org.springframework.dao.DataIntegrityViolationException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -89,10 +89,12 @@ public class LoginRateLimitService {
      * @return 정규화된 시도 키
      */
     private String toAttemptKey(String loginId, String clientIp) {
-        final var normalizedLoginId = Objects.requireNonNull(loginId, "loginId must not be null")
-            .trim()
-            .toLowerCase(Locale.ROOT);
-        final var normalizedClientIp = Objects.requireNonNull(clientIp, "clientIp must not be null").trim();
+        final var normalizedLoginId = AppStringUtils.lowerTrimToEmpty(
+            Objects.requireNonNull(loginId, "loginId must not be null")
+        );
+        final var normalizedClientIp = AppStringUtils.trimToEmpty(
+            Objects.requireNonNull(clientIp, "clientIp must not be null")
+        );
         return normalizedClientIp + ":" + normalizedLoginId;
     }
 
@@ -105,7 +107,9 @@ public class LoginRateLimitService {
      */
     private LoginRateLimitAttempt findOrCreateAttemptForUpdate(String attemptKey, long now) {
         for (var retry = 0; retry < MAX_CREATE_RETRY_COUNT; retry++) {
-            final var existingAttempt = loginRateLimitAttemptRepository.findByAttemptKeyForUpdate(attemptKey).orElse(null);
+            final var existingAttempt = loginRateLimitAttemptRepository
+                .findByAttemptKeyForUpdate(attemptKey)
+                .orElse(null);
             if (existingAttempt != null) {
                 return existingAttempt;
             }
@@ -138,8 +142,8 @@ public class LoginRateLimitService {
         if (message == null) {
             return false;
         }
-        final var normalized = message.toLowerCase(Locale.ROOT);
-        return normalized.contains("unique") || normalized.contains("duplicate");
+        return AppStringUtils.containsIgnoreCase(message, "unique") ||
+            AppStringUtils.containsIgnoreCase(message, "duplicate");
     }
 
     /**

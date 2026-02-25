@@ -13,6 +13,7 @@ import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
+import com.smarterd.utils.AppStringUtils;
 import com.smarterd.utils.ExcelUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -127,7 +128,7 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
         // DB 기존 논리명 일괄 조회
         final var logicalNames = rawRows
             .stream()
-            .map((row) -> row.getOrDefault("logicalName", ""))
+            .map((row) -> AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", "")))
             .toList();
         final var existingNames = termRepository
             .findByDictionarySetAndLogicalNameIn(dictionarySet, logicalNames)
@@ -149,13 +150,13 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
         for (var i = 0; i < rawRows.size(); i++) {
             final var row = rawRows.get(i);
             final var errors = new ArrayList<String>();
-            final var logicalName = row.getOrDefault("logicalName", "").trim();
-            final var physicalName = row.getOrDefault("physicalName", "").trim();
-            final var domainLogicalName = row.getOrDefault("domainLogicalName", "").trim();
-            final var description = row.getOrDefault("description", "").trim();
+            final var logicalName = AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", ""));
+            final var physicalName = AppStringUtils.trimToEmpty(row.getOrDefault("physicalName", ""));
+            final var domainLogicalName = AppStringUtils.trimToEmpty(row.getOrDefault("domainLogicalName", ""));
+            final var description = AppStringUtils.trimToEmpty(row.getOrDefault("description", ""));
 
             // 필수 필드 검증
-            if (logicalName.isBlank()) {
+            if (AppStringUtils.isBlank(logicalName)) {
                 errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_LOGICAL_NAME_REQUIRED.code(), locale));
             } else if (logicalName.length() > LOGICAL_NAME_MAX) {
                 errors.add(
@@ -163,7 +164,7 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
                 );
             }
 
-            if (physicalName.isBlank()) {
+            if (AppStringUtils.isBlank(physicalName)) {
                 errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_PHYSICAL_NAME_REQUIRED.code(), locale));
             } else if (physicalName.length() > PHYSICAL_NAME_MAX) {
                 errors.add(
@@ -178,17 +179,17 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
             }
 
             // 도메인 논리명 검증
-            if (!domainLogicalName.isBlank() && !domainMap.containsKey(domainLogicalName)) {
+            if (AppStringUtils.isNotBlank(domainLogicalName) && !domainMap.containsKey(domainLogicalName)) {
                 errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DOMAIN_NOT_FOUND.code(), locale, domainLogicalName));
             }
 
             // 파일 내 중복 체크
-            if (!logicalName.isBlank() && !seenNames.add(logicalName)) {
+            if (AppStringUtils.isNotBlank(logicalName) && !seenNames.add(logicalName)) {
                 errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DUPLICATE_IN_FILE.code(), locale, logicalName));
             }
 
             // DB 중복 체크
-            if (!logicalName.isBlank() && existingNames.contains(logicalName)) {
+            if (AppStringUtils.isNotBlank(logicalName) && existingNames.contains(logicalName)) {
                 errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DUPLICATE_IN_DB.code(), locale, logicalName));
             }
 
@@ -247,7 +248,7 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
             }
 
             Domain domain = null;
-            if (row.domainLogicalName() != null && !row.domainLogicalName().isBlank()) {
+            if (AppStringUtils.isNotBlank(row.domainLogicalName())) {
                 domain = domainMap.get(row.domainLogicalName());
             }
 

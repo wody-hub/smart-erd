@@ -11,6 +11,7 @@ import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
+import com.smarterd.utils.AppStringUtils;
 import com.smarterd.utils.ExcelUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -117,7 +118,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
         // DB 기존 논리명 일괄 조회
         final var logicalNames = rawRows
             .stream()
-            .map((row) -> row.getOrDefault("logicalName", ""))
+            .map((row) -> AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", "")))
             .toList();
         final var existingNames = domainRepository
             .findByDictionarySetAndLogicalNameIn(dictionarySet, logicalNames)
@@ -133,12 +134,12 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
         for (var i = 0; i < rawRows.size(); i++) {
             final var row = rawRows.get(i);
             final var errors = new ArrayList<String>();
-            final var logicalName = row.getOrDefault("logicalName", "").trim();
-            final var physicalType = row.getOrDefault("physicalType", "").trim();
-            final var description = row.getOrDefault("description", "").trim();
+            final var logicalName = AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", ""));
+            final var physicalType = AppStringUtils.trimToEmpty(row.getOrDefault("physicalType", ""));
+            final var description = AppStringUtils.trimToEmpty(row.getOrDefault("description", ""));
 
             // 필수 필드 검증
-            if (logicalName.isBlank()) {
+            if (AppStringUtils.isBlank(logicalName)) {
                 errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_LOGICAL_NAME_REQUIRED.code(), locale));
             } else if (logicalName.length() > LOGICAL_NAME_MAX) {
                 errors.add(
@@ -146,7 +147,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
                 );
             }
 
-            if (physicalType.isBlank()) {
+            if (AppStringUtils.isBlank(physicalType)) {
                 errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_PHYSICAL_TYPE_REQUIRED.code(), locale));
             } else if (physicalType.length() > PHYSICAL_TYPE_MAX) {
                 errors.add(
@@ -161,12 +162,12 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
             }
 
             // 파일 내 중복 체크
-            if (!logicalName.isBlank() && !seenNames.add(logicalName)) {
+            if (AppStringUtils.isNotBlank(logicalName) && !seenNames.add(logicalName)) {
                 errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DUPLICATE_IN_FILE.code(), locale, logicalName));
             }
 
             // DB 중복 체크
-            if (!logicalName.isBlank() && existingNames.contains(logicalName)) {
+            if (AppStringUtils.isNotBlank(logicalName) && existingNames.contains(logicalName)) {
                 errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DUPLICATE_IN_DB.code(), locale, logicalName));
             }
 
