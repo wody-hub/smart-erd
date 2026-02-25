@@ -1,6 +1,7 @@
 import { useReactFlow, getNodesBounds, getViewportForBounds } from '@xyflow/react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
+import { useRef } from 'react';
 
 /** fitView 패딩 비율 */
 const PADDING = 0.15;
@@ -20,27 +21,16 @@ const PDF_TILE_WIDTH = 6000;
 const PDF_TILE_HEIGHT = 4000;
 /** 단일 페이지 PDF를 유지할 최대 길이(px) */
 const PDF_SINGLE_PAGE_MAX_DIMENSION = 8000;
-/**
- * 내보내기 이미지 배경색 — 인쇄/공유용 고정 흰색 배경.
- * 디자인 토큰 예외: 다크 모드에서도 인쇄 매체 특성상 흰색 고정. 다크 모드 export 지원 시 getComputedStyle로 동적 추출 전환.
- */
-const EXPORT_BACKGROUND = '#ffffff';
+/** 디자인 토큰 기반 export 배경색 fallback */
+const EXPORT_BACKGROUND_FALLBACK = 'hsl(0 0% 100%)';
 
-let htmlToImageModulePromise: Promise<typeof import('html-to-image')> | null = null;
-let jsPdfModulePromise: Promise<typeof import('jspdf')> | null = null;
-
-const getHtmlToImageModule = async () => {
-  if (!htmlToImageModulePromise) {
-    htmlToImageModulePromise = import('html-to-image');
+/** 현재 테마의 배경 토큰을 캡처용 배경색으로 변환한다. */
+const getExportBackgroundColor = (): string => {
+  const token = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
+  if (!token) {
+    return EXPORT_BACKGROUND_FALLBACK;
   }
-  return htmlToImageModulePromise;
-};
-
-const getJsPdfModule = async () => {
-  if (!jsPdfModulePromise) {
-    jsPdfModulePromise = import('jspdf');
-  }
-  return jsPdfModulePromise;
+  return `hsl(${token})`;
 };
 
 /** 캡처 옵션 (뷰포트 요소 + 이미지 크기 + CSS transform) */
@@ -71,6 +61,22 @@ interface CaptureOptions {
 export function useExportDiagram(diagramName: string) {
   const { t } = useTranslation();
   const { getNodes } = useReactFlow();
+  const htmlToImageModulePromiseRef = useRef<Promise<typeof import('html-to-image')> | null>(null);
+  const jsPdfModulePromiseRef = useRef<Promise<typeof import('jspdf')> | null>(null);
+
+  const getHtmlToImageModule = async () => {
+    if (!htmlToImageModulePromiseRef.current) {
+      htmlToImageModulePromiseRef.current = import('html-to-image');
+    }
+    return htmlToImageModulePromiseRef.current;
+  };
+
+  const getJsPdfModule = async () => {
+    if (!jsPdfModulePromiseRef.current) {
+      jsPdfModulePromiseRef.current = import('jspdf');
+    }
+    return jsPdfModulePromiseRef.current;
+  };
 
   /**
    * 공통 캡처 옵션을 계산한다.
@@ -100,7 +106,9 @@ export function useExportDiagram(diagramName: string) {
     );
 
     const viewportEl = document.querySelector<HTMLElement>('.react-flow__viewport');
-    if (!viewportEl) return null;
+    if (!viewportEl) {
+      return null;
+    }
 
     return {
       viewportEl,
@@ -147,7 +155,10 @@ export function useExportDiagram(diagramName: string) {
   const exportPng = async () => {
     try {
       const opts = getCaptureOptions();
-      if (!opts) return;
+      if (!opts) {
+        return;
+      }
+      const backgroundColor = getExportBackgroundColor();
       const pixelRatio = getSafePixelRatio(opts.imageWidth, opts.imageHeight);
       const { toPng } = await getHtmlToImageModule();
 
@@ -155,7 +166,7 @@ export function useExportDiagram(diagramName: string) {
         width: opts.imageWidth,
         height: opts.imageHeight,
         style: getCaptureStyle(opts),
-        backgroundColor: EXPORT_BACKGROUND,
+        backgroundColor,
         pixelRatio,
         skipAutoScale: true,
       });
@@ -173,7 +184,10 @@ export function useExportDiagram(diagramName: string) {
   const exportJpg = async () => {
     try {
       const opts = getCaptureOptions();
-      if (!opts) return;
+      if (!opts) {
+        return;
+      }
+      const backgroundColor = getExportBackgroundColor();
       const pixelRatio = getSafePixelRatio(opts.imageWidth, opts.imageHeight);
       const { toJpeg } = await getHtmlToImageModule();
 
@@ -181,7 +195,7 @@ export function useExportDiagram(diagramName: string) {
         width: opts.imageWidth,
         height: opts.imageHeight,
         style: getCaptureStyle(opts),
-        backgroundColor: EXPORT_BACKGROUND,
+        backgroundColor,
         quality: 0.95,
         pixelRatio,
         skipAutoScale: true,
@@ -200,14 +214,17 @@ export function useExportDiagram(diagramName: string) {
   const exportSvg = async () => {
     try {
       const opts = getCaptureOptions();
-      if (!opts) return;
+      if (!opts) {
+        return;
+      }
+      const backgroundColor = getExportBackgroundColor();
       const { toSvg } = await getHtmlToImageModule();
 
       const dataUrl = await toSvg(opts.viewportEl, {
         width: opts.imageWidth,
         height: opts.imageHeight,
         style: getCaptureStyle(opts),
-        backgroundColor: EXPORT_BACKGROUND,
+        backgroundColor,
       });
       downloadFile(dataUrl, `${diagramName}.svg`);
       toast.success(t('erd.export.success'));
@@ -220,7 +237,10 @@ export function useExportDiagram(diagramName: string) {
   const exportPdf = async () => {
     try {
       const opts = getCaptureOptions();
-      if (!opts) return;
+      if (!opts) {
+        return;
+      }
+      const backgroundColor = getExportBackgroundColor();
       const [{ toPng }, { jsPDF }] = await Promise.all([getHtmlToImageModule(), getJsPdfModule()]);
 
       const useTiledPdf =
@@ -234,7 +254,7 @@ export function useExportDiagram(diagramName: string) {
           width: opts.imageWidth,
           height: opts.imageHeight,
           style: getCaptureStyle(opts),
-          backgroundColor: EXPORT_BACKGROUND,
+          backgroundColor,
           pixelRatio,
           skipAutoScale: true,
         });
@@ -279,7 +299,7 @@ export function useExportDiagram(diagramName: string) {
             width: tileWidth,
             height: tileHeight,
             style: getCaptureStyle(opts, offsetX, offsetY),
-            backgroundColor: EXPORT_BACKGROUND,
+            backgroundColor,
             pixelRatio: tilePixelRatio,
             skipAutoScale: true,
           });

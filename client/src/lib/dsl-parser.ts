@@ -1,6 +1,13 @@
-import type { DdlParseResult, ParsedColumn, ParsedRelation, ParsedTable } from '@/lib/ddl-parser';
+import type {
+  DdlParseResult,
+  ParsedColumn,
+  ParsedRelation,
+  ParsedTable,
+  ParsedTableRange,
+} from '@/lib/ddl-parser';
 import type { Term, Domain } from '@/types/dictionary';
 import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
+import { buildTableLockKey } from '@/lib/table-lock-key';
 
 /** DSL 파싱에 필요한 사전 데이터 */
 export interface DslDictionary {
@@ -48,6 +55,8 @@ interface RawTable {
   nameEndCol: number;
   /** 수집된 컬럼 목록 */
   columns: RawColumn[];
+  /** '}' 종료 행 번호 (1-based) */
+  endLine?: number;
 }
 
 /** Pass 1에서 수집된 컬럼 정보 */
@@ -60,6 +69,8 @@ interface RawColumn {
   fkColumn?: string;
   /** 도메인 명시 지정 논리명 */
   domainName?: string;
+  /** 물리 타입 직접 지정 */
+  explicitType?: string;
   /** 옵션 문자열 배열 (PK, AI, NN) */
   options: string[];
   /** 행 번호 (1-based) */
@@ -72,6 +83,10 @@ interface RawColumn {
   domainStartCol?: number;
   /** 도메인명 끝 열 (1-based, exclusive) */
   domainEndCol?: number;
+  /** 물리 타입 시작 열 (1-based) */
+  typeStartCol?: number;
+  /** 물리 타입 끝 열 (1-based, exclusive) */
+  typeEndCol?: number;
   /** FK 참조 테이블명 시작 열 */
   fkTableStartCol?: number;
   /** FK 참조 테이블명 끝 열 */
@@ -93,6 +108,9 @@ const TABLE_PREFIX_LENGTH = `${DSL_TABLE_KEYWORD} `.length;
 
 /** 옵션 키워드 해체 */
 const [OPT_PK, OPT_AI, OPT_NN] = DSL_COLUMN_OPTIONS;
+/** `::TYPE` 형식의 허용 패턴 */
+const EXPLICIT_TYPE_PATTERN =
+  /^[A-Za-z][A-Za-z0-9_]*(?:\s+[A-Za-z][A-Za-z0-9_]*)*(?:\s*\([^)]+\))?$/;
 
 /**
  * 행 전체를 강조하기 위한 1-based 컬럼 범위를 계산한다.
@@ -220,6 +238,9 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
     if (state === 'IN_TABLE') {
       // 테이블 블록 종료
       if (trimmed === '}') {
+        if (currentTable) {
+          currentTable.endLine = lineNum;
+        }
         state = 'IDLE';
         currentTable = null;
         continue;
@@ -243,6 +264,7 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
   }
 
   if (state === 'IN_TABLE' && currentTable) {
+    currentTable.endLine = lines.length;
     const tableLineRaw = lines[currentTable.line - 1] ?? '';
     pushSyntaxError(currentTable.line, tableLineRaw);
   }
@@ -250,6 +272,7 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
   // === Pass 2: 사전 해석 + FK 참조 ===
   const tables: ParsedTable[] = [];
   const relations: ParsedRelation[] = [];
+  const tableRanges: ParsedTableRange[] = [];
 
   // 논리명 → 물리 테이블명 매핑 (FK 참조 해석용)
   const tablePhysicalMap = new Map<string, string>();
@@ -280,8 +303,31 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
 
     const parsedColumns: ParsedColumn[] = [];
     const colPhysicalMap = new Map<string, string>();
+    const seenLogicalColumns = new Map<string, RawColumn>();
+    const seenPhysicalColumns = new Map<string, RawColumn>();
 
     for (const rawCol of rawTable.columns) {
+      const duplicated = seenLogicalColumns.get(rawCol.logicalName);
+      if (duplicated) {
+        diagnostics.push({
+          messageKey: 'erd.dsl.error.duplicateColumnLogicalName',
+          messageArgs: {
+            name: rawCol.logicalName,
+            table: rawTable.logicalName,
+            firstLine: String(duplicated.line),
+          },
+          line: rawCol.line,
+          startColumn: rawCol.nameStartCol,
+          endColumn: rawCol.nameEndCol,
+          severity: 'error',
+        });
+        errors.push(
+          `Duplicate column logical name: ${rawTable.logicalName}.${rawCol.logicalName} (line ${rawCol.line})`,
+        );
+      } else {
+        seenLogicalColumns.set(rawCol.logicalName, rawCol);
+      }
+
       const colTerm = dictionary.termByName.get(rawCol.logicalName);
       let physicalName: string;
       let termId: number | undefined;
@@ -332,8 +378,61 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
         }
       }
 
+      // 타입 직접 지정 (`::VARCHAR(200)`) — 도메인과 동시 지정은 금지
+      if (rawCol.explicitType) {
+        if (rawCol.domainName) {
+          diagnostics.push({
+            messageKey: 'erd.dsl.error.domainAndTypeConflict',
+            line: rawCol.line,
+            startColumn: rawCol.typeStartCol ?? rawCol.nameStartCol,
+            endColumn: rawCol.typeEndCol ?? rawCol.nameEndCol,
+            severity: 'error',
+          });
+          errors.push(`Domain and type conflict: line ${rawCol.line}`);
+        } else {
+          const normalizedType = rawCol.explicitType.trim();
+          const typeLooksValid = EXPLICIT_TYPE_PATTERN.test(normalizedType);
+          if (!typeLooksValid) {
+            diagnostics.push({
+              messageKey: 'erd.dsl.error.invalidTypeFormat',
+              messageArgs: { type: normalizedType },
+              line: rawCol.line,
+              startColumn: rawCol.typeStartCol ?? rawCol.nameStartCol,
+              endColumn: rawCol.typeEndCol ?? rawCol.nameEndCol,
+              severity: 'error',
+            });
+            errors.push(`Invalid type format: ${normalizedType} (line ${rawCol.line})`);
+          } else {
+            domainId = undefined;
+            physicalType = normalizedType;
+          }
+        }
+      }
+
+      const physicalKey = physicalName.toLowerCase();
+      const duplicatedPhysical = seenPhysicalColumns.get(physicalKey);
+      if (duplicatedPhysical) {
+        diagnostics.push({
+          messageKey: 'erd.dsl.error.duplicateColumnPhysicalName',
+          messageArgs: {
+            name: physicalName,
+            table: rawTable.logicalName,
+            firstLine: String(duplicatedPhysical.line),
+          },
+          line: rawCol.line,
+          startColumn: rawCol.nameStartCol,
+          endColumn: rawCol.nameEndCol,
+          severity: 'error',
+        });
+        errors.push(
+          `Duplicate column physical name: ${physicalTableName}.${physicalName} (line ${rawCol.line})`,
+        );
+      } else {
+        seenPhysicalColumns.set(physicalKey, rawCol);
+      }
+
       // Domain 미연결 경고
-      if (colTerm && !domainId && !rawCol.domainName) {
+      if (colTerm && !domainId && !rawCol.domainName && !rawCol.explicitType) {
         diagnostics.push({
           messageKey: 'erd.dsl.warning.noDomain',
           messageArgs: { name: rawCol.logicalName },
@@ -369,6 +468,21 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
       logicalTableName: rawTable.logicalName,
       tableTermId,
       columns: parsedColumns,
+    });
+
+    tableRanges.push({
+      tableKey: buildTableLockKey({
+        logicalName: rawTable.logicalName,
+        physicalName: physicalTableName,
+        columns: parsedColumns.map((column) => ({
+          name: column.name,
+          type: column.type,
+          pk: column.pk,
+          fk: false,
+        })),
+      }),
+      startLine: rawTable.line,
+      endLine: rawTable.endLine ?? rawTable.line,
     });
 
     tablePhysicalMap.set(rawTable.logicalName, physicalTableName);
@@ -436,7 +550,7 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
   }
 
   return {
-    result: { diagnostics: [], tables, relations, errors },
+    result: { diagnostics: [], tables, relations, errors, tableRanges },
     diagnostics,
   };
 }
@@ -444,7 +558,7 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
 /**
  * 단일 컬럼 행을 파싱한다.
  *
- * 형식: `논리명  > 부모테이블.부모컬럼  :도메인명  [PK, AI, NN]`
+ * 형식: `논리명  > 부모테이블.부모컬럼  :도메인명  ::타입  [PK, AI, NN]`
  *
  * @param line    원본 행 텍스트
  * @param lineNum 1-based 행 번호
@@ -461,16 +575,21 @@ function parseColumnLine(line: string, lineNum: number): RawColumn | null {
   }
 
   // 컬럼 행 정규식 (캡처 그룹으로 위치 추적)
-  const colRegex = /^(\s*)(\S+)(?:\s+>\s*(\S+)\.(\S+))?(?:\s+:(\S+))?(?:\s+\[([^\]]*)\])?\s*$/;
+  // 형식: 논리명 [> 부모.컬럼] [:도메인] [::타입] [[옵션]]
+  const colRegex =
+    /^(\s*)(\S+)(?:\s+>\s*(\S+)\.(\S+))?(?:\s+:(\S+))?(?:\s+::(.+?))?(?:\s+\[([^\]]*)\])?\s*$/;
   const match = effective.match(colRegex);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
 
   const indent = match[1].length;
   const logicalName = match[2];
   const fkTable = match[3];
   const fkColumn = match[4];
   const domainName = match[5];
-  const optionStr = match[6];
+  const explicitType = match[6]?.trim();
+  const optionStr = match[7];
 
   const nameStartCol = indent + 1;
   const nameEndCol = indent + logicalName.length + 1;
@@ -518,6 +637,19 @@ function parseColumnLine(line: string, lineNum: number): RawColumn | null {
       const domainStart = colonIdx + 1 + (afterColon.length - afterColon.trimStart().length);
       result.domainStartCol = domainStart + 1;
       result.domainEndCol = domainStart + domainName.length + 1;
+    }
+  }
+
+  if (explicitType) {
+    result.explicitType = explicitType;
+    const typeMarkerIdx = effective.indexOf('::');
+    if (typeMarkerIdx >= 0) {
+      const afterTypeMarker = effective.substring(typeMarkerIdx + 2);
+      const typeStartOffset =
+        typeMarkerIdx + 2 + (afterTypeMarker.length - afterTypeMarker.trimStart().length);
+      const normalizedType = afterTypeMarker.trim();
+      result.typeStartCol = typeStartOffset + 1;
+      result.typeEndCol = typeStartOffset + normalizedType.length + 1;
     }
   }
 

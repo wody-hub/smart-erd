@@ -1,4 +1,5 @@
 import type { DbmsType } from '@/types/erd';
+import { buildTableLockKey } from '@/lib/table-lock-key';
 
 /** DDL 파싱된 컬럼 정보 */
 export interface ParsedColumn {
@@ -58,6 +59,18 @@ export interface DdlParseResult {
   relations: ParsedRelation[];
   /** 파싱 중 발생한 에러 메시지 목록 */
   errors: string[];
+  /** 파싱된 테이블 라인 범위 목록 (코드 편집 락 연동용) */
+  tableRanges: ParsedTableRange[];
+}
+
+/** 파싱된 테이블 라인 범위 정보 */
+export interface ParsedTableRange {
+  /** 소프트 락 식별용 테이블 키 */
+  tableKey: string;
+  /** 테이블 시작 라인 (1-based) */
+  startLine: number;
+  /** 테이블 종료 라인 (1-based) */
+  endLine: number;
 }
 
 /** DDL 진단 정보 (i18n 키 + 선택적 위치 정보) */
@@ -77,31 +90,35 @@ export interface DdlDiagnostic {
 }
 
 /**
- * node-sql-parser 모듈 캐시 (최초 1회만 동적 import하여 저장).
- *
- * 모듈 스코프 — 비직렬화 가능한 모듈 참조이므로 Zustand에 저장할 수 없다.
- * JavaScript 단일 스레드 특성상 race condition은 발생하지 않는다.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let parserModule: any = null;
-
-/**
  * node-sql-parser 모듈을 동적으로 로드한다 (최초 1회만).
  * 번들 사이즈 최적화를 위해 dynamic import를 사용한다.
  *
+ * @param dbms 대상 DBMS 타입
  * @returns node-sql-parser 모듈
  */
-async function getParser(): Promise<{ Parser: new () => ParserInstance }> {
-  if (!parserModule) {
-    parserModule = await import('node-sql-parser');
+async function getParser(dbms: DbmsType): Promise<{ Parser: new () => ParserInstance }> {
+  switch (dbms) {
+    case 'postgresql':
+      return import('node-sql-parser/build/postgresql');
+    case 'sqlserver':
+      return import('node-sql-parser/build/transactsql');
+    case 'mysql':
+    case 'oracle':
+    case 'ansi':
+    default:
+      return import('node-sql-parser/build/mysql');
   }
-  return parserModule;
 }
 
 /** node-sql-parser의 Parser 인스턴스 인터페이스 */
 interface ParserInstance {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  astify(sql: string, options?: { database?: string }): any;
+  astify(
+    sql: string,
+    options?: {
+      database?: string;
+      parseOptions?: { includeLocations?: boolean };
+    },
+  ): unknown;
 }
 
 /**
@@ -132,7 +149,9 @@ function mapDbmsToParserDb(dbms: DbmsType): string {
  * @returns 배열
  */
 function toArray<T>(value: T | T[] | undefined | null): T[] {
-  if (value == null) return [];
+  if (value == null) {
+    return [];
+  }
   return Array.isArray(value) ? value : [value];
 }
 
@@ -145,21 +164,39 @@ function toArray<T>(value: T | T[] | undefined | null): T[] {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractIdentifier(value: any, seen = new Set<unknown>()): string | undefined {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number') return String(value);
-  if (!value || typeof value !== 'object') return undefined;
-  if (seen.has(value)) return undefined;
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  if (seen.has(value)) {
+    return undefined;
+  }
   seen.add(value);
 
-  if (typeof value.name === 'string') return value.name;
-  if (typeof value.column === 'string') return value.column;
-  if (typeof value.table === 'string') return value.table;
-  if (typeof value.value === 'string') return value.value;
+  if (typeof value.name === 'string') {
+    return value.name;
+  }
+  if (typeof value.column === 'string') {
+    return value.column;
+  }
+  if (typeof value.table === 'string') {
+    return value.table;
+  }
+  if (typeof value.value === 'string') {
+    return value.value;
+  }
 
   const nestedCandidates = [value.expr, value.column, value.table, value.value, value.name];
   for (const nested of nestedCandidates) {
     const extracted = extractIdentifier(nested, seen);
-    if (extracted) return extracted;
+    if (extracted) {
+      return extracted;
+    }
   }
 
   return undefined;
@@ -175,7 +212,9 @@ function extractIdentifier(value: any, seen = new Set<unknown>()): string | unde
 function extractTableName(tableNode: any): string {
   for (const candidate of toArray(tableNode)) {
     const name = extractIdentifier(candidate?.table ?? candidate);
-    if (name) return name;
+    if (name) {
+      return name;
+    }
   }
   return 'unknown';
 }
@@ -204,7 +243,9 @@ function extractColumnNames(definition: any): string[] {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractDataType(definition: any): string {
-  if (!definition?.dataType) return 'VARCHAR(255)';
+  if (!definition?.dataType) {
+    return 'VARCHAR(255)';
+  }
 
   let type = definition.dataType.toUpperCase();
 
@@ -228,10 +269,14 @@ function extractDataType(definition: any): string {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function detectAutoIncrement(definition: any, dataType: string): boolean {
-  if (definition?.auto_increment) return true;
+  if (definition?.auto_increment) {
+    return true;
+  }
 
   const upper = dataType.toUpperCase();
-  if (upper === 'SERIAL' || upper === 'BIGSERIAL' || upper === 'SMALLSERIAL') return true;
+  if (upper === 'SERIAL' || upper === 'BIGSERIAL' || upper === 'SMALLSERIAL') {
+    return true;
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (definition?.reference_definition?.definition?.some?.((d: any) => d.type === 'identity')) {
@@ -249,7 +294,9 @@ function detectAutoIncrement(definition: any, dataType: string): boolean {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function detectNullable(definition: any): boolean {
-  if (!definition?.nullable) return true;
+  if (!definition?.nullable) {
+    return true;
+  }
   return definition.nullable.type === 'null';
 }
 
@@ -502,6 +549,20 @@ interface SqlStatementChunk {
   startOffset: number;
   /** 원본 SQL 기준 시작 라인 (1-based) */
   startLine: number;
+  /** 원본 SQL 기준 종료 라인 (1-based) */
+  endLine: number;
+}
+
+/** SQL 문장에서 추출한 테이블 범위 후보 */
+interface CoarseTableRange {
+  /** 소문자 테이블명 */
+  tableNameLower: string;
+  /** 소프트 락 식별용 임시 키 */
+  tableKey: string;
+  /** 시작 라인 (1-based) */
+  startLine: number;
+  /** 종료 라인 (1-based) */
+  endLine: number;
 }
 
 /**
@@ -573,6 +634,10 @@ function splitSqlStatements(ddl: string): SqlStatementChunk[] {
         sql,
         startOffset,
         startLine: getLineFromLineStarts(lineStarts, startOffset),
+        endLine: getLineFromLineStarts(
+          lineStarts,
+          Math.max(startOffset, startOffset + Math.max(0, sql.length - 1)),
+        ),
       });
     }
   };
@@ -648,6 +713,144 @@ function splitSqlStatements(ddl: string): SqlStatementChunk[] {
 
   pushChunk(ddl.length);
   return chunks;
+}
+
+/** SQL 식별자 양 끝의 quote/backtick/bracket을 제거한다. */
+function stripIdentifierQuotes(identifier: string): string {
+  const trimmed = identifier.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith('`') && trimmed.endsWith('`')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+/**
+ * CREATE TABLE 문에서 테이블 물리명을 추출한다.
+ *
+ * @param sql 단일 SQL 문장
+ * @returns 테이블명 또는 null
+ */
+function extractCreateTableNameFromSql(sql: string): string | null {
+  const match = sql.match(
+    /create\s+table\s+(?:if\s+not\s+exists\s+)?((?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[a-zA-Z0-9_]+)(?:\s*\.\s*(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[a-zA-Z0-9_]+))?)/i,
+  );
+  if (!match) {
+    return null;
+  }
+
+  const rawName = match[1].trim();
+  const parts = rawName.split('.').map((part) => stripIdentifierQuotes(part));
+  return parts[parts.length - 1] || null;
+}
+
+/**
+ * ALTER TABLE 문에서 대상 테이블명을 추출한다.
+ *
+ * @param sql 단일 SQL 문장
+ * @returns 테이블명 또는 null
+ */
+function extractAlterTableNameFromSql(sql: string): string | null {
+  const match = sql.match(
+    /alter\s+table\s+(?:if\s+exists\s+)?((?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[a-zA-Z0-9_]+)(?:\s*\.\s*(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[a-zA-Z0-9_]+))?)/i,
+  );
+  if (!match) {
+    return null;
+  }
+  const rawName = match[1].trim();
+  const parts = rawName.split('.').map((part) => stripIdentifierQuotes(part));
+  return parts[parts.length - 1] || null;
+}
+
+/**
+ * COMMENT ON TABLE/COLUMN 문에서 대상 테이블명을 추출한다.
+ *
+ * @param sql 단일 SQL 문장
+ * @returns 테이블명 또는 null
+ */
+function extractCommentTargetTableName(sql: string): string | null {
+  const tableMatch = sql.match(
+    /comment\s+on\s+table\s+((?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[a-zA-Z0-9_]+)(?:\s*\.\s*(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[a-zA-Z0-9_]+))?)/i,
+  );
+  if (tableMatch) {
+    const parts = tableMatch[1]
+      .trim()
+      .split('.')
+      .map((part) => stripIdentifierQuotes(part));
+    return parts[parts.length - 1] || null;
+  }
+
+  const columnMatch = sql.match(
+    /comment\s+on\s+column\s+((?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[a-zA-Z0-9_]+)\s*\.\s*(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[a-zA-Z0-9_]+)(?:\s*\.\s*(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[a-zA-Z0-9_]+))?)/i,
+  );
+  if (!columnMatch) {
+    return null;
+  }
+  const parts = columnMatch[1]
+    .trim()
+    .split('.')
+    .map((part) => stripIdentifierQuotes(part));
+  if (parts.length < 2) {
+    return null;
+  }
+  return parts.length === 2 ? parts[0] : parts[1];
+}
+
+/**
+ * SQL 문장 분해 결과에서 테이블 라인 범위를 추출한다.
+ *
+ * @param chunks SQL 문장 분해 결과
+ * @returns 테이블 범위 목록
+ */
+function buildTableRangesFromChunks(chunks: SqlStatementChunk[]): CoarseTableRange[] {
+  const ranges: CoarseTableRange[] = [];
+
+  for (const chunk of chunks) {
+    const candidateNames = [
+      extractCreateTableNameFromSql(chunk.sql),
+      extractAlterTableNameFromSql(chunk.sql),
+      extractCommentTargetTableName(chunk.sql),
+    ].filter((value): value is string => Boolean(value));
+
+    for (const tableName of candidateNames) {
+      const tableNameLower = tableName.toLowerCase();
+      ranges.push({
+        tableNameLower,
+        tableKey: buildTableLockKey({
+          physicalName: tableName,
+          columns: [],
+        }),
+        startLine: chunk.startLine,
+        endLine: Math.max(chunk.startLine, chunk.endLine),
+      });
+    }
+  }
+
+  return ranges;
+}
+
+/**
+ * CREATE TABLE 문장 기준 테이블 시작 라인 맵을 만든다.
+ *
+ * @param chunks SQL 문장 분해 결과
+ * @returns 테이블 소문자명 -> 시작 라인(1-based)
+ */
+function buildCreateTableStartLineMap(chunks: SqlStatementChunk[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const chunk of chunks) {
+    const tableName = extractCreateTableNameFromSql(chunk.sql);
+    if (!tableName) {
+      continue;
+    }
+    const key = tableName.toLowerCase();
+    if (!map.has(key)) {
+      map.set(key, chunk.startLine);
+    }
+  }
+  return map;
 }
 
 /**
@@ -769,15 +972,19 @@ export async function parseDdl(ddl: string, dbms: DbmsType): Promise<DdlParseRes
   const tables: ParsedTable[] = [];
   const relations: ParsedRelation[] = [];
   const errors: string[] = [];
+  const tableRanges: ParsedTableRange[] = [];
 
   if (!ddl.trim()) {
-    return { diagnostics, tables, relations, errors };
+    return { diagnostics, tables, relations, errors, tableRanges };
   }
 
   const normalizedDdl = normalizeDdlForParser(ddl, dbms);
+  const statementChunks = splitSqlStatements(normalizedDdl);
+  const coarseRanges = buildTableRangesFromChunks(statementChunks);
+  const createTableStartLines = buildCreateTableStartLineMap(statementChunks);
 
   try {
-    const { Parser } = await getParser();
+    const { Parser } = await getParser(dbms);
     const parser = new Parser();
     const database = mapDbmsToParserDb(dbms);
 
@@ -804,7 +1011,10 @@ export async function parseDdl(ddl: string, dbms: DbmsType): Promise<DdlParseRes
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let astResult: any;
     try {
-      astResult = parser.astify(normalizedDdl, { database });
+      astResult = parser.astify(normalizedDdl, {
+        database,
+        parseOptions: { includeLocations: true },
+      });
       const astArray = Array.isArray(astResult) ? astResult : [astResult];
       for (let i = 0; i < astArray.length; i++) {
         processAstSafely(astArray[i], `Statement ${i + 1}`);
@@ -822,7 +1032,10 @@ export async function parseDdl(ddl: string, dbms: DbmsType): Promise<DdlParseRes
       if (chunks.length > 1) {
         for (const chunk of chunks) {
           try {
-            const statementAst = parser.astify(chunk.sql, { database });
+            const statementAst = parser.astify(chunk.sql, {
+              database,
+              parseOptions: { includeLocations: true },
+            });
             const astArray = Array.isArray(statementAst) ? statementAst : [statementAst];
             for (const ast of astArray) {
               processAstSafely(ast, `Statement ${chunk.index}`);
@@ -862,6 +1075,73 @@ export async function parseDdl(ddl: string, dbms: DbmsType): Promise<DdlParseRes
         }
       }
     }
+
+    // 테이블 내 중복 컬럼명(대소문자 무시) 진단
+    for (const table of tables) {
+      const seenPhysical = new Map<string, { name: string; line: number }>();
+      const seenLogical = new Map<string, { name: string; line: number }>();
+      const tableStartLine = createTableStartLines.get(table.name.toLowerCase());
+
+      for (let idx = 0; idx < table.columns.length; idx++) {
+        const col = table.columns[idx];
+        const colPhysicalKey = col.name.toLowerCase();
+        const approxLine = tableStartLine != null ? tableStartLine + idx + 1 : -1;
+        const firstPhysical = seenPhysical.get(colPhysicalKey);
+
+        if (firstPhysical) {
+          diagnostics.push({
+            messageKey: 'erd.ddlImport.duplicateColumnInTable',
+            messageArgs: {
+              table: table.name,
+              column: col.name,
+              firstLine: firstPhysical.line > 0 ? String(firstPhysical.line) : '?',
+            },
+            severity: 'error',
+            location:
+              approxLine > 0
+                ? {
+                    line: approxLine,
+                    startColumn: 1,
+                    endColumn: 2,
+                  }
+                : undefined,
+          });
+          errors.push(`Duplicate column in table ${table.name}: ${col.name}`);
+        } else {
+          seenPhysical.set(colPhysicalKey, { name: col.name, line: approxLine });
+        }
+
+        const logicalName = (col.logicalName ?? col.comment)?.trim();
+        if (!logicalName) {
+          continue;
+        }
+        const normalizedLogical = logicalName.toLowerCase();
+        const firstLogical = seenLogical.get(normalizedLogical);
+        if (firstLogical) {
+          diagnostics.push({
+            messageKey: 'erd.ddlImport.duplicateLogicalColumnInTable',
+            messageArgs: {
+              table: table.name,
+              logicalName,
+              firstLine: firstLogical.line > 0 ? String(firstLogical.line) : '?',
+            },
+            severity: 'error',
+            location:
+              approxLine > 0
+                ? {
+                    line: approxLine,
+                    startColumn: 1,
+                    endColumn: 2,
+                  }
+                : undefined,
+          });
+          errors.push(`Duplicate logical column in table ${table.name}: ${logicalName}`);
+          continue;
+        }
+
+        seenLogical.set(normalizedLogical, { name: logicalName, line: approxLine });
+      }
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const details = `DDL parser load failed: ${msg}`;
@@ -869,5 +1149,32 @@ export async function parseDdl(ddl: string, dbms: DbmsType): Promise<DdlParseRes
     diagnostics.push(createParseDiagnostic(details));
   }
 
-  return { diagnostics, tables, relations, errors };
+  // 파싱 성공 시 추출된 테이블 구조를 반영한 키로 coarse range를 보강한다.
+  const lockKeyByTableName = new Map<string, string>();
+  for (const table of tables) {
+    lockKeyByTableName.set(
+      table.name.toLowerCase(),
+      buildTableLockKey({
+        logicalName: table.logicalTableName ?? table.comment,
+        physicalName: table.name,
+        columns: table.columns.map((column) => ({
+          name: column.name,
+          type: column.type,
+          pk: column.pk,
+          fk: false,
+        })),
+      }),
+    );
+  }
+
+  for (const range of coarseRanges) {
+    const refinedKey = lockKeyByTableName.get(range.tableNameLower) ?? range.tableKey;
+    tableRanges.push({
+      tableKey: refinedKey,
+      startLine: range.startLine,
+      endLine: range.endLine,
+    });
+  }
+
+  return { diagnostics, tables, relations, errors, tableRanges };
 }

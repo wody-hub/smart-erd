@@ -249,6 +249,22 @@
       "refreshConfirmTitle": "코드 새로고침",
       "refreshConfirmDescription": "현재 편집 내용을 버리고 ERD에서 코드를 다시 생성합니다. 계속하시겠습니까?"
     },
+    "lock": {
+      "lockedBy": "{{name}} 님이 편집 중입니다",
+      "badgeAria": "{{name}} 님이 테이블 편집 중",
+      "blockedEditToast": "{{name}} 님이 이 테이블을 편집 중입니다"
+    },
+    "sync": {
+      "statusAria": "코드 동기화 상태",
+      "status": {
+        "idlePending": "자동 반영 대기중",
+        "syntaxErrorHold": "문법 오류로 보류",
+        "remoteLockHold": "원격 편집 락으로 보류",
+        "staleDrop": "코드 자동반영 취소 (파싱 중 ERD가 먼저 변경됨)",
+        "queueTimeoutManual": "보류 시간 초과로 수동 적용 필요",
+        "synced": "동기화 완료"
+      }
+    },
     "ddlImport": {
       "title": "SQL DDL 가져오기",
       "description": "SQL DDL을 붙여넣거나 입력하면 자동으로 테이블과 관계가 파싱됩니다.",
@@ -258,6 +274,8 @@
       "warnings": "경고 {{count}}건",
       "parseError": "DDL 파싱에 실패했습니다",
       "parseErrorDetails": "DDL 파싱 오류: {{details}}",
+      "duplicateColumnInTable": "중복 컬럼명: {{table}}.{{column}} (첫 선언 {{firstLine}}행)",
+      "duplicateLogicalColumnInTable": "중복 컬럼 논리명: {{table}}.{{logicalName}} (첫 선언 {{firstLine}}행)",
       "errorDetails": "파싱 오류 상세",
       "moreErrors": "추가 오류 {{count}}건",
       "import": "가져오기",
@@ -295,6 +313,8 @@
       "addColumn": "컬럼 추가",
       "selectDomain": "도메인 선택",
       "tableLogicalName": "테이블 논리명 입력...",
+      "duplicateLogicalNameWarning": "중복 컬럼 논리명: {{name}}",
+      "duplicateLogicalNameCount": "중복 논리명 {{count}}건",
       "title": {
         "togglePk": "PK 토글",
         "toggleFk": "FK 토글",
@@ -314,6 +334,7 @@
         "toggleAutoIncrement": "{{name}} 자동증가 토글",
         "deleteColumn": "컬럼 {{name}} 삭제",
         "validationWarning": "{{name}} 사전 불일치 경고",
+        "duplicateLogicalNameWarning": "{{name}} 컬럼 논리명 중복 오류",
         "domainBadge": "{{colName}} 도메인: {{domainName}}",
         "selectDomain": "{{colName}} 도메인 선택",
         "changeColor": "테이블 색상 변경",
@@ -381,12 +402,28 @@
       "errorCount": "에러 {{count}}건",
       "warningCount": "경고 {{count}}건",
       "noTables": "테이블 선언이 없습니다",
+      "assist": {
+        "title": "코드 도우미",
+        "keyboardHint": "↑/↓ 이동 · Enter/Tab 선택 · Esc 닫기",
+        "moreCount": "{{shown}} / {{total}}",
+        "loadMore": "더보기",
+        "badgeNew": "NEW",
+        "registerTerm": "용어 등록",
+        "registerDomain": "도메인 등록",
+        "typeSuggestion": "타입 추천",
+        "optionSuggestion": "옵션 추천",
+        "tableKeyword": "Table 키워드"
+      },
       "error": {
         "syntaxError": "문법 오류",
         "unknownTerm": "사전에 없는 논리명: {{name}}",
         "unknownDomain": "사전에 없는 도메인: {{name}}",
         "unknownFkTable": "선언되지 않은 테이블: {{name}}",
-        "unknownFkColumn": "선언되지 않은 컬럼: {{table}}.{{column}}"
+        "unknownFkColumn": "선언되지 않은 컬럼: {{table}}.{{column}}",
+        "domainAndTypeConflict": "한 컬럼에서 도메인(:)과 타입(::)을 동시에 지정할 수 없습니다",
+        "invalidTypeFormat": "타입 형식이 올바르지 않습니다: {{type}}",
+        "duplicateColumnLogicalName": "중복 컬럼 논리명: {{name}} (첫 선언 {{firstLine}}행)",
+        "duplicateColumnPhysicalName": "중복 컬럼 물리명: {{name}} (첫 선언 {{firstLine}}행)"
       },
       "warning": {
         "noDomain": "도메인 미연결: {{name}}"
@@ -403,15 +440,17 @@
         "columnTitle": "2) 컬럼 문법",
         "columnRule1": "옵션은 대괄호로 지정합니다. '{{pk}}' 기본키, '{{ai}}' 자동증가, '{{nn}}' NOT NULL",
         "columnRule2": "도메인 지정: '컬럼논리명 :도메인논리명'",
-        "columnRule3": "FK 지정: '컬럼논리명 > 부모테이블논리명.부모컬럼논리명'",
+        "columnRule3": "타입 지정(도메인 없을 때): '컬럼논리명 ::VARCHAR(200)'",
+        "columnRule4": "FK 지정: '컬럼논리명 > 부모테이블논리명.부모컬럼논리명'",
         "examplesTitle": "3) 예시",
         "exampleBasicLabel": "기본 예시",
         "exampleBasicCode": "{{tableKeyword}} 사용자 {\n  아이디 [{{pk}}, {{ai}}]\n  이름 [{{nn}}]\n  이메일 :이메일도메인\n}",
-        "exampleRelationLabel": "도메인 + FK 예시",
-        "exampleRelationCode": "{{tableKeyword}} 팀 {\n  아이디 [{{pk}}, {{ai}}]\n  팀명 [{{nn}}]\n}\n\n{{tableKeyword}} 사용자 {\n  아이디 [{{pk}}, {{ai}}]\n  팀아이디 > 팀.아이디 [{{nn}}]\n}",
+        "exampleRelationLabel": "도메인 + FK + 타입 예시",
+        "exampleRelationCode": "{{tableKeyword}} 팀 {\n  아이디 [{{pk}}, {{ai}}]\n  팀명 [{{nn}}]\n}\n\n{{tableKeyword}} 사용자 {\n  아이디 [{{pk}}, {{ai}}]\n  팀아이디 > 팀.아이디 [{{nn}}]\n  메모 ::VARCHAR(500)\n}",
         "invalidTitle": "4) 자주 나는 문법 오류",
         "invalidRule1": "'Table 사용자'처럼 블록 없이 선언하면 오류입니다. '{'와 '}'를 함께 작성하세요.",
-        "invalidRule2": "열린 블록을 닫지 않거나(}) 단독 '{'를 쓰면 오류로 표시됩니다."
+        "invalidRule2": "열린 블록을 닫지 않거나(}) 단독 '{'를 쓰면 오류로 표시됩니다.",
+        "invalidRule3": "한 컬럼에서 ':도메인'과 '::타입'을 같이 쓰면 오류입니다."
       },
       "errorGuide": {
         "openButton": "오류 가이드",
@@ -442,6 +481,11 @@
         "badExample": "잘못된 예시",
         "goodExample": "수정 예시",
         "moveToLine": "해당 위치로 이동",
+        "quickAction": {
+          "registerTerm": "'{{name}}' 용어 등록",
+          "registerDomain": "'{{name}}' 도메인 등록",
+          "keyboardHint": "Enter 실행 · Esc 닫기"
+        },
         "guides": {
           "syntaxError": {
             "cause": "DSL 문법 형식(테이블 블록, 컬럼 표현식, 괄호/기호)이 맞지 않아 파서가 라인을 해석하지 못했습니다.",
@@ -488,11 +532,43 @@
             "goodExample": "Table 팀 {\n  아이디 [PK]\n}\n\nTable 사용자 {\n  팀아이디 > 팀.아이디\n}",
             "rule": "FK는 '부모테이블.부모컬럼'이 모두 실제 선언과 일치해야 합니다."
           },
+          "domainAndTypeConflict": {
+            "cause": "한 컬럼 라인에서 도메인(:도메인명)과 타입(::TYPE)을 동시에 지정했습니다.",
+            "action1": "도메인을 사용할 컬럼이면 '::TYPE'을 제거하세요.",
+            "action2": "타입을 직접 지정할 컬럼이면 ':도메인명'을 제거하세요.",
+            "badExample": "Table 사용자 {\n  이름 :이름도메인 ::VARCHAR(200)\n}",
+            "goodExample": "Table 사용자 {\n  이름 :이름도메인\n  별칭 ::VARCHAR(200)\n}",
+            "rule": "한 컬럼은 ':도메인' 또는 '::타입' 중 하나만 지정할 수 있습니다."
+          },
+          "invalidTypeFormat": {
+            "cause": "'::' 뒤 타입 문자열 형식이 허용 패턴과 다릅니다.",
+            "action1": "타입명을 영문 식별자(+선택적 길이 괄호) 형태로 수정하세요. 예: VARCHAR(200), BIGINT",
+            "action2": "불필요한 기호/괄호를 제거하고 다시 입력하세요.",
+            "badExample": "Table 사용자 {\n  점수 ::@@@\n}",
+            "goodExample": "Table 사용자 {\n  점수 ::NUMERIC(10,2)\n}",
+            "rule": "타입 직접 지정은 '::TYPE' 형식을 지켜야 하며, 보통 SQL 타입 표기를 사용합니다."
+          },
           "noDomainWarning": {
             "cause": "해당 용어에 연결된 도메인이 없어 기본 물리 타입으로 처리됩니다.",
             "action1": "데이터 사전에서 용어에 도메인을 연결하면 타입 일관성을 유지할 수 있습니다.",
             "action2": "필요 시 DSL에서 ':도메인명'을 직접 지정해 명시적으로 타입을 고정하세요.",
             "rule": "경고는 적용을 막지는 않지만, 스키마 품질을 위해 정리하는 것을 권장합니다."
+          },
+          "duplicateColumnLogicalNameError": {
+            "cause": "같은 테이블 블록 안에서 컬럼 논리명이 중복 선언되었습니다.",
+            "action1": "중복 컬럼 중 하나의 논리명을 변경해 테이블 내부 논리명이 유일하도록 맞추세요.",
+            "action2": "의도된 중복이 아니라면 중복된 라인을 삭제하거나 병합하세요.",
+            "badExample": "Table 사용자 {\n  아이디 [PK]\n  아이디 [NN]\n}",
+            "goodExample": "Table 사용자 {\n  아이디 [PK]\n  사용자아이디 [NN]\n}",
+            "rule": "테이블 내부 컬럼 논리명은 충돌 없이 유일해야 합니다."
+          },
+          "duplicateColumnPhysicalNameError": {
+            "cause": "테이블 내부에서 컬럼 물리명이 중복되어 DB 스키마 생성 시 충돌이 발생합니다.",
+            "action1": "중복된 컬럼 중 하나의 용어/논리명을 변경하거나, 연결된 사전 물리명을 조정하세요.",
+            "action2": "의도치 않은 중복이면 불필요한 컬럼 라인을 제거하거나 통합하세요.",
+            "badExample": "Table 사용자 {\n  사용자아이디\n  아이디\n}",
+            "goodExample": "Table 사용자 {\n  사용자아이디\n  사용자번호\n}",
+            "rule": "테이블 내부 컬럼 물리명은 반드시 유일해야 합니다."
           },
           "genericError": {
             "cause": "파서가 처리하지 못한 오류입니다.",

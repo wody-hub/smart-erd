@@ -48,7 +48,9 @@ export function generateDsl(
   edges: ERDEdge[],
   dictionary: DslGeneratorDictionary,
 ): string {
-  if (nodes.length === 0) return '';
+  if (nodes.length === 0) {
+    return '';
+  }
 
   // 노드 맵 구축: nodeId → TableNode
   const nodeMap = new Map<string, TableNode>();
@@ -111,6 +113,11 @@ export function generateDsl(
       const domainLabel = resolveDomainLabel(col, dictionary);
       if (domainLabel) {
         parts.push(`:${domainLabel}`);
+      } else {
+        const typeLabel = resolveTypeLabel(col);
+        if (typeLabel) {
+          parts.push(`::${typeLabel}`);
+        }
       }
 
       // 옵션
@@ -136,8 +143,7 @@ export function generateDsl(
 /**
  * 컬럼의 도메인 명시 여부를 판정하고, 명시할 도메인 논리명을 반환한다.
  *
- * - Term이 있고 Term의 기본 도메인과 컬럼의 domainId가 다를 때 → 명시
- * - Term이 없고 domainId가 있을 때 → 명시
+ * - domainId가 있으면 항상 명시
  * - 그 외 → null (생략)
  *
  * @param col        컬럼 정보
@@ -148,26 +154,24 @@ function resolveDomainLabel(
   col: { termId?: number; domainId?: number },
   dictionary: DslGeneratorDictionary,
 ): string | null {
-  if (col.termId) {
-    const term = dictionary.findTermById(col.termId);
-    if (term) {
-      const termDefaultDomainId = term.domainId ?? undefined;
-      if (col.domainId && col.domainId !== termDefaultDomainId) {
-        const domain = dictionary.findDomainById(col.domainId);
-        return domain?.logicalName ?? null;
-      }
-      // Term 기본 도메인과 동일하면 생략
-      return null;
-    }
-  }
-
-  // Term 없이 도메인만 있는 경우
   if (col.domainId) {
     const domain = dictionary.findDomainById(col.domainId);
     return domain?.logicalName ?? null;
   }
 
   return null;
+}
+
+/** 도메인이 없는 컬럼의 타입 표현 문자열을 반환한다. */
+function resolveTypeLabel(col: { domainId?: number; type?: string }): string | null {
+  if (col.domainId) {
+    return null;
+  }
+  const normalized = col.type?.trim();
+  if (!normalized) {
+    return null;
+  }
+  return normalized;
 }
 
 /**

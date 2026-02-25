@@ -26,6 +26,10 @@ interface QuickDomainDialogProps {
   onOpenChange: (open: boolean) => void;
   /** 도메인 생성 완료 콜백 */
   onCreated: (domain: Domain) => void;
+  /** 초기 논리명 (선택) */
+  initialLogicalName?: string;
+  /** 초기 물리 타입 (선택) */
+  initialPhysicalType?: string;
 }
 
 /**
@@ -42,6 +46,8 @@ export default function QuickDomainDialog({
   open,
   onOpenChange,
   onCreated,
+  initialLogicalName,
+  initialPhysicalType,
 }: QuickDomainDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -56,11 +62,11 @@ export default function QuickDomainDialog({
 
   useEffect(() => {
     if (open) {
-      setLogicalName('');
-      setPhysicalType('');
+      setLogicalName(initialLogicalName ?? '');
+      setPhysicalType(initialPhysicalType ?? '');
       setDescription('');
     }
-  }, [open]);
+  }, [initialLogicalName, initialPhysicalType, open]);
 
   const mutation = useMutation({
     mutationFn: () =>

@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useMemo, useState, useRef } from 'react';
+import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -13,6 +13,8 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useShallow } from 'zustand/react/shallow';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import useCanvasStore from '@/stores/useCanvasStore';
 import { extractColId } from '@/lib/handle-id';
 import type { TableNodeData } from '@/types/erd';
@@ -23,8 +25,10 @@ import { cn } from '@/lib/utils';
 import { useFkConnectMode } from '@/hooks/useFkConnectMode';
 import { useExportDiagram } from '@/hooks/useExportDiagram';
 import { useAwareness } from '@/hooks/useAwareness';
+import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
 import TableNode from './TableNode';
 import GroupNode from './GroupNode';
+import RemoteEditLocksProvider from './RemoteEditLocksProvider';
 import CanvasToolbar from './CanvasToolbar';
 import EdgeContextMenu from './EdgeContextMenu';
 import DeleteEdgeDialog from './DeleteEdgeDialog';
@@ -111,8 +115,11 @@ function ERDCanvas({
   onToggleCodeEditor,
   isSidebarResizing = false,
 }: ERDCanvasProps) {
+  const { t } = useTranslation();
   /** 캔버스 컨테이너 ref (Awareness 커서 추적용) */
   const canvasRef = useRef<HTMLDivElement>(null);
+  /** 동일 락 토스트 중복 방지용 ref */
+  const lastBlockedNodeRef = useRef<string | null>(null);
   useAwareness(provider ?? null, canvasRef);
   const { nodes, edges, groupNodes, onNodesChange, onEdgesChange } = useCanvasStore(
     useShallow((s) => ({
@@ -128,6 +135,7 @@ function ERDCanvas({
   const allNodes = useMemo(() => [...groupNodes, ...nodes] as Node[], [groupNodes, nodes]);
 
   const highlightedEdgeId = useCanvasStore((s) => s.highlightedEdgeId);
+  const activeEditNodeId = useCanvasStore((s) => s.activeEditNodeId);
   const setHighlightedEdge = useCanvasStore((s) => s.setHighlightedEdge);
   const setHighlightedNodes = useCanvasStore((s) => s.setHighlightedNodes);
   const clearHighlights = useCanvasStore((s) => s.clearHighlights);
@@ -135,6 +143,8 @@ function ERDCanvas({
   const removeEdgeWithFkColumn = useCanvasStore((s) => s.removeEdgeWithFkColumn);
   const applyLayout = useCanvasStore((s) => s.applyLayout);
   const setActiveEditNodeId = useCanvasStore((s) => s.setActiveEditNodeId);
+  const remoteEditLocks = useRemoteEditLocks();
+  const { locksByNodeId } = remoteEditLocks;
 
   const {
     fkMode,
@@ -203,7 +213,17 @@ function ERDCanvas({
       handleNodeClickInFkMode(event, node as Node<TableNodeData>);
       return;
     }
-    if (node.type === 'table') {
+    if (canEdit && node.type === 'table') {
+      const lockInfo = locksByNodeId.get(node.id);
+      if (lockInfo) {
+        if (lastBlockedNodeRef.current !== node.id) {
+          toast.info(t('erd.lock.blockedEditToast', { name: lockInfo.name }));
+          lastBlockedNodeRef.current = node.id;
+        }
+        return;
+      }
+
+      lastBlockedNodeRef.current = null;
       setActiveEditNodeId(node.id);
     }
   };
@@ -213,7 +233,21 @@ function ERDCanvas({
     clearHighlights();
     setContextMenu(null);
     setActiveEditNodeId(null);
+    lastBlockedNodeRef.current = null;
   };
+
+  // 편집 중인 노드가 원격 락 상태가 되면 즉시 편집 모드를 해제한다.
+  useEffect(() => {
+    if (!activeEditNodeId) {
+      return;
+    }
+    const lockInfo = locksByNodeId.get(activeEditNodeId);
+    if (!lockInfo) {
+      return;
+    }
+    setActiveEditNodeId(null);
+    toast.info(t('erd.lock.blockedEditToast', { name: lockInfo.name }));
+  }, [activeEditNodeId, locksByNodeId, setActiveEditNodeId, t]);
 
   /** 엣지 우클릭 — 컨텍스트 메뉴 표시 */
   const handleEdgeContextMenu = (event: React.MouseEvent, edge: Edge) => {
@@ -259,61 +293,63 @@ function ERDCanvas({
   return (
     <div className="w-full h-full" ref={canvasRef}>
       <ErdFkModeProvider value={fkMode}>
-        <ReactFlow
-          nodes={allNodes}
-          edges={styledEdges}
-          onNodesChange={canEdit ? onNodesChange : undefined}
-          onEdgesChange={canEdit ? onEdgesChange : undefined}
-          onConnect={canEdit ? handleDragConnect : undefined}
-          onNodeClick={handleNodeClick}
-          onNodeDragStart={canEdit ? () => setIsDraggingNode(true) : undefined}
-          onNodeDragStop={canEdit ? () => setIsDraggingNode(false) : undefined}
-          onEdgeClick={handleEdgeClick}
-          onEdgeContextMenu={canEdit ? handleEdgeContextMenu : undefined}
-          onPaneClick={handlePaneClick}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          deleteKeyCode={null}
-          panActivationKeyCode={null}
-          nodesDraggable={canEdit}
-          nodesConnectable={canEdit}
-          elementsSelectable={canEdit}
-          snapToGrid
-          snapGrid={[16, 16]}
-          defaultEdgeOptions={{
-            type: 'erdRelation',
-          }}
-          fitView
-          className={cn(fkMode && 'cursor-crosshair')}
-        >
-          {showPerformanceOverlays && (
-            <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-          )}
-          {showPerformanceOverlays && <Controls />}
-          {showMiniMap && (
-            <MiniMap
-              nodeStrokeColor="hsl(var(--muted-foreground))"
-              nodeColor="hsl(var(--card))"
-              nodeBorderRadius={4}
+        <RemoteEditLocksProvider value={remoteEditLocks}>
+          <ReactFlow
+            nodes={allNodes}
+            edges={styledEdges}
+            onNodesChange={canEdit ? onNodesChange : undefined}
+            onEdgesChange={canEdit ? onEdgesChange : undefined}
+            onConnect={canEdit ? handleDragConnect : undefined}
+            onNodeClick={handleNodeClick}
+            onNodeDragStart={canEdit ? () => setIsDraggingNode(true) : undefined}
+            onNodeDragStop={canEdit ? () => setIsDraggingNode(false) : undefined}
+            onEdgeClick={handleEdgeClick}
+            onEdgeContextMenu={canEdit ? handleEdgeContextMenu : undefined}
+            onPaneClick={handlePaneClick}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            deleteKeyCode={null}
+            panActivationKeyCode={null}
+            nodesDraggable={canEdit}
+            nodesConnectable={canEdit}
+            elementsSelectable={canEdit}
+            snapToGrid
+            snapGrid={[16, 16]}
+            defaultEdgeOptions={{
+              type: 'erdRelation',
+            }}
+            fitView
+            className={cn(fkMode && 'cursor-crosshair')}
+          >
+            {showPerformanceOverlays && (
+              <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+            )}
+            {showPerformanceOverlays && <Controls />}
+            {showMiniMap && (
+              <MiniMap
+                nodeStrokeColor="hsl(var(--muted-foreground))"
+                nodeColor="hsl(var(--card))"
+                nodeBorderRadius={4}
+              />
+            )}
+            <CanvasToolbar
+              fkMode={fkMode}
+              onToggleFkMode={toggleFkMode}
+              onAutoLayout={handleAutoLayout}
+              onExportPng={exportPng}
+              onExportJpg={exportJpg}
+              onExportSvg={exportSvg}
+              onExportPdf={exportPdf}
+              onExportDdl={() => setDdlDialogOpen(true)}
+              onImportDdl={() => setDdlImportOpen(true)}
+              codeEditorActive={codeEditorActive}
+              onToggleCodeEditor={onToggleCodeEditor}
+              validationOpen={validationOpen}
+              onToggleValidation={onToggleValidation}
+              canEdit={canEdit}
             />
-          )}
-          <CanvasToolbar
-            fkMode={fkMode}
-            onToggleFkMode={toggleFkMode}
-            onAutoLayout={handleAutoLayout}
-            onExportPng={exportPng}
-            onExportJpg={exportJpg}
-            onExportSvg={exportSvg}
-            onExportPdf={exportPdf}
-            onExportDdl={() => setDdlDialogOpen(true)}
-            onImportDdl={() => setDdlImportOpen(true)}
-            codeEditorActive={codeEditorActive}
-            onToggleCodeEditor={onToggleCodeEditor}
-            validationOpen={validationOpen}
-            onToggleValidation={onToggleValidation}
-            canEdit={canEdit}
-          />
-        </ReactFlow>
+          </ReactFlow>
+        </RemoteEditLocksProvider>
       </ErdFkModeProvider>
 
       {showPerformanceOverlays && <RemoteCursors />}

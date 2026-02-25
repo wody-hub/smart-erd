@@ -23,8 +23,14 @@ import Spinner from '@/components/ui/spinner';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import { useDdlParse } from '@/hooks/useDdlParse';
 import { useApplyToErd } from '@/hooks/useApplyToErd';
+import { useBidirectionalCodeSync } from '@/hooks/useBidirectionalCodeSync';
 import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
+import { useCodeEditorTableLock } from '@/hooks/useCodeEditorTableLock';
+import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
+import useCanvasStore from '@/stores/useCanvasStore';
+import { applyDagreLayout } from '@/lib/auto-layout';
 import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
+import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import { generateDdl } from '@/lib/ddl-generator';
 import CodeEditorFooter from './CodeEditorFooter';
@@ -67,7 +73,7 @@ export default function DdlCodeEditorPanel({ canEdit = true }: DdlCodeEditorPane
             role="tab"
             aria-selected={mode === 'sql'}
             className={cn(
-              'flex-1 px-3 py-1.5 text-xs font-medium transition-colors',
+              'flex-1 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
               mode === 'sql'
                 ? 'bg-background text-foreground border-b-2 border-primary'
                 : 'bg-muted text-muted-foreground hover:text-foreground',
@@ -81,7 +87,7 @@ export default function DdlCodeEditorPanel({ canEdit = true }: DdlCodeEditorPane
             role="tab"
             aria-selected={mode === 'dsl'}
             className={cn(
-              'flex-1 px-3 py-1.5 text-xs font-medium transition-colors',
+              'flex-1 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
               mode === 'dsl'
                 ? 'bg-background text-foreground border-b-2 border-primary'
                 : 'bg-muted text-muted-foreground hover:text-foreground',
@@ -164,6 +170,7 @@ function DslSyntaxGuideDialog() {
               </li>
               <li>{t('erd.dsl.syntaxGuide.columnRule2')}</li>
               <li>{t('erd.dsl.syntaxGuide.columnRule3')}</li>
+              <li>{t('erd.dsl.syntaxGuide.columnRule4')}</li>
             </ul>
           </section>
 
@@ -208,6 +215,7 @@ function DslSyntaxGuideDialog() {
             <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
               <li>{t('erd.dsl.syntaxGuide.invalidRule1')}</li>
               <li>{t('erd.dsl.syntaxGuide.invalidRule2')}</li>
+              <li>{t('erd.dsl.syntaxGuide.invalidRule3')}</li>
             </ul>
           </section>
         </div>
@@ -219,6 +227,7 @@ function DslSyntaxGuideDialog() {
 /** SQL DDL 에디터 (기존 로직) */
 function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
   const { t } = useTranslation();
+  const { hasLocks: hasRemoteEditLocks } = useRemoteEditLocks();
 
   const { dbms, ddlText, parseResult, parsing, handleDdlChange, handleDbmsChange } = useDdlParse({
     persistDbms: true,
@@ -236,12 +245,64 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
     [dbms],
   );
 
+  /** 현재 ERD 상태를 SQL DDL 텍스트로 생성한다. */
+  const generateFromErd = useCallback(() => {
+    const { nodes, edges } = useCanvasStore.getState();
+    return generate(nodes as TableNode[], edges as ERDEdge[]);
+  }, [generate]);
+
+  const replaceFromDdl = useCanvasStore((s) => s.replaceFromDdl);
+  const applyLayout = useCanvasStore((s) => s.applyLayout);
+
+  /** 파싱 결과를 ERD에 자동 반영한다. */
+  const applyParsedToErd = useCallback(() => {
+    if (!canEdit || !parseResult || parseResult.tables.length === 0) {
+      return;
+    }
+
+    replaceFromDdl(parseResult);
+    const { nodes, edges } = useCanvasStore.getState();
+    if (nodes.length > 0) {
+      const layoutedNodes = applyDagreLayout(nodes as TableNode[], edges as ERDEdge[]);
+      applyLayout(layoutedNodes);
+    }
+  }, [applyLayout, canEdit, parseResult, replaceFromDdl]);
+
+  const hasBlockingErrors =
+    (parseResult?.diagnostics.some((d) => d.severity === 'error') ?? false) ||
+    ((parseResult?.tables.length ?? 0) === 0 && (parseResult?.errors.length ?? 0) > 0);
+
+  const { handleUserCodeChange, handleGeneratedCodeChange, clearQueueTimeoutHold, syncStatus } =
+    useBidirectionalCodeSync({
+      enabled: canEdit,
+      codeText: ddlText,
+      parsing,
+      hasBlockingErrors,
+      hasParsedTables: (parseResult?.tables.length ?? 0) > 0,
+      hasRemoteEditLocks,
+      onCodeTextChange: handleDdlChange,
+      generateCodeFromErd: generateFromErd,
+      applyParsedToErd,
+    });
+
+  const handleApplyWithSyncReset = useCallback(() => {
+    clearQueueTimeoutHold();
+    handleApply();
+  }, [clearQueueTimeoutHold, handleApply]);
+
+  const executeApplyWithSyncReset = useCallback(() => {
+    clearQueueTimeoutHold();
+    executeApply();
+  }, [clearQueueTimeoutHold, executeApply]);
+
   const { executeRefresh, handleRefresh, hasNodes, refreshConfirmOpen, setRefreshConfirmOpen } =
     useCodeEditorRefresh({
       generate,
-      onGenerated: handleDdlChange,
+      onGenerated: handleGeneratedCodeChange,
       currentText: ddlText,
     });
+
+  const syncStatusMeta = getSyncStatusMeta(t, syncStatus);
 
   /** 다크 모드 감지 (반응형) */
   const isDark = useDarkMode();
@@ -249,12 +310,23 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
   const monacoRef = useRef<typeof Monaco | null>(null);
   /** 에디터 인스턴스 ref */
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  /** 에디터 mount 완료 여부 */
+  const [editorReady, setEditorReady] = useState(false);
 
   /** onMount — editorRef/monacoRef 저장 */
   const handleOnMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+    setEditorReady(true);
   };
+
+  useCodeEditorTableLock({
+    enabled: canEdit,
+    editorReady,
+    editorRef,
+    tableRanges: parseResult?.tableRanges ?? [],
+    hasParseErrors: hasBlockingErrors,
+  });
 
   // diagnostics 변경 시 SQL 에러 마커 갱신 (라인 전체 마킹 정책)
   useEffect(() => {
@@ -334,7 +406,7 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
           height="100%"
           language="sql"
           value={ddlText}
-          onChange={handleDdlChange}
+          onChange={handleUserCodeChange}
           onMount={handleOnMount}
           options={{
             minimap: { enabled: false },
@@ -355,9 +427,9 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
 
       {/* 파싱 결과 프리뷰 + Apply/Refresh 버튼 */}
       <CodeEditorFooter
-        onApply={handleApply}
+        onApply={handleApplyWithSyncReset}
         canApply={canApply}
-        executeApply={executeApply}
+        executeApply={executeApplyWithSyncReset}
         confirmOpen={confirmOpen}
         setConfirmOpen={setConfirmOpen}
         onRefresh={handleRefresh}
@@ -400,6 +472,18 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
                 </span>
               )}
             </>
+          )}
+
+          {syncStatusMeta && (
+            <span
+              className={cn('flex items-center gap-1', syncStatusMeta.className)}
+              aria-label={t('erd.sync.statusAria')}
+            >
+              <syncStatusMeta.Icon
+                className={cn('h-3 w-3', syncStatusMeta.spin && 'animate-spin')}
+              />
+              {syncStatusMeta.label}
+            </span>
           )}
         </div>
       </CodeEditorFooter>

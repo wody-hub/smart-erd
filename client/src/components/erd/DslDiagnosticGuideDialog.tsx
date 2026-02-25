@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CircleAlert, Wrench } from 'lucide-react';
+import { CircleAlert, Plus, Wrench } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,8 @@ interface DslDiagnosticGuideDialogProps {
   parsing: boolean;
   hasInput: boolean;
   onMoveToDiagnostic: (diagnostic: DslError) => void;
+  onQuickRegisterTerm?: (logicalName: string) => void;
+  onQuickRegisterDomain?: (logicalName: string) => void;
 }
 
 interface DiagnosticGuideSpec {
@@ -60,10 +62,30 @@ const GUIDE_BY_MESSAGE_KEY: Record<string, DiagnosticGuideSpec> = {
     actionCount: 3,
     hasExamples: true,
   },
+  'erd.dsl.error.domainAndTypeConflict': {
+    guideKey: 'domainAndTypeConflict',
+    actionCount: 2,
+    hasExamples: true,
+  },
+  'erd.dsl.error.invalidTypeFormat': {
+    guideKey: 'invalidTypeFormat',
+    actionCount: 2,
+    hasExamples: true,
+  },
   'erd.dsl.warning.noDomain': {
     guideKey: 'noDomainWarning',
     actionCount: 2,
     hasExamples: false,
+  },
+  'erd.dsl.error.duplicateColumnLogicalName': {
+    guideKey: 'duplicateColumnLogicalNameError',
+    actionCount: 2,
+    hasExamples: true,
+  },
+  'erd.dsl.error.duplicateColumnPhysicalName': {
+    guideKey: 'duplicateColumnPhysicalNameError',
+    actionCount: 2,
+    hasExamples: true,
   },
 };
 
@@ -96,6 +118,8 @@ export default function DslDiagnosticGuideDialog({
   parsing,
   hasInput,
   onMoveToDiagnostic,
+  onQuickRegisterTerm,
+  onQuickRegisterDomain,
 }: DslDiagnosticGuideDialogProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -223,7 +247,7 @@ export default function DslDiagnosticGuideDialog({
                         type="button"
                         onClick={() => setSelectedEntryId(entry.id)}
                         className={cn(
-                          'w-full rounded-md border px-3 py-2 text-left transition-colors',
+                          'w-full rounded-md border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
                           active
                             ? 'border-primary bg-accent/70'
                             : 'border-border bg-background hover:bg-accent/40',
@@ -258,7 +282,12 @@ export default function DslDiagnosticGuideDialog({
 
           <div className="min-h-0 overflow-y-auto px-6 py-5">
             {selectedEntry ? (
-              <DiagnosticDetail entry={selectedEntry} onMoveToDiagnostic={onMoveToDiagnostic} />
+              <DiagnosticDetail
+                entry={selectedEntry}
+                onMoveToDiagnostic={onMoveToDiagnostic}
+                onQuickRegisterTerm={onQuickRegisterTerm}
+                onQuickRegisterDomain={onQuickRegisterDomain}
+              />
             ) : (
               <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                 {parsing
@@ -278,9 +307,16 @@ export default function DslDiagnosticGuideDialog({
 interface DiagnosticDetailProps {
   entry: DiagnosticEntry;
   onMoveToDiagnostic: (diagnostic: DslError) => void;
+  onQuickRegisterTerm?: (logicalName: string) => void;
+  onQuickRegisterDomain?: (logicalName: string) => void;
 }
 
-function DiagnosticDetail({ entry, onMoveToDiagnostic }: DiagnosticDetailProps) {
+function DiagnosticDetail({
+  entry,
+  onMoveToDiagnostic,
+  onQuickRegisterTerm,
+  onQuickRegisterDomain,
+}: DiagnosticDetailProps) {
   const { t } = useTranslation();
   const tAny = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { diagnostic, guide } = entry;
@@ -288,6 +324,10 @@ function DiagnosticDetail({ entry, onMoveToDiagnostic }: DiagnosticDetailProps) 
   const actions = Array.from({ length: guide.actionCount }, (_, index) =>
     tAny(`${keyPrefix}.action${index + 1}`),
   );
+  const nameArg = diagnostic.messageArgs?.name?.trim();
+  const registerName = nameArg ?? '';
+  const canRegisterTerm = diagnostic.messageKey === 'erd.dsl.error.unknownTerm' && !!nameArg;
+  const canRegisterDomain = diagnostic.messageKey === 'erd.dsl.error.unknownDomain' && !!nameArg;
 
   return (
     <div className="space-y-4">
@@ -359,7 +399,31 @@ function DiagnosticDetail({ entry, onMoveToDiagnostic }: DiagnosticDetailProps) 
         <p className="text-sm text-muted-foreground">{tAny(`${keyPrefix}.rule`)}</p>
       </section>
 
-      <div className="pt-1">
+      <div className="flex flex-wrap gap-2 pt-1">
+        {canRegisterTerm && onQuickRegisterTerm && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => onQuickRegisterTerm(registerName)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t('erd.dsl.errorGuide.quickAction.registerTerm', { name: registerName })}
+          </Button>
+        )}
+        {canRegisterDomain && onQuickRegisterDomain && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => onQuickRegisterDomain(registerName)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t('erd.dsl.errorGuide.quickAction.registerDomain', { name: registerName })}
+          </Button>
+        )}
         <Button
           type="button"
           size="sm"

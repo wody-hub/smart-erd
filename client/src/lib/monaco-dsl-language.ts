@@ -1,9 +1,13 @@
 import type * as Monaco from 'monaco-editor';
 import type { Term, Domain } from '@/types/dictionary';
-import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
+import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS, DSL_TYPE_SUGGESTIONS } from '@/lib/dsl-keywords';
 
 /** DSL 커스텀 언어 ID */
 export const DSL_LANGUAGE_ID = 'smart-erd-dsl';
+/** 자동완성에서 빠른 용어 등록을 실행하는 커맨드 ID */
+export const DSL_QUICK_REGISTER_TERM_COMMAND_ID = 'smart-erd.dsl.quickRegisterTerm';
+/** 자동완성에서 빠른 도메인 등록을 실행하는 커맨드 ID */
+export const DSL_QUICK_REGISTER_DOMAIN_COMMAND_ID = 'smart-erd.dsl.quickRegisterDomain';
 
 /** `Table ` 뒤 컨텍스트 감지 정규식 */
 const TABLE_AFTER_REGEX = new RegExp(`^\\s*${DSL_TABLE_KEYWORD}\\s+\\S*$`);
@@ -49,8 +53,10 @@ export function registerDslLanguage(monaco: typeof Monaco): void {
         ],
         // 옵션 블록
         [/\[/, { token: 'delimiter.square', next: '@options' }],
+        // 물리 타입 직접 지정
+        [/::([^[]+)/, 'type'],
         // 도메인 지정
-        [/:(\S+)/, 'type'],
+        [/:(?!:)(\S+)/, 'type'],
         // FK 참조 연산자
         [/>/, 'operator'],
         // 중괄호
@@ -82,6 +88,14 @@ export interface DslParsedTableRef {
   columns: string[];
 }
 
+/** DSL 자동완성에서 사용하는 빠른 등록 액션 */
+export interface DslCompletionQuickActions {
+  /** 용어 빠른 등록 콜백 */
+  onQuickRegisterTerm?: (logicalName: string) => void;
+  /** 도메인 빠른 등록 콜백 */
+  onQuickRegisterDomain?: (logicalName: string) => void;
+}
+
 /**
  * DSL CompletionItemProvider를 생성한다.
  *
@@ -96,7 +110,91 @@ export function createDslCompletionProvider(
   terms: Term[],
   domains: Domain[],
   tablesRef: React.RefObject<DslParsedTableRef[]>,
+  quickActions?: DslCompletionQuickActions,
 ): Monaco.languages.CompletionItemProvider {
+  /**
+   * 빠른 등록 자동완성에 표시할 대상 텍스트를 포맷한다.
+   *
+   * @param logicalName 입력한 논리명
+   * @returns 표시용 텍스트
+   */
+  const formatQuickRegisterTarget = (logicalName: string): string =>
+    logicalName.trim() ? `'${logicalName.trim()}'` : '현재 입력값';
+
+  /**
+   * 자동완성 목록에 빠른 용어 등록 항목을 추가한다.
+   *
+   * @param suggestions 자동완성 목록
+   * @param position 현재 커서 위치
+   * @param logicalName 초기 논리명
+   */
+  const pushQuickTermSuggestion = (
+    suggestions: Monaco.languages.CompletionItem[],
+    position: Monaco.Position,
+    logicalName: string,
+  ) => {
+    if (!quickActions?.onQuickRegisterTerm) {
+      return;
+    }
+    const targetLabel = formatQuickRegisterTarget(logicalName);
+    suggestions.unshift({
+      label: '용어 등록',
+      kind: monaco.languages.CompletionItemKind.Reference,
+      detail: `${targetLabel} 용어를 사전에 추가`,
+      insertText: '',
+      range: new monaco.Range(
+        position.lineNumber,
+        position.column,
+        position.lineNumber,
+        position.column,
+      ),
+      filterText: `${logicalName} 용어 신규 등록`,
+      sortText: '0000',
+      command: {
+        id: DSL_QUICK_REGISTER_TERM_COMMAND_ID,
+        title: '용어 등록',
+        arguments: [logicalName],
+      },
+    });
+  };
+
+  /**
+   * 자동완성 목록에 빠른 도메인 등록 항목을 추가한다.
+   *
+   * @param suggestions 자동완성 목록
+   * @param position 현재 커서 위치
+   * @param logicalName 초기 논리명
+   */
+  const pushQuickDomainSuggestion = (
+    suggestions: Monaco.languages.CompletionItem[],
+    position: Monaco.Position,
+    logicalName: string,
+  ) => {
+    if (!quickActions?.onQuickRegisterDomain) {
+      return;
+    }
+    const targetLabel = formatQuickRegisterTarget(logicalName);
+    suggestions.unshift({
+      label: '도메인 등록',
+      kind: monaco.languages.CompletionItemKind.Reference,
+      detail: `${targetLabel} 도메인을 사전에 추가`,
+      insertText: '',
+      range: new monaco.Range(
+        position.lineNumber,
+        position.column,
+        position.lineNumber,
+        position.column,
+      ),
+      filterText: `${logicalName} 도메인 신규 등록`,
+      sortText: '0000',
+      command: {
+        id: DSL_QUICK_REGISTER_DOMAIN_COMMAND_ID,
+        title: '도메인 등록',
+        arguments: [logicalName],
+      },
+    });
+  };
+
   return {
     triggerCharacters: ['[', ':', '>', ','],
 
@@ -153,8 +251,27 @@ export function createDslCompletionProvider(
         }
       }
 
-      // 2. `:` 뒤 → Domain 목록
-      if (/:\s*\S*$/.test(textUntilPosition) && !textUntilPosition.includes('//')) {
+      // 2. `::` 뒤 → 타입 스니펫
+      if (/::\s*\S*$/.test(textUntilPosition) && !textUntilPosition.includes('//')) {
+        for (const snippet of DSL_TYPE_SUGGESTIONS) {
+          suggestions.push({
+            label: snippet,
+            kind: monaco.languages.CompletionItemKind.TypeParameter,
+            insertText: snippet,
+            range,
+          });
+        }
+        return { suggestions };
+      }
+
+      // 3. `:` 뒤(단일 콜론) → Domain 목록
+      if (
+        /(^|[^:]):\s*\S*$/.test(textUntilPosition) &&
+        !/::\s*\S*$/.test(textUntilPosition) &&
+        !textUntilPosition.includes('//')
+      ) {
+        const domainInput =
+          textUntilPosition.match(/(^|[^:]):\s*([^\s[]*)$/)?.[2]?.trim() ?? word.word.trim();
         for (const domain of domains) {
           suggestions.push({
             label: domain.logicalName,
@@ -164,10 +281,11 @@ export function createDslCompletionProvider(
             range,
           });
         }
+        pushQuickDomainSuggestion(suggestions, position, domainInput);
         return { suggestions };
       }
 
-      // 3. `>` 뒤 → 테이블.컬럼 자동완성
+      // 4. `>` 뒤 → 테이블.컬럼 자동완성
       if (/>\s*\S*$/.test(textUntilPosition)) {
         const parsedTables = tablesRef.current ?? [];
         const afterArrow = textUntilPosition.match(/>\s*(\S*)$/)?.[1] ?? '';
@@ -211,8 +329,9 @@ export function createDslCompletionProvider(
         }
       }
 
-      // 4. `Table ` 뒤 → Term 검색
+      // 5. `Table ` 뒤 → Term 검색
       if (TABLE_AFTER_REGEX.test(textUntilPosition)) {
+        const termInput = word.word.trim();
         for (const term of terms) {
           suggestions.push({
             label: term.logicalName,
@@ -222,11 +341,13 @@ export function createDslCompletionProvider(
             range,
           });
         }
+        pushQuickTermSuggestion(suggestions, position, termInput);
         return { suggestions };
       }
 
-      // 5. 테이블 블록 내부 행 시작 → Term 검색 (컬럼 논리명)
+      // 6. 테이블 블록 내부 행 시작 → Term 검색 (컬럼 논리명)
       if (isInsideTableBlock(model, position.lineNumber)) {
+        const termInput = word.word.trim();
         for (const term of terms) {
           suggestions.push({
             label: term.logicalName,
@@ -236,6 +357,7 @@ export function createDslCompletionProvider(
             range,
           });
         }
+        pushQuickTermSuggestion(suggestions, position, termInput);
         return { suggestions };
       }
 
@@ -258,7 +380,9 @@ function isInsideTableBlock(model: Monaco.editor.ITextModel, lineNum: number): b
     if (text === '}') depth--;
     if (text.endsWith('{') || TABLE_LINE_REGEX.test(text)) {
       depth++;
-      if (depth > 0) return true;
+      if (depth > 0) {
+        return true;
+      }
     }
   }
   return false;

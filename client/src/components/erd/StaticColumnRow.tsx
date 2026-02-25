@@ -18,6 +18,8 @@ interface StaticColumnRowProps {
   connected: boolean;
   /** 컬럼 유효성 경고 */
   warning: ColumnWarning;
+  /** 컬럼 논리명 중복 여부 */
+  hasDuplicateLogicalName?: boolean;
   /** 도메인 논리명 */
   domainLogicalName?: string;
   /** 도메인 물리 타입 */
@@ -44,6 +46,7 @@ function StaticColumnRow({
   nodeId,
   connected,
   warning,
+  hasDuplicateLogicalName = false,
   domainLogicalName,
   domainPhysicalType,
 }: StaticColumnRowProps) {
@@ -51,7 +54,12 @@ function StaticColumnRow({
   const fkMode = useErdFkMode();
 
   return (
-    <div className="relative px-3 py-1 text-xs group/col">
+    <div
+      className={cn(
+        'relative px-3 py-1 text-xs group/col',
+        hasDuplicateLogicalName && 'bg-destructive/5',
+      )}
+    >
       {/* Row 1: Handle + PK/FK + 논리명 + 경고 + N + Handle */}
       <div className="flex items-center gap-1" style={{ paddingLeft: '12px' }}>
         <Handle
@@ -105,6 +113,24 @@ function StaticColumnRow({
               {t(
                 `erd.validation.status.${warning.status === 'name-mismatch' ? 'nameMismatch' : warning.status === 'type-mismatch' ? 'typeMismatch' : 'unregistered'}`,
               )}
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        {hasDuplicateLogicalName && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <AlertTriangle
+                className="h-3 w-3 text-destructive shrink-0"
+                aria-label={t('erd.tableNode.aria.duplicateLogicalNameWarning', {
+                  name: col.logicalName ?? col.name,
+                })}
+              />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              {t('erd.tableNode.duplicateLogicalNameWarning', {
+                name: col.logicalName ?? col.name,
+              })}
             </TooltipContent>
           </Tooltip>
         )}

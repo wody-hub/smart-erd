@@ -51,6 +51,7 @@ client/node_modules/
 client/dist/
 client/out/
 client/.cache/
+client/.tmp-test/
 
 # Logs
 *.log

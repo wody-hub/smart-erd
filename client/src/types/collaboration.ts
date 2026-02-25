@@ -17,6 +17,16 @@ export interface AwarenessState {
   cursor: { x: number; y: number } | null;
   /** 현재 선택 중인 노드 ID */
   selectedNodeId: string | null;
+  /** 현재 편집 중인 노드 ID (뷰 하이라이트용) */
+  editingNodeId?: string | null;
+  /** 현재 편집 락 테이블 키 */
+  editingTableKey?: string | null;
+  /** 편집 소스 */
+  editingSource?: 'erd' | 'code' | null;
+  /** 편집 클라이언트 ID */
+  editingClientId?: number | null;
+  /** 락 heartbeat 타임스탬프 (epoch ms) */
+  lockHeartbeatAt?: number | null;
 }
 
 /**

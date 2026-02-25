@@ -1,7 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import useAuthStore from '@/stores/useAuthStore';
+import useCanvasStore from '@/stores/useCanvasStore';
 import { CURSOR_COLORS } from '@/constants/ws';
+import { LOCK_HEARTBEAT_MS } from '@/constants/collab-lock';
+import { buildTableLockKeyFromNodeData } from '@/lib/table-lock-key';
 import type { YjsProvider } from '@/collaboration/YjsProvider';
 import type { AwarenessState } from '@/types/collaboration';
 
@@ -23,18 +26,70 @@ export function useAwareness(
 ) {
   const loginId = useAuthStore((s) => s.loginId);
   const name = useAuthStore((s) => s.name);
+  const activeEditNodeId = useCanvasStore((s) => s.activeEditNodeId);
+  const codeEditingTableKey = useCanvasStore((s) => s.codeEditingTableKey);
+  const nodes = useCanvasStore((s) => s.nodes);
   const { screenToFlowPosition } = useReactFlow();
   const screenToFlowPositionRef = useRef(screenToFlowPosition);
+  const activeEditNodeIdRef = useRef(activeEditNodeId);
+  const activeErdTableKeyRef = useRef<string | null>(null);
+  const codeEditingTableKeyRef = useRef<string | null>(codeEditingTableKey);
+  const emitAwarenessRef = useRef<
+    ((cursor: { x: number; y: number } | null, selectedNodeId?: string | null) => void) | null
+  >(null);
 
   /** 마지막 발행 시각 */
   const lastEmitRef = useRef(0);
+  /** 마지막 커서 위치 */
+  const lastCursorRef = useRef<{ x: number; y: number } | null>(null);
+  /** ERD 편집 중 락 키 스냅샷 */
+  const activeErdLockSnapshotRef = useRef<{ nodeId: string; tableKey: string } | null>(null);
+
+  const activeErdTableKey = useMemo(() => {
+    if (!activeEditNodeId) {
+      return null;
+    }
+    const snapshot = activeErdLockSnapshotRef.current;
+    if (snapshot && snapshot.nodeId === activeEditNodeId) {
+      return snapshot.tableKey;
+    }
+
+    const node = nodes.find((candidate) => candidate.id === activeEditNodeId);
+    if (!node) {
+      return null;
+    }
+
+    const tableKey = buildTableLockKeyFromNodeData(node.data);
+    activeErdLockSnapshotRef.current = { nodeId: activeEditNodeId, tableKey };
+    return tableKey;
+  }, [activeEditNodeId, nodes]);
+
+  useEffect(() => {
+    if (!activeEditNodeId) {
+      activeErdLockSnapshotRef.current = null;
+    }
+  }, [activeEditNodeId]);
 
   useEffect(() => {
     screenToFlowPositionRef.current = screenToFlowPosition;
   }, [screenToFlowPosition]);
 
   useEffect(() => {
-    if (!provider || !canvasRef.current || !loginId || !name) return;
+    activeEditNodeIdRef.current = activeEditNodeId;
+  }, [activeEditNodeId]);
+
+  useEffect(() => {
+    activeErdTableKeyRef.current = activeErdTableKey;
+  }, [activeErdTableKey]);
+
+  useEffect(() => {
+    codeEditingTableKeyRef.current = codeEditingTableKey;
+  }, [codeEditingTableKey]);
+
+  useEffect(() => {
+    if (!provider || !canvasRef.current || !loginId || !name) {
+      return;
+    }
 
     const colorIndex = provider.clientId % CURSOR_COLORS.length;
     const color = CURSOR_COLORS[colorIndex];
@@ -44,14 +99,30 @@ export function useAwareness(
      *
      * @param cursor 커서 위치 (null이면 캔버스 밖)
      */
-    const emitAwareness = (cursor: { x: number; y: number } | null) => {
+    const emitAwareness = (
+      cursor: { x: number; y: number } | null,
+      selectedNodeId: string | null = activeEditNodeIdRef.current,
+    ) => {
+      lastCursorRef.current = cursor;
+      const editingTableKey = codeEditingTableKeyRef.current ?? activeErdTableKeyRef.current;
+      const editingSource = codeEditingTableKeyRef.current
+        ? 'code'
+        : editingTableKey
+          ? 'erd'
+          : null;
       const state: AwarenessState = {
         user: { userId: provider.userId, name, loginId, color },
         cursor,
-        selectedNodeId: null,
+        selectedNodeId,
+        editingNodeId: editingSource === 'erd' ? activeEditNodeIdRef.current : null,
+        editingTableKey,
+        editingSource,
+        editingClientId: editingTableKey ? provider.clientId : null,
+        lockHeartbeatAt: editingTableKey ? Date.now() : null,
       };
       provider.setLocalAwareness(state);
     };
+    emitAwarenessRef.current = emitAwareness;
 
     // 입장 직후에도 사용자 목록이 즉시 동기화되도록 초기 Awareness를 즉시 전송한다.
     emitAwareness(null);
@@ -59,11 +130,15 @@ export function useAwareness(
     /** 마우스 이동 핸들러 (throttle 적용) */
     const handleMouseMove = (e: MouseEvent) => {
       const now = Date.now();
-      if (now - lastEmitRef.current < CURSOR_THROTTLE_MS) return;
+      if (now - lastEmitRef.current < CURSOR_THROTTLE_MS) {
+        return;
+      }
       lastEmitRef.current = now;
 
       const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
+      if (!rect) {
+        return;
+      }
 
       const flowPos = screenToFlowPositionRef.current({ x: e.clientX, y: e.clientY });
       emitAwareness(flowPos);
@@ -78,10 +153,23 @@ export function useAwareness(
     el.addEventListener('mousemove', handleMouseMove);
     el.addEventListener('mouseleave', handleMouseLeave);
 
+    const heartbeatTimer = setInterval(() => {
+      if (!codeEditingTableKeyRef.current && !activeErdTableKeyRef.current) {
+        return;
+      }
+      emitAwareness(lastCursorRef.current);
+    }, LOCK_HEARTBEAT_MS);
+
     return () => {
       el.removeEventListener('mousemove', handleMouseMove);
       el.removeEventListener('mouseleave', handleMouseLeave);
-      emitAwareness(null);
+      clearInterval(heartbeatTimer);
+      emitAwarenessRef.current = null;
+      emitAwareness(null, null);
     };
   }, [provider, canvasRef, loginId, name]);
+
+  useEffect(() => {
+    emitAwarenessRef.current?.(lastCursorRef.current, activeEditNodeId);
+  }, [activeEditNodeId, activeErdTableKey, codeEditingTableKey]);
 }

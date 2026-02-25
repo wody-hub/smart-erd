@@ -50,7 +50,9 @@ export function useYjsCollaboration(
 
   // Y.Doc 생성 + YjsProvider 연결 + 라이프사이클 관리
   useEffect(() => {
-    if (!diagram || !diagramId) return;
+    if (!diagram || !diagramId) {
+      return;
+    }
 
     // 1. Y.Doc 생성
     const ydoc = new Y.Doc();

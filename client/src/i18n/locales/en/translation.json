@@ -250,6 +250,22 @@
       "refreshConfirmTitle": "Refresh Code",
       "refreshConfirmDescription": "Current edits will be replaced with code generated from the ERD. Continue?"
     },
+    "lock": {
+      "lockedBy": "{{name}} is editing",
+      "badgeAria": "{{name}} is editing this table",
+      "blockedEditToast": "{{name}} is currently editing this table"
+    },
+    "sync": {
+      "statusAria": "Code sync status",
+      "status": {
+        "idlePending": "Waiting for auto-apply",
+        "syntaxErrorHold": "On hold due to syntax errors",
+        "remoteLockHold": "On hold due to remote edit lock",
+        "staleDrop": "Code auto-apply canceled (ERD changed during parsing)",
+        "queueTimeoutManual": "Queue timeout: manual apply required",
+        "synced": "Sync complete"
+      }
+    },
     "ddlImport": {
       "title": "Import SQL DDL",
       "description": "Paste or type SQL DDL to automatically parse tables and relationships.",
@@ -259,6 +275,8 @@
       "warnings": "{{count}} warnings",
       "parseError": "Failed to parse DDL",
       "parseErrorDetails": "DDL parse error: {{details}}",
+      "duplicateColumnInTable": "Duplicate column: {{table}}.{{column}} (first at line {{firstLine}})",
+      "duplicateLogicalColumnInTable": "Duplicate logical column: {{table}}.{{logicalName}} (first at line {{firstLine}})",
       "errorDetails": "Parse error details",
       "moreErrors": "{{count}} more errors",
       "import": "Import",
@@ -296,6 +314,8 @@
       "addColumn": "Add Column",
       "selectDomain": "Select domain",
       "tableLogicalName": "Enter table logical name...",
+      "duplicateLogicalNameWarning": "Duplicate column logical name: {{name}}",
+      "duplicateLogicalNameCount": "{{count}} duplicate logical names",
       "title": {
         "togglePk": "Toggle PK",
         "toggleFk": "Toggle FK",
@@ -315,6 +335,7 @@
         "toggleAutoIncrement": "Toggle auto increment for {{name}}",
         "deleteColumn": "Delete column {{name}}",
         "validationWarning": "{{name}} dictionary mismatch warning",
+        "duplicateLogicalNameWarning": "{{name}} duplicate logical name error",
         "domainBadge": "{{colName}} domain: {{domainName}}",
         "selectDomain": "Select domain for {{colName}}",
         "changeColor": "Change table color",
@@ -382,12 +403,28 @@
       "errorCount": "{{count}} errors",
       "warningCount": "{{count}} warnings",
       "noTables": "No table declarations found",
+      "assist": {
+        "title": "Code Assist",
+        "keyboardHint": "↑/↓ move · Enter/Tab select · Esc close",
+        "moreCount": "{{shown}} / {{total}}",
+        "loadMore": "Load more",
+        "badgeNew": "NEW",
+        "registerTerm": "Register term",
+        "registerDomain": "Register domain",
+        "typeSuggestion": "Type suggestion",
+        "optionSuggestion": "Option suggestion",
+        "tableKeyword": "Table keyword"
+      },
       "error": {
         "syntaxError": "Syntax error",
         "unknownTerm": "Unknown term: {{name}}",
         "unknownDomain": "Unknown domain: {{name}}",
         "unknownFkTable": "Undeclared table: {{name}}",
-        "unknownFkColumn": "Undeclared column: {{table}}.{{column}}"
+        "unknownFkColumn": "Undeclared column: {{table}}.{{column}}",
+        "domainAndTypeConflict": "A column cannot declare both domain(:) and type(::) at once",
+        "invalidTypeFormat": "Invalid type format: {{type}}",
+        "duplicateColumnLogicalName": "Duplicate column logical name: {{name}} (first declared at line {{firstLine}})",
+        "duplicateColumnPhysicalName": "Duplicate column physical name: {{name}} (first declared at line {{firstLine}})"
       },
       "warning": {
         "noDomain": "No domain linked: {{name}}"
@@ -404,15 +441,17 @@
         "columnTitle": "2) Column Syntax",
         "columnRule1": "Use options in brackets: '{{pk}}' primary key, '{{ai}}' auto increment, '{{nn}}' NOT NULL.",
         "columnRule2": "Domain mapping: 'columnLogicalName :domainLogicalName'",
-        "columnRule3": "FK reference: 'columnLogicalName > parentTableLogicalName.parentColumnLogicalName'",
+        "columnRule3": "Type mapping (when no domain): 'columnLogicalName ::VARCHAR(200)'",
+        "columnRule4": "FK reference: 'columnLogicalName > parentTableLogicalName.parentColumnLogicalName'",
         "examplesTitle": "3) Examples",
         "exampleBasicLabel": "Basic example",
         "exampleBasicCode": "{{tableKeyword}} User {\n  Id [{{pk}}, {{ai}}]\n  Name [{{nn}}]\n  Email :EmailDomain\n}",
-        "exampleRelationLabel": "Domain + FK example",
-        "exampleRelationCode": "{{tableKeyword}} Team {\n  Id [{{pk}}, {{ai}}]\n  TeamName [{{nn}}]\n}\n\n{{tableKeyword}} User {\n  Id [{{pk}}, {{ai}}]\n  TeamId > Team.Id [{{nn}}]\n}",
+        "exampleRelationLabel": "Domain + FK + Type example",
+        "exampleRelationCode": "{{tableKeyword}} Team {\n  Id [{{pk}}, {{ai}}]\n  TeamName [{{nn}}]\n}\n\n{{tableKeyword}} User {\n  Id [{{pk}}, {{ai}}]\n  TeamId > Team.Id [{{nn}}]\n  Memo ::VARCHAR(500)\n}",
         "invalidTitle": "4) Common Syntax Errors",
         "invalidRule1": "'Table User' without a block is invalid. Always write '{' and '}' together.",
-        "invalidRule2": "Unclosed blocks or standalone '{' are marked as syntax errors."
+        "invalidRule2": "Unclosed blocks or standalone '{' are marked as syntax errors.",
+        "invalidRule3": "Using ':Domain' and '::Type' together on the same column is invalid."
       },
       "errorGuide": {
         "openButton": "Error Guide",
@@ -443,6 +482,11 @@
         "badExample": "Bad example",
         "goodExample": "Fixed example",
         "moveToLine": "Move to this line",
+        "quickAction": {
+          "registerTerm": "Register term '{{name}}'",
+          "registerDomain": "Register domain '{{name}}'",
+          "keyboardHint": "Press Enter to run · Esc to close"
+        },
         "guides": {
           "syntaxError": {
             "cause": "The parser could not read the line because the DSL syntax format (table block, column expression, braces/symbols) is invalid.",
@@ -489,11 +533,43 @@
             "goodExample": "Table Team {\n  Id [PK]\n}\n\nTable User {\n  TeamId > Team.Id\n}",
             "rule": "FK requires both 'ParentTable.ParentColumn' to exactly match declared names."
           },
+          "domainAndTypeConflict": {
+            "cause": "The same column line declares both a domain (:DomainName) and an explicit type (::TYPE).",
+            "action1": "If you want domain-based typing, remove '::TYPE'.",
+            "action2": "If you want explicit typing, remove ':DomainName'.",
+            "badExample": "Table User {\n  Name :NameDomain ::VARCHAR(200)\n}",
+            "goodExample": "Table User {\n  Name :NameDomain\n  Nickname ::VARCHAR(200)\n}",
+            "rule": "A single column can use either ':domain' or '::type', not both."
+          },
+          "invalidTypeFormat": {
+            "cause": "The type string after '::' does not match the accepted format.",
+            "action1": "Use an identifier-based SQL type form, e.g. VARCHAR(200), BIGINT.",
+            "action2": "Remove invalid symbols or malformed parentheses and retry.",
+            "badExample": "Table User {\n  Score ::@@@\n}",
+            "goodExample": "Table User {\n  Score ::NUMERIC(10,2)\n}",
+            "rule": "Explicit type mapping must follow '::TYPE' format, typically SQL type notation."
+          },
           "noDomainWarning": {
             "cause": "No domain is linked to this term, so a default physical type is used.",
             "action1": "Link a domain to the term in dictionary to keep type consistency.",
             "action2": "Or explicitly assign ':DomainName' in DSL for deterministic type mapping.",
             "rule": "Warnings do not block apply, but resolving them improves schema quality."
+          },
+          "duplicateColumnLogicalNameError": {
+            "cause": "The same column logical name is declared more than once in a single table block.",
+            "action1": "Rename one of the duplicated column logical names so each column is unique in the table.",
+            "action2": "If unintentional, remove or merge the duplicated line.",
+            "badExample": "Table User {\n  Id [PK]\n  Id [NN]\n}",
+            "goodExample": "Table User {\n  Id [PK]\n  UserId [NN]\n}",
+            "rule": "Column logical names must be unique within the same table."
+          },
+          "duplicateColumnPhysicalNameError": {
+            "cause": "Duplicate physical column names exist in the same table, which will fail at DB schema level.",
+            "action1": "Change one column's term/logical name or update mapped dictionary physical name to remove collision.",
+            "action2": "If accidental, remove or merge the duplicated column line.",
+            "badExample": "Table User {\n  UserId\n  Id\n}",
+            "goodExample": "Table User {\n  UserId\n  UserNumber\n}",
+            "rule": "Physical column names must be unique within a table."
           },
           "genericError": {
             "cause": "An unclassified parser error occurred.",

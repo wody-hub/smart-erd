@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import { Plus, X, AlertTriangle, Palette, GripVertical } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -25,6 +25,7 @@ import { useCompoundTermRegister } from '@/hooks/useCompoundTermRegister';
 import { useErdDictionary } from './ErdDictionaryContext';
 import { useErdPermission } from './ErdPermissionContext';
 import { useErdFkMode } from './ErdFkModeContext';
+import { useRemoteEditLocksContext } from './RemoteEditLocksContext';
 import { getColumnWarning } from '@/hooks/useColumnValidation';
 import { KEYS } from '@/constants/keybindings';
 import { cn } from '@/lib/utils';
@@ -128,7 +129,10 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const isHighlighted = useCanvasStore((s) => s.highlightedNodeIds.includes(id));
 
   const { findTermById, findDomainById } = useErdDictionary();
-  const { canEdit } = useErdPermission();
+  const { canEdit: permissionCanEdit } = useErdPermission();
+  const { locksByNodeId } = useRemoteEditLocksContext();
+  const lockInfo = locksByNodeId.get(id);
+  const canEdit = permissionCanEdit && !lockInfo;
   /** 이 노드가 현재 편집 모드인지 여부 (파생 boolean으로 전환 시 최대 2개 노드만 리렌더링) */
   const isEditingState = useCanvasStore((s) => s.activeEditNodeId === id);
   /** 편집 권한이 있고, 이 노드가 편집 모드로 활성화된 상태 */
@@ -148,9 +152,13 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
       return set;
     },
     (a, b) => {
-      if (a.size !== b.size) return false;
+      if (a.size !== b.size) {
+        return false;
+      }
       for (const v of a) {
-        if (!b.has(v)) return false;
+        if (!b.has(v)) {
+          return false;
+        }
       }
       return true;
     },
@@ -166,6 +174,31 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const [domainPopoverColId, setDomainPopoverColId] = useState<string | null>(null);
   /** 테이블 빠른 용어 등록 대상 논리명 */
   const [tableQuickTermLogicalName, setTableQuickTermLogicalName] = useState<string | null>(null);
+
+  /** 테이블 내부 중복 컬럼 논리명 집합 */
+  const duplicatedLogicalNames = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const col of columns) {
+      const key = col.logicalName?.trim();
+      if (!key) continue;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return new Set(
+      Array.from(counts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([name]) => name),
+    );
+  }, [columns]);
+
+  /** 중복 논리명을 가진 컬럼 개수 */
+  const duplicateLogicalNameColumnCount = useMemo(
+    () =>
+      columns.filter((col) => {
+        const key = col.logicalName?.trim();
+        return !!key && duplicatedLogicalNames.has(key);
+      }).length,
+    [columns, duplicatedLogicalNames],
+  );
 
   /** 테이블 물리명 변경 핸들러. @param value 새 테이블 이름 */
   const handleRename = (value: string) => renameTable(id, value);
@@ -231,7 +264,9 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
    */
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    if (!over || active.id === over.id) {
+      return;
+    }
 
     const fromIndex = columns.findIndex((c) => c.id === active.id);
     const toIndex = columns.findIndex((c) => c.id === over.id);
@@ -321,9 +356,17 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const renderColumnRow = (col: Column) => {
     const warning = getColumnWarning(col, findTermById, findDomainById);
     const domain = col.domainId != null ? findDomainById(col.domainId) : undefined;
+    const normalizedLogicalName = col.logicalName?.trim() ?? '';
+    const hasDuplicateLogicalName =
+      normalizedLogicalName.length > 0 && duplicatedLogicalNames.has(normalizedLogicalName);
 
     return (
-      <div className="relative px-3 py-1 text-xs group/col">
+      <div
+        className={cn(
+          'relative px-3 py-1 text-xs group/col',
+          hasDuplicateLogicalName && 'bg-destructive/5',
+        )}
+      >
         {/* Row 1: Handle + PK/FK + 논리명 + 경고 + N + X + Handle */}
         <div
           className="flex items-center gap-1"
@@ -341,7 +384,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
           {/* PK toggle */}
           <button
-            className={`nodrag w-5 text-center font-bold text-2xs ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.pk ? 'text-erd-pk' : 'text-muted-foreground/40 hover:text-erd-pk/80'}`}
+            className={`nodrag w-5 text-center font-bold text-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.pk ? 'text-erd-pk' : 'text-muted-foreground/40 hover:text-erd-pk/80'}`}
             onClick={
               canEdit
                 ? () =>
@@ -360,7 +403,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
 
           {/* FK toggle */}
           <button
-            className={`nodrag w-5 text-center font-bold text-2xs ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.fk ? 'text-erd-fk' : 'text-muted-foreground/40 hover:text-erd-fk/80'}`}
+            className={`nodrag w-5 text-center font-bold text-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.fk ? 'text-erd-fk' : 'text-muted-foreground/40 hover:text-erd-fk/80'}`}
             onClick={canEdit ? () => updateColumn(id, col.id, { fk: !col.fk }) : undefined}
             title={t('erd.tableNode.title.toggleFk')}
             aria-label={t('erd.tableNode.aria.toggleFk', { name: col.name })}
@@ -371,7 +414,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
           {/* AI (Auto Increment) toggle — PK 컬럼에서만 표시 */}
           {col.pk && (
             <button
-              className={`nodrag w-5 text-center font-bold text-2xs ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.autoIncrement ? 'text-erd-ai' : 'text-muted-foreground/40 hover:text-erd-ai/80'}`}
+              className={`nodrag w-5 text-center font-bold text-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.autoIncrement ? 'text-erd-ai' : 'text-muted-foreground/40 hover:text-erd-ai/80'}`}
               onClick={
                 canEdit
                   ? () =>
@@ -424,9 +467,28 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
             </Tooltip>
           )}
 
+          {/* Duplicate logical name error icon */}
+          {hasDuplicateLogicalName && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <AlertTriangle
+                  className="h-3 w-3 text-destructive shrink-0"
+                  aria-label={t('erd.tableNode.aria.duplicateLogicalNameWarning', {
+                    name: normalizedLogicalName,
+                  })}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {t('erd.tableNode.duplicateLogicalNameWarning', {
+                  name: normalizedLogicalName,
+                })}
+              </TooltipContent>
+            </Tooltip>
+          )}
+
           {/* Nullable toggle */}
           <button
-            className={`nodrag text-2xs ${canEdit ? 'cursor-pointer' : 'cursor-default'} w-4 text-center ${col.nullable ? 'text-erd-nullable' : 'text-muted-foreground/40 hover:text-erd-nullable/80'}`}
+            className={`nodrag text-2xs w-4 text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${canEdit ? 'cursor-pointer' : 'cursor-default'} ${col.nullable ? 'text-erd-nullable' : 'text-muted-foreground/40 hover:text-erd-nullable/80'}`}
             onClick={
               canEdit ? () => updateColumn(id, col.id, { nullable: !col.nullable }) : undefined
             }
@@ -439,7 +501,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
           {/* Delete column */}
           {canEdit && (
             <button
-              className="nodrag opacity-0 group-hover/col:opacity-100 transition-opacity text-muted-foreground hover:text-destructive cursor-pointer"
+              className="nodrag opacity-0 group-hover/col:opacity-100 transition-opacity text-muted-foreground hover:text-destructive cursor-pointer focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               onClick={() => deleteColumn(id, col.id)}
               title={t('erd.tableNode.title.deleteColumn')}
               aria-label={t('erd.tableNode.aria.deleteColumn', { name: col.name })}
@@ -565,6 +627,15 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
             )}
 
             <div className="flex-1 min-w-0">
+              {lockInfo && (
+                <div
+                  className="text-2xs opacity-80 truncate"
+                  title={t('erd.lock.lockedBy', { name: lockInfo.name })}
+                  aria-label={t('erd.lock.badgeAria', { name: lockInfo.name })}
+                >
+                  {t('erd.lock.lockedBy', { name: lockInfo.name })}
+                </div>
+              )}
               {/* 논리명 행 (있으면 표시, 없으면 더블클릭으로 추가) */}
               {isEditing ? (
                 <ColumnAutocomplete
@@ -573,7 +644,9 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                   onSelectTerm={handleTableSelectTerm}
                   onSelectCompound={handleTableSelectCompound}
                   onRegisterNew={(newLogicalName, partialOnly) => {
-                    if (partialOnly) return;
+                    if (partialOnly) {
+                      return;
+                    }
                     setTableQuickTermLogicalName(newLogicalName);
                   }}
                   termLinked={!!tableTermId}
@@ -605,6 +678,19 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                   onDoubleClick={isEditing ? () => startEdit(label) : undefined}
                 >
                   {label}
+                </div>
+              )}
+
+              {duplicateLogicalNameColumnCount > 0 && (
+                <div
+                  className="mt-1 inline-flex items-center rounded-full bg-destructive/20 px-1.5 py-0.5 text-2xs"
+                  title={t('erd.tableNode.duplicateLogicalNameCount', {
+                    count: duplicateLogicalNameColumnCount,
+                  })}
+                >
+                  {t('erd.tableNode.duplicateLogicalNameCount', {
+                    count: duplicateLogicalNameColumnCount,
+                  })}
                 </div>
               )}
             </div>
@@ -649,6 +735,9 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                   nodeId={id}
                   connected={isConnected(col.id)}
                   warning={getColumnWarning(col, findTermById, findDomainById)}
+                  hasDuplicateLogicalName={
+                    !!col.logicalName?.trim() && duplicatedLogicalNames.has(col.logicalName.trim())
+                  }
                   domainLogicalName={domain?.logicalName}
                   domainPhysicalType={domain?.physicalType}
                 />
@@ -661,7 +750,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
         {isEditing && (
           <div className="border-t border-border">
             <button
-              className="nodrag w-full px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent flex items-center justify-center gap-1 cursor-pointer"
+              className="nodrag flex w-full items-center justify-center gap-1 px-3 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               onClick={() => addColumn(id)}
             >
               <Plus className="h-3 w-3" />

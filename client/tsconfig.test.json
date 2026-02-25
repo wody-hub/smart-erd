@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023"],
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "outDir": ".tmp-test",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "test/**/*.ts",
+    "src/lib/code-sync-revision.ts",
+    "src/lib/remote-edit-locks.ts",
+    "src/lib/hash.ts",
+    "src/types/collaboration.ts"
+  ]
+}

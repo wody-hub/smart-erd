@@ -103,7 +103,13 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
           return;
         }
         const msg = err instanceof Error ? err.message : 'Failed to parse DDL';
-        setParseResult({ diagnostics: [], tables: [], relations: [], errors: [msg] });
+        setParseResult({
+          diagnostics: [],
+          tables: [],
+          relations: [],
+          errors: [msg],
+          tableRanges: [],
+        });
       } finally {
         if (isCurrentRequest()) {
           setParsing(false);
