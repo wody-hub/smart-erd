@@ -197,6 +197,9 @@
       "addTable": "테이블 추가",
       "resize": "사이드바 너비 조절",
       "groups": "그룹",
+      "viewGroup": "그룹 보기",
+      "addTableToGroup": "테이블 추가",
+      "removeFromGroup": "그룹에서 제거",
       "noGroups": "아직 그룹이 없습니다",
       "addGroup": "그룹 추가",
       "aria": {
@@ -205,7 +208,12 @@
         "deleteTable": "테이블 {{name}} 삭제",
         "addGroup": "그룹 추가",
         "renameGroup": "그룹 {{name}} 이름 변경",
-        "deleteGroup": "그룹 {{name}} 삭제"
+        "deleteGroup": "그룹 {{name}} 삭제",
+        "viewGroup": "{{name}} 그룹 보기",
+        "viewGroupEmpty": "{{name}} 그룹 보기 (비어있음)",
+        "removeFromGroup": "{{group}} 그룹에서 {{table}} 제거",
+        "toggleGroup": "{{name}} 그룹 접기/펼치기",
+        "groupNameInput": "{{name}} 그룹 이름 입력"
       }
     },
     "toolbar": {
@@ -359,10 +367,22 @@
       "purple": "보라",
       "pink": "분홍"
     },
-    "groupNode": {
+    "group": {
+      "readonly": "읽기 전용 뷰",
+      "selectTables": "테이블 선택",
+      "selectTablesDesc": "\"{{name}}\"에 추가할 테이블을 선택하세요",
+      "noTables": "이 그룹에 테이블이 없습니다",
+      "deleteConfirm": {
+        "title": "\"{{name}}\" 그룹을 삭제하시겠습니까?",
+        "description": "테이블에는 영향이 없습니다."
+      },
+      "toast": {
+        "groupDeleted": "보고 있던 그룹이 삭제되었습니다"
+      },
       "aria": {
-        "group": "그룹: {{name}}",
-        "groupName": "그룹 이름"
+        "backToAll": "그룹 뷰를 종료하고 전체 다이어그램으로 돌아가기",
+        "readonlyCanvas": "읽기 전용 그룹 뷰: {{name}}",
+        "addTableToGroup": "{{name}} 그룹에 테이블 추가"
       }
     },
     "domain": {

@@ -198,6 +198,9 @@
       "addTable": "Add table",
       "resize": "Resize sidebar width",
       "groups": "Groups",
+      "viewGroup": "View group",
+      "addTableToGroup": "Add tables",
+      "removeFromGroup": "Remove from group",
       "noGroups": "No groups yet",
       "addGroup": "Add group",
       "aria": {
@@ -206,7 +209,12 @@
         "deleteTable": "Delete table {{name}}",
         "addGroup": "Add group",
         "renameGroup": "Rename group {{name}}",
-        "deleteGroup": "Delete group {{name}}"
+        "deleteGroup": "Delete group {{name}}",
+        "viewGroup": "View group {{name}}",
+        "viewGroupEmpty": "View group {{name}} (empty)",
+        "removeFromGroup": "Remove {{table}} from group {{group}}",
+        "toggleGroup": "Toggle group {{name}}",
+        "groupNameInput": "Group name for {{name}}"
       }
     },
     "toolbar": {
@@ -360,10 +368,22 @@
       "purple": "Purple",
       "pink": "Pink"
     },
-    "groupNode": {
+    "group": {
+      "readonly": "Read-only view",
+      "selectTables": "Select tables",
+      "selectTablesDesc": "Select tables to add to \"{{name}}\"",
+      "noTables": "No tables in this group",
+      "deleteConfirm": {
+        "title": "Delete group \"{{name}}\"?",
+        "description": "Tables will not be affected."
+      },
+      "toast": {
+        "groupDeleted": "The group you were viewing has been deleted"
+      },
       "aria": {
-        "group": "Group: {{name}}",
-        "groupName": "Group name"
+        "backToAll": "Exit group view and return to full diagram",
+        "readonlyCanvas": "Read-only group view: {{name}}",
+        "addTableToGroup": "Add tables to group {{name}}"
       }
     },
     "domain": {
