@@ -48,8 +48,8 @@ test('buildRevisionHash 는 입력 순서가 달라도 동일 해시를 반환�
     data: { relationType: 'non-identifying' },
   };
 
-  const hash1 = buildRevisionHash([nodeA, nodeB], [edge], []);
-  const hash2 = buildRevisionHash([nodeB, nodeA], [edge], []);
+  const hash1 = buildRevisionHash([nodeA, nodeB], [edge]);
+  const hash2 = buildRevisionHash([nodeB, nodeA], [edge]);
 
   assert.equal(hash1, hash2);
 });
@@ -74,8 +74,8 @@ test('buildRevisionHash 는 의미 있는 변경 시 다른 해시를 반환한�
     },
   };
 
-  const baseHash = buildRevisionHash([baseNode], [], []);
-  const changedHash = buildRevisionHash([changedNode], [], []);
+  const baseHash = buildRevisionHash([baseNode], []);
+  const changedHash = buildRevisionHash([changedNode], []);
 
   assert.notEqual(baseHash, changedHash);
 });
