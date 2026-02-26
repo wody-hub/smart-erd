@@ -37,7 +37,6 @@ public class ClauseBreakStep extends RegexRuleStep {
 
     private static final List<SqlKeyword.Phrase> CLAUSE_BREAK_PHRASES = List.of(
         phrase(FROM),
-        phrase(WHERE),
         phrase(GROUP, BY),
         phrase(HAVING),
         phrase(ORDER, BY),
@@ -46,7 +45,6 @@ public class ClauseBreakStep extends RegexRuleStep {
         phrase(UNION, SqlKeyword.ALL),
         phrase(UNION),
         phrase(RETURNING),
-        phrase(SET),
         phrase(VALUES)
     );
 
@@ -63,12 +61,16 @@ public class ClauseBreakStep extends RegexRuleStep {
     );
 
     private static final List<RegexRule> RULES = List.of(
-        // 주요 절(FROM/WHERE/JOIN/SET/VALUES)은 2칸 들여쓰기
+        // 기본 절(FROM/JOIN/VALUES 등)은 2칸 들여쓰기
         new RegexRule(SqlKeyword.leadingWhitespaceAlternationPattern(CLAUSE_BREAK_PHRASES), "\n  $1"),
         new RegexRule(SqlKeyword.leadingWhitespaceAlternationPattern(JOIN_BREAK_PHRASES), "\n  $1"),
-        new RegexRule(SqlKeyword.leadingWhitespaceAlternationPattern(List.of(phrase(ON))), "\n  $1"),
+        // 프로젝트 로그 스타일에 맞춰 WHERE/SET/ON은 별도 정렬 규칙을 사용한다.
+        new RegexRule(SqlKeyword.leadingWhitespaceAlternationPattern(List.of(phrase(WHERE))), "\n $1"),
+        new RegexRule(SqlKeyword.leadingWhitespaceAlternationPattern(List.of(phrase(SET))), "\n   $1"),
+        new RegexRule(SqlKeyword.leadingWhitespaceAlternationPattern(List.of(phrase(ON))), "\n    $1"),
         // 논리 연산자(AND/OR)는 절보다 1칸 더 안쪽으로 들여쓰기
-        new RegexRule(SqlKeyword.leadingWhitespaceAlternationPattern(List.of(phrase(AND), phrase(OR))), "\n   $1")
+        new RegexRule(SqlKeyword.leadingWhitespaceAlternationPattern(List.of(phrase(AND))), "\n   $1"),
+        new RegexRule(SqlKeyword.leadingWhitespaceAlternationPattern(List.of(phrase(OR))), "\n    $1")
     );
 
     /**

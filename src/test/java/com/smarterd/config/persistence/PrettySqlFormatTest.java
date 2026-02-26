@@ -20,8 +20,8 @@ class PrettySqlFormatTest {
         assertThat(formatted).contains("\n     , coalesce(u.email, '') as email");
         assertThat(formatted).contains("\n  FROM tb_user u");
         assertThat(formatted).contains("\n  LEFT JOIN tb_org o");
-        assertThat(formatted).contains("\n  ON o.org_no = u.org_no");
-        assertThat(formatted).contains("\n  WHERE u.del_yn = 'N'");
+        assertThat(formatted).contains("\n    ON o.org_no = u.org_no");
+        assertThat(formatted).contains("\n WHERE u.del_yn = 'N'");
         assertThat(formatted).contains("\n   AND u.user_name like '%jae%'");
     }
 
@@ -32,10 +32,27 @@ class PrettySqlFormatTest {
         final var formatted = formatter.formatMessage(1, "", 3L, "statement", "", sql, "");
 
         assertThat(formatted).contains("UPDATE tb_user");
-        assertThat(formatted).contains("\n  SET user_name = 'JAE'");
+        assertThat(formatted).contains("\n   SET user_name = 'JAE'");
         assertThat(formatted).contains("\n    , mod_no = 100");
         assertThat(formatted).contains("\n    , mod_dt = now()");
-        assertThat(formatted).contains("\n  WHERE user_no = 10");
+        assertThat(formatted).contains("\n WHERE user_no = 10");
+    }
+
+    @Test
+    void formatMessage_formatsUpdateFromJoinWithPreferredClauseIndent() {
+        final var sql = "update diagrams set dictionary_set_id=3 from diagrams d1_0 join projects p1_0 on p1_0.id=d1_0.project_id "
+            + "where p1_0.team_id=3 and d1_0.dictionary_set_id is null and diagrams.ctid=d1_0.ctid";
+
+        final var formatted = formatter.formatMessage(1, "", 5L, "statement", "", sql, "");
+
+        assertThat(formatted).contains("UPDATE diagrams");
+        assertThat(formatted).contains("\n   SET dictionary_set_id=3");
+        assertThat(formatted).contains("\n  FROM diagrams d1_0");
+        assertThat(formatted).contains("\n  JOIN projects p1_0");
+        assertThat(formatted).contains("\n    ON p1_0.id=d1_0.project_id");
+        assertThat(formatted).contains("\n WHERE p1_0.team_id=3");
+        assertThat(formatted).contains("\n   AND d1_0.dictionary_set_id is null");
+        assertThat(formatted).contains("\n   AND diagrams.ctid=d1_0.ctid");
     }
 
     @Test
@@ -63,7 +80,7 @@ class PrettySqlFormatTest {
         assertThat(formatted).contains("SELECT a.\"ßcol\"");
         assertThat(formatted).contains("\n     , a.user_name");
         assertThat(formatted).contains("\n  FROM tb_user a");
-        assertThat(formatted).contains("\n  WHERE a.user_no = 1");
+        assertThat(formatted).contains("\n WHERE a.user_no = 1");
         assertThat(formatted).contains("\n   AND a.del_yn = 'N'");
     }
 }
