@@ -6,7 +6,7 @@ import type { CanvasState } from '@/stores/canvas/canvasStoreTypes';
 
 const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: [],
-  groupNodes: [],
+  groups: [],
   edges: [],
   highlightedNodeIds: [],
   highlightedEdgeId: null,
@@ -22,9 +22,7 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
     groupsObserver: null,
     isNodeDragging: false,
     hasDeferredTableSync: false,
-    groupNodeIds: new Set(),
     tablePositionQueue: { pending: new Map() },
-    groupPositionQueue: { pending: new Map() },
   },
   ...createCanvasSyncActions(set, get),
   ...createCanvasTableActions(set, get),

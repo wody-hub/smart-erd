@@ -9,7 +9,7 @@ import {
   getTablesMap,
   yDocToJson,
   yEdgesMapToEdges,
-  yGroupsMapToNodes,
+  yGroupsMapToTableGroups,
   yTablesMapToNodes,
 } from '@/collaboration/yjsBridge';
 import type {
@@ -40,6 +40,10 @@ type CanvasSyncActionKeys =
  * 캔버스 동기화/뷰 상태 액션 팩토리.
  *
  * Y.Doc observe 연동, 노드/엣지 변경 동기화, 백업/하이라이트/직렬화 기능을 제공한다.
+ *
+ * @param set Zustand set 함수
+ * @param get Zustand get 함수
+ * @returns 동기화/뷰 상태 액션 맵
  */
 export function createCanvasSyncActions(
   set: CanvasSetState,
@@ -47,6 +51,13 @@ export function createCanvasSyncActions(
 ): Pick<CanvasState, CanvasSyncActionKeys> {
   const POSITION_SYNC_ORIGIN = 'local-position-sync';
 
+  /**
+   * 노드 position 변경을 대기 큐에 적재한다.
+   *
+   * @param changes React Flow 노드 변경 목록
+   * @param ctx 위치 동기화 큐 컨텍스트
+   * @returns 없음
+   */
   function queuePositionToYDoc(changes: NodeChange[], ctx: PositionQueueCtx) {
     const posChanges = changes.filter(
       (c) => c.type === 'position' && 'position' in c && c.position,
@@ -61,6 +72,13 @@ export function createCanvasSyncActions(
     }
   }
 
+  /**
+   * 큐에 쌓인 position 변경을 Y.Doc에 반영한다.
+   *
+   * @param ctx 위치 동기화 큐 컨텍스트
+   * @param getYMap 대상 Y.Map getter
+   * @returns 없음
+   */
   function flushQueuedPositionsToYDoc(
     ctx: PositionQueueCtx,
     getYMap: (doc: Y.Doc) => Y.Map<Y.Map<unknown>>,
@@ -86,6 +104,13 @@ export function createCanvasSyncActions(
     ctx.pending.clear();
   }
 
+  /**
+   * position-only 변경은 빠른 경로로 적용한다.
+   *
+   * @param current 현재 노드 목록
+   * @param changes 적용할 변경 목록
+   * @returns 빠른 적용 결과. 빠른 경로 미사용 시 null
+   */
   function applyPositionChangesFast<T extends Node>(
     current: T[],
     changes: NodeChange[],
@@ -132,14 +157,12 @@ export function createCanvasSyncActions(
       const tablesMap = getTablesMap(ydoc);
       const edgesMap = getEdgesMap(ydoc);
       const groupsMap = getGroupsMap(ydoc);
-      const initialGroupNodes = yGroupsMapToNodes(groupsMap);
       const internal = get().internal;
-      internal.groupNodeIds = new Set(initialGroupNodes.map((g) => g.id));
 
       set({
         nodes: yTablesMapToNodes(tablesMap),
         edges: yEdgesMapToEdges(edgesMap),
-        groupNodes: initialGroupNodes,
+        groups: yGroupsMapToTableGroups(groupsMap),
         ydoc,
         lastBackupHash: djb2(yDocToJson(ydoc)),
       });
@@ -161,9 +184,7 @@ export function createCanvasSyncActions(
         set({ edges: yEdgesMapToEdges(edgesMap) });
       };
       internal.groupsObserver = () => {
-        const newGroupNodes = yGroupsMapToNodes(groupsMap);
-        get().internal.groupNodeIds = new Set(newGroupNodes.map((g) => g.id));
-        set({ groupNodes: newGroupNodes });
+        set({ groups: yGroupsMapToTableGroups(groupsMap) });
       };
 
       tablesMap.observeDeep(internal.tablesObserver);
@@ -193,16 +214,14 @@ export function createCanvasSyncActions(
       internal.edgesObserver = null;
       internal.groupsObserver = null;
       internal.tablePositionQueue.pending.clear();
-      internal.groupPositionQueue.pending.clear();
       internal.isNodeDragging = false;
       internal.hasDeferredTableSync = false;
-      internal.groupNodeIds = new Set();
 
       set({
         ydoc: null,
         nodes: [],
         edges: [],
-        groupNodes: [],
+        groups: [],
         lastBackupHash: '',
         activeEditNodeId: null,
         codeEditingTableKey: null,
@@ -211,15 +230,6 @@ export function createCanvasSyncActions(
 
     onNodesChange: (changes) => {
       const internal = get().internal;
-      const isGroupId = (id: string) =>
-        internal.groupNodeIds.has(id) || get().groupNodes.some((g) => g.id === id);
-
-      const tableChanges =
-        internal.groupNodeIds.size > 0
-          ? changes.filter((c) => !('id' in c && isGroupId(c.id)))
-          : changes;
-      const groupChanges =
-        internal.groupNodeIds.size > 0 ? changes.filter((c) => 'id' in c && isGroupId(c.id)) : [];
 
       let shouldSyncDeferredTables = false;
       for (const change of changes) {
@@ -236,30 +246,17 @@ export function createCanvasSyncActions(
         }
       }
 
-      if (tableChanges.length > 0) {
+      if (changes.length > 0) {
         const currentNodes = get().nodes;
-        const fastNodes = applyPositionChangesFast(currentNodes, tableChanges);
+        const fastNodes = applyPositionChangesFast(currentNodes, changes);
         set({
-          nodes:
-            fastNodes ?? (applyNodeChanges(tableChanges, currentNodes) as CanvasState['nodes']),
+          nodes: fastNodes ?? (applyNodeChanges(changes, currentNodes) as CanvasState['nodes']),
         });
       }
 
-      if (groupChanges.length > 0) {
-        const currentGroupNodes = get().groupNodes;
-        const fastGroupNodes = applyPositionChangesFast(currentGroupNodes, groupChanges);
-        set({
-          groupNodes:
-            fastGroupNodes ??
-            (applyNodeChanges(groupChanges, currentGroupNodes) as CanvasState['groupNodes']),
-        });
-      }
-
-      queuePositionToYDoc(tableChanges, internal.tablePositionQueue);
-      queuePositionToYDoc(groupChanges, internal.groupPositionQueue);
+      queuePositionToYDoc(changes, internal.tablePositionQueue);
       if (!internal.isNodeDragging) {
         flushQueuedPositionsToYDoc(internal.tablePositionQueue, getTablesMap);
-        flushQueuedPositionsToYDoc(internal.groupPositionQueue, getGroupsMap);
       }
       if (shouldSyncDeferredTables) {
         const doc = get().ydoc;

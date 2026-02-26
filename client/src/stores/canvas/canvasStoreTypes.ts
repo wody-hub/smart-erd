@@ -1,7 +1,13 @@
 import * as Y from 'yjs';
 import type { Edge, Node, OnEdgesChange, OnNodesChange } from '@xyflow/react';
 import type { DdlParseResult } from '@/lib/ddl-parser';
-import type { Column, GroupNodeData, RelationType, TableNodeData } from '@/types/erd';
+import type {
+  Column,
+  RelationType,
+  TableGroup,
+  TableHeaderColor,
+  TableNodeData,
+} from '@/types/erd';
 
 /** 드래그 중인 position 대기 큐 컨텍스트 */
 export interface PositionQueueCtx {
@@ -22,9 +28,7 @@ export interface InternalState {
   groupsObserver: (() => void) | null;
   isNodeDragging: boolean;
   hasDeferredTableSync: boolean;
-  groupNodeIds: Set<string>;
   tablePositionQueue: PositionQueueCtx;
-  groupPositionQueue: PositionQueueCtx;
 }
 
 /**
@@ -32,7 +36,7 @@ export interface InternalState {
  */
 export interface CanvasState {
   nodes: Node<TableNodeData>[];
-  groupNodes: Node<GroupNodeData>[];
+  groups: TableGroup[];
   edges: Edge[];
   highlightedNodeIds: string[];
   highlightedEdgeId: string | null;
@@ -88,11 +92,24 @@ export interface CanvasState {
   ) => void;
   importDdl: (result: DdlParseResult) => void;
   replaceFromDdl: (result: DdlParseResult) => void;
+  /** 새 논리적 그룹을 생성한다. */
   addGroup: (label?: string) => void;
+  /** 논리적 그룹을 삭제한다. 소속 테이블에는 영향이 없다. */
   deleteGroup: (groupId: string) => void;
+  /** 그룹 이름을 변경한다. */
   renameGroup: (groupId: string, newName: string) => void;
-  resizeGroup: (groupId: string, width: number, height: number) => void;
-  updateGroupMeta: (groupId: string, updates: Partial<Pick<GroupNodeData, 'color'>>) => void;
+  /** 그룹 색상을 변경한다. */
+  updateGroupColor: (groupId: string, color: TableHeaderColor | 'default') => void;
+  /** 그룹에 테이블을 추가한다. 이미 존재하면 무시한다. */
+  addTableToGroup: (groupId: string, tableId: string) => void;
+  /** 그룹에 여러 테이블을 추가한다. */
+  addTablesToGroup: (groupId: string, tableIds: string[]) => void;
+  /** 그룹에서 테이블을 제거한다. */
+  removeTableFromGroup: (groupId: string, tableId: string) => void;
+  /** 그룹에서 여러 테이블을 제거한다. */
+  removeTablesFromGroup: (groupId: string, tableIds: string[]) => void;
+  /** 그룹 테이블 목록을 원자적으로 갱신한다. */
+  updateGroupTables: (groupId: string, toAdd: string[], toRemove: string[]) => void;
   ydoc: Y.Doc | null;
   internal: InternalState;
   initYDoc: (ydoc: Y.Doc) => void;

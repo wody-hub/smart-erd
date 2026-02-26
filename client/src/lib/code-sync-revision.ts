@@ -20,7 +20,12 @@ export interface RevisionSnapshotEdge {
   data: unknown;
 }
 
-/** 객체 키를 정렬해 결정적 직렬화를 보장한다. */
+/**
+ * 객체 키를 정렬해 결정적 직렬화를 보장한다.
+ *
+ * @param value 정렬 대상 값
+ * @returns 키 정렬이 적용된 값
+ */
 export function sortObjectKeys(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(sortObjectKeys);
@@ -34,16 +39,20 @@ export function sortObjectKeys(value: unknown): unknown {
   return value;
 }
 
-/** nodes/edges/groupNodes 스냅샷으로 결정적 리비전 해시를 계산한다. */
+/**
+ * nodes/edges 스냅샷으로 결정적 리비전 해시를 계산한다.
+ *
+ * @param nodes 노드 스냅샷 목록
+ * @param edges 엣지 스냅샷 목록
+ * @returns 결정적 리비전 해시
+ */
 export function buildRevisionHash(
   nodes: RevisionSnapshotNode[],
   edges: RevisionSnapshotEdge[],
-  groupNodes: RevisionSnapshotNode[],
 ): string {
   const payload = {
     nodes: [...nodes].sort((a, b) => a.id.localeCompare(b.id)),
     edges: [...edges].sort((a, b) => a.id.localeCompare(b.id)),
-    groups: [...groupNodes].sort((a, b) => a.id.localeCompare(b.id)),
   };
   return djb2(JSON.stringify(sortObjectKeys(payload)));
 }

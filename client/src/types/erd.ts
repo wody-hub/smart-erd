@@ -1,4 +1,4 @@
-import type { Node, Edge } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 
 /**
  * ERD 테이블의 개별 컬럼 정보.
@@ -66,20 +66,21 @@ export interface TableNodeData extends Record<string, unknown> {
 export type TableNode = Node<TableNodeData, 'table'>;
 
 /**
- * 그룹 노드 데이터 구조 (Feature 4b: 서브영역).
+ * 논리적 테이블 그룹.
  *
- * 여러 테이블을 시각적으로 묶는 그룹 영역의 데이터.
- * 테이블과의 포함 관계 없이 순수 시각적 그룹으로 동작한다.
+ * Yjs Y.Map에서 변환된 직렬화 후 인터페이스.
+ * 하나의 테이블이 여러 그룹에 참여할 수 있다.
  */
-export interface GroupNodeData extends Record<string, unknown> {
+export interface TableGroup {
+  /** 그룹 고유 식별자 */
+  id: string;
   /** 그룹 이름 */
   label: string;
-  /** 그룹 영역 색상 */
+  /** 그룹 색상 */
   color?: TableHeaderColor;
+  /** 소속 테이블 ID 목록 */
+  tableIds: string[];
 }
-
-/** 그룹 노드 타입 */
-export type GroupNode = Node<GroupNodeData, 'group'>;
 
 /** 관계 유형: 식별(실선) / 비식별(점선) */
 export type RelationType = 'identifying' | 'non-identifying';

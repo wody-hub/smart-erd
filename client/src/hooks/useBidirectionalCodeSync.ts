@@ -60,6 +60,8 @@ interface UseBidirectionalCodeSyncReturn {
  * - 사용자 코드 입력 idle + parse success 시 코드 -> ERD 자동 반영
  * - ERD 변경 idle 시 ERD -> 코드 자동 생성
  * - origin 플래그로 역방향 루프를 차단
+ *
+ * @returns 코드/ERD 동기화 핸들러와 상태
  */
 export function useBidirectionalCodeSync({
   enabled,
@@ -77,7 +79,6 @@ export function useBidirectionalCodeSync({
   maxQueueWaitMs = CODE_SYNC_MAX_QUEUE_WAIT_MS,
 }: UseBidirectionalCodeSyncOptions): UseBidirectionalCodeSyncReturn {
   const nodes = useCanvasStore((s) => s.nodes);
-  const groupNodes = useCanvasStore((s) => s.groupNodes);
   const edges = useCanvasStore((s) => s.edges);
 
   const originRef = useRef<SyncOrigin>(null);
@@ -124,15 +125,8 @@ export function useBidirectionalCodeSync({
           type: edge.type ?? 'default',
           data: edge.data,
         })),
-        groupNodes.map((groupNode) => ({
-          id: groupNode.id,
-          type: groupNode.type ?? 'group',
-          parentId: groupNode.parentId ?? null,
-          position: { x: groupNode.position.x, y: groupNode.position.y },
-          data: groupNode.data,
-        })),
       ),
-    [edges, groupNodes, nodes],
+    [edges, nodes],
   );
 
   const clearCodeToErdTimer = useCallback(() => {
@@ -318,6 +312,11 @@ export function useBidirectionalCodeSync({
       return;
     }
 
+    /**
+     * 대기 중인 ERD 변경을 코드 에디터에 반영한다.
+     *
+     * @returns 없음
+     */
     const runErdToCode = () => {
       if (!pendingErdSyncRevisionRef.current) {
         return;

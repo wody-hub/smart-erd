@@ -3,8 +3,8 @@ import { type Edge, type Node } from '@xyflow/react';
 import type {
   Column,
   ERDEdgeData,
-  GroupNodeData,
   RelationType,
+  TableGroup,
   TableHeaderColor,
   TableNodeData,
 } from '@/types/erd';
@@ -117,36 +117,38 @@ export function yEdgesMapToEdges(edgesMap: Y.Map<Y.Map<unknown>>): Edge<ERDEdgeD
 }
 
 /**
- * Y.Map으로 표현된 그룹들을 React Flow Node 배열로 변환한다.
+ * Y.Map으로 표현된 그룹들을 논리적 그룹 배열로 변환한다.
  *
  * @param groupsMap Y.Map<groupId, Y.Map>
- * @returns React Flow 그룹 노드 배열
+ * @returns 논리적 그룹 배열
  */
-export function yGroupsMapToNodes(groupsMap: Y.Map<Y.Map<unknown>>): Node<GroupNodeData>[] {
-  const nodes: Node<GroupNodeData>[] = [];
+export function yGroupsMapToTableGroups(groupsMap: Y.Map<Y.Map<unknown>>): TableGroup[] {
+  const groups: TableGroup[] = [];
 
   groupsMap.forEach((groupYMap, groupId) => {
-    const positionYMap = groupYMap.get('position') as Y.Map<number> | undefined;
+    const tableIdsYArray = groupYMap.get('tableIds') as Y.Array<string> | undefined;
 
-    nodes.push({
+    // CRDT 동시 추가로 중복이 들어올 수 있으므로 읽기 시 deduplicate한다.
+    const seen = new Set<string>();
+    const tableIds: string[] = [];
+    if (tableIdsYArray) {
+      tableIdsYArray.forEach((tableId) => {
+        if (!seen.has(tableId)) {
+          seen.add(tableId);
+          tableIds.push(tableId);
+        }
+      });
+    }
+
+    groups.push({
       id: groupId,
-      type: 'group',
-      position: {
-        x: positionYMap?.get('x') ?? 100,
-        y: positionYMap?.get('y') ?? 100,
-      },
-      style: {
-        width: (groupYMap.get('width') as number) ?? 400,
-        height: (groupYMap.get('height') as number) ?? 300,
-      },
-      data: {
-        label: (groupYMap.get('label') as string) ?? 'Group',
-        color: (groupYMap.get('color') as TableHeaderColor) ?? undefined,
-      },
+      label: (groupYMap.get('label') as string) ?? 'Group',
+      color: (groupYMap.get('color') as TableHeaderColor) ?? undefined,
+      tableIds,
     });
   });
 
-  return nodes;
+  return groups;
 }
 
 /**
@@ -161,7 +163,7 @@ export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
     const parsed = JSON.parse(json) as {
       nodes?: Node<TableNodeData>[];
       edges?: Edge[];
-      groups?: Node<GroupNodeData>[];
+      groups?: unknown[];
     };
 
     const nodesArray = Array.isArray(parsed.nodes) ? parsed.nodes : [];
@@ -199,21 +201,60 @@ export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
         );
       }
 
-      for (const group of groupsArray) {
-        const groupYMap = createGroupYMap(
-          group.data?.label ?? 'Group',
-          { x: group.position?.x ?? 100, y: group.position?.y ?? 100 },
-          (group.style?.width as number) ?? 400,
-          (group.style?.height as number) ?? 300,
-          group.data?.color,
-        );
-        groupsMap.set(group.id, groupYMap);
+      for (const rawGroup of groupsArray) {
+        const group = normalizeGroupFromJson(rawGroup);
+        if (!group) {
+          continue;
+        }
+        groupsMap.set(group.id, createGroupYMap(group.label, group.tableIds, group.color));
       }
     });
   } catch (err) {
     // JSON → Y.Doc 마이그레이션 실패: 기존 JSON이 유효하지 않은 경우 빈 Y.Doc으로 시작
     console.warn('[yjsBridge] migrateJsonToYDoc failed, starting with empty Y.Doc:', err);
   }
+}
+
+/**
+ * JSON groups 엔트리를 논리적 그룹으로 정규화한다.
+ *
+ * @param raw 원본 그룹 데이터
+ * @returns 정규화된 그룹. 유효하지 않으면 null
+ */
+function normalizeGroupFromJson(raw: unknown): TableGroup | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const record = raw as Record<string, unknown>;
+  const id = record.id;
+  if (typeof id !== 'string' || id.trim() === '') {
+    return null;
+  }
+
+  const logicalLabel = typeof record.label === 'string' ? record.label : null;
+  const data = record.data;
+  const legacyData = data && typeof data === 'object' ? (data as Record<string, unknown>) : null;
+  const legacyLabel = legacyData && typeof legacyData.label === 'string' ? legacyData.label : null;
+
+  const colorValue =
+    typeof record.color === 'string'
+      ? (record.color as TableHeaderColor)
+      : legacyData && typeof legacyData.color === 'string'
+        ? (legacyData.color as TableHeaderColor)
+        : undefined;
+
+  const tableIdsRaw = record.tableIds;
+  const tableIds = Array.isArray(tableIdsRaw)
+    ? tableIdsRaw.filter((value): value is string => typeof value === 'string')
+    : [];
+
+  return {
+    id,
+    label: logicalLabel ?? legacyLabel ?? 'Group',
+    color: colorValue,
+    tableIds,
+  };
 }
 
 /**
@@ -315,32 +356,50 @@ export function createTableYMap(
  * 그룹 데이터를 Y.Map으로 변환한다.
  *
  * @param label    그룹 이름
- * @param position 위치 좌표
- * @param width    너비
- * @param height   높이
+ * @param tableIds 소속 테이블 ID 배열
  * @param color    색상 (옵션)
  * @returns Y.Map 인스턴스
  */
 export function createGroupYMap(
   label: string,
-  position: { x: number; y: number },
-  width: number,
-  height: number,
+  tableIds: string[] = [],
   color?: TableHeaderColor,
 ): Y.Map<unknown> {
   const groupYMap = new Y.Map<unknown>();
   groupYMap.set('label', label);
 
-  const posYMap = new Y.Map<number>();
-  posYMap.set('x', position.x);
-  posYMap.set('y', position.y);
-  groupYMap.set('position', posYMap);
+  const tableIdsYArray = new Y.Array<string>();
+  if (tableIds.length > 0) {
+    tableIdsYArray.push(tableIds);
+  }
+  groupYMap.set('tableIds', tableIdsYArray);
 
-  groupYMap.set('width', width);
-  groupYMap.set('height', height);
-  if (color && color !== 'default') groupYMap.set('color', color);
+  if (color && color !== 'default') {
+    groupYMap.set('color', color);
+  }
 
   return groupYMap;
+}
+
+/**
+ * 그룹 tableIds Y.Array에서 특정 테이블 ID를 제거한다.
+ *
+ * @param tableIdsYArray tableIds Y.Array
+ * @param tableId        제거할 테이블 ID
+ * @returns 제거 성공 여부
+ */
+export function removeTableIdFromYArray(tableIdsYArray: Y.Array<string>, tableId: string): boolean {
+  let removed = false;
+
+  // CRDT 동시 추가로 중복이 들어올 수 있으므로 모든 매치를 제거한다.
+  for (let i = tableIdsYArray.length - 1; i >= 0; i--) {
+    if (tableIdsYArray.get(i) === tableId) {
+      tableIdsYArray.delete(i, 1);
+      removed = true;
+    }
+  }
+
+  return removed;
 }
 
 /**
@@ -412,7 +471,7 @@ export function yDocToJson(doc: Y.Doc): string {
 
   const nodes = yTablesMapToNodes(tablesMap);
   const edges = yEdgesMapToEdges(edgesMap);
-  const groups = yGroupsMapToNodes(groupsMap);
+  const groups = yGroupsMapToTableGroups(groupsMap);
 
   return JSON.stringify({ nodes, edges, groups });
 }

@@ -13,8 +13,10 @@ import {
   createTableYMap,
   deleteColumnFromYArray,
   getEdgesMap,
+  getGroupsMap,
   getTablesMap,
   moveColumnInYArray,
+  removeTableIdFromYArray,
 } from '@/collaboration/yjsBridge';
 import type { CanvasGetState, CanvasSetState, CanvasState } from './canvasStoreTypes';
 
@@ -34,6 +36,10 @@ type CanvasTableActionKeys =
 
 /**
  * 캔버스 테이블/컬럼/관계 액션 팩토리.
+ *
+ * @param set Zustand set 함수
+ * @param get Zustand get 함수
+ * @returns 테이블/컬럼/관계 액션 맵
  */
 export function createCanvasTableActions(
   set: CanvasSetState,
@@ -87,6 +93,15 @@ export function createCanvasTableActions(
           }
         });
         toDelete.forEach((eid) => edgesMap.delete(eid));
+
+        // 삭제된 테이블이 포함된 그룹 참조를 함께 정리한다.
+        const groupsMap = getGroupsMap(ydoc);
+        groupsMap.forEach((groupYMap) => {
+          const tableIdsYArray = groupYMap.get('tableIds') as Y.Array<string> | undefined;
+          if (tableIdsYArray) {
+            removeTableIdFromYArray(tableIdsYArray, nodeId);
+          }
+        });
       });
 
       if (get().activeEditNodeId === nodeId) {
