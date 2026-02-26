@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useCanvasStore from '@/stores/useCanvasStore';
 import { djb2 } from '@/lib/hash';
 import { buildRevisionHash } from '@/lib/code-sync-revision';
+import { resolveCodeAutoApplyStatus } from '@/lib/code-sync-apply-gate';
 import type { SyncStatus } from '@/constants/sync-status';
 import {
   CODE_SYNC_IDLE_MS,
@@ -33,7 +34,7 @@ interface UseBidirectionalCodeSyncOptions {
   /** ERD -> 코드 생성 함수 */
   generateCodeFromErd: () => string;
   /** 코드 -> ERD 반영 함수 */
-  applyParsedToErd: () => void;
+  applyParsedToErd: () => boolean;
   /** 코드 idle 대기 시간 (ms) */
   codeIdleMs?: number;
   /** ERD idle 대기 시간 (ms) */
@@ -169,7 +170,10 @@ export function useBidirectionalCodeSync({
   const clearQueueTimeoutHold = useCallback(() => {
     autoApplyBlockedRef.current = false;
     lockBlockedSinceRef.current = null;
-    if (syncStatusRef.current === 'hold-queue-timeout') {
+    if (
+      syncStatusRef.current === 'hold-queue-timeout' ||
+      syncStatusRef.current === 'hold-manual-confirm'
+    ) {
       setStatus('idle-wait');
     }
   }, [setStatus]);
@@ -266,9 +270,14 @@ export function useBidirectionalCodeSync({
       try {
         // code->ERD 직후 발생하는 1회의 ERD 리비전 변경은 역방향 코드 생성에서 제외한다.
         suppressNextErdSyncRef.current = true;
-        applyParsedToErd();
+        const applied = applyParsedToErd();
+        if (!applied) {
+          suppressNextErdSyncRef.current = false;
+          setStatus(resolveCodeAutoApplyStatus(false));
+          return;
+        }
         lastAppliedCodeHashRef.current = codeHash;
-        setStatus('synced');
+        setStatus(resolveCodeAutoApplyStatus(true));
       } finally {
         inFlightApplyRef.current = false;
         if (originRef.current === 'code-auto-sync') {

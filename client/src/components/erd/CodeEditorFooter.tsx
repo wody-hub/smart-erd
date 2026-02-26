@@ -18,6 +18,10 @@ interface CodeEditorFooterProps {
   confirmOpen: boolean;
   /** Apply 확인 다이얼로그 열림 상태 세터 */
   setConfirmOpen: (open: boolean) => void;
+  /** Apply 확인 다이얼로그 제목 (미지정 시 기본 번역 키 사용) */
+  confirmTitle?: string;
+  /** Apply 확인 다이얼로그 설명 (미지정 시 기본 번역 키 사용) */
+  confirmDescription?: string;
   /** Refresh 버튼 클릭 핸들러 */
   onRefresh: () => void;
   /** Refresh 실행 함수 (확인 다이얼로그에서 사용) */
@@ -40,6 +44,7 @@ interface CodeEditorFooterProps {
  * 파싱 상태 표시 영역은 children으로 에디터별 커스텀 렌더링을 주입받는다.
  *
  * @param props 컴포넌트 props
+ * @returns 코드 에디터 하단 푸터 JSX
  */
 export default function CodeEditorFooter({
   onApply,
@@ -47,6 +52,8 @@ export default function CodeEditorFooter({
   executeApply,
   confirmOpen,
   setConfirmOpen,
+  confirmTitle,
+  confirmDescription,
   onRefresh,
   executeRefresh,
   hasNodes,
@@ -84,8 +91,8 @@ export default function CodeEditorFooter({
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title={t('erd.codeEditor.confirmTitle')}
-        description={t('erd.codeEditor.confirmDescription')}
+        title={confirmTitle ?? t('erd.codeEditor.confirmTitle')}
+        description={confirmDescription ?? t('erd.codeEditor.confirmDescription')}
         onConfirm={executeApply}
       />
 

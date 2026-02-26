@@ -4,6 +4,7 @@ export type SyncStatus =
   | 'hold-parse-error'
   | 'hold-remote-lock'
   | 'hold-queue-timeout'
+  | 'hold-manual-confirm'
   | 'dropped-stale'
   | 'synced'
   | null;

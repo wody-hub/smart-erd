@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { applyDiffToYDoc } from '@/lib/erd-diff-apply';
 import {
   buildFkPrefix,
   buildUniqueFkColumnName,
@@ -32,7 +33,8 @@ type CanvasTableActionKeys =
   | 'addFkRelation'
   | 'connectWithRelationType'
   | 'importDdl'
-  | 'replaceFromDdl';
+  | 'replaceFromDdl'
+  | 'applyDiffPlan';
 
 /**
  * 캔버스 테이블/컬럼/관계 액션 팩토리.
@@ -114,10 +116,33 @@ export function createCanvasTableActions(
       if (!ydoc) {
         return;
       }
-      const tableYMap = getTablesMap(ydoc).get(nodeId);
-      if (tableYMap) {
-        tableYMap.set('label', newName);
+      const nextLabel = newName.trim();
+      if (!nextLabel) {
+        return;
       }
+      const tablesMap = getTablesMap(ydoc);
+      const tableYMap = tablesMap.get(nodeId);
+      if (!tableYMap) {
+        return;
+      }
+      const currentLabel = tableYMap.get('label');
+      if (currentLabel === nextLabel) {
+        return;
+      }
+      const existingLabels: string[] = [];
+      tablesMap.forEach((table, tableId) => {
+        if (tableId === nodeId) {
+          return;
+        }
+        const label = table.get('label');
+        if (typeof label === 'string' && label.length > 0) {
+          existingLabels.push(label);
+        }
+      });
+      const uniqueLabel = buildUniqueName(nextLabel, existingLabels);
+      ydoc.transact(() => {
+        tableYMap.set('label', uniqueLabel);
+      });
     },
 
     updateTableMeta: (nodeId, updates) => {
@@ -388,6 +413,19 @@ export function createCanvasTableActions(
           startY: 100,
         });
       });
+    },
+
+    applyDiffPlan: (plan) => {
+      const { ydoc, activeEditNodeId } = get();
+      if (!ydoc) {
+        return null;
+      }
+
+      const result = applyDiffToYDoc(ydoc, plan);
+      if (activeEditNodeId && !getTablesMap(ydoc).has(activeEditNodeId)) {
+        set({ activeEditNodeId: null });
+      }
+      return result;
     },
   };
 }

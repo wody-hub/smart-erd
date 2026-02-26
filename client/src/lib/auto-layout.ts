@@ -69,3 +69,50 @@ export function applyDagreLayout(
     };
   });
 }
+
+/**
+ * full 배치 대신 기존 테이블명(label) 기준 위치를 가능한 범위에서 복원한다.
+ *
+ * replaceFromDdl 이후 신규 노드는 기본 그리드 위치를 유지하고,
+ * 이름이 동일한 노드는 기존 위치를 재사용해 화면 흔들림을 줄인다.
+ *
+ * @param previousNodes 교체 이전 노드
+ * @param nextNodes 교체 직후 노드
+ * @returns 위치가 보정된 노드 배열
+ */
+export function applyIncrementalLayoutByLabel(
+  previousNodes: Node<TableNodeData>[],
+  nextNodes: Node<TableNodeData>[],
+): Node<TableNodeData>[] {
+  if (previousNodes.length === 0 || nextNodes.length === 0) {
+    return nextNodes;
+  }
+
+  const positionsByLabel = new Map<string, Array<{ x: number; y: number }>>();
+  for (const node of previousNodes) {
+    const label = String(node.data.label ?? '');
+    if (!positionsByLabel.has(label)) {
+      positionsByLabel.set(label, []);
+    }
+    positionsByLabel.get(label)?.push({ x: node.position.x, y: node.position.y });
+  }
+
+  const usedByLabel = new Map<string, number>();
+  return nextNodes.map((node) => {
+    const label = String(node.data.label ?? '');
+    const positions = positionsByLabel.get(label);
+    if (!positions || positions.length === 0) {
+      return node;
+    }
+    const usedCount = usedByLabel.get(label) ?? 0;
+    if (usedCount >= positions.length) {
+      return node;
+    }
+    usedByLabel.set(label, usedCount + 1);
+    const position = positions[usedCount];
+    return {
+      ...node,
+      position,
+    };
+  });
+}

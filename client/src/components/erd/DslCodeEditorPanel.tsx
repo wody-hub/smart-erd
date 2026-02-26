@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, CheckCircle2, AlertTriangle, Sparkles, XCircle } from 'lucide-react';
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
@@ -18,7 +19,6 @@ import QuickDomainDialog from './QuickDomainDialog';
 import { DSL_LANGUAGE_ID, registerDslLanguage } from '@/lib/monaco-dsl-language';
 import type { DslDictionary } from '@/lib/dsl-parser';
 import { generateDsl } from '@/lib/dsl-generator';
-import { applyDagreLayout } from '@/lib/auto-layout';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -74,9 +74,15 @@ const TABLE_LINE_REGEX = new RegExp(`^${DSL_TABLE_KEYWORD}\\s+`);
  * 자동 조회하여 물리명 + 물리타입이 적용된 ERD를 생성한다.
  *
  * @param props.canEdit 편집 가능 여부
+ * @returns 논리명 DSL 에디터 패널 JSX
  */
 export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPanelProps) {
   const { t } = useTranslation();
+  const { teamId, projectId, diagramId } = useParams<{
+    teamId: string;
+    projectId: string;
+    diagramId: string;
+  }>();
   const { hasLocks: hasRemoteEditLocks } = useRemoteEditLocks();
 
   const {
@@ -98,10 +104,19 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
 
   const { dslText, parseResult, parsing, handleDslChange } = useDslParse({ dictionary });
 
-  const { handleApply, executeApply, confirmOpen, setConfirmOpen, canApply } = useApplyToErd({
+  const {
+    handleApply,
+    executeApply,
+    applyParsedToErd,
+    confirmOpen,
+    setConfirmOpen,
+    confirmDescription,
+    canApply,
+  } = useApplyToErd({
     canEdit,
     parseResult: parseResult?.result ?? null,
     parsing,
+    policyScope: { teamId, projectId, diagramId },
   });
 
   /** 사전 데이터 로딩 완료 여부 (초기화 시 사전 없이 생성하면 빈 결과) */
@@ -119,24 +134,6 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     const { nodes, edges } = useCanvasStore.getState();
     return generate(nodes as TableNode[], edges as ERDEdge[]);
   }, [generate]);
-
-  const replaceFromDdl = useCanvasStore((s) => s.replaceFromDdl);
-  const applyLayout = useCanvasStore((s) => s.applyLayout);
-
-  /** 파싱 결과를 ERD에 자동 반영한다. */
-  const applyParsedToErd = useCallback(() => {
-    const parsed = parseResult?.result;
-    if (!canEdit || !parsed || parsed.tables.length === 0) {
-      return;
-    }
-
-    replaceFromDdl(parsed);
-    const { nodes, edges } = useCanvasStore.getState();
-    if (nodes.length > 0) {
-      const layoutedNodes = applyDagreLayout(nodes as TableNode[], edges as ERDEdge[]);
-      applyLayout(layoutedNodes);
-    }
-  }, [applyLayout, canEdit, parseResult, replaceFromDdl]);
 
   /** 에러 건수 */
   const errorCount = parseResult?.diagnostics.filter((d) => d.severity === 'error').length ?? 0;
@@ -206,12 +203,23 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
   /** Monaco mount 완료 여부 */
   const [monacoReady, setMonacoReady] = useState(false);
 
-  /** beforeMount — 언어 등록 (1회) */
+  /**
+   * beforeMount — 언어 등록 (1회).
+   *
+   * @param monaco Monaco 네임스페이스
+   * @returns 없음
+   */
   const handleBeforeMount: BeforeMount = (monaco) => {
     registerDslLanguage(monaco);
   };
 
-  /** onMount — editorRef/monacoRef 저장 (CompletionProvider 등록은 useEffect에 위임) */
+  /**
+   * onMount — editorRef/monacoRef 저장 (CompletionProvider 등록은 useEffect에 위임).
+   *
+   * @param editor Monaco editor 인스턴스
+   * @param monaco Monaco 네임스페이스
+   * @returns 없음
+   */
   const handleOnMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
@@ -402,6 +410,12 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
       const items: AssistPopupItem[] = [];
       const seen = new Set<string>();
 
+      /**
+       * 보조 팝업 후보 목록에 항목을 중복 없이 추가한다.
+       *
+       * @param item 추가할 보조 팝업 항목
+       * @returns 없음
+       */
       const addItem = (item: AssistPopupItem) => {
         if (seen.has(item.id)) {
           return;
@@ -410,6 +424,12 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
         items.push(item);
       };
 
+      /**
+       * 용어 미등록 컨텍스트에 빠른 용어 등록 액션을 추가한다.
+       *
+       * @param name 후보 용어명
+       * @returns 없음
+       */
       const addRegisterTerm = (name: string) => {
         const normalized = name.trim();
         if (!normalized) {
@@ -427,6 +447,12 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
         });
       };
 
+      /**
+       * 도메인 미등록 컨텍스트에 빠른 도메인 등록 액션을 추가한다.
+       *
+       * @param name 후보 도메인명
+       * @returns 없음
+       */
       const addRegisterDomain = (name: string) => {
         const normalized = name.trim();
         if (!normalized) {
@@ -444,6 +470,17 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
         });
       };
 
+      /**
+       * 텍스트 치환형 자동완성 항목을 추가한다.
+       *
+       * @param id 항목 ID
+       * @param label 표시 라벨
+       * @param insertText 삽입 텍스트
+       * @param description 보조 설명
+       * @param startColumn 치환 시작 컬럼
+       * @param endColumn 치환 종료 컬럼
+       * @returns 없음
+       */
       const addInsert = (
         id: string,
         label: string,
@@ -466,6 +503,13 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
 
       type MatchScore = readonly [number, number, number, number];
 
+      /**
+       * 검색어(query)와 후보(candidate)의 부분 일치 점수를 계산한다.
+       *
+       * @param candidate 후보 문자열
+       * @param query 사용자 입력 문자열
+       * @returns 일치 점수. 일치하지 않으면 null
+       */
       const scoreMatch = (candidate: string, query: string): MatchScore | null => {
         const normalizedCandidate = candidate.toLowerCase();
         const normalizedQuery = query.toLowerCase();
@@ -827,6 +871,11 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
 
     const keyDownDisposable = editor.onKeyDown((event) => {
       const browserEvent = event.browserEvent;
+      /**
+       * 현재 키 이벤트를 Monaco/브라우저 양쪽에서 소비 처리한다.
+       *
+       * @returns 없음
+       */
       const consume = () => {
         event.preventDefault();
         event.stopPropagation();
@@ -905,6 +954,12 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     assistPopupVisibleKeyRef.current = editor.createContextKey('dslAssistPopupVisible', false);
     assistPopupVisibleKeyRef.current.set(Boolean(assistPopupRef.current));
 
+    /**
+     * 보조 팝업 선택 인덱스를 delta만큼 순환 이동한다.
+     *
+     * @param delta 이동량 (양수: 아래, 음수: 위)
+     * @returns 없음
+     */
     const moveSelection = (delta: number) => {
       const popup = assistPopupRef.current;
       if (!popup || popup.items.length === 0) {
@@ -918,6 +973,11 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
       setAssistPopupSelectedIndex(nextIndex);
     };
 
+    /**
+     * 현재 선택된 보조 팝업 항목을 실행한다.
+     *
+     * @returns 없음
+     */
     const executeSelected = () => {
       const popup = assistPopupRef.current;
       if (!popup) {
@@ -982,6 +1042,11 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
       return;
     }
 
+    /**
+     * 커서 정지 후 자동 보조 팝업을 띄우기 위한 타이머를 예약한다.
+     *
+     * @returns 없음
+     */
     const scheduleIdleQuickAction = () => {
       clearIdleQuickActionTimer();
       const pos = editor.getPosition();
@@ -1187,6 +1252,7 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
         executeApply={executeApplyWithSyncReset}
         confirmOpen={confirmOpen}
         setConfirmOpen={setConfirmOpen}
+        confirmDescription={confirmDescription}
         onRefresh={handleRefresh}
         executeRefresh={executeRefresh}
         hasNodes={hasNodes}

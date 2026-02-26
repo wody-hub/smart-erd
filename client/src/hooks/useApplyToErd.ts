@@ -1,9 +1,30 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import type { Edge, Node } from '@xyflow/react';
 import useCanvasStore from '@/stores/useCanvasStore';
-import { applyDagreLayout } from '@/lib/auto-layout';
+import useAuthStore from '@/stores/useAuthStore';
+import { applyDagreLayout, applyIncrementalLayoutByLabel } from '@/lib/auto-layout';
 import type { DdlParseResult } from '@/lib/ddl-parser';
+import { buildErdTableDiffPlan } from '@/lib/erd-diff-builder';
+import { buildFallbackGroupAssignments } from '@/lib/erd-fallback-group-remap';
+import { loadDiffApplyLocalOverride, resolveDiffApplyRollout } from '@/lib/diff-apply-rollout';
+import {
+  createCurrentSnapshots,
+  type DiffParsedRelation,
+  type DiffParsedTable,
+  type TableDiff,
+} from '@/lib/erd-diff-plan';
+import type { ERDEdge, TableGroup, TableNode, TableNodeData } from '@/types/erd';
+import {
+  getAutoApplyBlockReason,
+  LARGE_DIAGRAM_WARNING_THRESHOLD,
+  loadSyncPolicy,
+  resolveLayoutMode,
+  type SyncPolicy,
+  type SyncPolicyScope,
+} from '@/lib/sync-policy';
+import { shouldOpenApplyConfirm } from '@/lib/code-sync-apply-gate';
 
 /** useApplyToErd 훅 옵션 */
 interface UseApplyToErdOptions {
@@ -13,6 +34,8 @@ interface UseApplyToErdOptions {
   parseResult: DdlParseResult | null;
   /** 파싱 중 여부 */
   parsing: boolean;
+  /** 다이어그램 단위 정책 스코프 */
+  policyScope?: SyncPolicyScope;
 }
 
 /** useApplyToErd 훅 반환 타입 */
@@ -21,12 +44,153 @@ interface UseApplyToErdReturn {
   handleApply: () => void;
   /** 파싱 결과를 ERD에 즉시 반영한다 (확인 다이얼로그에서 호출) */
   executeApply: () => void;
+  /** 코드 자동 동기화 경로에서 파싱 결과를 ERD에 반영한다 (차단 시 false) */
+  applyParsedToErd: () => boolean;
   /** 교체 확인 다이얼로그 열림 상태 */
   confirmOpen: boolean;
   /** 교체 확인 다이얼로그 열림 상태 변경 함수 */
   setConfirmOpen: (open: boolean) => void;
+  /** 교체 확인 다이얼로그 설명 문구 */
+  confirmDescription: string;
   /** Apply 버튼 활성화 여부 */
   canApply: boolean;
+}
+
+type ApplySource = 'manual' | 'auto';
+type ApplyPath = 'diff' | 'full-replace' | 'full-replace-fallback';
+
+interface DiffPhaseResult {
+  applyPath: ApplyPath;
+  diffAppliedOperations: number;
+  diffSkippedOperations: number;
+  groupDroppedCount: number;
+}
+
+interface LayoutPhaseResult {
+  freshNodes: Node<TableNodeData>[];
+  freshEdges: Edge[];
+  effectiveLayoutMode: SyncPolicy['layoutMode'];
+  layoutDurationMs: number;
+}
+
+interface ExecuteDiffPhaseParams {
+  diffApplyEnabled: boolean;
+  beforeNodes: TableNode[];
+  beforeEdges: ERDEdge[];
+  beforeGroups: TableGroup[];
+  parseResult: DdlParseResult;
+  replaceFromDdl: (result: DdlParseResult) => void;
+  applyDiffPlan: ReturnType<typeof useCanvasStore.getState>['applyDiffPlan'];
+  updateGroupTables: ReturnType<typeof useCanvasStore.getState>['updateGroupTables'];
+  getCurrentNodes: () => TableNode[];
+  onFallback: (droppedCount: number, error: unknown) => void;
+}
+
+/**
+ * Diff 적용 경로를 실행하고, 실패 시 Full Replace 폴백까지 처리한다.
+ *
+ * @param params 실행 파라미터
+ * @returns 적용 경로/디프 통계 결과
+ */
+function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
+  if (!params.diffApplyEnabled) {
+    params.replaceFromDdl(params.parseResult);
+    return {
+      applyPath: 'full-replace',
+      diffAppliedOperations: 0,
+      diffSkippedOperations: 0,
+      groupDroppedCount: 0,
+    };
+  }
+
+  let diffTableDiffs: TableDiff[] = [];
+  try {
+    const currentSnapshots = createCurrentSnapshots(params.beforeNodes, params.beforeEdges);
+    const diffPlan = buildErdTableDiffPlan({
+      currentTables: currentSnapshots.tables,
+      currentEdges: Object.values(currentSnapshots.edgeById),
+      nextTables: toDiffParsedTables(params.parseResult),
+      nextRelations: toDiffParsedRelations(params.parseResult),
+    });
+    diffTableDiffs = diffPlan.tables;
+    const diffResult = params.applyDiffPlan(diffPlan);
+    if (!diffResult) {
+      throw new Error('applyDiffPlan unavailable');
+    }
+    return {
+      applyPath: 'diff',
+      diffAppliedOperations: diffResult.appliedOperations,
+      diffSkippedOperations: diffResult.skippedOperations,
+      groupDroppedCount: diffResult.groupRemap.droppedCount,
+    };
+  } catch (error) {
+    params.replaceFromDdl(params.parseResult);
+    const replacedNodes = params.getCurrentNodes();
+    const assignments = buildFallbackGroupAssignments(
+      params.beforeGroups,
+      diffTableDiffs,
+      replacedNodes,
+    );
+    for (const assignment of assignments) {
+      params.updateGroupTables(assignment.groupId, assignment.tableIds, []);
+    }
+    const droppedCount = assignments.reduce((sum, item) => sum + item.droppedCount, 0);
+    params.onFallback(droppedCount, error);
+    return {
+      applyPath: 'full-replace-fallback',
+      diffAppliedOperations: 0,
+      diffSkippedOperations: 0,
+      groupDroppedCount: droppedCount,
+    };
+  }
+}
+
+interface ExecuteLayoutPhaseParams {
+  beforeNodes: Node<TableNodeData>[];
+  estimatedNodeCount: number;
+  syncPolicy: SyncPolicy;
+  applyPath: ApplyPath;
+  diffAppliedOperations: number;
+  applyLayout: ReturnType<typeof useCanvasStore.getState>['applyLayout'];
+  getCurrentState: () => { nodes: Node<TableNodeData>[]; edges: Edge[] };
+}
+
+/**
+ * 정책과 변경량을 기반으로 레이아웃 단계를 수행한다.
+ *
+ * @param params 실행 파라미터
+ * @returns 레이아웃 결과와 최신 노드/엣지
+ */
+function executeLayoutPhase(params: ExecuteLayoutPhaseParams): LayoutPhaseResult {
+  const { nodes: freshNodes, edges: freshEdges } = params.getCurrentState();
+  const shouldRunLayout = params.applyPath !== 'diff' || params.diffAppliedOperations > 0;
+  const effectiveLayoutMode = shouldRunLayout
+    ? resolveLayoutMode(
+        params.syncPolicy.layoutMode,
+        Math.max(params.estimatedNodeCount, freshNodes.length),
+        params.syncPolicy.largeDiagramThreshold,
+      )
+    : 'none';
+
+  let layoutDurationMs = 0;
+  if (freshNodes.length > 0 && shouldRunLayout) {
+    const layoutStart = performance.now();
+    if (effectiveLayoutMode === 'full') {
+      const layoutedNodes = applyDagreLayout(freshNodes, freshEdges);
+      params.applyLayout(layoutedNodes);
+    } else if (effectiveLayoutMode === 'incremental') {
+      const layoutedNodes = applyIncrementalLayoutByLabel(params.beforeNodes, freshNodes);
+      params.applyLayout(layoutedNodes);
+    }
+    layoutDurationMs = performance.now() - layoutStart;
+  }
+
+  return {
+    freshNodes,
+    freshEdges,
+    effectiveLayoutMode,
+    layoutDurationMs,
+  };
 }
 
 /**
@@ -44,42 +208,190 @@ export function useApplyToErd({
   canEdit,
   parseResult,
   parsing,
+  policyScope = {},
 }: UseApplyToErdOptions): UseApplyToErdReturn {
   const { t } = useTranslation();
+  const { teamId, projectId, diagramId } = policyScope;
+  const loginId = useAuthStore((s) => s.loginId);
 
   const replaceFromDdl = useCanvasStore((s) => s.replaceFromDdl);
+  const applyDiffPlan = useCanvasStore((s) => s.applyDiffPlan);
   const applyLayout = useCanvasStore((s) => s.applyLayout);
+  const updateGroupTables = useCanvasStore((s) => s.updateGroupTables);
   const nodes = useCanvasStore((s) => s.nodes);
 
   /** 교체 확인 다이얼로그 열림 상태 */
   const [confirmOpen, setConfirmOpen] = useState(false);
+  /** 다이어그램별 동기화 정책 */
+  const syncPolicy = useMemo(
+    () => loadSyncPolicy({ teamId, projectId, diagramId }),
+    [diagramId, projectId, teamId],
+  );
+  /** Diff Apply rollout 판정 */
+  const diffApplyRollout = useMemo(
+    () =>
+      resolveDiffApplyRollout({
+        mode: import.meta.env.VITE_ERD_DIFF_APPLY_MODE,
+        betaPercent: import.meta.env.VITE_ERD_DIFF_APPLY_BETA_PERCENT,
+        internalIds: import.meta.env.VITE_ERD_DIFF_APPLY_INTERNAL_IDS,
+        teamId,
+        projectId,
+        diagramId,
+        loginId,
+        localOverride: loadDiffApplyLocalOverride(),
+      }),
+    [diagramId, loginId, projectId, teamId],
+  );
+  /** 현재 또는 반영 예정 노드 수 */
+  const projectedNodeCount = Math.max(nodes.length, parseResult?.tables.length ?? 0);
+  /** 대형 다이어그램 여부 */
+  const isLargeDiagram = projectedNodeCount >= syncPolicy.largeDiagramThreshold;
 
   /** Apply 버튼 활성화 여부 */
   const canApply = canEdit && parseResult != null && parseResult.tables.length > 0 && !parsing;
+  /** 교체 확인 다이얼로그 설명 문구 */
+  const confirmDescription = isLargeDiagram
+    ? t('erd.codeEditor.confirmDescriptionLarge', {
+        count: projectedNodeCount,
+        threshold: syncPolicy.largeDiagramThreshold,
+      })
+    : t('erd.codeEditor.confirmDescription');
 
   /**
-   * 파싱 결과를 ERD에 즉시 반영한다.
+   * 파싱 결과를 ERD에 반영한다.
    *
-   * replaceFromDdl → dagre 자동 배치 → toast 알림.
+   * @param source 반영 트리거 출처 (수동/자동)
+   * @returns 반영 성공 여부
+   */
+  const runApply = useCallback(
+    (source: ApplySource): boolean => {
+      if (!parseResult || parseResult.tables.length === 0) {
+        return false;
+      }
+      const beforeState = useCanvasStore.getState();
+      const beforeNodes = beforeState.nodes as TableNode[];
+      const beforeEdges = beforeState.edges as ERDEdge[];
+      const beforeGroups = beforeState.groups as TableGroup[];
+      const beforeLayoutNodes = beforeState.nodes as Node<TableNodeData>[];
+      const estimatedNodeCount = Math.max(beforeNodes.length, parseResult.tables.length);
+
+      if (source === 'auto') {
+        const blockReason = getAutoApplyBlockReason(syncPolicy, estimatedNodeCount);
+        if (blockReason) {
+          return false;
+        }
+      }
+
+      const totalStart = performance.now();
+
+      try {
+        const replaceStart = performance.now();
+        const diffPhase = executeDiffPhase({
+          diffApplyEnabled: diffApplyRollout.enabled,
+          beforeNodes,
+          beforeEdges,
+          beforeGroups,
+          parseResult,
+          replaceFromDdl,
+          applyDiffPlan,
+          updateGroupTables,
+          getCurrentNodes: () => useCanvasStore.getState().nodes as TableNode[],
+          onFallback: (droppedCount, error) => {
+            if (source === 'manual') {
+              toast.info(t('erd.codeEditor.diffFallbackApplied', { dropped: droppedCount }));
+            }
+            console.warn('[erd-sync-metrics] diff-apply-fallback', error);
+          },
+        });
+        const replaceDurationMs = performance.now() - replaceStart;
+
+        const layoutPhase = executeLayoutPhase({
+          beforeNodes: beforeLayoutNodes,
+          estimatedNodeCount,
+          syncPolicy,
+          applyPath: diffPhase.applyPath,
+          diffAppliedOperations: diffPhase.diffAppliedOperations,
+          applyLayout,
+          getCurrentState: () => {
+            const state = useCanvasStore.getState();
+            return {
+              nodes: state.nodes as Node<TableNodeData>[],
+              edges: state.edges as Edge[],
+            };
+          },
+        });
+
+        const totalDurationMs = performance.now() - totalStart;
+        console.info('[erd-sync-metrics]', {
+          source,
+          applyPath: diffPhase.applyPath,
+          nodeCount: layoutPhase.freshNodes.length,
+          edgeCount: layoutPhase.freshEdges.length,
+          policyLayoutMode: syncPolicy.layoutMode,
+          effectiveLayoutMode: layoutPhase.effectiveLayoutMode,
+          largeDiagramThreshold: syncPolicy.largeDiagramThreshold,
+          rollout: {
+            mode: diffApplyRollout.mode,
+            enabled: diffApplyRollout.enabled,
+            reason: diffApplyRollout.reason,
+            bucket: diffApplyRollout.bucket ?? null,
+            betaPercent: diffApplyRollout.betaPercent ?? null,
+          },
+          diff: {
+            appliedOperations: diffPhase.diffAppliedOperations,
+            skippedOperations: diffPhase.diffSkippedOperations,
+            groupDroppedCount: diffPhase.groupDroppedCount,
+          },
+          metrics: {
+            replaceMs: Math.round(replaceDurationMs),
+            layoutMs: Math.round(layoutPhase.layoutDurationMs),
+            applyTotalMs: Math.round(totalDurationMs),
+          },
+        });
+
+        if (source === 'manual') {
+          toast.success(t('erd.codeEditor.success', { count: parseResult.tables.length }));
+        }
+        return true;
+      } catch (err) {
+        console.error('[erd-sync-metrics] apply-failed', err);
+        if (source === 'manual') {
+          toast.error(t('erd.codeEditor.failed'));
+        }
+        return false;
+      }
+    },
+    [
+      applyDiffPlan,
+      applyLayout,
+      diffApplyRollout,
+      parseResult,
+      replaceFromDdl,
+      syncPolicy,
+      t,
+      updateGroupTables,
+    ],
+  );
+
+  /**
+   * 파싱 결과를 수동으로 ERD에 즉시 반영한다.
+   *
+   * replaceFromDdl + 정책 기반 레이아웃 분기를 수행하고 성공 토스트를 표시한다.
    */
   const executeApply = useCallback(() => {
     if (!parseResult) {
       return;
     }
-    try {
-      replaceFromDdl(parseResult);
-      const freshNodes = useCanvasStore.getState().nodes;
-      const freshEdges = useCanvasStore.getState().edges;
-      if (freshNodes.length > 0) {
-        const layoutedNodes = applyDagreLayout(freshNodes, freshEdges);
-        applyLayout(layoutedNodes);
-      }
-      toast.success(t('erd.codeEditor.success', { count: parseResult.tables.length }));
-    } catch {
-      toast.error(t('erd.codeEditor.failed'));
-    }
+    runApply('manual');
     setConfirmOpen(false);
-  }, [parseResult, replaceFromDdl, applyLayout, t]);
+  }, [parseResult, runApply]);
+
+  /**
+   * 파싱 결과를 코드 자동 동기화 경로에서 ERD에 반영한다.
+   *
+   * @returns 반영 성공 여부 (차단 시 false)
+   */
+  const applyParsedToErd = useCallback(() => runApply('auto'), [runApply]);
 
   /**
    * Apply 버튼 클릭 핸들러.
@@ -90,18 +402,67 @@ export function useApplyToErd({
     if (!parseResult || parseResult.tables.length === 0) {
       return;
     }
-    if (nodes.length > 0) {
+    if (projectedNodeCount >= LARGE_DIAGRAM_WARNING_THRESHOLD) {
+      toast.info(
+        t('erd.codeEditor.largeDiagramWarning', {
+          count: projectedNodeCount,
+          threshold: syncPolicy.largeDiagramThreshold,
+        }),
+      );
+    }
+    if (shouldOpenApplyConfirm(nodes.length, isLargeDiagram)) {
       setConfirmOpen(true);
     } else {
       executeApply();
     }
-  }, [parseResult, nodes.length, executeApply]);
+  }, [executeApply, isLargeDiagram, nodes.length, parseResult, projectedNodeCount, syncPolicy, t]);
 
   return {
     handleApply,
     executeApply,
+    applyParsedToErd,
     confirmOpen,
     setConfirmOpen,
+    confirmDescription,
     canApply,
   };
+}
+
+/**
+ * DDL 파싱 결과 테이블을 DiffPlan 입력 스냅샷으로 변환한다.
+ *
+ * @param result DDL 파싱 결과
+ * @returns DiffPlan 비교용 테이블 배열
+ */
+function toDiffParsedTables(result: DdlParseResult): DiffParsedTable[] {
+  return result.tables.map((table) => ({
+    name: table.name,
+    logicalTableName: table.logicalTableName || table.comment || undefined,
+    tableTermId: table.tableTermId,
+    columns: table.columns.map((column) => ({
+      name: column.name,
+      type: column.type,
+      pk: column.pk,
+      nullable: column.nullable,
+      autoIncrement: column.autoIncrement,
+      logicalName: column.logicalName || column.comment || undefined,
+      termId: column.termId,
+      domainId: column.domainId,
+    })),
+  }));
+}
+
+/**
+ * DDL 파싱 결과 관계를 DiffPlan 입력 스냅샷으로 변환한다.
+ *
+ * @param result DDL 파싱 결과
+ * @returns DiffPlan 비교용 관계 배열
+ */
+function toDiffParsedRelations(result: DdlParseResult): DiffParsedRelation[] {
+  return result.relations.map((relation) => ({
+    parentTable: relation.parentTable,
+    parentColumn: relation.parentColumn,
+    childTable: relation.childTable,
+    childColumn: relation.childColumn,
+  }));
 }

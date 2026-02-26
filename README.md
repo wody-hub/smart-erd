@@ -47,6 +47,8 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 cd client
 npm install
 npm run dev                # http://localhost:3000 (프록시 /api → :8190)
+npm run perf:erd:apply     # S50/S200/S500 parse/apply/layout/total p50/p95 리포트 생성 (/tmp/smart-erd/perf)
+npm run perf:erd:apply:sample  # 저장소 샘플 리포트 갱신 (client/perf-reports/erd-apply-report.json)
 ```
 
 ### 환경변수
@@ -54,6 +56,9 @@ npm run dev                # http://localhost:3000 (프록시 /api → :8190)
 | 변수                   | 설명                 | 기본값                                 |
 | ---------------------- | -------------------- | -------------------------------------- |
 | `SMART_ERD_JWT_SECRET` | JWT 서명 키 (Base64) | 개발용 기본값 내장 (`application.yml`) |
+| `VITE_ERD_DIFF_APPLY_MODE` | Diff Apply rollout 모드 (`off/internal/beta/all`) | `off` |
+| `VITE_ERD_DIFF_APPLY_BETA_PERCENT` | beta 모드 대상 비율(0~100) | `10` |
+| `VITE_ERD_DIFF_APPLY_INTERNAL_IDS` | internal 모드 허용 loginId 목록(csv) | 빈 값 |
 
 ## 프로젝트 구조
 

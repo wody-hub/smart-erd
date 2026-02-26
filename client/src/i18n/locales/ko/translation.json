@@ -251,6 +251,9 @@
       "applying": "적용 중...",
       "confirmTitle": "ERD 교체",
       "confirmDescription": "DDL을 적용하면 기존의 모든 테이블과 관계가 교체됩니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?",
+      "confirmDescriptionLarge": "대형 다이어그램({{count}}개, 임계치 {{threshold}}개)입니다. 적용 시 전체 교체가 발생할 수 있습니다. 계속하시겠습니까?",
+      "largeDiagramWarning": "대형 다이어그램 구간({{count}}개)입니다. 자동 반영은 제한되고 수동 적용을 권장합니다.",
+      "diffFallbackApplied": "증분 반영 실패로 전체 교체를 수행했습니다. 그룹 멤버십 {{dropped}}건이 제외되었습니다.",
       "success": "{{count}}개 테이블이 ERD에 적용되었습니다",
       "failed": "DDL 적용에 실패했습니다",
       "refreshButton": "ERD에서 새로고침",
@@ -270,6 +273,7 @@
         "remoteLockHold": "원격 편집 락으로 보류",
         "staleDrop": "코드 자동반영 취소 (파싱 중 ERD가 먼저 변경됨)",
         "queueTimeoutManual": "보류 시간 초과로 수동 적용 필요",
+        "manualConfirmHold": "대형 다이어그램으로 자동반영 보류 (수동 적용 필요)",
         "synced": "동기화 완료"
       }
     },

@@ -10,7 +10,13 @@ export interface SyncStatusMeta {
   spin: boolean;
 }
 
-/** 동기화 상태 값을 UI 메타 정보로 변환한다. */
+/**
+ * 동기화 상태 값을 UI 메타 정보로 변환한다.
+ *
+ * @param t i18n 번역 함수
+ * @param syncStatus 현재 동기화 상태
+ * @returns 상태별 UI 메타 정보. 표시할 상태가 없으면 null
+ */
 export function getSyncStatusMeta(t: TFunction, syncStatus: SyncStatus): SyncStatusMeta | null {
   switch (syncStatus) {
     case 'idle-wait':
@@ -37,6 +43,13 @@ export function getSyncStatusMeta(t: TFunction, syncStatus: SyncStatus): SyncSta
     case 'hold-queue-timeout':
       return {
         label: t('erd.sync.status.queueTimeoutManual'),
+        className: 'text-erd-warning',
+        Icon: AlertTriangle,
+        spin: false,
+      };
+    case 'hold-manual-confirm':
+      return {
+        label: t('erd.sync.status.manualConfirmHold'),
         className: 'text-erd-warning',
         Icon: AlertTriangle,
         spin: false,

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState, useCallback, useRef, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle, CircleHelp } from 'lucide-react';
 import Editor, { type OnMount } from '@monaco-editor/react';
@@ -28,7 +29,6 @@ import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
 import { useCodeEditorTableLock } from '@/hooks/useCodeEditorTableLock';
 import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
 import useCanvasStore from '@/stores/useCanvasStore';
-import { applyDagreLayout } from '@/lib/auto-layout';
 import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
@@ -56,6 +56,7 @@ interface DdlCodeEditorPanelProps {
  * 실시간 파싱 프리뷰를 표시하고, Apply 버튼으로 ERD에 반영한다.
  *
  * @param props.canEdit 편집 가능 여부
+ * @returns 코드 에디터 패널 JSX
  */
 export default function DdlCodeEditorPanel({ canEdit = true }: DdlCodeEditorPanelProps) {
   const { t } = useTranslation();
@@ -118,7 +119,11 @@ export default function DdlCodeEditorPanel({ canEdit = true }: DdlCodeEditorPane
   );
 }
 
-/** DSL 문법 가이드 레이어 팝업 */
+/**
+ * DSL 문법 가이드 레이어 팝업.
+ *
+ * @returns DSL 문법 가이드 다이얼로그 JSX
+ */
 function DslSyntaxGuideDialog() {
   const { t } = useTranslation();
 
@@ -224,19 +229,38 @@ function DslSyntaxGuideDialog() {
   );
 }
 
-/** SQL DDL 에디터 (기존 로직) */
+/**
+ * SQL DDL 에디터 패널.
+ *
+ * @param props.canEdit 편집 가능 여부
+ * @returns SQL DDL 에디터 JSX
+ */
 function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
   const { t } = useTranslation();
+  const { teamId, projectId, diagramId } = useParams<{
+    teamId: string;
+    projectId: string;
+    diagramId: string;
+  }>();
   const { hasLocks: hasRemoteEditLocks } = useRemoteEditLocks();
 
   const { dbms, ddlText, parseResult, parsing, handleDdlChange, handleDbmsChange } = useDdlParse({
     persistDbms: true,
   });
 
-  const { handleApply, executeApply, confirmOpen, setConfirmOpen, canApply } = useApplyToErd({
+  const {
+    handleApply,
+    executeApply,
+    applyParsedToErd,
+    confirmOpen,
+    setConfirmOpen,
+    confirmDescription,
+    canApply,
+  } = useApplyToErd({
     canEdit,
     parseResult,
     parsing,
+    policyScope: { teamId, projectId, diagramId },
   });
 
   /** ERD → SQL DDL 생성 함수 (useCodeEditorRefresh에 전달) */
@@ -250,23 +274,6 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
     const { nodes, edges } = useCanvasStore.getState();
     return generate(nodes as TableNode[], edges as ERDEdge[]);
   }, [generate]);
-
-  const replaceFromDdl = useCanvasStore((s) => s.replaceFromDdl);
-  const applyLayout = useCanvasStore((s) => s.applyLayout);
-
-  /** 파싱 결과를 ERD에 자동 반영한다. */
-  const applyParsedToErd = useCallback(() => {
-    if (!canEdit || !parseResult || parseResult.tables.length === 0) {
-      return;
-    }
-
-    replaceFromDdl(parseResult);
-    const { nodes, edges } = useCanvasStore.getState();
-    if (nodes.length > 0) {
-      const layoutedNodes = applyDagreLayout(nodes as TableNode[], edges as ERDEdge[]);
-      applyLayout(layoutedNodes);
-    }
-  }, [applyLayout, canEdit, parseResult, replaceFromDdl]);
 
   const hasBlockingErrors =
     (parseResult?.diagnostics.some((d) => d.severity === 'error') ?? false) ||
@@ -313,7 +320,13 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
   /** 에디터 mount 완료 여부 */
   const [editorReady, setEditorReady] = useState(false);
 
-  /** onMount — editorRef/monacoRef 저장 */
+  /**
+   * onMount — editorRef/monacoRef 저장.
+   *
+   * @param editor Monaco editor 인스턴스
+   * @param monaco Monaco 네임스페이스
+   * @returns 없음
+   */
   const handleOnMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
@@ -432,6 +445,7 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
         executeApply={executeApplyWithSyncReset}
         confirmOpen={confirmOpen}
         setConfirmOpen={setConfirmOpen}
+        confirmDescription={confirmDescription}
         onRefresh={handleRefresh}
         executeRefresh={executeRefresh}
         hasNodes={hasNodes}

@@ -252,6 +252,9 @@
       "applying": "Applying...",
       "confirmTitle": "Replace ERD",
       "confirmDescription": "Applying DDL will replace all existing tables and relationships. This action cannot be undone. Do you want to continue?",
+      "confirmDescriptionLarge": "This is a large diagram ({{count}} tables, threshold {{threshold}}). Applying may trigger a full replacement. Continue?",
+      "largeDiagramWarning": "Large diagram range detected ({{count}} tables). Auto-apply is limited; manual apply is recommended.",
+      "diffFallbackApplied": "Incremental apply failed, so full replacement was used. {{dropped}} group memberships were excluded.",
       "success": "Applied {{count}} tables to ERD",
       "failed": "Failed to apply DDL",
       "refreshButton": "Refresh from ERD",
@@ -271,6 +274,7 @@
         "remoteLockHold": "On hold due to remote edit lock",
         "staleDrop": "Code auto-apply canceled (ERD changed during parsing)",
         "queueTimeoutManual": "Queue timeout: manual apply required",
+        "manualConfirmHold": "Auto-apply paused for large diagram (manual apply required)",
         "synced": "Sync complete"
       }
     },

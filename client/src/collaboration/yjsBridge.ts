@@ -222,7 +222,10 @@ export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
  * @param tableNodes JSON 내 테이블 노드 목록
  * @returns 정규화된 그룹. 유효하지 않으면 null
  */
-function normalizeGroupFromJson(raw: unknown, tableNodes: Node<TableNodeData>[]): TableGroup | null {
+function normalizeGroupFromJson(
+  raw: unknown,
+  tableNodes: Node<TableNodeData>[],
+): TableGroup | null {
   if (!raw || typeof raw !== 'object') {
     return null;
   }

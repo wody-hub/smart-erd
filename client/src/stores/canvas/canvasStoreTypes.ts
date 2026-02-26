@@ -1,6 +1,8 @@
 import * as Y from 'yjs';
 import type { Edge, Node, OnEdgesChange, OnNodesChange } from '@xyflow/react';
 import type { DdlParseResult } from '@/lib/ddl-parser';
+import type { ApplyDiffResult } from '@/lib/erd-diff-apply';
+import type { DiffPlan } from '@/lib/erd-diff-plan';
 import type {
   Column,
   RelationType,
@@ -92,6 +94,7 @@ export interface CanvasState {
   ) => void;
   importDdl: (result: DdlParseResult) => void;
   replaceFromDdl: (result: DdlParseResult) => void;
+  applyDiffPlan: (plan: DiffPlan) => ApplyDiffResult | null;
   /** 새 논리적 그룹을 생성한다. */
   addGroup: (label?: string) => void;
   /** 논리적 그룹을 삭제한다. 소속 테이블에는 영향이 없다. */
