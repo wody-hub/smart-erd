@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -30,6 +30,8 @@ const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPane
  * URL 파라미터에서 teamId/projectId/diagramId를 추출하여
  * 다이어그램을 로드하고, Y.Doc 기반 실시간 협업 캔버스를 제공한다.
  * Ctrl+S(Mac: Cmd+S) 단축키로 JSON 백업 저장을 할 수 있다.
+ *
+ * @returns 다이어그램 편집 페이지 JSX
  */
 export default function DiagramPage() {
   const SIDEBAR_MIN_WIDTH = 180;
@@ -55,6 +57,8 @@ export default function DiagramPage() {
   const [sidebarWidth, setSidebarWidth] = useState(224);
   /** 사이드바 리사이즈 진행 여부 */
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
+  /** 활성 그룹 ID (null이면 전체 보기) */
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   /** 진행 중인 사이드바 리사이즈 정리 함수 */
   const sidebarResizeCleanupRef = useRef<(() => void) | null>(null);
   /** 언마운트 진행 여부 */
@@ -74,7 +78,18 @@ export default function DiagramPage() {
 
   const prepareBackup = useCanvasStore((s) => s.prepareBackup);
   const markBackedUp = useCanvasStore((s) => s.markBackedUp);
+  const groups = useCanvasStore((s) => s.groups);
   const connectionStatus = useCollaborationStore((s) => s.connectionStatus);
+
+  /** 현재 활성 그룹 객체 */
+  const activeGroup = activeGroupId
+    ? (groups.find((group) => group.id === activeGroupId) ?? null)
+    : null;
+  /** 활성 그룹의 테이블 ID 집합 */
+  const activeGroupTableIds = useMemo(
+    () => (activeGroup ? new Set(activeGroup.tableIds) : null),
+    [activeGroup],
+  );
 
   const {
     data: diagram,
@@ -90,7 +105,13 @@ export default function DiagramPage() {
     mutationFn: (content: string) => saveDiagram(teamId!, projectId!, diagramId!, content),
   });
 
-  /** 다이어그램을 서버에 백업한다. 변경이 없으면 생략하고, 백업 중이면 중복 실행을 방지한다. */
+  /**
+   * 다이어그램을 서버에 백업한다.
+   *
+   * 변경이 없으면 생략하고, 백업 중이면 중복 실행을 방지한다.
+   *
+   * @returns 없음
+   */
   const handleSave = () => {
     if (saveMutation.isPending) {
       return;
@@ -118,7 +139,35 @@ export default function DiagramPage() {
     [],
   );
 
-  /** 사이드바 너비를 허용 범위로 보정한다. */
+  /**
+   * 그룹 뷰를 활성화한다.
+   *
+   * @param groupId 그룹 ID
+   * @returns 없음
+   */
+  const handleViewGroup = (groupId: string) => {
+    setActiveGroupId(groupId);
+    setLeftPanel('sidebar');
+    const { setActiveEditNodeId, clearHighlights } = useCanvasStore.getState();
+    setActiveEditNodeId(null);
+    clearHighlights();
+  };
+
+  /**
+   * 전체 보기로 복귀한다.
+   *
+   * @returns 없음
+   */
+  const handleBackToAll = () => {
+    setActiveGroupId(null);
+  };
+
+  /**
+   * 사이드바 너비를 허용 범위로 보정한다.
+   *
+   * @param width 후보 너비
+   * @returns 보정된 너비
+   */
   const clampSidebarWidth = (width: number) =>
     Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, width));
 
@@ -134,7 +183,11 @@ export default function DiagramPage() {
     }
   }, []);
 
-  /** 현재 진행 중인 사이드바 리사이즈 리스너/전역 스타일을 정리한다. */
+  /**
+   * 현재 진행 중인 사이드바 리사이즈 리스너/전역 스타일을 정리한다.
+   *
+   * @returns 없음
+   */
   const cleanupSidebarResize = () => {
     if (!sidebarResizeCleanupRef.current) return;
     sidebarResizeCleanupRef.current();
@@ -145,6 +198,7 @@ export default function DiagramPage() {
    * 사이드바 리사이즈 시작 핸들러.
    *
    * @param e PointerDown 이벤트
+   * @returns 없음
    */
   const handleSidebarResizeStart = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -156,6 +210,11 @@ export default function DiagramPage() {
     document.body.style.userSelect = 'none';
     setIsSidebarResizing(true);
 
+    /**
+     * 리사이즈 중 대기 너비를 상태와 DOM에 반영한다.
+     *
+     * @returns 없음
+     */
     const flushPendingWidth = () => {
       if (sidebarResizeRafRef.current !== null) {
         cancelAnimationFrame(sidebarResizeRafRef.current);
@@ -178,6 +237,12 @@ export default function DiagramPage() {
       }
     };
 
+    /**
+     * pointermove 중 사이드바 너비를 갱신한다.
+     *
+     * @param ev PointerEvent
+     * @returns 없음
+     */
     const handleMove = (ev: PointerEvent) => {
       pendingSidebarWidthRef.current = clampSidebarWidth(startWidth + (ev.clientX - startX));
       if (sidebarResizeRafRef.current !== null) {
@@ -198,6 +263,11 @@ export default function DiagramPage() {
       });
     };
 
+    /**
+     * 리사이즈 종료 시 리스너와 전역 상태를 정리한다.
+     *
+     * @returns 없음
+     */
     const handleEnd = () => {
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleEnd);
@@ -223,6 +293,9 @@ export default function DiagramPage() {
    * 키보드 기반 사이드바 리사이즈 핸들러.
    *
    * ArrowLeft/ArrowRight로 너비를 조절하고, Home/End로 최소/최대로 이동한다.
+   *
+   * @param e 키보드 이벤트
+   * @returns 없음
    */
   const handleSidebarResizeKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'ArrowLeft') {
@@ -279,6 +352,14 @@ export default function DiagramPage() {
     }
   }, [diagram]);
 
+  // 원격으로 현재 보고 중인 그룹이 삭제된 경우 전체 보기로 복귀한다.
+  useEffect(() => {
+    if (activeGroupId && !groups.some((group) => group.id === activeGroupId)) {
+      setActiveGroupId(null);
+      toast.info(t('erd.group.toast.groupDeleted'));
+    }
+  }, [activeGroupId, groups, t]);
+
   if (isError) {
     return (
       <div className="h-screen flex flex-col">
@@ -327,7 +408,12 @@ export default function DiagramPage() {
                 style={{ width: sidebarWidth }}
               >
                 {leftPanel === 'sidebar' ? (
-                  <Sidebar canEdit={canEdit} />
+                  <Sidebar
+                    canEdit={canEdit}
+                    activeGroupId={activeGroupId}
+                    onViewGroup={handleViewGroup}
+                    onBackToAll={handleBackToAll}
+                  />
                 ) : (
                   <Suspense fallback={<Spinner />}>
                     <DdlCodeEditorPanel canEdit={canEdit} />
@@ -358,8 +444,13 @@ export default function DiagramPage() {
                   validationOpen={validationOpen}
                   onToggleValidation={handleToggleValidation}
                   canEdit={canEdit}
+                  activeGroupId={activeGroupId}
+                  activeGroupName={activeGroup?.label}
+                  activeGroupTableIds={activeGroupTableIds}
                   codeEditorActive={leftPanel === 'code'}
-                  onToggleCodeEditor={canEdit ? handleToggleCodeEditor : undefined}
+                  onToggleCodeEditor={
+                    canEdit && !activeGroupId ? handleToggleCodeEditor : undefined
+                  }
                   isSidebarResizing={isSidebarResizing}
                 />
               </main>

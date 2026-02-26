@@ -1,28 +1,35 @@
-import { memo } from 'react';
-import { Plus } from 'lucide-react';
+import { memo, useMemo, useState } from 'react';
+import { Layers, Plus, X } from 'lucide-react';
 import { useReactFlow } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
+import GroupTableSelectDialog from '@/components/erd/GroupTableSelectDialog';
 import { Button } from '@/components/ui/button';
 import useCanvasStore from '@/stores/useCanvasStore';
+import SidebarGroupItem from './SidebarGroupItem';
 import SidebarTableItem from './SidebarTableItem';
 
 /** Sidebar 컴포넌트의 props. */
 interface SidebarProps {
   /** 편집 가능 여부 (VIEWER일 때 false — 테이블 추가/삭제/이름변경 숨김) */
   canEdit?: boolean;
+  /** 현재 활성 그룹 ID */
+  activeGroupId?: string | null;
+  /** 그룹 뷰 진입 핸들러 */
+  onViewGroup?: (groupId: string) => void;
+  /** 전체 보기 복귀 핸들러 */
+  onBackToAll?: () => void;
 }
+
+/** 사이드바 엔트리 문자열 분리자 */
 const SIDEBAR_ENTRY_SEPARATOR = '\u001f';
 
 /**
  * 좌측 사이드바 컴포넌트.
  *
- * 고정 너비(224px)의 테이블/그룹 목록 패널을 표시한다.
- * 테이블·그룹 추가, 삭제, 이름 변경, 클릭 시 캔버스 포커스 기능을 제공한다.
- *
- * @param props.canEdit 편집 가능 여부
+ * @returns 사이드바 JSX
  */
-function Sidebar({ canEdit = true }: SidebarProps) {
+function Sidebar({ canEdit = true, activeGroupId = null, onViewGroup, onBackToAll }: SidebarProps) {
   const { t } = useTranslation();
   const tableEntries = useCanvasStore(
     useShallow((state) =>
@@ -32,48 +39,51 @@ function Sidebar({ canEdit = true }: SidebarProps) {
       ),
     ),
   );
-  const groupEntries = useCanvasStore(
-    useShallow((state) =>
-      state.groupNodes.map((group) => `${group.id}${SIDEBAR_ENTRY_SEPARATOR}${group.data.label}`),
-    ),
-  );
+  const groups = useCanvasStore((s) => s.groups);
   const addTable = useCanvasStore((s) => s.addTable);
   const deleteTable = useCanvasStore((s) => s.deleteTable);
   const renameTable = useCanvasStore((s) => s.renameTable);
   const addGroup = useCanvasStore((s) => s.addGroup);
   const deleteGroup = useCanvasStore((s) => s.deleteGroup);
   const renameGroup = useCanvasStore((s) => s.renameGroup);
+  const removeTableFromGroup = useCanvasStore((s) => s.removeTableFromGroup);
   const reactFlowInstance = useReactFlow();
 
-  const getNodeSize = (value: unknown, fallback: number): number => {
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') {
-      const parsed = Number.parseFloat(value);
-      return Number.isFinite(parsed) ? parsed : fallback;
-    }
-    return fallback;
-  };
+  /** 테이블 선택 다이얼로그 대상 그룹 ID (null이면 닫힘) */
+  const [tableSelectGroupId, setTableSelectGroupId] = useState<string | null>(null);
 
-  /** 테이블 클릭 시 캔버스에서 해당 노드로 포커스한다. @param nodeId 포커스할 테이블 노드 ID */
+  /** 현재 활성 그룹 객체 */
+  const activeGroup = activeGroupId
+    ? (groups.find((group) => group.id === activeGroupId) ?? null)
+    : null;
+
+  /** 테이블 ID -> label 매핑 */
+  const tableMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const entry of tableEntries) {
+      const [id, label] = entry.split(SIDEBAR_ENTRY_SEPARATOR);
+      map.set(id, label);
+    }
+    return map;
+  }, [tableEntries]);
+
+  /** 테이블 선택 다이얼로그 대상 그룹 */
+  const tableSelectGroup = tableSelectGroupId
+    ? (groups.find((group) => group.id === tableSelectGroupId) ?? null)
+    : null;
+
+  /**
+   * 테이블 클릭 시 캔버스에서 해당 노드로 포커스한다.
+   *
+   * @param nodeId 포커스할 테이블 노드 ID
+   * @returns 없음
+   */
   const handleFocusNode = (nodeId: string) => {
     const node = reactFlowInstance.getNode(nodeId);
     if (!node) return;
 
     reactFlowInstance.setCenter(node.position.x + 100, node.position.y + 50, {
       zoom: 1.2,
-      duration: 300,
-    });
-  };
-
-  /** 그룹 클릭 시 캔버스에서 해당 그룹으로 포커스한다. @param groupId 포커스할 그룹 노드 ID */
-  const handleFocusGroup = (groupId: string) => {
-    const group = reactFlowInstance.getNode(groupId);
-    if (!group) return;
-    const width = getNodeSize(group.style?.width, 400);
-    const height = getNodeSize(group.style?.height, 300);
-
-    reactFlowInstance.setCenter(group.position.x + width / 2, group.position.y + height / 2, {
-      zoom: 1.0,
       duration: 300,
     });
   };
@@ -148,29 +158,63 @@ function Sidebar({ canEdit = true }: SidebarProps) {
           )}
         </div>
 
+        {activeGroupId && activeGroup && (
+          <div className="mb-3 px-3 py-2 rounded-md bg-muted flex items-center gap-2" role="status">
+            <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{activeGroup.label}</p>
+              <p className="text-xs text-muted-foreground">{t('erd.group.readonly')}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0"
+              onClick={onBackToAll}
+              aria-label={t('erd.group.aria.backToAll')}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
         <div className="space-y-0.5">
-          {groupEntries.length === 0 ? (
+          {groups.length === 0 ? (
             <p className="text-xs text-muted-foreground">{t('erd.sidebar.noGroups')}</p>
           ) : (
-            groupEntries.map((entry) => {
-              const [groupId, groupLabel] = entry.split(SIDEBAR_ENTRY_SEPARATOR);
-              return (
-                <SidebarTableItem
-                  key={groupId}
-                  nodeId={groupId}
-                  label={groupLabel}
-                  renameAriaLabel={t('erd.sidebar.aria.renameGroup', { name: groupLabel })}
-                  deleteAriaLabel={t('erd.sidebar.aria.deleteGroup', { name: groupLabel })}
-                  onClick={() => handleFocusGroup(groupId)}
-                  onRename={(newName) => renameGroup(groupId, newName)}
-                  onDelete={() => deleteGroup(groupId)}
-                  canEdit={canEdit}
-                />
-              );
-            })
+            groups.map((group) => (
+              <SidebarGroupItem
+                key={group.id}
+                group={group}
+                tableMap={tableMap}
+                canEdit={canEdit}
+                onViewGroup={onViewGroup}
+                onRename={(newName) => renameGroup(group.id, newName)}
+                onDelete={() => {
+                  if (activeGroupId === group.id) {
+                    onBackToAll?.();
+                  }
+                  deleteGroup(group.id);
+                }}
+                onRemoveTable={(tableId) => removeTableFromGroup(group.id, tableId)}
+                onOpenTableSelect={() => setTableSelectGroupId(group.id)}
+                isActive={activeGroupId === group.id}
+              />
+            ))
           )}
         </div>
       </div>
+
+      <GroupTableSelectDialog
+        open={!!tableSelectGroupId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTableSelectGroupId(null);
+          }
+        }}
+        groupId={tableSelectGroupId ?? ''}
+        groupName={tableSelectGroup?.label ?? ''}
+        existingTableIds={tableSelectGroup?.tableIds ?? []}
+      />
     </aside>
   );
 }

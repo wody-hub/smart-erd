@@ -1,14 +1,15 @@
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ReactFlow,
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
-  BackgroundVariant,
-  type NodeTypes,
-  type EdgeTypes,
+  ReactFlow,
   type Edge,
+  type EdgeTypes,
   type Node,
+  type NodeTypes,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useShallow } from 'zustand/react/shallow';
@@ -27,7 +28,6 @@ import { useExportDiagram } from '@/hooks/useExportDiagram';
 import { useAwareness } from '@/hooks/useAwareness';
 import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
 import TableNode from './TableNode';
-import GroupNode from './GroupNode';
 import RemoteEditLocksProvider from './RemoteEditLocksProvider';
 import CanvasToolbar from './CanvasToolbar';
 import EdgeContextMenu from './EdgeContextMenu';
@@ -43,7 +43,6 @@ const DdlImportDialog = lazy(() => import('./DdlImportDialog'));
 /** React Flow에 등록할 커스텀 노드 타입 매핑 */
 const nodeTypes: NodeTypes = {
   table: TableNode,
-  group: GroupNode,
 };
 
 /** React Flow에 등록할 커스텀 엣지 타입 매핑 */
@@ -80,6 +79,12 @@ interface ERDCanvasProps {
   onToggleCodeEditor?: () => void;
   /** 사이드바 리사이즈 진행 여부 (성능 최적화용) */
   isSidebarResizing?: boolean;
+  /** 활성 그룹 ID (null이면 전체 보기) */
+  activeGroupId?: string | null;
+  /** 활성 그룹 이름 (읽기 전용 aria 라벨용) */
+  activeGroupName?: string | null;
+  /** 활성 그룹의 테이블 ID 집합 */
+  activeGroupTableIds?: Set<string> | null;
 }
 
 /** 삭제 다이얼로그 상태 */
@@ -104,6 +109,7 @@ interface DeleteDialogState {
  * @param props.diagramName 내보내기 시 파일명에 사용할 다이어그램 이름
  * @param props.provider   YjsProvider 인스턴스 (실시간 협업 시 커서 발행용)
  * @param props.canEdit    편집 가능 여부 (VIEWER일 때 false)
+ * @returns ERD 캔버스 JSX
  */
 function ERDCanvas({
   diagramName = 'diagram',
@@ -114,25 +120,25 @@ function ERDCanvas({
   codeEditorActive,
   onToggleCodeEditor,
   isSidebarResizing = false,
+  activeGroupId,
+  activeGroupName,
+  activeGroupTableIds,
 }: ERDCanvasProps) {
   const { t } = useTranslation();
+  const reactFlowInstance = useReactFlow();
   /** 캔버스 컨테이너 ref (Awareness 커서 추적용) */
   const canvasRef = useRef<HTMLDivElement>(null);
   /** 동일 락 토스트 중복 방지용 ref */
   const lastBlockedNodeRef = useRef<string | null>(null);
   useAwareness(provider ?? null, canvasRef);
-  const { nodes, edges, groupNodes, onNodesChange, onEdgesChange } = useCanvasStore(
+  const { nodes, edges, onNodesChange, onEdgesChange } = useCanvasStore(
     useShallow((s) => ({
       nodes: s.nodes,
       edges: s.edges,
-      groupNodes: s.groupNodes,
       onNodesChange: s.onNodesChange,
       onEdgesChange: s.onEdgesChange,
     })),
   );
-
-  /** 그룹 노드를 테이블 노드 아래에 합산하여 React Flow에 전달 */
-  const allNodes = useMemo(() => [...groupNodes, ...nodes] as Node[], [groupNodes, nodes]);
 
   const highlightedEdgeId = useCanvasStore((s) => s.highlightedEdgeId);
   const activeEditNodeId = useCanvasStore((s) => s.activeEditNodeId);
@@ -169,10 +175,44 @@ function ERDCanvas({
   /** 노드 드래그 진행 여부 (드래그 중 성능 우선 렌더링 제어용) */
   const [isDraggingNode, setIsDraggingNode] = useState(false);
 
+  /** 그룹 뷰 활성 여부 */
+  const isGroupView = !!activeGroupId && !!activeGroupTableIds;
+  /** 그룹 뷰에서는 모든 편집 기능을 차단한다. */
+  const effectiveCanEdit = canEdit && !isGroupView;
+
+  /** 그룹 뷰일 때 필터링된 노드, 아닐 때 전체 노드 */
+  const displayNodes = useMemo(() => {
+    if (!activeGroupTableIds) {
+      return nodes;
+    }
+    return nodes.filter((node) => activeGroupTableIds.has(node.id));
+  }, [nodes, activeGroupTableIds]);
+
+  /** 그룹 뷰일 때 양쪽 노드가 모두 속한 엣지만 노출한다. */
+  const displayEdges = useMemo(() => {
+    if (!activeGroupTableIds) {
+      return edges;
+    }
+    return edges.filter(
+      (edge) => activeGroupTableIds.has(edge.source) && activeGroupTableIds.has(edge.target),
+    );
+  }, [edges, activeGroupTableIds]);
+
+  // 그룹 뷰 전환 시 필터링된 노드에 맞춰 뷰포트를 보정한다.
+  useEffect(() => {
+    if (!isGroupView || displayNodes.length === 0) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+    });
+  }, [activeGroupId, displayNodes.length, isGroupView, reactFlowInstance]);
+
   /**
    * 엣지에 대한 삭제 다이얼로그를 여는 공통 함수.
    *
    * @param edgeId 삭제 대상 엣지 ID
+   * @returns 없음
    */
   const openDeleteDialog = (edgeId: string) => {
     const edge = edges.find((e) => e.id === edgeId);
@@ -201,19 +241,31 @@ function ERDCanvas({
     });
   };
 
-  /** 엣지 클릭 — 하이라이트 적용 */
+  /**
+   * 엣지 클릭 시 하이라이트를 갱신한다.
+   *
+   * @param _ 클릭 이벤트
+   * @param edge 클릭된 엣지
+   * @returns 없음
+   */
   const handleEdgeClick = (_: React.MouseEvent, edge: Edge) => {
     setHighlightedEdge(edge.id);
     setHighlightedNodes([edge.source, edge.target]);
   };
 
-  /** 노드 클릭 — FK 모드일 때 FK 핸들러 호출, 일반 클릭 시 편집 모드 진입 */
+  /**
+   * 노드 클릭을 처리한다.
+   *
+   * @param event 노드 클릭 이벤트
+   * @param node 클릭된 노드
+   * @returns 없음
+   */
   const handleNodeClick = (event: React.MouseEvent, node: Node) => {
-    if (fkMode && node.type === 'table') {
+    if (fkMode && effectiveCanEdit && node.type === 'table') {
       handleNodeClickInFkMode(event, node as Node<TableNodeData>);
       return;
     }
-    if (canEdit && node.type === 'table') {
+    if (effectiveCanEdit && node.type === 'table') {
       const lockInfo = locksByNodeId.get(node.id);
       if (lockInfo) {
         if (lastBlockedNodeRef.current !== node.id) {
@@ -228,7 +280,11 @@ function ERDCanvas({
     }
   };
 
-  /** 캔버스 빈 영역 클릭 — 하이라이트 해제 + 편집 모드 해제 */
+  /**
+   * 캔버스 빈 영역 클릭을 처리한다.
+   *
+   * @returns 없음
+   */
   const handlePaneClick = () => {
     clearHighlights();
     setContextMenu(null);
@@ -249,13 +305,23 @@ function ERDCanvas({
     toast.info(t('erd.lock.blockedEditToast', { name: lockInfo.name }));
   }, [activeEditNodeId, locksByNodeId, setActiveEditNodeId, t]);
 
-  /** 엣지 우클릭 — 컨텍스트 메뉴 표시 */
+  /**
+   * 엣지 우클릭 시 컨텍스트 메뉴를 연다.
+   *
+   * @param event 마우스 이벤트
+   * @param edge 대상 엣지
+   * @returns 없음
+   */
   const handleEdgeContextMenu = (event: React.MouseEvent, edge: Edge) => {
     event.preventDefault();
     setContextMenu({ edgeId: edge.id, position: { x: event.clientX, y: event.clientY } });
   };
 
-  /** 자동 배치 실행 */
+  /**
+   * 자동 배치를 실행한다.
+   *
+   * @returns 없음
+   */
   const handleAutoLayout = () => {
     const layoutedNodes = applyDagreLayout(nodes, edges);
     applyLayout(layoutedNodes);
@@ -269,7 +335,7 @@ function ERDCanvas({
         openDeleteDialog(highlightedEdgeId);
       }
     },
-    { enabled: canEdit && !!highlightedEdgeId },
+    { enabled: effectiveCanEdit && !!highlightedEdgeId },
   );
 
   /** Escape 키 — FK 모드 해제 */
@@ -278,41 +344,50 @@ function ERDCanvas({
   /** 엣지에 하이라이트 스타일 적용 */
   const styledEdges = useMemo(
     () =>
-      edges.map((e) => ({
-        ...e,
-        selected: e.id === highlightedEdgeId,
-        animated: !isDraggingNode && e.id === highlightedEdgeId,
+      displayEdges.map((edge) => ({
+        ...edge,
+        selected: edge.id === highlightedEdgeId,
+        animated: !isDraggingNode && edge.id === highlightedEdgeId,
       })),
-    [edges, highlightedEdgeId, isDraggingNode],
+    [displayEdges, highlightedEdgeId, isDraggingNode],
   );
 
   const showOverlayWidgets = !isDraggingNode;
   const showPerformanceOverlays = showOverlayWidgets && !isSidebarResizing;
-  const showMiniMap = showPerformanceOverlays && allNodes.length <= MINIMAP_NODE_LIMIT;
+  const showMiniMap = showPerformanceOverlays && displayNodes.length <= MINIMAP_NODE_LIMIT;
 
   return (
-    <div className="w-full h-full" ref={canvasRef}>
+    <div
+      className="w-full h-full"
+      ref={canvasRef}
+      role={isGroupView ? 'region' : undefined}
+      aria-label={
+        isGroupView
+          ? t('erd.group.aria.readonlyCanvas', { name: activeGroupName ?? '' })
+          : undefined
+      }
+    >
       <ErdFkModeProvider value={fkMode}>
         <RemoteEditLocksProvider value={remoteEditLocks}>
           <ReactFlow
-            nodes={allNodes}
+            nodes={displayNodes}
             edges={styledEdges}
-            onNodesChange={canEdit ? onNodesChange : undefined}
-            onEdgesChange={canEdit ? onEdgesChange : undefined}
-            onConnect={canEdit ? handleDragConnect : undefined}
+            onNodesChange={effectiveCanEdit ? onNodesChange : undefined}
+            onEdgesChange={effectiveCanEdit ? onEdgesChange : undefined}
+            onConnect={effectiveCanEdit ? handleDragConnect : undefined}
             onNodeClick={handleNodeClick}
-            onNodeDragStart={canEdit ? () => setIsDraggingNode(true) : undefined}
-            onNodeDragStop={canEdit ? () => setIsDraggingNode(false) : undefined}
+            onNodeDragStart={effectiveCanEdit ? () => setIsDraggingNode(true) : undefined}
+            onNodeDragStop={effectiveCanEdit ? () => setIsDraggingNode(false) : undefined}
             onEdgeClick={handleEdgeClick}
-            onEdgeContextMenu={canEdit ? handleEdgeContextMenu : undefined}
+            onEdgeContextMenu={effectiveCanEdit ? handleEdgeContextMenu : undefined}
             onPaneClick={handlePaneClick}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             deleteKeyCode={null}
             panActivationKeyCode={null}
-            nodesDraggable={canEdit}
-            nodesConnectable={canEdit}
-            elementsSelectable={canEdit}
+            nodesDraggable={effectiveCanEdit}
+            nodesConnectable={effectiveCanEdit}
+            elementsSelectable={effectiveCanEdit}
             snapToGrid
             snapGrid={[16, 16]}
             defaultEdgeOptions={{
@@ -346,7 +421,7 @@ function ERDCanvas({
               onToggleCodeEditor={onToggleCodeEditor}
               validationOpen={validationOpen}
               onToggleValidation={onToggleValidation}
-              canEdit={canEdit}
+              canEdit={effectiveCanEdit}
             />
           </ReactFlow>
         </RemoteEditLocksProvider>
