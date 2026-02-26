@@ -67,6 +67,18 @@ function Sidebar({ canEdit = true, activeGroupId = null, onViewGroup, onBackToAl
     return map;
   }, [tableEntries]);
 
+  /** 현재 뷰(전체/그룹)에 따라 사이드바에 표시할 테이블 항목 */
+  const visibleTableEntries = useMemo(() => {
+    if (!activeGroup) {
+      return tableEntries;
+    }
+    const activeTableIds = new Set(activeGroup.tableIds);
+    return tableEntries.filter((entry) => {
+      const [tableId] = entry.split(SIDEBAR_ENTRY_SEPARATOR);
+      return activeTableIds.has(tableId);
+    });
+  }, [activeGroup, tableEntries]);
+
   /** 테이블 선택 다이얼로그 대상 그룹 */
   const tableSelectGroup = tableSelectGroupId
     ? (groups.find((group) => group.id === tableSelectGroupId) ?? null)
@@ -114,10 +126,12 @@ function Sidebar({ canEdit = true, activeGroupId = null, onViewGroup, onBackToAl
         </div>
 
         <div className="space-y-0.5">
-          {tableEntries.length === 0 ? (
-            <p className="text-xs text-muted-foreground">{t('erd.sidebar.noTables')}</p>
+          {visibleTableEntries.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {activeGroup ? t('erd.group.noTables') : t('erd.sidebar.noTables')}
+            </p>
           ) : (
-            tableEntries.map((entry) => {
+            visibleTableEntries.map((entry) => {
               const [tableId, label, logicalTableName] = entry.split(SIDEBAR_ENTRY_SEPARATOR);
               const logical = logicalTableName?.trim();
               const displayLabel = logical ? `${logical} (${label})` : label;

@@ -202,7 +202,7 @@ export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
       }
 
       for (const rawGroup of groupsArray) {
-        const group = normalizeGroupFromJson(rawGroup);
+        const group = normalizeGroupFromJson(rawGroup, nodesArray);
         if (!group) {
           continue;
         }
@@ -219,9 +219,10 @@ export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
  * JSON groups 엔트리를 논리적 그룹으로 정규화한다.
  *
  * @param raw 원본 그룹 데이터
+ * @param tableNodes JSON 내 테이블 노드 목록
  * @returns 정규화된 그룹. 유효하지 않으면 null
  */
-function normalizeGroupFromJson(raw: unknown): TableGroup | null {
+function normalizeGroupFromJson(raw: unknown, tableNodes: Node<TableNodeData>[]): TableGroup | null {
   if (!raw || typeof raw !== 'object') {
     return null;
   }
@@ -244,10 +245,15 @@ function normalizeGroupFromJson(raw: unknown): TableGroup | null {
         ? (legacyData.color as TableHeaderColor)
         : undefined;
 
+  const hasExplicitTableIds = Object.prototype.hasOwnProperty.call(record, 'tableIds');
   const tableIdsRaw = record.tableIds;
-  const tableIds = Array.isArray(tableIdsRaw)
+  let tableIds = Array.isArray(tableIdsRaw)
     ? tableIdsRaw.filter((value): value is string => typeof value === 'string')
     : [];
+
+  if (!hasExplicitTableIds && tableIds.length === 0) {
+    tableIds = inferGroupTableIdsFromLegacyBounds(record, tableNodes);
+  }
 
   return {
     id,
@@ -255,6 +261,72 @@ function normalizeGroupFromJson(raw: unknown): TableGroup | null {
     color: colorValue,
     tableIds,
   };
+}
+
+/**
+ * 레거시 시각 그룹 영역(position/size) 기반으로 소속 테이블 ID를 추론한다.
+ *
+ * @param record 레거시 그룹 엔트리
+ * @param tableNodes JSON 내 테이블 노드 목록
+ * @returns 그룹 내부로 판정된 테이블 ID 목록
+ */
+function inferGroupTableIdsFromLegacyBounds(
+  record: Record<string, unknown>,
+  tableNodes: Node<TableNodeData>[],
+): string[] {
+  const position = record.position;
+  const style = record.style;
+  if (!position || typeof position !== 'object' || !style || typeof style !== 'object') {
+    return [];
+  }
+
+  const positionRecord = position as Record<string, unknown>;
+  const styleRecord = style as Record<string, unknown>;
+  const x = parseNumberOrNull(positionRecord.x);
+  const y = parseNumberOrNull(positionRecord.y);
+  const width = parseNumberOrNull(styleRecord.width);
+  const height = parseNumberOrNull(styleRecord.height);
+  if (x === null || y === null || width === null || height === null || width <= 0 || height <= 0) {
+    return [];
+  }
+
+  const right = x + width;
+  const bottom = y + height;
+  const matched: string[] = [];
+  for (const tableNode of tableNodes) {
+    const nodeX = tableNode.position?.x;
+    const nodeY = tableNode.position?.y;
+    if (
+      typeof nodeX === 'number' &&
+      typeof nodeY === 'number' &&
+      nodeX >= x &&
+      nodeX <= right &&
+      nodeY >= y &&
+      nodeY <= bottom
+    ) {
+      matched.push(tableNode.id);
+    }
+  }
+  return matched;
+}
+
+/**
+ * 숫자 혹은 숫자 문자열을 number로 변환한다.
+ *
+ * @param value 변환할 값
+ * @returns 유효한 number 또는 null
+ */
+function parseNumberOrNull(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
 }
 
 /**

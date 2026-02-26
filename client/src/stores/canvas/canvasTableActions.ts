@@ -365,12 +365,20 @@ export function createCanvasTableActions(
       ydoc.transact(() => {
         const tablesMap = getTablesMap(ydoc);
         const edgesMap = getEdgesMap(ydoc);
+        const groupsMap = getGroupsMap(ydoc);
         for (const key of [...tablesMap.keys()]) {
           tablesMap.delete(key);
         }
         for (const key of [...edgesMap.keys()]) {
           edgesMap.delete(key);
         }
+        // 전체 스키마 교체 시 기존 테이블 ID 참조는 모두 무효이므로 그룹 연결을 초기화한다.
+        groupsMap.forEach((groupYMap) => {
+          const tableIdsYArray = groupYMap.get('tableIds') as Y.Array<string> | undefined;
+          if (tableIdsYArray && tableIdsYArray.length > 0) {
+            tableIdsYArray.delete(0, tableIdsYArray.length);
+          }
+        });
         populateFromDdl(tablesMap, edgesMap, result, {
           resolveTableName: (name) => {
             const unique = buildUniqueName(name, [...assigned]);
