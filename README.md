@@ -286,6 +286,14 @@ import jakarta.persistence.Id;
 ./scripts/check-string-utils.sh
 ```
 
+최근 반영 (2026-02-25):
+
+- 공통 문자열 유틸 `AppStringUtils` 추가 및 확장: `trimToNull`, `trimToEmpty`, `isBlank`, `isNotBlank`, `defaultIfBlank`, `startsWith`, `equalsIgnoreCase`, `containsIgnoreCase`, `lowerTrimToNull`, `lowerTrimToEmpty`, `endsWithIgnoreCase`, `endsWithAnyIgnoreCase`, `firstCsvTokenToNull`
+- 공통 배열 유틸 `AppArrayUtils` 추가: `isEmpty(Object[] values)`
+- 주요 입력 검증/정규화 로직(`SecurityConfig`, `ClientIpUtils`, `EnvironmentProfile`, `LoginRateLimitService`, `DiagramService`, `WsTicketHandshakeInterceptor`, `Dictionary*BulkService`, `ExcelUtils`, `CsvParser`)을 `App*Utils` 기준으로 통일
+- Apache Commons 직접 호출은 `AppStringUtils`/`AppArrayUtils` 내부로 제한
+- 문자열 규칙 자동 점검 스크립트 추가: `scripts/check-string-utils.sh`
+
 #### 예외 처리 체계
 
 `IllegalArgumentException` 등 범용 예외 대신 도메인별 커스텀 예외를 사용한다.

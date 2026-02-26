@@ -8,6 +8,8 @@
     "format:check": "prettier --check \"src/**/*.java\" \"client/src/**/*.{ts,tsx}\" \"src/**/*.yml\"",
     "format:java": "prettier --write \"src/**/*.java\"",
     "format:client": "cd client && prettier --write \"src/**/*.{ts,tsx}\"",
+    "verify:docs": "node scripts/verify-function-docs.mjs",
+    "verify:docs:all": "node scripts/verify-function-docs.mjs --all",
     "perf:k6:ws:load": "k6 run scripts/perf/k6/websocket-load.js",
     "perf:k6:ws:soak": "k6 run scripts/perf/k6/websocket-soak.js"
   },

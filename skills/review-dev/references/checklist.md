@@ -70,7 +70,16 @@
 - [ ] `domain/` 계층에 Entity/Repository/Service를 배치하는지 확인
 - [ ] DTO에 `record`와 `@Valid`를 적절히 사용하는지 확인
 
-### 9. Gradle (해당 시)
+### 9. 주석 / 문서화 (MUST)
+
+- [ ] 클래스/인터페이스를 신규 작성하거나 큰 구조 변경 시 목적/역할을 설명하는 클래스 Javadoc이 있는지 확인
+- [ ] 백엔드(Java) 신규/수정 함수/메서드마다 Javadoc이 반드시 작성되어 있는지 확인(최소 `@param`, `@return`, 필요 시 `@throws`)
+- [ ] 프론트엔드(TypeScript/React) 신규/수정 함수/메서드/훅/핸들러마다 JSDoc이 반드시 작성되어 있는지 확인(최소 `@param`, 반환값 설명)
+- [ ] 선언 순서가 `Javadoc -> Annotation -> 선언부` 순서를 따르는지 확인
+- [ ] 로직 이해에 필요한 설명 주석은 유지하되, 자명한 코드 설명/중복 주석이 없는지 확인
+- [ ] 주석 내용이 현재 구현과 불일치(복붙/구버전 설명)하지 않는지 확인
+
+### 10. Gradle (해당 시)
 
 - [ ] `annotationProcessor` 순서가 Lombok -> QueryDSL인지 확인
 
@@ -132,9 +141,9 @@
 - [ ] 페이지 내부 코드 순서 준수 여부 확인: URL params -> Router hooks -> Query client -> Local state -> Store selectors -> Derived values/constants -> Queries -> Mutations -> Event handlers -> Effects -> Conditional returns -> JSX
 - [ ] `useEffect`가 query/mutation 블록 사이에 끼어들지 않는지 확인
 
-### 10. JSDoc (Medium)
+### 10. JSDoc (MUST)
 
-- [ ] 함수/컴포넌트에 멀티라인 JSDoc + `@param`을 작성하는지 확인
+- [ ] 함수/컴포넌트/커스텀 훅에 멀티라인 JSDoc + `@param`을 반드시 작성하는지 확인
 - [ ] 인터페이스 필드에 한 줄 `/** ... */`를 작성하는지 확인
 - [ ] `useState` 선언 위에 한 줄 상태 설명을 작성하는지 확인
 - [ ] `components/ui/` shadcn 프리미티브에는 JSDoc 강제 예외를 적용하는지 확인

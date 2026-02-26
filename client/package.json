@@ -12,7 +12,9 @@
     "dist:mac": "electron-vite build && electron-builder --mac",
     "dist:win": "electron-vite build && electron-builder --win",
     "test:unit": "node --input-type=module --eval \"import { rmSync } from 'node:fs'; rmSync('.tmp-test', { recursive: true, force: true });\" && tsc -p tsconfig.test.json && node --test .tmp-test/test/unit",
-    "lint": "eslint .",
+    "lint": "eslint . && node ../scripts/verify-function-docs.mjs --frontend-only",
+    "lint:docs": "node ../scripts/verify-function-docs.mjs --frontend-only",
+    "lint:docs:all": "node ../scripts/verify-function-docs.mjs --all --frontend-only",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "preview": "vite preview"

@@ -26,6 +26,7 @@ git ls-files --others --exclude-standard
 - 구조 설계 수준의 문제와 보안 취약점만 다룬다.
 - 코딩 컨벤션/스타일은 `review-dev`로 위임한다.
 - 디자인/퍼블리싱 품질은 `review-design`으로 위임한다.
+- 단, 팀 공통 문서화 계약(백엔드 Javadoc / 프론트 JSDoc 필수) 위반은 구조 품질 저하 요소로 함께 보고한다.
 
 ## 점검 절차
 

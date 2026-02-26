@@ -85,3 +85,13 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+tasks.register('verifyFunctionDocs', Exec) {
+    group = 'verification'
+    description = 'Verifies Javadoc/JSDoc presence on changed backend/frontend functions.'
+    commandLine 'node', 'scripts/verify-function-docs.mjs'
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyFunctionDocs')
+}
