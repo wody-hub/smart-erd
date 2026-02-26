@@ -56,7 +56,7 @@ npm run format:check                 # Check formatting (CI)
 
 ## Architecture
 
-### Backend: Spring Boot 3.5.10 / Java 25
+### Backend: Spring Boot 3.5.11 / Java 25
 
 Base package: `com.smarterd`
 
@@ -418,7 +418,7 @@ Accept-Language: ko → { "error": "사용자를 찾을 수 없습니다: testus
 
 | Layer         | Stack                                                                            |
 | ------------- | -------------------------------------------------------------------------------- |
-| Backend       | Spring Boot 3.5.10, Java 25, Gradle 8.12, Spring Security 6.x, Spring Data JPA   |
+| Backend       | Spring Boot 3.5.11, Java 25, Gradle 8.12, Spring Security 6.x, Spring Data JPA   |
 | Query         | QueryDSL 5.1.0:jakarta, Blaze-Persistence 1.6.17                                 |
 | Auth          | Spring OAuth2 Resource Server (HMAC-SHA256 JWT + Refresh Token rotation), BCrypt |
 | DB            | PostgreSQL 17 (Docker), Testcontainers (test)                                    |
