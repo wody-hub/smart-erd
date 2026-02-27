@@ -100,8 +100,8 @@ interface RawColumn {
 /** 파서 상태 머신 */
 type ParserState = 'IDLE' | 'EXPECT_TABLE_BLOCK' | 'IN_TABLE';
 
-/** Table 선언 감지 정규식 */
-const TABLE_DECL_REGEX = new RegExp(`^(\\s*)${DSL_TABLE_KEYWORD}\\s+(\\S+)\\s*\\{?\\s*$`);
+/** Table 선언 감지 정규식 (공백 포함 논리명 허용) */
+const TABLE_DECL_REGEX = new RegExp(`^(\\s*)${DSL_TABLE_KEYWORD}\\s+(.+?)\\s*\\{?\\s*$`);
 
 /** Table 키워드 + 공백 접두사 길이 (위치 계산용) */
 const TABLE_PREFIX_LENGTH = `${DSL_TABLE_KEYWORD} `.length;
@@ -121,6 +121,27 @@ const EXPLICIT_TYPE_PATTERN =
 function getLineColumns(line: string): { startColumn: number; endColumn: number } {
   const endColumn = Math.max(2, line.replace(/\r$/, '').length + 1);
   return { startColumn: 1, endColumn };
+}
+
+/**
+ * 식별자 양끝의 동일한 따옴표를 제거한다.
+ *
+ * DSL에서 `'논리명'`, `"논리명"` 형태를 허용하기 위한 정규화 유틸.
+ *
+ * @param value 원본 식별자 문자열
+ * @returns 따옴표 제거 후 문자열
+ */
+function unwrapQuotedIdentifier(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length < 2) {
+    return trimmed;
+  }
+  const first = trimmed.charAt(0);
+  const last = trimmed.charAt(trimmed.length - 1);
+  if ((first === "'" || first === '"') && first === last) {
+    return trimmed.substring(1, trimmed.length - 1).trim();
+  }
+  return trimmed;
 }
 
 /**
@@ -144,6 +165,7 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
    *
    * @param line        행 번호 (1-based)
    * @param sourceLine  오류 대상 원본 행
+   * @returns 없음
    */
   const pushSyntaxError = (line: number, sourceLine: string) => {
     const { startColumn, endColumn } = getLineColumns(sourceLine);
@@ -203,12 +225,17 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
       if (tableMatch) {
         const prefix = tableMatch[1].length;
         const nameStart = prefix + TABLE_PREFIX_LENGTH;
-        const logicalName = tableMatch[2];
+        const rawLogicalName = tableMatch[2] ?? '';
+        const logicalName = unwrapQuotedIdentifier(rawLogicalName);
+        if (!logicalName) {
+          pushSyntaxError(lineNum, effective);
+          continue;
+        }
         const nextTable: RawTable = {
           logicalName,
           line: lineNum,
           nameStartCol: nameStart + 1,
-          nameEndCol: nameStart + logicalName.length + 1,
+          nameEndCol: nameStart + rawLogicalName.length + 1,
           columns: [],
         };
 
@@ -559,6 +586,7 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
  * 단일 컬럼 행을 파싱한다.
  *
  * 형식: `논리명  > 부모테이블.부모컬럼  :도메인명  ::타입  [PK, AI, NN]`
+ * 공백이 포함된 논리명/도메인명/FK 참조명도 허용한다.
  *
  * @param line    원본 행 텍스트
  * @param lineNum 1-based 행 번호
@@ -577,22 +605,27 @@ function parseColumnLine(line: string, lineNum: number): RawColumn | null {
   // 컬럼 행 정규식 (캡처 그룹으로 위치 추적)
   // 형식: 논리명 [> 부모.컬럼] [:도메인] [::타입] [[옵션]]
   const colRegex =
-    /^(\s*)(\S+)(?:\s+>\s*(\S+)\.(\S+))?(?:\s+:(\S+))?(?:\s+::(.+?))?(?:\s+\[([^\]]*)\])?\s*$/;
+    /^(\s*)(.+?)(?:\s*>\s*(.+?)\s*\.\s*(.+?))?(?:\s*:(?!:)\s*(.+?))?(?:\s*::\s*(.+?))?(?:\s*\[([^\]]*)\])?\s*$/;
   const match = effective.match(colRegex);
   if (!match) {
     return null;
   }
 
   const indent = match[1].length;
-  const logicalName = match[2];
-  const fkTable = match[3];
-  const fkColumn = match[4];
-  const domainName = match[5];
-  const explicitType = match[6]?.trim();
+  const logicalName = unwrapQuotedIdentifier(match[2] ?? '');
+  const fkTable = match[3] ? unwrapQuotedIdentifier(match[3]) : undefined;
+  const fkColumn = match[4] ? unwrapQuotedIdentifier(match[4]) : undefined;
+  const rawDomainName = match[5];
+  const domainName = rawDomainName ? unwrapQuotedIdentifier(rawDomainName) : undefined;
+  const rawExplicitType = match[6];
+  const explicitType = rawExplicitType?.trim();
   const optionStr = match[7];
+  if (!logicalName) {
+    return null;
+  }
 
   const nameStartCol = indent + 1;
-  const nameEndCol = indent + logicalName.length + 1;
+  const nameEndCol = indent + (match[2]?.length ?? logicalName.length) + 1;
 
   const options: string[] = optionStr
     ? optionStr
@@ -616,40 +649,49 @@ function parseColumnLine(line: string, lineNum: number): RawColumn | null {
     // FK 참조 위치 계산
     const fkIdx = effective.indexOf('>');
     if (fkIdx >= 0) {
-      const afterArrow = effective.substring(fkIdx + 1).trimStart();
-      const fkStart = effective.indexOf(afterArrow, fkIdx + 1);
-      const dotIdx = afterArrow.indexOf('.');
-      if (dotIdx >= 0) {
-        result.fkTableStartCol = fkStart + 1;
-        result.fkTableEndCol = fkStart + dotIdx + 1;
-        result.fkColumnStartCol = fkStart + dotIdx + 2;
-        result.fkColumnEndCol = fkStart + afterArrow.trimEnd().length + 1;
+      const afterArrowRaw = effective.substring(fkIdx + 1);
+      const fkRefMatch = afterArrowRaw.match(/^\s*(.+?)\s*\.\s*(.+?)(?=\s*(?::(?!:)|::|\[|$))/);
+      if (fkRefMatch) {
+        const fkTableRaw = fkRefMatch[1] ?? '';
+        const fkColumnRaw = fkRefMatch[2] ?? '';
+        const tableOffset = afterArrowRaw.indexOf(fkTableRaw);
+        if (tableOffset >= 0) {
+          const tableStart = fkIdx + 1 + tableOffset;
+          result.fkTableStartCol = tableStart + 1;
+          result.fkTableEndCol = result.fkTableStartCol + fkTableRaw.length;
+        }
+
+        const dotOffset = afterArrowRaw.indexOf('.', Math.max(0, tableOffset + fkTableRaw.length));
+        const colOffset =
+          dotOffset >= 0
+            ? afterArrowRaw.indexOf(fkColumnRaw, dotOffset + 1)
+            : afterArrowRaw.indexOf(fkColumnRaw);
+        if (colOffset >= 0) {
+          const colStart = fkIdx + 1 + colOffset;
+          result.fkColumnStartCol = colStart + 1;
+          result.fkColumnEndCol = result.fkColumnStartCol + fkColumnRaw.length;
+        }
       }
     }
   }
 
   if (domainName) {
     result.domainName = domainName;
-    const colonIdx = effective.indexOf(':');
-    if (colonIdx >= 0) {
-      // : 다음 공백 제거 후 도메인명 시작 위치
-      const afterColon = effective.substring(colonIdx + 1);
-      const domainStart = colonIdx + 1 + (afterColon.length - afterColon.trimStart().length);
+    const rawDomainToken = rawDomainName?.trim() ?? domainName;
+    const domainStart = effective.lastIndexOf(rawDomainToken);
+    if (domainStart >= 0) {
       result.domainStartCol = domainStart + 1;
-      result.domainEndCol = domainStart + domainName.length + 1;
+      result.domainEndCol = domainStart + rawDomainToken.length + 1;
     }
   }
 
   if (explicitType) {
     result.explicitType = explicitType;
-    const typeMarkerIdx = effective.indexOf('::');
-    if (typeMarkerIdx >= 0) {
-      const afterTypeMarker = effective.substring(typeMarkerIdx + 2);
-      const typeStartOffset =
-        typeMarkerIdx + 2 + (afterTypeMarker.length - afterTypeMarker.trimStart().length);
-      const normalizedType = afterTypeMarker.trim();
-      result.typeStartCol = typeStartOffset + 1;
-      result.typeEndCol = typeStartOffset + normalizedType.length + 1;
+    const explicitTypeToken = rawExplicitType?.trim() ?? explicitType;
+    const typeStart = effective.lastIndexOf(explicitTypeToken);
+    if (typeStart >= 0) {
+      result.typeStartCol = typeStart + 1;
+      result.typeEndCol = typeStart + explicitTypeToken.length + 1;
     }
   }
 

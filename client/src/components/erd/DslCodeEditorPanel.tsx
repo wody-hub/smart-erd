@@ -22,7 +22,20 @@ import { generateDsl } from '@/lib/dsl-generator';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS, DSL_TYPE_SUGGESTIONS } from '@/lib/dsl-keywords';
+import {
+  DSL_TABLE_KEYWORD,
+  DSL_COLUMN_OPTIONS,
+  DSL_TYPE_SUGGESTIONS,
+  DSL_TABLE_AFTER_REGEX,
+  DSL_TABLE_TERM_CAPTURE_REGEX,
+  DSL_TABLE_LINE_REGEX,
+  DSL_DOMAIN_CONTEXT_REGEX,
+  DSL_DOMAIN_CAPTURE_REGEX,
+  DSL_EXPLICIT_TYPE_CONTEXT_REGEX,
+  DSL_FK_CONTEXT_REGEX,
+  DSL_FK_CAPTURE_REGEX,
+  DSL_BLOCK_TERM_CAPTURE_REGEX,
+} from '@/lib/dsl-keywords';
 import useCanvasStore from '@/stores/useCanvasStore';
 import type { TableNode, ERDEdge } from '@/types/erd';
 import type { DslError } from '@/lib/dsl-parser';
@@ -62,10 +75,6 @@ const QUICK_ACTION_IDLE_DELAY_MS = 700;
 const ASSIST_POPUP_INITIAL_VISIBLE = 10;
 /** 보조 팝업 더보기 증가 건수 */
 const ASSIST_POPUP_VISIBLE_STEP = 10;
-/** `Table ` 뒤 컨텍스트 감지 정규식 */
-const TABLE_AFTER_REGEX = new RegExp(`^\\s*${DSL_TABLE_KEYWORD}\\s+\\S*$`);
-/** Table 키워드 행 시작 감지 정규식 (블록 판정용) */
-const TABLE_LINE_REGEX = new RegExp(`^${DSL_TABLE_KEYWORD}\\s+`);
 
 /**
  * 논리명 DSL 코드 에디터 패널.
@@ -385,7 +394,7 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     for (let i = lineNum - 1; i >= 1; i--) {
       const text = model.getLineContent(i).trim();
       if (text === '}') depth--;
-      if (text.endsWith('{') || TABLE_LINE_REGEX.test(text)) {
+      if (text.endsWith('{') || DSL_TABLE_LINE_REGEX.test(text)) {
         depth++;
         if (depth > 0) {
           return true;
@@ -561,14 +570,15 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
       }
 
       if (
-        /(^|[^:]):\s*\S*$/.test(textUntilPosition) &&
-        !/::\s*\S*$/.test(textUntilPosition) &&
+        DSL_DOMAIN_CONTEXT_REGEX.test(textUntilPosition) &&
+        !DSL_EXPLICIT_TYPE_CONTEXT_REGEX.test(textUntilPosition) &&
         !textUntilPosition.includes('//')
       ) {
-        const domainInput =
-          textUntilPosition.match(/(^|[^:]):\s*([^\s[]*)$/)?.[2]?.trim() ?? word.word.trim();
+        const domainInputRaw =
+          textUntilPosition.match(DSL_DOMAIN_CAPTURE_REGEX)?.[2] ?? word.word.trim();
+        const domainInput = domainInputRaw.trim();
         const normalizedDomainInput = domainInput.toLowerCase();
-        const replaceStart = Math.max(1, position.column - domainInput.length);
+        const replaceStart = Math.max(1, position.column - domainInputRaw.length);
         const rankedDomains: Array<{ domain: (typeof domains)[number]; score: MatchScore }> = [];
         for (const domain of domains) {
           if (!normalizedDomainInput) {
@@ -607,25 +617,39 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
         return items;
       }
 
-      if (/>\s*\S*$/.test(textUntilPosition)) {
+      if (DSL_FK_CONTEXT_REGEX.test(textUntilPosition)) {
         const parsedTables = parseResult?.result.tables.map((table) => ({
           logicalName: table.logicalTableName ?? table.name,
           columns: table.columns.map((col) => col.logicalName ?? col.name),
         }));
-        const afterArrow = textUntilPosition.match(/>\s*(\S*)$/)?.[1] ?? '';
+        const afterArrow = textUntilPosition.match(DSL_FK_CAPTURE_REGEX)?.[1] ?? '';
         const dotIdx = afterArrow.indexOf('.');
+        let hasFkSuggestions = false;
         if (dotIdx < 0) {
+          const tableStart = Math.max(1, position.column - afterArrow.length);
           for (const table of parsedTables ?? []) {
-            addInsert(`fk-table:${table.logicalName}`, table.logicalName, table.logicalName);
+            hasFkSuggestions = true;
+            addInsert(
+              `fk-table:${table.logicalName}`,
+              table.logicalName,
+              table.logicalName,
+              undefined,
+              tableStart,
+              position.column,
+            );
           }
         } else {
-          const tableName = afterArrow.substring(0, dotIdx);
+          const tableName = afterArrow.substring(0, dotIdx).trim();
           const colInput = afterArrow.substring(dotIdx + 1);
           const colStart = Math.max(1, position.column - colInput.length);
           const table = parsedTables?.find((item) => item.logicalName === tableName);
           for (const col of table?.columns ?? []) {
+            hasFkSuggestions = true;
             addInsert(`fk-col:${tableName}.${col}`, col, col, undefined, colStart, position.column);
           }
+        }
+        if (hasFkSuggestions) {
+          return items;
         }
       }
 
@@ -642,8 +666,12 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
         }
       }
 
-      if (TABLE_AFTER_REGEX.test(textUntilPosition) || inBlock) {
-        const termInput = word.word.trim();
+      if (DSL_TABLE_AFTER_REGEX.test(textUntilPosition) || inBlock) {
+        const termInputRaw = DSL_TABLE_AFTER_REGEX.test(textUntilPosition)
+          ? (textUntilPosition.match(DSL_TABLE_TERM_CAPTURE_REGEX)?.[1] ?? word.word.trim())
+          : (textUntilPosition.match(DSL_BLOCK_TERM_CAPTURE_REGEX)?.[1] ?? word.word.trim());
+        const termInput = termInputRaw.trim();
+        const termStart = Math.max(1, position.column - termInputRaw.length);
         const normalizedTermInput = termInput.toLowerCase();
         const rankedTerms: Array<{ term: (typeof terms)[number]; score: MatchScore }> = [];
         for (const term of terms) {
@@ -675,6 +703,8 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
             term.logicalName,
             term.logicalName,
             `${term.physicalName}${term.domainLogicalName ? ` (${term.domainLogicalName})` : ''}`,
+            termStart,
+            position.column,
           );
         }
         addRegisterTerm(termInput || diagnosticAtCursor?.messageArgs?.name || '');

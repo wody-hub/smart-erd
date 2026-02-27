@@ -1,6 +1,19 @@
 import type * as Monaco from 'monaco-editor';
 import type { Term, Domain } from '@/types/dictionary';
-import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS, DSL_TYPE_SUGGESTIONS } from '@/lib/dsl-keywords';
+import {
+  DSL_TABLE_KEYWORD,
+  DSL_TABLE_AFTER_REGEX,
+  DSL_TABLE_TERM_CAPTURE_REGEX,
+  DSL_TABLE_LINE_REGEX,
+  DSL_COLUMN_OPTIONS,
+  DSL_TYPE_SUGGESTIONS,
+  DSL_DOMAIN_CONTEXT_REGEX,
+  DSL_DOMAIN_CAPTURE_REGEX,
+  DSL_EXPLICIT_TYPE_CONTEXT_REGEX,
+  DSL_FK_CONTEXT_REGEX,
+  DSL_FK_CAPTURE_REGEX,
+  DSL_BLOCK_TERM_CAPTURE_REGEX,
+} from '@/lib/dsl-keywords';
 
 /** DSL 커스텀 언어 ID */
 export const DSL_LANGUAGE_ID = 'smart-erd-dsl';
@@ -9,10 +22,6 @@ export const DSL_QUICK_REGISTER_TERM_COMMAND_ID = 'smart-erd.dsl.quickRegisterTe
 /** 자동완성에서 빠른 도메인 등록을 실행하는 커맨드 ID */
 export const DSL_QUICK_REGISTER_DOMAIN_COMMAND_ID = 'smart-erd.dsl.quickRegisterDomain';
 
-/** `Table ` 뒤 컨텍스트 감지 정규식 */
-const TABLE_AFTER_REGEX = new RegExp(`^\\s*${DSL_TABLE_KEYWORD}\\s+\\S*$`);
-/** Table 키워드 행 시작 감지 정규식 (블록 판정용) */
-const TABLE_LINE_REGEX = new RegExp(`^${DSL_TABLE_KEYWORD}\\s+`);
 /** Table 키워드 소문자 (자동완성 필터링용) */
 const TABLE_KEYWORD_LOWER = DSL_TABLE_KEYWORD.toLowerCase();
 
@@ -56,7 +65,7 @@ export function registerDslLanguage(monaco: typeof Monaco): void {
         // 물리 타입 직접 지정
         [/::([^[]+)/, 'type'],
         // 도메인 지정
-        [/:(?!:)(\S+)/, 'type'],
+        [/:(?!:)([^[]+)/, 'type'],
         // FK 참조 연산자
         [/>/, 'operator'],
         // 중괄호
@@ -67,7 +76,7 @@ export function registerDslLanguage(monaco: typeof Monaco): void {
 
       tableName: [
         [/\s+/, ''],
-        [/\S+/, { token: 'type.identifier', next: '@pop' }],
+        [/[^{}\r\n]+/, { token: 'type.identifier', next: '@pop' }],
       ],
 
       options: [
@@ -103,6 +112,7 @@ export interface DslCompletionQuickActions {
  * @param terms        Term 사전 목록
  * @param domains      Domain 사전 목록
  * @param tablesRef    파싱된 테이블 Ref (최신값 참조)
+ * @param quickActions 빠른 등록 액션 핸들러
  * @returns CompletionItemProvider
  */
 export function createDslCompletionProvider(
@@ -127,6 +137,7 @@ export function createDslCompletionProvider(
    * @param suggestions 자동완성 목록
    * @param position 현재 커서 위치
    * @param logicalName 초기 논리명
+   * @returns 없음
    */
   const pushQuickTermSuggestion = (
     suggestions: Monaco.languages.CompletionItem[],
@@ -164,6 +175,7 @@ export function createDslCompletionProvider(
    * @param suggestions 자동완성 목록
    * @param position 현재 커서 위치
    * @param logicalName 초기 논리명
+   * @returns 없음
    */
   const pushQuickDomainSuggestion = (
     suggestions: Monaco.languages.CompletionItem[],
@@ -198,6 +210,13 @@ export function createDslCompletionProvider(
   return {
     triggerCharacters: ['[', ':', '>', ','],
 
+    /**
+     * 현재 커서 문맥에 맞는 DSL 자동완성 항목을 계산한다.
+     *
+     * @param model Monaco 텍스트 모델
+     * @param position 현재 커서 위치
+     * @returns 자동완성 목록
+     */
     provideCompletionItems(
       model: Monaco.editor.ITextModel,
       position: Monaco.Position,
@@ -266,19 +285,26 @@ export function createDslCompletionProvider(
 
       // 3. `:` 뒤(단일 콜론) → Domain 목록
       if (
-        /(^|[^:]):\s*\S*$/.test(textUntilPosition) &&
-        !/::\s*\S*$/.test(textUntilPosition) &&
+        DSL_DOMAIN_CONTEXT_REGEX.test(textUntilPosition) &&
+        !DSL_EXPLICIT_TYPE_CONTEXT_REGEX.test(textUntilPosition) &&
         !textUntilPosition.includes('//')
       ) {
-        const domainInput =
-          textUntilPosition.match(/(^|[^:]):\s*([^\s[]*)$/)?.[2]?.trim() ?? word.word.trim();
+        const domainInputRaw =
+          textUntilPosition.match(DSL_DOMAIN_CAPTURE_REGEX)?.[2] ?? word.word.trim();
+        const domainInput = domainInputRaw.trim();
+        const domainRange = new monaco.Range(
+          position.lineNumber,
+          Math.max(1, position.column - domainInputRaw.length),
+          position.lineNumber,
+          position.column,
+        );
         for (const domain of domains) {
           suggestions.push({
             label: domain.logicalName,
             kind: monaco.languages.CompletionItemKind.TypeParameter,
             detail: domain.physicalType,
             insertText: domain.logicalName,
-            range,
+            range: domainRange,
           });
         }
         pushQuickDomainSuggestion(suggestions, position, domainInput);
@@ -286,30 +312,36 @@ export function createDslCompletionProvider(
       }
 
       // 4. `>` 뒤 → 테이블.컬럼 자동완성
-      if (/>\s*\S*$/.test(textUntilPosition)) {
+      if (DSL_FK_CONTEXT_REGEX.test(textUntilPosition)) {
         const parsedTables = tablesRef.current ?? [];
-        const afterArrow = textUntilPosition.match(/>\s*(\S*)$/)?.[1] ?? '';
+        const afterArrow = textUntilPosition.match(DSL_FK_CAPTURE_REGEX)?.[1] ?? '';
         const dotIdx = afterArrow.indexOf('.');
 
         if (dotIdx < 0) {
+          const tableRange = new monaco.Range(
+            position.lineNumber,
+            Math.max(1, position.column - afterArrow.length),
+            position.lineNumber,
+            position.column,
+          );
           // 테이블명 자동완성
           for (const table of parsedTables) {
             suggestions.push({
               label: table.logicalName,
               kind: monaco.languages.CompletionItemKind.Class,
               insertText: table.logicalName,
-              range,
+              range: tableRange,
             });
           }
         } else {
           // 테이블.컬럼명 자동완성
-          const tableName = afterArrow.substring(0, dotIdx);
+          const tableName = afterArrow.substring(0, dotIdx).trim();
           const table = parsedTables.find((t) => t.logicalName === tableName);
           if (table) {
             const colWord = afterArrow.substring(dotIdx + 1);
             const colRange = new monaco.Range(
               position.lineNumber,
-              position.column - colWord.length,
+              Math.max(1, position.column - colWord.length),
               position.lineNumber,
               position.column,
             );
@@ -330,15 +362,23 @@ export function createDslCompletionProvider(
       }
 
       // 5. `Table ` 뒤 → Term 검색
-      if (TABLE_AFTER_REGEX.test(textUntilPosition)) {
-        const termInput = word.word.trim();
+      if (DSL_TABLE_AFTER_REGEX.test(textUntilPosition)) {
+        const termInputRaw =
+          textUntilPosition.match(DSL_TABLE_TERM_CAPTURE_REGEX)?.[1] ?? word.word.trim();
+        const termInput = termInputRaw.trim();
+        const termRange = new monaco.Range(
+          position.lineNumber,
+          Math.max(1, position.column - termInputRaw.length),
+          position.lineNumber,
+          position.column,
+        );
         for (const term of terms) {
           suggestions.push({
             label: term.logicalName,
             kind: monaco.languages.CompletionItemKind.Class,
             detail: term.physicalName,
             insertText: term.logicalName,
-            range,
+            range: termRange,
           });
         }
         pushQuickTermSuggestion(suggestions, position, termInput);
@@ -347,14 +387,22 @@ export function createDslCompletionProvider(
 
       // 6. 테이블 블록 내부 행 시작 → Term 검색 (컬럼 논리명)
       if (isInsideTableBlock(model, position.lineNumber)) {
-        const termInput = word.word.trim();
+        const termInputRaw =
+          textUntilPosition.match(DSL_BLOCK_TERM_CAPTURE_REGEX)?.[1] ?? word.word.trim();
+        const termInput = termInputRaw.trim();
+        const termRange = new monaco.Range(
+          position.lineNumber,
+          Math.max(1, position.column - termInputRaw.length),
+          position.lineNumber,
+          position.column,
+        );
         for (const term of terms) {
           suggestions.push({
             label: term.logicalName,
             kind: monaco.languages.CompletionItemKind.Field,
             detail: `${term.physicalName}${term.domainLogicalName ? ` (${term.domainLogicalName})` : ''}`,
             insertText: term.logicalName,
-            range,
+            range: termRange,
           });
         }
         pushQuickTermSuggestion(suggestions, position, termInput);
@@ -378,7 +426,7 @@ function isInsideTableBlock(model: Monaco.editor.ITextModel, lineNum: number): b
   for (let i = lineNum - 1; i >= 1; i--) {
     const text = model.getLineContent(i).trim();
     if (text === '}') depth--;
-    if (text.endsWith('{') || TABLE_LINE_REGEX.test(text)) {
+    if (text.endsWith('{') || DSL_TABLE_LINE_REGEX.test(text)) {
       depth++;
       if (depth > 0) {
         return true;

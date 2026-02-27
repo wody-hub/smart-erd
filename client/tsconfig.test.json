@@ -18,6 +18,7 @@
     "test/**/*.ts",
     "src/lib/code-sync-revision.ts",
     "src/lib/code-sync-apply-gate.ts",
+    "src/lib/dsl-keywords.ts",
     "src/lib/diff-apply-rollout.ts",
     "src/lib/erd-diff-apply.ts",
     "src/lib/erd-diff-builder.ts",
