@@ -383,7 +383,7 @@ export function createCanvasTableActions(
 
     replaceFromDdl: (result) => {
       const { ydoc } = get();
-      if (!ydoc) {
+      if (!ydoc || result.tables.length === 0) {
         return;
       }
       const assigned = new Set<string>();
@@ -404,16 +404,14 @@ export function createCanvasTableActions(
             tableIdsYArray.delete(0, tableIdsYArray.length);
           }
         });
-        if (result.tables.length > 0) {
-          populateFromDdl(tablesMap, edgesMap, result, {
-            resolveTableName: (name) => {
-              const unique = buildUniqueName(name, [...assigned]);
-              assigned.add(unique);
-              return unique;
-            },
-            startY: 100,
-          });
-        }
+        populateFromDdl(tablesMap, edgesMap, result, {
+          resolveTableName: (name) => {
+            const unique = buildUniqueName(name, [...assigned]);
+            assigned.add(unique);
+            return unique;
+          },
+          startY: 100,
+        });
       });
     },
 
