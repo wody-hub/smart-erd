@@ -12,7 +12,6 @@ import org.springframework.data.repository.query.Param;
  * 로그인 rate-limit 상태 레포지토리.
  */
 public interface LoginRateLimitAttemptRepository extends JpaRepository<LoginRateLimitAttempt, String> {
-
     /**
      * 키로 상태를 비관적 락으로 조회한다.
      *

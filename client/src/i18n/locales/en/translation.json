@@ -633,6 +633,14 @@
       "domains": "Domains",
       "terms": "Terms"
     },
+    "pagination": {
+      "total": "{{count}} total",
+      "page": "Page {{current}} / {{total}}"
+    },
+    "search": {
+      "domainPlaceholder": "Search domains (logical/physical type/description)",
+      "termPlaceholder": "Search terms (logical/physical/description)"
+    },
     "set": {
       "placeholder": "Select dictionary set",
       "defaultBadge": "Default",
@@ -747,11 +755,18 @@
       "preview": {
         "title": "Preview",
         "summary": "{{success}} valid, {{error}} errors ({{total}} total)",
+        "limitNotice": "For performance, up to {{max}} rows are shown with error rows prioritized. Hidden valid rows are still included for saving.",
+        "errorOnly": "Show error rows only ({{count}} in preview)",
+        "downloadErrors": "Download error rows (Excel)",
+        "emptyFiltered": "No preview rows match the current filter.",
         "row": "Row",
         "status": "Status",
-        "errorNote": "Rows with errors will be excluded from saving."
+        "errorNote": "Rows with errors will be excluded from saving.",
+        "savedWithErrors": "{{saved}} rows were saved. {{error}} error rows were excluded, and you can still download the error report."
       },
       "save": "Save ({{count}})",
+      "saveExcludingErrors": "Save excluding errors ({{count}})",
+      "saved": "Saved",
       "complete": {
         "title": "Upload Complete",
         "success": "{{count}} items successfully registered.",
@@ -760,11 +775,13 @@
       "toast": {
         "success": "Bulk upload completed",
         "failed": "Bulk upload failed",
-        "templateFailed": "Failed to download template"
+        "templateFailed": "Failed to download template",
+        "partialSaved": "{{count}} rows were saved. Error rows were excluded.",
+        "errorDownloadFailed": "Failed to download error rows"
       },
       "error": {
         "unsupportedFormat": "Unsupported file format",
-        "fileTooLarge": "File size exceeds limit (max 5MB)",
+        "fileTooLarge": "File size exceeds limit (max {{max}}MB)",
         "emptyFile": "File contains no data",
         "tooManyRows": "Maximum {{max}} rows can be uploaded",
         "missingColumns": "Required columns are missing",

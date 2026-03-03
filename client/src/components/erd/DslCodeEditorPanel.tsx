@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Loader2, CheckCircle2, AlertTriangle, Sparkles, XCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { useDarkMode } from '@/hooks/useDarkMode';
@@ -11,9 +11,13 @@ import { useBidirectionalCodeSync } from '@/hooks/useBidirectionalCodeSync';
 import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
 import { useCodeEditorTableLock } from '@/hooks/useCodeEditorTableLock';
 import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
+import { useDslEditorCompletion } from '@/hooks/useDslEditorCompletion';
+import { useDslDiagnosticMarkers } from '@/hooks/useDslDiagnosticMarkers';
+import type { AssistPopupItem } from '@/hooks/useDslEditorCompletion';
 import { useErdDictionary } from './ErdDictionaryContext';
 import CodeEditorFooter from './CodeEditorFooter';
 import DslDiagnosticGuideDialog from './DslDiagnosticGuideDialog';
+import DslAssistPopup, { type AssistPopupState } from './DslAssistPopup';
 import QuickTermDialog from './QuickTermDialog';
 import QuickDomainDialog from './QuickDomainDialog';
 import { DSL_LANGUAGE_ID, registerDslLanguage } from '@/lib/monaco-dsl-language';
@@ -21,52 +25,13 @@ import type { DslDictionary } from '@/lib/dsl-parser';
 import { generateDsl } from '@/lib/dsl-generator';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import {
-  DSL_TABLE_KEYWORD,
-  DSL_COLUMN_OPTIONS,
-  DSL_TYPE_SUGGESTIONS,
-  DSL_TABLE_AFTER_REGEX,
-  DSL_TABLE_TERM_CAPTURE_REGEX,
-  DSL_TABLE_LINE_REGEX,
-  DSL_DOMAIN_CONTEXT_REGEX,
-  DSL_DOMAIN_CAPTURE_REGEX,
-  DSL_EXPLICIT_TYPE_CONTEXT_REGEX,
-  DSL_FK_CONTEXT_REGEX,
-  DSL_FK_CAPTURE_REGEX,
-  DSL_BLOCK_TERM_CAPTURE_REGEX,
-} from '@/lib/dsl-keywords';
 import useCanvasStore from '@/stores/useCanvasStore';
 import type { TableNode, ERDEdge } from '@/types/erd';
-import type { DslError } from '@/lib/dsl-parser';
 
 /** DslCodeEditorPanel 컴포넌트의 props */
 interface DslCodeEditorPanelProps {
   /** 편집 가능 여부 (VIEWER일 때 false) */
   canEdit?: boolean;
-}
-
-type AssistPopupItemType = 'insert' | 'registerTerm' | 'registerDomain';
-
-interface AssistPopupItem {
-  id: string;
-  type: AssistPopupItemType;
-  label: string;
-  description?: string;
-  lineNumber: number;
-  startColumn: number;
-  endColumn: number;
-  insertText?: string;
-  name?: string;
-}
-
-interface AssistPopupState {
-  items: AssistPopupItem[];
-  selectedIndex: number;
-  left: number;
-  top: number;
-  preview: boolean;
-  visibleCount: number;
 }
 
 /** 커서 정지 시 빠른 등록 팝업 노출 대기 시간(ms) */
@@ -156,7 +121,7 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
       codeText: dslText,
       parsing,
       hasBlockingErrors: errorCount > 0,
-      hasParsedTables: (parseResult?.result.tables.length ?? 0) > 0,
+      hasParsedTables: parseResult != null && errorCount === 0,
       hasRemoteEditLocks,
       onCodeTextChange: handleDslChange,
       generateCodeFromErd: generateFromErd,
@@ -212,11 +177,20 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
   /** Monaco mount 완료 여부 */
   const [monacoReady, setMonacoReady] = useState(false);
 
+  // 자동완성 훅
+  const { buildAssistItems } = useDslEditorCompletion({
+    terms,
+    domains,
+    parseResult,
+  });
+
+  // 진단 마커 동기화 훅
+  useDslDiagnosticMarkers({ monacoRef, editorRef, parseResult });
+
   /**
    * beforeMount — 언어 등록 (1회).
    *
    * @param monaco Monaco 네임스페이스
-   * @returns 없음
    */
   const handleBeforeMount: BeforeMount = (monaco) => {
     registerDslLanguage(monaco);
@@ -227,7 +201,6 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
    *
    * @param editor Monaco editor 인스턴스
    * @param monaco Monaco 네임스페이스
-   * @returns 없음
    */
   const handleOnMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -357,365 +330,6 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
       visibleCount: nextVisible,
     });
   }, [setAssistPopupSync]);
-
-  /**
-   * 현재 위치에서 빠른 등록 가능한 진단을 찾는다.
-   *
-   * @param diagnostics DSL 진단 목록
-   * @param line        1-based 행
-   * @param column      1-based 열
-   * @returns 빠른 등록 대상 진단
-   */
-  const findQuickRegisterDiagnostic = useCallback(
-    (diagnostics: DslError[], line: number, column: number): DslError | null => {
-      for (const diag of diagnostics) {
-        if (diag.line !== line) {
-          continue;
-        }
-        const endInclusive = Math.max(diag.startColumn, diag.endColumn - 1);
-        if (column < diag.startColumn || column > endInclusive) {
-          continue;
-        }
-        if (diag.messageKey === 'erd.dsl.error.unknownTerm' && diag.messageArgs?.name?.trim()) {
-          return diag;
-        }
-        if (diag.messageKey === 'erd.dsl.error.unknownDomain' && diag.messageArgs?.name?.trim()) {
-          return diag;
-        }
-      }
-      return null;
-    },
-    [],
-  );
-
-  /** 현재 행이 Table {} 블록 내부인지 판별한다. */
-  const isInsideTableBlock = useCallback((model: Monaco.editor.ITextModel, lineNum: number) => {
-    let depth = 0;
-    for (let i = lineNum - 1; i >= 1; i--) {
-      const text = model.getLineContent(i).trim();
-      if (text === '}') depth--;
-      if (text.endsWith('{') || DSL_TABLE_LINE_REGEX.test(text)) {
-        depth++;
-        if (depth > 0) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }, []);
-
-  /** 커서 컨텍스트를 기반으로 보조 팝업 항목을 계산한다. */
-  const buildAssistItems = useCallback(
-    (
-      model: Monaco.editor.ITextModel,
-      position: Monaco.Position,
-      includeContextCompletions: boolean,
-    ): AssistPopupItem[] => {
-      const lineContent = model.getLineContent(position.lineNumber);
-      const textUntilPosition = lineContent.substring(0, position.column - 1);
-      const word = model.getWordUntilPosition(position);
-      const defaultStart = word.startColumn;
-      const defaultEnd = word.endColumn;
-      const items: AssistPopupItem[] = [];
-      const seen = new Set<string>();
-
-      /**
-       * 보조 팝업 후보 목록에 항목을 중복 없이 추가한다.
-       *
-       * @param item 추가할 보조 팝업 항목
-       * @returns 없음
-       */
-      const addItem = (item: AssistPopupItem) => {
-        if (seen.has(item.id)) {
-          return;
-        }
-        seen.add(item.id);
-        items.push(item);
-      };
-
-      /**
-       * 용어 미등록 컨텍스트에 빠른 용어 등록 액션을 추가한다.
-       *
-       * @param name 후보 용어명
-       * @returns 없음
-       */
-      const addRegisterTerm = (name: string) => {
-        const normalized = name.trim();
-        if (!normalized) {
-          return;
-        }
-        addItem({
-          id: `register-term:${normalized}`,
-          type: 'registerTerm',
-          label: t('erd.dsl.assist.registerTerm'),
-          description: t('erd.dsl.errorGuide.quickAction.registerTerm', { name: normalized }),
-          lineNumber: position.lineNumber,
-          startColumn: position.column,
-          endColumn: position.column,
-          name: normalized,
-        });
-      };
-
-      /**
-       * 도메인 미등록 컨텍스트에 빠른 도메인 등록 액션을 추가한다.
-       *
-       * @param name 후보 도메인명
-       * @returns 없음
-       */
-      const addRegisterDomain = (name: string) => {
-        const normalized = name.trim();
-        if (!normalized) {
-          return;
-        }
-        addItem({
-          id: `register-domain:${normalized}`,
-          type: 'registerDomain',
-          label: t('erd.dsl.assist.registerDomain'),
-          description: t('erd.dsl.errorGuide.quickAction.registerDomain', { name: normalized }),
-          lineNumber: position.lineNumber,
-          startColumn: position.column,
-          endColumn: position.column,
-          name: normalized,
-        });
-      };
-
-      /**
-       * 텍스트 치환형 자동완성 항목을 추가한다.
-       *
-       * @param id 항목 ID
-       * @param label 표시 라벨
-       * @param insertText 삽입 텍스트
-       * @param description 보조 설명
-       * @param startColumn 치환 시작 컬럼
-       * @param endColumn 치환 종료 컬럼
-       * @returns 없음
-       */
-      const addInsert = (
-        id: string,
-        label: string,
-        insertText: string,
-        description?: string,
-        startColumn = defaultStart,
-        endColumn = defaultEnd,
-      ) => {
-        addItem({
-          id,
-          type: 'insert',
-          label,
-          description,
-          lineNumber: position.lineNumber,
-          startColumn,
-          endColumn,
-          insertText,
-        });
-      };
-
-      type MatchScore = readonly [number, number, number, number];
-
-      /**
-       * 검색어(query)와 후보(candidate)의 부분 일치 점수를 계산한다.
-       *
-       * @param candidate 후보 문자열
-       * @param query 사용자 입력 문자열
-       * @returns 일치 점수. 일치하지 않으면 null
-       */
-      const scoreMatch = (candidate: string, query: string): MatchScore | null => {
-        const normalizedCandidate = candidate.toLowerCase();
-        const normalizedQuery = query.toLowerCase();
-        const index = normalizedCandidate.indexOf(normalizedQuery);
-        if (index < 0) {
-          return null;
-        }
-        const startsWith = index === 0 ? 0 : 1;
-        const exact = normalizedCandidate === normalizedQuery ? 0 : 1;
-        return [exact, startsWith, index, normalizedCandidate.length] as const;
-      };
-
-      const diagnosticAtCursor =
-        parseResult?.diagnostics &&
-        (findQuickRegisterDiagnostic(
-          parseResult.diagnostics,
-          position.lineNumber,
-          position.column - 1,
-        ) ||
-          findQuickRegisterDiagnostic(
-            parseResult.diagnostics,
-            position.lineNumber,
-            position.column,
-          ));
-      if (diagnosticAtCursor?.messageKey === 'erd.dsl.error.unknownTerm') {
-        addRegisterTerm(diagnosticAtCursor.messageArgs?.name ?? '');
-      } else if (diagnosticAtCursor?.messageKey === 'erd.dsl.error.unknownDomain') {
-        addRegisterDomain(diagnosticAtCursor.messageArgs?.name ?? '');
-      }
-
-      if (!includeContextCompletions) {
-        return items;
-      }
-
-      if (/::\s*\S*$/.test(textUntilPosition) && !textUntilPosition.includes('//')) {
-        for (const type of DSL_TYPE_SUGGESTIONS) {
-          addInsert(`type:${type}`, type, type, t('erd.dsl.assist.typeSuggestion'));
-        }
-      }
-
-      if (/\[\s*$/.test(textUntilPosition) || /,\s*$/.test(textUntilPosition)) {
-        const bracketIdx = lineContent.lastIndexOf('[');
-        const optionsUsed = bracketIdx >= 0 ? lineContent.substring(bracketIdx).toUpperCase() : '';
-        for (const option of DSL_COLUMN_OPTIONS) {
-          if (!optionsUsed.includes(option)) {
-            addInsert(`option:${option}`, option, option, t('erd.dsl.assist.optionSuggestion'));
-          }
-        }
-      }
-
-      if (
-        DSL_DOMAIN_CONTEXT_REGEX.test(textUntilPosition) &&
-        !DSL_EXPLICIT_TYPE_CONTEXT_REGEX.test(textUntilPosition) &&
-        !textUntilPosition.includes('//')
-      ) {
-        const domainInputRaw =
-          textUntilPosition.match(DSL_DOMAIN_CAPTURE_REGEX)?.[2] ?? word.word.trim();
-        const domainInput = domainInputRaw.trim();
-        const normalizedDomainInput = domainInput.toLowerCase();
-        const replaceStart = Math.max(1, position.column - domainInputRaw.length);
-        const rankedDomains: Array<{ domain: (typeof domains)[number]; score: MatchScore }> = [];
-        for (const domain of domains) {
-          if (!normalizedDomainInput) {
-            rankedDomains.push({ domain, score: [1, 1, 0, domain.logicalName.length] });
-            continue;
-          }
-          const logicalScore = scoreMatch(domain.logicalName, normalizedDomainInput);
-          const physicalTypeScore = scoreMatch(domain.physicalType, normalizedDomainInput);
-          const score = logicalScore ?? physicalTypeScore;
-          if (score) {
-            rankedDomains.push({ domain, score });
-          }
-        }
-        const matchedDomains = rankedDomains
-          .sort((a, b) => {
-            for (let i = 0; i < a.score.length; i++) {
-              if (a.score[i] !== b.score[i]) {
-                return a.score[i] - b.score[i];
-              }
-            }
-            return a.domain.logicalName.localeCompare(b.domain.logicalName);
-          })
-          .map((item) => item.domain);
-
-        for (const domain of matchedDomains) {
-          addInsert(
-            `domain:${domain.id}`,
-            domain.logicalName,
-            domain.logicalName,
-            domain.physicalType,
-            replaceStart,
-            position.column,
-          );
-        }
-        addRegisterDomain(domainInput || diagnosticAtCursor?.messageArgs?.name || '');
-        return items;
-      }
-
-      if (DSL_FK_CONTEXT_REGEX.test(textUntilPosition)) {
-        const parsedTables = parseResult?.result.tables.map((table) => ({
-          logicalName: table.logicalTableName ?? table.name,
-          columns: table.columns.map((col) => col.logicalName ?? col.name),
-        }));
-        const afterArrow = textUntilPosition.match(DSL_FK_CAPTURE_REGEX)?.[1] ?? '';
-        const dotIdx = afterArrow.indexOf('.');
-        let hasFkSuggestions = false;
-        if (dotIdx < 0) {
-          const tableStart = Math.max(1, position.column - afterArrow.length);
-          for (const table of parsedTables ?? []) {
-            hasFkSuggestions = true;
-            addInsert(
-              `fk-table:${table.logicalName}`,
-              table.logicalName,
-              table.logicalName,
-              undefined,
-              tableStart,
-              position.column,
-            );
-          }
-        } else {
-          const tableName = afterArrow.substring(0, dotIdx).trim();
-          const colInput = afterArrow.substring(dotIdx + 1);
-          const colStart = Math.max(1, position.column - colInput.length);
-          const table = parsedTables?.find((item) => item.logicalName === tableName);
-          for (const col of table?.columns ?? []) {
-            hasFkSuggestions = true;
-            addInsert(`fk-col:${tableName}.${col}`, col, col, undefined, colStart, position.column);
-          }
-        }
-        if (hasFkSuggestions) {
-          return items;
-        }
-      }
-
-      const inBlock = isInsideTableBlock(model, position.lineNumber);
-      if (/^\s*\S*$/.test(textUntilPosition) && !inBlock) {
-        const typed = word.word.toLowerCase();
-        if (typed.length > 0 && DSL_TABLE_KEYWORD.toLowerCase().startsWith(typed)) {
-          addInsert(
-            'keyword:table',
-            DSL_TABLE_KEYWORD,
-            `${DSL_TABLE_KEYWORD} `,
-            t('erd.dsl.assist.tableKeyword'),
-          );
-        }
-      }
-
-      if (DSL_TABLE_AFTER_REGEX.test(textUntilPosition) || inBlock) {
-        const termInputRaw = DSL_TABLE_AFTER_REGEX.test(textUntilPosition)
-          ? (textUntilPosition.match(DSL_TABLE_TERM_CAPTURE_REGEX)?.[1] ?? word.word.trim())
-          : (textUntilPosition.match(DSL_BLOCK_TERM_CAPTURE_REGEX)?.[1] ?? word.word.trim());
-        const termInput = termInputRaw.trim();
-        const termStart = Math.max(1, position.column - termInputRaw.length);
-        const normalizedTermInput = termInput.toLowerCase();
-        const rankedTerms: Array<{ term: (typeof terms)[number]; score: MatchScore }> = [];
-        for (const term of terms) {
-          if (!normalizedTermInput) {
-            rankedTerms.push({ term, score: [1, 1, 0, term.logicalName.length] });
-            continue;
-          }
-          const logicalScore = scoreMatch(term.logicalName, normalizedTermInput);
-          const physicalScore = scoreMatch(term.physicalName, normalizedTermInput);
-          const score = logicalScore ?? physicalScore;
-          if (score) {
-            rankedTerms.push({ term, score });
-          }
-        }
-        const matchedTerms = rankedTerms
-          .sort((a, b) => {
-            for (let i = 0; i < a.score.length; i++) {
-              if (a.score[i] !== b.score[i]) {
-                return a.score[i] - b.score[i];
-              }
-            }
-            return a.term.logicalName.localeCompare(b.term.logicalName);
-          })
-          .map((item) => item.term);
-
-        for (const term of matchedTerms) {
-          addInsert(
-            `term:${term.id}`,
-            term.logicalName,
-            term.logicalName,
-            `${term.physicalName}${term.domainLogicalName ? ` (${term.domainLogicalName})` : ''}`,
-            termStart,
-            position.column,
-          );
-        }
-        addRegisterTerm(termInput || diagnosticAtCursor?.messageArgs?.name || '');
-      }
-
-      const registerItems = items.filter((item) => item.type !== 'insert');
-      const insertItems = items.filter((item) => item.type === 'insert');
-      return [...registerItems, ...insertItems].slice(0, 40);
-    },
-    [domains, findQuickRegisterDiagnostic, isInsideTableBlock, parseResult, t, terms],
-  );
 
   /** 보조 팝업을 연다. */
   const openAssistPopup = useCallback(
@@ -853,43 +467,6 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     handleDslChange(dslText);
   }, [terms, domains, dslText, handleDslChange]);
 
-  // diagnostics 변경 시 Monaco 에러 마커 갱신
-  useEffect(() => {
-    const monaco = monacoRef.current;
-    const editor = editorRef.current;
-    if (!monaco || !editor) {
-      return;
-    }
-
-    const model = editor.getModel();
-    if (!model) {
-      return;
-    }
-
-    if (!parseResult || parseResult.diagnostics.length === 0) {
-      monaco.editor.setModelMarkers(model, 'dsl', []);
-    } else {
-      const markers: Monaco.editor.IMarkerData[] = parseResult.diagnostics.map((diag) => ({
-        severity:
-          diag.severity === 'error' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        message: t(diag.messageKey as any, diag.messageArgs),
-        startLineNumber: diag.line,
-        startColumn: diag.startColumn,
-        endLineNumber: diag.line,
-        endColumn: diag.endColumn,
-      }));
-
-      monaco.editor.setModelMarkers(model, 'dsl', markers);
-    }
-
-    return () => {
-      if (!model.isDisposed()) {
-        monaco.editor.setModelMarkers(model, 'dsl', []);
-      }
-    };
-  }, [parseResult, t]);
-
   // Ctrl+Space는 팝업 오픈 트리거로 유지한다.
   useEffect(() => {
     const editor = editorRef.current;
@@ -903,8 +480,6 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
       const browserEvent = event.browserEvent;
       /**
        * 현재 키 이벤트를 Monaco/브라우저 양쪽에서 소비 처리한다.
-       *
-       * @returns 없음
        */
       const consume = () => {
         event.preventDefault();
@@ -988,7 +563,6 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
      * 보조 팝업 선택 인덱스를 delta만큼 순환 이동한다.
      *
      * @param delta 이동량 (양수: 아래, 음수: 위)
-     * @returns 없음
      */
     const moveSelection = (delta: number) => {
       const popup = assistPopupRef.current;
@@ -1005,8 +579,6 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
 
     /**
      * 현재 선택된 보조 팝업 항목을 실행한다.
-     *
-     * @returns 없음
      */
     const executeSelected = () => {
       const popup = assistPopupRef.current;
@@ -1074,8 +646,6 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
 
     /**
      * 커서 정지 후 자동 보조 팝업을 띄우기 위한 타이머를 예약한다.
-     *
-     * @returns 없음
      */
     const scheduleIdleQuickAction = () => {
       clearIdleQuickActionTimer();
@@ -1167,111 +737,14 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
         />
 
         {assistPopup && (
-          <div
-            className="absolute z-20 pointer-events-none"
-            style={{ left: assistPopup.left, top: assistPopup.top }}
-          >
-            <div
-              className={cn(
-                'pointer-events-auto w-[312px] animate-in fade-in zoom-in-95 duration-150 rounded-xl border p-2.5 shadow-lg backdrop-blur-sm transition-all',
-                assistPopup.preview
-                  ? 'border-border/60 bg-card/70 opacity-40 hover:opacity-100'
-                  : 'border-border/80 bg-card/100 opacity-100',
-              )}
-              onMouseDown={promoteAssistPopup}
-            >
-              <div className="mb-2 flex items-center justify-between border-b border-border/70 pb-2">
-                <p className="text-[11px] font-medium text-muted-foreground">
-                  {t('erd.dsl.assist.title')}
-                </p>
-                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                  <span>
-                    {t('erd.dsl.assist.moreCount', {
-                      shown: Math.min(assistPopup.visibleCount, assistPopup.items.length),
-                      total: assistPopup.items.length,
-                    })}
-                  </span>
-                  <span>{t('erd.dsl.assist.keyboardHint')}</span>
-                </div>
-              </div>
-              <p className="sr-only" aria-live="polite">
-                {`${assistPopup.selectedIndex + 1}/${Math.min(
-                  assistPopup.visibleCount,
-                  assistPopup.items.length,
-                )} ${assistPopup.items[assistPopup.selectedIndex]?.label ?? ''}`}
-              </p>
-              <ul
-                ref={assistPopupListRef}
-                role="listbox"
-                aria-label={t('erd.dsl.assist.title')}
-                aria-activedescendant={`dsl-assist-option-${assistPopup.selectedIndex}`}
-                className="max-h-[228px] space-y-1 overflow-y-auto"
-              >
-                {assistPopup.items.slice(0, assistPopup.visibleCount).map((item, idx) => {
-                  const selected = assistPopup.selectedIndex === idx;
-                  const optionId = `dsl-assist-option-${idx}`;
-                  return (
-                    <li key={item.id}>
-                      <button
-                        id={optionId}
-                        type="button"
-                        role="option"
-                        aria-selected={selected}
-                        className={cn(
-                          'flex w-full items-start justify-between gap-3 rounded-md px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                          selected ? 'bg-primary/10 text-primary' : 'hover:bg-muted/70',
-                        )}
-                        data-assist-index={idx}
-                        onMouseEnter={() => setAssistPopupSelectedIndex(idx)}
-                        onMouseDown={(event) => {
-                          // 버튼 클릭 시 editor blur가 먼저 발생하면 popup이 닫혀 onClick이 유실될 수 있다.
-                          event.preventDefault();
-                        }}
-                        onClick={() => executeAssistPopupItem(item)}
-                      >
-                        <span className="flex min-w-0 flex-col">
-                          <span className="flex items-center gap-1.5 text-xs font-medium leading-5">
-                            {item.type !== 'insert' && (
-                              <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                            )}
-                            <span className="truncate">{item.label}</span>
-                          </span>
-                          {item.description && (
-                            <span className="truncate text-[11px] text-muted-foreground">
-                              {item.description}
-                            </span>
-                          )}
-                        </span>
-                        {item.type !== 'insert' && (
-                          <Badge
-                            variant="secondary"
-                            className="h-5 shrink-0 px-1.5 text-[10px] font-medium"
-                          >
-                            {t('erd.dsl.assist.badgeNew')}
-                          </Badge>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-              {assistPopup.visibleCount < assistPopup.items.length && (
-                <div className="mt-2 border-t border-border/60 pt-2">
-                  <button
-                    type="button"
-                    aria-label={t('erd.dsl.assist.loadMore')}
-                    className="w-full rounded-md bg-muted/60 px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    onMouseDown={(event) => {
-                      event.preventDefault();
-                    }}
-                    onClick={expandAssistPopupVisibleCount}
-                  >
-                    {t('erd.dsl.assist.loadMore')}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+          <DslAssistPopup
+            popup={assistPopup}
+            listRef={assistPopupListRef}
+            onSelectIndex={setAssistPopupSelectedIndex}
+            onExecuteItem={executeAssistPopupItem}
+            onPromote={promoteAssistPopup}
+            onExpand={expandAssistPopupVisibleCount}
+          />
         )}
       </div>
 

@@ -1,5 +1,6 @@
 package com.smarterd.domain.dictionary.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.api.dictionary.dto.BulkDomainRow;
 import com.smarterd.api.dictionary.dto.BulkDomainSaveRequest;
 import com.smarterd.api.dictionary.dto.BulkSaveResponse;
@@ -7,25 +8,33 @@ import com.smarterd.api.dictionary.dto.BulkValidationResponse;
 import com.smarterd.api.dictionary.dto.BulkValidationRow;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import com.smarterd.utils.AppStringUtils;
 import com.smarterd.utils.ExcelUtils;
+import com.smarterd.utils.excel.ExcelData;
+import com.smarterd.utils.excel.ExcelSheet;
+import java.lang.reflect.Method;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +52,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class DomainBulkService extends AbstractBulkService<DomainBulkService.DomainUploadRow> {
 
     private static final int PHYSICAL_TYPE_MAX = 50;
+    private static final int LOGICAL_NAME_QUERY_BATCH_SIZE = 5_000;
+    private static final int PREVIEW_ROW_LIMIT = 2_000;
 
     /** 도메인 레포지토리 */
     private final DomainRepository domainRepository;
@@ -59,11 +70,13 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     public DomainBulkService(
         DomainRepository domainRepository,
         DictionarySetService dictionarySetService,
+        StringRedisTemplate redisTemplate,
+        ObjectMapper objectMapper,
         AuthService authService,
         TeamService teamService,
         MessageSource messageSource
     ) {
-        super(authService, teamService, messageSource);
+        super(authService, teamService, messageSource, redisTemplate, objectMapper);
         this.domainRepository = domainRepository;
         this.dictionarySetService = dictionarySetService;
     }
@@ -91,11 +104,22 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
         return map;
     }
 
+    @Override
+    protected List<String> excelColumnKeys() {
+        return List.of("logicalName", "physicalType", "description");
+    }
+
+    @Override
+    protected String validationSessionKeyPrefix() {
+        return "dict:bulk:validation:domain:";
+    }
+
     /**
      * 업로드 파일에서 도메인 데이터를 파싱하고 검증한다.
      *
      * @param loginId 요청 사용자의 로그인 ID
      * @param teamId  팀 ID
+     * @param setId   사전 세트 ID
      * @param file    업로드 파일 (.xlsx 또는 .csv)
      * @param locale  요청 로케일
      * @return 검증 결과 응답
@@ -112,78 +136,210 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
 
         final var fileName = file.getOriginalFilename();
         final var rawRows = parseFile(file, fileName);
-
         validateRowCount(rawRows);
 
         // DB 기존 논리명 일괄 조회
-        final var logicalNames = rawRows
-            .stream()
-            .map((row) -> AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", "")))
-            .toList();
-        final var existingNames = domainRepository
-            .findByDictionarySetAndLogicalNameIn(dictionarySet, logicalNames)
-            .stream()
-            .map(Domain::getLogicalName)
-            .collect(Collectors.toSet());
+        final var existingNames = findExistingLogicalNames(
+            dictionarySet,
+            rawRows
+                .stream()
+                .map((row) -> AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", "")))
+                .toList()
+        );
 
-        // 파일 내 중복 추적
+        // 행별 검증
+        final var validationResult = validateRows(rawRows, existingNames, locale);
+
+        // 세션 생성 및 응답
+        return createValidationResponse(loginId, teamId, dictionarySet.getId(), rawRows.size(), validationResult);
+    }
+
+    /**
+     * 모든 행을 순회하며 필드 검증, 중복 검사를 수행하고 결과를 수집한다.
+     *
+     * @param rawRows       파싱된 행 목록
+     * @param existingNames DB에 이미 존재하는 논리명 집합
+     * @param locale        요청 로케일
+     * @return 검증 결과 누적 객체
+     */
+    private RowValidationResult validateRows(
+        List<Map<String, String>> rawRows,
+        Set<String> existingNames,
+        Locale locale
+    ) {
         final var seenNames = new HashSet<String>();
-        final var validationRows = new ArrayList<BulkValidationRow>();
-        var validCount = 0;
+        final var result = new RowValidationResult(rawRows.size());
 
         for (var i = 0; i < rawRows.size(); i++) {
             final var row = rawRows.get(i);
-            final var errors = new ArrayList<String>();
             final var logicalName = AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", ""));
             final var physicalType = AppStringUtils.trimToEmpty(row.getOrDefault("physicalType", ""));
             final var description = AppStringUtils.trimToEmpty(row.getOrDefault("description", ""));
 
-            // 필수 필드 검증
-            if (AppStringUtils.isBlank(logicalName)) {
-                errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_LOGICAL_NAME_REQUIRED.code(), locale));
-            } else if (logicalName.length() > LOGICAL_NAME_MAX) {
-                errors.add(
-                    msg(MessageCode.ERROR_BULK_VALIDATION_LOGICAL_NAME_MAX_LENGTH.code(), locale, LOGICAL_NAME_MAX)
-                );
-            }
-
-            if (AppStringUtils.isBlank(physicalType)) {
-                errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_PHYSICAL_TYPE_REQUIRED.code(), locale));
-            } else if (physicalType.length() > PHYSICAL_TYPE_MAX) {
-                errors.add(
-                    msg(MessageCode.ERROR_BULK_VALIDATION_PHYSICAL_TYPE_MAX_LENGTH.code(), locale, PHYSICAL_TYPE_MAX)
-                );
-            }
-
-            if (description.length() > DESCRIPTION_MAX) {
-                errors.add(
-                    msg(MessageCode.ERROR_BULK_VALIDATION_DESCRIPTION_MAX_LENGTH.code(), locale, DESCRIPTION_MAX)
-                );
-            }
-
-            // 파일 내 중복 체크
-            if (AppStringUtils.isNotBlank(logicalName) && !seenNames.add(logicalName)) {
-                errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DUPLICATE_IN_FILE.code(), locale, logicalName));
-            }
-
-            // DB 중복 체크
-            if (AppStringUtils.isNotBlank(logicalName) && existingNames.contains(logicalName)) {
-                errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DUPLICATE_IN_DB.code(), locale, logicalName));
-            }
+            final var errors = validateSingleRow(
+                logicalName,
+                physicalType,
+                description,
+                seenNames,
+                existingNames,
+                locale
+            );
 
             final var data = new LinkedHashMap<String, String>();
             data.put("logicalName", logicalName);
             data.put("physicalType", physicalType);
             data.put("description", description);
 
+            final var rowNumber = i + 2;
             final var valid = errors.isEmpty();
+            final var previewRow = new BulkValidationRow(rowNumber, valid, errors, data);
+
             if (valid) {
-                validCount++;
+                result.addValid(
+                    previewRow,
+                    new ValidatedDomainRow(rowNumber, new BulkDomainRow(logicalName, physicalType, description))
+                );
+            } else {
+                result.addError(
+                    previewRow,
+                    new DomainErrorReportRow(
+                        rowNumber,
+                        logicalName,
+                        physicalType,
+                        description,
+                        String.join("\n", errors)
+                    )
+                );
             }
-            validationRows.add(new BulkValidationRow(i + 2, valid, errors, data));
+        }
+        return result;
+    }
+
+    /**
+     * 단일 도메인 행의 필드 검증과 중복 검사를 수행한다.
+     *
+     * @param logicalName   논리명
+     * @param physicalType  물리 타입
+     * @param description   설명
+     * @param seenNames     파일 내 이미 등장한 논리명 집합 (변경됨)
+     * @param existingNames DB에 존재하는 논리명 집합
+     * @param locale        요청 로케일
+     * @return 에러 메시지 목록 (비어있으면 유효)
+     */
+    private List<String> validateSingleRow(
+        String logicalName,
+        String physicalType,
+        String description,
+        Set<String> seenNames,
+        Set<String> existingNames,
+        Locale locale
+    ) {
+        final var errors = new ArrayList<String>();
+
+        if (AppStringUtils.isBlank(logicalName)) {
+            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_LOGICAL_NAME_REQUIRED.code(), locale));
+        } else if (logicalName.length() > LOGICAL_NAME_MAX) {
+            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_LOGICAL_NAME_MAX_LENGTH.code(), locale, LOGICAL_NAME_MAX));
         }
 
-        return new BulkValidationResponse(rawRows.size(), validCount, rawRows.size() - validCount, validationRows);
+        if (AppStringUtils.isBlank(physicalType)) {
+            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_PHYSICAL_TYPE_REQUIRED.code(), locale));
+        } else if (physicalType.length() > PHYSICAL_TYPE_MAX) {
+            errors.add(
+                msg(MessageCode.ERROR_BULK_VALIDATION_PHYSICAL_TYPE_MAX_LENGTH.code(), locale, PHYSICAL_TYPE_MAX)
+            );
+        }
+
+        if (description.length() > DESCRIPTION_MAX) {
+            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DESCRIPTION_MAX_LENGTH.code(), locale, DESCRIPTION_MAX));
+        }
+
+        if (AppStringUtils.isNotBlank(logicalName) && !seenNames.add(logicalName)) {
+            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DUPLICATE_IN_FILE.code(), locale, logicalName));
+        }
+
+        if (AppStringUtils.isNotBlank(logicalName) && existingNames.contains(logicalName)) {
+            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DUPLICATE_IN_DB.code(), locale, logicalName));
+        }
+
+        return errors;
+    }
+
+    /**
+     * 검증 결과를 기반으로 Redis 세션을 저장하고 응답을 생성한다.
+     *
+     * @param loginId          요청 사용자 로그인 ID
+     * @param teamId           팀 ID
+     * @param setId            사전 세트 ID
+     * @param totalRows        전체 행 수
+     * @param validationResult 검증 결과 누적 객체
+     * @return 검증 결과 응답
+     */
+    private BulkValidationResponse createValidationResponse(
+        String loginId,
+        Long teamId,
+        Long setId,
+        int totalRows,
+        RowValidationResult validationResult
+    ) {
+        final var previewRows = mergePreviewRows(
+            validationResult.errorPreviewRows,
+            validationResult.validPreviewRows,
+            PREVIEW_ROW_LIMIT
+        );
+
+        final var session = new ValidationSession(
+            loginId,
+            teamId,
+            setId,
+            Instant.now().plus(VALIDATION_SESSION_TTL),
+            List.copyOf(validationResult.validRows),
+            List.copyOf(validationResult.errorRows),
+            false
+        );
+        final var validationToken = issueValidationToken(session);
+        return new BulkValidationResponse(
+            validationToken,
+            totalRows,
+            validationResult.validCount,
+            validationResult.errorCount,
+            totalRows > previewRows.size(),
+            previewRows
+        );
+    }
+
+    /**
+     * 행 검증 결과를 누적하는 내부 데이터 홀더.
+     */
+    private static class RowValidationResult {
+
+        final ArrayList<BulkValidationRow> errorPreviewRows;
+        final ArrayList<BulkValidationRow> validPreviewRows;
+        final ArrayList<ValidatedDomainRow> validRows = new ArrayList<>();
+        final ArrayList<DomainErrorReportRow> errorRows = new ArrayList<>();
+        int validCount = 0;
+        int errorCount = 0;
+
+        RowValidationResult(int estimatedSize) {
+            this.errorPreviewRows = new ArrayList<>(Math.min(estimatedSize, PREVIEW_ROW_LIMIT));
+            this.validPreviewRows = new ArrayList<>(Math.min(estimatedSize, PREVIEW_ROW_LIMIT));
+        }
+
+        void addValid(BulkValidationRow previewRow, ValidatedDomainRow validatedRow) {
+            validCount++;
+            validRows.add(validatedRow);
+            if (validPreviewRows.size() < PREVIEW_ROW_LIMIT) {
+                validPreviewRows.add(previewRow);
+            }
+        }
+
+        void addError(BulkValidationRow previewRow, DomainErrorReportRow errorReportRow) {
+            errorCount++;
+            errorRows.add(errorReportRow);
+            if (errorPreviewRows.size() < PREVIEW_ROW_LIMIT) {
+                errorPreviewRows.add(previewRow);
+            }
+        }
     }
 
     /**
@@ -198,21 +354,31 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     public BulkSaveResponse bulkSave(String loginId, Long teamId, Long setId, BulkDomainSaveRequest request) {
         final var team = verifyTeamAccess(loginId, teamId);
         final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
+        final var session = consumeValidationSession(
+            loginId,
+            teamId,
+            setId,
+            request.validationToken(),
+            ValidationSession.class
+        );
+        final var excludedRowNumbers = new HashSet<>(request.excludedRowNumbers());
+        final var candidateRows = session
+            .validRows()
+            .stream()
+            .filter((row) -> !excludedRowNumbers.contains(row.rowNumber()))
+            .map(ValidatedDomainRow::row)
+            .toList();
 
         // 기존 논리명 일괄 조회 (N+1 방지)
-        final var existingNames = domainRepository
-            .findByDictionarySetAndLogicalNameIn(
-                dictionarySet,
-                request.rows().stream().map(BulkDomainRow::logicalName).toList()
-            )
-            .stream()
-            .map(Domain::getLogicalName)
-            .collect(Collectors.toSet());
+        final var existingNames = findExistingLogicalNames(
+            dictionarySet,
+            candidateRows.stream().map(BulkDomainRow::logicalName).toList()
+        );
 
         final var domainsToSave = new ArrayList<Domain>();
         var failedCount = 0;
 
-        for (BulkDomainRow row : request.rows()) {
+        for (BulkDomainRow row : candidateRows) {
             if (existingNames.contains(row.logicalName())) {
                 failedCount++;
                 continue;
@@ -237,6 +403,95 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     }
 
     /**
+     * 검증 실패 행을 엑셀로 다운로드한다.
+     *
+     * @param loginId         요청 사용자의 로그인 ID
+     * @param teamId          팀 ID
+     * @param setId           사전 세트 ID
+     * @param validationToken 검증 세션 토큰
+     * @param locale          요청 로케일
+     * @return 오류 행 엑셀 데이터
+     */
+    public ExcelData generateErrorReport(
+        String loginId,
+        Long teamId,
+        Long setId,
+        String validationToken,
+        Locale locale
+    ) {
+        final var team = verifyTeamAccess(loginId, teamId);
+        dictionarySetService.findByTeamAndId(team, setId);
+        final var session = resolveValidationSession(loginId, teamId, setId, validationToken, ValidationSession.class);
+
+        final var sheet = new ExcelSheet<DomainErrorReportRow>();
+        sheet.setSheetName(msg("bulk.error-report.sheet-name", locale));
+        sheet.setTitles(
+            List.of(
+                msg("bulk.error-report.col.row", locale),
+                msg("bulk.error-report.col.logical-name", locale),
+                msg("bulk.error-report.col.physical-type", locale),
+                msg("bulk.error-report.col.description", locale),
+                msg("bulk.error-report.col.errors", locale)
+            )
+        );
+        sheet.setReqMethods(errorReportMethods());
+        sheet.setDataList(session.errorRows());
+
+        return new ExcelUtils<DomainErrorReportRow>().toExcel(List.of(sheet), null, "domain-upload-errors");
+    }
+
+    /**
+     * 논리명 목록을 배치로 조회하여 기존 도메인 논리명을 반환한다.
+     *
+     * <p>대량 업로드에서 DB IN 절 파라미터 한도 초과를 피하기 위해 일정 크기로 분할 조회한다.</p>
+     *
+     * @param dictionarySet 사전 세트
+     * @param logicalNames  조회 대상 논리명 목록
+     * @return DB에 이미 존재하는 논리명 집합
+     */
+    private Set<String> findExistingLogicalNames(DictionarySet dictionarySet, List<String> logicalNames) {
+        final var normalized = logicalNames
+            .stream()
+            .map(AppStringUtils::trimToEmpty)
+            .filter(AppStringUtils::isNotBlank)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (normalized.isEmpty()) {
+            return Set.of();
+        }
+
+        final var names = new ArrayList<>(normalized);
+        final var existing = new HashSet<String>();
+        for (var start = 0; start < names.size(); start += LOGICAL_NAME_QUERY_BATCH_SIZE) {
+            final var end = Math.min(start + LOGICAL_NAME_QUERY_BATCH_SIZE, names.size());
+            existing.addAll(
+                domainRepository
+                    .findByDictionarySetAndLogicalNameIn(dictionarySet, names.subList(start, end))
+                    .stream()
+                    .map(Domain::getLogicalName)
+                    .toList()
+            );
+        }
+        return existing;
+    }
+
+    /**
+     * 오류 보고서 엑셀 컬럼 순서 메서드를 반환한다.
+     */
+    private List<Method> errorReportMethods() {
+        try {
+            return List.of(
+                DomainErrorReportRow.class.getMethod("rowNumber"),
+                DomainErrorReportRow.class.getMethod("logicalName"),
+                DomainErrorReportRow.class.getMethod("physicalType"),
+                DomainErrorReportRow.class.getMethod("description"),
+                DomainErrorReportRow.class.getMethod("errors")
+            );
+        } catch (NoSuchMethodException e) {
+            throw new IllegalStateException("Failed to resolve domain error report methods", e);
+        }
+    }
+
+    /**
      * 도메인 템플릿 엑셀을 생성한다.
      *
      * <p>Accept-Language 헤더에 따라 컬럼 헤더, 샘플 데이터, 가이드 시트가 해당 언어로 생성된다.</p>
@@ -246,7 +501,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
      * @param locale  요청 로케일
      * @return 엑셀 데이터
      */
-    public ExcelUtils.ExcelData generateTemplate(String loginId, Long teamId, Long setId, @NonNull Locale locale) {
+    public ExcelData generateTemplate(String loginId, Long teamId, Long setId, @NonNull Locale locale) {
         final var team = verifyTeamAccess(loginId, teamId);
         dictionarySetService.findByTeamAndId(team, setId);
 
@@ -285,6 +540,29 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
         private String physicalType;
         private String description;
     }
+
+    /** 검증 후 저장 가능한 도메인 행. */
+    private record ValidatedDomainRow(int rowNumber, BulkDomainRow row) {}
+
+    /** 오류 보고서 엑셀 행. */
+    public record DomainErrorReportRow(
+        int rowNumber,
+        String logicalName,
+        String physicalType,
+        String description,
+        String errors
+    ) {}
+
+    /** 검증 세션 저장 모델. */
+    private record ValidationSession(
+        String loginId,
+        Long teamId,
+        Long setId,
+        Instant expiresAt,
+        List<ValidatedDomainRow> validRows,
+        List<DomainErrorReportRow> errorRows,
+        boolean saveConsumed
+    ) implements SessionExpirable, SessionOwnership {}
 
     /** 템플릿 엑셀 생성용 행 데이터. */
     public record TemplateRow(String logicalName, String physicalType, String description) {}

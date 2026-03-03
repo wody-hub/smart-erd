@@ -1,5 +1,7 @@
 package com.smarterd.config.persistence.sqlformat.step;
 
+import com.smarterd.config.persistence.sqlformat.SqlCharUtils;
+
 /**
  * 문자열 리터럴 외부의 연속 공백을 1칸으로 축약한다.
  *
@@ -26,7 +28,7 @@ public class CollapseWhitespaceStep implements SqlFormatStep {
                 result.append(ch);
                 if (ch == '\'') {
                     // ''는 SQL 문자열 이스케이프이므로 둘 다 유지한다.
-                    if (isEscapedSingleQuote(sql, i)) {
+                    if (SqlCharUtils.isEscapedSingleQuote(sql, i)) {
                         result.append(sql.charAt(i + 1));
                         i++;
                     } else {
@@ -56,18 +58,5 @@ public class CollapseWhitespaceStep implements SqlFormatStep {
         }
 
         return result.toString().trim();
-    }
-
-    /**
-     * SQL 문자열에서 '' 형태 이스케이프 여부.
-     *
-     * @param text 검사 문자열
-     * @param index 현재 인덱스
-     * @return '' 이스케이프 시작 여부
-     */
-    private static boolean isEscapedSingleQuote(String text, int index) {
-        return index + 1 < text.length()
-            && text.charAt(index) == '\''
-            && text.charAt(index + 1) == '\'';
     }
 }

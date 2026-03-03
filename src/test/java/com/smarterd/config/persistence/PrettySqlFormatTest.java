@@ -10,8 +10,9 @@ class PrettySqlFormatTest {
 
     @Test
     void formatMessage_formatsSelectWithLeadingCommaAndClauseLineBreak() {
-        final var sql = "select u.user_no, u.user_name, coalesce(u.email, '') as email from tb_user u "
-            + "left join tb_org o on o.org_no = u.org_no where u.del_yn = 'N' and u.user_name like '%jae%'";
+        final var sql =
+            "select u.user_no, u.user_name, coalesce(u.email, '') as email from tb_user u " +
+            "left join tb_org o on o.org_no = u.org_no where u.del_yn = 'N' and u.user_name like '%jae%'";
 
         final var formatted = formatter.formatMessage(1, "", 12L, "statement", "", sql, "");
 
@@ -40,8 +41,9 @@ class PrettySqlFormatTest {
 
     @Test
     void formatMessage_formatsUpdateFromJoinWithPreferredClauseIndent() {
-        final var sql = "update diagrams set dictionary_set_id=3 from diagrams d1_0 join projects p1_0 on p1_0.id=d1_0.project_id "
-            + "where p1_0.team_id=3 and d1_0.dictionary_set_id is null and diagrams.ctid=d1_0.ctid";
+        final var sql =
+            "update diagrams set dictionary_set_id=3 from diagrams d1_0 join projects p1_0 on p1_0.id=d1_0.project_id " +
+            "where p1_0.team_id=3 and d1_0.dictionary_set_id is null and diagrams.ctid=d1_0.ctid";
 
         final var formatted = formatter.formatMessage(1, "", 5L, "statement", "", sql, "");
 

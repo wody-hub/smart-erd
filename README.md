@@ -974,5 +974,5 @@ PostgreSQL 17을 Docker 컨테이너로 사용한다. `spring-boot-docker-compos
 - **테스트 환경:** Testcontainers가 임시 PostgreSQL 컨테이너를 자동 생성/폐기
 - **스키마:** `ddl-auto: update` — 엔티티 변경 시 자동 업데이트
 - **시간 컬럼:** 감사/만료 시각 컬럼은 `timestamptz` 사용 (UTC 기준 저장)
-- **기존 데이터 변환:** `plan/migration-utc-timestamptz.sql` 스크립트로 `timestamp without time zone` → `timestamptz` 변환 가능
+- **기존 데이터 변환:** 운영 DB의 `timestamp without time zone` 컬럼은 별도 SQL 마이그레이션으로 `timestamptz`로 변환 필요
 - **전제 조건:** Docker Desktop 실행 중, 포트 5432 사용 가능, 최초 실행 시 `postgres:17` 이미지 다운로드 (~400MB)

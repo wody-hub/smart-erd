@@ -183,7 +183,7 @@ export default function DslDiagnosticGuideDialog({
           {t('erd.dsl.errorGuide.openButton')}
           <Badge
             variant={errorCount > 0 ? 'destructive' : 'secondary'}
-            className="h-4 min-w-4 justify-center px-1 text-[10px]"
+            className="h-4 min-w-4 justify-center px-1 text-2xs"
           >
             {diagnostics.length}
           </Badge>
@@ -258,11 +258,11 @@ export default function DslDiagnosticGuideDialog({
                             variant={
                               entry.diagnostic.severity === 'error' ? 'destructive' : 'secondary'
                             }
-                            className="h-5 px-2 text-[10px]"
+                            className="h-5 px-2 text-2xs"
                           >
                             {t(`erd.dsl.errorGuide.severity.${entry.diagnostic.severity}`)}
                           </Badge>
-                          <span className="text-[11px] text-muted-foreground">
+                          <span className="text-2xs text-muted-foreground">
                             {t('erd.dsl.errorGuide.lineLabel', { line: entry.diagnostic.line })}
                           </span>
                         </div>

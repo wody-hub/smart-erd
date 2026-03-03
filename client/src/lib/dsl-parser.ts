@@ -97,6 +97,30 @@ interface RawColumn {
   fkColumnEndCol?: number;
 }
 
+/** Pass 1 결과 */
+interface Pass1Result {
+  /** 수집된 RawTable 목록 */
+  rawTables: RawTable[];
+  /** 구문 오류 진단 목록 */
+  diagnostics: DslError[];
+  /** 구문 오류 메시지 목록 */
+  errors: string[];
+}
+
+/** Pass 2 결과 */
+interface Pass2Result {
+  /** 파싱된 테이블 목록 */
+  tables: ParsedTable[];
+  /** 파싱된 FK 관계 목록 */
+  relations: ParsedRelation[];
+  /** 테이블 범위 정보 (코드 에디터 락 용) */
+  tableRanges: ParsedTableRange[];
+  /** 사전 해석/FK 진단 목록 */
+  diagnostics: DslError[];
+  /** 에러 메시지 목록 */
+  errors: string[];
+}
+
 /** 파서 상태 머신 */
 type ParserState = 'IDLE' | 'EXPECT_TABLE_BLOCK' | 'IN_TABLE';
 
@@ -111,6 +135,18 @@ const [OPT_PK, OPT_AI, OPT_NN] = DSL_COLUMN_OPTIONS;
 /** `::TYPE` 형식의 허용 패턴 */
 const EXPLICIT_TYPE_PATTERN =
   /^[A-Za-z][A-Za-z0-9_]*(?:\s+[A-Za-z][A-Za-z0-9_]*)*(?:\s*\([^)]+\))?$/;
+/** 복합 용어 분해 시 단일 그룹에서 시도할 최대 길이 */
+const MAX_TERM_LENGTH = 20;
+
+interface ResolvedDslTerm {
+  physicalName: string;
+  termId?: number;
+  domainId?: number;
+  physicalType?: string;
+  matched: boolean;
+}
+
+// ─── 유틸 함수 ────────────────────────────────────────────────────
 
 /**
  * 행 전체를 강조하기 위한 1-based 컬럼 범위를 계산한다.
@@ -139,23 +175,302 @@ function unwrapQuotedIdentifier(value: string): string {
   const first = trimmed.charAt(0);
   const last = trimmed.charAt(trimmed.length - 1);
   if ((first === "'" || first === '"') && first === last) {
-    return trimmed.substring(1, trimmed.length - 1).trim();
+    const inner = trimmed.substring(1, trimmed.length - 1).trim();
+    if (first === "'") {
+      return inner.replace(/''/g, "'");
+    }
+    return inner.replace(/""/g, '"');
   }
   return trimmed;
 }
 
 /**
- * 논리명 DSL을 파싱하여 ERD 생성용 데이터를 반환한다.
+ * 공백 없는 문자열을 greedy longest-match로 기본 용어로 분해한다.
  *
- * 2-pass 라인 스캐너:
- * - Pass 1: 구조 파싱 (테이블/컬럼 수집)
- * - Pass 2: 사전 해석 + FK 참조 해석
+ * useDictionaryCache의 복합 용어 분해 규칙과 동일한 방식으로 동작한다.
  *
- * @param dsl        DSL 텍스트
- * @param dictionary 사전 데이터 (Term/Domain 매핑)
- * @returns DslParseResult
+ * @param group 공백 없는 연속 문자열
+ * @param termByName 논리명 → Term 매핑
+ * @returns 분해된 Term 배열(2개 이상) 또는 null
  */
-export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult {
+function decomposeGroup(group: string, termByName: Map<string, Term>): Term[] | null {
+  const result: Term[] = [];
+  let pos = 0;
+
+  while (pos < group.length) {
+    let matched = false;
+    const maxLen = Math.min(group.length - pos, MAX_TERM_LENGTH);
+
+    for (let len = maxLen; len >= 1; len--) {
+      const candidate = group.substring(pos, pos + len);
+      const term = termByName.get(candidate);
+      if (term) {
+        result.push(term);
+        pos += len;
+        matched = true;
+        break;
+      }
+    }
+
+    if (!matched) {
+      return null;
+    }
+  }
+
+  return result.length >= 2 ? result : null;
+}
+
+/**
+ * 논리명을 사전 용어로 해석한다.
+ *
+ * 우선순위:
+ * 1) 완전 일치 Term
+ * 2) 공백 그룹 단위 복합 용어 분해(그룹 간 `_`, 그룹 내 concat)
+ *
+ * @param logicalName 논리명
+ * @param dictionary DSL 사전
+ * @returns 해석 결과
+ */
+function resolveDslTerm(logicalName: string, dictionary: DslDictionary): ResolvedDslTerm {
+  const exact = dictionary.termByName.get(logicalName);
+  if (exact) {
+    const domainId = exact.domainId ?? undefined;
+    const physicalType = domainId ? dictionary.domainById.get(domainId)?.physicalType : undefined;
+    return {
+      physicalName: exact.physicalName,
+      termId: exact.id,
+      domainId,
+      physicalType,
+      matched: true,
+    };
+  }
+
+  const groups = logicalName
+    .trim()
+    .split(/\s+/)
+    .filter((group) => group.length > 0);
+  if (groups.length === 0) {
+    return {
+      physicalName: logicalName,
+      matched: false,
+    };
+  }
+
+  const baseTerms: Term[] = [];
+  const groupPhysicals: string[] = [];
+
+  for (const group of groups) {
+    const groupedExact = dictionary.termByName.get(group);
+    if (groupedExact) {
+      baseTerms.push(groupedExact);
+      groupPhysicals.push(groupedExact.physicalName);
+      continue;
+    }
+
+    const decomposed = decomposeGroup(group, dictionary.termByName);
+    if (!decomposed) {
+      return {
+        physicalName: logicalName,
+        matched: false,
+      };
+    }
+
+    baseTerms.push(...decomposed);
+    groupPhysicals.push(decomposed.map((term) => term.physicalName).join(''));
+  }
+
+  if (baseTerms.length < 2) {
+    return {
+      physicalName: logicalName,
+      matched: false,
+    };
+  }
+
+  const physicalName = groupPhysicals.join('_');
+  const lastTerm = baseTerms[baseTerms.length - 1];
+  const domainId = lastTerm?.domainId ?? undefined;
+  const physicalType = domainId ? dictionary.domainById.get(domainId)?.physicalType : undefined;
+
+  return {
+    physicalName,
+    domainId,
+    physicalType,
+    matched: true,
+  };
+}
+
+// ─── FK 참조 위치 계산 헬퍼 ───────────────────────────────────────
+
+/**
+ * FK 참조 (`> 부모테이블.부모컬럼`)의 위치를 계산하여 RawColumn에 설정한다.
+ *
+ * @param result    대상 RawColumn (위치 필드가 설정됨)
+ * @param effective 주석 제거 후 원본 행 텍스트
+ */
+function computeFkPositions(result: RawColumn, effective: string): void {
+  const fkIdx = effective.indexOf('>');
+  if (fkIdx < 0) {
+    return;
+  }
+
+  const afterArrowRaw = effective.substring(fkIdx + 1);
+  const fkRefMatch = afterArrowRaw.match(/^\s*(.+?)\s*\.\s*(.+?)(?=\s*(?::(?!:)|::|\[|$))/);
+  if (!fkRefMatch) {
+    return;
+  }
+
+  const fkTableRaw = fkRefMatch[1] ?? '';
+  const fkColumnRaw = fkRefMatch[2] ?? '';
+  const tableOffset = afterArrowRaw.indexOf(fkTableRaw);
+  if (tableOffset >= 0) {
+    const tableStart = fkIdx + 1 + tableOffset;
+    result.fkTableStartCol = tableStart + 1;
+    result.fkTableEndCol = result.fkTableStartCol + fkTableRaw.length;
+  }
+
+  const dotOffset = afterArrowRaw.indexOf('.', Math.max(0, tableOffset + fkTableRaw.length));
+  const colOffset =
+    dotOffset >= 0
+      ? afterArrowRaw.indexOf(fkColumnRaw, dotOffset + 1)
+      : afterArrowRaw.indexOf(fkColumnRaw);
+  if (colOffset >= 0) {
+    const colStart = fkIdx + 1 + colOffset;
+    result.fkColumnStartCol = colStart + 1;
+    result.fkColumnEndCol = result.fkColumnStartCol + fkColumnRaw.length;
+  }
+}
+
+/**
+ * 도메인/타입 명시 지정의 위치를 계산하여 RawColumn에 설정한다.
+ *
+ * @param result          대상 RawColumn
+ * @param effective       주석 제거 후 원본 행 텍스트
+ * @param rawDomainName   정규식 매칭된 원본 도메인명 (따옴표 포함)
+ * @param domainName      따옴표 해제된 도메인명
+ * @param rawExplicitType 정규식 매칭된 원본 타입 문자열
+ * @param explicitType    트림된 타입 문자열
+ */
+function computeDomainTypePositions(
+  result: RawColumn,
+  effective: string,
+  rawDomainName: string | undefined,
+  domainName: string | undefined,
+  rawExplicitType: string | undefined,
+  explicitType: string | undefined,
+): void {
+  if (domainName) {
+    result.domainName = domainName;
+    const rawDomainToken = rawDomainName?.trim() ?? domainName;
+    const domainStart = effective.lastIndexOf(rawDomainToken);
+    if (domainStart >= 0) {
+      result.domainStartCol = domainStart + 1;
+      result.domainEndCol = domainStart + rawDomainToken.length + 1;
+    }
+  }
+
+  if (explicitType) {
+    result.explicitType = explicitType;
+    const explicitTypeToken = rawExplicitType?.trim() ?? explicitType;
+    const typeStart = effective.lastIndexOf(explicitTypeToken);
+    if (typeStart >= 0) {
+      result.typeStartCol = typeStart + 1;
+      result.typeEndCol = typeStart + explicitTypeToken.length + 1;
+    }
+  }
+}
+
+// ─── parseColumnLine ─────────────────────────────────────────────
+
+/**
+ * 단일 컬럼 행을 파싱한다.
+ *
+ * 형식: `논리명  > 부모테이블.부모컬럼  :도메인명  ::타입  [PK, AI, NN]`
+ * 공백이 포함된 논리명/도메인명/FK 참조명도 허용한다.
+ *
+ * @param line    원본 행 텍스트
+ * @param lineNum 1-based 행 번호
+ * @returns RawColumn 또는 null (빈 행 등)
+ */
+function parseColumnLine(line: string, lineNum: number): RawColumn | null {
+  // 주석 제거
+  const commentIdx = line.indexOf('//');
+  const effective = commentIdx >= 0 ? line.substring(0, commentIdx) : line;
+  const trimmed = effective.trim();
+
+  if (!trimmed || trimmed === '{' || trimmed === '}') {
+    return null;
+  }
+
+  // 컬럼 행 정규식 (캡처 그룹으로 위치 추적)
+  // 형식: 논리명 [> 부모.컬럼] [:도메인] [::타입] [[옵션]]
+  const colRegex =
+    /^(\s*)(.+?)(?:\s*>\s*(.+?)\s*\.\s*(.+?))?(?:\s*:(?!:)\s*(.+?))?(?:\s*::\s*(.+?))?(?:\s*\[([^\]]*)\])?\s*$/;
+  const match = effective.match(colRegex);
+  if (!match) {
+    return null;
+  }
+
+  const indent = match[1].length;
+  const logicalName = unwrapQuotedIdentifier(match[2] ?? '');
+  const fkTable = match[3] ? unwrapQuotedIdentifier(match[3]) : undefined;
+  const fkColumn = match[4] ? unwrapQuotedIdentifier(match[4]) : undefined;
+  const rawDomainName = match[5];
+  const domainName = rawDomainName ? unwrapQuotedIdentifier(rawDomainName) : undefined;
+  const rawExplicitType = match[6];
+  const explicitType = rawExplicitType?.trim();
+  const optionStr = match[7];
+  if (!logicalName) {
+    return null;
+  }
+
+  const nameStartCol = indent + 1;
+  const nameEndCol = indent + (match[2]?.length ?? logicalName.length) + 1;
+
+  const options: string[] = optionStr
+    ? optionStr
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean)
+    : [];
+
+  const result: RawColumn = {
+    logicalName,
+    options,
+    line: lineNum,
+    nameStartCol,
+    nameEndCol,
+  };
+
+  if (fkTable && fkColumn) {
+    result.fkTable = fkTable;
+    result.fkColumn = fkColumn;
+    computeFkPositions(result, effective);
+  }
+
+  computeDomainTypePositions(
+    result,
+    effective,
+    rawDomainName,
+    domainName,
+    rawExplicitType,
+    explicitType,
+  );
+
+  return result;
+}
+
+// ─── Pass 1: 구조 파싱 ──────────────────────────────────────────
+
+/**
+ * DSL 텍스트를 구조적으로 파싱하여 RawTable 목록을 수집한다 (Pass 1).
+ *
+ * 상태 머신(IDLE → EXPECT_TABLE_BLOCK → IN_TABLE)으로 테이블 블록과
+ * 컬럼 행을 인식한다. 사전 해석은 수행하지 않는다.
+ *
+ * @param lines DSL 텍스트를 줄 단위로 분할한 배열
+ * @returns Pass1Result (rawTables, 구문 오류 diagnostics, errors)
+ */
+function parsePass1(lines: string[]): Pass1Result {
   const diagnostics: DslError[] = [];
   const rawTables: RawTable[] = [];
   const errors: string[] = [];
@@ -165,7 +480,6 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
    *
    * @param line        행 번호 (1-based)
    * @param sourceLine  오류 대상 원본 행
-   * @returns 없음
    */
   const pushSyntaxError = (line: number, sourceLine: string) => {
     const { startColumn, endColumn } = getLineColumns(sourceLine);
@@ -179,8 +493,6 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
     errors.push(`Syntax error: line ${line}`);
   };
 
-  // === Pass 1: 구조 파싱 ===
-  const lines = dsl.split('\n');
   let state: ParserState = 'IDLE';
   let currentTable: RawTable | null = null;
   let pendingTable: RawTable | null = null;
@@ -296,7 +608,25 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
     pushSyntaxError(currentTable.line, tableLineRaw);
   }
 
-  // === Pass 2: 사전 해석 + FK 참조 ===
+  return { rawTables, diagnostics, errors };
+}
+
+// ─── Pass 2: 사전 해석 + FK 참조 ────────────────────────────────
+
+/**
+ * Pass 1에서 수집된 RawTable 목록을 사전으로 해석하고 FK 관계를 연결한다 (Pass 2).
+ *
+ * 각 테이블/컬럼의 논리명을 사전(Term/Domain)에서 물리명으로 변환하고,
+ * FK 참조를 물리명 기반으로 해석한다. 미등록 용어, 중복 컬럼, 도메인 충돌 등의
+ * 진단을 생성한다.
+ *
+ * @param rawTables  Pass 1에서 수집된 RawTable 배열
+ * @param dictionary 사전 데이터 (Term/Domain 매핑)
+ * @returns Pass2Result (tables, relations, tableRanges, diagnostics, errors)
+ */
+function parsePass2(rawTables: RawTable[], dictionary: DslDictionary): Pass2Result {
+  const diagnostics: DslError[] = [];
+  const errors: string[] = [];
   const tables: ParsedTable[] = [];
   const relations: ParsedRelation[] = [];
   const tableRanges: ParsedTableRange[] = [];
@@ -308,15 +638,11 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
 
   for (const rawTable of rawTables) {
     // 테이블명 사전 해석
-    const tableTerm = dictionary.termByName.get(rawTable.logicalName);
-    let physicalTableName: string;
-    let tableTermId: number | undefined;
+    const tableTerm = resolveDslTerm(rawTable.logicalName, dictionary);
+    const physicalTableName = tableTerm.physicalName;
+    const tableTermId = tableTerm.termId;
 
-    if (tableTerm) {
-      physicalTableName = tableTerm.physicalName;
-      tableTermId = tableTerm.id;
-    } else {
-      physicalTableName = rawTable.logicalName;
+    if (!tableTerm.matched) {
       diagnostics.push({
         messageKey: 'erd.dsl.error.unknownTerm',
         messageArgs: { name: rawTable.logicalName },
@@ -334,160 +660,18 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
     const seenPhysicalColumns = new Map<string, RawColumn>();
 
     for (const rawCol of rawTable.columns) {
-      const duplicated = seenLogicalColumns.get(rawCol.logicalName);
-      if (duplicated) {
-        diagnostics.push({
-          messageKey: 'erd.dsl.error.duplicateColumnLogicalName',
-          messageArgs: {
-            name: rawCol.logicalName,
-            table: rawTable.logicalName,
-            firstLine: String(duplicated.line),
-          },
-          line: rawCol.line,
-          startColumn: rawCol.nameStartCol,
-          endColumn: rawCol.nameEndCol,
-          severity: 'error',
-        });
-        errors.push(
-          `Duplicate column logical name: ${rawTable.logicalName}.${rawCol.logicalName} (line ${rawCol.line})`,
-        );
-      } else {
-        seenLogicalColumns.set(rawCol.logicalName, rawCol);
-      }
-
-      const colTerm = dictionary.termByName.get(rawCol.logicalName);
-      let physicalName: string;
-      let termId: number | undefined;
-      let domainId: number | undefined;
-      let physicalType = 'VARCHAR(255)';
-
-      if (colTerm) {
-        physicalName = colTerm.physicalName;
-        termId = colTerm.id;
-
-        // 기본 도메인 (Term에 연결된 도메인)
-        if (colTerm.domainId) {
-          domainId = colTerm.domainId;
-          const domain = dictionary.domainById.get(colTerm.domainId);
-          if (domain) {
-            physicalType = domain.physicalType;
-          }
-        }
-      } else {
-        physicalName = rawCol.logicalName;
-        diagnostics.push({
-          messageKey: 'erd.dsl.error.unknownTerm',
-          messageArgs: { name: rawCol.logicalName },
-          line: rawCol.line,
-          startColumn: rawCol.nameStartCol,
-          endColumn: rawCol.nameEndCol,
-          severity: 'error',
-        });
-        errors.push(`Unknown term: ${rawCol.logicalName} (line ${rawCol.line})`);
-      }
-
-      // 도메인 명시 지정 (`:도메인명`)
-      if (rawCol.domainName) {
-        const explicitDomain = dictionary.domainByName.get(rawCol.domainName);
-        if (explicitDomain) {
-          domainId = explicitDomain.id;
-          physicalType = explicitDomain.physicalType;
-        } else {
-          diagnostics.push({
-            messageKey: 'erd.dsl.error.unknownDomain',
-            messageArgs: { name: rawCol.domainName },
-            line: rawCol.line,
-            startColumn: rawCol.domainStartCol ?? rawCol.nameStartCol,
-            endColumn: rawCol.domainEndCol ?? rawCol.nameEndCol,
-            severity: 'error',
-          });
-          errors.push(`Unknown domain: ${rawCol.domainName} (line ${rawCol.line})`);
-        }
-      }
-
-      // 타입 직접 지정 (`::VARCHAR(200)`) — 도메인과 동시 지정은 금지
-      if (rawCol.explicitType) {
-        if (rawCol.domainName) {
-          diagnostics.push({
-            messageKey: 'erd.dsl.error.domainAndTypeConflict',
-            line: rawCol.line,
-            startColumn: rawCol.typeStartCol ?? rawCol.nameStartCol,
-            endColumn: rawCol.typeEndCol ?? rawCol.nameEndCol,
-            severity: 'error',
-          });
-          errors.push(`Domain and type conflict: line ${rawCol.line}`);
-        } else {
-          const normalizedType = rawCol.explicitType.trim();
-          const typeLooksValid = EXPLICIT_TYPE_PATTERN.test(normalizedType);
-          if (!typeLooksValid) {
-            diagnostics.push({
-              messageKey: 'erd.dsl.error.invalidTypeFormat',
-              messageArgs: { type: normalizedType },
-              line: rawCol.line,
-              startColumn: rawCol.typeStartCol ?? rawCol.nameStartCol,
-              endColumn: rawCol.typeEndCol ?? rawCol.nameEndCol,
-              severity: 'error',
-            });
-            errors.push(`Invalid type format: ${normalizedType} (line ${rawCol.line})`);
-          } else {
-            domainId = undefined;
-            physicalType = normalizedType;
-          }
-        }
-      }
-
-      const physicalKey = physicalName.toLowerCase();
-      const duplicatedPhysical = seenPhysicalColumns.get(physicalKey);
-      if (duplicatedPhysical) {
-        diagnostics.push({
-          messageKey: 'erd.dsl.error.duplicateColumnPhysicalName',
-          messageArgs: {
-            name: physicalName,
-            table: rawTable.logicalName,
-            firstLine: String(duplicatedPhysical.line),
-          },
-          line: rawCol.line,
-          startColumn: rawCol.nameStartCol,
-          endColumn: rawCol.nameEndCol,
-          severity: 'error',
-        });
-        errors.push(
-          `Duplicate column physical name: ${physicalTableName}.${physicalName} (line ${rawCol.line})`,
-        );
-      } else {
-        seenPhysicalColumns.set(physicalKey, rawCol);
-      }
-
-      // Domain 미연결 경고
-      if (colTerm && !domainId && !rawCol.domainName && !rawCol.explicitType) {
-        diagnostics.push({
-          messageKey: 'erd.dsl.warning.noDomain',
-          messageArgs: { name: rawCol.logicalName },
-          line: rawCol.line,
-          startColumn: rawCol.nameStartCol,
-          endColumn: rawCol.nameEndCol,
-          severity: 'warning',
-        });
-      }
-
-      // 옵션 파싱
-      const options = new Set(rawCol.options.map((o) => o.toUpperCase().trim()));
-      const isPk = options.has(OPT_PK);
-      const isAI = options.has(OPT_AI);
-      const isNN = options.has(OPT_NN);
-
-      parsedColumns.push({
-        name: physicalName,
-        type: physicalType,
-        pk: isPk,
-        nullable: isPk ? false : !isNN,
-        autoIncrement: isAI,
-        logicalName: rawCol.logicalName,
-        termId,
-        domainId,
-      });
-
-      colPhysicalMap.set(rawCol.logicalName, physicalName);
+      resolveColumn(
+        rawCol,
+        rawTable,
+        physicalTableName,
+        dictionary,
+        diagnostics,
+        errors,
+        parsedColumns,
+        colPhysicalMap,
+        seenLogicalColumns,
+        seenPhysicalColumns,
+      );
     }
 
     tables.push({
@@ -517,6 +701,211 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
   }
 
   // FK 관계 해석
+  resolveFkRelations(
+    rawTables,
+    tablePhysicalMap,
+    tableColumnsPhysical,
+    relations,
+    diagnostics,
+    errors,
+  );
+
+  return { tables, relations, tableRanges, diagnostics, errors };
+}
+
+/**
+ * 단일 RawColumn을 사전 해석하여 ParsedColumn으로 변환한다.
+ *
+ * 도메인/타입 명시 지정, 중복 검사, 옵션 파싱을 처리한다.
+ *
+ * @param rawCol              원본 컬럼 데이터
+ * @param rawTable            소속 테이블 데이터
+ * @param physicalTableName   물리 테이블명 (에러 메시지용)
+ * @param dictionary          사전 데이터
+ * @param diagnostics         진단 누적 배열
+ * @param errors              에러 메시지 누적 배열
+ * @param parsedColumns       결과 컬럼 누적 배열
+ * @param colPhysicalMap      컬럼 논리명→물리명 매핑
+ * @param seenLogicalColumns  이미 등장한 논리 컬럼명 추적
+ * @param seenPhysicalColumns 이미 등장한 물리 컬럼명 추적
+ */
+function resolveColumn(
+  rawCol: RawColumn,
+  rawTable: RawTable,
+  physicalTableName: string,
+  dictionary: DslDictionary,
+  diagnostics: DslError[],
+  errors: string[],
+  parsedColumns: ParsedColumn[],
+  colPhysicalMap: Map<string, string>,
+  seenLogicalColumns: Map<string, RawColumn>,
+  seenPhysicalColumns: Map<string, RawColumn>,
+): void {
+  const duplicated = seenLogicalColumns.get(rawCol.logicalName);
+  if (duplicated) {
+    diagnostics.push({
+      messageKey: 'erd.dsl.error.duplicateColumnLogicalName',
+      messageArgs: {
+        name: rawCol.logicalName,
+        table: rawTable.logicalName,
+        firstLine: String(duplicated.line),
+      },
+      line: rawCol.line,
+      startColumn: rawCol.nameStartCol,
+      endColumn: rawCol.nameEndCol,
+      severity: 'error',
+    });
+    errors.push(
+      `Duplicate column logical name: ${rawTable.logicalName}.${rawCol.logicalName} (line ${rawCol.line})`,
+    );
+  } else {
+    seenLogicalColumns.set(rawCol.logicalName, rawCol);
+  }
+
+  const colTerm = resolveDslTerm(rawCol.logicalName, dictionary);
+  const physicalName = colTerm.physicalName;
+  const termId = colTerm.termId;
+  let domainId = colTerm.domainId;
+  let physicalType = 'VARCHAR(255)';
+
+  if (colTerm.physicalType) {
+    physicalType = colTerm.physicalType;
+  }
+
+  if (!colTerm.matched) {
+    diagnostics.push({
+      messageKey: 'erd.dsl.error.unknownTerm',
+      messageArgs: { name: rawCol.logicalName },
+      line: rawCol.line,
+      startColumn: rawCol.nameStartCol,
+      endColumn: rawCol.nameEndCol,
+      severity: 'error',
+    });
+    errors.push(`Unknown term: ${rawCol.logicalName} (line ${rawCol.line})`);
+  }
+
+  // 도메인 명시 지정 (`:도메인명`)
+  if (rawCol.domainName) {
+    const explicitDomain = dictionary.domainByName.get(rawCol.domainName);
+    if (explicitDomain) {
+      domainId = explicitDomain.id;
+      physicalType = explicitDomain.physicalType;
+    } else {
+      diagnostics.push({
+        messageKey: 'erd.dsl.error.unknownDomain',
+        messageArgs: { name: rawCol.domainName },
+        line: rawCol.line,
+        startColumn: rawCol.domainStartCol ?? rawCol.nameStartCol,
+        endColumn: rawCol.domainEndCol ?? rawCol.nameEndCol,
+        severity: 'error',
+      });
+      errors.push(`Unknown domain: ${rawCol.domainName} (line ${rawCol.line})`);
+    }
+  }
+
+  // 타입 직접 지정 (`::VARCHAR(200)`) — 도메인과 동시 지정은 금지
+  if (rawCol.explicitType) {
+    if (rawCol.domainName) {
+      diagnostics.push({
+        messageKey: 'erd.dsl.error.domainAndTypeConflict',
+        line: rawCol.line,
+        startColumn: rawCol.typeStartCol ?? rawCol.nameStartCol,
+        endColumn: rawCol.typeEndCol ?? rawCol.nameEndCol,
+        severity: 'error',
+      });
+      errors.push(`Domain and type conflict: line ${rawCol.line}`);
+    } else {
+      const normalizedType = rawCol.explicitType.trim();
+      const typeLooksValid = EXPLICIT_TYPE_PATTERN.test(normalizedType);
+      if (!typeLooksValid) {
+        diagnostics.push({
+          messageKey: 'erd.dsl.error.invalidTypeFormat',
+          messageArgs: { type: normalizedType },
+          line: rawCol.line,
+          startColumn: rawCol.typeStartCol ?? rawCol.nameStartCol,
+          endColumn: rawCol.typeEndCol ?? rawCol.nameEndCol,
+          severity: 'error',
+        });
+        errors.push(`Invalid type format: ${normalizedType} (line ${rawCol.line})`);
+      } else {
+        domainId = undefined;
+        physicalType = normalizedType;
+      }
+    }
+  }
+
+  const physicalKey = physicalName.toLowerCase();
+  const duplicatedPhysical = seenPhysicalColumns.get(physicalKey);
+  if (duplicatedPhysical) {
+    diagnostics.push({
+      messageKey: 'erd.dsl.error.duplicateColumnPhysicalName',
+      messageArgs: {
+        name: physicalName,
+        table: rawTable.logicalName,
+        firstLine: String(duplicatedPhysical.line),
+      },
+      line: rawCol.line,
+      startColumn: rawCol.nameStartCol,
+      endColumn: rawCol.nameEndCol,
+      severity: 'error',
+    });
+    errors.push(
+      `Duplicate column physical name: ${physicalTableName}.${physicalName} (line ${rawCol.line})`,
+    );
+  } else {
+    seenPhysicalColumns.set(physicalKey, rawCol);
+  }
+
+  // Domain 미연결 경고
+  if (colTerm.matched && !domainId && !rawCol.domainName && !rawCol.explicitType) {
+    diagnostics.push({
+      messageKey: 'erd.dsl.warning.noDomain',
+      messageArgs: { name: rawCol.logicalName },
+      line: rawCol.line,
+      startColumn: rawCol.nameStartCol,
+      endColumn: rawCol.nameEndCol,
+      severity: 'warning',
+    });
+  }
+
+  // 옵션 파싱
+  const options = new Set(rawCol.options.map((o) => o.toUpperCase().trim()));
+  const isPk = options.has(OPT_PK);
+  const isAI = options.has(OPT_AI);
+  const isNN = options.has(OPT_NN);
+
+  parsedColumns.push({
+    name: physicalName,
+    type: physicalType,
+    pk: isPk,
+    nullable: isPk ? false : !isNN,
+    autoIncrement: isAI,
+    logicalName: rawCol.logicalName,
+    termId,
+    domainId,
+  });
+
+  colPhysicalMap.set(rawCol.logicalName, physicalName);
+}
+
+/**
+ * FK 관계를 해석하여 ParsedRelation 배열에 추가한다.
+ *
+ * @param rawTables             원본 테이블 목록
+ * @param tablePhysicalMap      논리명→물리 테이블명 매핑
+ * @param tableColumnsPhysical  논리명→컬럼 물리명 매핑
+ * @param relations             결과 관계 누적 배열
+ * @param diagnostics           진단 누적 배열
+ * @param errors                에러 메시지 누적 배열
+ */
+function resolveFkRelations(
+  rawTables: RawTable[],
+  tablePhysicalMap: Map<string, string>,
+  tableColumnsPhysical: Map<string, Map<string, string>>,
+  relations: ParsedRelation[],
+  diagnostics: DslError[],
+  errors: string[],
+): void {
   for (const rawTable of rawTables) {
     const childTablePhysical = tablePhysicalMap.get(rawTable.logicalName);
     if (!childTablePhysical) {
@@ -575,125 +964,42 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
       });
     }
   }
-
-  return {
-    result: { diagnostics: [], tables, relations, errors, tableRanges },
-    diagnostics,
-  };
 }
 
+// ─── parseDsl (공개 API) ─────────────────────────────────────────
+
 /**
- * 단일 컬럼 행을 파싱한다.
+ * 논리명 DSL을 파싱하여 ERD 생성용 데이터를 반환한다.
  *
- * 형식: `논리명  > 부모테이블.부모컬럼  :도메인명  ::타입  [PK, AI, NN]`
- * 공백이 포함된 논리명/도메인명/FK 참조명도 허용한다.
+ * 2-pass 라인 스캐너:
+ * - Pass 1: 구조 파싱 (테이블/컬럼 수집)
+ * - Pass 2: 사전 해석 + FK 참조 해석
  *
- * @param line    원본 행 텍스트
- * @param lineNum 1-based 행 번호
- * @returns RawColumn 또는 null (빈 행 등)
+ * @param dsl        DSL 텍스트
+ * @param dictionary 사전 데이터 (Term/Domain 매핑)
+ * @returns DslParseResult
  */
-function parseColumnLine(line: string, lineNum: number): RawColumn | null {
-  // 주석 제거
-  const commentIdx = line.indexOf('//');
-  const effective = commentIdx >= 0 ? line.substring(0, commentIdx) : line;
-  const trimmed = effective.trim();
+export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult {
+  const lines = dsl.split('\n');
 
-  if (!trimmed || trimmed === '{' || trimmed === '}') {
-    return null;
-  }
+  // Pass 1: 구조 파싱
+  const pass1 = parsePass1(lines);
 
-  // 컬럼 행 정규식 (캡처 그룹으로 위치 추적)
-  // 형식: 논리명 [> 부모.컬럼] [:도메인] [::타입] [[옵션]]
-  const colRegex =
-    /^(\s*)(.+?)(?:\s*>\s*(.+?)\s*\.\s*(.+?))?(?:\s*:(?!:)\s*(.+?))?(?:\s*::\s*(.+?))?(?:\s*\[([^\]]*)\])?\s*$/;
-  const match = effective.match(colRegex);
-  if (!match) {
-    return null;
-  }
+  // Pass 2: 사전 해석 + FK 참조
+  const pass2 = parsePass2(pass1.rawTables, dictionary);
 
-  const indent = match[1].length;
-  const logicalName = unwrapQuotedIdentifier(match[2] ?? '');
-  const fkTable = match[3] ? unwrapQuotedIdentifier(match[3]) : undefined;
-  const fkColumn = match[4] ? unwrapQuotedIdentifier(match[4]) : undefined;
-  const rawDomainName = match[5];
-  const domainName = rawDomainName ? unwrapQuotedIdentifier(rawDomainName) : undefined;
-  const rawExplicitType = match[6];
-  const explicitType = rawExplicitType?.trim();
-  const optionStr = match[7];
-  if (!logicalName) {
-    return null;
-  }
+  // 진단 합산
+  const diagnostics = [...pass1.diagnostics, ...pass2.diagnostics];
+  const errors = [...pass1.errors, ...pass2.errors];
 
-  const nameStartCol = indent + 1;
-  const nameEndCol = indent + (match[2]?.length ?? logicalName.length) + 1;
-
-  const options: string[] = optionStr
-    ? optionStr
-        .split(',')
-        .map((o) => o.trim())
-        .filter(Boolean)
-    : [];
-
-  const result: RawColumn = {
-    logicalName,
-    options,
-    line: lineNum,
-    nameStartCol,
-    nameEndCol,
+  return {
+    result: {
+      diagnostics: [],
+      tables: pass2.tables,
+      relations: pass2.relations,
+      errors,
+      tableRanges: pass2.tableRanges,
+    },
+    diagnostics,
   };
-
-  if (fkTable && fkColumn) {
-    result.fkTable = fkTable;
-    result.fkColumn = fkColumn;
-
-    // FK 참조 위치 계산
-    const fkIdx = effective.indexOf('>');
-    if (fkIdx >= 0) {
-      const afterArrowRaw = effective.substring(fkIdx + 1);
-      const fkRefMatch = afterArrowRaw.match(/^\s*(.+?)\s*\.\s*(.+?)(?=\s*(?::(?!:)|::|\[|$))/);
-      if (fkRefMatch) {
-        const fkTableRaw = fkRefMatch[1] ?? '';
-        const fkColumnRaw = fkRefMatch[2] ?? '';
-        const tableOffset = afterArrowRaw.indexOf(fkTableRaw);
-        if (tableOffset >= 0) {
-          const tableStart = fkIdx + 1 + tableOffset;
-          result.fkTableStartCol = tableStart + 1;
-          result.fkTableEndCol = result.fkTableStartCol + fkTableRaw.length;
-        }
-
-        const dotOffset = afterArrowRaw.indexOf('.', Math.max(0, tableOffset + fkTableRaw.length));
-        const colOffset =
-          dotOffset >= 0
-            ? afterArrowRaw.indexOf(fkColumnRaw, dotOffset + 1)
-            : afterArrowRaw.indexOf(fkColumnRaw);
-        if (colOffset >= 0) {
-          const colStart = fkIdx + 1 + colOffset;
-          result.fkColumnStartCol = colStart + 1;
-          result.fkColumnEndCol = result.fkColumnStartCol + fkColumnRaw.length;
-        }
-      }
-    }
-  }
-
-  if (domainName) {
-    result.domainName = domainName;
-    const rawDomainToken = rawDomainName?.trim() ?? domainName;
-    const domainStart = effective.lastIndexOf(rawDomainToken);
-    if (domainStart >= 0) {
-      result.domainStartCol = domainStart + 1;
-      result.domainEndCol = domainStart + rawDomainToken.length + 1;
-    }
-  }
-
-  if (explicitType) {
-    result.explicitType = explicitType;
-    const explicitTypeToken = rawExplicitType?.trim() ?? explicitType;
-    const typeStart = effective.lastIndexOf(explicitTypeToken);
-    if (typeStart >= 0) {
-      result.typeStartCol = typeStart + 1;
-      result.typeEndCol = typeStart + explicitTypeToken.length + 1;
-    }
-  }
-
-  return result;
 }

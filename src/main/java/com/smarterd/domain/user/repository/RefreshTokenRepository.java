@@ -2,9 +2,9 @@ package com.smarterd.domain.user.repository;
 
 import com.smarterd.domain.user.entity.RefreshToken;
 import com.smarterd.domain.user.entity.User;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Optional;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;

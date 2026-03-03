@@ -31,12 +31,12 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
 
     @Override
     public boolean existsYdocSnapshotById(Long id) {
-        final var result = queryFactory
-            .select(diagram.ydocSnapshot.isNotNull())
+        final var snapshot = queryFactory
+            .select(diagram.ydocSnapshot)
             .from(diagram)
             .where(diagram.id.eq(id))
             .fetchOne();
-        return Boolean.TRUE.equals(result);
+        return snapshot != null && snapshot.length > 0;
     }
 
     @Override

@@ -632,6 +632,14 @@
       "domains": "도메인 사전",
       "terms": "용어 사전"
     },
+    "pagination": {
+      "total": "총 {{count}}건",
+      "page": "{{current}} / {{total}} 페이지"
+    },
+    "search": {
+      "domainPlaceholder": "도메인 검색 (논리명/물리 타입/설명)",
+      "termPlaceholder": "용어 검색 (논리명/물리명/설명)"
+    },
     "set": {
       "placeholder": "사전 세트 선택",
       "defaultBadge": "기본",
@@ -746,11 +754,18 @@
       "preview": {
         "title": "미리보기",
         "summary": "성공 {{success}}건, 오류 {{error}}건 (총 {{total}}건)",
+        "limitNotice": "성능 보호를 위해 오류 행을 우선 포함하여 최대 {{max}}행만 표시합니다. 표시되지 않은 유효 행도 저장 대상에 포함됩니다.",
+        "errorOnly": "오류 행만 보기 (미리보기 내 {{count}}건)",
+        "downloadErrors": "오류 항목 엑셀 다운로드",
+        "emptyFiltered": "선택한 조건에 맞는 미리보기 행이 없습니다.",
         "row": "행",
         "status": "상태",
-        "errorNote": "오류가 있는 행은 저장에서 제외됩니다."
+        "errorNote": "오류가 있는 행은 저장에서 제외됩니다.",
+        "savedWithErrors": "{{saved}}건 저장 완료. 오류 {{error}}건은 제외되었으며 오류 항목 엑셀 다운로드를 계속 사용할 수 있습니다."
       },
       "save": "저장 ({{count}}건)",
+      "saveExcludingErrors": "오류 제외 저장 ({{count}}건)",
+      "saved": "저장 완료",
       "complete": {
         "title": "업로드 완료",
         "success": "{{count}}건이 성공적으로 등록되었습니다.",
@@ -759,11 +774,13 @@
       "toast": {
         "success": "일괄 업로드가 완료되었습니다",
         "failed": "일괄 업로드에 실패했습니다",
-        "templateFailed": "템플릿 다운로드에 실패했습니다"
+        "templateFailed": "템플릿 다운로드에 실패했습니다",
+        "partialSaved": "{{count}}건 저장되었습니다. 오류 행은 제외되었습니다.",
+        "errorDownloadFailed": "오류 항목 엑셀 다운로드에 실패했습니다"
       },
       "error": {
         "unsupportedFormat": "지원하지 않는 파일 형식입니다",
-        "fileTooLarge": "파일 크기가 제한을 초과합니다 (최대 5MB)",
+        "fileTooLarge": "파일 크기가 제한을 초과합니다 (최대 {{max}}MB)",
         "emptyFile": "파일에 데이터가 없습니다",
         "tooManyRows": "최대 {{max}}행까지 업로드할 수 있습니다",
         "missingColumns": "필수 컬럼이 누락되었습니다",

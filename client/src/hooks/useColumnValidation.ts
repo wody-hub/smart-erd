@@ -64,12 +64,32 @@ export function getColumnWarning(
   col: { logicalName?: string; name: string; type: string; termId?: number },
   findTerm: (id: number) => { physicalName: string; domainId: number | null } | undefined,
   findDomain: (id: number) => { physicalType: string } | undefined,
+  resolveCompound?: (logicalName: string) => {
+    physicalName: string;
+    domainId: number | null;
+    physicalType?: string;
+  } | null,
 ): ColumnWarning {
-  if (!col.logicalName) {
+  const logicalName = col.logicalName?.trim();
+  if (!logicalName) {
     return { status: null };
   }
   if (!col.termId) {
-    return { status: 'unregistered' };
+    const compound = resolveCompound?.(logicalName);
+    if (!compound) {
+      return { status: 'unregistered' };
+    }
+    if (col.name !== compound.physicalName) {
+      return { status: 'name-mismatch', expectedName: compound.physicalName };
+    }
+    if (compound.domainId && compound.physicalType && col.type !== compound.physicalType) {
+      return {
+        status: 'type-mismatch',
+        expectedType: compound.physicalType,
+        actualType: col.type,
+      };
+    }
+    return { status: null };
   }
 
   const term = findTerm(col.termId);
@@ -101,7 +121,7 @@ export function getColumnWarning(
  */
 export function useColumnValidation() {
   const nodes = useCanvasStore((s) => s.nodes);
-  const { terms, findTermById, findDomainById } = useErdDictionary();
+  const { terms, findTermById, findDomainById, resolveCompound } = useErdDictionary();
 
   /** 사전 데이터 존재 여부 */
   const hasDictionary = terms.length > 0;
@@ -118,7 +138,7 @@ export function useColumnValidation() {
         }
 
         totalCount++;
-        const warning = getColumnWarning(col, findTermById, findDomainById);
+        const warning = getColumnWarning(col, findTermById, findDomainById, resolveCompound);
 
         if (warning.status) {
           return {
@@ -144,7 +164,7 @@ export function useColumnValidation() {
     });
 
     return { tableValidations, matchedCount, totalCount };
-  }, [nodes, findTermById, findDomainById]);
+  }, [nodes, findTermById, findDomainById, resolveCompound]);
 
   return { ...result, hasDictionary };
 }

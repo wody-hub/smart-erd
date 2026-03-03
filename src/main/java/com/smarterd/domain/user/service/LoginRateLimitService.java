@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class LoginRateLimitService {
 
     private static final int MAX_CREATE_RETRY_COUNT = 3;
@@ -142,8 +143,10 @@ public class LoginRateLimitService {
         if (message == null) {
             return false;
         }
-        return AppStringUtils.containsIgnoreCase(message, "unique") ||
-            AppStringUtils.containsIgnoreCase(message, "duplicate");
+        return (
+            AppStringUtils.containsIgnoreCase(message, "unique") ||
+            AppStringUtils.containsIgnoreCase(message, "duplicate")
+        );
     }
 
     /**

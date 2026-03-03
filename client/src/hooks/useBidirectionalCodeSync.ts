@@ -25,7 +25,7 @@ interface UseBidirectionalCodeSyncOptions {
   parsing: boolean;
   /** 코드 반영을 막는 에러 존재 여부 */
   hasBlockingErrors: boolean;
-  /** 파싱된 테이블 존재 여부 */
+  /** 코드 반영 가능한 파싱 결과 존재 여부 (빈 스키마 포함) */
   hasParsedTables: boolean;
   /** 원격 편집 락 존재 여부 */
   hasRemoteEditLocks: boolean;
@@ -208,7 +208,7 @@ export function useBidirectionalCodeSync({
   // 코드 -> ERD 자동 반영
   useEffect(() => {
     clearCodeToErdTimer();
-    if (!enabled || !ready || !codeText.trim()) {
+    if (!enabled || !ready) {
       setStatus(null);
       return;
     }
@@ -217,74 +217,79 @@ export function useBidirectionalCodeSync({
       return;
     }
 
-    codeToErdTimerRef.current = setTimeout(() => {
-      if (originRef.current === 'erd-auto-sync') {
-        originRef.current = null;
-        return;
-      }
+    const isClearRequest = codeText.trim().length === 0;
 
-      if (parsing || hasBlockingErrors || !hasParsedTables) {
-        if (hasBlockingErrors) {
-          setStatus('hold-parse-error');
-        }
-        return;
-      }
-
-      if (Date.now() - lastUserEditAtRef.current < codeIdleMs) {
-        setStatus('idle-wait');
-        return;
-      }
-
-      if (hasRemoteEditLocks) {
-        setStatus('hold-remote-lock');
-        if (lockBlockedSinceRef.current == null) {
-          lockBlockedSinceRef.current = Date.now();
-        }
-        if (Date.now() - lockBlockedSinceRef.current > maxQueueWaitMs) {
-          autoApplyBlockedRef.current = true;
-          lockBlockedSinceRef.current = null;
-          setStatus('hold-queue-timeout');
-        }
-        return;
-      }
-
-      lockBlockedSinceRef.current = null;
-
-      const baseRevisionHash = parseBaseRevisionHashRef.current;
-      if (baseRevisionHash && baseRevisionHash !== currentRevisionHash) {
-        setStatus('dropped-stale');
-        return;
-      }
-
-      const codeHash = djb2(codeText);
-      if (lastAppliedCodeHashRef.current === codeHash) {
-        return;
-      }
-
-      if (inFlightApplyRef.current) {
-        return;
-      }
-
-      inFlightApplyRef.current = true;
-      originRef.current = 'code-auto-sync';
-      try {
-        // code->ERD 직후 발생하는 1회의 ERD 리비전 변경은 역방향 코드 생성에서 제외한다.
-        suppressNextErdSyncRef.current = true;
-        const applied = applyParsedToErd();
-        if (!applied) {
-          suppressNextErdSyncRef.current = false;
-          setStatus(resolveCodeAutoApplyStatus(false));
+    codeToErdTimerRef.current = setTimeout(
+      () => {
+        if (originRef.current === 'erd-auto-sync') {
+          originRef.current = null;
           return;
         }
-        lastAppliedCodeHashRef.current = codeHash;
-        setStatus(resolveCodeAutoApplyStatus(true));
-      } finally {
-        inFlightApplyRef.current = false;
-        if (originRef.current === 'code-auto-sync') {
-          originRef.current = null;
+
+        if (parsing || hasBlockingErrors || !hasParsedTables) {
+          if (hasBlockingErrors) {
+            setStatus('hold-parse-error');
+          }
+          return;
         }
-      }
-    }, codeIdleMs);
+
+        if (!isClearRequest && Date.now() - lastUserEditAtRef.current < codeIdleMs) {
+          setStatus('idle-wait');
+          return;
+        }
+
+        if (hasRemoteEditLocks) {
+          setStatus('hold-remote-lock');
+          if (lockBlockedSinceRef.current == null) {
+            lockBlockedSinceRef.current = Date.now();
+          }
+          if (Date.now() - lockBlockedSinceRef.current > maxQueueWaitMs) {
+            autoApplyBlockedRef.current = true;
+            lockBlockedSinceRef.current = null;
+            setStatus('hold-queue-timeout');
+          }
+          return;
+        }
+
+        lockBlockedSinceRef.current = null;
+
+        const baseRevisionHash = parseBaseRevisionHashRef.current;
+        if (baseRevisionHash && baseRevisionHash !== currentRevisionHash) {
+          setStatus('dropped-stale');
+          return;
+        }
+
+        const codeHash = djb2(codeText);
+        if (lastAppliedCodeHashRef.current === codeHash) {
+          return;
+        }
+
+        if (inFlightApplyRef.current) {
+          return;
+        }
+
+        inFlightApplyRef.current = true;
+        originRef.current = 'code-auto-sync';
+        try {
+          // code->ERD 직후 발생하는 1회의 ERD 리비전 변경은 역방향 코드 생성에서 제외한다.
+          suppressNextErdSyncRef.current = true;
+          const applied = applyParsedToErd();
+          if (!applied) {
+            suppressNextErdSyncRef.current = false;
+            setStatus(resolveCodeAutoApplyStatus(false));
+            return;
+          }
+          lastAppliedCodeHashRef.current = codeHash;
+          setStatus(resolveCodeAutoApplyStatus(true));
+        } finally {
+          inFlightApplyRef.current = false;
+          if (originRef.current === 'code-auto-sync') {
+            originRef.current = null;
+          }
+        }
+      },
+      isClearRequest ? 0 : codeIdleMs,
+    );
 
     return clearCodeToErdTimer;
   }, [

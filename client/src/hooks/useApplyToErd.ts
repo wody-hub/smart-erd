@@ -59,6 +59,51 @@ interface UseApplyToErdReturn {
 type ApplySource = 'manual' | 'auto';
 type ApplyPath = 'diff' | 'full-replace' | 'full-replace-fallback';
 
+/** logApplyMetrics 파라미터 */
+interface ApplyMetricsParams {
+  source: ApplySource;
+  diffPhase: DiffPhaseResult;
+  layoutPhase: LayoutPhaseResult;
+  syncPolicy: SyncPolicy;
+  diffApplyRollout: ReturnType<typeof resolveDiffApplyRollout>;
+  replaceDurationMs: number;
+  totalDurationMs: number;
+}
+
+/**
+ * ERD Apply 파이프라인 실행 메트릭을 콘솔에 로깅한다.
+ *
+ * @param params 메트릭 로깅에 필요한 파라미터
+ */
+function logApplyMetrics(params: ApplyMetricsParams): void {
+  console.info('[erd-sync-metrics]', {
+    source: params.source,
+    applyPath: params.diffPhase.applyPath,
+    nodeCount: params.layoutPhase.freshNodes.length,
+    edgeCount: params.layoutPhase.freshEdges.length,
+    policyLayoutMode: params.syncPolicy.layoutMode,
+    effectiveLayoutMode: params.layoutPhase.effectiveLayoutMode,
+    largeDiagramThreshold: params.syncPolicy.largeDiagramThreshold,
+    rollout: {
+      mode: params.diffApplyRollout.mode,
+      enabled: params.diffApplyRollout.enabled,
+      reason: params.diffApplyRollout.reason,
+      bucket: params.diffApplyRollout.bucket ?? null,
+      betaPercent: params.diffApplyRollout.betaPercent ?? null,
+    },
+    diff: {
+      appliedOperations: params.diffPhase.diffAppliedOperations,
+      skippedOperations: params.diffPhase.diffSkippedOperations,
+      groupDroppedCount: params.diffPhase.groupDroppedCount,
+    },
+    metrics: {
+      replaceMs: Math.round(params.replaceDurationMs),
+      layoutMs: Math.round(params.layoutPhase.layoutDurationMs),
+      applyTotalMs: Math.round(params.totalDurationMs),
+    },
+  });
+}
+
 interface DiffPhaseResult {
   applyPath: ApplyPath;
   diffAppliedOperations: number;
@@ -246,9 +291,12 @@ export function useApplyToErd({
   const projectedNodeCount = Math.max(nodes.length, parseResult?.tables.length ?? 0);
   /** 대형 다이어그램 여부 */
   const isLargeDiagram = projectedNodeCount >= syncPolicy.largeDiagramThreshold;
+  /** 반영 가능한 파싱 결과인지 여부 (빈 스키마 포함) */
+  const hasApplicableParseResult =
+    parseResult != null && !(parseResult.tables.length === 0 && parseResult.errors.length > 0);
 
   /** Apply 버튼 활성화 여부 */
-  const canApply = canEdit && parseResult != null && parseResult.tables.length > 0 && !parsing;
+  const canApply = canEdit && hasApplicableParseResult && !parsing;
   /** 교체 확인 다이얼로그 설명 문구 */
   const confirmDescription = isLargeDiagram
     ? t('erd.codeEditor.confirmDescriptionLarge', {
@@ -265,7 +313,7 @@ export function useApplyToErd({
    */
   const runApply = useCallback(
     (source: ApplySource): boolean => {
-      if (!parseResult || parseResult.tables.length === 0) {
+      if (!parseResult || (parseResult.tables.length === 0 && parseResult.errors.length > 0)) {
         return false;
       }
       const beforeState = useCanvasStore.getState();
@@ -322,31 +370,14 @@ export function useApplyToErd({
         });
 
         const totalDurationMs = performance.now() - totalStart;
-        console.info('[erd-sync-metrics]', {
+        logApplyMetrics({
           source,
-          applyPath: diffPhase.applyPath,
-          nodeCount: layoutPhase.freshNodes.length,
-          edgeCount: layoutPhase.freshEdges.length,
-          policyLayoutMode: syncPolicy.layoutMode,
-          effectiveLayoutMode: layoutPhase.effectiveLayoutMode,
-          largeDiagramThreshold: syncPolicy.largeDiagramThreshold,
-          rollout: {
-            mode: diffApplyRollout.mode,
-            enabled: diffApplyRollout.enabled,
-            reason: diffApplyRollout.reason,
-            bucket: diffApplyRollout.bucket ?? null,
-            betaPercent: diffApplyRollout.betaPercent ?? null,
-          },
-          diff: {
-            appliedOperations: diffPhase.diffAppliedOperations,
-            skippedOperations: diffPhase.diffSkippedOperations,
-            groupDroppedCount: diffPhase.groupDroppedCount,
-          },
-          metrics: {
-            replaceMs: Math.round(replaceDurationMs),
-            layoutMs: Math.round(layoutPhase.layoutDurationMs),
-            applyTotalMs: Math.round(totalDurationMs),
-          },
+          diffPhase,
+          layoutPhase,
+          syncPolicy,
+          diffApplyRollout,
+          replaceDurationMs,
+          totalDurationMs,
         });
 
         if (source === 'manual') {
@@ -399,7 +430,7 @@ export function useApplyToErd({
    * 기존 테이블이 있으면 확인 다이얼로그를 표시하고, 없으면 즉시 적용한다.
    */
   const handleApply = useCallback(() => {
-    if (!parseResult || parseResult.tables.length === 0) {
+    if (!parseResult || (parseResult.tables.length === 0 && parseResult.errors.length > 0)) {
       return;
     }
     if (projectedNodeCount >= LARGE_DIAGRAM_WARNING_THRESHOLD) {

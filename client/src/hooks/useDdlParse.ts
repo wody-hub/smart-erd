@@ -27,6 +27,15 @@ interface UseDdlParseReturn {
   resetParse: () => void;
 }
 
+/** 빈 코드 입력 시 사용하는 빈 스키마 파싱 결과 */
+const EMPTY_PARSE_RESULT: DdlParseResult = {
+  diagnostics: [],
+  tables: [],
+  relations: [],
+  errors: [],
+  tableRanges: [],
+};
+
 /**
  * DDL 디바운스 파싱 공통 훅.
  *
@@ -84,7 +93,7 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
     const seq = ++parseSeqRef.current;
 
     if (!text.trim()) {
-      setParseResult(null);
+      setParseResult(EMPTY_PARSE_RESULT);
       setParsing(false);
       return;
     }

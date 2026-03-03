@@ -7,6 +7,9 @@ import com.smarterd.domain.team.entity.Team;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -17,6 +20,28 @@ import org.springframework.data.repository.query.Param;
  */
 public interface TermRepository extends JpaRepository<Term, Long>, TermRepositoryCustom {
     List<Term> findByDictionarySet(DictionarySet dictionarySet);
+
+    @EntityGraph(attributePaths = "domain")
+    Page<Term> findByDictionarySet(DictionarySet dictionarySet, Pageable pageable);
+
+    @EntityGraph(attributePaths = "domain")
+    @Query(
+        """
+        select t
+        from Term t
+        where t.dictionarySet = :dictionarySet
+          and (
+            lower(t.logicalName) like lower(concat('%', :keyword, '%'))
+            or lower(t.physicalName) like lower(concat('%', :keyword, '%'))
+            or lower(coalesce(t.description, '')) like lower(concat('%', :keyword, '%'))
+          )
+        """
+    )
+    Page<Term> searchByDictionarySet(
+        @Param("dictionarySet") DictionarySet dictionarySet,
+        @Param("keyword") String keyword,
+        Pageable pageable
+    );
 
     boolean existsByDictionarySetAndLogicalName(DictionarySet dictionarySet, String logicalName);
 

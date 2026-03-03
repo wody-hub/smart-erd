@@ -28,9 +28,15 @@ export const queryKeys = {
     /** 팀별 도메인 목록 */
     domains: (teamId: string, setId: string) =>
       ['teams', teamId, 'dictionary-sets', setId, 'domains'] as const,
+    /** 팀별 도메인 페이지 */
+    domainsPage: (teamId: string, setId: string, page: number, size: number, q: string) =>
+      ['teams', teamId, 'dictionary-sets', setId, 'domains', { page, size, q }] as const,
     /** 팀별 용어 목록 */
     terms: (teamId: string, setId: string) =>
       ['teams', teamId, 'dictionary-sets', setId, 'terms'] as const,
+    /** 팀별 용어 페이지 */
+    termsPage: (teamId: string, setId: string, page: number, size: number, q: string) =>
+      ['teams', teamId, 'dictionary-sets', setId, 'terms', { page, size, q }] as const,
     /** 키워드 추천 */
     suggest: (teamId: string, setId: string, keyword: string) =>
       ['teams', teamId, 'dictionary-sets', setId, 'dictionary', 'suggest', keyword] as const,

@@ -15,8 +15,8 @@ import com.smarterd.utils.AppStringUtils;
  */
 public class PrettySqlFormat implements MessageFormattingStrategy {
 
-    /** 현재 서비스 기본 SQL 로그 스타일(SCSMS 프로필) 파이프라인 */
-    private static final SqlFormatPipeline PIPELINE = SqlFormatPipelineFactory.create(SqlFormatProfile.SCSMS);
+    /** 현재 서비스 기본 SQL 로그 스타일(LEADING_COMMA 프로필) 파이프라인 */
+    private static final SqlFormatPipeline PIPELINE = SqlFormatPipelineFactory.create(SqlFormatProfile.LEADING_COMMA);
 
     /**
      * p6spy 콜백 진입점에서 SQL 로그 문자열을 가공한다.

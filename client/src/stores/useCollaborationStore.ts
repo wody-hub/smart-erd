@@ -67,7 +67,24 @@ const useCollaborationStore = create<CollaborationState>((set, get) => ({
   setConnectionStatus: (status) => set({ connectionStatus: status }),
 
   setPresenceMode: (mode) => set({ presenceMode: mode }),
-  setSelfUserId: (userId) => set({ selfUserId: userId }),
+  setSelfUserId: (userId) =>
+    set((state) => {
+      if (!userId) {
+        return { selfUserId: userId };
+      }
+
+      const cursors = new Map(state.remoteCursors);
+      for (const [clientId, awareness] of cursors) {
+        if (awareness.user?.userId === userId) {
+          cursors.delete(clientId);
+        }
+      }
+
+      return {
+        selfUserId: userId,
+        remoteCursors: cursors,
+      };
+    }),
 
   applyPresenceSnapshot: (payload) => {
     const participants = new Map<string, PresenceParticipant>();
@@ -126,10 +143,17 @@ const useCollaborationStore = create<CollaborationState>((set, get) => ({
   },
 
   updateAwareness: (clientId, state) => {
-    const cursors = new Map(get().remoteCursors);
+    const currentState = get();
+    const cursors = new Map(currentState.remoteCursors);
+    const selfUserId = currentState.selfUserId;
     if (state === null) {
       cursors.delete(clientId);
     } else {
+      if (selfUserId && state.user?.userId === selfUserId) {
+        cursors.delete(clientId);
+        set({ remoteCursors: cursors });
+        return;
+      }
       cursors.set(clientId, state);
     }
     set({ remoteCursors: cursors });

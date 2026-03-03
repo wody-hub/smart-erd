@@ -1,5 +1,6 @@
 import { useReactFlow } from '@xyflow/react';
 import useCollaborationStore from '@/stores/useCollaborationStore';
+import useAuthStore from '@/stores/useAuthStore';
 
 /**
  * 원격 사용자의 커서를 캔버스 위에 오버레이로 표시하는 컴포넌트.
@@ -10,16 +11,30 @@ import useCollaborationStore from '@/stores/useCollaborationStore';
 export default function RemoteCursors() {
   /** 원격 사용자 커서 상태 맵 */
   const remoteCursors = useCollaborationStore((s) => s.remoteCursors);
+  const selfUserId = useCollaborationStore((s) => s.selfUserId);
+  const selfLoginId = useAuthStore((s) => s.loginId);
   /** React Flow 뷰포트 → 화면 좌표 변환 함수 */
   const { flowToScreenPosition } = useReactFlow();
 
   /** 원격 커서 엔트리 배열 */
-  const entries = Array.from(remoteCursors.entries());
+  const entries = Array.from(remoteCursors.entries()).filter(([, state]) => {
+    const user = state.user;
+    if (!user) {
+      return true;
+    }
+    if (selfUserId && user.userId === selfUserId) {
+      return false;
+    }
+    if (selfLoginId && user.loginId === selfLoginId) {
+      return false;
+    }
+    return true;
+  });
 
   if (entries.length === 0) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
+    <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden" aria-hidden="true">
       {entries.map(([clientId, state]) => {
         if (!state.cursor) return null;
 

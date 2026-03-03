@@ -15,6 +15,14 @@ export interface RemoteEditLockInfo {
   color: string;
 }
 
+/** 원격 락 계산 시 제외할 로컬 사용자 식별자 */
+export interface ResolveRemoteEditLocksOptions {
+  /** 현재 사용자 ID */
+  selfUserId?: string | null;
+  /** 현재 사용자 loginId */
+  selfLoginId?: string | null;
+}
+
 /**
  * 원격 커서 상태에서 테이블 키별 소프트 락 맵을 계산한다.
  *
@@ -25,6 +33,7 @@ export interface RemoteEditLockInfo {
 export function resolveRemoteEditLocks(
   remoteCursors: Map<number, AwarenessState>,
   participantsByUserId: Map<string, PresenceParticipant>,
+  options?: ResolveRemoteEditLocksOptions,
   nowMs: number = Date.now(),
 ): Map<string, RemoteEditLockInfo> {
   const locks = new Map<string, RemoteEditLockInfo>();
@@ -36,6 +45,14 @@ export function resolveRemoteEditLocks(
     }
 
     const userId = state.user?.userId ?? null;
+    const loginId = state.user?.loginId ?? '';
+    if (
+      (options?.selfUserId && userId === options.selfUserId) ||
+      (options?.selfLoginId && loginId === options.selfLoginId)
+    ) {
+      continue;
+    }
+
     if (participantsByUserId.size > 0) {
       if (!userId || !participantsByUserId.has(userId)) {
         continue;
@@ -59,7 +76,7 @@ export function resolveRemoteEditLocks(
       clientId,
       userId,
       name: state.user?.name ?? 'Unknown',
-      loginId: state.user?.loginId ?? '',
+      loginId,
       color: state.user?.color ?? 'hsl(var(--muted-foreground))',
     };
 

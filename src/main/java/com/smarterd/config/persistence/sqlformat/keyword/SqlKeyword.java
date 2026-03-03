@@ -68,9 +68,7 @@ public enum SqlKeyword {
      * @return 단일 키워드 phrase 목록
      */
     public static List<Phrase> singleWordPhrases(SqlKeyword... keywords) {
-        return Arrays.stream(keywords)
-            .map(SqlKeyword::phrase)
-            .toList();
+        return Arrays.stream(keywords).map(SqlKeyword::phrase).toList();
     }
 
     /**
@@ -92,9 +90,7 @@ public enum SqlKeyword {
      * @return 정규식 alternation 조각 문자열
      */
     public static String alternationRegex(List<Phrase> phrases) {
-        return phrases.stream()
-            .map(Phrase::regexFragment)
-            .collect(Collectors.joining("|"));
+        return phrases.stream().map(Phrase::regexFragment).collect(Collectors.joining("|"));
     }
 
     /**
@@ -103,7 +99,6 @@ public enum SqlKeyword {
      * @param keywords phrase를 구성하는 키워드 목록
      */
     public record Phrase(List<SqlKeyword> keywords) {
-
         public Phrase {
             if (keywords == null || keywords.isEmpty()) {
                 throw new IllegalArgumentException("keywords must not be empty");
@@ -116,9 +111,7 @@ public enum SqlKeyword {
          * @return 공백 연결 phrase 원문
          */
         public String text() {
-            return keywords.stream()
-                .map(SqlKeyword::text)
-                .collect(Collectors.joining(" "));
+            return keywords.stream().map(SqlKeyword::text).collect(Collectors.joining(" "));
         }
 
         /**
@@ -129,10 +122,7 @@ public enum SqlKeyword {
          * @return phrase 대응 정규식 조각 문자열
          */
         public String regexFragment() {
-            return keywords.stream()
-                .map(SqlKeyword::text)
-                .map(Pattern::quote)
-                .collect(Collectors.joining("\\s+"));
+            return keywords.stream().map(SqlKeyword::text).map(Pattern::quote).collect(Collectors.joining("\\s+"));
         }
 
         /**

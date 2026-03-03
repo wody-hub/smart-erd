@@ -77,7 +77,10 @@ public class AuthController {
     @ApiResponse(responseCode = "429", description = "로그인 시도 제한 초과", content = @Content)
     @SecurityRequirements
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpServletRequest) {
+    public ResponseEntity<AuthResponse> login(
+        @Valid @RequestBody LoginRequest request,
+        HttpServletRequest httpServletRequest
+    ) {
         return ResponseEntity.ok(authService.login(request, clientIpUtils.resolveClientIp(httpServletRequest)));
     }
 

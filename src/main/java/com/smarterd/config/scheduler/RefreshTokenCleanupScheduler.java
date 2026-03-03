@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Component
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class RefreshTokenCleanupScheduler {
 
     /** Refresh Token 레포지토리 */
@@ -27,7 +28,9 @@ public class RefreshTokenCleanupScheduler {
     @Transactional
     public void cleanupExpiredTokens() {
         final var now = Instant.now();
-        final var consumedRetentionSeconds = authSecurityProperties.getRefreshTokenCleanup().getConsumedRetentionSeconds();
+        final var consumedRetentionSeconds = authSecurityProperties
+            .getRefreshTokenCleanup()
+            .getConsumedRetentionSeconds();
         refreshTokenRepository.deleteByExpiresAtBefore(now);
         refreshTokenRepository.deleteByConsumedTrueAndConsumedAtBefore(now.minusSeconds(consumedRetentionSeconds));
     }

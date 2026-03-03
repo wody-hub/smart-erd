@@ -269,14 +269,14 @@ export function createCanvasTableActions(
       }
     },
 
-    addFkRelation: (
+    addFkRelation: ({
       parentNodeId,
       childNodeId,
       pkColumns,
       parentLabel,
       existingNames,
       relationType,
-    ) => {
+    }) => {
       const { ydoc } = get();
       if (!ydoc) {
         return 0;
@@ -383,7 +383,7 @@ export function createCanvasTableActions(
 
     replaceFromDdl: (result) => {
       const { ydoc } = get();
-      if (!ydoc || result.tables.length === 0) {
+      if (!ydoc) {
         return;
       }
       const assigned = new Set<string>();
@@ -404,14 +404,16 @@ export function createCanvasTableActions(
             tableIdsYArray.delete(0, tableIdsYArray.length);
           }
         });
-        populateFromDdl(tablesMap, edgesMap, result, {
-          resolveTableName: (name) => {
-            const unique = buildUniqueName(name, [...assigned]);
-            assigned.add(unique);
-            return unique;
-          },
-          startY: 100,
-        });
+        if (result.tables.length > 0) {
+          populateFromDdl(tablesMap, edgesMap, result, {
+            resolveTableName: (name) => {
+              const unique = buildUniqueName(name, [...assigned]);
+              assigned.add(unique);
+              return unique;
+            },
+            startY: 100,
+          });
+        }
       });
     },
 

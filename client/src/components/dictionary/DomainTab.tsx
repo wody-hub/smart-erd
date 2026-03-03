@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -6,6 +6,7 @@ import { Plus, Pencil, Trash2, Database, Upload, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableHeader,
@@ -19,7 +20,7 @@ import Spinner from '@/components/ui/spinner';
 import DomainFormDialog from '@/components/dictionary/DomainFormDialog';
 import BulkUploadDialog from '@/components/dictionary/BulkUploadDialog';
 import {
-  fetchDomains,
+  fetchDomainsPage,
   createDomain,
   updateDomain,
   deleteDomain,
@@ -27,7 +28,10 @@ import {
 } from '@/api/domainApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
+import { usePaginatedSearch } from '@/hooks/usePaginatedSearch';
 import type { Domain, DomainFormData } from '@/types/dictionary';
+
+const PAGE_SIZE = 20;
 
 /** DomainTab 컴포넌트의 props. */
 interface DomainTabProps {
@@ -59,11 +63,23 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
   /** 일괄 업로드 다이얼로그 열림 상태 */
   const [uploadOpen, setUploadOpen] = useState(false);
 
-  const { data: domains = [], isLoading } = useQuery({
-    queryKey: queryKeys.dictionary.domains(teamId!, setId),
-    queryFn: () => fetchDomains(teamId!, setId),
+  const { searchInput, setSearchInput, searchKeyword, page, setPage, adjustToTotalPages } =
+    usePaginatedSearch({ resetDeps: [teamId, setId] });
+
+  const {
+    data: domainPageData,
+    isLoading,
+    isFetching,
+  } = useQuery({
+    queryKey: queryKeys.dictionary.domainsPage(teamId!, setId, page, PAGE_SIZE, searchKeyword),
+    queryFn: () => fetchDomainsPage(teamId!, setId, page, PAGE_SIZE, searchKeyword),
     enabled: !!teamId && !!setId,
+    placeholderData: (previousData) => previousData,
   });
+  const domains = domainPageData?.content ?? [];
+  const totalElements = domainPageData?.totalElements ?? 0;
+  const totalPages = domainPageData?.totalPages ?? 0;
+  const isLastPage = domainPageData?.last ?? true;
 
   const createMutation = useMutation({
     mutationFn: (data: DomainFormData) => createDomain(teamId!, setId, data),
@@ -138,34 +154,50 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
     downloadTemplateMutation.mutate();
   };
 
-  if (isLoading) {
+  // 서버 totalPages 기반 페이지 범위 보정
+  useEffect(() => {
+    if (!domainPageData) return;
+    adjustToTotalPages(domainPageData.totalPages);
+  }, [domainPageData, adjustToTotalPages]);
+
+  if (isLoading && !domainPageData) {
     return <Spinner text={t('common.loading')} />;
   }
 
   return (
     <div>
-      {canEdit && (
-        <div className="flex justify-end gap-2 mb-4">
-          <Button
-            variant="outline"
-            onClick={handleTemplateDownload}
-            disabled={downloadTemplateMutation.isPending}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            {t('dictionary.upload.template')}
-          </Button>
-          <Button variant="outline" onClick={() => setUploadOpen(true)}>
-            <Upload className="h-4 w-4 mr-2" />
-            {t('dictionary.upload.button')}
-          </Button>
-          <Button onClick={handleCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            {t('dictionary.domain.form.createTitle')}
-          </Button>
+      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div className="w-full md:max-w-sm">
+          <Input
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder={t('dictionary.search.domainPlaceholder')}
+            aria-label={t('dictionary.search.domainPlaceholder')}
+          />
         </div>
-      )}
+        {canEdit && (
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={handleTemplateDownload}
+              disabled={downloadTemplateMutation.isPending}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {t('dictionary.upload.template')}
+            </Button>
+            <Button variant="outline" onClick={() => setUploadOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              {t('dictionary.upload.button')}
+            </Button>
+            <Button onClick={handleCreate}>
+              <Plus className="h-4 w-4 mr-2" />
+              {t('dictionary.domain.form.createTitle')}
+            </Button>
+          </div>
+        )}
+      </div>
 
-      {domains.length === 0 ? (
+      {totalElements === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Database className="h-12 w-12 text-muted-foreground mb-4" />
@@ -179,55 +211,103 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
           </CardContent>
         </Card>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('dictionary.domain.table.logicalName')}</TableHead>
-              <TableHead>{t('dictionary.domain.table.physicalType')}</TableHead>
-              <TableHead>{t('dictionary.domain.table.description')}</TableHead>
-              {canEdit && (
-                <TableHead className="w-[100px]">{t('dictionary.domain.table.actions')}</TableHead>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {domains.map((domain) => (
-              <TableRow key={domain.id}>
-                <TableCell className="font-medium">{domain.logicalName}</TableCell>
-                <TableCell className="font-mono">{domain.physicalType}</TableCell>
-                <TableCell className="text-muted-foreground">{domain.description ?? ''}</TableCell>
+        <div className="overflow-x-auto">
+          <Table className="w-full table-fixed min-w-[1060px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[220px] whitespace-nowrap">
+                  {t('dictionary.domain.table.logicalName')}
+                </TableHead>
+                <TableHead className="w-[220px] whitespace-nowrap">
+                  {t('dictionary.domain.table.physicalType')}
+                </TableHead>
+                <TableHead className="w-[520px] max-w-[520px]">
+                  {t('dictionary.domain.table.description')}
+                </TableHead>
                 {canEdit && (
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleEdit(domain)}
-                        aria-label={t('dictionary.domain.aria.editDomain', {
-                          name: domain.logicalName,
-                        })}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setDeleteTarget(domain.id)}
-                        aria-label={t('dictionary.domain.aria.deleteDomain', {
-                          name: domain.logicalName,
-                        })}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  <TableHead className="w-[100px]">
+                    {t('dictionary.domain.table.actions')}
+                  </TableHead>
                 )}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {domains.map((domain) => (
+                <TableRow key={domain.id}>
+                  <TableCell className="font-medium whitespace-nowrap">
+                    {domain.logicalName}
+                  </TableCell>
+                  <TableCell className="font-mono whitespace-nowrap">
+                    {domain.physicalType}
+                  </TableCell>
+                  <TableCell className="max-w-[520px] whitespace-normal break-words text-muted-foreground">
+                    {domain.description ?? ''}
+                  </TableCell>
+                  {canEdit && (
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleEdit(domain)}
+                          aria-label={t('dictionary.domain.aria.editDomain', {
+                            name: domain.logicalName,
+                          })}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setDeleteTarget(domain.id)}
+                          aria-label={t('dictionary.domain.aria.deleteDomain', {
+                            name: domain.logicalName,
+                          })}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {totalElements > 0 && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">
+            {t('dictionary.pagination.total', { count: totalElements })}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
+              disabled={page === 0 || isFetching}
+            >
+              {t('common.button.previous')}
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              {t('dictionary.pagination.page', {
+                current: totalPages === 0 ? 0 : page + 1,
+                total: Math.max(totalPages, 1),
+              })}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((prev) => prev + 1)}
+              disabled={isLastPage || isFetching}
+            >
+              {t('common.button.next')}
+            </Button>
+          </div>
+        </div>
       )}
 
       <DomainFormDialog

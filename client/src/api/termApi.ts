@@ -3,10 +3,12 @@ import { downloadBlob } from '@/lib/download';
 import type {
   Term,
   TermFormData,
-  BulkTermRow,
+  PagedResponse,
   BulkValidationResponse,
   BulkSaveResponse,
 } from '@/types/dictionary';
+
+const BULK_FETCH_PAGE_SIZE = 200;
 
 /**
  * 팀의 용어 목록을 조회한다.
@@ -16,7 +18,47 @@ import type {
  * @returns 용어 목록
  */
 export async function fetchTerms(teamId: string, setId: string): Promise<Term[]> {
-  const res = await axiosInstance.get<Term[]>(`/teams/${teamId}/dictionary-sets/${setId}/terms`);
+  const allTerms: Term[] = [];
+  const MAX_PAGES = 100;
+
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const pageResult = await fetchTermsPage(teamId, setId, page, BULK_FETCH_PAGE_SIZE);
+    allTerms.push(...pageResult.content);
+    if (pageResult.last) {
+      return allTerms;
+    }
+  }
+  console.warn('[fetchTerms] 페이지 상한 초과, 조회 중단');
+  return allTerms;
+}
+
+/**
+ * 팀의 용어 목록을 페이지 단위로 조회한다.
+ *
+ * @param teamId 조회할 팀 ID
+ * @param setId  조회할 사전 세트 ID
+ * @param page   페이지 번호 (0-base)
+ * @param size   페이지 크기
+ * @returns 페이징 응답
+ */
+export async function fetchTermsPage(
+  teamId: string,
+  setId: string,
+  page: number,
+  size: number,
+  keyword?: string,
+): Promise<PagedResponse<Term>> {
+  const normalizedKeyword = keyword?.trim();
+  const res = await axiosInstance.get<PagedResponse<Term>>(
+    `/teams/${teamId}/dictionary-sets/${setId}/terms`,
+    {
+      params: {
+        page,
+        size,
+        ...(normalizedKeyword ? { q: normalizedKeyword } : {}),
+      },
+    },
+  );
   return res.data;
 }
 
@@ -95,20 +137,23 @@ export async function validateTermUpload(
 /**
  * 검증 통과한 용어를 일괄 저장한다.
  *
- * @param teamId 대상 팀 ID
- * @param setId  대상 사전 세트 ID
- * @param rows   저장할 용어 데이터 목록
+ * @param teamId            대상 팀 ID
+ * @param setId             대상 사전 세트 ID
+ * @param validationToken   검증 세션 토큰
+ * @param excludedRowNumbers 저장에서 제외할 행 번호 목록
  * @returns 저장 결과
  */
 export async function bulkSaveTerms(
   teamId: string,
   setId: string,
-  rows: BulkTermRow[],
+  validationToken: string,
+  excludedRowNumbers: number[],
 ): Promise<BulkSaveResponse> {
   const res = await axiosInstance.post<BulkSaveResponse>(
     `/teams/${teamId}/dictionary-sets/${setId}/terms/upload`,
     {
-      rows,
+      validationToken,
+      excludedRowNumbers,
     },
   );
   return res.data;
@@ -131,4 +176,26 @@ export async function downloadTermTemplate(teamId: string, setId: string): Promi
     },
   );
   downloadBlob(res, 'term-template.xlsx');
+}
+
+/**
+ * 업로드 검증 오류 행 엑셀을 다운로드한다.
+ *
+ * @param teamId          대상 팀 ID
+ * @param setId           대상 사전 세트 ID
+ * @param validationToken 검증 세션 토큰
+ */
+export async function downloadTermUploadErrors(
+  teamId: string,
+  setId: string,
+  validationToken: string,
+): Promise<void> {
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/dictionary-sets/${setId}/terms/upload/errors`,
+    {
+      params: { validationToken },
+      responseType: 'blob',
+    },
+  );
+  downloadBlob(res, 'term-upload-errors.xlsx');
 }

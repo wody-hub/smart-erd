@@ -126,7 +126,7 @@ export default function DictionaryPage() {
     <div className="h-screen flex flex-col">
       <Header />
       <main className="flex-1 overflow-auto bg-muted p-6">
-        <div className="max-w-4xl mx-auto">
+        <div className="mx-auto w-full max-w-[1400px]">
           <Button
             variant="ghost"
             size="sm"

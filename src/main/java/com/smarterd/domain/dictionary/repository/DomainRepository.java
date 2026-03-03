@@ -6,6 +6,8 @@ import com.smarterd.domain.team.entity.Team;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -16,6 +18,26 @@ import org.springframework.data.repository.query.Param;
  */
 public interface DomainRepository extends JpaRepository<Domain, Long> {
     List<Domain> findByDictionarySet(DictionarySet dictionarySet);
+
+    Page<Domain> findByDictionarySet(DictionarySet dictionarySet, Pageable pageable);
+
+    @Query(
+        """
+        select d
+        from Domain d
+        where d.dictionarySet = :dictionarySet
+          and (
+            lower(d.logicalName) like lower(concat('%', :keyword, '%'))
+            or lower(d.physicalType) like lower(concat('%', :keyword, '%'))
+            or lower(coalesce(d.description, '')) like lower(concat('%', :keyword, '%'))
+          )
+        """
+    )
+    Page<Domain> searchByDictionarySet(
+        @Param("dictionarySet") DictionarySet dictionarySet,
+        @Param("keyword") String keyword,
+        Pageable pageable
+    );
 
     boolean existsByDictionarySetAndLogicalName(DictionarySet dictionarySet, String logicalName);
 

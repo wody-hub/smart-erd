@@ -1,5 +1,6 @@
 package com.smarterd.config.persistence.sqlformat.parser;
 
+import com.smarterd.config.persistence.sqlformat.SqlCharUtils;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,7 +59,7 @@ public final class SqlStructureParser {
                 current.append(ch);
                 if (ch == '\'') {
                     // SQL 문자열 이스케이프('')는 그대로 유지하고 다음 문자까지 소비한다.
-                    if (isEscapedSingleQuote(sql, i)) {
+                    if (SqlCharUtils.isEscapedSingleQuote(sql, i)) {
                         current.append(sql.charAt(i + 1));
                         i++;
                     } else {
@@ -137,11 +138,7 @@ public final class SqlStructureParser {
      * @return 문자 인덱스. 없으면 -1
      */
     public int findNextTopLevelChar(char target, int start) {
-        return scanTopLevel(
-            Math.max(start, 0),
-            sql.length(),
-            (index, ch, depth) -> ch == target && depth == 0
-        );
+        return scanTopLevel(Math.max(start, 0), sql.length(), (index, ch, depth) -> ch == target && depth == 0);
     }
 
     /**
@@ -163,7 +160,7 @@ public final class SqlStructureParser {
 
             if (inSingleQuote) {
                 if (ch == '\'') {
-                    if (isEscapedSingleQuote(sql, i)) {
+                    if (SqlCharUtils.isEscapedSingleQuote(sql, i)) {
                         i++;
                     } else {
                         inSingleQuote = false;
@@ -211,7 +208,7 @@ public final class SqlStructureParser {
 
             if (inSingleQuote) {
                 if (ch == '\'') {
-                    if (isEscapedSingleQuote(sql, i)) {
+                    if (SqlCharUtils.isEscapedSingleQuote(sql, i)) {
                         i++;
                     } else {
                         inSingleQuote = false;
@@ -280,19 +277,6 @@ public final class SqlStructureParser {
         }
 
         return true;
-    }
-
-    /**
-     * SQL 문자열에서 '' 형태 이스케이프 여부.
-     *
-     * @param text 검사할 문자열
-     * @param index 현재 인덱스
-     * @return 현재 위치가 '' 이스케이프 시작이면 true
-     */
-    private static boolean isEscapedSingleQuote(String text, int index) {
-        return index + 1 < text.length()
-            && text.charAt(index) == '\''
-            && text.charAt(index + 1) == '\'';
     }
 
     @FunctionalInterface

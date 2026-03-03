@@ -60,6 +60,24 @@ export interface Term {
   updatedAt: string;
 }
 
+/** 페이지네이션 응답 공통 타입 */
+export interface PagedResponse<T> {
+  /** 현재 페이지 데이터 */
+  content: T[];
+  /** 현재 페이지 번호 (0-base) */
+  page: number;
+  /** 페이지 크기 */
+  size: number;
+  /** 전체 데이터 건수 */
+  totalElements: number;
+  /** 전체 페이지 수 */
+  totalPages: number;
+  /** 첫 페이지 여부 */
+  first: boolean;
+  /** 마지막 페이지 여부 */
+  last: boolean;
+}
+
 /** 도메인 생성/수정 요청 페이로드 */
 export interface DomainFormData {
   /** 논리명 */
@@ -96,13 +114,17 @@ export interface BulkTermRow {
 
 /** 일괄 업로드 검증 응답 */
 export interface BulkValidationResponse {
+  /** 검증 세션 토큰 (저장 요청 시 사용) */
+  validationToken: string;
   /** 전체 행 수 */
   totalCount: number;
   /** 유효 행 수 */
   validCount: number;
   /** 에러 행 수 */
   errorCount: number;
-  /** 행별 검증 결과 */
+  /** 미리보기 일부 반환 여부 */
+  previewTruncated: boolean;
+  /** 미리보기 행별 검증 결과 */
   rows: BulkValidationRow[];
 }
 

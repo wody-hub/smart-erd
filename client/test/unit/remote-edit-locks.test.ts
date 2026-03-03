@@ -156,3 +156,30 @@ test('동일 테이블 충돌 시 (userId, clientId) 오름차순 후보를 선�
   assert.equal(winner.userId, 'u1');
   assert.equal(winner.clientId, 1);
 });
+
+test('현재 사용자 userId와 일치하는 락은 원격 락 계산에서 제외한다', () => {
+  const cursors = new Map<number, AwarenessState>([
+    [1, awareness('self-user', 'Me', 'table-1')],
+    [2, awareness('u2', 'User2', 'table-2')],
+  ]);
+
+  const locks = resolveRemoteEditLocks(cursors, new Map(), { selfUserId: 'self-user' });
+  assert.equal(locks.has('table-1'), false);
+  assert.equal(locks.get('table-2')?.userId, 'u2');
+});
+
+test('현재 사용자 loginId와 일치하는 락은 userId가 없어도 제외한다', () => {
+  const me = awareness(null, 'Me', 'table-1');
+  me.user.loginId = 'me@example.com';
+  const other = awareness('u2', 'Other', 'table-2');
+  other.user.loginId = 'other@example.com';
+
+  const cursors = new Map<number, AwarenessState>([
+    [1, me],
+    [2, other],
+  ]);
+
+  const locks = resolveRemoteEditLocks(cursors, new Map(), { selfLoginId: 'me@example.com' });
+  assert.equal(locks.has('table-1'), false);
+  assert.equal(locks.get('table-2')?.userId, 'u2');
+});

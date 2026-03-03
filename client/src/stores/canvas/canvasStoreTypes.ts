@@ -11,6 +11,22 @@ import type {
   TableNodeData,
 } from '@/types/erd';
 
+/** FK 관계 추가 파라미터 */
+export interface AddFkRelationParams {
+  /** 부모(참조 대상) 노드 ID */
+  parentNodeId: string;
+  /** 자식(FK 소유) 노드 ID */
+  childNodeId: string;
+  /** 부모 테이블의 PK 컬럼 목록 */
+  pkColumns: Column[];
+  /** 부모 테이블 라벨 (FK 컬럼 접두어 생성용) */
+  parentLabel: string;
+  /** 자식 테이블의 기존 컬럼 이름 목록 (중복 방지용) */
+  existingNames: string[];
+  /** 관계 유형 (식별/비식별) */
+  relationType: RelationType;
+}
+
 /** 드래그 중인 position 대기 큐 컨텍스트 */
 export interface PositionQueueCtx {
   pending: Map<string, { x: number; y: number }>;
@@ -77,14 +93,7 @@ export interface CanvasState {
   removeEdgeWithFkColumn: (edgeId: string) => void;
   applyLayout: (nodes: Node<TableNodeData>[]) => void;
   serialize: () => string;
-  addFkRelation: (
-    parentNodeId: string,
-    childNodeId: string,
-    pkColumns: Column[],
-    parentLabel: string,
-    existingNames: string[],
-    relationType: RelationType,
-  ) => number;
+  addFkRelation: (params: AddFkRelationParams) => number;
   connectWithRelationType: (
     source: string,
     target: string,

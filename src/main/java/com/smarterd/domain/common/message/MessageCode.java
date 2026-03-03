@@ -14,6 +14,8 @@ public enum MessageCode {
     ERROR_BULK_MISSING_COLUMNS("error.bulk.missing-columns"),
     ERROR_BULK_TOO_MANY_ROWS("error.bulk.too-many-rows"),
     ERROR_BULK_UNSUPPORTED_FORMAT("error.bulk.unsupported-format"),
+    ERROR_BULK_VALIDATION_TOKEN_ISSUE_FAILED("error.bulk.validation-token-issue-failed"),
+    ERROR_BULK_VALIDATION_TOKEN_INVALID("error.bulk.validation-token-invalid"),
     ERROR_BULK_VALIDATION_DESCRIPTION_MAX_LENGTH("error.bulk.validation.description-max-length"),
     ERROR_BULK_VALIDATION_DOMAIN_NOT_FOUND("error.bulk.validation.domain-not-found"),
     ERROR_BULK_VALIDATION_DUPLICATE_IN_DB("error.bulk.validation.duplicate-in-db"),

@@ -42,6 +42,8 @@ export class YjsProvider {
 
   /** 수동으로 연결을 끊었는지 여부 */
   private intentionalClose = false;
+  /** destroy 이후 인스턴스 재사용 차단 플래그 */
+  private destroyed = false;
 
   /** Y.Doc update 핸들러 참조 (cleanup용) */
   private readonly updateHandler: (update: Uint8Array, origin: unknown) => void;
@@ -126,6 +128,9 @@ export class YjsProvider {
    * WebSocket 연결을 시작한다.
    */
   connect(): void {
+    if (this.destroyed) {
+      return;
+    }
     this.intentionalClose = false;
     void this.createWebSocket();
   }
@@ -135,6 +140,7 @@ export class YjsProvider {
    */
   destroy(): void {
     this.intentionalClose = true;
+    this.destroyed = true;
     this.doc.off('update', this.updateHandler);
     this.clearReconnectTimer();
     this.clearPresenceBootstrapTimer();
@@ -178,13 +184,24 @@ export class YjsProvider {
    * WebSocket 인스턴스를 생성하고 이벤트를 바인딩한다.
    */
   private async createWebSocket(): Promise<void> {
+    if (this.destroyed || this.intentionalClose) {
+      return;
+    }
+
     let ticketData;
     try {
       ticketData = await this.options.getTicket();
     } catch (e) {
+      if (this.destroyed || this.intentionalClose) {
+        return;
+      }
       console.error('[YjsProvider] ticket 발급 실패:', e);
       this.emitConnectionStatus('disconnected');
       this.scheduleReconnect();
+      return;
+    }
+
+    if (this.destroyed || this.intentionalClose) {
       return;
     }
 
@@ -210,6 +227,11 @@ export class YjsProvider {
     this.ws.binaryType = 'arraybuffer';
 
     this.ws.onopen = () => {
+      if (this.destroyed || this.intentionalClose) {
+        this.ws?.close();
+        this.ws = null;
+        return;
+      }
       this.reconnectDelay = WS_RECONNECT.INITIAL_DELAY;
       this.lastRoomEpoch = null;
       this.lastPresenceVersion = 0;
@@ -570,7 +592,7 @@ export class YjsProvider {
    * @returns WebSocket URL
    */
   private buildWsUrl(ticket: string): string {
-    return `${getWsBaseUrl()}/ws/diagram/${this.options.diagramId}?ticket=${ticket}`;
+    return `${getWsBaseUrl()}/ws/diagram/${this.options.diagramId}?ticket=${encodeURIComponent(ticket)}`;
   }
 
   /**

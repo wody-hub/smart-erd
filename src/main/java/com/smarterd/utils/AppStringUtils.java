@@ -12,8 +12,7 @@ import org.springframework.lang.Nullable;
  */
 public final class AppStringUtils {
 
-    private AppStringUtils() {
-    }
+    private AppStringUtils() {}
 
     /**
      * 문자열을 trim 한 뒤 빈 문자열이면 {@code null}을 반환한다.

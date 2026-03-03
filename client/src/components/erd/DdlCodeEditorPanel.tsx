@@ -35,6 +35,27 @@ import { cn } from '@/lib/utils';
 import { generateDdl } from '@/lib/ddl-generator';
 import CodeEditorFooter from './CodeEditorFooter';
 import type { DbmsType, TableNode, ERDEdge } from '@/types/erd';
+import type { TFunction } from 'i18next';
+
+/**
+ * 진단 항목의 i18n 메시지키를 번역한다.
+ *
+ * messageKey가 동적 문자열이므로 t() 호출 시 타입 캐스팅이 필요하다.
+ * 이 헬퍼에 캐스팅을 격리하여 나머지 코드에서 as any 사용을 방지한다.
+ *
+ * @param t          i18n 번역 함수
+ * @param messageKey 진단 메시지 i18n 키
+ * @param messageArgs 보간 인자
+ * @returns 번역된 메시지 문자열
+ */
+function translateDiagnostic(
+  t: TFunction,
+  messageKey: string,
+  messageArgs?: Record<string, string>,
+): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return t(messageKey as any, messageArgs);
+}
 
 /** DSL 패널 lazy import (Monaco 번들 분리) */
 const DslCodeEditorPanel = lazy(() => import('./DslCodeEditorPanel'));
@@ -285,7 +306,7 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
       codeText: ddlText,
       parsing,
       hasBlockingErrors,
-      hasParsedTables: (parseResult?.tables.length ?? 0) > 0,
+      hasParsedTables: parseResult != null && !hasBlockingErrors,
       hasRemoteEditLocks,
       onCodeTextChange: handleDdlChange,
       generateCodeFromErd: generateFromErd,
@@ -372,8 +393,7 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
               diag.severity === 'error'
                 ? monaco.MarkerSeverity.Error
                 : monaco.MarkerSeverity.Warning,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            message: t(diag.messageKey as any, diag.messageArgs),
+            message: translateDiagnostic(t, diag.messageKey, diag.messageArgs),
             startLineNumber: line,
             startColumn: 1,
             endLineNumber: line,

@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,6 +68,9 @@ public class DiagramService {
 
     /** 다이어그램 방 관리자 */
     private final DiagramRoomManager roomManager;
+
+    /** 다이어그램 스냅샷 서비스 */
+    private final DiagramSnapshotService diagramSnapshotService;
 
     /** 용어 레포지토리 */
     private final TermRepository termRepository;
@@ -132,6 +136,8 @@ public class DiagramService {
     public DiagramDetailResponse getDiagram(String loginId, Long teamId, Long projectId, Long diagramId) {
         final var project = verifyReadAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
+        // 새로고침 직후에도 최신 상태를 반환하도록 조회 직전에 누적 update를 즉시 flush한다.
+        diagramSnapshotService.flushDiagramSnapshotNow(diagram.getId());
         final var hasSnapshot = diagramRepository.existsYdocSnapshotById(diagramId);
 
         return DiagramDetailResponse.from(diagram, project.getId(), hasSnapshot);
@@ -152,6 +158,8 @@ public class DiagramService {
         final var diagram = findDiagramByProjectAndId(project, diagramId);
 
         diagram.updateContent(request.content());
+        // content 저장 직후 stale snapshot 우선 로딩을 피하기 위해 기존 스냅샷을 무효화한다.
+        diagram.updateYdocSnapshot(null);
     }
 
     /**
@@ -287,12 +295,10 @@ public class DiagramService {
     /**
      * 다이어그램 content의 term/domain 바인딩을 대상 세트 기준으로 정리한다.
      *
-     * <p>
-     * 세트에 존재하지 않는 termId/domainId는 제거한다.
-     * </p>
+     * <p>세트에 존재하지 않는 termId/domainId는 제거한다.</p>
      *
-     * @param diagram        대상 다이어그램
-     * @param targetSet      변경 대상 사전 세트
+     * @param diagram   대상 다이어그램
+     * @param targetSet 변경 대상 사전 세트
      * @return 무효화 카운트
      */
     private InvalidationCounts invalidateDictionaryBindings(Diagram diagram, DictionarySet targetSet) {
@@ -318,67 +324,130 @@ public class DiagramService {
                 return InvalidationCounts.empty();
             }
 
-            var invalidatedTermBindingCount = 0;
-            var invalidatedDomainBindingCount = 0;
+            final var counts = invalidateRootAndNodes(rootObject, validTermIds, validDomainIds);
 
-            final var tableTermIdNode = rootObject.path("tableTermId");
-            final var tableTermId = toLongValue(tableTermIdNode);
-            if (tableTermId != null && !validTermIds.contains(tableTermId)) {
-                rootObject.remove("tableTermId");
-                invalidatedTermBindingCount++;
-            }
-
-            final var nodesNode = rootObject.get("nodes");
-            if (nodesNode instanceof ArrayNode nodesArray) {
-                for (final var node : nodesArray) {
-                    if (!(node instanceof ObjectNode nodeObject)) {
-                        continue;
-                    }
-                    final var dataNode = nodeObject.get("data");
-                    if (!(dataNode instanceof ObjectNode dataObject)) {
-                        continue;
-                    }
-
-                    final var tableTermIdInNode = toLongValue(dataObject.get("tableTermId"));
-                    if (tableTermIdInNode != null && !validTermIds.contains(tableTermIdInNode)) {
-                        dataObject.remove("tableTermId");
-                        invalidatedTermBindingCount++;
-                    }
-
-                    final var columnsNode = dataObject.get("columns");
-                    if (!(columnsNode instanceof ArrayNode columnsArray)) {
-                        continue;
-                    }
-                    for (final var columnNode : columnsArray) {
-                        if (!(columnNode instanceof ObjectNode columnObject)) {
-                            continue;
-                        }
-
-                        final var termId = toLongValue(columnObject.get("termId"));
-                        if (termId != null && !validTermIds.contains(termId)) {
-                            columnObject.remove("termId");
-                            invalidatedTermBindingCount++;
-                        }
-
-                        final var domainId = toLongValue(columnObject.get("domainId"));
-                        if (domainId != null && !validDomainIds.contains(domainId)) {
-                            columnObject.remove("domainId");
-                            invalidatedDomainBindingCount++;
-                        }
-                    }
-                }
-            }
-
-            if (invalidatedTermBindingCount > 0 || invalidatedDomainBindingCount > 0) {
+            if (counts.invalidatedTermBindingCount() > 0 || counts.invalidatedDomainBindingCount() > 0) {
                 diagram.updateContent(objectMapper.writeValueAsString(rootObject));
             }
-            return new InvalidationCounts(invalidatedTermBindingCount, invalidatedDomainBindingCount);
+            return counts;
         } catch (JsonProcessingException e) {
             log.warn("Failed to invalidate dictionary bindings for diagramId={}", diagram.getId(), e);
             throw new BusinessException(MessageCode.ERROR_BUSINESS_DIAGRAM_CONTENT_INVALID_JSON.code());
         }
     }
 
+    /**
+     * 루트 객체와 노드 배열의 바인딩을 무효화한다.
+     *
+     * @param rootObject    JSON 루트 객체
+     * @param validTermIds  유효한 용어 ID 집합
+     * @param validDomainIds 유효한 도메인 ID 집합
+     * @return 무효화 카운트
+     */
+    private InvalidationCounts invalidateRootAndNodes(
+        ObjectNode rootObject,
+        Set<Long> validTermIds,
+        Set<Long> validDomainIds
+    ) {
+        var invalidatedTermBindingCount = 0;
+        var invalidatedDomainBindingCount = 0;
+
+        final var tableTermId = toLongValue(rootObject.path("tableTermId"));
+        if (tableTermId != null && !validTermIds.contains(tableTermId)) {
+            rootObject.remove("tableTermId");
+            invalidatedTermBindingCount++;
+        }
+
+        final var nodesNode = rootObject.get("nodes");
+        if (nodesNode instanceof ArrayNode nodesArray) {
+            for (final var node : nodesArray) {
+                if (!(node instanceof ObjectNode nodeObject)) {
+                    continue;
+                }
+                final var nodeCounts = invalidateNodeBindings(nodeObject, validTermIds, validDomainIds);
+                invalidatedTermBindingCount += nodeCounts.invalidatedTermBindingCount();
+                invalidatedDomainBindingCount += nodeCounts.invalidatedDomainBindingCount();
+            }
+        }
+
+        return new InvalidationCounts(invalidatedTermBindingCount, invalidatedDomainBindingCount);
+    }
+
+    /**
+     * 개별 노드의 data 객체에서 term/domain 바인딩을 무효화한다.
+     *
+     * @param nodeObject     노드 JSON 객체
+     * @param validTermIds   유효한 용어 ID 집합
+     * @param validDomainIds 유효한 도메인 ID 집합
+     * @return 무효화 카운트
+     */
+    private InvalidationCounts invalidateNodeBindings(
+        ObjectNode nodeObject,
+        Set<Long> validTermIds,
+        Set<Long> validDomainIds
+    ) {
+        final var dataNode = nodeObject.get("data");
+        if (!(dataNode instanceof ObjectNode dataObject)) {
+            return InvalidationCounts.empty();
+        }
+
+        var invalidatedTermBindingCount = 0;
+        var invalidatedDomainBindingCount = 0;
+
+        final var tableTermId = toLongValue(dataObject.get("tableTermId"));
+        if (tableTermId != null && !validTermIds.contains(tableTermId)) {
+            dataObject.remove("tableTermId");
+            invalidatedTermBindingCount++;
+        }
+
+        final var columnsNode = dataObject.get("columns");
+        if (columnsNode instanceof ArrayNode columnsArray) {
+            final var columnCounts = invalidateColumnBindings(columnsArray, validTermIds, validDomainIds);
+            invalidatedTermBindingCount += columnCounts.invalidatedTermBindingCount();
+            invalidatedDomainBindingCount += columnCounts.invalidatedDomainBindingCount();
+        }
+
+        return new InvalidationCounts(invalidatedTermBindingCount, invalidatedDomainBindingCount);
+    }
+
+    /**
+     * 컬럼 배열에서 term/domain 바인딩을 무효화한다.
+     *
+     * @param columnsArray   컬럼 JSON 배열
+     * @param validTermIds   유효한 용어 ID 집합
+     * @param validDomainIds 유효한 도메인 ID 집합
+     * @return 무효화 카운트
+     */
+    private InvalidationCounts invalidateColumnBindings(
+        ArrayNode columnsArray,
+        Set<Long> validTermIds,
+        Set<Long> validDomainIds
+    ) {
+        var invalidatedTermBindingCount = 0;
+        var invalidatedDomainBindingCount = 0;
+
+        for (final var columnNode : columnsArray) {
+            if (!(columnNode instanceof ObjectNode columnObject)) {
+                continue;
+            }
+
+            final var termId = toLongValue(columnObject.get("termId"));
+            if (termId != null && !validTermIds.contains(termId)) {
+                columnObject.remove("termId");
+                invalidatedTermBindingCount++;
+            }
+
+            final var domainId = toLongValue(columnObject.get("domainId"));
+            if (domainId != null && !validDomainIds.contains(domainId)) {
+                columnObject.remove("domainId");
+                invalidatedDomainBindingCount++;
+            }
+        }
+
+        return new InvalidationCounts(invalidatedTermBindingCount, invalidatedDomainBindingCount);
+    }
+
+    @Nullable
     private Long toLongValue(JsonNode valueNode) {
         if (valueNode == null || valueNode.isNull()) {
             return null;
@@ -389,7 +458,8 @@ public class DiagramService {
         if (valueNode.isTextual()) {
             try {
                 return Long.parseLong(valueNode.textValue());
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                log.trace("텍스트를 Long으로 변환 불가: '{}'", valueNode.textValue(), e);
                 return null;
             }
         }

@@ -1,5 +1,7 @@
 package com.smarterd.api.dictionary;
 
+import com.smarterd.api.common.dto.PageResponse;
+import com.smarterd.api.common.dto.PageSearchRequest;
 import com.smarterd.api.dictionary.dto.BulkDomainSaveRequest;
 import com.smarterd.api.dictionary.dto.BulkSaveResponse;
 import com.smarterd.api.dictionary.dto.BulkValidationResponse;
@@ -18,7 +20,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.io.IOException;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -94,12 +95,19 @@ public class DomainController {
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @ApiResponse(responseCode = "400", description = "팀이 존재하지 않거나 접근 권한 없음")
     @GetMapping
-    public ResponseEntity<List<DomainResponse>> getDomains(
+    public ResponseEntity<PageResponse<DomainResponse>> getDomains(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
-        @Parameter(description = "사전 세트 ID") @PathVariable Long setId
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
+        @Parameter(description = "페이지 번호 (0-base)") @RequestParam(defaultValue = "0") int page,
+        @Parameter(description = "페이지 크기 (최대 200)") @RequestParam(defaultValue = "20") int size,
+        @Parameter(description = "복합 검색어 (논리명/물리 타입/설명)") @RequestParam(
+            required = false,
+            name = "q"
+        ) String keyword
     ) {
-        return ResponseEntity.ok(domainService.getDomains(jwt.getSubject(), teamId, setId));
+        final var searchRequest = new PageSearchRequest(page, size, keyword);
+        return ResponseEntity.ok(domainService.getDomains(jwt.getSubject(), teamId, setId, searchRequest));
     }
 
     /**
@@ -179,7 +187,7 @@ public class DomainController {
      */
     @Operation(summary = "도메인 일괄 저장", description = "검증 통과한 도메인을 일괄 저장한다.")
     @ApiResponse(responseCode = "200", description = "저장 완료")
-    @ApiResponse(responseCode = "400", description = "빈 rows 배열", content = @Content)
+    @ApiResponse(responseCode = "400", description = "검증 토큰이 무효/만료되었거나 요청이 잘못됨", content = @Content)
     @PostMapping("/upload")
     public ResponseEntity<BulkSaveResponse> bulkSave(
         @AuthenticationPrincipal Jwt jwt,
@@ -188,6 +196,42 @@ public class DomainController {
         @Valid @RequestBody BulkDomainSaveRequest request
     ) {
         return ResponseEntity.ok(domainBulkService.bulkSave(jwt.getSubject(), teamId, setId, request));
+    }
+
+    /**
+     * 업로드 검증 오류 행을 엑셀로 다운로드한다.
+     *
+     * @param jwt             인증된 JWT 토큰
+     * @param teamId          팀 ID
+     * @param setId           사전 세트 ID
+     * @param validationToken 검증 세션 토큰
+     * @param locale          요청 로케일
+     * @param response        HTTP 응답
+     * @throws IOException 엑셀 생성 실패 시
+     */
+    @Operation(
+        summary = "도메인 업로드 오류 엑셀 다운로드",
+        description = "도메인 업로드 검증 오류 행을 엑셀로 다운로드한다."
+    )
+    @ApiResponse(responseCode = "200", description = "오류 엑셀 다운로드 성공")
+    @ApiResponse(responseCode = "400", description = "검증 토큰이 무효/만료되었거나 요청이 잘못됨", content = @Content)
+    @GetMapping("/upload/errors")
+    public void downloadErrorReport(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
+        @Parameter(description = "검증 세션 토큰") @RequestParam("validationToken") String validationToken,
+        Locale locale,
+        HttpServletResponse response
+    ) throws IOException {
+        final var excelData = domainBulkService.generateErrorReport(
+            jwt.getSubject(),
+            teamId,
+            setId,
+            validationToken,
+            Objects.requireNonNull(locale)
+        );
+        ExcelUtils.download(excelData, response, "domain-upload-errors");
     }
 
     /**

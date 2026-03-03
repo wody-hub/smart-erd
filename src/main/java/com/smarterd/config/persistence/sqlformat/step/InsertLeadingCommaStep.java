@@ -57,10 +57,12 @@ public class InsertLeadingCommaStep implements SqlFormatStep {
         final var formattedColumns = SqlClauseFormatSupport.formatParenthesizedLeadingCommaList(columnItems, 4, 2);
         final var formattedValues = SqlClauseFormatSupport.formatParenthesizedLeadingCommaList(valueItems, 4, 2);
 
-        return sql.substring(0, columnsOpen)
-            + formattedColumns
-            + sql.substring(columnsClose + 1, valuesOpen)
-            + formattedValues
-            + sql.substring(valuesClose + 1);
+        return (
+            sql.substring(0, columnsOpen) +
+            formattedColumns +
+            sql.substring(columnsClose + 1, valuesOpen) +
+            formattedValues +
+            sql.substring(valuesClose + 1)
+        );
     }
 }

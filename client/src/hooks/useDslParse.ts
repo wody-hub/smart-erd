@@ -19,6 +19,18 @@ interface UseDslParseReturn {
   handleDslChange: (value: string | undefined) => void;
 }
 
+/** 빈 코드 입력 시 사용하는 빈 스키마 파싱 결과 */
+const EMPTY_PARSE_RESULT: DslParseResult = {
+  result: {
+    diagnostics: [],
+    tables: [],
+    relations: [],
+    errors: [],
+    tableRanges: [],
+  },
+  diagnostics: [],
+};
+
 /**
  * DSL 디바운스 파싱 훅.
  *
@@ -66,7 +78,7 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
     const seq = ++parseSeqRef.current;
 
     if (!text.trim()) {
-      setParseResult(null);
+      setParseResult(EMPTY_PARSE_RESULT);
       setParsing(false);
       return;
     }
@@ -74,10 +86,12 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
     setParsing(true);
     debounceTimerRef.current = setTimeout(() => {
       if (seq !== parseSeqRef.current) {
+        setParsing(false);
         return;
       }
       const result = parseDsl(text, dictionaryRef.current);
       if (seq !== parseSeqRef.current) {
+        setParsing(false);
         return;
       }
       setParseResult(result);

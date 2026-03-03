@@ -1,5 +1,7 @@
 package com.smarterd.domain.dictionary.service;
 
+import com.smarterd.api.common.dto.PageResponse;
+import com.smarterd.api.common.dto.PageSearchRequest;
 import com.smarterd.api.dictionary.dto.CreateDomainRequest;
 import com.smarterd.api.dictionary.dto.DomainResponse;
 import com.smarterd.api.dictionary.dto.UpdateDomainRequest;
@@ -7,14 +9,17 @@ import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
+import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
+import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.service.AuthService;
-import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class DomainService {
+
+    private static final int MAX_PAGE_SIZE = 200;
 
     /** 도메인 레포지토리 */
     private final DomainRepository domainRepository;
@@ -54,12 +61,9 @@ public class DomainService {
      */
     @Transactional
     public DomainResponse createDomain(String loginId, Long teamId, Long setId, CreateDomainRequest request) {
-        final var user = authService.findUserByLoginId(loginId);
-        final var team = teamService.findTeamById(teamId);
-        teamService.verifyEditable(team, user);
-        final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
+        final var context = verifyWriteAccess(loginId, teamId, setId);
 
-        if (domainRepository.existsByDictionarySetAndLogicalName(dictionarySet, request.logicalName())) {
+        if (domainRepository.existsByDictionarySetAndLogicalName(context.dictionarySet(), request.logicalName())) {
             throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), request.logicalName());
         }
 
@@ -67,8 +71,8 @@ public class DomainService {
             .logicalName(request.logicalName())
             .physicalType(request.physicalType())
             .description(request.description())
-            .team(team)
-            .dictionarySet(dictionarySet)
+            .team(context.team())
+            .dictionarySet(context.dictionarySet())
             .build();
         domainRepository.save(Objects.requireNonNull(domain));
 
@@ -78,18 +82,31 @@ public class DomainService {
     /**
      * 팀의 도메인 목록을 조회한다.
      *
-     * @param loginId 요청 사용자의 로그인 ID
-     * @param teamId  팀 ID
-     * @param setId   사전 세트 ID
+     * @param loginId       요청 사용자의 로그인 ID
+     * @param teamId        팀 ID
+     * @param setId         사전 세트 ID
+     * @param searchRequest 페이지네이션 + 검색 요청
      * @return 도메인 응답 목록
      */
-    public List<DomainResponse> getDomains(String loginId, Long teamId, Long setId) {
-        final var user = authService.findUserByLoginId(loginId);
-        final var team = teamService.findTeamById(teamId);
-        teamService.verifyMembership(team, user);
-        final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
+    public PageResponse<DomainResponse> getDomains(
+        String loginId,
+        Long teamId,
+        Long setId,
+        PageSearchRequest searchRequest
+    ) {
+        final var context = verifyReadAccess(loginId, teamId, setId);
 
-        return domainRepository.findByDictionarySet(dictionarySet).stream().map(DomainResponse::from).toList();
+        final var pageable = searchRequest.toPageRequest(
+            MAX_PAGE_SIZE,
+            Sort.by(Sort.Order.asc("logicalName"), Sort.Order.asc("id"))
+        );
+        final var normalizedKeyword = searchRequest.normalizedKeyword();
+        final var resultPage = (
+            normalizedKeyword == null
+                ? domainRepository.findByDictionarySet(context.dictionarySet(), pageable)
+                : domainRepository.searchByDictionarySet(context.dictionarySet(), normalizedKeyword, pageable)
+        ).map(DomainResponse::from);
+        return PageResponse.from(resultPage);
     }
 
     /**
@@ -102,10 +119,7 @@ public class DomainService {
      * @return 도메인 응답
      */
     public DomainResponse getDomain(String loginId, Long teamId, Long setId, Long domainId) {
-        final var user = authService.findUserByLoginId(loginId);
-        final var team = teamService.findTeamById(teamId);
-        teamService.verifyMembership(team, user);
-        dictionarySetService.findByTeamAndId(team, setId);
+        verifyReadAccess(loginId, teamId, setId);
 
         final var domain = findDomainById(domainId);
         verifyDomainBelongsToTeam(domain, teamId);
@@ -132,17 +146,18 @@ public class DomainService {
         Long domainId,
         UpdateDomainRequest request
     ) {
-        final var user = authService.findUserByLoginId(loginId);
-        final var team = teamService.findTeamById(teamId);
-        teamService.verifyEditable(team, user);
-        final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
+        final var context = verifyWriteAccess(loginId, teamId, setId);
 
         final var domain = findDomainById(domainId);
         verifyDomainBelongsToTeam(domain, teamId);
         verifyDomainBelongsToSet(domain, setId);
 
         if (
-            domainRepository.existsByDictionarySetAndLogicalNameAndIdNot(dictionarySet, request.logicalName(), domainId)
+            domainRepository.existsByDictionarySetAndLogicalNameAndIdNot(
+                context.dictionarySet(),
+                request.logicalName(),
+                domainId
+            )
         ) {
             throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), request.logicalName());
         }
@@ -162,10 +177,7 @@ public class DomainService {
      */
     @Transactional
     public void deleteDomain(String loginId, Long teamId, Long setId, Long domainId) {
-        final var user = authService.findUserByLoginId(loginId);
-        final var team = teamService.findTeamById(teamId);
-        teamService.verifyEditable(team, user);
-        dictionarySetService.findByTeamAndId(team, setId);
+        verifyWriteAccess(loginId, teamId, setId);
 
         final var domain = Objects.requireNonNull(findDomainById(domainId));
         verifyDomainBelongsToTeam(domain, teamId);
@@ -187,13 +199,47 @@ public class DomainService {
      * @throws EntityNotFoundException 도메인이 존재하지 않는 경우
      */
     public Domain findDomainById(Long domainId) {
-        if (domainId == null) {
-            new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_DOMAIN.code(), domainId);
-        }
+        Objects.requireNonNull(domainId, "domainId must not be null");
         return domainRepository
-            .findById(Objects.requireNonNull(domainId))
+            .findById(domainId)
             .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_DOMAIN.code(), domainId));
     }
+
+    // ── 접근 검증 메서드 ──
+
+    /**
+     * 읽기 접근을 검증한다. 모든 팀 멤버가 접근 가능하다.
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId  팀 ID
+     * @param setId   사전 세트 ID
+     * @return 검증된 접근 컨텍스트
+     */
+    private AccessContext verifyReadAccess(String loginId, Long teamId, Long setId) {
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = teamService.findTeamById(teamId);
+        teamService.verifyMembership(team, user);
+        final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
+        return new AccessContext(user, team, dictionarySet);
+    }
+
+    /**
+     * 쓰기 접근을 검증한다. ADMIN과 MEMBER만 접근 가능하다.
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId  팀 ID
+     * @param setId   사전 세트 ID
+     * @return 검증된 접근 컨텍스트
+     */
+    private AccessContext verifyWriteAccess(String loginId, Long teamId, Long setId) {
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = teamService.findTeamById(teamId);
+        teamService.verifyEditable(team, user);
+        final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
+        return new AccessContext(user, team, dictionarySet);
+    }
+
+    // ── 소속 검증 메서드 ──
 
     /**
      * 도메인이 해당 팀에 소속되어 있는지 확인한다.
@@ -220,4 +266,13 @@ public class DomainService {
             throw new BusinessException(MessageCode.ERROR_BUSINESS_DICTIONARY_SET_TEAM_MISMATCH.code());
         }
     }
+
+    /**
+     * 접근 검증 결과를 담는 내부 컨텍스트.
+     *
+     * @param user          인증된 사용자
+     * @param team          대상 팀
+     * @param dictionarySet 대상 사전 세트
+     */
+    private record AccessContext(User user, Team team, DictionarySet dictionarySet) {}
 }

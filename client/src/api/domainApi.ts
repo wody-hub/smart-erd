@@ -3,9 +3,12 @@ import { downloadBlob } from '@/lib/download';
 import type {
   Domain,
   DomainFormData,
+  PagedResponse,
   BulkValidationResponse,
   BulkSaveResponse,
 } from '@/types/dictionary';
+
+const BULK_FETCH_PAGE_SIZE = 200;
 
 /**
  * 팀의 도메인 목록을 조회한다.
@@ -15,8 +18,46 @@ import type {
  * @returns 도메인 목록
  */
 export async function fetchDomains(teamId: string, setId: string): Promise<Domain[]> {
-  const res = await axiosInstance.get<Domain[]>(
+  const allDomains: Domain[] = [];
+  const MAX_PAGES = 100;
+
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const pageResult = await fetchDomainsPage(teamId, setId, page, BULK_FETCH_PAGE_SIZE);
+    allDomains.push(...pageResult.content);
+    if (pageResult.last) {
+      return allDomains;
+    }
+  }
+  console.warn('[fetchDomains] 페이지 상한 초과, 조회 중단');
+  return allDomains;
+}
+
+/**
+ * 팀의 도메인 목록을 페이지 단위로 조회한다.
+ *
+ * @param teamId 조회할 팀 ID
+ * @param setId  조회할 사전 세트 ID
+ * @param page   페이지 번호 (0-base)
+ * @param size   페이지 크기
+ * @returns 페이징 응답
+ */
+export async function fetchDomainsPage(
+  teamId: string,
+  setId: string,
+  page: number,
+  size: number,
+  keyword?: string,
+): Promise<PagedResponse<Domain>> {
+  const normalizedKeyword = keyword?.trim();
+  const res = await axiosInstance.get<PagedResponse<Domain>>(
     `/teams/${teamId}/dictionary-sets/${setId}/domains`,
+    {
+      params: {
+        page,
+        size,
+        ...(normalizedKeyword ? { q: normalizedKeyword } : {}),
+      },
+    },
   );
   return res.data;
 }
@@ -100,20 +141,23 @@ export async function validateDomainUpload(
 /**
  * 검증 통과한 도메인을 일괄 저장한다.
  *
- * @param teamId 대상 팀 ID
- * @param setId  대상 사전 세트 ID
- * @param rows   저장할 도메인 데이터 목록
+ * @param teamId            대상 팀 ID
+ * @param setId             대상 사전 세트 ID
+ * @param validationToken   검증 세션 토큰
+ * @param excludedRowNumbers 저장에서 제외할 행 번호 목록
  * @returns 저장 결과
  */
 export async function bulkSaveDomains(
   teamId: string,
   setId: string,
-  rows: DomainFormData[],
+  validationToken: string,
+  excludedRowNumbers: number[],
 ): Promise<BulkSaveResponse> {
   const res = await axiosInstance.post<BulkSaveResponse>(
     `/teams/${teamId}/dictionary-sets/${setId}/domains/upload`,
     {
-      rows,
+      validationToken,
+      excludedRowNumbers,
     },
   );
   return res.data;
@@ -136,4 +180,26 @@ export async function downloadDomainTemplate(teamId: string, setId: string): Pro
     },
   );
   downloadBlob(res, 'domain-template.xlsx');
+}
+
+/**
+ * 업로드 검증 오류 행 엑셀을 다운로드한다.
+ *
+ * @param teamId          대상 팀 ID
+ * @param setId           대상 사전 세트 ID
+ * @param validationToken 검증 세션 토큰
+ */
+export async function downloadDomainUploadErrors(
+  teamId: string,
+  setId: string,
+  validationToken: string,
+): Promise<void> {
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/dictionary-sets/${setId}/domains/upload/errors`,
+    {
+      params: { validationToken },
+      responseType: 'blob',
+    },
+  );
+  downloadBlob(res, 'domain-upload-errors.xlsx');
 }

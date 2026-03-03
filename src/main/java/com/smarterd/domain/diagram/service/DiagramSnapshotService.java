@@ -6,12 +6,14 @@ import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
@@ -48,6 +50,8 @@ public class DiagramSnapshotService implements SmartLifecycle {
 
     /** 다이어그램별 다음 컴팩션 허용 시각 (diagramId -> blockedUntil) */
     private final Map<Long, Instant> compactionBlockedUntil = new ConcurrentHashMap<>();
+    /** 스냅샷 flush 실패 누적 카운터 */
+    private final AtomicLong snapshotFlushFailCount = new AtomicLong(0);
 
     /** 컴팩션 성공 시 최소 대기 시간 (1분) */
     private static final Duration COMPACTION_COOL_DOWN = Duration.ofMinutes(1);
@@ -201,19 +205,28 @@ public class DiagramSnapshotService implements SmartLifecycle {
         }
 
         try {
+            final var failCountBefore = snapshotFlushFailCount.get();
             var savedCount = 0;
             for (final var id : dirtyIds) {
                 if (flushSingleDiagram(id)) {
                     savedCount++;
                 }
             }
+            final var runFailedCount = Math.max(0, snapshotFlushFailCount.get() - failCountBefore);
 
-            if (savedCount > 0) {
-                log.info("주기적 Y.Doc 스냅샷 저장 완료: {}개 다이어그램", savedCount);
+            if (savedCount > 0 || runFailedCount > 0) {
+                log.info(
+                    "snapshot-flush-metrics saved={}, failed={}, snapshot_flush_fail_count={}",
+                    savedCount,
+                    runFailedCount,
+                    snapshotFlushFailCount.get()
+                );
             }
         } catch (Exception e) {
             // 최상위 예외 발생 시 dirty ID 전체를 복구하여 다음 주기에 재시도
+            final var totalFailCount = addSnapshotFlushFailCount(dirtyIds.size(), "batch-exception", null);
             log.error("주기적 스냅샷 저장 중 예외 발생, dirty ID 복구: {}개", dirtyIds.size(), e);
+            log.warn("snapshot_flush_fail_count={} reason=batch-exception", totalFailCount);
             for (final var id : dirtyIds) {
                 roomManager.reDirty(id);
             }
@@ -221,15 +234,28 @@ public class DiagramSnapshotService implements SmartLifecycle {
     }
 
     /**
+     * 특정 다이어그램의 누적 update를 즉시 DB 스냅샷으로 flush한다.
+     *
+     * <p>조회 직전/명시 저장 직후 정합성이 필요할 때 사용한다.
+     * 누적 update가 없으면 no-op(false)를 반환한다.</p>
+     *
+     * @param diagramId 다이어그램 ID
+     * @return flush 수행 여부 (true: 저장됨, false: 누적 update 없음 또는 실패)
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public boolean flushDiagramSnapshotNow(Long diagramId) {
+        return flushSingleDiagram(diagramId);
+    }
+
+    /**
      * 단일 다이어그램의 누적 update를 DB에 저장한다.
-     * flush 락 안에서 트랜잭션 커밋까지 완료하여 락 해제 전에 DB 영속화를 보장한다.
+     * flush 락 안에서 drain + 위임 + 복구 책임만 담당한다.
      *
      * @param id 다이어그램 ID
      * @return 저장 성공 여부
      */
     private boolean flushSingleDiagram(Long id) {
         // @Scheduled flush와 연결 종료 flush 간 레이스 방지를 위해 다이어그램별 flush 락 사용
-        // TransactionTemplate으로 flush 락 안에서 커밋까지 완료
         synchronized (roomManager.getFlushLock(id)) {
             byte[] mergedUpdates = null;
             try {
@@ -238,22 +264,11 @@ public class DiagramSnapshotService implements SmartLifecycle {
                 if (mergedUpdates.length == 0) {
                     return false;
                 }
-
-                final var updates = mergedUpdates;
-                final var result = transactionTemplate.execute((status) -> {
-                    final var existingSnapshot = diagramRepository.findYdocSnapshotById(id).orElse(new byte[0]);
-                    final var combined = combineSnapshotAndUpdates(id, existingSnapshot, updates);
-                    final var updated = diagramRepository.updateYdocSnapshotById(id, combined);
-                    if (updated == 0) {
-                        log.warn("주기적 스냅샷 저장 실패: 다이어그램 미존재 (id={})", id);
-                        return false;
-                    }
-                    log.debug("주기적 Y.Doc 스냅샷 저장: diagramId={}, size={}bytes", id, combined.length);
-                    return true;
-                });
-                return Boolean.TRUE.equals(result);
+                return doFlushInTransaction(id, mergedUpdates);
             } catch (Exception e) {
+                final var totalFailCount = addSnapshotFlushFailCount(1, "exception", id);
                 log.error("주기적 스냅샷 저장 실패 (diagramId={})", id, e);
+                log.warn("snapshot_flush_fail_count={} reason=exception diagramId={}", totalFailCount, id);
                 // drain 후 DB 저장 실패: drain된 데이터를 개별 update로 디코딩 후 재삽입
                 final var restored = roomManager.restoreUpdates(id, mergedUpdates);
                 if (!restored) {
@@ -262,6 +277,48 @@ public class DiagramSnapshotService implements SmartLifecycle {
                 return false;
             }
         }
+    }
+
+    /**
+     * 트랜잭션 내에서 drain된 update를 DB 스냅샷에 병합하여 저장한다.
+     *
+     * @param id            다이어그램 ID
+     * @param mergedUpdates drain된 Yjs update 바이트 배열
+     * @return 저장 성공 여부
+     */
+    private boolean doFlushInTransaction(Long id, byte[] mergedUpdates) {
+        final var result = transactionTemplate.execute((status) -> {
+            final var existingSnapshot = diagramRepository.findYdocSnapshotById(id).orElse(new byte[0]);
+            final var combined = combineSnapshotAndUpdates(id, existingSnapshot, mergedUpdates);
+            final var updated = diagramRepository.updateYdocSnapshotById(id, combined);
+            if (updated == 0) {
+                final var totalFailCount = addSnapshotFlushFailCount(1, "diagram-not-found", id);
+                log.warn("주기적 스냅샷 저장 실패: 다이어그램 미존재 (id={})", id);
+                log.warn("snapshot_flush_fail_count={} reason=diagram-not-found diagramId={}", totalFailCount, id);
+                return false;
+            }
+            log.debug("주기적 Y.Doc 스냅샷 저장: diagramId={}, size={}bytes", id, combined.length);
+            return true;
+        });
+        return Boolean.TRUE.equals(result);
+    }
+
+    /**
+     * 스냅샷 flush 실패 누적 카운터를 증가시킨다.
+     *
+     * @param delta    증가량
+     * @param reason   실패 사유
+     * @param diagramId 다이어그램 ID (없으면 null)
+     * @return 증가 후 누적 카운터 값
+     */
+    private long addSnapshotFlushFailCount(long delta, String reason, Long diagramId) {
+        final var total = snapshotFlushFailCount.addAndGet(Math.max(0L, delta));
+        if (diagramId == null) {
+            log.debug("snapshot_flush_fail_count={} reason={}", total, reason);
+            return total;
+        }
+        log.debug("snapshot_flush_fail_count={} reason={} diagramId={}", total, reason, diagramId);
+        return total;
     }
 
     /**
@@ -315,7 +372,7 @@ public class DiagramSnapshotService implements SmartLifecycle {
 
         // 2. 누적 update가 있는 모든 다이어그램 ID 추가 (dirty에 포함되지 않은 것도 포함)
         final var allIdsWithUpdates = roomManager.getAllDiagramIdsWithUpdates();
-        final var allIds = new java.util.HashSet<>(dirtyIds);
+        final var allIds = new HashSet<>(dirtyIds);
         allIds.addAll(allIdsWithUpdates);
 
         if (allIds.isEmpty()) {
@@ -374,6 +431,7 @@ public class DiagramSnapshotService implements SmartLifecycle {
                     "서버 종료: Y.Doc flush 타임아웃 ({}초) 초과, 미저장 update가 유실될 수 있음",
                     SHUTDOWN_FLUSH_TIMEOUT_SECONDS
                 );
+                executor.shutdownNow();
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

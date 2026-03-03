@@ -65,60 +65,31 @@ src/main/java/com/smarterd/
 ├── SmartErdApplication.java         # Application entry point (@SpringBootApplication)
 ├── package-info.java                # @NonNullApi (non-null by default for all sub-packages)
 ├── api/                             # HTTP interface layer (Controller + DTO only)
-│   ├── auth/
-│   │   ├── AuthController.java      #   POST /api/auth/login, /api/auth/signup
-│   │   └── dto/                     #   LoginRequest, SignupRequest, AuthResponse (record)
-│   ├── team/
-│   │   ├── TeamController.java      #   /api/teams CRUD + /api/teams/{id}/members management
-│   │   └── dto/                     #   CreateTeamRequest, TeamResponse, AddMemberRequest, UpdateMemberRoleRequest, TeamMemberResponse
-│   ├── project/
-│   │   ├── ProjectController.java   #   /api/teams/{teamId}/projects CRUD
-│   │   └── dto/                     #   CreateProjectRequest, ProjectResponse
-│   ├── dictionary/
-│   │   ├── DomainController.java    #   /api/teams/{teamId}/domains CRUD (5 endpoints)
-│   │   ├── TermController.java      #   /api/teams/{teamId}/terms CRUD (5 endpoints)
-│   │   └── dto/                     #   Create/Update/Response records (Domain, Term)
-│   └── common/
-│       └── GlobalExceptionHandler.java  # @RestControllerAdvice (404/403/409/400 mapping)
+│   ├── auth/                        #   AuthController (login, signup) + dto/ (record)
+│   ├── team/                        #   TeamController (CRUD + members) + dto/
+│   ├── project/                     #   ProjectController (CRUD) + dto/
+│   ├── dictionary/                  #   DomainController, TermController (CRUD) + dto/
+│   └── common/                      #   GlobalExceptionHandler (404/403/409/400 mapping)
 ├── config/                          # Configuration
 │   ├── SecurityConfig.java          #   Spring Security (OAuth2 Resource Server JWT, CSRF disabled)
 │   ├── JwtConfig.java               #   JwtEncoder / JwtDecoder beans (NimbusJwtDecoder, HS256)
-│   ├── JwtProperties.java           #   @ConfigurationProperties("smart-erd.jwt") — secret, expiration
-│   ├── CorsConfig.java              #   @ConfigurationProperties("smart-erd.cors") + CorsProperties inner class
+│   ├── JwtProperties.java           #   @ConfigurationProperties("smart-erd.jwt")
+│   ├── CorsConfig.java              #   @ConfigurationProperties("smart-erd.cors")
 │   ├── LocaleConfig.java            #   AcceptHeaderLocaleResolver (ko/en, default: en)
-│   ├── ValidationConfig.java        #   LocalValidatorFactoryBean + MessageSource 연결
-│   ├── QuerydslConfig.java          #   JPAQueryFactory bean (QueryDSL type-safe query builder)
-│   ├── BlazeConfig.java             #   CriteriaBuilderFactory bean (Blaze-Persistence advanced queries)
-│   ├── OpenApiConfig.java           #   Swagger/OpenAPI config (JWT Bearer auth scheme)
-│   └── PrettySqlFormat.java         #   p6spy SQL 포맷터 (Hibernate FormatStyle.BASIC 기반 들여쓰기)
+│   ├── ValidationConfig.java        #   LocalValidatorFactoryBean + MessageSource
+│   ├── QuerydslConfig.java          #   JPAQueryFactory bean
+│   ├── BlazeConfig.java             #   CriteriaBuilderFactory bean
+│   ├── OpenApiConfig.java           #   Swagger/OpenAPI config (JWT Bearer auth)
+│   └── PrettySqlFormat.java         #   p6spy SQL formatter
 └── domain/                          # Domain layer (Services live here too)
     ├── common/
     │   ├── entity/                   #   BaseTimeEntity (createdAt, updatedAt auto-audit)
-    │   └── exception/               #   Custom exception hierarchy (5 types, all extend LocalizedException)
-    │       ├── LocalizedException.java          # Abstract base — messageCode + messageArgs
-    │       ├── EntityNotFoundException.java     # → 404 Not Found
-    │       ├── DomainAccessDeniedException.java # → 403 Forbidden
-    │       ├── DuplicateException.java          # → 409 Conflict
-    │       └── BusinessException.java           # → 400 Bad Request
-    ├── user/
-    │   ├── entity/                   #   User, RefreshToken (loginId unique, BCrypt password)
-    │   ├── repository/              #   UserRepository, RefreshTokenRepository (+Custom — QueryDSL bulk delete)
-    │   └── service/                 #   AuthService, AuthUserDetailsService, JwtTokenService
-    ├── team/
-    │   ├── entity/                  #   Team, TeamMember (@IdClass), TeamMemberId (record), TeamMemberRole
-    │   ├── repository/             #   TeamRepository (+Custom), TeamMemberRepository (+Custom) — QueryDSL fetch join
-    │   └── service/                #   TeamService (CRUD + member management with ADMIN permission checks)
-    ├── project/
-    │   ├── entity/                  #   Project (belongs to Team)
-    │   ├── repository/             #   ProjectRepository (findByTeam)
-    │   └── service/                #   ProjectService (CRUD with team membership checks)
-    ├── diagram/
-    │   ├── entity/                  #   Diagram (TEXT content — serialized React Flow JSON)
-    │   └── repository/             #   DiagramRepository
-    └── dictionary/
-        ├── entity/                  #   Domain (logical→physical type), Term (logical→physical name)
-        ├── repository/             #   DomainRepository, TermRepository (+Custom — QueryDSL fetch join)
-        └── service/                #   DomainService, TermService (CRUD with team membership + duplicate checks)
+    │   └── exception/               #   LocalizedException + 4 subtypes (404/403/409/400)
+    ├── user/                        #   User, RefreshToken, AuthService, JwtTokenService
+    ├── team/                        #   Team, TeamMember(@IdClass), TeamService
+    ├── project/                     #   Project, ProjectService
+    ├── diagram/                     #   Diagram (TEXT content — serialized React Flow JSON)
+    └── dictionary/                  #   Domain, Term, DomainService, TermService
 ```
 
 **Entity ownership chain:** User → Team → (Project → Diagram, Domain, Term). TeamMember is a join table with `@IdClass(TeamMemberId)` record composite key (team_id + user_id) and role enum (ADMIN, MEMBER, VIEWER).
@@ -135,11 +106,11 @@ src/main/java/com/smarterd/
 
 **Configuration:** Custom properties are namespaced under `smart-erd.*` in `application.yml`. JWT and CORS settings use `@ConfigurationProperties` for type-safe binding (`smart-erd.jwt.*`, `smart-erd.cors.*`).
 
-**Backend i18n:** All error messages (exceptions, validation) are localized server-side via Spring `MessageSource`. Message bundles: `src/main/resources/i18n/messages.properties` (English fallback) + `messages_ko.properties` (Korean). `AcceptHeaderLocaleResolver` resolves locale from `Accept-Language` header. Bean Validation `{key}` interpolation is connected to `MessageSource` via `ValidationConfig`. Frontend sends `Accept-Language: i18n.language` on every request.
+**Backend i18n:** All error messages localized via Spring `MessageSource`. Bundles: `src/main/resources/i18n/messages.properties` (en) + `messages_ko.properties` (ko). `AcceptHeaderLocaleResolver` resolves locale from `Accept-Language` header. Bean Validation `{key}` interpolation connected to `MessageSource` via `ValidationConfig`. Frontend sends `Accept-Language: i18n.language` on every request.
 
 **Database:** PostgreSQL 17 (Docker). `spring-boot-docker-compose`가 `compose.yaml`을 자동 감지하여 컨테이너를 시작하고, datasource를 자동 주입한다. `ddl-auto: update`. Docker Desktop이 실행 중이어야 한다.
 
-**SQL 로깅:** p6spy (`p6spy-spring-boot-starter`)로 실제 바인딩 파라미터가 채워진 완성 SQL을 로깅한다. `PrettySqlFormat`이 Hibernate `FormatStyle.BASIC`으로 SQL을 포맷하여 들여쓰기/줄바꿈이 적용된다. 설정: `spy.properties` (`logMessageFormat`) + `application.yml` (`decorator.datasource.p6spy.*`). Hibernate 기본 `show-sql`/`format_sql`은 사용하지 않는다.
+**SQL 로깅:** p6spy로 실제 바인딩 파라미터가 채워진 완성 SQL 로깅. `PrettySqlFormat` (FormatStyle.BASIC). 설정: `spy.properties` + `application.yml` (`decorator.datasource.p6spy.*`). Hibernate 기본 `show-sql`/`format_sql`은 미사용.
 
 ### Frontend: Vite 6 + React 19 + TypeScript + shadcn/ui + React Query
 
@@ -147,24 +118,17 @@ src/main/java/com/smarterd/
 client/
 ├── index.html                       # SPA entry point
 ├── package.json                     # "type": "module" (ESM)
-├── tailwind.config.js               # CSS variable colors, darkMode: ["class"], tailwindcss-animate
-├── postcss.config.js                # tailwindcss + autoprefixer
+├── tailwind.config.js               # CSS variable colors, darkMode: ["class"]
 ├── vite.config.ts                   # @/ alias → ./src, proxy /api → :8190
 ├── tsconfig.app.json                # paths: { "@/*": ["./src/*"] }
-├── .prettierrc.json                 # Prettier config
-├── .prettierignore                  # Prettier ignore
-├── eslint.config.js                 # ESLint flat config (TypeScript + Prettier)
 └── src/
     ├── main.tsx                     # createRoot + StrictMode
     ├── App.tsx                      # QueryClientProvider + BrowserRouter + Routes
     ├── index.css                    # Tailwind directives + CSS variables (light/dark)
-    ├── vite-env.d.ts                # Vite type reference
     ├── i18n/
     │   ├── index.ts                 # i18next initialization (LanguageDetector + initReactI18next)
     │   ├── i18next.d.ts             # Type augmentation (translation key autocomplete)
-    │   └── locales/
-    │       ├── en/translation.json  # English translations (~200 keys)
-    │       └── ko/translation.json  # Korean translations (~200 keys)
+    │   └── locales/{en,ko}/         # translation.json (~200 keys each)
     ├── api/
     │   ├── axiosInstance.ts         # baseURL: /api, JWT auto-attach + 401 Refresh Token rotation
     │   ├── authApi.ts               # login(), signup()
@@ -176,95 +140,46 @@ client/
     ├── constants/
     │   ├── keybindings.ts           # KEYBINDINGS — keyboard shortcut key registry
     │   ├── storage.ts               # STORAGE_KEYS — localStorage key constants
-    │   ├── routes.ts                # ROUTES — route path constants (static + parameterized)
+    │   ├── routes.ts                # ROUTES — route path constants
     │   └── query-keys.ts            # queryKeys — React Query cache key hierarchy
     ├── hooks/
-    │   ├── useInlineEdit.ts         # Inline text editing hook (startEdit, confirmEdit, cancelEdit)
-    │   └── useFkConnectMode.ts      # FK connect mode state/logic hook (parent→child 2-click flow)
+    │   ├── useInlineEdit.ts         # Inline text editing (startEdit, confirmEdit, cancelEdit)
+    │   └── useFkConnectMode.ts      # FK connect mode (parent→child 2-click flow)
     ├── components/
-    │   ├── auth/
-    │   │   └── ProtectedRoute.tsx   # Auth guard (redirects to /login if no token)
-    │   ├── erd/
-    │   │   ├── ERDCanvas.tsx        # @xyflow/react canvas (FK connect, edge deletion, auto layout, highlights)
-    │   │   ├── TableNode.tsx        # Custom node: table header + column rows (PK/FK badges, L/R handles)
-    │   │   ├── CanvasToolbar.tsx    # Floating toolbar (FK Connect + Auto Layout buttons)
-    │   │   ├── EdgeContextMenu.tsx  # Edge right-click context menu (delete)
-    │   │   └── DeleteEdgeDialog.tsx # Edge deletion dialog (Remove FK / Keep FK / Cancel)
-    │   ├── layout/
-    │   │   ├── Header.tsx           # Top header (h-12, bg-header, user name + logout + save)
-    │   │   ├── LanguageSwitcher.tsx  # Language switching dropdown (ko/en)
-    │   │   ├── Sidebar.tsx          # Left sidebar (w-56, table list)
-    │   │   └── SidebarTableItem.tsx # Individual table item with inline rename
-    │   ├── dictionary/
-    │   │   ├── DomainTab.tsx        # Domain list table + CRUD (useQuery + useMutation)
-    │   │   ├── TermTab.tsx          # Term list table + CRUD (useQuery + useMutation)
-    │   │   ├── DomainFormDialog.tsx  # Domain create/edit form dialog
-    │   │   └── TermFormDialog.tsx    # Term create/edit form dialog (domain Select)
-    │   ├── team/
-    │   │   └── MembersDialog.tsx    # Team member management dialog (invite/remove, uses React Query)
-    │   └── ui/                      # shadcn/ui + shared UI components
-    │       ├── confirm-dialog.tsx   #   Confirmation dialog (replaces window.confirm())
-    │       ├── create-resource-dialog.tsx  # Resource creation dialog (Team/Project/Diagram)
-    │       ├── button.tsx           #   Button — 6 variants, 4 sizes, asChild (@radix-ui/react-slot)
-    │       ├── card.tsx             #   Card/CardHeader/CardTitle/CardDescription/CardContent/CardFooter
-    │       ├── dialog.tsx           #   Dialog/DialogContent/DialogHeader/DialogFooter/DialogTitle
-    │       ├── dropdown-menu.tsx    #   DropdownMenu (full Radix implementation)
-    │       ├── input.tsx            #   Input — plain HTML input (shadcn/ui standard)
-    │       ├── label.tsx            #   Label — @radix-ui/react-label + CVA
-    │       ├── select.tsx           #   Select — @radix-ui/react-select
-    │       ├── table.tsx            #   Table — semantic HTML table components
-    │       ├── tabs.tsx             #   Tabs — @radix-ui/react-tabs
-    │       └── spinner.tsx          #   Spinner — Loader2 animate-spin + optional text
+    │   ├── auth/ProtectedRoute.tsx   # Auth guard (redirects to /login)
+    │   ├── erd/                      # ERDCanvas, TableNode, CanvasToolbar, EdgeContextMenu, DeleteEdgeDialog
+    │   ├── layout/                   # Header, LanguageSwitcher, Sidebar, SidebarTableItem
+    │   ├── dictionary/               # DomainTab, TermTab, DomainFormDialog, TermFormDialog
+    │   ├── team/MembersDialog.tsx    # Team member management
+    │   └── ui/                       # shadcn/ui + confirm-dialog, create-resource-dialog, spinner
     ├── lib/
     │   ├── utils.ts                 # cn() = clsx + tailwind-merge
-    │   ├── api-error.ts             # getErrorMessage() — server error message extraction
-    │   ├── query-client.ts          # QueryClient (staleTime: 30s, retry: 1, refetchOnWindowFocus: false)
-    │   └── auto-layout.ts           # dagre-based auto layout pure function (LR direction)
-    ├── pages/                       # Domain-based page directories
-    │   ├── auth/
-    │   │   ├── LoginPage.tsx        # Login form (useMutation + authApi, redirects to /teams on success)
-    │   │   └── SignupPage.tsx       # Signup form (useMutation + authApi, auto-login on success)
-    │   ├── team/
-    │   │   └── TeamsPage.tsx        # Team list + create (useQuery + useMutation + CreateResourceDialog)
-    │   ├── project/
-    │   │   └── ProjectsPage.tsx     # Project list + CRUD + member management (useQuery + useMutation)
-    │   ├── dictionary/
-    │   │   └── DictionaryPage.tsx   # Data dictionary: Domain/Term tabs (Tabs container)
-    │   └── diagram/
-    │       ├── DiagramsPage.tsx     # Diagram list + CRUD + inline rename (useQuery + useMutation)
-    │       └── DiagramPage.tsx      # Diagram editor: Header + Sidebar + ERDCanvas (useQuery + useMutation)
+    │   ├── api-error.ts             # getErrorMessage() — server error extraction
+    │   ├── query-client.ts          # QueryClient (staleTime: 30s, retry: 1)
+    │   └── auto-layout.ts           # dagre-based auto layout (LR direction)
+    ├── pages/                       # auth/, team/, project/, dictionary/, diagram/
     ├── stores/
-    │   ├── useAuthStore.ts          # Zustand: auth state (tokens, loginId, name) + localStorage sync
-    │   └── useCanvasStore.ts        # Zustand: nodes, edges, onChange handlers, serialize/deserialize
-    └── types/
-        ├── erd.ts                   # Column, TableNodeData, TableNode, ERDEdge
-        ├── auth.ts                  # AuthResponse
-        ├── team.ts                  # Team, TeamMember, TeamMemberRole
-        ├── project.ts              # Project
-        ├── diagram.ts              # DiagramSummary, DiagramDetail
-        └── dictionary.ts           # Domain, Term, DomainFormData, TermFormData
+    │   ├── useAuthStore.ts          # Zustand: auth state + localStorage sync
+    │   └── useCanvasStore.ts        # Zustand: nodes, edges, serialize/deserialize
+    └── types/                       # erd.ts, auth.ts, team.ts, project.ts, diagram.ts, dictionary.ts
 ```
 
 **Frontend conventions:**
 
-- `api/` — API module per domain. Each module exports typed async functions. Pages never call `axiosInstance` directly.
-- `constants/` — Magic strings are forbidden. All localStorage keys, route paths, and query keys are defined as constants.
-- `types/` — Shared TypeScript interfaces per domain. Inline type definitions in pages are forbidden.
-- `hooks/` — Reusable custom hooks. Extract when a pattern repeats across 2+ components.
+- `api/` — API module per domain. Pages never call `axiosInstance` directly.
+- `constants/` — Magic strings forbidden. All localStorage keys, route paths, query keys defined as constants.
+- `types/` — Shared TypeScript interfaces per domain. Inline type definitions in pages forbidden.
+- `hooks/` — Reusable custom hooks. Extract when pattern repeats across 2+ components.
 - `components/ui/` — Reusable primitives (shadcn/ui + shared dialogs). No domain logic.
-- `components/dictionary/` — Dictionary domain-specific components (DomainTab, TermTab, form dialogs).
-- `components/team/` — Team domain-specific components (MembersDialog).
-- `components/auth/` — Authentication components (ProtectedRoute).
-- `components/erd/` — ERD domain-specific components.
-- `components/layout/` — Page structure components (Header, Sidebar).
-- `pages/` — Domain-based subdirectories (`auth/`, `team/`, `project/`, `dictionary/`, `diagram/`). Each page groups code in standard order (see "Page Component Code Ordering").
+- `components/{domain}/` — Domain-specific components (dictionary, team, auth, erd, layout).
+- `pages/` — Domain-based subdirectories. Each page groups code in standard order (see "Page Component Code Ordering").
 - `lib/` — Pure utility functions and configurations (no React dependencies except query-client).
 - Use `@/` alias for imports (`@/components/ui/button`, `@/lib/utils`).
-- State management: Zustand for client-only state (`stores/`), React Query for server state (`useQuery`/`useMutation`).
+- State management: Zustand for client-only state (`stores/`), React Query for server state.
 - ESM only (`"type": "module"`) — never use `require()`, use ESM imports.
 - Adding new shadcn/ui components: create file in `components/ui/`, use `cn()`, `ref`는 일반 prop으로 전달 (`forwardRef` 사용 금지 — React 19).
-- **i18n (Frontend):** All UI text is internationalized with `react-i18next`. Use `const { t } = useTranslation()` and `t('key')` instead of hardcoded strings. Translation files: `i18n/locales/{en,ko}/translation.json`. Key convention: `{domain}.{screen}.{usage}` (e.g., `auth.login.submit`). `useTranslation()` is placed after `useQueryClient` in page component code ordering.
-- **i18n (Backend):** All error messages (exceptions, validation) are localized server-side via Spring `MessageSource`. Message bundles: `src/main/resources/i18n/messages.properties` (English fallback) + `messages_ko.properties` (Korean). Exceptions carry message codes (e.g., `"error.not-found.user"`) resolved by `GlobalExceptionHandler` using request `Locale`. DTO validation uses `@NotBlank(message = "{validation.not-blank.login-id}")` interpolated through `MessageSource`.
+- **i18n (Frontend):** `react-i18next` — `t('key')` 사용, 하드코딩 문자열 금지. Key convention: `{domain}.{screen}.{usage}`. `useTranslation()` 위치: `useQueryClient` 다음.
+- **i18n (Backend):** 예외는 message code 사용 (예: `"error.not-found.user"`), `GlobalExceptionHandler`가 `MessageSource` + `Locale`로 해석. DTO 검증: `@NotBlank(message = "{validation.not-blank.login-id}")`.
 
 **Routes:** `/login`, `/signup`, `/teams`, `/teams/:teamId/projects`, `/teams/:teamId/dictionary`, `/teams/:teamId/projects/:projectId/diagrams`, `/teams/:teamId/projects/:projectId/diagrams/:diagramId`. All routes except `/login` and `/signup` are protected by `ProtectedRoute`.
 
@@ -278,17 +193,16 @@ baseURL: /api  →  Vite 프록시  →  localhost:8190
 
 - 페이지에서 `axiosInstance`를 직접 호출하지 않는다. `api/` 모듈 함수를 통해서만 호출.
 - 서버 에러 메시지 추출: `getErrorMessage(err, fallback)` (`lib/api-error.ts`)
-- `Accept-Language` 헤더: 매 요청마다 `i18n.language` 값을 전송하여 서버 에러 메시지가 사용자 언어로 반환되도록 한다
 - 401 발생 시 큐 패턴으로 동시 요청 관리: 갱신 중 다른 401 요청은 큐에 대기 → 갱신 완료 후 일괄 재시도
 
 ### Key Conventions
 
 - **Handle IDs:** `{nodeId}-{colId}-source` / `{nodeId}-{colId}-target` — enables column-level relationships
 - **Edge IDs:** `e-{sourceHandle}-{targetHandle}`
-- **extractColId helper:** `extractColId(handleId, nodeId)` — Handle ID에서 컬럼 ID를 추출하는 exported 함수 (`useCanvasStore.ts`)
+- **extractColId helper:** `extractColId(handleId, nodeId)` — Handle ID에서 컬럼 ID 추출 (`useCanvasStore.ts`)
 - **Diagram persistence:** `useCanvasStore.serialize()` → JSON string stored in `Diagram.content` (TEXT)
 - **Type assertion needed:** `applyNodeChanges()` returns generic `Node[]`, must cast to `Node<TableNodeData>[]`
-- **Keyboard shortcuts:** 모든 단축키는 `constants/keybindings.ts`의 `KEYBINDINGS` 상수로 정의하고, `react-hotkeys-hook`의 `useHotkeys(KEYBINDINGS.*, handler)` 패턴으로 등록. 네이티브 `addEventListener('keydown')` + 매직 스트링(`'Escape'`, `'Delete'` 등) 사용 금지.
+- **Keyboard shortcuts:** `constants/keybindings.ts`의 `KEYBINDINGS` + `useHotkeys()`. 네이티브 `addEventListener('keydown')` + 매직 스트링 금지.
 - **KEYBINDINGS registry:** `SAVE` (`mod+s`), `DELETE` (`delete, backspace`), `ESCAPE` (`escape`)
 
 ### Entity Relationships
@@ -301,7 +215,7 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 
 - **User** : 사용자 (`loginId`로 인증, BCrypt 비밀번호)
 - **Team** : 프로젝트와 데이터 사전을 소유하는 조직 단위
-- **TeamMember** : 팀-사용자 다대다 조인 (`@IdClass(TeamMemberId)` record 복합키, 역할: ADMIN, MEMBER, VIEWER)
+- **TeamMember** : 팀-사용자 다대다 조인 (`@IdClass(TeamMemberId)` record, 역할: ADMIN, MEMBER, VIEWER)
 - **Project** : ERD 프로젝트 그룹 (Team 소속)
 - **Diagram** : React Flow JSON을 TEXT로 저장하는 ERD 다이어그램 (Project 소속)
 - **Domain** : 논리명→물리 데이터타입 매핑 사전 (예: "금액" → `DECIMAL(15,2)`)
@@ -332,57 +246,37 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 | DELETE | `/api/teams/{id}/members/{userId}` | 멤버 제거  | —                   |
 | PATCH  | `/api/teams/{id}/members/{userId}` | 역할 변경  | `{ role }`          |
 
-#### 프로젝트 (`/api/teams/{teamId}/projects/**` — 인증 필요)
+#### 프로젝트 (`/api/teams/{teamId}/projects/**`)
 
-| Method | Path                                | 설명          | Request Body |
-| ------ | ----------------------------------- | ------------- | ------------ |
-| POST   | `/api/teams/{teamId}/projects`      | 프로젝트 생성 | `{ name }`   |
-| GET    | `/api/teams/{teamId}/projects`      | 프로젝트 목록 | —            |
-| GET    | `/api/teams/{teamId}/projects/{id}` | 프로젝트 상세 | —            |
-| DELETE | `/api/teams/{teamId}/projects/{id}` | 프로젝트 삭제 | —            |
+| Method | Path       | 설명          | Request Body |
+| ------ | ---------- | ------------- | ------------ |
+| POST   | `/`        | 프로젝트 생성 | `{ name }`   |
+| GET    | `/`        | 프로젝트 목록 | —            |
+| GET    | `/{id}`    | 프로젝트 상세 | —            |
+| DELETE | `/{id}`    | 프로젝트 삭제 | —            |
 
-#### 도메인 사전 (`/api/teams/{teamId}/domains/**` — 인증 필요)
+#### 도메인 사전 (`/api/teams/{teamId}/domains/**`)
 
-| Method | Path                                     | 설명        | Request Body                                  |
-| ------ | ---------------------------------------- | ----------- | --------------------------------------------- |
-| POST   | `/api/teams/{teamId}/domains`            | 도메인 생성 | `{ logicalName, physicalType, description? }` |
-| GET    | `/api/teams/{teamId}/domains`            | 도메인 목록 | —                                             |
-| GET    | `/api/teams/{teamId}/domains/{domainId}` | 도메인 상세 | —                                             |
-| PUT    | `/api/teams/{teamId}/domains/{domainId}` | 도메인 수정 | `{ logicalName, physicalType, description? }` |
-| DELETE | `/api/teams/{teamId}/domains/{domainId}` | 도메인 삭제 | —                                             |
+CRUD (5 endpoints): POST 생성, GET 목록, GET `/{domainId}` 상세, PUT `/{domainId}` 수정, DELETE `/{domainId}` 삭제
+Body: `{ logicalName, physicalType, description? }`
 
-#### 용어 사전 (`/api/teams/{teamId}/terms/**` — 인증 필요)
+#### 용어 사전 (`/api/teams/{teamId}/terms/**`)
 
-| Method | Path                                   | 설명      | Request Body                                           |
-| ------ | -------------------------------------- | --------- | ------------------------------------------------------ |
-| POST   | `/api/teams/{teamId}/terms`            | 용어 생성 | `{ logicalName, physicalName, domainId?, description? }` |
-| GET    | `/api/teams/{teamId}/terms`            | 용어 목록 | —                                                      |
-| GET    | `/api/teams/{teamId}/terms/{termId}`   | 용어 상세 | —                                                      |
-| PUT    | `/api/teams/{teamId}/terms/{termId}`   | 용어 수정 | `{ logicalName, physicalName, domainId?, description? }` |
-| DELETE | `/api/teams/{teamId}/terms/{termId}`   | 용어 삭제 | —                                                      |
+CRUD (5 endpoints): POST 생성, GET 목록, GET `/{termId}` 상세, PUT `/{termId}` 수정, DELETE `/{termId}` 삭제
+Body: `{ logicalName, physicalName, domainId?, description? }`
 
 Swagger UI: `http://localhost:8190/swagger-ui/index.html`
 
 ### Authentication Flow
 
 ```text
-Client                                        Server
-  │  POST /api/auth/login                      │
-  │  { loginId, password }              ────►  │ AuthenticationManager 검증
-  │                                            │ Access Token (30분) + Refresh Token (24시간) 발급
-  │  ◄────  { accessToken, refreshToken,       │
-  │           loginId, name }                  │
-  │                                            │
-  │  GET /api/...                              │
-  │  Authorization: Bearer <accessToken>       │ BearerTokenAuthenticationFilter
-  │                                     ────►  │ JwtDecoder (NimbusJwtDecoder, HS256)
-  │  ◄────  200 OK / 401                      │
-  │                                            │
-  │  (401 발생 시 — Access Token 만료)          │
-  │  POST /api/auth/refresh                    │
-  │  { refreshToken }                   ────►  │ Refresh Token 검증 + 로테이션
-  │  ◄────  { accessToken, refreshToken }      │ 새 Access + 새 Refresh 발급, 기존 Refresh 폐기
-  │  (원래 요청 재시도)                         │
+Client                                    Server
+  │ POST /api/auth/login {loginId, pw} ──► AuthenticationManager 검증
+  │ ◄── {accessToken, refreshToken}        Access(30분) + Refresh(24시간) 발급
+  │ GET /api/... Authorization: Bearer ──► JwtDecoder (HS256) 검증
+  │ ◄── 200 OK / 401
+  │ (401) POST /api/auth/refresh ────────► Refresh Token 검증 + 로테이션
+  │ ◄── 새 Access + 새 Refresh              기존 Refresh 폐기
 ```
 
 - **Access Token**: HMAC-SHA256 JWT, 만료 30분
@@ -399,7 +293,7 @@ Client                                        Server
 
 ### Error Response Format
 
-모든 에러는 통일된 JSON 형식으로 반환되며, `Accept-Language` 헤더에 따라 다국어 메시지가 반환된다:
+모든 에러는 통일된 JSON 형식, `Accept-Language` 헤더에 따라 다국어 메시지 반환:
 
 ```text
 Accept-Language: en → { "error": "User not found: testuser" }
@@ -425,14 +319,10 @@ Accept-Language: ko → { "error": "사용자를 찾을 수 없습니다: testus
 | Frontend      | React 19, TypeScript 5.6, Vite 6, Tailwind CSS 3.4, shadcn/ui                    |
 | Data Fetching | @tanstack/react-query 5 (useQuery, useMutation, cache invalidation)              |
 | ERD Canvas    | @xyflow/react 12, Zustand 5                                                      |
-| Auto Layout   | dagre 0.8                                                                  |
-| Editor        | @monaco-editor/react 4.6                                                         |
+| Layout/Editor | dagre 0.8, @monaco-editor/react 4.6                                              |
 | Shortcuts     | react-hotkeys-hook 5                                                             |
-| i18n          | i18next, react-i18next, i18next-browser-languagedetector (FE) + Spring MessageSource (BE) |
-| SQL 로깅      | p6spy-spring-boot-starter 1.12.1 (바인딩 파라미터 포함 SQL 로깅)                 |
-| Toast         | Sonner                                                                           |
-| Formatting    | Prettier (Java + TypeScript), prettier-plugin-java                               |
-| Code Quality  | ESLint, SonarQube / SonarLint                                                    |
+| i18n          | i18next, react-i18next (FE) + Spring MessageSource (BE)                          |
+| Misc          | p6spy 1.12.1, Sonner, Prettier + prettier-plugin-java, ESLint, SonarQube        |
 
 ## Code Standards
 
@@ -460,7 +350,7 @@ Use domain-specific custom exceptions (NOT `IllegalArgumentException`). All exce
 | `DuplicateException`           | 409         | Duplicate resource (member, login ID)          |
 | `BusinessException`            | 400         | Business rule violation (removing owner, etc.) |
 
-All exceptions extend `LocalizedException(messageCode, messageArgs...)` in `domain/common/exception/`. `GlobalExceptionHandler` resolves the message code via `MessageSource` + request `Locale` and returns the translated message.
+All exceptions extend `LocalizedException(messageCode, messageArgs...)` in `domain/common/exception/`. `GlobalExceptionHandler` resolves the message code via `MessageSource` + request `Locale`.
 
 ```java
 // Good — message code + args (resolved via MessageSource)
@@ -495,8 +385,6 @@ member.changeRole(request.role());  // Good — dirty checking
 
 `@Query` JPQL 대신 QueryDSL `JPAQueryFactory`로 타입 안전한 쿼리를 작성한다. Spring Data의 Custom Repository 컨벤션을 따른다.
 
-**패턴:**
-
 ```text
 XxxRepository (interface)
   extends JpaRepository<Xxx, Id>, XxxRepositoryCustom
@@ -513,8 +401,6 @@ XxxRepositoryCustomImpl (class)          — QueryDSL 구현체 (JPAQueryFactory
 - Bulk DELETE/UPDATE는 영속성 컨텍스트를 우회 (기존 `@Modifying`과 동일 동작)
 - Spring Data 파생 쿼리 메서드(`findByUser`, `existsByTeamAndUser` 등)는 QueryDSL로 전환하지 않음
 
-**예시:**
-
 ```java
 @RequiredArgsConstructor
 public class TeamRepositoryCustomImpl implements TeamRepositoryCustom {
@@ -529,10 +415,7 @@ public class TeamRepositoryCustomImpl implements TeamRepositoryCustom {
 }
 ```
 
-**Config 빈:**
-
-- `QuerydslConfig` — `JPAQueryFactory` 빈 등록 (`EntityManager` 주입, Spring shared proxy이므로 스레드 안전)
-- `BlazeConfig` — `CriteriaBuilderFactory` 빈 등록 (CTE, Keyset Pagination 등 고급 쿼리 인프라)
+**Config 빈:** `QuerydslConfig` — `JPAQueryFactory` 빈 등록 (EntityManager 주입, 스레드 안전). `BlazeConfig` — `CriteriaBuilderFactory` 빈.
 
 ### Frontend Code Standards (MUST follow)
 
@@ -549,15 +432,10 @@ const { data: teams = [], isLoading } = useQuery({
 
 // Bad — manual fetching
 const [teams, setTeams] = useState([]);
-const [loading, setLoading] = useState(true);
-useEffect(() => {
-    fetchTeams()
-        .then(setTeams)
-        .finally(() => setLoading(false));
-}, []);
+useEffect(() => { fetchTeams().then(setTeams); }, []);
 ```
 
-Mutation 후 캐시 무효화는 `invalidateQueries`로 선언적으로 수행. 에러 처리는 반드시 `toast.error()` + `getErrorMessage(err, t('key'))` 패턴을 사용한다 (인라인 `<p>` 에러 표시 금지).
+Mutation 후 캐시 무효화는 `invalidateQueries`로 선언적으로 수행. 에러 처리는 반드시 `toast.error()` + `getErrorMessage(err, t('key'))` 패턴 (인라인 에러 표시 금지).
 
 ```typescript
 const createMutation = useMutation({
@@ -576,7 +454,7 @@ const createMutation = useMutation({
 
 - Pages never call `axiosInstance` directly. Always go through `api/` module functions.
 - Each API function is typed with explicit return types and has JSDoc with `@param`.
-- Error handling: `onError`에서 `toast.error(getErrorMessage(err, t('key')))` 패턴으로 통일. 인라인 에러 표시 금지.
+- Error handling: `onError`에서 `toast.error(getErrorMessage(err, t('key')))` 패턴으로 통일.
 
 #### Constants — No Magic Strings
 
@@ -599,7 +477,7 @@ const createMutation = useMutation({
 - `MembersDialog` — team member management (uses React Query internally)
 - `Spinner` — loading spinner (Loader2 animate-spin + optional text)
 - `useInlineEdit` hook — inline text editing pattern (SidebarTableItem, TableNode)
-- `useFkConnectMode` hook — FK connection mode state/logic (2-click parent→child flow, column auto-naming)
+- `useFkConnectMode` hook — FK connection mode (2-click parent→child flow, column auto-naming)
 
 #### Styling — Design Token System (MUST follow)
 
@@ -612,35 +490,22 @@ tailwind.config.js         →  Tailwind 시맨틱 색상 매핑 (hsl(var(--toke
 컴포넌트                    →  시맨틱 클래스 사용 (bg-card, text-muted-foreground 등)
 ```
 
-**shadcn/ui 기본 토큰** — 리스트 페이지, 폼, 다이얼로그에서 사용:
-```
-bg-background, bg-card, bg-muted, bg-accent, bg-popover
-text-foreground, text-muted-foreground, text-card-foreground
-bg-primary, bg-secondary, bg-destructive
-border-border, border-input
-```
+**shadcn/ui 기본 토큰:** `bg-background`, `bg-card`, `bg-muted`, `bg-accent`, `bg-popover`, `text-foreground`, `text-muted-foreground`, `text-card-foreground`, `bg-primary`, `bg-secondary`, `bg-destructive`, `border-border`, `border-input`
 
-**ERD 전용 토큰** — ERD 편집기(Header, Sidebar, TableNode, ERDCanvas)에서 사용:
-```
-bg-header, text-header-foreground, text-header-muted        — 헤더 바
-bg-erd-table-header, text-erd-table-header-foreground        — 테이블 노드 헤더
-text-erd-pk, text-erd-fk, text-erd-nullable                  — PK/FK/nullable 뱃지
-bg-erd-handle, border-erd-handle-border                      — Handle (연결점)
-text-erd-warning                                              — unsaved 경고
-```
+**ERD 전용 토큰:** `bg-header`, `text-header-foreground`, `text-header-muted`, `bg-erd-table-header`, `text-erd-table-header-foreground`, `text-erd-pk`, `text-erd-fk`, `text-erd-nullable`, `bg-erd-handle`, `border-erd-handle-border`, `text-erd-warning`
 
 **규칙:**
-- 새 컴포넌트에서 `gray-*`, `blue-*` 등 Tailwind 기본 팔레트 색상을 직접 사용하지 않는다
-- 새 색상이 필요하면 `index.css`에 CSS Variable 추가 → `tailwind.config.js`에 매핑 → 컴포넌트에서 시맨틱 클래스 사용
-- `hover:bg-accent`, `focus:bg-accent` — 인터랙티브 상태용 시맨틱 토큰
-- MiniMap 등 prop으로 색상을 전달해야 하는 경우: `hsl(var(--token-name))` 형식 사용
+- 새 컴포넌트에서 Tailwind 기본 팔레트 색상 직접 사용 금지
+- 새 색상: `index.css` CSS Variable → `tailwind.config.js` 매핑 → 시맨틱 클래스
+- 인터랙티브: `hover:bg-accent`, `focus:bg-accent`
+- prop 색상: `hsl(var(--token-name))` 형식
 
 #### Accessibility (a11y)
 
-- **아이콘 전용 버튼**: 반드시 `aria-label` 속성을 추가한다 (예: `aria-label="Delete column"`)
-- **토글 버튼**: `aria-label`에 대상 컨텍스트를 포함한다 (예: `` aria-label={`Toggle PK for ${col.name}`} ``)
-- **form 요소**: `<label>` 연결이 불가능한 경우 `aria-label`을 추가한다
-- shadcn/ui 컴포넌트는 Radix UI가 접근성을 처리하므로 추가 작업 불필요
+- **아이콘 전용 버튼**: 반드시 `aria-label` 속성 추가
+- **토글 버튼**: `aria-label`에 대상 컨텍스트 포함
+- **form 요소**: `<label>` 연결 불가 시 `aria-label` 추가
+- shadcn/ui 컴포넌트는 Radix UI가 접근성 처리하므로 추가 작업 불필요
 
 #### Page Component Code Ordering (MUST follow)
 
@@ -681,7 +546,6 @@ All functions, components, interfaces, and important variables must have JSDoc:
 - **shadcn/ui components** (`components/ui/button.tsx` etc.): Auto-generated, JSDoc not required.
 
 ```typescript
-// Function — multi-line with @param
 /**
  * 팀에 멤버를 초대한다.
  *
@@ -691,7 +555,6 @@ All functions, components, interfaces, and important variables must have JSDoc:
  */
 export async function inviteMember(teamId: string, loginId: string, role: string): Promise<void> { ... }
 
-// Interface field — single-line
 export interface Team {
   /** 팀 고유 ID */
   id: number;
@@ -699,7 +562,6 @@ export interface Team {
   name: string;
 }
 
-// State variable — single-line above
 /** 삭제 확인 대상 프로젝트 ID (null이면 다이얼로그 닫힘) */
 const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 ```
@@ -709,32 +571,25 @@ const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 - Root `.prettierrc.json` with `prettier-plugin-java`
 - Java: tabWidth 4, printWidth 120
 - TypeScript: tabWidth 2, printWidth 100
-- SonarQube S1611 (lambda parentheses) suppressed in favor of Prettier
-- Prettier와 SonarQube 충돌: Prettier가 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...`), SonarQube S1611은 이를 제거하라고 경고한다. **Prettier를 우선**으로 하고, `sonar-project.properties`에서 S1611 전역 무시, VS Code에서 `sonarlint.rules: java:S1611: off` 설정.
+- Prettier와 SonarQube S1611 충돌: **Prettier 우선** — `sonar-project.properties`에서 S1611 전역 무시, VS Code에서 `sonarlint.rules: java:S1611: off`
 
 ### VS Code Development Environment
 
-`.vscode/settings.json`에 다음 설정이 포함되어 있다:
+`.vscode/settings.json` 주요 설정:
 
-| 기능        | 설정                                        | 설명                                |
-| ----------- | ------------------------------------------- | ----------------------------------- |
-| 자동 포맷   | `editor.formatOnSave: true`                 | 저장 시 Prettier 자동 적용          |
-| Import 정리 | `source.organizeImports: explicit`          | 저장 시 미사용 import 제거 및 정렬  |
-| 자동 저장   | `files.autoSave: afterDelay` (1초)          | 1초 후 자동 저장                    |
-| Null 분석   | `java.compile.nullAnalysis.mode: automatic` | `@NonNullApi` 기반 null 분석 활성화 |
-| 후행 공백   | `files.trimTrailingWhitespace: true`        | 저장 시 후행 공백 제거              |
-| 최종 개행   | `files.insertFinalNewline: true`            | 파일 끝 개행 자동 추가              |
-
-에디터 기본 포맷터: Java, TypeScript 모두 `esbenp.prettier-vscode` (Prettier)
+- `editor.formatOnSave: true` (Prettier), `source.organizeImports: explicit` (미사용 import 제거)
+- `files.autoSave: afterDelay` (1초), `trimTrailingWhitespace`, `insertFinalNewline`
+- `java.compile.nullAnalysis.mode: automatic` (`@NonNullApi` null 분석)
+- 기본 포맷터: `esbenp.prettier-vscode` (Java + TypeScript)
 
 ### Database
 
-PostgreSQL 17을 Docker 컨테이너로 사용한다. `spring-boot-docker-compose`가 프로젝트 루트의 `compose.yaml`을 자동 감지하여 컨테이너 시작 및 datasource 주입을 처리한다.
+PostgreSQL 17 (Docker). `spring-boot-docker-compose`가 `compose.yaml` 자동 감지.
 
-- **개발 환경:** `./gradlew bootRun` 시 Docker 컨테이너 자동 시작 (`lifecycle-management: start-only` — 앱 종료 시 컨테이너 유지)
-- **테스트 환경:** Testcontainers가 임시 PostgreSQL 컨테이너를 자동 생성/폐기
-- **스키마:** `ddl-auto: update` — 엔티티 변경 시 자동 업데이트
-- **시간 컬럼:** 감사/만료 시각 컬럼은 `timestamptz` 사용 (UTC 기준 저장)
+- **개발:** `./gradlew bootRun` → Docker 자동 시작 (`lifecycle-management: start-only`)
+- **테스트:** Testcontainers 임시 PostgreSQL 자동 생성/폐기
+- **스키마:** `ddl-auto: update`
+- **시간 컬럼:** `timestamptz` (UTC 기준)
 - **전제 조건:** Docker Desktop 실행 중, 포트 5432 사용 가능
 
 ### Gradle Annotation Processor Order

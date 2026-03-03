@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import useCollaborationStore from '@/stores/useCollaborationStore';
 import useCanvasStore from '@/stores/useCanvasStore';
+import useAuthStore from '@/stores/useAuthStore';
 import { LOCK_HEARTBEAT_MS } from '@/constants/collab-lock';
 import { buildTableLockKeyFromNodeData } from '@/lib/table-lock-key';
 import { resolveRemoteEditLocks, type RemoteEditLockInfo } from '@/lib/remote-edit-locks';
@@ -24,6 +25,8 @@ interface UseRemoteEditLocksReturn {
 export function useRemoteEditLocks(): UseRemoteEditLocksReturn {
   const remoteCursors = useCollaborationStore((s) => s.remoteCursors);
   const participantsByUserId = useCollaborationStore((s) => s.participantsByUserId);
+  const selfUserId = useCollaborationStore((s) => s.selfUserId);
+  const selfLoginId = useAuthStore((s) => s.loginId);
   const nodes = useCanvasStore((s) => s.nodes);
   const [ttlTick, setTtlTick] = useState(0);
 
@@ -41,8 +44,13 @@ export function useRemoteEditLocks(): UseRemoteEditLocksReturn {
     // remote cursor 값이 그대로여도 ttlTick 변경으로 stale 만료 재평가가 필요하다.
     void ttlTick;
     const nowMs = Date.now();
-    return resolveRemoteEditLocks(remoteCursors, participantsByUserId, nowMs);
-  }, [participantsByUserId, remoteCursors, ttlTick]);
+    return resolveRemoteEditLocks(
+      remoteCursors,
+      participantsByUserId,
+      { selfUserId, selfLoginId },
+      nowMs,
+    );
+  }, [participantsByUserId, remoteCursors, selfLoginId, selfUserId, ttlTick]);
 
   const locksByNodeId = useMemo(() => {
     const byNodeId = new Map<string, RemoteEditLockInfo>();

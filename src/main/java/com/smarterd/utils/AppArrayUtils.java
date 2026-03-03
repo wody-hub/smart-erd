@@ -9,8 +9,7 @@ import org.apache.commons.lang3.ArrayUtils;
  */
 public final class AppArrayUtils {
 
-    private AppArrayUtils() {
-    }
+    private AppArrayUtils() {}
 
     /**
      * 배열이 {@code null}이거나 비어 있으면 {@code true}를 반환한다.

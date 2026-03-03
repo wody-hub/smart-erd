@@ -127,14 +127,14 @@ export function useFkConnectMode() {
     const pkColumns = parentNode.data.columns.filter((c) => c.pk);
     const existingNames = childNode.data.columns.map((c) => c.name);
 
-    const createdCount = addFkRelation(
-      parentNode.id,
-      childNode.id,
+    const createdCount = addFkRelation({
+      parentNodeId: parentNode.id,
+      childNodeId: childNode.id,
       pkColumns,
-      parentNode.data.label,
+      parentLabel: parentNode.data.label,
       existingNames,
       relationType,
-    );
+    });
 
     if (createdCount > 0) {
       toast.success(t('erd.fkMode.success', { count: createdCount }));
