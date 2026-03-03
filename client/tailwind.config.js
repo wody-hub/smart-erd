@@ -57,7 +57,7 @@ export default {
           "table-header-foreground": "hsl(var(--erd-table-header-foreground))",
           pk: "hsl(var(--erd-pk))",
           fk: "hsl(var(--erd-fk))",
-          nullable: "hsl(var(--erd-nullable))",
+          nn: "hsl(var(--erd-nn))",
           ai: "hsl(var(--erd-ai))",
           handle: "hsl(var(--erd-handle))",
           "handle-border": "hsl(var(--erd-handle-border))",

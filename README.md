@@ -792,7 +792,7 @@ ERD 편집기 영역(Header, Sidebar, TableNode, ERDCanvas)에서 사용하는 �
 |------|------|
 | `bg-header`, `text-header-foreground`, `text-header-muted` | 상단 헤더 바 |
 | `bg-erd-table-header`, `text-erd-table-header-foreground` | 테이블 노드 헤더 |
-| `text-erd-pk`, `text-erd-fk`, `text-erd-nullable` | PK/FK/nullable 뱃지 |
+| `text-erd-pk`, `text-erd-fk`, `text-erd-nn` | PK/FK/NN 뱃지 |
 | `bg-erd-handle`, `border-erd-handle-border` | Handle (연결점) |
 | `text-erd-warning` | unsaved 경고 표시 |
 

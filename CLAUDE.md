@@ -492,7 +492,7 @@ tailwind.config.js         →  Tailwind 시맨틱 색상 매핑 (hsl(var(--toke
 
 **shadcn/ui 기본 토큰:** `bg-background`, `bg-card`, `bg-muted`, `bg-accent`, `bg-popover`, `text-foreground`, `text-muted-foreground`, `text-card-foreground`, `bg-primary`, `bg-secondary`, `bg-destructive`, `border-border`, `border-input`
 
-**ERD 전용 토큰:** `bg-header`, `text-header-foreground`, `text-header-muted`, `bg-erd-table-header`, `text-erd-table-header-foreground`, `text-erd-pk`, `text-erd-fk`, `text-erd-nullable`, `bg-erd-handle`, `border-erd-handle-border`, `text-erd-warning`
+**ERD 전용 토큰:** `bg-header`, `text-header-foreground`, `text-header-muted`, `bg-erd-table-header`, `text-erd-table-header-foreground`, `text-erd-pk`, `text-erd-fk`, `text-erd-nn`, `bg-erd-handle`, `border-erd-handle-border`, `text-erd-warning`
 
 **규칙:**
 - 새 컴포넌트에서 Tailwind 기본 팔레트 색상 직접 사용 금지

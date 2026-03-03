@@ -330,7 +330,7 @@
       "title": {
         "togglePk": "PK 토글",
         "toggleFk": "FK 토글",
-        "toggleNullable": "널 허용 토글",
+        "toggleNotNull": "NOT NULL 토글",
         "toggleAutoIncrement": "자동증가 토글",
         "deleteColumn": "컬럼 삭제"
       },
@@ -342,7 +342,7 @@
         "columnType": "컬럼 타입",
         "togglePk": "{{name}} 기본키 토글",
         "toggleFk": "{{name}} 외래키 토글",
-        "toggleNullable": "{{name}} 널 허용 토글",
+        "toggleNotNull": "{{name}} NOT NULL 토글",
         "toggleAutoIncrement": "{{name}} 자동증가 토글",
         "deleteColumn": "컬럼 {{name}} 삭제",
         "validationWarning": "{{name}} 사전 불일치 경고",

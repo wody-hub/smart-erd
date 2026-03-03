@@ -54,7 +54,7 @@ export interface EditableColumnRowProps {
 /**
  * 편집 가능한 컬럼 행 컴포넌트.
  *
- * PK/FK/AI/N 토글, 논리명 자동완성, 경고 아이콘, 삭제 버튼,
+ * PK/FK/AI/NN 토글, 논리명 자동완성, 경고 아이콘, 삭제 버튼,
  * 도메인 배지, 물리명/타입 입력 필드를 포함한다.
  * Handle(source/target)을 배치하여 컬럼 레벨의 관계 연결을 지원한다.
  *
@@ -219,18 +219,18 @@ export default function EditableColumnRow({
           </Tooltip>
         )}
 
-        {/* Nullable toggle */}
+        {/* NN (NOT NULL) toggle */}
         <button
           className={cn(
-            'nodrag text-2xs w-4 text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+            'nodrag w-5 text-center font-bold text-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
             canEdit ? 'cursor-pointer' : 'cursor-default',
-            col.nullable ? 'text-erd-nullable' : 'text-muted-foreground/40 hover:text-erd-nullable/80',
+            !col.nullable ? 'text-erd-nn' : 'text-muted-foreground/40 hover:text-erd-nn/80',
           )}
           onClick={canEdit ? () => onUpdateColumn(col.id, { nullable: !col.nullable }) : undefined}
-          title={t('erd.tableNode.title.toggleNullable')}
-          aria-label={t('erd.tableNode.aria.toggleNullable', { name: col.name })}
+          title={t('erd.tableNode.title.toggleNotNull')}
+          aria-label={t('erd.tableNode.aria.toggleNotNull', { name: col.name })}
         >
-          N
+          NN
         </button>
 
         {/* Delete column */}

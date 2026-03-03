@@ -331,7 +331,7 @@
       "title": {
         "togglePk": "Toggle PK",
         "toggleFk": "Toggle FK",
-        "toggleNullable": "Toggle nullable",
+        "toggleNotNull": "Toggle NOT NULL",
         "toggleAutoIncrement": "Toggle auto increment",
         "deleteColumn": "Delete column"
       },
@@ -343,7 +343,7 @@
         "columnType": "Column type",
         "togglePk": "Toggle primary key for {{name}}",
         "toggleFk": "Toggle foreign key for {{name}}",
-        "toggleNullable": "Toggle nullable for {{name}}",
+        "toggleNotNull": "Toggle NOT NULL for {{name}}",
         "toggleAutoIncrement": "Toggle auto increment for {{name}}",
         "deleteColumn": "Delete column {{name}}",
         "validationWarning": "{{name}} dictionary mismatch warning",

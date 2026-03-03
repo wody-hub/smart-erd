@@ -135,11 +135,11 @@ function StaticColumnRow({
           </Tooltip>
         )}
 
-        {/* Nullable badge */}
+        {/* NN (NOT NULL) badge */}
         <span
-          className={`text-2xs w-4 text-center ${col.nullable ? 'text-erd-nullable' : 'text-muted-foreground/40'}`}
+          className={`w-5 text-center font-bold text-2xs ${!col.nullable ? 'text-erd-nn' : 'text-muted-foreground/40'}`}
         >
-          N
+          NN
         </span>
 
         <Handle
