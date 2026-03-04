@@ -11,6 +11,7 @@ import { useBidirectionalCodeSync } from '@/hooks/useBidirectionalCodeSync';
 import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
 import { useCodeEditorTableLock } from '@/hooks/useCodeEditorTableLock';
 import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
+import { useEditorCursorGuard } from '@/hooks/useEditorCursorGuard';
 import { useDslEditorCompletion } from '@/hooks/useDslEditorCompletion';
 import { useDslDiagnosticMarkers } from '@/hooks/useDslDiagnosticMarkers';
 import type { AssistPopupItem } from '@/hooks/useDslEditorCompletion';
@@ -114,6 +115,12 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
   /** 경고 건수 */
   const warningCount = parseResult?.diagnostics.filter((d) => d.severity === 'warning').length ?? 0;
 
+  /** 에디터 인스턴스 ref (커서 가드용으로 sync 훅보다 앞에 선언) */
+  const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+
+  // ERD→Code 동기화 시 커서/스크롤 보존 가드
+  const { syncCodeChange, isSyncing } = useEditorCursorGuard(editorRef, handleDslChange);
+
   const { handleUserCodeChange, handleGeneratedCodeChange, clearQueueTimeoutHold, syncStatus } =
     useBidirectionalCodeSync({
       enabled: canEdit,
@@ -124,6 +131,7 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
       hasParsedTables: parseResult != null && errorCount === 0,
       hasRemoteEditLocks,
       onCodeTextChange: handleDslChange,
+      onSyncCodeTextChange: syncCodeChange,
       generateCodeFromErd: generateFromErd,
       applyParsedToErd,
     });
@@ -172,8 +180,6 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
 
   /** Monaco 인스턴스 ref */
   const monacoRef = useRef<typeof Monaco | null>(null);
-  /** 에디터 인스턴스 ref */
-  const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   /** Monaco mount 완료 여부 */
   const [monacoReady, setMonacoReady] = useState(false);
 
@@ -186,6 +192,21 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
 
   // 진단 마커 동기화 훅
   useDslDiagnosticMarkers({ monacoRef, editorRef, parseResult });
+
+  /**
+   * Editor onChange 가드 — 내부 동기화 중이면 무시한다.
+   *
+   * @param value 에디터 텍스트
+   */
+  const guardedOnChange = useCallback(
+    (value: string | undefined) => {
+      if (isSyncing()) {
+        return;
+      }
+      handleUserCodeChange(value);
+    },
+    [handleUserCodeChange, isSyncing],
+  );
 
   /**
    * beforeMount — 언어 등록 (1회).
@@ -673,10 +694,16 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     };
 
     const changeDisposable = editor.onDidChangeModelContent(() => {
+      // ERD→Code 동기화(커서 가드)에 의한 콘텐츠 변경 시 팝업을 유지한다.
+      if (!isSyncing()) {
+        closeAssistPopup();
+      }
+      scheduleIdleQuickAction();
+    });
+    const cursorDisposable = editor.onDidChangeCursorPosition(() => {
       closeAssistPopup();
       scheduleIdleQuickAction();
     });
-    const cursorDisposable = editor.onDidChangeCursorPosition(scheduleIdleQuickAction);
     const focusDisposable = editor.onDidFocusEditorText(scheduleIdleQuickAction);
     const scrollDisposable = editor.onDidScrollChange(closeAssistPopup);
     const blurDisposable = editor.onDidBlurEditorText(() => {
@@ -694,7 +721,7 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
       scrollDisposable.dispose();
       blurDisposable.dispose();
     };
-  }, [canEdit, clearIdleQuickActionTimer, closeAssistPopup, openAssistPopup]);
+  }, [canEdit, clearIdleQuickActionTimer, closeAssistPopup, isSyncing, openAssistPopup]);
 
   return (
     <div className="h-full flex flex-col">
@@ -717,7 +744,7 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
           height="100%"
           language={DSL_LANGUAGE_ID}
           value={dslText}
-          onChange={handleUserCodeChange}
+          onChange={guardedOnChange}
           beforeMount={handleBeforeMount}
           onMount={handleOnMount}
           options={{

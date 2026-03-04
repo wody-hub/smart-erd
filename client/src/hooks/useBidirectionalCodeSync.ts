@@ -31,6 +31,8 @@ interface UseBidirectionalCodeSyncOptions {
   hasRemoteEditLocks: boolean;
   /** 코드 텍스트 변경 함수 (파싱 트리거 포함) */
   onCodeTextChange: (value: string | undefined) => void;
+  /** (선택) 프로그래밍적 코드 업데이트 함수 — 커서 보존. 미제공 시 onCodeTextChange 사용 */
+  onSyncCodeTextChange?: (value: string | undefined) => void;
   /** ERD -> 코드 생성 함수 */
   generateCodeFromErd: () => string;
   /** 코드 -> ERD 반영 함수 */
@@ -73,12 +75,15 @@ export function useBidirectionalCodeSync({
   hasParsedTables,
   hasRemoteEditLocks,
   onCodeTextChange,
+  onSyncCodeTextChange,
   generateCodeFromErd,
   applyParsedToErd,
   codeIdleMs = CODE_SYNC_IDLE_MS,
   erdIdleMs = ERD_SYNC_IDLE_MS,
   maxQueueWaitMs = CODE_SYNC_MAX_QUEUE_WAIT_MS,
 }: UseBidirectionalCodeSyncOptions): UseBidirectionalCodeSyncReturn {
+  /** 프로그래밍적 업데이트 함수 — 커서 보존 콜백이 있으면 그쪽으로 라우팅 */
+  const syncUpdate = onSyncCodeTextChange ?? onCodeTextChange;
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
 
@@ -199,10 +204,10 @@ export function useBidirectionalCodeSync({
         return;
       }
       originRef.current = 'erd-auto-sync';
-      onCodeTextChange(text);
+      syncUpdate(text);
       setStatus('synced');
     },
-    [codeText, onCodeTextChange, setStatus],
+    [codeText, syncUpdate, setStatus],
   );
 
   // 코드 -> ERD 자동 반영
@@ -363,7 +368,7 @@ export function useBidirectionalCodeSync({
       }
 
       originRef.current = 'erd-auto-sync';
-      onCodeTextChange(generated);
+      syncUpdate(generated);
       pendingErdSyncRevisionRef.current = null;
       setStatus('synced');
     };
@@ -377,7 +382,7 @@ export function useBidirectionalCodeSync({
     erdIdleMs,
     generateCodeFromErd,
     hasBlockingErrors,
-    onCodeTextChange,
+    syncUpdate,
     parsing,
     ready,
     setStatus,

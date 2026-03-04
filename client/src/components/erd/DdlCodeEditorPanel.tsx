@@ -28,6 +28,7 @@ import { useBidirectionalCodeSync } from '@/hooks/useBidirectionalCodeSync';
 import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
 import { useCodeEditorTableLock } from '@/hooks/useCodeEditorTableLock';
 import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
+import { useEditorCursorGuard } from '@/hooks/useEditorCursorGuard';
 import useCanvasStore from '@/stores/useCanvasStore';
 import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
@@ -300,6 +301,12 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
     (parseResult?.diagnostics.some((d) => d.severity === 'error') ?? false) ||
     ((parseResult?.tables.length ?? 0) === 0 && (parseResult?.errors.length ?? 0) > 0);
 
+  /** 에디터 인스턴스 ref (커서 가드용으로 sync 훅보다 앞에 선언) */
+  const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+
+  // ERD→Code 동기화 시 커서/스크롤 보존 가드
+  const { syncCodeChange, isSyncing } = useEditorCursorGuard(editorRef, handleDdlChange);
+
   const { handleUserCodeChange, handleGeneratedCodeChange, clearQueueTimeoutHold, syncStatus } =
     useBidirectionalCodeSync({
       enabled: canEdit,
@@ -309,6 +316,7 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
       hasParsedTables: parseResult != null && !hasBlockingErrors,
       hasRemoteEditLocks,
       onCodeTextChange: handleDdlChange,
+      onSyncCodeTextChange: syncCodeChange,
       generateCodeFromErd: generateFromErd,
       applyParsedToErd,
     });
@@ -336,10 +344,23 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
   const isDark = useDarkMode();
   /** Monaco 인스턴스 ref */
   const monacoRef = useRef<typeof Monaco | null>(null);
-  /** 에디터 인스턴스 ref */
-  const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   /** 에디터 mount 완료 여부 */
   const [editorReady, setEditorReady] = useState(false);
+
+  /**
+   * Editor onChange 가드 — 내부 동기화 중이면 무시한다.
+   *
+   * @param value 에디터 텍스트
+   */
+  const guardedOnChange = useCallback(
+    (value: string | undefined) => {
+      if (isSyncing()) {
+        return;
+      }
+      handleUserCodeChange(value);
+    },
+    [handleUserCodeChange, isSyncing],
+  );
 
   /**
    * onMount — editorRef/monacoRef 저장.
@@ -439,7 +460,7 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
           height="100%"
           language="sql"
           value={ddlText}
-          onChange={handleUserCodeChange}
+          onChange={guardedOnChange}
           onMount={handleOnMount}
           options={{
             minimap: { enabled: false },
