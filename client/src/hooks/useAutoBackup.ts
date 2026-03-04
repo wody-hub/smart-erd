@@ -19,7 +19,7 @@ type AutoBackupTrigger =
   | 'cleanup';
 
 /** 자동 백업 스킵 사유 */
-type AutoBackupSkipReason = 'pending' | 'mutex' | 'unchanged';
+type AutoBackupSkipReason = 'pending' | 'mutex' | 'unchanged' | 'no-local-change';
 
 /** 자동 백업 메트릭 누적 상태 */
 interface AutoBackupMetricsState {
@@ -78,7 +78,10 @@ function logAutosaveMetrics(
   const successRate = completed === 0 ? 1 : metrics.successes / completed;
   const latencyP95 = calculateLatencyP95(metrics.successLatenciesMs);
   const totalSkipCount =
-    metrics.skipCounts.pending + metrics.skipCounts.mutex + metrics.skipCounts.unchanged;
+    metrics.skipCounts.pending +
+    metrics.skipCounts.mutex +
+    metrics.skipCounts.unchanged +
+    metrics.skipCounts['no-local-change'];
 
   console.info('[autosave-metrics]', {
     event,
@@ -89,6 +92,7 @@ function logAutosaveMetrics(
       pending: metrics.skipCounts.pending,
       mutex: metrics.skipCounts.mutex,
       unchanged: metrics.skipCounts.unchanged,
+      noLocalChange: metrics.skipCounts['no-local-change'],
       total: totalSkipCount,
     },
     attempts: metrics.attempts,
@@ -118,6 +122,8 @@ export function useAutoBackup(
   const ydoc = useCanvasStore((s) => s.ydoc);
   /** 동시 실행 방지 뮤텍스 */
   const backupMutex = useRef(false);
+  /** 최근 저장 이후 로컬(비-remote origin) 변경 발생 여부 */
+  const hasLocalChangeRef = useRef(false);
   /** idle 트리거 타이머 */
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** 자동 백업 메트릭 누적 상태 */
@@ -129,6 +135,7 @@ export function useAutoBackup(
       pending: 0,
       mutex: 0,
       unchanged: 0,
+      'no-local-change': 0,
     },
     successLatenciesMs: [],
   });
@@ -148,9 +155,16 @@ export function useAutoBackup(
       logAutosaveMetrics('skip', trigger, metricsRef.current, { reason: 'pending' });
       return;
     }
+    if (!hasLocalChangeRef.current) {
+      metricsRef.current.skipCounts['no-local-change'] += 1;
+      logAutosaveMetrics('skip', trigger, metricsRef.current, { reason: 'no-local-change' });
+      return;
+    }
     const prepareBackup = useCanvasStore.getState().prepareBackup;
     const result = prepareBackup();
     if (!result) {
+      // 마지막 저장 직후/수동 저장 직후처럼 더 이상 미저장 로컬 변경이 없으면 플래그를 내린다.
+      hasLocalChangeRef.current = false;
       metricsRef.current.skipCounts.unchanged += 1;
       logAutosaveMetrics('skip', trigger, metricsRef.current, { reason: 'unchanged' });
       return;
@@ -169,6 +183,7 @@ export function useAutoBackup(
           latencyMs,
         );
         markBackedUp(result.hash);
+        hasLocalChangeRef.current = false;
         backupMutex.current = false;
         logAutosaveMetrics('success', trigger, metricsRef.current, {
           latencyMs: Math.round(latencyMs),
@@ -187,6 +202,13 @@ export function useAutoBackup(
   };
 
   useEffect(() => {
+    hasLocalChangeRef.current = false;
+
+    /**
+     * 등록된 idle 타이머를 해제한다.
+     *
+     * @returns 없음
+     */
     const clearIdleTimer = () => {
       if (!idleTimerRef.current) {
         return;
@@ -194,6 +216,12 @@ export function useAutoBackup(
       clearTimeout(idleTimerRef.current);
       idleTimerRef.current = null;
     };
+
+    /**
+     * 마지막 변경 후 유휴 구간에 백업을 예약한다.
+     *
+     * @returns 없음
+     */
     const scheduleIdleBackup = () => {
       clearIdleTimer();
       idleTimerRef.current = setTimeout(() => {
@@ -207,20 +235,47 @@ export function useAutoBackup(
       attemptBackup.current('interval');
     }, AUTO_BACKUP_INTERVAL_MS);
 
-    // 탭 숨김 시 즉시 백업 (브라우저 throttling 대응)
+    /**
+     * 탭 숨김 시 백업을 즉시 시도한다.
+     *
+     * @returns 없음
+     */
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         attemptBackup.current('visibility-hidden');
       }
     };
-    // 페이지 이탈 시점(새로고침/탭 닫기 포함)에 마지막 백업을 시도한다.
+
+    /**
+     * 페이지 이탈(pagehide) 시 마지막 백업을 시도한다.
+     *
+     * @returns 없음
+     */
     const handlePageHide = () => {
       attemptBackup.current('pagehide');
     };
+
+    /**
+     * beforeunload 시 마지막 백업을 시도한다.
+     *
+     * @returns 없음
+     */
     const handleBeforeUnload = () => {
       attemptBackup.current('beforeunload');
     };
-    const handleYDocUpdate = () => {
+
+    /**
+     * Y.Doc 업데이트를 감지해 로컬 변경만 idle 백업 대상으로 표시한다.
+     *
+     * @param _update Yjs 업데이트 페이로드
+     * @param origin  업데이트 origin (remote면 원격 반영)
+     * @returns 없음
+     */
+    const handleYDocUpdate = (_update: Uint8Array, origin: unknown) => {
+      if (origin === 'remote') {
+        return;
+      }
+      hasLocalChangeRef.current = true;
       scheduleIdleBackup();
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
