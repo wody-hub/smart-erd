@@ -170,10 +170,7 @@ export default function BulkUploadStepPreview({
               </TableRow>
             ) : (
               filteredPreviewRows.map((row) => (
-                <TableRow
-                  key={row.rowNumber}
-                  className={cn(!row.valid && 'bg-destructive/10')}
-                >
+                <TableRow key={row.rowNumber} className={cn(!row.valid && 'bg-destructive/10')}>
                   <TableCell className="align-top">
                     <input
                       type="checkbox"
@@ -189,7 +186,10 @@ export default function BulkUploadStepPreview({
                   {columns.map((col) => (
                     <TableCell
                       key={col}
-                      className={cn(getColumnWidthClass(col), 'whitespace-pre-wrap break-all align-top text-sm')}
+                      className={cn(
+                        getColumnWidthClass(col),
+                        'whitespace-pre-wrap break-all align-top text-sm',
+                      )}
                     >
                       {row.data[col] ?? ''}
                     </TableCell>

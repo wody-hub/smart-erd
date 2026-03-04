@@ -336,7 +336,7 @@ public abstract class AbstractBulkService<R> {
      */
     protected static <T> DefaultRedisScript<T> loadScript(String path, Class<T> resultType) {
         final var script = new DefaultRedisScript<T>();
-        script.setLocation(new ClassPathResource(path));
+        script.setLocation(new ClassPathResource(Objects.requireNonNull(path)));
         script.setResultType(resultType);
         return script;
     }
@@ -378,9 +378,11 @@ public abstract class AbstractBulkService<R> {
     protected String issueValidationToken(Object session) {
         for (var attempt = 0; attempt < MAX_TOKEN_ISSUE_ATTEMPTS; attempt++) {
             final var token = UUID.randomUUID().toString();
-            final var key = validationSessionKey(token);
-            final var payload = serializeSession(session);
-            final var stored = redisTemplate.opsForValue().setIfAbsent(key, payload, VALIDATION_SESSION_TTL);
+            final var key = Objects.requireNonNull(validationSessionKey(token));
+            final var payload = Objects.requireNonNull(serializeSession(session));
+            final var stored = redisTemplate
+                .opsForValue()
+                .setIfAbsent(key, payload, Objects.requireNonNull(VALIDATION_SESSION_TTL));
             if (Boolean.TRUE.equals(stored)) {
                 return token;
             }
@@ -411,8 +413,8 @@ public abstract class AbstractBulkService<R> {
     ) {
         final var normalizedToken = normalizeValidationToken(token);
         final var consumeResult = redisTemplate.execute(
-            CONSUME_SCRIPT,
-            List.of(validationSessionKey(normalizedToken)),
+            Objects.requireNonNull(CONSUME_SCRIPT),
+            Objects.requireNonNull(List.of(validationSessionKey(normalizedToken))),
             loginId,
             String.valueOf(teamId),
             String.valueOf(setId)
@@ -446,7 +448,7 @@ public abstract class AbstractBulkService<R> {
         Class<S> sessionClass
     ) {
         final var normalizedToken = normalizeValidationToken(token);
-        final var key = validationSessionKey(normalizedToken);
+        final var key = Objects.requireNonNull(validationSessionKey(normalizedToken));
         final var payload = redisTemplate.opsForValue().get(key);
         if (payload == null || payload.isEmpty()) {
             throw new BusinessException(MessageCode.ERROR_BULK_VALIDATION_TOKEN_INVALID.code());

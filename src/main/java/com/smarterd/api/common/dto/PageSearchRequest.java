@@ -1,6 +1,7 @@
 package com.smarterd.api.common.dto;
 
 import io.swagger.v3.oas.annotations.Parameter;
+import java.util.Objects;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.lang.Nullable;
@@ -37,7 +38,7 @@ public record PageSearchRequest(
     public PageRequest toPageRequest(int maxPageSize, Sort sort) {
         final var normalizedPage = Math.max(page, 0);
         final var normalizedSize = Math.min(Math.max(size, 1), maxPageSize);
-        return PageRequest.of(normalizedPage, normalizedSize, sort);
+        return PageRequest.of(normalizedPage, normalizedSize, Objects.requireNonNull(sort));
     }
 
     /**
