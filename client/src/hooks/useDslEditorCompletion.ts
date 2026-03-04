@@ -446,7 +446,33 @@ export function useDslEditorCompletion({
             position.column,
           );
         }
-        addRegisterTerm(termInput || diagnosticAtCursor?.messageArgs?.name || '');
+        const isCurrentLineMapped = (() => {
+          const tables = parseResult?.result.tables;
+          const ranges = parseResult?.result.tableRanges;
+          if (!tables || !ranges) {
+            return false;
+          }
+          const lineNum = position.lineNumber;
+          const rangeIdx = ranges.findIndex((r) => lineNum >= r.startLine && lineNum <= r.endLine);
+          if (rangeIdx < 0) {
+            return false;
+          }
+          const table = tables[rangeIdx];
+          const range = ranges[rangeIdx];
+          if (!table || !range) {
+            return false;
+          }
+          if (lineNum === range.startLine) {
+            return table.tableTermId != null;
+          }
+          const colIdx = lineNum - range.startLine - 1;
+          return (
+            colIdx >= 0 && colIdx < table.columns.length && table.columns[colIdx].termId != null
+          );
+        })();
+        if (!isCurrentLineMapped) {
+          addRegisterTerm(termInput || diagnosticAtCursor?.messageArgs?.name || '');
+        }
       }
 
       const registerItems = items.filter((item) => item.type !== 'insert');
