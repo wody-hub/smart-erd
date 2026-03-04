@@ -1,13 +1,16 @@
 import { useEffect, useRef, useCallback } from 'react';
 import * as Y from 'yjs';
 import { YjsProvider } from '@/collaboration/YjsProvider';
-import { migrateJsonToYDoc } from '@/collaboration/yjsBridge';
+import { getTablesMap, migrateJsonToYDoc } from '@/collaboration/yjsBridge';
 import useCanvasStore from '@/stores/useCanvasStore';
 import useCollaborationStore from '@/stores/useCollaborationStore';
 import { useSnapshotCompaction } from '@/hooks/useSnapshotCompaction';
 import { requestWsTicket } from '@/api/diagramApi';
 import type { DiagramDetail } from '@/types/diagram';
 import type { ConnectionStatus } from '@/types/collaboration';
+
+/** WS 스냅샷이 도착하지 않을 때 JSON content로 폴백하기까지의 대기 시간 (ms) */
+const WS_SNAPSHOT_FALLBACK_MS = 5_000;
 
 /**
  * useYjsCollaboration 훅의 반환 타입.
@@ -108,7 +111,26 @@ export function useYjsCollaboration(
     provider.connect();
     providerRef.current = provider;
 
+    // 5. hasYdocSnapshot === true인데 WS 스냅샷이 도착하지 않으면 JSON content로 폴백
+    let snapshotFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    if (diagram.hasYdocSnapshot && diagram.content) {
+      snapshotFallbackTimer = setTimeout(() => {
+        snapshotFallbackTimer = null;
+        if (getTablesMap(ydoc).size === 0) {
+          console.warn(
+            '[useYjsCollaboration] WS 스냅샷 %dms 내 미도착 — JSON content로 폴백',
+            WS_SNAPSHOT_FALLBACK_MS,
+          );
+          // 'remote' origin: WS 브로드캐스트 방지 + useAutoBackup 로컬 변경 미인식
+          ydoc.transact(() => migrateJsonToYDoc(ydoc, diagram.content!), 'remote');
+        }
+      }, WS_SNAPSHOT_FALLBACK_MS);
+    }
+
     return () => {
+      if (snapshotFallbackTimer) {
+        clearTimeout(snapshotFallbackTimer);
+      }
       try {
         provider.destroy();
       } catch (e) {
