@@ -14,7 +14,7 @@ const CURSOR_THROTTLE_MS = 100;
 /** buildAwarenessState 파라미터 */
 interface BuildAwarenessStateParams {
   /** Provider의 사용자 ID */
-  userId: string;
+  userId: string | null;
   /** 사용자 이름 */
   name: string;
   /** 로그인 ID */

@@ -45,19 +45,18 @@ const DOMAIN_COLUMNS = ['logicalName', 'physicalType', 'description'] as const;
 const TERM_COLUMNS = ['logicalName', 'physicalName', 'domainLogicalName', 'description'] as const;
 
 /**
- * 컬럼 키에 대응하는 i18n 헤더 텍스트를 반환한다.
+ * 컬럼 키에 대응하는 i18n 헤더 키를 반환한다.
  *
  * @param col 컬럼 키
- * @param t   i18n 번역 함수
- * @returns 번역된 헤더 텍스트
+ * @returns i18n 헤더 키
  */
-function getColumnHeader(col: string, t: (key: string) => string): string {
+function getColumnHeaderKey(col: string): string {
   const headerMap: Record<string, string> = {
-    logicalName: t('dictionary.domain.table.logicalName'),
-    physicalType: t('dictionary.domain.table.physicalType'),
-    physicalName: t('dictionary.term.table.physicalName'),
-    domainLogicalName: t('dictionary.term.table.domain'),
-    description: t('dictionary.domain.table.description'),
+    logicalName: 'dictionary.domain.table.logicalName',
+    physicalType: 'dictionary.domain.table.physicalType',
+    physicalName: 'dictionary.term.table.physicalName',
+    domainLogicalName: 'dictionary.term.table.domain',
+    description: 'dictionary.domain.table.description',
   };
   return headerMap[col] ?? col;
 }
@@ -152,7 +151,7 @@ export default function BulkUploadStepPreview({
               <TableHead className="w-[50px]">{t('dictionary.upload.preview.row')}</TableHead>
               {columns.map((col) => (
                 <TableHead key={col} className={getColumnWidthClass(col)}>
-                  {getColumnHeader(col, t)}
+                  {t(getColumnHeaderKey(col) as never)}
                 </TableHead>
               ))}
               <TableHead className="w-[180px]">{t('dictionary.upload.preview.status')}</TableHead>
