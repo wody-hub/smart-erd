@@ -138,7 +138,8 @@ public class WsTicketService {
                     data.loginId(),
                     data.userName(),
                     data.diagramId(),
-                    sessionExpiresAt
+                    sessionExpiresAt,
+                    1
                 );
             });
     }

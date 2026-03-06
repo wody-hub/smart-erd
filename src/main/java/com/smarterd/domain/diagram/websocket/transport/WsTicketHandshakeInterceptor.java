@@ -55,12 +55,9 @@ public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
         @NonNull WebSocketHandler wsHandler,
         @NonNull Map<String, Object> attributes
     ) {
-        final var nonNullRequest = Objects.requireNonNull(request, "request must not be null");
-        final var nonNullAttributes = Objects.requireNonNull(attributes, "attributes must not be null");
-
         try {
             // 1. URL에서 ticket과 diagramId 추출
-            final var uri = nonNullRequest.getURI();
+            final var uri = request.getURI();
             final var queryParams = UriComponentsBuilder.fromUri(uri).build().getQueryParams();
             final var ticket = queryParams.getFirst("ticket");
             if (AppStringUtils.isBlank(ticket)) {
@@ -95,10 +92,39 @@ public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
                 return false;
             }
 
-            // 4. 세션 attributes에 메타데이터 저장
-            nonNullAttributes.put(AuthenticatedSession.SESSION_ATTR_KEY, sessionInfo);
+            // 4. protocolVersion 파싱 (1 또는 2만 허용, 그 외 1로 강등)
+            var protocolVersion = 1;
+            final var pvParam = queryParams.getFirst("protocolVersion");
+            if (pvParam != null) {
+                try {
+                    final var parsed = Integer.parseInt(pvParam);
+                    if (parsed == 2) {
+                        protocolVersion = 2;
+                    } else if (parsed != 1) {
+                        log.warn("WebSocket 핸드셰이크: 미지원 protocolVersion={}, 1로 강등", parsed);
+                    }
+                } catch (NumberFormatException e) {
+                    log.warn("WebSocket 핸드셰이크: protocolVersion 파싱 실패 '{}', 1로 강등", pvParam);
+                }
+            }
 
-            log.info("WebSocket 핸드셰이크 성공: loginId={}, diagramId={}", sessionInfo.loginId(), diagramId);
+            // 5. protocolVersion을 포함한 세션 정보로 재구성하여 attributes에 저장
+            final var enrichedSession = new AuthenticatedSession(
+                sessionInfo.userId(),
+                sessionInfo.loginId(),
+                sessionInfo.userName(),
+                sessionInfo.diagramId(),
+                sessionInfo.expiresAt(),
+                protocolVersion
+            );
+            attributes.put(AuthenticatedSession.SESSION_ATTR_KEY, enrichedSession);
+
+            log.info(
+                "WebSocket 핸드셰이크 성공: loginId={}, diagramId={}, protocolVersion={}",
+                enrichedSession.loginId(),
+                diagramId,
+                enrichedSession.protocolVersion()
+            );
             return true;
         } catch (NumberFormatException e) {
             log.warn("WebSocket 핸드셰이크 실패: diagramId 파싱 오류", e);

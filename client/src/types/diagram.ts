@@ -22,7 +22,25 @@ export interface DiagramDetail extends DiagramSummary {
   content: string | null;
   /** Y.Doc 스냅샷 존재 여부 (true면 JSON 마이그레이션 불필요) */
   hasYdocSnapshot: boolean;
+  /** content 리비전 (long 문자열) */
+  contentRevision: string;
+  /** snapshot 리비전 (null이면 스냅샷 없음) */
+  snapshotRevision: string | null;
+  /** snapshot 저장 시각 (ISO 8601, null 가능) */
+  snapshotUpdatedAt: string | null;
 }
+
+/** 다이어그램 동기화 상태 */
+export type SyncStage =
+  | 'boot'
+  | 'api-preview'
+  | 'api-preview-empty'
+  | 'yjs-live'
+  | 'yjs-timeout-degraded'
+  | 'yjs-failed-readonly';
+
+/** Yjs handoff 모드 */
+export type HandoffMode = 'snapshot' | 'sync-only';
 
 /** 다이어그램 사전 세트 변경 결과 */
 export interface UpdateDiagramDictionarySetResult {

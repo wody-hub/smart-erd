@@ -13,6 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -61,6 +62,18 @@ public class Diagram extends BaseTimeEntity {
     @Column(columnDefinition = "BYTEA")
     @Getter(AccessLevel.NONE)
     private byte[] ydocSnapshot;
+
+    /** content 리비전 — content 변경 시마다 증가 */
+    @Column(name = "content_revision", nullable = false, columnDefinition = "BIGINT DEFAULT 1")
+    private long contentRevision = 1L;
+
+    /** snapshot 리비전 — snapshot flush 시 당시 contentRevision 값으로 설정 */
+    @Column(name = "snapshot_revision")
+    private Long snapshotRevision;
+
+    /** snapshot 저장 시각 */
+    @Column(name = "snapshot_updated_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
+    private Instant snapshotUpdatedAt;
 
     /**
      * 다이어그램 엔티티를 생성한다.
@@ -124,5 +137,32 @@ public class Diagram extends BaseTimeEntity {
     @SuppressWarnings("java:S2384")
     public void updateYdocSnapshot(byte[] ydocSnapshot) {
         this.ydocSnapshot = ydocSnapshot;
+    }
+
+    /**
+     * content 리비전을 1 증가시킨다.
+     */
+    public void incrementContentRevision() {
+        this.contentRevision++;
+    }
+
+    /**
+     * snapshot 리비전을 현재 contentRevision으로 동기화한다.
+     *
+     * @param contentRevisionAtFlush flush 시점의 contentRevision 값
+     */
+    public void syncSnapshotRevision(long contentRevisionAtFlush) {
+        this.snapshotRevision = contentRevisionAtFlush;
+        this.snapshotUpdatedAt = Instant.now();
+    }
+
+    /**
+     * snapshot 관련 필드를 모두 무효화한다.
+     * 비-Yjs 저장 또는 사전 세트 변경 시 호출한다.
+     */
+    public void nullifySnapshot() {
+        this.ydocSnapshot = null;
+        this.snapshotRevision = null;
+        this.snapshotUpdatedAt = null;
     }
 }

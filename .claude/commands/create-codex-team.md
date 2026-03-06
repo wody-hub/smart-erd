@@ -110,7 +110,7 @@ Codex는 아래 템플릿으로 역할을 전환해 작업한다.
 
 1. 컴파일/빌드 성공 (`./gradlew compileJava`, `npm run build` 등 해당 범위)
 2. 테스트 또는 재현 시나리오 확인
-3. 컨벤션 점검(`review-dev.md`, `review-arch.md`, 필요 시 `review-design.md`)
+3. 컨벤션 점검(`review-convention.md`, `review-arch.md`, 필요 시 `review-design.md`)
 4. 변경 영향 및 롤백 포인트 확인
 
 ## 팀 종료 절차 (Codex)

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Clean Code Reviewer"
+  short_description: "Review code smells and complexity risks"
+  default_prompt: "Use $review-clean to inspect changed files for code smells, complexity thresholds, and actionable refactoring proposals with file:line evidence."

@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class DomainService {
 
-    private static final int MAX_PAGE_SIZE = 200;
+    private static final int MAX_PAGE_SIZE = 5_000;
 
     /** 도메인 레포지토리 */
     private final DomainRepository domainRepository;

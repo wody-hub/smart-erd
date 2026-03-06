@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 export interface UsePaginatedSearchOptions {
   /** 디바운스 지연 시간 (ms, 기본값: 300) */
   debounceMs?: number;
-  /** 리셋 의존성 배열 — 이 값들이 변경되면 페이지와 검색어를 초기화한다 */
-  resetDeps: unknown[];
+  /** 리셋 기준 키 — 이 값이 변경되면 페이지와 검색어를 초기화한다 */
+  resetKey: string;
 }
 
 /** usePaginatedSearch 반환값 */
@@ -35,7 +35,7 @@ export interface UsePaginatedSearchResult {
  * @returns 검색/페이지네이션 상태와 제어 함수
  */
 export function usePaginatedSearch(options: UsePaginatedSearchOptions): UsePaginatedSearchResult {
-  const { debounceMs = 300, resetDeps } = options;
+  const { debounceMs = 300, resetKey } = options;
 
   /** 검색 입력값 */
   const [searchInput, setSearchInput] = useState('');
@@ -53,10 +53,9 @@ export function usePaginatedSearch(options: UsePaginatedSearchOptions): UsePagin
   }, [searchInput, debounceMs]);
 
   // 외부 의존성 변경 시 페이지 리셋
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setPage(0);
-  }, resetDeps);
+  }, [resetKey]);
 
   // 검색어 변경 시 페이지 리셋
   useEffect(() => {

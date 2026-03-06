@@ -1,6 +1,7 @@
 package com.smarterd.domain.diagram.repository;
 
 import com.smarterd.domain.diagram.entity.Diagram;
+import com.smarterd.domain.project.entity.Project;
 import java.util.Optional;
 
 /**
@@ -43,4 +44,41 @@ public interface DiagramRepositoryCustom {
      * @return 갱신된 행 수 (0이면 다이어그램 미존재)
      */
     long updateYdocSnapshotById(Long id, byte[] snapshot);
+
+    /**
+     * 다이어그램의 contentRevision을 비관적 락(FOR UPDATE)으로 조회한다.
+     * snapshot flush 시 동시 content 변경을 방지하기 위해 사용한다.
+     *
+     * @param id 다이어그램 ID
+     * @return contentRevision (없으면 null)
+     */
+    Long findContentRevisionForUpdate(Long id);
+
+    /**
+     * Y.Doc 스냅샷과 snapshotRevision을 함께 갱신한다.
+     *
+     * @param id               다이어그램 ID
+     * @param snapshot         Y.Doc 스냅샷 바이트 배열
+     * @param snapshotRevision snapshot 리비전 값
+     * @return 갱신된 행 수
+     */
+    long updateYdocSnapshotAndRevisionById(Long id, byte[] snapshot, long snapshotRevision);
+
+    /**
+     * Y.Doc 스냅샷과 snapshotRevision을 함께 프로젝션 조회한다.
+     *
+     * @param id 다이어그램 ID
+     * @return SnapshotWithRevision Optional
+     */
+    Optional<SnapshotWithRevision> findYdocSnapshotWithRevisionById(Long id);
+
+    /**
+     * 프로젝트와 ID로 다이어그램을 조회하면서 스냅샷 존재 여부를 함께 반환한다.
+     * 별도 existsYdocSnapshotById 쿼리를 제거하여 1쿼리로 통합한다.
+     *
+     * @param project   프로젝트 엔티티
+     * @param diagramId 다이어그램 ID
+     * @return DiagramWithSnapshotFlag Optional
+     */
+    Optional<DiagramWithSnapshotFlag> findByProjectAndIdWithSnapshotFlag(Project project, Long diagramId);
 }

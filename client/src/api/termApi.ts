@@ -8,7 +8,7 @@ import type {
   BulkSaveResponse,
 } from '@/types/dictionary';
 
-const BULK_FETCH_PAGE_SIZE = 200;
+const BULK_FETCH_PAGE_SIZE = 5_000;
 
 /**
  * 팀의 용어 목록을 조회한다.
@@ -39,6 +39,7 @@ export async function fetchTerms(teamId: string, setId: string): Promise<Term[]>
  * @param setId  조회할 사전 세트 ID
  * @param page   페이지 번호 (0-base)
  * @param size   페이지 크기
+ * @param keyword 검색 키워드 (선택)
  * @returns 페이징 응답
  */
 export async function fetchTermsPage(
@@ -106,6 +107,7 @@ export async function updateTerm(
  * @param teamId 용어가 속한 팀 ID
  * @param setId  용어가 속한 사전 세트 ID
  * @param termId 삭제할 용어 ID
+ * @returns 없음
  */
 export async function deleteTerm(teamId: string, setId: string, termId: number): Promise<void> {
   await axiosInstance.delete(`/teams/${teamId}/dictionary-sets/${setId}/terms/${termId}`);
@@ -167,6 +169,7 @@ export async function bulkSaveTerms(
  *
  * @param teamId 대상 팀 ID
  * @param setId  대상 사전 세트 ID
+ * @returns 없음
  */
 export async function downloadTermTemplate(teamId: string, setId: string): Promise<void> {
   const res = await axiosInstance.get(
@@ -184,6 +187,7 @@ export async function downloadTermTemplate(teamId: string, setId: string): Promi
  * @param teamId          대상 팀 ID
  * @param setId           대상 사전 세트 ID
  * @param validationToken 검증 세션 토큰
+ * @returns 없음
  */
 export async function downloadTermUploadErrors(
   teamId: string,

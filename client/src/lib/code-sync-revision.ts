@@ -1,11 +1,10 @@
 import { djb2 } from './hash.js';
 
-/** ERD 리비전 해시 계산용 노드 스냅샷 */
+/** ERD 리비전 해시 계산용 노드 스냅샷 — 구조 변경만 감지 (position 제외) */
 export interface RevisionSnapshotNode {
   id: string;
   type: string;
   parentId: string | null;
-  position: { x: number; y: number };
   data: unknown;
 }
 

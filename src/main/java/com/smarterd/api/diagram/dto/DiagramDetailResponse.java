@@ -17,6 +17,9 @@ import java.time.Instant;
  * @param dictionarySetName 사전 세트 이름
  * @param content           직렬화된 React Flow JSON (노드 + 엣지)
  * @param hasYdocSnapshot   Y.Doc 스냅샷 존재 여부 (클라이언트 JSON 마이그레이션 판단용)
+ * @param contentRevision   content 리비전 (long 문자열)
+ * @param snapshotRevision  snapshot 리비전 (null 가능)
+ * @param snapshotUpdatedAt snapshot 저장 시각
  * @param createdAt         생성 시각
  * @param updatedAt         수정 시각
  */
@@ -35,6 +38,12 @@ public record DiagramDetailResponse(
     @Schema(description = "직렬화된 React Flow JSON") String content,
 
     @Schema(description = "Y.Doc 스냅샷 존재 여부") boolean hasYdocSnapshot,
+
+    @Schema(description = "content 리비전 (long 문자열)") String contentRevision,
+
+    @Schema(description = "snapshot 리비전 (null 가능)") String snapshotRevision,
+
+    @Schema(description = "snapshot 저장 시각") Instant snapshotUpdatedAt,
 
     @Schema(description = "생성 시각 (UTC, ISO-8601)") Instant createdAt,
 
@@ -59,6 +68,9 @@ public record DiagramDetailResponse(
             diagram.getDictionarySet() != null ? diagram.getDictionarySet().getName() : null,
             diagram.getContent(),
             hasYdocSnapshot,
+            String.valueOf(diagram.getContentRevision()),
+            diagram.getSnapshotRevision() != null ? String.valueOf(diagram.getSnapshotRevision()) : null,
+            diagram.getSnapshotUpdatedAt(),
             diagram.getCreatedAt(),
             diagram.getUpdatedAt()
         );

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Development Reviewer"
-  short_description: "Review coding standards and implementation quality"
-  default_prompt: "Use $review-dev to inspect changed files for backend/frontend convention violations with file:line fixes and MUST-first prioritization."

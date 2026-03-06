@@ -12,12 +12,12 @@ import org.springframework.lang.Nullable;
  * <p>{@code @ModelAttribute}로 쿼리 파라미터를 자동 바인딩한다.</p>
  *
  * @param page    페이지 번호 (0-base, 기본값 0)
- * @param size    페이지 크기 (기본값 20, 최대 200)
+ * @param size    페이지 크기 (기본값 20, 최대값은 서비스별 MAX_PAGE_SIZE에 의해 결정)
  * @param keyword 복합 검색어 (nullable)
  */
 public record PageSearchRequest(
     @Parameter(description = "페이지 번호 (0-base)") int page,
-    @Parameter(description = "페이지 크기 (최대 200)") int size,
+    @Parameter(description = "페이지 크기") int size,
     @Nullable @Parameter(description = "복합 검색어") String keyword
 ) {
     /**

@@ -215,7 +215,7 @@ class DiagramWebSocketFlowIntegrationTest {
         final Map<String, Object> attributes = new ConcurrentHashMap<>();
         attributes.put(
             AuthenticatedSession.SESSION_ATTR_KEY,
-            new AuthenticatedSession(userId, loginId, userName, diagramId, Instant.now().plusSeconds(60))
+            new AuthenticatedSession(userId, loginId, userName, diagramId, Instant.now().plusSeconds(60), 1)
         );
 
         final var inbox = new CopyOnWriteArrayList<BinaryMessage>();

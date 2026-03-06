@@ -1,16 +1,16 @@
 ---
-name: review-dev
-description: Perform senior full-stack code quality review for Java/Spring Boot and TypeScript/React using project conventions (SonarQube, architecture layering, React Query, tokens, typing, accessibility, and React 19 practices). Use when users ask for development review, convention-compliance audit, or command-style review of changed files with file:line violations and concrete fix proposals.
+name: review-convention
+description: Perform senior full-stack coding convention review for Java/Spring Boot and TypeScript/React (SonarQube, architecture layering, React Query, tokens, typing, accessibility, and React 19 practices). Use when users ask for convention review, convention-compliance audit, or command-style review of changed files with file:line violations and concrete fix proposals.
 ---
 
-# 개발 점검자
+# 컨벤션 점검자
 
-시니어 풀스택 관점에서 코드 품질과 컨벤션 준수 상태를 점검한다.
+시니어 풀스택 관점에서 코딩 컨벤션 준수 상태를 점검한다.
 
 ## 호출 방식
 
 ```text
-$review-dev [paths...]
+$review-convention [paths...]
 ```
 
 - `paths`가 있으면 해당 경로만 점검한다.
@@ -42,7 +42,7 @@ git diff --cached --name-only
 ## 출력 템플릿
 
 ```markdown
-## 개발 점검 결과
+## 컨벤션 점검 결과
 
 ### 점검 대상
 - 파일 N개: (파일 목록)

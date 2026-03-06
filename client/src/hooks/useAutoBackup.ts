@@ -112,12 +112,14 @@ function logAutosaveMetrics(
  * @param teamId       팀 ID
  * @param projectId    프로젝트 ID
  * @param diagramId    다이어그램 ID
+ * @param enabled      자동 백업 활성화 여부 (기본: true)
  */
 export function useAutoBackup(
   saveMutation: UseMutationResult<void, Error, string>,
   teamId: string,
   projectId: string,
   diagramId: string,
+  enabled: boolean = true,
 ): void {
   const ydoc = useCanvasStore((s) => s.ydoc);
   /** 동시 실행 방지 뮤텍스 */
@@ -202,6 +204,10 @@ export function useAutoBackup(
   };
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     hasLocalChangeRef.current = false;
 
     /**
@@ -292,5 +298,5 @@ export function useAutoBackup(
       window.removeEventListener('beforeunload', handleBeforeUnload);
       ydoc?.off('update', handleYDocUpdate);
     };
-  }, [teamId, projectId, diagramId, ydoc]);
+  }, [teamId, projectId, diagramId, ydoc, enabled]);
 }

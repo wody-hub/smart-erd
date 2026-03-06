@@ -78,7 +78,7 @@ class DiagramWebSocketHandlerTest {
         final var attributes = new HashMap<String, Object>();
         attributes.put(
             AuthenticatedSession.SESSION_ATTR_KEY,
-            new AuthenticatedSession("user-1", "login-1", "User 1", 100L, Instant.now().plusSeconds(60))
+            new AuthenticatedSession("user-1", "login-1", "User 1", 100L, Instant.now().plusSeconds(60), 1)
         );
 
         when(session.getId()).thenReturn("session-1");
@@ -110,7 +110,7 @@ class DiagramWebSocketHandlerTest {
         final var attributes = new HashMap<String, Object>();
         attributes.put(
             AuthenticatedSession.SESSION_ATTR_KEY,
-            new AuthenticatedSession("user-1", "login-1", "User 1", 100L, Instant.now().plusSeconds(60))
+            new AuthenticatedSession("user-1", "login-1", "User 1", 100L, Instant.now().plusSeconds(60), 1)
         );
         when(session.getId()).thenReturn("session-1");
         when(session.getAttributes()).thenReturn(attributes);

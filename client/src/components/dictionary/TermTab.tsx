@@ -48,6 +48,7 @@ interface TermTabProps {
  * 역할에 따라 CRUD/업로드 버튼을 조건부 렌더링한다.
  *
  * @param props.canEdit 편집 가능 여부
+ * @returns 용어 사전 탭 JSX
  */
 export default function TermTab({ canEdit = true, setId }: TermTabProps) {
   const { teamId } = useParams<{ teamId: string }>();
@@ -64,7 +65,7 @@ export default function TermTab({ canEdit = true, setId }: TermTabProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
 
   const { searchInput, setSearchInput, searchKeyword, page, setPage, adjustToTotalPages } =
-    usePaginatedSearch({ resetDeps: [teamId, setId] });
+    usePaginatedSearch({ resetKey: `${teamId ?? ''}:${setId}` });
 
   const {
     data: termPageData,
@@ -118,6 +119,8 @@ export default function TermTab({ canEdit = true, setId }: TermTabProps) {
 
   /**
    * 생성 버튼 클릭 핸들러.
+   *
+   * @returns 없음
    */
   const handleCreate = () => {
     setEditTarget(null);
@@ -128,6 +131,7 @@ export default function TermTab({ canEdit = true, setId }: TermTabProps) {
    * 수정 버튼 클릭 핸들러.
    *
    * @param term 수정 대상 용어
+   * @returns 없음
    */
   const handleEdit = (term: Term) => {
     setEditTarget(term);
@@ -138,6 +142,7 @@ export default function TermTab({ canEdit = true, setId }: TermTabProps) {
    * 폼 제출 핸들러 (생성/수정 분기).
    *
    * @param data 폼 데이터
+   * @returns 없음
    */
   const handleSubmit = async (data: TermFormData) => {
     if (editTarget) {
@@ -149,6 +154,8 @@ export default function TermTab({ canEdit = true, setId }: TermTabProps) {
 
   /**
    * 용어 업로드 템플릿 다운로드 핸들러.
+   *
+   * @returns 없음
    */
   const handleTemplateDownload = () => {
     downloadTemplateMutation.mutate();

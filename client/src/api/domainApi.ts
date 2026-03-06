@@ -8,7 +8,7 @@ import type {
   BulkSaveResponse,
 } from '@/types/dictionary';
 
-const BULK_FETCH_PAGE_SIZE = 200;
+const BULK_FETCH_PAGE_SIZE = 5_000;
 
 /**
  * 팀의 도메인 목록을 조회한다.
@@ -39,6 +39,7 @@ export async function fetchDomains(teamId: string, setId: string): Promise<Domai
  * @param setId  조회할 사전 세트 ID
  * @param page   페이지 번호 (0-base)
  * @param size   페이지 크기
+ * @param keyword 검색 키워드 (선택)
  * @returns 페이징 응답
  */
 export async function fetchDomainsPage(
@@ -110,6 +111,7 @@ export async function updateDomain(
  * @param teamId   도메인이 속한 팀 ID
  * @param setId    도메인이 속한 사전 세트 ID
  * @param domainId 삭제할 도메인 ID
+ * @returns 없음
  */
 export async function deleteDomain(teamId: string, setId: string, domainId: number): Promise<void> {
   await axiosInstance.delete(`/teams/${teamId}/dictionary-sets/${setId}/domains/${domainId}`);
@@ -171,6 +173,7 @@ export async function bulkSaveDomains(
  *
  * @param teamId 대상 팀 ID
  * @param setId  대상 사전 세트 ID
+ * @returns 없음
  */
 export async function downloadDomainTemplate(teamId: string, setId: string): Promise<void> {
   const res = await axiosInstance.get(
@@ -188,6 +191,7 @@ export async function downloadDomainTemplate(teamId: string, setId: string): Pro
  * @param teamId          대상 팀 ID
  * @param setId           대상 사전 세트 ID
  * @param validationToken 검증 세션 토큰
+ * @returns 없음
  */
 export async function downloadDomainUploadErrors(
   teamId: string,

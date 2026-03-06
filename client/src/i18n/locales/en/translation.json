@@ -272,10 +272,26 @@
         "idlePending": "Waiting for auto-apply",
         "syntaxErrorHold": "On hold due to syntax errors",
         "remoteLockHold": "On hold due to remote edit lock",
-        "staleDrop": "Code auto-apply canceled (ERD changed during parsing)",
+        "staleDrop": "Auto-apply skipped. Will retry on next edit.",
         "queueTimeoutManual": "Queue timeout: manual apply required",
         "manualConfirmHold": "Auto-apply paused for large diagram (manual apply required)",
         "synced": "Sync complete"
+      }
+    },
+    "collabSync": {
+      "connecting": "Connecting real-time sync...",
+      "degraded": "Sync delayed — retrying ({{current}}/{{max}})",
+      "failed": "Real-time sync failed. Editing is disabled.",
+      "retry": "Retry",
+      "editDisabledTooltip": "Editing is disabled until real-time sync completes",
+      "previewParseFailed": "Unable to parse diagram preview data",
+      "overlay": {
+        "loading": "Preparing diagram...",
+        "loadingDetail": "Waiting for real-time sync connection",
+        "loadingGeneric": "Loading diagram...",
+        "degraded": "Connection delayed. Retrying automatically. ({{current}}/{{max}})",
+        "failed": "Connection failed. Please try again.",
+        "retry": "Retry"
       }
     },
     "ddlImport": {

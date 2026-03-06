@@ -271,10 +271,26 @@
         "idlePending": "자동 반영 대기중",
         "syntaxErrorHold": "문법 오류로 보류",
         "remoteLockHold": "원격 편집 락으로 보류",
-        "staleDrop": "코드 자동반영 취소 (파싱 중 ERD가 먼저 변경됨)",
+        "staleDrop": "자동반영을 건너뛰었습니다. 다시 편집하면 재시도합니다.",
         "queueTimeoutManual": "보류 시간 초과로 수동 적용 필요",
         "manualConfirmHold": "대형 다이어그램으로 자동반영 보류 (수동 적용 필요)",
         "synced": "동기화 완료"
+      }
+    },
+    "collabSync": {
+      "connecting": "실시간 동기화 연결 중...",
+      "degraded": "동기화 지연 — 재시도 중 ({{current}}/{{max}})",
+      "failed": "실시간 동기화에 실패했습니다. 편집이 비활성화됩니다.",
+      "retry": "다시 시도",
+      "editDisabledTooltip": "실시간 동기화가 완료될 때까지 편집이 비활성화됩니다",
+      "previewParseFailed": "다이어그램 미리보기 데이터를 파싱할 수 없습니다",
+      "overlay": {
+        "loading": "다이어그램을 준비하고 있습니다.",
+        "loadingDetail": "실시간 동기화 연결을 기다리고 있습니다",
+        "loadingGeneric": "다이어그램을 불러오는 중입니다.",
+        "degraded": "연결이 지연되고 있습니다. 자동 재시도 중입니다. ({{current}}/{{max}})",
+        "failed": "연결에 실패했습니다. 다시 시도해 주세요.",
+        "retry": "다시 시도"
       }
     },
     "ddlImport": {

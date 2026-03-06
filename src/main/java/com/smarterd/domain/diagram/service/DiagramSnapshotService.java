@@ -1,6 +1,7 @@
 package com.smarterd.domain.diagram.service;
 
 import com.smarterd.domain.diagram.repository.DiagramRepository;
+import com.smarterd.domain.diagram.repository.SnapshotWithRevision;
 import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import java.time.Duration;
@@ -9,8 +10,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -80,14 +81,24 @@ public class DiagramSnapshotService implements SmartLifecycle {
      */
     @Transactional
     public void saveSnapshotWithUpdates(Long diagramId, byte[] mergedUpdates) {
+        final var contentRevision = diagramRepository.findContentRevisionForUpdate(diagramId);
+        if (contentRevision == null) {
+            log.warn("스냅샷 저장 실패: 다이어그램 미존재 (id={})", diagramId);
+            return;
+        }
         final var existingSnapshot = diagramRepository.findYdocSnapshotById(diagramId).orElse(new byte[0]);
         final var combined = combineSnapshotAndUpdates(diagramId, existingSnapshot, mergedUpdates);
-        final var updated = diagramRepository.updateYdocSnapshotById(diagramId, combined);
+        final var updated = diagramRepository.updateYdocSnapshotAndRevisionById(diagramId, combined, contentRevision);
         if (updated == 0) {
             log.warn("스냅샷 저장 실패: 다이어그램 미존재 (id={})", diagramId);
             return;
         }
-        log.info("Y.Doc 스냅샷 저장 완료: diagramId={}, size={}bytes", diagramId, combined.length);
+        log.info(
+            "Y.Doc 스냅샷 저장 완료: diagramId={}, size={}bytes, snapshotRevision={}",
+            diagramId,
+            combined.length,
+            contentRevision
+        );
     }
 
     /**
@@ -102,6 +113,17 @@ public class DiagramSnapshotService implements SmartLifecycle {
     }
 
     /**
+     * DB에서 Y.Doc 스냅샷과 snapshotRevision을 함께 로드한다.
+     * v2 프로토콜에서 리비전 정보를 클라이언트에 전달하기 위해 사용한다.
+     *
+     * @param diagramId 다이어그램 ID
+     * @return SnapshotWithRevision Optional
+     */
+    public Optional<SnapshotWithRevision> loadSnapshotWithRevision(Long diagramId) {
+        return diagramRepository.findYdocSnapshotWithRevisionById(diagramId);
+    }
+
+    /**
      * 컴팩션된 스냅샷으로 기존 ydocSnapshot을 교체한다.
      * 크기 비교 검증을 수행하여 컴팩션 결과가 기존보다 큰 경우 거부한다.
      *
@@ -111,6 +133,12 @@ public class DiagramSnapshotService implements SmartLifecycle {
      */
     @Transactional
     public boolean replaceSnapshot(Long diagramId, byte[] compactedUpdate) {
+        final var contentRevision = diagramRepository.findContentRevisionForUpdate(diagramId);
+        if (contentRevision == null) {
+            log.warn("컴팩션 실패: 다이어그램 미존재 (id={})", diagramId);
+            return false;
+        }
+
         final var existingSnapshot = diagramRepository.findYdocSnapshotById(diagramId).orElse(new byte[0]);
         final var existingSize = existingSnapshot.length;
 
@@ -128,7 +156,11 @@ public class DiagramSnapshotService implements SmartLifecycle {
             return false;
         }
 
-        final var updated = diagramRepository.updateYdocSnapshotById(diagramId, compactedSnapshot);
+        final var updated = diagramRepository.updateYdocSnapshotAndRevisionById(
+            diagramId,
+            compactedSnapshot,
+            contentRevision
+        );
         if (updated == 0) {
             log.warn("컴팩션 실패: 다이어그램 미존재 (id={})", diagramId);
             return false;
@@ -288,16 +320,28 @@ public class DiagramSnapshotService implements SmartLifecycle {
      */
     private boolean doFlushInTransaction(Long id, byte[] mergedUpdates) {
         final var result = transactionTemplate.execute((status) -> {
-            final var existingSnapshot = diagramRepository.findYdocSnapshotById(id).orElse(new byte[0]);
-            final var combined = combineSnapshotAndUpdates(id, existingSnapshot, mergedUpdates);
-            final var updated = diagramRepository.updateYdocSnapshotById(id, combined);
-            if (updated == 0) {
+            final var contentRevision = diagramRepository.findContentRevisionForUpdate(id);
+            if (contentRevision == null) {
                 final var totalFailCount = addSnapshotFlushFailCount(1, "diagram-not-found", id);
                 log.warn("주기적 스냅샷 저장 실패: 다이어그램 미존재 (id={})", id);
                 log.warn("snapshot_flush_fail_count={} reason=diagram-not-found diagramId={}", totalFailCount, id);
                 return false;
             }
-            log.debug("주기적 Y.Doc 스냅샷 저장: diagramId={}, size={}bytes", id, combined.length);
+            final var existingSnapshot = diagramRepository.findYdocSnapshotById(id).orElse(new byte[0]);
+            final var combined = combineSnapshotAndUpdates(id, existingSnapshot, mergedUpdates);
+            final var updated = diagramRepository.updateYdocSnapshotAndRevisionById(id, combined, contentRevision);
+            if (updated == 0) {
+                final var totalFailCount = addSnapshotFlushFailCount(1, "update-failed", id);
+                log.warn("주기적 스냅샷 저장 실패: UPDATE 실패 (id={})", id);
+                log.warn("snapshot_flush_fail_count={} reason=update-failed diagramId={}", totalFailCount, id);
+                return false;
+            }
+            log.debug(
+                "주기적 Y.Doc 스냅샷 저장: diagramId={}, size={}bytes, snapshotRevision={}",
+                id,
+                combined.length,
+                contentRevision
+            );
             return true;
         });
         return Boolean.TRUE.equals(result);
@@ -422,8 +466,14 @@ public class DiagramSnapshotService implements SmartLifecycle {
      */
     @Override
     public void stop(@NonNull Runnable callback) {
-        final ExecutorService executor = Executors.newSingleThreadExecutor();
-        executor.submit((Runnable) this::stop);
+        final var executor = Executors.newSingleThreadExecutor();
+        executor.submit(() -> {
+            try {
+                this.stop();
+            } catch (Exception e) {
+                log.error("서버 종료: Y.Doc flush 중 예외 발생", e);
+            }
+        });
         executor.shutdown();
         try {
             if (!executor.awaitTermination(SHUTDOWN_FLUSH_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
@@ -436,7 +486,8 @@ public class DiagramSnapshotService implements SmartLifecycle {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("서버 종료: Y.Doc flush 중 인터럽트 발생");
+        } finally {
+            callback.run();
         }
-        callback.run();
     }
 }

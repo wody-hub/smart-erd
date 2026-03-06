@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { YjsProvider } from '@/collaboration/YjsProvider';
 import { isSnapshotRevisionValid } from '@/collaboration/snapshotRevisionGuard';
+import { getEdgesMap, getTablesMap, migrateJsonToYDoc } from '@/collaboration/yjsBridge';
 import type { DiagramDetail, HandoffMode, SyncStage } from '@/types/diagram';
 
 /** 초기 sync 타임아웃 (ms) */
@@ -24,6 +25,8 @@ interface UseDiagramSyncStageInput {
   isLoading: boolean;
   /** preview JSON 파싱 성공 여부 */
   previewParseSuccess: boolean;
+  /** preview graph에 표시 가능한 노드/엣지 존재 여부 */
+  previewHasRenderableGraph: boolean;
   /** YjsProvider 참조 */
   providerRef: React.RefObject<YjsProvider | null>;
   /** feature flag 활성화 여부 */
@@ -67,7 +70,14 @@ function getRetryDelay(attempt: number): number {
  * @returns 동기화 상태 및 제어 함수
  */
 export function useDiagramSyncStage(input: UseDiagramSyncStageInput): UseDiagramSyncStageReturn {
-  const { diagram, isLoading, previewParseSuccess, providerRef, featureEnabled } = input;
+  const {
+    diagram,
+    isLoading,
+    previewParseSuccess,
+    previewHasRenderableGraph,
+    providerRef,
+    featureEnabled,
+  } = input;
 
   /** 현재 동기화 단계 */
   const [syncStage, setSyncStage] = useState<SyncStage>('boot');
@@ -220,11 +230,45 @@ export function useDiagramSyncStage(input: UseDiagramSyncStageInput): UseDiagram
       return;
     }
 
+    /**
+     * Y.Doc이 비어있으면 preview JSON을 마이그레이션한다.
+     *
+     * @returns 없음
+     */
+    const migratePreviewIfEmpty = () => {
+      if (diagram?.content && previewParseSuccess && getTablesMap(provider.doc).size === 0) {
+        provider.doc.transact(() => {
+          migrateJsonToYDoc(provider.doc, diagram.content!);
+        }, 'remote');
+      }
+    };
+
     // 콜백 등록: snapshot 수신 시
     const prevOnSnapshotReceived = provider.onSnapshotReceived;
     provider.onSnapshotReceived = (snapshotRevision: bigint | null) => {
       prevOnSnapshotReceived?.(snapshotRevision);
-      if (isSnapshotRevisionValid(snapshotRevision, diagram?.contentRevision)) {
+      // snapshot handoff는 snapshot 모드에서만 허용한다.
+      // sync-only 모드는 SYNC_STEP2 확인 후 전환한다.
+      if (handoffModeRef.current !== 'snapshot') {
+        return;
+      }
+
+      if (!isSnapshotRevisionValid(snapshotRevision, diagram?.contentRevision)) {
+        return;
+      }
+
+      // snapshot 프레임이 여러 조각으로 올 수 있으므로, 실제 그래프 데이터가 반영됐는지 확인 후 전환한다.
+      const hasYDocGraph =
+        getTablesMap(provider.doc).size > 0 || getEdgesMap(provider.doc).size > 0;
+      if (hasYDocGraph || !previewHasRenderableGraph) {
+        transitionToLive();
+        return;
+      }
+
+      // 레거시(snapshotRevision=null) + 빈 snapshot + preview 데이터가 있는 경우
+      // preview JSON으로 안전하게 보정해 "보였다가 사라짐"을 방지한다.
+      if (snapshotRevision == null) {
+        migratePreviewIfEmpty();
         transitionToLive();
       }
     };
@@ -236,6 +280,9 @@ export function useDiagramSyncStage(input: UseDiagramSyncStageInput): UseDiagram
       // sync-only 모드에서만 SYNC_STEP2로 live 전환한다.
       // snapshot 모드는 onSnapshotReceived의 리비전 검증 통과가 필요하다.
       if (handoffModeRef.current === 'sync-only') {
+        // sync-only에서는 API preview를 표시했더라도 Y.Doc이 비어있을 수 있다.
+        // live 전환 직전에 최초 1회 JSON -> Y.Doc 마이그레이션으로 공백 전환을 방지한다.
+        migratePreviewIfEmpty();
         transitionToLive();
       }
     };
@@ -267,6 +314,9 @@ export function useDiagramSyncStage(input: UseDiagramSyncStageInput): UseDiagram
     scheduleRetry,
     clearTimers,
     diagram?.contentRevision,
+    diagram?.content,
+    previewParseSuccess,
+    previewHasRenderableGraph,
     providerRef,
   ]);
 

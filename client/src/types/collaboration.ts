@@ -37,6 +37,8 @@ export interface YjsProviderOptions {
   diagramId: string;
   /** 일회용 WebSocket ticket을 발급받는 콜백 */
   getTicket: () => Promise<WsTicketIssueResponse>;
+  /** WS 프로토콜 버전 (1: 레거시, 2: 리비전 포함 바이너리). 기본값 1 */
+  protocolVersion?: 1 | 2;
 }
 
 /**

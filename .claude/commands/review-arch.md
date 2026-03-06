@@ -2,7 +2,7 @@
 
 15년차 시니어 개발자 관점에서 **구조적 설계, 공통 모듈화, 안티패턴, 웹 보안 취약점**을 점검한다. 점검 대상은 `$ARGUMENTS`이다. 인자가 없으면 최근 변경 파일(`git diff --name-only` + `git ls-files --others --exclude-standard`)을 대상으로 한다.
 
-> 컨벤션/코딩 표준은 `/review-dev`가, 디자인/퍼블리싱은 `/review-design`이 담당한다. 이 점검자는 **설계 수준의 구조적 문제와 보안 취약점**을 다룬다.
+> 코딩 컨벤션은 `/review-convention`이, 디자인/퍼블리싱은 `/review-design`이 담당한다. 이 점검자는 **설계 수준의 구조적 문제와 보안 취약점**을 다룬다.
 
 ## 점검 절차
 

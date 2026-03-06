@@ -9,3 +9,6 @@ export const CODE_SYNC_MAX_QUEUE_WAIT_MS = 10000;
 
 /** 코드 파싱 오류 중 마지막 편집 테이블 락을 유지하는 grace 시간 (ms) */
 export const CODE_LOCK_GRACE_MS = 2000;
+
+/** Code→ERD apply 직후 ERD 변경을 무시하는 suppress 윈도우 (ms) */
+export const CODE_SYNC_SUPPRESS_WINDOW_MS = 200;
