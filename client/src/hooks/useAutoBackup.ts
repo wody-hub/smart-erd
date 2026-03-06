@@ -1,11 +1,8 @@
 import { useEffect, useRef } from 'react';
 import type { UseMutationResult } from '@tanstack/react-query';
 import useCanvasStore from '@/stores/useCanvasStore';
+import { AUTO_BACKUP_IDLE_MS, AUTO_BACKUP_INTERVAL_MS } from '@/constants/feature-flags';
 
-/** 자동 백업 주기 (밀리초) — 60초 */
-const AUTO_BACKUP_INTERVAL_MS = 60 * 1000;
-/** 변경 후 유휴 백업 대기 시간 (밀리초) — 10초 */
-const AUTO_BACKUP_IDLE_MS = 10 * 1000;
 /** p95 산출을 위한 최근 성공 지연 샘플 최대 개수 */
 const AUTOSAVE_LATENCY_SAMPLE_LIMIT = 200;
 
@@ -103,7 +100,7 @@ function logAutosaveMetrics(
 }
 
 /**
- * 60초 주기 자동 백업, 변경 후 idle 10초 백업, 탭 이탈 시 즉시 백업을 수행하는 훅.
+ * 주기 자동 백업, 변경 후 idle 백업, 탭 이탈 시 즉시 백업을 수행하는 훅.
  *
  * 변경이 없으면 백업을 생략하고, 수동 백업(saveMutation) 진행 중이면 자동 백업을 건너뛴다.
  * 자동 백업 성공 시 토스트 없이 해시만 갱신한다.

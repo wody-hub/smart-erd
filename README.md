@@ -53,9 +53,15 @@ npm run perf:erd:apply:sample  # 저장소 샘플 리포트 갱신 (client/perf-
 
 ### 환경변수
 
-| 변수                   | 설명                 | 기본값                                 |
+| 변수 | 설명 | 기본값 |
 | ---------------------- | -------------------- | -------------------------------------- |
 | `SMART_ERD_JWT_SECRET` | JWT 서명 키 (Base64) | 개발용 기본값 내장 (`application.yml`) |
+| `SMART_ERD_WEBSOCKET_SNAPSHOT_FLUSH_INTERVAL` | Y.Doc 스냅샷 DB flush 주기(ms) | `5000` |
+| `SMART_ERD_WEBSOCKET_SHUTDOWN_FLUSH_TIMEOUT_MILLIS` | 서버 종료 시 Y.Doc flush 최대 대기(ms) | `15000` |
+| `SMART_ERD_SHUTDOWN_PHASE_TIMEOUT` | Spring graceful shutdown phase timeout | `20s` |
+| `VITE_ENABLE_DIAGRAM_API_PREVIEW` | 다이어그램 API preview 활성화 여부 (`false`면 비활성) | `true` |
+| `VITE_ERD_AUTOSAVE_INTERVAL_MS` | 주기 autosave 간격(ms) | `30000` |
+| `VITE_ERD_AUTOSAVE_IDLE_MS` | 변경 후 idle autosave 대기(ms) | `5000` |
 | `VITE_ERD_DIFF_APPLY_MODE` | Diff Apply rollout 모드 (`off/internal/beta/all`) | `off` |
 | `VITE_ERD_DIFF_APPLY_BETA_PERCENT` | beta 모드 대상 비율(0~100) | `10` |
 | `VITE_ERD_DIFF_APPLY_INTERNAL_IDS` | internal 모드 허용 loginId 목록(csv) | 빈 값 |

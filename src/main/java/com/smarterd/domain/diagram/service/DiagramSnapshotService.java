@@ -1,5 +1,6 @@
 package com.smarterd.domain.diagram.service;
 
+import com.smarterd.config.websocket.WebSocketProperties;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.diagram.repository.SnapshotWithRevision;
 import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
@@ -40,9 +41,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 public class DiagramSnapshotService implements SmartLifecycle {
 
-    /** 서버 종료 시 flush 타임아웃 (초) */
-    private static final long SHUTDOWN_FLUSH_TIMEOUT_SECONDS = 10;
-
     /** 누적 update 수 경고 임계치 (초과 시 컴팩션 필요 경고) */
     private static final int COMPACTION_WARN_THRESHOLD = 500;
 
@@ -62,6 +60,9 @@ public class DiagramSnapshotService implements SmartLifecycle {
 
     /** 다이어그램 레포지토리 */
     private final DiagramRepository diagramRepository;
+
+    /** WebSocket 설정 프로퍼티 */
+    private final WebSocketProperties webSocketProperties;
 
     /** 방 관리자 (dirty ID 조회 + 누적 update 병합용) */
     private final DiagramRoomManager roomManager;
@@ -228,7 +229,7 @@ public class DiagramSnapshotService implements SmartLifecycle {
      * dirty 플래그가 설정된 다이어그램만 처리한다.
      * 개별 다이어그램 저장 실패 시 해당 ID를 다시 dirty로 표시하여 다음 주기에 재시도한다.</p>
      */
-    @Scheduled(fixedDelayString = "${smart-erd.websocket.snapshot-flush-interval:30000}")
+    @Scheduled(fixedDelayString = "${smart-erd.websocket.snapshot-flush-interval:5000}")
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void flushDirtySnapshots() {
         final var dirtyIds = roomManager.getDirtyIdsAndClear();
@@ -476,10 +477,11 @@ public class DiagramSnapshotService implements SmartLifecycle {
         });
         executor.shutdown();
         try {
-            if (!executor.awaitTermination(SHUTDOWN_FLUSH_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            final var shutdownFlushTimeoutMillis = webSocketProperties.getShutdownFlushTimeoutMillis();
+            if (!executor.awaitTermination(shutdownFlushTimeoutMillis, TimeUnit.MILLISECONDS)) {
                 log.warn(
-                    "서버 종료: Y.Doc flush 타임아웃 ({}초) 초과, 미저장 update가 유실될 수 있음",
-                    SHUTDOWN_FLUSH_TIMEOUT_SECONDS
+                    "서버 종료: Y.Doc flush 타임아웃 ({}ms) 초과, 미저장 update가 유실될 수 있음",
+                    shutdownFlushTimeoutMillis
                 );
                 executor.shutdownNow();
             }

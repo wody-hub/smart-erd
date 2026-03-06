@@ -1,5 +1,6 @@
 server:
   port: 8190
+  shutdown: graceful
 
 logging:
   level:
@@ -10,6 +11,8 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  lifecycle:
+    timeout-per-shutdown-phase: ${SMART_ERD_SHUTDOWN_PHASE_TIMEOUT:20s}
 
   servlet:
     multipart:
@@ -48,10 +51,11 @@ smart-erd:
     max-sessions-per-room: 10
     max-messages-per-second: 100
     binary-message-size-limit: 1048576 # 1MB
-    snapshot-flush-interval: 30000 # 30초
+    snapshot-flush-interval: ${SMART_ERD_WEBSOCKET_SNAPSHOT_FLUSH_INTERVAL:5000} # 기본 5초
     max-connections-per-user: 5
     max-accumulated-updates-size: 10485760 # 10MB
     session-max-duration: 1800000 # 30분
+    shutdown-flush-timeout-millis: ${SMART_ERD_WEBSOCKET_SHUTDOWN_FLUSH_TIMEOUT_MILLIS:15000}
     ticket-store: in-memory # in-memory | redis (redis 사용 시: docker compose --profile redis up -d)
   cors:
     allowed-origins: ${SMART_ERD_CORS_ORIGINS:http://localhost:3000}

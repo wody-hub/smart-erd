@@ -24,7 +24,7 @@ public class WebSocketProperties {
     private int binaryMessageSizeLimit = 1024 * 1024;
 
     /** dirty 스냅샷 flush 주기 (밀리초) */
-    private long snapshotFlushInterval = 30000;
+    private long snapshotFlushInterval = 5000;
 
     /** 사용자별 최대 동시 WebSocket 연결 수 */
     private int maxConnectionsPerUser = 5;
@@ -34,6 +34,9 @@ public class WebSocketProperties {
 
     /** WebSocket 세션 최대 유지 시간 (밀리초) */
     private long sessionMaxDuration = 1800000;
+
+    /** 서버 종료 시 Y.Doc flush 최대 대기 시간 (밀리초) */
+    private long shutdownFlushTimeoutMillis = 15000;
 
     /** ticket 저장소 유형 ({@code in-memory} 또는 {@code redis}) */
     private String ticketStore = "in-memory";
