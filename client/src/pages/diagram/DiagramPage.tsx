@@ -7,6 +7,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import ERDCanvas from '@/components/erd/ERDCanvas';
+import CanvasLoadingOverlay from '@/components/erd/CanvasLoadingOverlay';
 import ValidationPanel from '@/components/erd/ValidationPanel';
 import { ErdDictionaryProvider } from '@/components/erd/ErdDictionaryContext';
 import { ErdPermissionProvider } from '@/components/erd/ErdPermissionContext';
@@ -23,6 +24,9 @@ import { useYjsCollaboration } from '@/hooks/useYjsCollaboration';
 import { useAutoBackup } from '@/hooks/useAutoBackup';
 
 const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPanel'));
+
+/** 빈 핸들러 (오버레이 retry prop용, 현재 syncStage 고정이므로 미사용) */
+const noop = () => {};
 
 /**
  * 다이어그램 편집 페이지.
@@ -59,6 +63,14 @@ export default function DiagramPage() {
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
   /** 활성 그룹 ID (null이면 전체 보기) */
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  /** 초기 진입 렌더 완료 래치 (한 번 true가 되면 동일 다이어그램 세션에서 유지) */
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  /** 다이어그램 전환 감지용 래치 키 */
+  const latchKey = `${projectId}:${diagramId}`;
+  /** 이전 래치 키 보관 ref */
+  const prevLatchKeyRef = useRef(latchKey);
+  /** 다이어그램 전환 직후 1회 평가 스킵 가드 */
+  const skipLatchEvalRef = useRef(false);
   /** 진행 중인 사이드바 리사이즈 정리 함수 */
   const sidebarResizeCleanupRef = useRef<(() => void) | null>(null);
   /** 언마운트 진행 여부 */
@@ -80,6 +92,10 @@ export default function DiagramPage() {
   const markBackedUp = useCanvasStore((s) => s.markBackedUp);
   const groups = useCanvasStore((s) => s.groups);
   const connectionStatus = useCollaborationStore((s) => s.connectionStatus);
+  /** store에 렌더 가능한 노드/엣지가 존재하는지 (boolean selector로 리렌더 최소화) */
+  const storeHasRenderableGraph = useCanvasStore(
+    (s) => s.nodes.length > 0 || s.edges.length > 0,
+  );
 
   /** 현재 활성 그룹 객체 */
   const activeGroup = activeGroupId
@@ -100,6 +116,16 @@ export default function DiagramPage() {
     queryFn: () => fetchDiagram(teamId!, projectId!, diagramId!),
     enabled: !!teamId && !!projectId && !!diagramId,
   });
+
+  // --- 파생값 (useQuery 결과 `diagram`에 의존하므로 그룹7 이후 배치) ---
+  /** 빈 다이어그램 여부 */
+  const diagramHasContent = !!diagram?.content;
+  /** 렌더 가능 그래프 판정 */
+  const hasRenderableGraph = storeHasRenderableGraph;
+  /** 빈 다이어그램이면 오버레이 불필요 */
+  const isPersistedEmptyDiagram = !diagramHasContent;
+  /** 오버레이 표시 조건 */
+  const showOverlay = !isPersistedEmptyDiagram && !hasRenderableGraph && !initialLoadComplete;
 
   const saveMutation = useMutation({
     mutationFn: (content: string) => saveDiagram(teamId!, projectId!, diagramId!, content),
@@ -352,6 +378,39 @@ export default function DiagramPage() {
     }
   }, [diagram]);
 
+  /**
+   * 오버레이 래치 관리 (단일 useEffect + ref 가드).
+   *
+   * 3단계로 동작한다:
+   * 1. 키 변경 감지: latchKey(projectId:diagramId)가 변경되면 래치를 리셋하고
+   *    skipLatchEvalRef를 설정하여 다음 평가를 1프레임 지연시킨다.
+   * 2. 스킵 가드: 다이어그램 전환 직후 store에 이전 다이어그램의 노드/엣지가
+   *    잔존할 수 있으므로, 첫 번째 평가를 건너뛰어 조기 래치 설정을 방지한다.
+   * 3. 정상 평가: 렌더 가능 그래프가 도착하거나 빈 다이어그램이면 래치를
+   *    true로 설정하여 오버레이를 영구 해제한다.
+   */
+  useEffect(() => {
+    if (prevLatchKeyRef.current !== latchKey) {
+      prevLatchKeyRef.current = latchKey;
+      skipLatchEvalRef.current = true;
+      setInitialLoadComplete(false);
+      return;
+    }
+
+    if (skipLatchEvalRef.current) {
+      skipLatchEvalRef.current = false;
+      return;
+    }
+
+    if (isLoading || !diagram) {
+      return;
+    }
+
+    if (hasRenderableGraph || isPersistedEmptyDiagram) {
+      setInitialLoadComplete(true);
+    }
+  }, [latchKey, isLoading, diagram, hasRenderableGraph, isPersistedEmptyDiagram]);
+
   // 원격으로 현재 보고 중인 그룹이 삭제된 경우 전체 보기로 복귀한다.
   useEffect(() => {
     if (activeGroupId && !groups.some((group) => group.id === activeGroupId)) {
@@ -437,7 +496,7 @@ export default function DiagramPage() {
               >
                 <div className="w-px h-full bg-border/80 group-hover:bg-primary/80 group-active:bg-primary transition-colors" />
               </div>
-              <main className="flex-1">
+              <main className="flex-1 relative">
                 <ERDCanvas
                   diagramName={diagramName || 'diagram'}
                   provider={providerRef.current}
@@ -453,6 +512,14 @@ export default function DiagramPage() {
                   }
                   isSidebarResizing={isSidebarResizing}
                 />
+                {showOverlay && (
+                  <CanvasLoadingOverlay
+                    syncStage="yjs-live"
+                    retryCount={0}
+                    maxRetries={0}
+                    onRetry={noop}
+                  />
+                )}
               </main>
               {validationOpen && <ValidationPanel onClose={() => setValidationOpen(false)} />}
             </div>
