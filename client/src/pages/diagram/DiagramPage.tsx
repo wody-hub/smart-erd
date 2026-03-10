@@ -8,6 +8,7 @@ import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import ERDCanvas from '@/components/erd/ERDCanvas';
 import CanvasLoadingOverlay from '@/components/erd/CanvasLoadingOverlay';
+import DiagramSyncStatusBanner from '@/components/erd/DiagramSyncStatusBanner';
 import ValidationPanel from '@/components/erd/ValidationPanel';
 import { ErdDictionaryProvider } from '@/components/erd/ErdDictionaryContext';
 import { ErdPermissionProvider } from '@/components/erd/ErdPermissionContext';
@@ -69,6 +70,10 @@ export default function DiagramPage() {
   const latchKey = `${projectId}:${diagramId}`;
   /** 이전 래치 키 보관 ref */
   const prevLatchKeyRef = useRef(latchKey);
+  /** 이전 preview 모드 상태 보관 ref (연결 완료 토스트 1회 제어용) */
+  const prevPreviewSyncStatusRef = useRef<'inactive' | 'syncing' | 'live' | 'degraded'>(
+    'inactive',
+  );
   /** 다이어그램 전환 직후 1회 평가 스킵 가드 */
   const skipLatchEvalRef = useRef(false);
   /** 진행 중인 사이드바 리사이즈 정리 함수 */
@@ -369,7 +374,25 @@ export default function DiagramPage() {
   }, []);
 
   // Y.Doc + YjsProvider 라이프사이클 관리
-  const { providerRef } = useYjsCollaboration(diagram, diagramId);
+  const { providerRef, isPreviewMode, previewSyncStatus } = useYjsCollaboration(diagram, diagramId);
+  /** 프리뷰 중에는 전반적 편집을 잠근다. */
+  const effectiveCanEdit = canEdit && !isPreviewMode;
+  const previewReadOnlyMessage = isPreviewMode
+    ? t('diagram.previewSync.headerReadonly')
+    : undefined;
+
+  useEffect(() => {
+    if (prevLatchKeyRef.current !== latchKey) {
+      prevPreviewSyncStatusRef.current = previewSyncStatus;
+      return;
+    }
+
+    if (prevPreviewSyncStatusRef.current !== 'live' && previewSyncStatus === 'live' && canEdit) {
+      toast.success(t('diagram.previewSync.toast.connected'));
+    }
+
+    prevPreviewSyncStatusRef.current = previewSyncStatus;
+  }, [canEdit, latchKey, previewSyncStatus, t]);
 
   // diagram 로드 완료 시 이름 설정
   useEffect(() => {
@@ -446,15 +469,19 @@ export default function DiagramPage() {
   return (
     <ReactFlowProvider>
       <ErdDictionaryProvider teamId={teamId!} setId={dictionarySetId}>
-        <ErdPermissionProvider canEdit={canEdit}>
+        <ErdPermissionProvider canEdit={effectiveCanEdit}>
           <div className="h-screen flex flex-col">
             <Header
               diagramName={diagramName}
-              onSave={canEdit ? handleSave : undefined}
+              onSave={effectiveCanEdit ? handleSave : undefined}
               saving={saveMutation.isPending}
               connectionStatus={connectionStatus}
-              canEdit={canEdit}
+              canEdit={effectiveCanEdit}
+              readOnlyMessage={previewReadOnlyMessage}
             />
+            {canEdit && isPreviewMode && (
+              <DiagramSyncStatusBanner connectionStatus={connectionStatus} />
+            )}
             {diagram?.dictionarySetName && (
               <div className="px-4 py-1 text-xs text-muted-foreground border-b bg-background">
                 {t('diagram.edit.dictionarySet', { name: diagram.dictionarySetName })}
@@ -468,14 +495,14 @@ export default function DiagramPage() {
               >
                 {leftPanel === 'sidebar' ? (
                   <Sidebar
-                    canEdit={canEdit}
+                    canEdit={effectiveCanEdit}
                     activeGroupId={activeGroupId}
                     onViewGroup={handleViewGroup}
                     onBackToAll={handleBackToAll}
                   />
                 ) : (
                   <Suspense fallback={<Spinner />}>
-                    <DdlCodeEditorPanel canEdit={canEdit} />
+                    <DdlCodeEditorPanel canEdit={effectiveCanEdit} />
                   </Suspense>
                 )}
               </div>
@@ -502,13 +529,13 @@ export default function DiagramPage() {
                   provider={providerRef.current}
                   validationOpen={validationOpen}
                   onToggleValidation={handleToggleValidation}
-                  canEdit={canEdit}
+                  canEdit={effectiveCanEdit}
                   activeGroupId={activeGroupId}
                   activeGroupName={activeGroup?.label}
                   activeGroupTableIds={activeGroupTableIds}
                   codeEditorActive={leftPanel === 'code'}
                   onToggleCodeEditor={
-                    canEdit && !activeGroupId ? handleToggleCodeEditor : undefined
+                    effectiveCanEdit && !activeGroupId ? handleToggleCodeEditor : undefined
                   }
                   isSidebarResizing={isSidebarResizing}
                 />

@@ -173,6 +173,18 @@
       "loadingDiagram": "Loading diagram...",
       "dictionarySet": "Applied dictionary set: {{name}}"
     },
+    "previewSync": {
+      "headerReadonly": "Real-time sync in progress",
+      "banner": {
+        "title": "Preview is already visible",
+        "description": "Editing will unlock automatically once real-time sync finishes.",
+        "descriptionDisconnected": "Real-time sync is delayed. Editing will unlock automatically once the connection recovers.",
+        "locked": "Editing locked until sync completes"
+      },
+      "toast": {
+        "connected": "Real-time sync connected. Editing is now enabled."
+      }
+    },
     "toast": {
       "created": "Diagram created",
       "createFailed": "Failed to create diagram",

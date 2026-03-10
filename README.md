@@ -10,7 +10,7 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 
 | 계층        | 기술                                                                                      |
 | ----------- | ----------------------------------------------------------------------------------------- |
-| Backend     | Spring Boot 3.5.11, Java 25, Gradle 8.12, Spring Security 6.x, Spring Data JPA            |
+| Backend     | Spring Boot 3.5.11, Java 25, Gradle 9.4.0, Spring Security 6.x, Spring Data JPA           |
 | 인증        | Spring OAuth2 Resource Server (HMAC-SHA256 JWT), BCrypt                                   |
 | 쿼리        | QueryDSL 5.1.0:jakarta, Blaze-Persistence 1.6.17                                          |
 | DB          | PostgreSQL 17 (Docker), Testcontainers (test), `ddl-auto: update`                         |

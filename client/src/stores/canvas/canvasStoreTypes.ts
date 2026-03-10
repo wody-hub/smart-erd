@@ -126,6 +126,8 @@ export interface CanvasState {
   internal: InternalState;
   initYDoc: (ydoc: Y.Doc) => void;
   destroyYDoc: () => void;
+  /** API JSON을 Y.Doc을 거치지 않고 Zustand에 직접 주입한다 (프리뷰 전용). */
+  loadPreview: (json: string) => void;
 }
 
 /** Canvas 스토어 set 함수 타입 */

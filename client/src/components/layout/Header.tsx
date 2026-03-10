@@ -21,6 +21,8 @@ interface HeaderProps {
   connectionStatus?: ConnectionStatus;
   /** 편집 가능 여부 (VIEWER일 때 false) */
   canEdit?: boolean;
+  /** 편집 잠금 사유 메시지 */
+  readOnlyMessage?: string;
 }
 
 /**
@@ -42,6 +44,7 @@ export default function Header({
   saving,
   connectionStatus,
   canEdit = true,
+  readOnlyMessage,
 }: HeaderProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -91,7 +94,9 @@ export default function Header({
             </Button>
           )}
           {!canEdit && (
-            <span className="text-xs text-header-muted ml-2">{t('permission.viewerReadonly')}</span>
+            <span className="text-xs text-header-muted ml-2">
+              {readOnlyMessage ?? t('permission.viewerReadonly')}
+            </span>
           )}
         </div>
       )}

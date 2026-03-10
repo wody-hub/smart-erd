@@ -1,7 +1,8 @@
 import * as Y from 'yjs';
-import { type Node, type NodeChange, applyEdgeChanges, applyNodeChanges } from '@xyflow/react';
+import { type Edge, type Node, type NodeChange, applyEdgeChanges, applyNodeChanges } from '@xyflow/react';
 import { djb2 } from '@/lib/hash';
 import { extractColId } from '@/lib/handle-id';
+import type { TableGroup, TableNodeData } from '@/types/erd';
 import {
   deleteColumnFromYArray,
   getEdgesMap,
@@ -22,6 +23,7 @@ import type {
 type CanvasSyncActionKeys =
   | 'initYDoc'
   | 'destroyYDoc'
+  | 'loadPreview'
   | 'onNodesChange'
   | 'onEdgesChange'
   | 'setNodes'
@@ -190,6 +192,25 @@ export function createCanvasSyncActions(
       tablesMap.observeDeep(internal.tablesObserver);
       edgesMap.observeDeep(internal.edgesObserver);
       groupsMap.observeDeep(internal.groupsObserver);
+    },
+
+    loadPreview: (json: string) => {
+      try {
+        const parsed = JSON.parse(json) as {
+          nodes?: Node<TableNodeData>[];
+          edges?: Edge[];
+          groups?: TableGroup[];
+        };
+        set({
+          nodes: Array.isArray(parsed.nodes) ? parsed.nodes : [],
+          edges: Array.isArray(parsed.edges)
+            ? parsed.edges.map((e: Edge) => ({ ...e, type: e.type ?? 'erdRelation' }))
+            : [],
+          groups: Array.isArray(parsed.groups) ? parsed.groups : [],
+        });
+      } catch {
+        // JSON 파싱 실패 시 무시 — 빈 캔버스 유지
+      }
     },
 
     destroyYDoc: () => {
