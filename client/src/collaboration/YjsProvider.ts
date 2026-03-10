@@ -13,8 +13,6 @@ import type {
 
 /** snapshot 재요청 rate limit (분당 최대 횟수) */
 const MAX_SNAPSHOT_REQUESTS_PER_MINUTE = 6;
-/** rate limit 윈도우 (ms) — 1분 */
-const RATE_LIMIT_WINDOW_MS = 60_000;
 
 /**
  * Raw WebSocket 기반 Yjs sync provider.
@@ -73,12 +71,6 @@ export class YjsProvider {
 
   /** presence peer left 수신 콜백 */
   onPresencePeerLeft: ((payload: PresencePeerLeftPayload) => void) | null = null;
-
-  /** sync 완료 콜백 (SYNC_STEP2 수신 시) */
-  onSyncCompleted: (() => void) | null = null;
-
-  /** snapshot 수신 콜백 (v2: snapshotRevision 포함, v1: null) */
-  onSnapshotReceived: ((snapshotRevision: bigint | null) => void) | null = null;
 
   /** 로컬 Awareness 상태 */
   private localAwareness: AwarenessState | null = null;
@@ -190,8 +182,6 @@ export class YjsProvider {
 
   /**
    * WebSocket 인스턴스를 생성하고 이벤트를 바인딩한다.
-   *
-   * @returns 없음
    */
   private async createWebSocket(): Promise<void> {
     if (this.destroyed || this.intentionalClose) {
@@ -310,7 +300,6 @@ export class YjsProvider {
         }
         if (messageType === WS_MSG_TYPE.SYNC_STEP2) {
           this.synced = true;
-          this.onSyncCompleted?.();
         }
         break;
       }
@@ -319,30 +308,14 @@ export class YjsProvider {
         break;
       }
       case WS_MSG_TYPE.SNAPSHOT_RESPONSE: {
-        // v2 포맷: [8byte revision big-endian][Yjs binary]
-        // v1 포맷: [Yjs binary] (전체가 Yjs update)
-        let snapshotRevision: bigint | null = null;
-        let yjsPayload: Uint8Array;
-
-        if (this.options.protocolVersion === 2 && payload.length >= 9) {
-          // v2: 처음 8바이트가 revision (음수면 레거시 → null 처리)
-          const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
-          const rawRevision = view.getBigInt64(0, false);
-          snapshotRevision = rawRevision >= 0n ? rawRevision : null;
-          yjsPayload = payload.subarray(8);
-        } else {
-          // v1: 전체가 Yjs update
-          yjsPayload = payload;
-        }
-
+        // 서버 스냅샷 수신 -> Y.Doc에 적용
         try {
-          Y.applyUpdate(this.doc, yjsPayload, 'remote');
+          Y.applyUpdate(this.doc, payload, 'remote');
         } catch (e) {
           console.error('[YjsProvider] Y.applyUpdate 실패 (snapshot):', e);
           this.reconnectAfterError();
           return;
         }
-        this.onSnapshotReceived?.(snapshotRevision);
         break;
       }
       case WS_MSG_TYPE.PRESENCE_SNAPSHOT: {
@@ -368,17 +341,8 @@ export class YjsProvider {
    * 서버에 저장된 Y.Doc 스냅샷을 요청한다.
    * WebSocket 연결 시 sync 전에 호출하여 기존 상태를 복원한다.
    */
-  requestSnapshot(): void {
+  private requestSnapshot(): void {
     this.sendMessage(WS_MSG_TYPE.SNAPSHOT_REQUEST, new Uint8Array(0));
-  }
-
-  /**
-   * 현재 WebSocket 연결 여부를 반환한다.
-   *
-   * @returns 연결 여부
-   */
-  isConnected(): boolean {
-    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 
   /**
@@ -422,7 +386,7 @@ export class YjsProvider {
 
     const now = Date.now();
     this.snapshotRequestTimestamps = this.snapshotRequestTimestamps.filter(
-      (ts) => now - ts < RATE_LIMIT_WINDOW_MS,
+      (ts) => now - ts < 60000,
     );
     if (this.snapshotRequestTimestamps.length >= MAX_SNAPSHOT_REQUESTS_PER_MINUTE) {
       return;
@@ -469,8 +433,6 @@ export class YjsProvider {
 
   /**
    * Presence snapshot 메시지를 처리한다.
-   *
-   * @param payload 바이너리 페이로드
    */
   private handlePresenceSnapshot(payload: Uint8Array): void {
     try {
@@ -492,21 +454,12 @@ export class YjsProvider {
   }
 
   /**
-   * Presence peer joined/left 공통 가드 로직을 처리한다.
-   *
-   * roomEpoch/presenceVersion 검증 후 콜백을 호출한다.
-   *
-   * @param payload  바이너리 페이로드
-   * @param label    로그용 이벤트 이름
-   * @param callback 검증 통과 시 호출할 콜백
+   * Presence peer joined 메시지를 처리한다.
    */
-  private handlePresencePeerEvent<T extends { roomEpoch: string; presenceVersion: number }>(
-    payload: Uint8Array,
-    label: string,
-    callback: ((json: T) => void) | null,
-  ): void {
+  private handlePresencePeerJoined(payload: Uint8Array): void {
     try {
-      const json = JSON.parse(new TextDecoder().decode(payload)) as T;
+      const decoder = new TextDecoder();
+      const json = JSON.parse(decoder.decode(payload)) as PresencePeerJoinedPayload;
 
       if (!this.lastRoomEpoch) {
         this.requestPresenceSnapshot();
@@ -524,36 +477,40 @@ export class YjsProvider {
       }
 
       this.lastPresenceVersion = json.presenceVersion;
-      callback?.(json);
+      this.onPresencePeerJoined?.(json);
     } catch (e) {
-      console.debug(`[YjsProvider] ${label} 파싱 실패:`, e);
+      console.debug('[YjsProvider] Presence peer joined 파싱 실패:', e);
     }
   }
 
   /**
-   * Presence peer joined 메시지를 처리한다.
-   *
-   * @param payload 바이너리 페이로드
-   */
-  private handlePresencePeerJoined(payload: Uint8Array): void {
-    this.handlePresencePeerEvent<PresencePeerJoinedPayload>(
-      payload,
-      'Presence peer joined',
-      this.onPresencePeerJoined,
-    );
-  }
-
-  /**
    * Presence peer left 메시지를 처리한다.
-   *
-   * @param payload 바이너리 페이로드
    */
   private handlePresencePeerLeft(payload: Uint8Array): void {
-    this.handlePresencePeerEvent<PresencePeerLeftPayload>(
-      payload,
-      'Presence peer left',
-      this.onPresencePeerLeft,
-    );
+    try {
+      const decoder = new TextDecoder();
+      const json = JSON.parse(decoder.decode(payload)) as PresencePeerLeftPayload;
+
+      if (!this.lastRoomEpoch) {
+        this.requestPresenceSnapshot();
+        return;
+      }
+      if (json.roomEpoch !== this.lastRoomEpoch) {
+        return;
+      }
+      if (json.presenceVersion <= this.lastPresenceVersion) {
+        return;
+      }
+      if (json.presenceVersion > this.lastPresenceVersion + 1) {
+        this.requestPresenceSnapshot();
+        return;
+      }
+
+      this.lastPresenceVersion = json.presenceVersion;
+      this.onPresencePeerLeft?.(json);
+    } catch (e) {
+      console.debug('[YjsProvider] Presence peer left 파싱 실패:', e);
+    }
   }
 
   /**
@@ -635,8 +592,7 @@ export class YjsProvider {
    * @returns WebSocket URL
    */
   private buildWsUrl(ticket: string): string {
-    const pv = this.options.protocolVersion ?? 1;
-    return `${getWsBaseUrl()}/ws/diagram/${this.options.diagramId}?ticket=${encodeURIComponent(ticket)}&protocolVersion=${pv}`;
+    return `${getWsBaseUrl()}/ws/diagram/${this.options.diagramId}?ticket=${encodeURIComponent(ticket)}`;
   }
 
   /**

@@ -15,7 +15,6 @@ import {
   type DiffParsedTable,
   type TableDiff,
 } from '@/lib/erd-diff-plan';
-import { snapshotPositions, restorePositions } from '@/lib/position-snapshot';
 import type { ERDEdge, TableGroup, TableNode, TableNodeData } from '@/types/erd';
 import {
   getAutoApplyBlockReason,
@@ -55,17 +54,6 @@ interface UseApplyToErdReturn {
   confirmDescription: string;
   /** Apply 버튼 활성화 여부 */
   canApply: boolean;
-}
-
-/**
- * 파싱 결과가 ERD에 반영 가능한지 판별한다.
- * 에러만 있고 테이블이 없는 결과는 반영 불가로 판단한다.
- *
- * @param result 파싱 결과
- * @returns result가 DdlParseResult이면 true
- */
-function isApplicableParseResult(result: DdlParseResult | null): result is DdlParseResult {
-  return result != null && !(result.tables.length === 0 && result.errors.length > 0);
 }
 
 type ApplySource = 'manual' | 'auto';
@@ -304,7 +292,8 @@ export function useApplyToErd({
   /** 대형 다이어그램 여부 */
   const isLargeDiagram = projectedNodeCount >= syncPolicy.largeDiagramThreshold;
   /** 반영 가능한 파싱 결과인지 여부 (빈 스키마 포함) */
-  const hasApplicableParseResult = isApplicableParseResult(parseResult);
+  const hasApplicableParseResult =
+    parseResult != null && !(parseResult.tables.length === 0 && parseResult.errors.length > 0);
 
   /** Apply 버튼 활성화 여부 */
   const canApply = canEdit && hasApplicableParseResult && !parsing;
@@ -324,7 +313,7 @@ export function useApplyToErd({
    */
   const runApply = useCallback(
     (source: ApplySource): boolean => {
-      if (!isApplicableParseResult(parseResult)) {
+      if (!parseResult || (parseResult.tables.length === 0 && parseResult.errors.length > 0)) {
         return false;
       }
       const beforeState = useCanvasStore.getState();
@@ -342,8 +331,6 @@ export function useApplyToErd({
       }
 
       const totalStart = performance.now();
-      // R1: apply 전 위치 스냅샷 캡처
-      const positionSnapshot = snapshotPositions(beforeNodes);
 
       try {
         const replaceStart = performance.now();
@@ -365,15 +352,6 @@ export function useApplyToErd({
           },
         });
         const replaceDurationMs = performance.now() - replaceStart;
-
-        // R1: full-replace 경로에서 유실된 위치를 스냅샷 기준으로 복원
-        if (diffPhase.applyPath !== 'diff') {
-          const currentNodes = useCanvasStore.getState().nodes as Node<TableNodeData>[];
-          const restoredNodes = restorePositions(currentNodes, positionSnapshot);
-          if (restoredNodes) {
-            applyLayout(restoredNodes);
-          }
-        }
 
         const layoutPhase = executeLayoutPhase({
           beforeNodes: beforeLayoutNodes,
@@ -452,7 +430,7 @@ export function useApplyToErd({
    * 기존 테이블이 있으면 확인 다이얼로그를 표시하고, 없으면 즉시 적용한다.
    */
   const handleApply = useCallback(() => {
-    if (!isApplicableParseResult(parseResult)) {
+    if (!parseResult || (parseResult.tables.length === 0 && parseResult.errors.length > 0)) {
       return;
     }
     if (projectedNodeCount >= LARGE_DIAGRAM_WARNING_THRESHOLD) {

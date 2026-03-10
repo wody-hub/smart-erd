@@ -1,5 +1,10 @@
 package com.smarterd.domain.diagram.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.smarterd.api.diagram.dto.CreateDiagramRequest;
 import com.smarterd.api.diagram.dto.DiagramDetailResponse;
 import com.smarterd.api.diagram.dto.DiagramResponse;
@@ -7,22 +12,29 @@ import com.smarterd.api.diagram.dto.RenameDiagramRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetResponse;
+import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
-import com.smarterd.domain.diagram.entity.SaveSource;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
+import com.smarterd.domain.dictionary.entity.DictionarySet;
+import com.smarterd.domain.dictionary.repository.DomainRepository;
+import com.smarterd.domain.dictionary.repository.TermRepository;
 import com.smarterd.domain.dictionary.service.DictionarySetService;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.service.ProjectService;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
+import com.smarterd.utils.AppStringUtils;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,8 +72,14 @@ public class DiagramService {
     /** 다이어그램 스냅샷 서비스 */
     private final DiagramSnapshotService diagramSnapshotService;
 
-    /** 사전 바인딩 무효화 서비스 */
-    private final DiagramDictionaryBindingService dictionaryBindingService;
+    /** 용어 레포지토리 */
+    private final TermRepository termRepository;
+
+    /** 도메인 레포지토리 */
+    private final DomainRepository domainRepository;
+
+    /** JSON 파서 */
+    private final ObjectMapper objectMapper;
 
     /**
      * 다이어그램을 생성한다.
@@ -109,9 +127,6 @@ public class DiagramService {
     /**
      * 다이어그램 상세를 조회한다 (content 포함).
      *
-     * <p>flushDiagramSnapshotNow + existsYdocSnapshotById 2쿼리를 제거하고
-     * ydocSnapshot IS NOT NULL 기준으로 스냅샷 존재를 판단한다.</p>
-     *
      * @param loginId    요청 사용자의 로그인 ID
      * @param teamId     팀 ID
      * @param projectId  프로젝트 ID
@@ -120,25 +135,12 @@ public class DiagramService {
      */
     public DiagramDetailResponse getDiagram(String loginId, Long teamId, Long projectId, Long diagramId) {
         final var project = verifyReadAccess(loginId, teamId, projectId);
-        final var result = diagramRepository
-            .findByProjectAndIdWithSnapshotFlag(project, diagramId)
-            .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_DIAGRAM.code(), diagramId));
+        final var diagram = findDiagramByProjectAndId(project, diagramId);
+        // 새로고침 직후에도 최신 상태를 반환하도록 조회 직전에 누적 update를 즉시 flush한다.
+        diagramSnapshotService.flushDiagramSnapshotNow(diagram.getId());
+        final var hasSnapshot = diagramRepository.existsYdocSnapshotById(diagramId);
 
-        return DiagramDetailResponse.from(result.diagram(), project.getId(), result.hasYdocSnapshot());
-    }
-
-    /**
-     * 다이어그램 콘텐츠를 저장한다 (YJS_BACKUP 원본).
-     *
-     * @param loginId    요청 사용자의 로그인 ID
-     * @param teamId     팀 ID
-     * @param projectId  프로젝트 ID
-     * @param diagramId  다이어그램 ID
-     * @param request    저장 요청 (content)
-     */
-    @Transactional
-    public void saveDiagram(String loginId, Long teamId, Long projectId, Long diagramId, SaveDiagramRequest request) {
-        saveDiagram(loginId, teamId, projectId, diagramId, request, SaveSource.YJS_BACKUP);
+        return DiagramDetailResponse.from(diagram, project.getId(), hasSnapshot);
     }
 
     /**
@@ -149,34 +151,15 @@ public class DiagramService {
      * @param projectId  프로젝트 ID
      * @param diagramId  다이어그램 ID
      * @param request    저장 요청 (content)
-     * @param source     저장 원본 구분
      */
     @Transactional
-    public void saveDiagram(
-        String loginId,
-        Long teamId,
-        Long projectId,
-        Long diagramId,
-        SaveDiagramRequest request,
-        SaveSource source
-    ) {
+    public void saveDiagram(String loginId, Long teamId, Long projectId, Long diagramId, SaveDiagramRequest request) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
 
-        switch (source) {
-            case YJS_BACKUP -> {
-                diagram.updateContent(request.content());
-                diagram.incrementContentRevision();
-            }
-            case NON_YJS_UPDATE -> {
-                if (roomManager.getSessionCount(diagramId) > 0) {
-                    throw new ConflictException(MessageCode.ERROR_BUSINESS_DIAGRAM_SAVE_WHILE_EDITING.code());
-                }
-                diagram.updateContent(request.content());
-                diagram.incrementContentRevision();
-                diagram.nullifySnapshot();
-            }
-        }
+        diagram.updateContent(request.content());
+        // content 저장 직후 stale snapshot 우선 로딩을 피하기 위해 기존 스냅샷을 무효화한다.
+        diagram.updateYdocSnapshot(null);
     }
 
     /**
@@ -231,13 +214,13 @@ public class DiagramService {
         }
 
         final var dictionarySet = dictionarySetService.findByTeamAndId(project.getTeam(), request.dictionarySetId());
-        final var counts = dictionaryBindingService.invalidateBindings(diagram, dictionarySet);
+        final var invalidationCounts = invalidateDictionaryBindings(diagram, dictionarySet);
         diagram.changeDictionarySet(dictionarySet);
-        diagram.nullifySnapshot();
+        diagram.updateYdocSnapshot(null);
         return new UpdateDiagramDictionarySetResponse(
             dictionarySet.getId(),
-            counts.invalidatedTermBindingCount(),
-            counts.invalidatedDomainBindingCount()
+            invalidationCounts.invalidatedTermBindingCount(),
+            invalidationCounts.invalidatedDomainBindingCount()
         );
     }
 
@@ -309,4 +292,183 @@ public class DiagramService {
             .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_DIAGRAM.code(), diagramId));
     }
 
+    /**
+     * 다이어그램 content의 term/domain 바인딩을 대상 세트 기준으로 정리한다.
+     *
+     * <p>세트에 존재하지 않는 termId/domainId는 제거한다.</p>
+     *
+     * @param diagram   대상 다이어그램
+     * @param targetSet 변경 대상 사전 세트
+     * @return 무효화 카운트
+     */
+    private InvalidationCounts invalidateDictionaryBindings(Diagram diagram, DictionarySet targetSet) {
+        final var content = diagram.getContent();
+        if (AppStringUtils.isBlank(content)) {
+            return InvalidationCounts.empty();
+        }
+
+        final Set<Long> validTermIds = termRepository
+            .findByDictionarySet(targetSet)
+            .stream()
+            .map((term) -> term.getId())
+            .collect(Collectors.toSet());
+        final Set<Long> validDomainIds = domainRepository
+            .findByDictionarySet(targetSet)
+            .stream()
+            .map((domain) -> domain.getId())
+            .collect(Collectors.toSet());
+
+        try {
+            final var rootNode = objectMapper.readTree(content);
+            if (!(rootNode instanceof ObjectNode rootObject)) {
+                return InvalidationCounts.empty();
+            }
+
+            final var counts = invalidateRootAndNodes(rootObject, validTermIds, validDomainIds);
+
+            if (counts.invalidatedTermBindingCount() > 0 || counts.invalidatedDomainBindingCount() > 0) {
+                diagram.updateContent(objectMapper.writeValueAsString(rootObject));
+            }
+            return counts;
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to invalidate dictionary bindings for diagramId={}", diagram.getId(), e);
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_DIAGRAM_CONTENT_INVALID_JSON.code());
+        }
+    }
+
+    /**
+     * 루트 객체와 노드 배열의 바인딩을 무효화한다.
+     *
+     * @param rootObject    JSON 루트 객체
+     * @param validTermIds  유효한 용어 ID 집합
+     * @param validDomainIds 유효한 도메인 ID 집합
+     * @return 무효화 카운트
+     */
+    private InvalidationCounts invalidateRootAndNodes(
+        ObjectNode rootObject,
+        Set<Long> validTermIds,
+        Set<Long> validDomainIds
+    ) {
+        var invalidatedTermBindingCount = 0;
+        var invalidatedDomainBindingCount = 0;
+
+        final var tableTermId = toLongValue(rootObject.path("tableTermId"));
+        if (tableTermId != null && !validTermIds.contains(tableTermId)) {
+            rootObject.remove("tableTermId");
+            invalidatedTermBindingCount++;
+        }
+
+        final var nodesNode = rootObject.get("nodes");
+        if (nodesNode instanceof ArrayNode nodesArray) {
+            for (final var node : nodesArray) {
+                if (!(node instanceof ObjectNode nodeObject)) {
+                    continue;
+                }
+                final var nodeCounts = invalidateNodeBindings(nodeObject, validTermIds, validDomainIds);
+                invalidatedTermBindingCount += nodeCounts.invalidatedTermBindingCount();
+                invalidatedDomainBindingCount += nodeCounts.invalidatedDomainBindingCount();
+            }
+        }
+
+        return new InvalidationCounts(invalidatedTermBindingCount, invalidatedDomainBindingCount);
+    }
+
+    /**
+     * 개별 노드의 data 객체에서 term/domain 바인딩을 무효화한다.
+     *
+     * @param nodeObject     노드 JSON 객체
+     * @param validTermIds   유효한 용어 ID 집합
+     * @param validDomainIds 유효한 도메인 ID 집합
+     * @return 무효화 카운트
+     */
+    private InvalidationCounts invalidateNodeBindings(
+        ObjectNode nodeObject,
+        Set<Long> validTermIds,
+        Set<Long> validDomainIds
+    ) {
+        final var dataNode = nodeObject.get("data");
+        if (!(dataNode instanceof ObjectNode dataObject)) {
+            return InvalidationCounts.empty();
+        }
+
+        var invalidatedTermBindingCount = 0;
+        var invalidatedDomainBindingCount = 0;
+
+        final var tableTermId = toLongValue(dataObject.get("tableTermId"));
+        if (tableTermId != null && !validTermIds.contains(tableTermId)) {
+            dataObject.remove("tableTermId");
+            invalidatedTermBindingCount++;
+        }
+
+        final var columnsNode = dataObject.get("columns");
+        if (columnsNode instanceof ArrayNode columnsArray) {
+            final var columnCounts = invalidateColumnBindings(columnsArray, validTermIds, validDomainIds);
+            invalidatedTermBindingCount += columnCounts.invalidatedTermBindingCount();
+            invalidatedDomainBindingCount += columnCounts.invalidatedDomainBindingCount();
+        }
+
+        return new InvalidationCounts(invalidatedTermBindingCount, invalidatedDomainBindingCount);
+    }
+
+    /**
+     * 컬럼 배열에서 term/domain 바인딩을 무효화한다.
+     *
+     * @param columnsArray   컬럼 JSON 배열
+     * @param validTermIds   유효한 용어 ID 집합
+     * @param validDomainIds 유효한 도메인 ID 집합
+     * @return 무효화 카운트
+     */
+    private InvalidationCounts invalidateColumnBindings(
+        ArrayNode columnsArray,
+        Set<Long> validTermIds,
+        Set<Long> validDomainIds
+    ) {
+        var invalidatedTermBindingCount = 0;
+        var invalidatedDomainBindingCount = 0;
+
+        for (final var columnNode : columnsArray) {
+            if (!(columnNode instanceof ObjectNode columnObject)) {
+                continue;
+            }
+
+            final var termId = toLongValue(columnObject.get("termId"));
+            if (termId != null && !validTermIds.contains(termId)) {
+                columnObject.remove("termId");
+                invalidatedTermBindingCount++;
+            }
+
+            final var domainId = toLongValue(columnObject.get("domainId"));
+            if (domainId != null && !validDomainIds.contains(domainId)) {
+                columnObject.remove("domainId");
+                invalidatedDomainBindingCount++;
+            }
+        }
+
+        return new InvalidationCounts(invalidatedTermBindingCount, invalidatedDomainBindingCount);
+    }
+
+    @Nullable
+    private Long toLongValue(JsonNode valueNode) {
+        if (valueNode == null || valueNode.isNull()) {
+            return null;
+        }
+        if (valueNode.canConvertToLong()) {
+            return valueNode.longValue();
+        }
+        if (valueNode.isTextual()) {
+            try {
+                return Long.parseLong(valueNode.textValue());
+            } catch (NumberFormatException e) {
+                log.trace("텍스트를 Long으로 변환 불가: '{}'", valueNode.textValue(), e);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private record InvalidationCounts(int invalidatedTermBindingCount, int invalidatedDomainBindingCount) {
+        private static InvalidationCounts empty() {
+            return new InvalidationCounts(0, 0);
+        }
+    }
 }

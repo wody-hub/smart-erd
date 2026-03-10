@@ -8,9 +8,8 @@ import { useSnapshotCompaction } from '@/hooks/useSnapshotCompaction';
 import { requestWsTicket } from '@/api/diagramApi';
 import type { DiagramDetail } from '@/types/diagram';
 import type { ConnectionStatus } from '@/types/collaboration';
-import { ENABLE_API_PREVIEW } from '@/constants/feature-flags';
 
-/** WS 스냅샷이 도착하지 않을 때 JSON content로 폴백하기까지의 대기 시간 (ms) — feature flag OFF 전용 */
+/** WS 스냅샷이 도착하지 않을 때 JSON content로 폴백하기까지의 대기 시간 (ms) */
 const WS_SNAPSHOT_FALLBACK_MS = 5_000;
 
 /**
@@ -62,9 +61,8 @@ export function useYjsCollaboration(
     const ydoc = new Y.Doc();
 
     // 2. 기존 JSON 데이터 마이그레이션 (ydocSnapshot이 없는 레거시 다이어그램용)
-    // feature flag ON: useDiagramSyncStage에서 제어하므로 즉시 마이그레이션 생략
-    // feature flag OFF: 기존 동작 유지
-    if (!ENABLE_API_PREVIEW && diagram.content && !diagram.hasYdocSnapshot) {
+    // Y.Doc 스냅샷은 WS 연결 후 SNAPSHOT_REQUEST로 서버에서 로드
+    if (diagram.content && !diagram.hasYdocSnapshot) {
       migrateJsonToYDoc(ydoc, diagram.content);
     }
 
@@ -75,7 +73,6 @@ export function useYjsCollaboration(
     const provider = new YjsProvider(ydoc, {
       diagramId,
       getTicket,
-      protocolVersion: ENABLE_API_PREVIEW ? 2 : 1,
     });
 
     provider.onConnectionStatusChange = (status: ConnectionStatus) => {
@@ -115,9 +112,8 @@ export function useYjsCollaboration(
     providerRef.current = provider;
 
     // 5. hasYdocSnapshot === true인데 WS 스냅샷이 도착하지 않으면 JSON content로 폴백
-    // feature flag ON: useDiagramSyncStage에서 타임아웃/재시도를 관리하므로 폴백 타이머 비활성화
     let snapshotFallbackTimer: ReturnType<typeof setTimeout> | null = null;
-    if (!ENABLE_API_PREVIEW && diagram.hasYdocSnapshot && diagram.content) {
+    if (diagram.hasYdocSnapshot && diagram.content) {
       snapshotFallbackTimer = setTimeout(() => {
         snapshotFallbackTimer = null;
         if (getTablesMap(ydoc).size === 0) {

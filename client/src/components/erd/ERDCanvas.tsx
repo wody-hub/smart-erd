@@ -19,7 +19,6 @@ import { toast } from 'sonner';
 import useCanvasStore from '@/stores/useCanvasStore';
 import { extractColId } from '@/lib/handle-id';
 import type { TableNodeData } from '@/types/erd';
-import type { SyncStage } from '@/types/diagram';
 import type { YjsProvider } from '@/collaboration/YjsProvider';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { applyDagreLayout } from '@/lib/auto-layout';
@@ -74,12 +73,6 @@ interface ERDCanvasProps {
   onToggleValidation?: () => void;
   /** 편집 가능 여부 (VIEWER일 때 false) */
   canEdit?: boolean;
-  /** 현재 동기화 단계 */
-  syncStage?: SyncStage;
-  /** preview용 노드 배열 (API JSON 파싱 결과) */
-  previewNodes?: Node<TableNodeData>[];
-  /** preview용 엣지 배열 (API JSON 파싱 결과) */
-  previewEdges?: Edge[];
   /** 코드 에디터 활성 여부 */
   codeEditorActive?: boolean;
   /** 코드 에디터 토글 핸들러 */
@@ -124,9 +117,6 @@ function ERDCanvas({
   validationOpen,
   onToggleValidation,
   canEdit = true,
-  syncStage = 'yjs-live',
-  previewNodes: previewNodesProp,
-  previewEdges: previewEdgesProp,
   codeEditorActive,
   onToggleCodeEditor,
   isSidebarResizing = false,
@@ -187,40 +177,26 @@ function ERDCanvas({
 
   /** 그룹 뷰 활성 여부 */
   const isGroupView = !!activeGroupId && !!activeGroupTableIds;
-  /** preview 상태 여부 (WS handoff 전) */
-  const isPreview =
-    syncStage === 'api-preview' ||
-    syncStage === 'api-preview-empty' ||
-    syncStage === 'yjs-timeout-degraded' ||
-    syncStage === 'yjs-failed-readonly';
-  /** 그룹 뷰 또는 preview 중에서는 모든 편집 기능을 차단한다. */
-  const effectiveCanEdit = canEdit && !isGroupView && !isPreview;
+  /** 그룹 뷰에서는 모든 편집 기능을 차단한다. */
+  const effectiveCanEdit = canEdit && !isGroupView;
 
   /** 그룹 뷰일 때 필터링된 노드, 아닐 때 전체 노드 */
   const displayNodes = useMemo(() => {
-    // preview 상태에서는 API JSON으로 파싱한 preview 노드를 사용
-    if (isPreview && previewNodesProp && previewNodesProp.length > 0) {
-      return previewNodesProp;
-    }
     if (!activeGroupTableIds) {
       return nodes;
     }
     return nodes.filter((node) => activeGroupTableIds.has(node.id));
-  }, [nodes, activeGroupTableIds, isPreview, previewNodesProp]);
+  }, [nodes, activeGroupTableIds]);
 
   /** 그룹 뷰일 때 양쪽 노드가 모두 속한 엣지만 노출한다. */
   const displayEdges = useMemo(() => {
-    // preview 상태에서는 API JSON으로 파싱한 preview 엣지를 사용
-    if (isPreview && previewEdgesProp && previewEdgesProp.length > 0) {
-      return previewEdgesProp;
-    }
     if (!activeGroupTableIds) {
       return edges;
     }
     return edges.filter(
       (edge) => activeGroupTableIds.has(edge.source) && activeGroupTableIds.has(edge.target),
     );
-  }, [edges, activeGroupTableIds, isPreview, previewEdgesProp]);
+  }, [edges, activeGroupTableIds]);
 
   // 그룹 뷰 전환 시 필터링된 노드에 맞춰 뷰포트를 보정한다.
   useEffect(() => {
@@ -231,20 +207,6 @@ function ERDCanvas({
       reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
     });
   }, [activeGroupId, displayNodes.length, isGroupView, reactFlowInstance]);
-
-  /** 이전 syncStage ref (yjs-live 전환 감지용) */
-  const prevSyncStageRef = useRef(syncStage);
-
-  // preview → yjs-live 전환 시 fitView로 뷰포트 보정
-  useEffect(() => {
-    const prev = prevSyncStageRef.current;
-    prevSyncStageRef.current = syncStage;
-    if (prev !== 'yjs-live' && syncStage === 'yjs-live') {
-      requestAnimationFrame(() => {
-        reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
-      });
-    }
-  }, [syncStage, reactFlowInstance]);
 
   /**
    * 엣지에 대한 삭제 다이얼로그를 여는 공통 함수.
@@ -396,7 +358,7 @@ function ERDCanvas({
 
   return (
     <div
-      className={cn('w-full h-full', isPreview && displayNodes.length > 0 && 'opacity-70')}
+      className="w-full h-full"
       ref={canvasRef}
       role={isGroupView ? 'region' : undefined}
       aria-label={

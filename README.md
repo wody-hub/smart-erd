@@ -8,24 +8,24 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 
 ## 기술 스택
 
-| 계층        | 기술                                                                           |
-| ----------- | ------------------------------------------------------------------------------ |
-| Backend     | Spring Boot 3.5.11, Java 25, Gradle 8.12, Spring Security 6.x, Spring Data JPA |
-| 인증        | Spring OAuth2 Resource Server (HMAC-SHA256 JWT), BCrypt                        |
-| 쿼리        | QueryDSL 5.1.0:jakarta, Blaze-Persistence 1.6.17                               |
-| DB          | PostgreSQL 17 (Docker), Testcontainers (test), `ddl-auto: update`              |
-| Frontend    | React 19, TypeScript 5.6, Vite 6, Tailwind CSS 3.4, shadcn/ui                  |
-| 데이터 페칭 | @tanstack/react-query 5 (useQuery, useMutation, 캐시 무효화)                   |
-| API 문서    | springdoc-openapi (Swagger UI)                                                 |
-| ERD 캔버스  | @xyflow/react 12, Zustand 5                                                    |
-| 자동 배치   | dagre 0.8                                                                |
-| 에디터      | @monaco-editor/react 4.6                                                       |
-| 단축키      | react-hotkeys-hook 5                                                           |
+| 계층        | 기술                                                                                      |
+| ----------- | ----------------------------------------------------------------------------------------- |
+| Backend     | Spring Boot 3.5.11, Java 25, Gradle 8.12, Spring Security 6.x, Spring Data JPA            |
+| 인증        | Spring OAuth2 Resource Server (HMAC-SHA256 JWT), BCrypt                                   |
+| 쿼리        | QueryDSL 5.1.0:jakarta, Blaze-Persistence 1.6.17                                          |
+| DB          | PostgreSQL 17 (Docker), Testcontainers (test), `ddl-auto: update`                         |
+| Frontend    | React 19, TypeScript 5.6, Vite 6, Tailwind CSS 3.4, shadcn/ui                             |
+| 데이터 페칭 | @tanstack/react-query 5 (useQuery, useMutation, 캐시 무효화)                              |
+| API 문서    | springdoc-openapi (Swagger UI)                                                            |
+| ERD 캔버스  | @xyflow/react 12, Zustand 5                                                               |
+| 자동 배치   | dagre 0.8                                                                                 |
+| 에디터      | @monaco-editor/react 4.6                                                                  |
+| 단축키      | react-hotkeys-hook 5                                                                      |
 | 다국어      | i18next, react-i18next, i18next-browser-languagedetector (FE) + Spring MessageSource (BE) |
-| SQL 로깅    | p6spy-spring-boot-starter 1.12.1 (바인딩 파라미터 포함 SQL 로깅)               |
-| 토스트      | Sonner                                                                         |
-| 포맷팅      | Prettier (Java + TypeScript 통합), prettier-plugin-java                        |
-| 코드 품질   | ESLint, SonarQube / SonarLint                                                  |
+| SQL 로깅    | p6spy-spring-boot-starter 1.12.1 (바인딩 파라미터 포함 SQL 로깅)                          |
+| 토스트      | Sonner                                                                                    |
+| 포맷팅      | Prettier (Java + TypeScript 통합), prettier-plugin-java                                   |
+| 코드 품질   | ESLint, SonarQube / SonarLint                                                             |
 
 ## 시작하기
 
@@ -53,18 +53,81 @@ npm run perf:erd:apply:sample  # 저장소 샘플 리포트 갱신 (client/perf-
 
 ### 환경변수
 
-| 변수 | 설명 | 기본값 |
-| ---------------------- | -------------------- | -------------------------------------- |
-| `SMART_ERD_JWT_SECRET` | JWT 서명 키 (Base64) | 개발용 기본값 내장 (`application.yml`) |
-| `SMART_ERD_WEBSOCKET_SNAPSHOT_FLUSH_INTERVAL` | Y.Doc 스냅샷 DB flush 주기(ms) | `5000` |
-| `SMART_ERD_WEBSOCKET_SHUTDOWN_FLUSH_TIMEOUT_MILLIS` | 서버 종료 시 Y.Doc flush 최대 대기(ms) | `15000` |
-| `SMART_ERD_SHUTDOWN_PHASE_TIMEOUT` | Spring graceful shutdown phase timeout | `20s` |
-| `VITE_ENABLE_DIAGRAM_API_PREVIEW` | 다이어그램 API preview 활성화 여부 (`false`면 비활성) | `true` |
-| `VITE_ERD_AUTOSAVE_INTERVAL_MS` | 주기 autosave 간격(ms) | `30000` |
-| `VITE_ERD_AUTOSAVE_IDLE_MS` | 변경 후 idle autosave 대기(ms) | `5000` |
-| `VITE_ERD_DIFF_APPLY_MODE` | Diff Apply rollout 모드 (`off/internal/beta/all`) | `off` |
-| `VITE_ERD_DIFF_APPLY_BETA_PERCENT` | beta 모드 대상 비율(0~100) | `10` |
-| `VITE_ERD_DIFF_APPLY_INTERNAL_IDS` | internal 모드 허용 loginId 목록(csv) | 빈 값 |
+| 변수                                                | 설명                                                  | 기본값                                    |
+| --------------------------------------------------- | ----------------------------------------------------- | ----------------------------------------- |
+| `SMART_ERD_JWT_SECRET`                              | JWT 서명 키 (Base64)                                  | 개발용 기본값 내장 (`application.yml`)    |
+| `SMART_ERD_WEBSOCKET_SNAPSHOT_FLUSH_INTERVAL`       | Y.Doc 스냅샷 DB flush 주기(ms)                        | `5000`                                    |
+| `SMART_ERD_WEBSOCKET_SHUTDOWN_FLUSH_TIMEOUT_MILLIS` | 서버 종료 시 Y.Doc flush 최대 대기(ms)                | `15000`                                   |
+| `SMART_ERD_SHUTDOWN_PHASE_TIMEOUT`                  | Spring graceful shutdown phase timeout                | `20s`                                     |
+| `VITE_ENABLE_DIAGRAM_API_PREVIEW`                   | 다이어그램 API preview 활성화 여부 (`false`면 비활성) | `true`                                    |
+| `VITE_ERD_AUTOSAVE_INTERVAL_MS`                     | 주기 autosave 간격(ms)                                | `30000`                                   |
+| `VITE_ERD_AUTOSAVE_IDLE_MS`                         | 변경 후 idle autosave 대기(ms)                        | `5000`                                    |
+| `VITE_ERD_DIFF_APPLY_MODE`                          | Diff Apply rollout 모드 (`off/internal/beta/all`)     | `off`                                     |
+| `VITE_ERD_DIFF_APPLY_BETA_PERCENT`                  | beta 모드 대상 비율(0~100)                            | `10`                                      |
+| `VITE_ERD_DIFF_APPLY_INTERNAL_IDS`                  | internal 모드 허용 loginId 목록(csv)                  | 빈 값                                     |
+| `SMART_ERD_E2E_LOGIN`                               | Playwright E2E 로그인 ID                              | 없음                                      |
+| `SMART_ERD_E2E_PASSWORD`                            | Playwright E2E 비밀번호                               | 없음                                      |
+| `SMART_ERD_E2E_BASE_URL`                            | Playwright 대상 프런트 주소                           | `http://localhost:3000`                   |
+| `SMART_ERD_E2E_API_URL`                             | Playwright 대상 API 주소                              | `http://localhost:8190/api`               |
+| `SMART_ERD_E2E_TEAM_ID`                             | 고정 smoke/recovery 대상 팀 ID                        | 자동 탐색                                 |
+| `SMART_ERD_E2E_PROJECT_ID`                          | 고정 smoke/recovery 대상 프로젝트 ID                  | 자동 탐색                                 |
+| `SMART_ERD_E2E_DIAGRAM_ID`                          | 고정 smoke/recovery 대상 다이어그램 ID                | 자동 탐색                                 |
+| `SMART_ERD_E2E_BACKEND_PORT`                        | recovery 테스트가 재기동할 백엔드 포트                | `8190`                                    |
+| `SMART_ERD_E2E_BACKEND_RESTART_CMD`                 | recovery 테스트 백엔드 재기동 명령                    | `./gradlew bootRun`                       |
+| `SMART_ERD_E2E_BOOT_LOG_PATH`                       | recovery 재기동 로그 파일 경로                        | `/tmp/smart-erd-e2e-recovery-backend.log` |
+| `SMART_ERD_E2E_BROWSER_CHANNEL`                     | Playwright 브라우저 채널 강제값 (`chrome` 등)         | Playwright 기본 Chromium                  |
+
+## Playwright E2E 운영
+
+무거운 회귀와 가벼운 회귀를 분리해서 관리한다.
+
+### 가벼운 smoke
+
+- 목적: 로그인 후 실제 다이어그램 첫 진입이 가능한지 빠르게 확인
+- 범위: 로그인, 다이어그램 진입, 첫 노드 렌더 확인
+- 권장 시점: 프런트 UI/라우팅/로딩 UX 수정 후, PR 전 기본 확인
+
+```bash
+cd client
+SMART_ERD_E2E_LOGIN='your-login-id' \
+SMART_ERD_E2E_PASSWORD='your-password' \
+npm run test:e2e:smoke
+```
+
+### 무거운 recovery
+
+- 목적: 편집 내용이 백업되고 백엔드 graceful restart 이후에도 유지되는지 확인
+- 범위: 로그인, 노드 이동, 백업, 서버 재기동, 복구 확인, 원복
+- 권장 시점: Yjs, snapshot, autosave, websocket, shutdown 관련 수정 후
+- 주의: 실제 백엔드 프로세스를 재기동하므로 단독 실행을 권장
+
+```bash
+cd client
+SMART_ERD_E2E_LOGIN='your-login-id' \
+SMART_ERD_E2E_PASSWORD='your-password' \
+npm run test:e2e:recovery
+```
+
+### 대상 다이어그램 고정 권장
+
+자동 탐색도 가능하지만, 정식 운영 시에는 전용 팀/프로젝트/다이어그램을 고정하는 편이 안정적이다.
+
+```bash
+cd client
+SMART_ERD_E2E_LOGIN='your-login-id' \
+SMART_ERD_E2E_PASSWORD='your-password' \
+SMART_ERD_E2E_TEAM_ID='team-id' \
+SMART_ERD_E2E_PROJECT_ID='project-id' \
+SMART_ERD_E2E_DIAGRAM_ID='diagram-id' \
+npm run test:e2e:smoke
+```
+
+### 운영 규칙
+
+- `smoke`는 자주 돌리고, `recovery`는 저장/재기동 관련 변경 때만 돌린다.
+- `recovery`는 공용 데이터 충돌을 막기 위해 전용 다이어그램을 두는 편이 낫다.
+- 브라우저 채널을 강제하지 않으면 Playwright 기본 Chromium을 사용한다.
+- 실패 산출물은 `client/playwright-report/`, `client/test-results/`에 남는다.
 
 ## 프로젝트 구조
 
@@ -255,13 +318,13 @@ client/
 
 프로젝트 전반에서 모던 Java 기능을 적극 활용한다.
 
-| 기능                          | 적용 범위                       | 예시                                                                          |
-| ----------------------------- | ------------------------------- | ----------------------------------------------------------------------------- |
+| 기능                                      | 적용 범위                                                                    | 예시                                                                          |
+| ----------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | `var` / `final var` (지역 변수 타입 추론) | 서비스, 설정 클래스의 지역 변수. 재할당 없으면 `final var`, 재할당하면 `var` | `final var user = findUserByLoginId(loginId);`                                |
-| `record` (불변 데이터 클래스) | DTO, 복합키 클래스              | `public record TeamMemberId(Long team, Long user) implements Serializable {}` |
-| `List.of()`                   | 불변 빈 컬렉션                  | `List.of()` (~~`Collections.emptyList()`~~ 사용 금지)                         |
-| Stream API                    | 컬렉션 변환, 필터링             | `.stream().map(ProjectResponse::from).toList()`                               |
-| Optional                      | JPA 단건 조회 결과 처리         | `.findByLoginId(id).orElseThrow(() -> ...)`                                   |
+| `record` (불변 데이터 클래스)             | DTO, 복합키 클래스                                                           | `public record TeamMemberId(Long team, Long user) implements Serializable {}` |
+| `List.of()`                               | 불변 빈 컬렉션                                                               | `List.of()` (~~`Collections.emptyList()`~~ 사용 금지)                         |
+| Stream API                                | 컬렉션 변환, 필터링                                                          | `.stream().map(ProjectResponse::from).toList()`                               |
+| Optional                                  | JPA 단건 조회 결과 처리                                                      | `.findByLoginId(id).orElseThrow(() -> ...)`                                   |
 
 #### Import 규칙
 
@@ -309,12 +372,12 @@ import jakarta.persistence.Id;
 
 `IllegalArgumentException` 등 범용 예외 대신 도메인별 커스텀 예외를 사용한다.
 
-| 예외 클래스               | HTTP 상태       | 용도                                       |
-| ------------------------- | --------------- | ------------------------------------------ |
-| `EntityNotFoundException` | 404 Not Found   | 엔티티 조회 실패                           |
+| 예외 클래스                   | HTTP 상태       | 용도                                       |
+| ----------------------------- | --------------- | ------------------------------------------ |
+| `EntityNotFoundException`     | 404 Not Found   | 엔티티 조회 실패                           |
 | `DomainAccessDeniedException` | 403 Forbidden   | 권한 부족 (팀 미소속, ADMIN 아님)          |
-| `DuplicateException`      | 409 Conflict    | 중복 리소스 (팀 멤버 중복, 로그인 ID 중복) |
-| `BusinessException`       | 400 Bad Request | 비즈니스 규칙 위반 (소유자 제거 시도 등)   |
+| `DuplicateException`          | 409 Conflict    | 중복 리소스 (팀 멤버 중복, 로그인 ID 중복) |
+| `BusinessException`           | 400 Bad Request | 비즈니스 규칙 위반 (소유자 제거 시도 등)   |
 
 모든 예외는 `LocalizedException(messageCode, messageArgs...)` 을 상속하며, `domain/common/exception/` 패키지에 위치한다. `GlobalExceptionHandler`가 `MessageSource`를 통해 요청 로케일에 맞는 다국어 메시지로 변환하여 HTTP 응답으로 반환한다.
 
@@ -372,7 +435,8 @@ teamMemberRepository.save(newMember);
 // Good — @NonNull + Objects.requireNonNull
 public Team findById(@NonNull Long id) {
     final var nonNullId = Objects.requireNonNull(id, "id must not be null");
-    return teamRepository.findByIdWithOwner(nonNullId)
+    return teamRepository
+        .findByIdWithOwner(nonNullId)
         .orElseThrow(() -> new EntityNotFoundException("error.not-found.team", nonNullId));
 }
 ```
@@ -502,21 +566,21 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 
 페이지 컴포넌트 내부의 코드는 다음 순서로 그룹핑하여 정렬한다:
 
-| 순번 | 그룹 | 예시 |
-|------|------|------|
-| 1 | URL 파라미터 | `useParams` |
-| 2 | 라우터 훅 | `useNavigate` |
-| 3 | Query Client | `useQueryClient` |
-| 3.5 | 다국어 | `useTranslation` |
-| 4 | 로컬 상태 | `useState` |
-| 5 | 스토어 셀렉터 | `useCanvasStore`, `useAuthStore` |
-| 6 | 파생값/상수 | computed values |
-| 7 | 쿼리 | `useQuery` |
-| 8 | 뮤테이션 | `useMutation` |
-| 9 | 이벤트 핸들러 | `handleSave`, `handleSubmit` 등 |
-| 10 | 사이드 이펙트 | `useEffect` |
-| 11 | 조건부 리턴 | loading/error early return |
-| 12 | JSX | `return (...)` |
+| 순번 | 그룹          | 예시                             |
+| ---- | ------------- | -------------------------------- |
+| 1    | URL 파라미터  | `useParams`                      |
+| 2    | 라우터 훅     | `useNavigate`                    |
+| 3    | Query Client  | `useQueryClient`                 |
+| 3.5  | 다국어        | `useTranslation`                 |
+| 4    | 로컬 상태     | `useState`                       |
+| 5    | 스토어 셀렉터 | `useCanvasStore`, `useAuthStore` |
+| 6    | 파생값/상수   | computed values                  |
+| 7    | 쿼리          | `useQuery`                       |
+| 8    | 뮤테이션      | `useMutation`                    |
+| 9    | 이벤트 핸들러 | `handleSave`, `handleSubmit` 등  |
+| 10   | 사이드 이펙트 | `useEffect`                      |
+| 11   | 조건부 리턴   | loading/error early return       |
+| 12   | JSX           | `return (...)`                   |
 
 같은 그룹 내에서는 선언 순서를 자유롭게 하되, **그룹 간 순서는 반드시 준수**한다.
 
@@ -567,11 +631,11 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 
 **백엔드:**
 
-| 패키지           | 역할                 | 포함 요소                                     |
-| ---------------- | -------------------- | --------------------------------------------- |
-| `api/`           | HTTP 인터페이스 계층 | Controller, DTO (record)                      |
-| `domain/`        | 비즈니스 도메인 계층 | Entity, Repository, Service                   |
-| `domain/common/` | 공통 코드            | BaseTimeEntity, 커스텀 예외                   |
+| 패키지           | 역할                 | 포함 요소                                                         |
+| ---------------- | -------------------- | ----------------------------------------------------------------- |
+| `api/`           | HTTP 인터페이스 계층 | Controller, DTO (record)                                          |
+| `domain/`        | 비즈니스 도메인 계층 | Entity, Repository, Service                                       |
+| `domain/common/` | 공통 코드            | BaseTimeEntity, 커스텀 예외                                       |
 | `config/`        | 설정                 | Security, JWT, CORS, Locale, Validation, OpenAPI, QueryDSL, Blaze |
 
 - DTO는 Java `record`로 작성, `@Valid` 검증 포함
@@ -580,21 +644,21 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 
 **프론트엔드:**
 
-| 디렉토리             | 역할                                                                 |
-| -------------------- | -------------------------------------------------------------------- |
-| `api/`               | 도메인별 API 모듈. 페이지에서 axiosInstance 직접 호출 금지           |
-| `constants/`         | 상수 정의 (localStorage 키, 라우트 경로, 쿼리 키)                    |
-| `hooks/`             | 재사용 커스텀 훅 (2+ 컴포넌트에서 반복 시 추출)                      |
-| `lib/`               | 순수 유틸리티 함수 및 설정 (api-error, query-client, utils)          |
-| `types/`             | 도메인별 공유 TypeScript 타입 정의                                   |
-| `components/ui/`     | 범용 재사용 컴포넌트 (shadcn/ui + 공유 다이얼로그). 도메인 로직 금지 |
-| `components/team/`   | 팀 도메인 전용 컴포넌트 (MembersDialog)                              |
-| `components/dictionary/` | 사전 도메인 전용 컴포넌트 (DomainTab, TermTab, 폼 다이얼로그)    |
-| `components/auth/`   | 인증 관련 컴포넌트 (ProtectedRoute)                                  |
-| `components/erd/`    | ERD 도메인 전용 컴포넌트                                             |
-| `components/layout/` | 페이지 구조 컴포넌트 (Header, Sidebar)                               |
-| `pages/`             | 도메인별 서브디렉토리(`auth/`, `team/`, `project/`, `dictionary/`, `diagram/`)로 페이지 관리 |
-| `stores/`            | Zustand 클라이언트 상태 관리 (`use` prefix)                          |
+| 디렉토리                 | 역할                                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------------- |
+| `api/`                   | 도메인별 API 모듈. 페이지에서 axiosInstance 직접 호출 금지                                   |
+| `constants/`             | 상수 정의 (localStorage 키, 라우트 경로, 쿼리 키)                                            |
+| `hooks/`                 | 재사용 커스텀 훅 (2+ 컴포넌트에서 반복 시 추출)                                              |
+| `lib/`                   | 순수 유틸리티 함수 및 설정 (api-error, query-client, utils)                                  |
+| `types/`                 | 도메인별 공유 TypeScript 타입 정의                                                           |
+| `components/ui/`         | 범용 재사용 컴포넌트 (shadcn/ui + 공유 다이얼로그). 도메인 로직 금지                         |
+| `components/team/`       | 팀 도메인 전용 컴포넌트 (MembersDialog)                                                      |
+| `components/dictionary/` | 사전 도메인 전용 컴포넌트 (DomainTab, TermTab, 폼 다이얼로그)                                |
+| `components/auth/`       | 인증 관련 컴포넌트 (ProtectedRoute)                                                          |
+| `components/erd/`        | ERD 도메인 전용 컴포넌트                                                                     |
+| `components/layout/`     | 페이지 구조 컴포넌트 (Header, Sidebar)                                                       |
+| `pages/`                 | 도메인별 서브디렉토리(`auth/`, `team/`, `project/`, `dictionary/`, `diagram/`)로 페이지 관리 |
+| `stores/`                | Zustand 클라이언트 상태 관리 (`use` prefix)                                                  |
 
 ## 엔티티 관계
 
@@ -658,13 +722,13 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 
 ### 용어 사전 (`/api/teams/{teamId}/terms/**` — 인증 필요)
 
-| Method | Path                                   | 설명      | Request Body                                           |
-| ------ | -------------------------------------- | --------- | ------------------------------------------------------ |
-| POST   | `/api/teams/{teamId}/terms`            | 용어 생성 | `{ logicalName, physicalName, domainId?, description? }` |
-| GET    | `/api/teams/{teamId}/terms`            | 용어 목록 | —                                                      |
-| GET    | `/api/teams/{teamId}/terms/{termId}`   | 용어 상세 | —                                                      |
-| PUT    | `/api/teams/{teamId}/terms/{termId}`   | 용어 수정 | `{ logicalName, physicalName, domainId?, description? }` |
-| DELETE | `/api/teams/{teamId}/terms/{termId}`   | 용어 삭제 | —                                                      |
+| Method | Path                                 | 설명      | Request Body                                             |
+| ------ | ------------------------------------ | --------- | -------------------------------------------------------- |
+| POST   | `/api/teams/{teamId}/terms`          | 용어 생성 | `{ logicalName, physicalName, domainId?, description? }` |
+| GET    | `/api/teams/{teamId}/terms`          | 용어 목록 | —                                                        |
+| GET    | `/api/teams/{teamId}/terms/{termId}` | 용어 상세 | —                                                        |
+| PUT    | `/api/teams/{teamId}/terms/{termId}` | 용어 수정 | `{ logicalName, physicalName, domainId?, description? }` |
+| DELETE | `/api/teams/{teamId}/terms/{termId}` | 용어 삭제 | —                                                        |
 
 ### Swagger UI
 
@@ -722,24 +786,24 @@ Client                                        Server
 
 **구성 요소:**
 
-| 구성 요소 | 역할 |
-|-----------|------|
-| `LocaleConfig` | `AcceptHeaderLocaleResolver` — `Accept-Language` 헤더에서 로케일 결정 (기본: en) |
-| `ValidationConfig` | `LocalValidatorFactoryBean` — Bean Validation `{key}` 보간을 `MessageSource`에 연결 |
-| `LocalizedException` | 추상 베이스 예외 — `messageCode` + `messageArgs` 보유 |
-| `GlobalExceptionHandler` | `MessageSource`로 메시지 코드를 로케일에 맞게 번역하여 반환 |
-| `messages.properties` | 영어 메시지 번들 (fallback) |
-| `messages_ko.properties` | 한국어 메시지 번들 |
+| 구성 요소                | 역할                                                                                |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| `LocaleConfig`           | `AcceptHeaderLocaleResolver` — `Accept-Language` 헤더에서 로케일 결정 (기본: en)    |
+| `ValidationConfig`       | `LocalValidatorFactoryBean` — Bean Validation `{key}` 보간을 `MessageSource`에 연결 |
+| `LocalizedException`     | 추상 베이스 예외 — `messageCode` + `messageArgs` 보유                               |
+| `GlobalExceptionHandler` | `MessageSource`로 메시지 코드를 로케일에 맞게 번역하여 반환                         |
+| `messages.properties`    | 영어 메시지 번들 (fallback)                                                         |
+| `messages_ko.properties` | 한국어 메시지 번들                                                                  |
 
 **메시지 키 규칙:**
 
-| 접두사 | 용도 | 예시 |
-|--------|------|------|
-| `error.not-found.*` | 엔티티 미존재 | `error.not-found.user` |
-| `error.access-denied.*` | 권한 부족 | `error.access-denied.not-member` |
-| `error.duplicate.*` | 중복 리소스 | `error.duplicate.login-id` |
-| `error.business.*` | 비즈니스 규칙 위반 | `error.business.remove-owner` |
-| `validation.*` | Bean Validation | `validation.not-blank.login-id` |
+| 접두사                  | 용도               | 예시                             |
+| ----------------------- | ------------------ | -------------------------------- |
+| `error.not-found.*`     | 엔티티 미존재      | `error.not-found.user`           |
+| `error.access-denied.*` | 권한 부족          | `error.access-denied.not-member` |
+| `error.duplicate.*`     | 중복 리소스        | `error.duplicate.login-id`       |
+| `error.business.*`      | 비즈니스 규칙 위반 | `error.business.remove-owner`    |
+| `validation.*`          | Bean Validation    | `validation.not-blank.login-id`  |
 
 ### 시간/타임존 정책 (UTC 표준화)
 
@@ -782,25 +846,25 @@ tailwind.config.js         →  Tailwind 시맨틱 색상 매핑 (hsl(var(--toke
 
 리스트 페이지, 폼, 다이얼로그 등 범용 UI에서 사용하는 표준 토큰:
 
-| 용도 | 토큰 예시 |
-|------|-----------|
-| 배경 | `bg-background`, `bg-card`, `bg-muted`, `bg-accent`, `bg-popover` |
-| 텍스트 | `text-foreground`, `text-muted-foreground`, `text-card-foreground` |
-| 강조/상태 | `bg-primary`, `bg-secondary`, `bg-destructive` |
-| 테두리 | `border-border`, `border-input` |
-| 인터랙션 | `hover:bg-accent`, `focus:bg-accent` |
+| 용도      | 토큰 예시                                                          |
+| --------- | ------------------------------------------------------------------ |
+| 배경      | `bg-background`, `bg-card`, `bg-muted`, `bg-accent`, `bg-popover`  |
+| 텍스트    | `text-foreground`, `text-muted-foreground`, `text-card-foreground` |
+| 강조/상태 | `bg-primary`, `bg-secondary`, `bg-destructive`                     |
+| 테두리    | `border-border`, `border-input`                                    |
+| 인터랙션  | `hover:bg-accent`, `focus:bg-accent`                               |
 
 #### ERD 전용 토큰
 
 ERD 편집기 영역(Header, Sidebar, TableNode, ERDCanvas)에서 사용하는 도메인 토큰:
 
-| 토큰 | 용도 |
-|------|------|
-| `bg-header`, `text-header-foreground`, `text-header-muted` | 상단 헤더 바 |
-| `bg-erd-table-header`, `text-erd-table-header-foreground` | 테이블 노드 헤더 |
-| `text-erd-pk`, `text-erd-fk`, `text-erd-nn` | PK/FK/NN 뱃지 |
-| `bg-erd-handle`, `border-erd-handle-border` | Handle (연결점) |
-| `text-erd-warning` | unsaved 경고 표시 |
+| 토큰                                                       | 용도              |
+| ---------------------------------------------------------- | ----------------- |
+| `bg-header`, `text-header-foreground`, `text-header-muted` | 상단 헤더 바      |
+| `bg-erd-table-header`, `text-erd-table-header-foreground`  | 테이블 노드 헤더  |
+| `text-erd-pk`, `text-erd-fk`, `text-erd-nn`                | PK/FK/NN 뱃지     |
+| `bg-erd-handle`, `border-erd-handle-border`                | Handle (연결점)   |
+| `text-erd-warning`                                         | unsaved 경고 표시 |
 
 모든 토큰은 `index.css`에 `:root` (라이트)와 `.dark` (다크) 양쪽에 정의되어 있다.
 
@@ -815,7 +879,7 @@ ERD 편집기 영역(Header, Sidebar, TableNode, ERDCanvas)에서 사용하는 �
 ### 접근성 (a11y)
 
 - **아이콘 전용 버튼**: 반드시 `aria-label` 속성을 포함한다
-- **토글 버튼**: `aria-label`에 대상 컨텍스트를 포함한다 (예: `` aria-label={`Toggle PK for ${col.name}`} ``)
+- **토글 버튼**: `aria-label`에 대상 컨텍스트를 포함한다 (예: ``aria-label={`Toggle PK for ${col.name}`}``)
 - **form 요소**: `<label>` 연결이 불가능한 경우 `aria-label`을 추가한다
 - **로딩 상태**: `Spinner` 컴포넌트 (`components/ui/spinner.tsx`)를 사용한다 — 단순 텍스트 표시 금지
 
@@ -854,11 +918,11 @@ ERD 편집기 영역(Header, Sidebar, TableNode, ERDCanvas)에서 사용하는 �
 
 #### 키보드 단축키
 
-| 단축키 | 상수 | 동작 |
-|--------|------|------|
-| `Ctrl+S` / `Cmd+S` | `KEYBINDINGS.SAVE` | 다이어그램 서버 저장 |
-| `Delete` / `Backspace` | `KEYBINDINGS.DELETE` | 선택된 엣지 삭제 다이얼로그 |
-| `Escape` | `KEYBINDINGS.ESCAPE` | FK 모드 해제, 컨텍스트 메뉴 닫기 |
+| 단축키                 | 상수                 | 동작                             |
+| ---------------------- | -------------------- | -------------------------------- |
+| `Ctrl+S` / `Cmd+S`     | `KEYBINDINGS.SAVE`   | 다이어그램 서버 저장             |
+| `Delete` / `Backspace` | `KEYBINDINGS.DELETE` | 선택된 엣지 삭제 다이얼로그      |
+| `Escape`               | `KEYBINDINGS.ESCAPE` | FK 모드 해제, 컨텍스트 메뉴 닫기 |
 
 모든 키보드 단축키는 `constants/keybindings.ts`의 `KEYBINDINGS` 상수로 관리하고 `react-hotkeys-hook`의 `useHotkeys()`를 통해 등록한다. 네이티브 `addEventListener('keydown')` + 매직 스트링(`'Escape'` 등)은 사용 금지.
 
@@ -899,7 +963,7 @@ spring:
         compose:
             lifecycle-management: start-only # 앱 종료 시 컨테이너 유지
     messages:
-        basename: i18n/messages          # 메시지 번들 경로 (i18n/messages.properties, i18n/messages_ko.properties)
+        basename: i18n/messages # 메시지 번들 경로 (i18n/messages.properties, i18n/messages_ko.properties)
         encoding: UTF-8
         fallback-to-system-locale: false # 항상 messages.properties (영어)로 fallback
     jackson:
@@ -915,9 +979,9 @@ spring:
 decorator:
     datasource:
         p6spy:
-            enable-logging: true   # p6spy 활성화 (바인딩 파라미터 포함 SQL 로깅)
-            multiline: false       # 커스텀 PrettySqlFormat이 포맷 담당
-            logging: slf4j         # SLF4J를 통해 Logback으로 출력
+            enable-logging: true # p6spy 활성화 (바인딩 파라미터 포함 SQL 로깅)
+            multiline: false # 커스텀 PrettySqlFormat이 포맷 담당
+            logging: slf4j # SLF4J를 통해 Logback으로 출력
 
 smart-erd:
     cors:
