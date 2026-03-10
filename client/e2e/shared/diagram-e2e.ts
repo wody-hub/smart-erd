@@ -1,0 +1,436 @@
+import { execSync, spawn } from 'node:child_process';
+import path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
+import net from 'node:net';
+import { expect, type Locator, type Page } from '@playwright/test';
+
+interface DiagramSummary {
+  id: number;
+  name: string;
+}
+
+interface ProjectSummary {
+  id: number;
+  name: string;
+}
+
+interface TeamSummary {
+  id: number;
+  name: string;
+}
+
+interface DiagramDetail {
+  content: string | null;
+}
+
+export interface DiagramTarget {
+  teamId: number;
+  teamName: string;
+  projectId: number;
+  projectName: string;
+  diagramId: number;
+  diagramName: string;
+}
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface E2EConfig {
+  baseUrl: string;
+  apiBaseUrl: string;
+  loginId: string;
+  password: string;
+  pinnedTeamId: number | null;
+  pinnedProjectId: number | null;
+  pinnedDiagramId: number | null;
+  backendPort: number;
+  frontendPort: number;
+  backendRestartCommand: string;
+  repoDir: string;
+  bootLogPath: string;
+}
+
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required env: ${name}`);
+  }
+  return value;
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseOptionalPositiveInt(value: string | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseTranslate(transform: string): Point {
+  const matched = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(transform);
+  if (!matched) {
+    throw new Error(`Unable to parse transform: ${transform}`);
+  }
+  return {
+    x: Number(matched[1]),
+    y: Number(matched[2]),
+  };
+}
+
+function parseScale(transform: string): number {
+  if (!transform || transform === 'none') {
+    return 1;
+  }
+  const matched = /matrix\(([^)]+)\)/.exec(transform);
+  if (!matched) {
+    return 1;
+  }
+  const values = matched[1].split(',').map((value) => Number(value.trim()));
+  return Number.isFinite(values[0]) && values[0] > 0 ? values[0] : 1;
+}
+
+async function waitForPortState(port: number, open: boolean, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const connected = await new Promise<boolean>((resolve) => {
+      const socket = net.createConnection({ port, host: '127.0.0.1' });
+      socket.once('connect', () => {
+        socket.destroy();
+        resolve(true);
+      });
+      socket.once('error', () => resolve(false));
+      socket.setTimeout(500, () => {
+        socket.destroy();
+        resolve(false);
+      });
+    });
+    if (connected === open) {
+      return;
+    }
+    await delay(250);
+  }
+
+  const state = open ? 'open' : 'closed';
+  throw new Error(`Port ${port} did not become ${state} within ${timeoutMs}ms`);
+}
+
+async function fetchJson<T>(url: string, token: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Accept-Language': 'ko',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Request failed ${response.status} for ${url}`);
+  }
+  return (await response.json()) as T;
+}
+
+function parseRenderableNodeCount(content: string | null | undefined): number {
+  if (!content) {
+    return 0;
+  }
+  try {
+    const parsed = JSON.parse(content) as { nodes?: unknown[] };
+    return Array.isArray(parsed.nodes) ? parsed.nodes.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function getE2EConfig(): E2EConfig {
+  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:3000';
+  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? 'http://localhost:8190/api';
+  const repoDir = process.env.SMART_ERD_E2E_REPO_DIR ?? path.resolve(process.cwd(), '..');
+
+  return {
+    baseUrl,
+    apiBaseUrl,
+    loginId: requireEnv('SMART_ERD_E2E_LOGIN'),
+    password: requireEnv('SMART_ERD_E2E_PASSWORD'),
+    pinnedTeamId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_TEAM_ID),
+    pinnedProjectId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_PROJECT_ID),
+    pinnedDiagramId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_DIAGRAM_ID),
+    backendPort: parsePositiveInt(process.env.SMART_ERD_E2E_BACKEND_PORT, 8190),
+    frontendPort: parsePositiveInt(process.env.SMART_ERD_E2E_FRONTEND_PORT, 3000),
+    backendRestartCommand: process.env.SMART_ERD_E2E_BACKEND_RESTART_CMD ?? './gradlew bootRun',
+    repoDir,
+    bootLogPath:
+      process.env.SMART_ERD_E2E_BOOT_LOG_PATH ?? '/tmp/smart-erd-e2e-recovery-backend.log',
+  };
+}
+
+export async function loginViaUi(page: Page, config: E2EConfig): Promise<string> {
+  await page.goto(`${config.baseUrl}/login`, { waitUntil: 'networkidle' });
+  await page.fill('#login-id', config.loginId);
+  await page.fill('#password', config.password);
+  await page.getByRole('button', { name: /로그인|login/i }).click();
+  await page.waitForURL('**/teams', { timeout: 30_000 });
+
+  const token = await page.evaluate(() => localStorage.getItem('accessToken'));
+  if (!token) {
+    throw new Error('Access token not found after login');
+  }
+  return token;
+}
+
+export async function resolveTargetDiagram(
+  token: string,
+  config: E2EConfig,
+): Promise<DiagramTarget> {
+  const teams = await fetchJson<TeamSummary[]>(`${config.apiBaseUrl}/teams`, token);
+  const explicitTarget =
+    config.pinnedTeamId !== null &&
+    config.pinnedProjectId !== null &&
+    config.pinnedDiagramId !== null;
+
+  if (explicitTarget) {
+    const team = teams.find((candidate) => candidate.id === config.pinnedTeamId);
+    if (!team) {
+      throw new Error(`Configured team ${config.pinnedTeamId} was not found for the test account`);
+    }
+
+    const projects = await fetchJson<ProjectSummary[]>(
+      `${config.apiBaseUrl}/teams/${team.id}/projects`,
+      token,
+    );
+    const project = projects.find((candidate) => candidate.id === config.pinnedProjectId);
+    if (!project) {
+      throw new Error(
+        `Configured project ${config.pinnedProjectId} was not found under team ${team.id}`,
+      );
+    }
+
+    const diagrams = await fetchJson<DiagramSummary[]>(
+      `${config.apiBaseUrl}/teams/${team.id}/projects/${project.id}/diagrams`,
+      token,
+    );
+    const diagram = diagrams.find((candidate) => candidate.id === config.pinnedDiagramId);
+    if (!diagram) {
+      throw new Error(
+        `Configured diagram ${config.pinnedDiagramId} was not found under project ${project.id}`,
+      );
+    }
+
+    return {
+      teamId: team.id,
+      teamName: team.name,
+      projectId: project.id,
+      projectName: project.name,
+      diagramId: diagram.id,
+      diagramName: diagram.name,
+    };
+  }
+
+  for (const team of teams) {
+    const projects = await fetchJson<ProjectSummary[]>(
+      `${config.apiBaseUrl}/teams/${team.id}/projects`,
+      token,
+    );
+    for (const project of projects) {
+      const diagrams = await fetchJson<DiagramSummary[]>(
+        `${config.apiBaseUrl}/teams/${team.id}/projects/${project.id}/diagrams`,
+        token,
+      );
+      for (const diagram of diagrams) {
+        const detail = await fetchJson<DiagramDetail>(
+          `${config.apiBaseUrl}/teams/${team.id}/projects/${project.id}/diagrams/${diagram.id}`,
+          token,
+        );
+        if (parseRenderableNodeCount(detail.content) > 0) {
+          return {
+            teamId: team.id,
+            teamName: team.name,
+            projectId: project.id,
+            projectName: project.name,
+            diagramId: diagram.id,
+            diagramName: diagram.name,
+          };
+        }
+      }
+    }
+  }
+
+  throw new Error('No diagram with renderable nodes found for the configured account');
+}
+
+export function diagramUrl(config: E2EConfig, target: DiagramTarget): string {
+  return `${config.baseUrl}/teams/${target.teamId}/projects/${target.projectId}/diagrams/${target.diagramId}`;
+}
+
+export async function waitForDiagramNode(
+  page: Page,
+  selector = '.react-flow__node-table',
+): Promise<Locator> {
+  const node = page.locator(selector).first();
+  await node.waitFor({ state: 'visible', timeout: 30_000 });
+  return node;
+}
+
+export async function getNodeModelPosition(locator: Locator): Promise<Point> {
+  const transform = await locator.evaluate((element) => (element as HTMLElement).style.transform);
+  return parseTranslate(transform);
+}
+
+export async function getViewportScale(page: Page): Promise<number> {
+  const transform = await page
+    .locator('.react-flow__viewport')
+    .evaluate((element) => getComputedStyle(element).transform);
+  return parseScale(transform);
+}
+
+export async function dragNodeByScreenDelta(
+  page: Page,
+  locator: Locator,
+  screenDx: number,
+  screenDy: number,
+): Promise<void> {
+  const box = await locator.boundingBox();
+  if (!box) {
+    throw new Error('Node bounding box not found');
+  }
+
+  const startX = box.x + Math.min(box.width / 2, 120);
+  const startY = box.y + 24;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  const maxDelta = Math.max(Math.abs(screenDx), Math.abs(screenDy));
+  if (maxDelta > 0 && maxDelta < 24) {
+    await page.mouse.move(
+      startX + (screenDx === 0 ? 0 : Math.sign(screenDx) * 24),
+      startY + (screenDy === 0 ? 0 : Math.sign(screenDy) * 24),
+      { steps: 6 },
+    );
+  }
+  await page.mouse.move(startX + screenDx, startY + screenDy, { steps: 12 });
+  await page.mouse.up();
+  await delay(500);
+}
+
+function toScreenDelta(modelDelta: number, scale: number): number {
+  if (Math.abs(modelDelta) <= 1) {
+    return 0;
+  }
+  return modelDelta * scale;
+}
+
+export async function dragNodeToModelPosition(
+  page: Page,
+  locator: Locator,
+  target: Point,
+  tolerance = 5,
+  maxAttempts = 4,
+): Promise<Point> {
+  let current = await getNodeModelPosition(locator);
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const remainingDx = target.x - current.x;
+    const remainingDy = target.y - current.y;
+
+    if (Math.abs(remainingDx) <= tolerance && Math.abs(remainingDy) <= tolerance) {
+      return current;
+    }
+
+    const viewportScale = await getViewportScale(page);
+    await dragNodeByScreenDelta(
+      page,
+      locator,
+      toScreenDelta(remainingDx, viewportScale),
+      toScreenDelta(remainingDy, viewportScale),
+    );
+    current = await getNodeModelPosition(locator);
+  }
+
+  return current;
+}
+
+export async function waitForEditableDiagram(page: Page, timeoutMs = 30_000): Promise<Locator> {
+  const backupButton = page.getByRole('button', { name: /백업|backup/i });
+  const retryButton = page.getByRole('button', { name: /재시도|retry/i });
+  const deadline = Date.now() + timeoutMs;
+  let manualRetryCount = 0;
+  let previousRetryVisible = false;
+
+  while (Date.now() < deadline) {
+    if (await backupButton.isVisible().catch(() => false)) {
+      return backupButton;
+    }
+
+    const retryVisible = await retryButton.isVisible().catch(() => false);
+    if (retryVisible && !previousRetryVisible && manualRetryCount < 2) {
+      await retryButton.click();
+      manualRetryCount += 1;
+      previousRetryVisible = true;
+      await delay(2_000);
+      continue;
+    }
+    previousRetryVisible = retryVisible;
+
+    await delay(1_000);
+  }
+
+  throw new Error('Diagram did not become editable within the expected time');
+}
+
+export async function clickBackup(page: Page): Promise<void> {
+  const backupButton = await waitForEditableDiagram(page, 30_000);
+  await backupButton.click();
+  await delay(1_000);
+}
+
+export async function restartBackend(config: E2EConfig): Promise<number> {
+  const pid = execSync(`lsof -nP -iTCP:${config.backendPort} -sTCP:LISTEN -t | head -n1`, {
+    encoding: 'utf-8',
+  }).trim();
+  if (!pid) {
+    throw new Error(`No backend listener found on port ${config.backendPort}`);
+  }
+
+  process.kill(Number(pid), 'SIGTERM');
+  await waitForPortState(config.backendPort, false, 20_000);
+
+  execSync(`: > ${config.bootLogPath}`, { shell: '/bin/zsh' });
+  const child = spawn(
+    '/bin/zsh',
+    ['-lc', `${config.backendRestartCommand} > ${config.bootLogPath} 2>&1`],
+    {
+      cwd: config.repoDir,
+      detached: true,
+      stdio: 'ignore',
+    },
+  );
+  child.unref();
+
+  await waitForPortState(config.backendPort, true, 120_000);
+  await delay(3_000);
+  return child.pid ?? 0;
+}
+
+export async function captureDiagramReady(
+  page: Page,
+  url: string,
+  selector?: string,
+): Promise<{ node: Locator; visibleMs: number }> {
+  const startedAt = Date.now();
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  const node = await waitForDiagramNode(page, selector);
+  return {
+    node,
+    visibleMs: Date.now() - startedAt,
+  };
+}
+
+export async function expectDiagramHeaderVisible(page: Page, target: DiagramTarget): Promise<void> {
+  await expect(page.getByText(target.diagramName)).toBeVisible();
+}
