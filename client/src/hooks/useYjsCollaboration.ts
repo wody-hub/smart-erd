@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Y from 'yjs';
 import { YjsProvider } from '@/collaboration/YjsProvider';
 import { getTablesMap, migrateJsonToYDoc } from '@/collaboration/yjsBridge';
@@ -57,9 +57,6 @@ export function useYjsCollaboration(
   const removePeerByLoginId = useCollaborationStore((s) => s.removePeerByLoginId);
   const resetCollaboration = useCollaborationStore((s) => s.reset);
 
-  /** 일회용 ticket 발급 콜백 (diagramId 캡처, 참조 안정) */
-  const getTicket = useCallback(() => requestWsTicket(diagramId!), [diagramId]);
-
   // Y.Doc 생성 + YjsProvider 연결 + 라이프사이클 관리
   useEffect(() => {
     if (!diagram || !diagramId) {
@@ -71,6 +68,12 @@ export function useYjsCollaboration(
     let currentConnectionStatus: ConnectionStatus = 'connecting';
     let previewHydrationSource: 'remote' | 'fallback' | null = null;
     let previewRemoteReadyPending = false;
+    const handoffStartedAt = performance.now();
+    const handoffLogPrefix = `[useYjsCollaboration][diagramId=${diagramId}]`;
+    let ticketRequestedAt: number | null = null;
+    let wsConnectedAt: number | null = null;
+    let previewShownAt: number | null = null;
+    let previewUnlockedAt: number | null = null;
 
     const updatePreviewMode = (next: boolean) => {
       setIsPreviewMode(next);
@@ -94,8 +97,14 @@ export function useYjsCollaboration(
     let previewExitObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null = null;
     if (diagram.hasYdocSnapshot && diagram.content) {
       loadPreview(diagram.content);
+      previewShownAt = performance.now();
       updatePreviewMode(true);
       updatePreviewSyncStatus('syncing');
+      console.info(
+        '%s preview-visible totalMs=%d',
+        handoffLogPrefix,
+        Math.round(previewShownAt - handoffStartedAt),
+      );
 
       // Y.Doc에 데이터가 들어오면 프리뷰 모드 해제
       const tablesMap = getTablesMap(ydoc);
@@ -105,6 +114,15 @@ export function useYjsCollaboration(
           tablesMap.unobserveDeep(previewExitObserver!);
           previewExitObserver = null;
           updatePreviewMode(false);
+          previewUnlockedAt = performance.now();
+          console.info(
+            '%s preview-unlocked source=%s totalMs=%d afterPreviewMs=%d updatesApplied=%d',
+            handoffLogPrefix,
+            previewHydrationSource,
+            Math.round(previewUnlockedAt - handoffStartedAt),
+            Math.round(previewUnlockedAt - (previewShownAt ?? handoffStartedAt)),
+            tablesMap.size,
+          );
           if (previewHydrationSource === 'fallback') {
             updatePreviewSyncStatus('degraded');
             return;
@@ -124,15 +142,41 @@ export function useYjsCollaboration(
     // 5. YjsProvider 연결
     const provider = new YjsProvider(ydoc, {
       diagramId,
-      getTicket,
+      getTicket: async () => {
+        ticketRequestedAt = performance.now();
+        const ticket = await requestWsTicket(diagramId);
+        const ticketResolvedAt = performance.now();
+        console.info(
+          '%s ticket-issued ms=%d totalMs=%d',
+          handoffLogPrefix,
+          Math.round(ticketResolvedAt - ticketRequestedAt),
+          Math.round(ticketResolvedAt - handoffStartedAt),
+        );
+        return ticket;
+      },
     });
 
     provider.onConnectionStatusChange = (status: ConnectionStatus) => {
       currentConnectionStatus = status;
       setConnectionStatus(status);
+      if (status === 'connected') {
+        wsConnectedAt = performance.now();
+        console.info(
+          '%s ws-connected totalMs=%d afterTicketMs=%s',
+          handoffLogPrefix,
+          Math.round(wsConnectedAt - handoffStartedAt),
+          ticketRequestedAt === null ? 'n/a' : Math.round(wsConnectedAt - ticketRequestedAt),
+        );
+      }
       if (status === 'connected' && previewRemoteReadyPending) {
         previewRemoteReadyPending = false;
         updatePreviewSyncStatus('live');
+        console.info(
+          '%s live-ready totalMs=%d afterWsMs=%s',
+          handoffLogPrefix,
+          Math.round(performance.now() - handoffStartedAt),
+          wsConnectedAt === null ? 'n/a' : Math.round(performance.now() - wsConnectedAt),
+        );
       }
     };
 
@@ -175,8 +219,10 @@ export function useYjsCollaboration(
         snapshotFallbackTimer = null;
         if (getTablesMap(ydoc).size === 0) {
           console.warn(
-            '[useYjsCollaboration] WS 스냅샷 %dms 내 미도착 — JSON content로 폴백',
+            '%s snapshot-fallback timeoutMs=%d totalMs=%d',
+            handoffLogPrefix,
             WS_SNAPSHOT_FALLBACK_MS,
+            Math.round(performance.now() - handoffStartedAt),
           );
           // 'remote' origin: WS 브로드캐스트 방지 + useAutoBackup 로컬 변경 미인식
           previewHydrationSource = 'fallback';

@@ -49,6 +49,8 @@ public class DiagramSnapshotService implements SmartLifecycle {
 
     /** 다이어그램별 다음 컴팩션 허용 시각 (diagramId -> blockedUntil) */
     private final Map<Long, Instant> compactionBlockedUntil = new ConcurrentHashMap<>();
+    /** 최근 persisted snapshot 캐시 (warm room handoff용) */
+    private final Map<Long, byte[]> snapshotCache = new ConcurrentHashMap<>();
     /** 스냅샷 flush 실패 누적 카운터 */
     private final AtomicLong snapshotFlushFailCount = new AtomicLong(0);
 
@@ -94,6 +96,7 @@ public class DiagramSnapshotService implements SmartLifecycle {
             log.warn("스냅샷 저장 실패: 다이어그램 미존재 (id={})", diagramId);
             return;
         }
+        snapshotCache.put(diagramId, combined);
         log.info(
             "Y.Doc 스냅샷 저장 완료: diagramId={}, size={}bytes, snapshotRevision={}",
             diagramId,
@@ -110,7 +113,20 @@ public class DiagramSnapshotService implements SmartLifecycle {
      * @return Y.Doc 스냅샷 바이트 배열, 없으면 빈 배열
      */
     public byte[] loadSnapshot(Long diagramId) {
-        return diagramRepository.findYdocSnapshotById(diagramId).orElse(new byte[0]);
+        return snapshotCache.computeIfAbsent(
+            diagramId,
+            (id) -> diagramRepository.findYdocSnapshotById(id).orElse(new byte[0])
+        );
+    }
+
+    /**
+     * 최근 persisted snapshot 캐시를 조회한다.
+     *
+     * @param diagramId 다이어그램 ID
+     * @return 캐시된 snapshot. 없으면 빈 Optional
+     */
+    public Optional<byte[]> getCachedSnapshot(Long diagramId) {
+        return Optional.ofNullable(snapshotCache.get(diagramId));
     }
 
     /**
@@ -167,6 +183,8 @@ public class DiagramSnapshotService implements SmartLifecycle {
             return false;
         }
 
+        snapshotCache.put(diagramId, compactedSnapshot);
+
         log.info(
             "Y.Doc 스냅샷 컴팩션 완료: diagramId={}, before={}B, after={}B ({}% 감소)",
             diagramId,
@@ -210,6 +228,18 @@ public class DiagramSnapshotService implements SmartLifecycle {
      */
     public void clearCompactionCoolDown(Long diagramId) {
         compactionBlockedUntil.remove(diagramId);
+    }
+
+    /**
+     * persisted snapshot과 아직 flush되지 않은 update를 합쳐 warm handoff payload를 만든다.
+     *
+     * @param diagramId 다이어그램 ID
+     * @param mergedUpdates 인메모리 누적 update blob
+     * @return handoff용 snapshot blob
+     */
+    public byte[] buildWarmHandoffSnapshot(Long diagramId, byte[] mergedUpdates) {
+        final var persistedSnapshot = loadSnapshot(diagramId);
+        return combineSnapshotAndUpdates(diagramId, persistedSnapshot, mergedUpdates);
     }
 
     /**
@@ -337,6 +367,7 @@ public class DiagramSnapshotService implements SmartLifecycle {
                 log.warn("snapshot_flush_fail_count={} reason=update-failed diagramId={}", totalFailCount, id);
                 return false;
             }
+            snapshotCache.put(id, combined);
             log.debug(
                 "주기적 Y.Doc 스냅샷 저장: diagramId={}, size={}bytes, snapshotRevision={}",
                 id,
@@ -376,6 +407,7 @@ public class DiagramSnapshotService implements SmartLifecycle {
      */
     private byte[] combineSnapshotAndUpdates(Long diagramId, byte[] existingSnapshot, byte[] mergedUpdates) {
         if (existingSnapshot.length == 0) {
+            logSnapshotShape(diagramId, YjsUpdateFormat.decode(mergedUpdates).size(), mergedUpdates, mergedUpdates);
             return mergedUpdates;
         }
 
@@ -393,14 +425,36 @@ public class DiagramSnapshotService implements SmartLifecycle {
 
         if (combined.size() > COMPACTION_WARN_THRESHOLD) {
             log.warn(
-                "Y.Doc 스냅샷 컴팩션 필요: diagramId={}, 누적 update {}개 (임계치: {})",
+                "Y.Doc 스냅샷 컴팩션 필요: diagramId={}, 누적 update {}개 (임계치: {}), existingBytes={}, mergedBytes={}",
                 diagramId,
                 combined.size(),
-                COMPACTION_WARN_THRESHOLD
+                COMPACTION_WARN_THRESHOLD,
+                existingSnapshot.length,
+                mergedUpdates.length
             );
         }
 
-        return YjsUpdateFormat.encode(combined);
+        final var encoded = YjsUpdateFormat.encode(combined);
+        logSnapshotShape(diagramId, combined.size(), mergedUpdates, encoded);
+        return encoded;
+    }
+
+    /**
+     * 스냅샷 저장 시점의 형태를 메트릭 로그로 남긴다.
+     *
+     * @param diagramId 다이어그램 ID
+     * @param updateCount snapshot 내부 update 개수
+     * @param mergedUpdates 이번 flush에서 병합된 update blob
+     * @param encoded 최종 저장 snapshot
+     */
+    private void logSnapshotShape(Long diagramId, int updateCount, byte[] mergedUpdates, byte[] encoded) {
+        log.info(
+            "snapshot-shape diagramId={} updateCount={} mergedBytes={} encodedBytes={}",
+            diagramId,
+            updateCount,
+            mergedUpdates.length,
+            encoded.length
+        );
     }
 
     // ── SmartLifecycle 구현 ──

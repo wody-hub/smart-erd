@@ -45,10 +45,8 @@ public class YjsUpdateMessageHandler implements DiagramMessageHandler {
 
         // 타입 바이트(0x03) 제외한 순수 Yjs update만 누적
         final var payload = context.payload();
-        final var accepted = roomManager.appendUpdate(
-            context.diagramId(),
-            Arrays.copyOfRange(payload, 1, payload.length)
-        );
+        final var update = Arrays.copyOfRange(payload, 1, payload.length);
+        final var accepted = roomManager.appendUpdate(context.diagramId(), update);
         if (!accepted) {
             log.warn(
                 "누적 update 크기 초과로 저장 거부 (diagramId={}, 세션 {})",

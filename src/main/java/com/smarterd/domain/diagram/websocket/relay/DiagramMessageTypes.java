@@ -43,6 +43,12 @@ public final class DiagramMessageTypes {
     /** Presence snapshot 재요청 (클라이언트 → 서버) */
     public static final byte MSG_PRESENCE_SNAPSHOT_REQUEST = 0x0C;
 
+    /** Snapshot request v2 (클라이언트 → 서버, single-payload handoff) */
+    public static final byte MSG_SNAPSHOT_REQUEST_V2 = 0x0D;
+
+    /** Snapshot response v2 (서버 → 클라이언트, raw snapshot blob) */
+    public static final byte MSG_SNAPSHOT_RESPONSE_V2 = 0x0E;
+
     /**
      * 유틸리티 클래스 인스턴스화 방지.
      */

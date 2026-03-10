@@ -362,6 +362,18 @@ public class DiagramRoomManager {
     }
 
     /**
+     * 현재 누적된 update를 비우지 않고 병합 snapshot 형태로 반환한다.
+     *
+     * @param diagramId 다이어그램 ID
+     * @return 병합된 바이트 배열, 누적 데이터가 없으면 빈 배열
+     */
+    public byte[] peekMergedUpdates(Long diagramId) {
+        synchronized (getFlushLock(diagramId)) {
+            return updateBuffer.peekMergedUpdates(diagramId);
+        }
+    }
+
+    /**
      * drain된 update를 인메모리 버퍼에 복원한다.
      * flush 또는 컴팩션 실패 시 데이터 유실을 방지하기 위해 호출한다.
      *

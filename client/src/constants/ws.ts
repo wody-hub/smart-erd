@@ -29,6 +29,10 @@ export const WS_MSG_TYPE = {
   PEER_LEFT: 0x0b,
   /** Presence snapshot 재요청 (클라이언트 → 서버) */
   PRESENCE_SNAPSHOT_REQUEST: 0x0c,
+  /** Snapshot request v2 (클라이언트 → 서버, single-payload handoff) */
+  SNAPSHOT_REQUEST_V2: 0x0d,
+  /** Snapshot response v2 (서버 → 클라이언트, raw snapshot blob) */
+  SNAPSHOT_RESPONSE_V2: 0x0e,
 } as const;
 
 /** Awareness 커서 색상 팔레트 (6색) — CSS Variable 기반 디자인 토큰 */

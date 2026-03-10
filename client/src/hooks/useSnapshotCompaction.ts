@@ -4,8 +4,12 @@ import type { YjsProvider } from '@/collaboration/YjsProvider';
 import useCollaborationStore from '@/stores/useCollaborationStore';
 import type { PresenceMode } from '@/types/collaboration';
 
-/** 컴팩션 트리거 크기 임계치 (bytes) — YLPF 오버헤드 감안 500 updates × ~200B */
-const COMPACTION_SIZE_THRESHOLD = 100_000;
+/** 컴팩션 트리거 크기 임계치 (bytes).
+ *
+ * 100KB 기준은 update 조각 수가 많은 중형 다이어그램을 너무 늦게 컴팩션했다.
+ * 실제 샘플에서 41KB / 679 updates가 handoff 비용을 키웠으므로 더 이른 시점에 압축을 시도한다.
+ */
+const COMPACTION_SIZE_THRESHOLD = 32_000;
 
 /** 컴팩션 메시지 크기 상한 (bytes) — WS 제한(1MB)보다 여유 있게 설정 */
 const COMPACTION_MAX_SIZE = 900_000;

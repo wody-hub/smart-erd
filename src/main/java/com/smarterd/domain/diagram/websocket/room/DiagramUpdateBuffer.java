@@ -90,6 +90,26 @@ final class DiagramUpdateBuffer {
     }
 
     /**
+     * 현재 누적된 update를 비우지 않고 병합 snapshot 형태로 반환한다.
+     *
+     * @param diagramId 다이어그램 ID
+     * @return 병합된 바이트 배열, 누적 데이터가 없으면 빈 배열
+     */
+    byte[] peekMergedUpdates(Long diagramId) {
+        final var updates = accumulatedUpdates.get(diagramId);
+        if (updates == null || updates.isEmpty()) {
+            return new byte[0];
+        }
+
+        synchronized (updates) {
+            if (updates.isEmpty()) {
+                return new byte[0];
+            }
+            return YjsUpdateFormat.encode(new ArrayList<>(updates));
+        }
+    }
+
+    /**
      * drain된 update를 인메모리 버퍼에 복원한다.
      * flush 또는 컴팩션 실패 시 데이터 유실을 방지하기 위해 호출한다.
      *

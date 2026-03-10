@@ -73,6 +73,7 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
         DiagramMessageTypes.MSG_YJS_UPDATE,
         DiagramMessageTypes.MSG_AWARENESS,
         DiagramMessageTypes.MSG_SNAPSHOT_REQUEST,
+        DiagramMessageTypes.MSG_SNAPSHOT_REQUEST_V2,
         DiagramMessageTypes.MSG_COMPACTED_SNAPSHOT,
         DiagramMessageTypes.MSG_PRESENCE_SNAPSHOT_REQUEST
     );

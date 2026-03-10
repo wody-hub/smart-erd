@@ -318,6 +318,16 @@ export class YjsProvider {
         }
         break;
       }
+      case WS_MSG_TYPE.SNAPSHOT_RESPONSE_V2: {
+        try {
+          Y.applyUpdate(this.doc, this.mergeSnapshotPayload(payload), 'remote');
+        } catch (e) {
+          console.error('[YjsProvider] Y.applyUpdate 실패 (snapshot v2):', e);
+          this.reconnectAfterError();
+          return;
+        }
+        break;
+      }
       case WS_MSG_TYPE.PRESENCE_SNAPSHOT: {
         this.handlePresenceSnapshot(payload);
         break;
@@ -342,7 +352,7 @@ export class YjsProvider {
    * WebSocket 연결 시 sync 전에 호출하여 기존 상태를 복원한다.
    */
   private requestSnapshot(): void {
-    this.sendMessage(WS_MSG_TYPE.SNAPSHOT_REQUEST, new Uint8Array(0));
+    this.sendMessage(WS_MSG_TYPE.SNAPSHOT_REQUEST_V2, new Uint8Array(0));
   }
 
   /**
@@ -373,6 +383,59 @@ export class YjsProvider {
     message.set(payload, 1);
 
     this.ws.send(message);
+  }
+
+  /**
+   * raw snapshot blob(v2)을 단일 update로 병합한다.
+   *
+   * length-prefixed 포맷은 개별 update들을 파싱해 `Y.mergeUpdates()`로 합치고,
+   * 레거시 raw update 포맷은 그대로 반환한다.
+   *
+   * @param payload 서버가 전달한 raw snapshot blob
+   * @returns 단일 Yjs update
+   */
+  private mergeSnapshotPayload(payload: Uint8Array): Uint8Array {
+    const updates = this.decodeSnapshotPayload(payload);
+    if (updates.length <= 1) {
+      return updates[0] ?? payload;
+    }
+    return Y.mergeUpdates(updates);
+  }
+
+  /**
+   * raw snapshot blob을 update 배열로 디코딩한다.
+   *
+   * 서버 저장 포맷은 `YLPF` magic header 기반 length-prefixed 형식이며,
+   * 레거시 포맷은 단일 raw update를 그대로 사용한다.
+   *
+   * @param payload 서버가 전달한 raw snapshot blob
+   * @returns update 배열
+   */
+  private decodeSnapshotPayload(payload: Uint8Array): Uint8Array[] {
+    if (payload.length === 0) {
+      return [];
+    }
+
+    const magic = [0x59, 0x4c, 0x50, 0x46];
+    const hasMagic =
+      payload.length >= magic.length && magic.every((value, index) => payload[index] === value);
+    if (!hasMagic) {
+      return [payload];
+    }
+
+    const updates: Uint8Array[] = [];
+    const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+    let offset = magic.length;
+    while (offset + 4 <= payload.length) {
+      const length = view.getInt32(offset, false);
+      offset += 4;
+      if (length <= 0 || offset + length > payload.length) {
+        break;
+      }
+      updates.push(payload.slice(offset, offset + length));
+      offset += length;
+    }
+    return updates;
   }
 
   /**
