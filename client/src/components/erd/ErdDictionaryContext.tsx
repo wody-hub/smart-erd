@@ -1,8 +1,8 @@
 import { createContext, useContext } from 'react';
-import { useDictionaryCache } from '@/hooks/useDictionaryCache';
+import { useErdDictionaryData } from './erdDictionaryData';
 
 /** ERD 에디터 공유 데이터 컨텍스트 값 */
-type ErdDictionaryContextValue = ReturnType<typeof useDictionaryCache> & {
+type ErdDictionaryContextValue = ReturnType<typeof useErdDictionaryData> & {
   /** 팀 ID (non-null 보장) */
   teamId: string;
   /** 사전 세트 ID (non-null 보장) */
@@ -24,7 +24,7 @@ interface ErdDictionaryProviderProps {
 /**
  * ERD 에디터용 사전 데이터 Provider.
  *
- * DiagramPage 레벨에서 단 한 번만 useQuery를 실행하여
+ * DiagramPage 레벨에서 단 한 번만 ERD 전용 조회 쿼리를 실행하여
  * terms/domains를 캐싱하고, 하위 ERD 컴포넌트들이 Context를 통해 공유한다.
  * 이렇게 하면 TableNode × N개가 각각 useQuery observer를 생성하는 것을 방지한다.
  *
@@ -32,7 +32,7 @@ interface ErdDictionaryProviderProps {
  * @param props.children 자식 요소
  */
 export function ErdDictionaryProvider({ teamId, setId, children }: ErdDictionaryProviderProps) {
-  const cache = useDictionaryCache(teamId, setId);
+  const cache = useErdDictionaryData(teamId, setId);
 
   return (
     <ErdDictionaryContext.Provider value={{ teamId, setId, ...cache }}>
@@ -47,7 +47,7 @@ export function ErdDictionaryProvider({ teamId, setId, children }: ErdDictionary
  * ErdDictionaryProvider 내부에서만 사용 가능하다.
  * teamId는 non-null이 보장되므로 teamId! 단언이 불필요하다.
  *
- * @returns teamId + useDictionaryCache 반환값
+ * @returns teamId + ERD 전용 사전 조회 계약
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function useErdDictionary(): ErdDictionaryContextValue {

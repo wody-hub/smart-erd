@@ -29,7 +29,7 @@ import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
 import { useCodeEditorTableLock } from '@/hooks/useCodeEditorTableLock';
 import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
 import { useEditorCursorGuard } from '@/hooks/useEditorCursorGuard';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';

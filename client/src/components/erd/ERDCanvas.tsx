@@ -16,7 +16,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { extractColId } from '@/lib/handle-id';
 import type { TableNodeData } from '@/types/erd';
 import type { YjsProvider } from '@/collaboration/YjsProvider';

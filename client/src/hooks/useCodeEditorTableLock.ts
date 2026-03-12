@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import type * as Monaco from 'monaco-editor';
 import { CODE_LOCK_GRACE_MS } from '@/constants/code-sync';
 import type { ParsedTableRange } from '@/lib/ddl-parser';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 
 /** 코드 에디터 테이블 락 훅 옵션 */
 interface UseCodeEditorTableLockOptions {

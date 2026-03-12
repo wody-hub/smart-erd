@@ -2,7 +2,7 @@ import axiosInstance from './axiosInstance';
 import type {
   DiagramSummary,
   DiagramDetail,
-  UpdateDiagramDictionarySetResult,
+  UpdateDiagramDictionaryContextResult,
 } from '@/types/diagram';
 import type { WsTicketIssueResponse } from '@/types/collaboration';
 
@@ -109,13 +109,13 @@ export async function renameDiagram(
  * @param diagramId       다이어그램 ID
  * @param dictionarySetId 변경할 사전 세트 ID
  */
-export async function updateDiagramDictionarySet(
+export async function updateDiagramDictionaryContext(
   teamId: string,
   projectId: string,
   diagramId: string,
   dictionarySetId: number,
-): Promise<UpdateDiagramDictionarySetResult> {
-  const res = await axiosInstance.patch<UpdateDiagramDictionarySetResult>(
+): Promise<UpdateDiagramDictionaryContextResult> {
+  const res = await axiosInstance.patch<UpdateDiagramDictionaryContextResult>(
     `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/dictionary-set`,
     {
       dictionarySetId,
@@ -123,6 +123,9 @@ export async function updateDiagramDictionarySet(
   );
   return res.data;
 }
+
+/** @deprecated `updateDiagramDictionaryContext` 사용 */
+export const updateDiagramDictionarySet = updateDiagramDictionaryContext;
 
 /**
  * WebSocket 연결을 위한 일회용 ticket을 발급받는다.

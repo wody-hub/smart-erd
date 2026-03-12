@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as Y from 'yjs';
 import type { YjsProvider } from '@/collaboration/YjsProvider';
-import useCollaborationStore from '@/stores/useCollaborationStore';
+import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import type { PresenceMode } from '@/types/collaboration';
 
 /** 컴팩션 트리거 크기 임계치 (bytes).

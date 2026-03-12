@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 
 /** GroupTableSelectDialog의 props. */
 interface GroupTableSelectDialogProps {

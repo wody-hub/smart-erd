@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { generateDdl } from '@/lib/ddl-generator';
 import type { DbmsType, ERDEdge, TableNode } from '@/types/erd';
 

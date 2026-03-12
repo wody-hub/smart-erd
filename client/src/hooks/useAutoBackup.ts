@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { UseMutationResult } from '@tanstack/react-query';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 
 /** 자동 백업 주기 (밀리초) — 60초 */
 const AUTO_BACKUP_INTERVAL_MS = 60 * 1000;

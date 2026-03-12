@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
 import { createTerm, fetchTerms } from '@/api/termApi';
+import { buildColumnUpdatesFromTerm } from '@/components/erd/erdDictionaryData';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
-import { buildColumnUpdatesFromTerm } from '@/hooks/useDictionaryCache';
 import { useErdDictionary } from '@/components/erd/ErdDictionaryContext';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { CompoundResolution } from '@/types/dictionary';
 
 /**

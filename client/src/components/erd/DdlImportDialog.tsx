@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import { useDdlParse } from '@/hooks/useDdlParse';
 import type { DbmsType } from '@/types/erd';

@@ -6,7 +6,6 @@ import useAuthStore from '@/stores/useAuthStore';
 import { ROUTES } from '@/constants/routes';
 import { isElectron } from '@/lib/platform';
 import LanguageSwitcher from './LanguageSwitcher';
-import CollaboratorsBar from './CollaboratorsBar';
 import type { ConnectionStatus } from '@/types/collaboration';
 
 /** Header 컴포넌트의 props. */
@@ -23,6 +22,8 @@ interface HeaderProps {
   canEdit?: boolean;
   /** 편집 잠금 사유 메시지 */
   readOnlyMessage?: string;
+  /** 다이어그램 문맥에서만 노출할 보조 UI */
+  diagramAccessory?: React.ReactNode;
 }
 
 /**
@@ -45,6 +46,7 @@ export default function Header({
   connectionStatus,
   canEdit = true,
   readOnlyMessage,
+  diagramAccessory,
 }: HeaderProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -102,7 +104,7 @@ export default function Header({
       )}
 
       <div className="ml-auto flex items-center gap-3">
-        {diagramName && <CollaboratorsBar />}
+        {diagramAccessory}
         <LanguageSwitcher />
         {isElectron() && (
           <Button

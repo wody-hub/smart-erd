@@ -6,9 +6,9 @@ export interface DiagramSummary {
   name: string;
   /** 소속 프로젝트 ID */
   projectId: number;
-  /** 적용 사전 세트 ID */
+  /** 다이어그램에 연결된 사전 컨텍스트 세트 ID */
   dictionarySetId: number | null;
-  /** 적용 사전 세트 이름 */
+  /** 다이어그램에 연결된 사전 컨텍스트 세트 이름 */
   dictionarySetName: string | null;
   /** 생성 일시 (ISO 8601) */
   createdAt: string;
@@ -42,12 +42,15 @@ export type SyncStage =
 /** Yjs handoff 모드 */
 export type HandoffMode = 'snapshot' | 'sync-only';
 
-/** 다이어그램 사전 세트 변경 결과 */
-export interface UpdateDiagramDictionarySetResult {
-  /** 변경된 사전 세트 ID */
+/** 다이어그램 사전 컨텍스트 변경 결과 */
+export interface UpdateDiagramDictionaryContextResult {
+  /** 변경된 사전 컨텍스트 세트 ID */
   dictionarySetId: number;
   /** 무효화된 term 바인딩 수 */
   invalidatedTermBindingCount: number;
   /** 무효화된 domain 바인딩 수 */
   invalidatedDomainBindingCount: number;
 }
+
+/** @deprecated `UpdateDiagramDictionaryContextResult` 사용 */
+export type UpdateDiagramDictionarySetResult = UpdateDiagramDictionaryContextResult;

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import useAuthStore from '@/stores/useAuthStore';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { CURSOR_COLORS } from '@/constants/ws';
 import { LOCK_HEARTBEAT_MS } from '@/constants/collab-lock';
 import { buildTableLockKeyFromNodeData } from '@/lib/table-lock-key';

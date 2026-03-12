@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import type { Node, Connection } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { RelationType, TableNodeData } from '@/types/erd';
 
 /**

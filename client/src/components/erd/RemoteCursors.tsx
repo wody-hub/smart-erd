@@ -1,5 +1,5 @@
 import { useReactFlow } from '@xyflow/react';
-import useCollaborationStore from '@/stores/useCollaborationStore';
+import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import useAuthStore from '@/stores/useAuthStore';
 
 /**

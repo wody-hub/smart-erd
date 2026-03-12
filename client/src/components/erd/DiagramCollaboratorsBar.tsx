@@ -2,11 +2,11 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import useCollaborationStore from '@/stores/useCollaborationStore';
+import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import useAuthStore from '@/stores/useAuthStore';
 import type { PresenceParticipant } from '@/types/collaboration';
-import CollaboratorsPopover from './CollaboratorsPopover';
-import { getInitial, getPresenceColor } from './collaboratorsUtils';
+import DiagramCollaboratorsPopover from './DiagramCollaboratorsPopover';
+import { getInitial, getPresenceColor } from './diagramCollaboratorsUtils';
 
 const MAX_PREVIEW_AVATARS = 3;
 
@@ -17,7 +17,7 @@ const MAX_PREVIEW_AVATARS = 3;
  * - 총 접속자 수는 숫자 배지로 표시하며
  * - 클릭 시 전체 목록 팝오버를 연다.
  */
-export default function CollaboratorsBar() {
+export default function DiagramCollaboratorsBar() {
   const { t } = useTranslation();
   const presenceMode = useCollaborationStore((s) => s.presenceMode);
   const participantsByUserId = useCollaborationStore((s) => s.participantsByUserId);
@@ -124,7 +124,7 @@ export default function CollaboratorsBar() {
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" side="bottom" className="w-80">
-        <CollaboratorsPopover
+        <DiagramCollaboratorsPopover
           participants={participants}
           selfUserId={selfUserId}
           selfLoginId={selfLoginId}

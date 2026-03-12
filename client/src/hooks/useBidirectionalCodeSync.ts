@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { djb2 } from '@/lib/hash';
 import { buildRevisionHash } from '@/lib/code-sync-revision';
 import { resolveCodeAutoApplyStatus } from '@/lib/code-sync-apply-gate';

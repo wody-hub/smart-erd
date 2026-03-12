@@ -157,7 +157,8 @@
       "createButton": "Create Diagram",
       "empty": "No diagrams yet. Create your first diagram.",
       "updatedAt": "Updated: {{date}}",
-      "selectDictionarySet": "Select dictionary set"
+      "selectDictionarySet": "Select dictionary set",
+      "selectDictionaryContext": "Select dictionary context"
     },
     "create": {
       "dialogTitle": "Create New Diagram",
@@ -171,7 +172,8 @@
     "edit": {
       "loadError": "Failed to load diagram. Please try again later.",
       "loadingDiagram": "Loading diagram...",
-      "dictionarySet": "Applied dictionary set: {{name}}"
+      "dictionarySet": "Applied dictionary set: {{name}}",
+      "dictionaryContext": "Diagram dictionary context: {{name}}"
     },
     "previewSync": {
       "headerReadonly": "Real-time sync in progress",
@@ -194,6 +196,8 @@
       "renameFailed": "Failed to rename diagram",
       "dictionarySetUpdated": "Diagram dictionary set updated",
       "dictionarySetUpdateFailed": "Failed to update diagram dictionary set",
+      "dictionaryContextUpdated": "Diagram dictionary context updated",
+      "dictionaryContextUpdateFailed": "Failed to update diagram dictionary context",
       "backupSynced": "Backup synced",
       "noChanges": "No changes to backup",
       "backupFailed": "Failed to sync backup"

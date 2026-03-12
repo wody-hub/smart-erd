@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { TableNode as TableNodeType, Column } from '@/types/erd';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { useCompoundTermRegister } from '@/hooks/useCompoundTermRegister';
 import { useErdDictionary } from './ErdDictionaryContext';
 import { useErdPermission } from './ErdPermissionContext';

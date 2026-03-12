@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { useErdDictionary } from '@/components/erd/ErdDictionaryContext';
 
 /** 컬럼 유효성 검사 상태 */

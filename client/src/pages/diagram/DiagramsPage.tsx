@@ -14,7 +14,7 @@ import {
   createDiagram,
   deleteDiagram,
   renameDiagram,
-  updateDiagramDictionarySet,
+  updateDiagramDictionaryContext,
 } from '@/api/diagramApi';
 import { fetchDictionarySets } from '@/api/dictionarySetApi';
 import {
@@ -52,8 +52,8 @@ export default function DiagramsPage() {
   const [renamingId, setRenamingId] = useState<number | null>(null);
   /** 이름 변경 입력값 */
   const [renameValue, setRenameValue] = useState('');
-  /** 생성 시 사용할 사전 세트 ID */
-  const [createSetId, setCreateSetId] = useState('');
+  /** 생성 시 사용할 다이어그램 사전 컨텍스트 ID */
+  const [createDictionaryContextId, setCreateDictionaryContextId] = useState('');
 
   const { canEdit } = useTeamRole(teamId);
 
@@ -67,11 +67,11 @@ export default function DiagramsPage() {
 
   useEffect(() => {
     if (dictionarySets.length === 0) {
-      setCreateSetId('');
+      setCreateDictionaryContextId('');
       return;
     }
     const defaultSet = dictionarySets.find((set) => set.isDefault);
-    setCreateSetId((prev) => {
+    setCreateDictionaryContextId((prev) => {
       if (prev && dictionarySets.some((set) => String(set.id) === prev)) {
         return prev;
       }
@@ -86,7 +86,8 @@ export default function DiagramsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (name: string) => createDiagram(teamId!, projectId!, name, Number(createSetId)),
+    mutationFn: (name: string) =>
+      createDiagram(teamId!, projectId!, name, Number(createDictionaryContextId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
       toast.success(t('diagram.toast.created'));
@@ -117,13 +118,13 @@ export default function DiagramsPage() {
 
   const updateDiagramSetMutation = useMutation({
     mutationFn: ({ diagramId, dictionarySetId }: { diagramId: number; dictionarySetId: number }) =>
-      updateDiagramDictionarySet(teamId!, projectId!, String(diagramId), dictionarySetId),
+      updateDiagramDictionaryContext(teamId!, projectId!, String(diagramId), dictionarySetId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
-      toast.success(t('diagram.toast.dictionarySetUpdated'));
+      toast.success(t('diagram.toast.dictionaryContextUpdated'));
     },
     onError: (err) =>
-      toast.error(getErrorMessage(err, t('diagram.toast.dictionarySetUpdateFailed'))),
+      toast.error(getErrorMessage(err, t('diagram.toast.dictionaryContextUpdateFailed'))),
   });
 
   /** 다이어그램 이름 변경을 시작한다. @param diagram 대상 다이어그램 @param e 마우스 이벤트 (전파 차단용) */
@@ -165,9 +166,9 @@ export default function DiagramsPage() {
             <h2 className="text-2xl font-bold">{t('diagram.list.title')}</h2>
             {canEdit && (
               <div className="flex items-center gap-2">
-                <Select value={createSetId} onValueChange={setCreateSetId}>
+                <Select value={createDictionaryContextId} onValueChange={setCreateDictionaryContextId}>
                   <SelectTrigger className="w-[220px]">
-                    <SelectValue placeholder={t('diagram.list.selectDictionarySet')} />
+                    <SelectValue placeholder={t('diagram.list.selectDictionaryContext')} />
                   </SelectTrigger>
                   <SelectContent>
                     {dictionarySets.map((set) => (
@@ -177,7 +178,7 @@ export default function DiagramsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button onClick={() => setDialogOpen(true)} disabled={!createSetId}>
+                <Button onClick={() => setDialogOpen(true)} disabled={!createDictionaryContextId}>
                   <Plus className="h-4 w-4 mr-2" />
                   {t('diagram.list.newButton')}
                 </Button>
@@ -193,7 +194,7 @@ export default function DiagramsPage() {
                 <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                 <p className="text-muted-foreground mb-4">{t('diagram.list.empty')}</p>
                 {canEdit && (
-                  <Button onClick={() => setDialogOpen(true)} disabled={!createSetId}>
+                  <Button onClick={() => setDialogOpen(true)} disabled={!createDictionaryContextId}>
                     <Plus className="h-4 w-4 mr-2" />
                     {t('diagram.list.createButton')}
                   </Button>
@@ -298,7 +299,7 @@ export default function DiagramsPage() {
                           }
                         >
                           <SelectTrigger className="h-8">
-                            <SelectValue placeholder={t('diagram.list.selectDictionarySet')} />
+                            <SelectValue placeholder={t('diagram.list.selectDictionaryContext')} />
                           </SelectTrigger>
                           <SelectContent>
                             {dictionarySets.map((set) => (

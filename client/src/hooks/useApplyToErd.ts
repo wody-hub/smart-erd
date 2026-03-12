@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import type { Edge, Node } from '@xyflow/react';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useAuthStore from '@/stores/useAuthStore';
 import { applyDagreLayout, applyIncrementalLayoutByLabel } from '@/lib/auto-layout';
 import type { DdlParseResult } from '@/lib/ddl-parser';

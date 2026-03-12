@@ -9,8 +9,8 @@ import { useInlineEdit } from '@/hooks/useInlineEdit';
 import { cn } from '@/lib/utils';
 import type { TableGroup } from '@/types/erd';
 
-/** SidebarGroupItem의 props. */
-interface SidebarGroupItemProps {
+/** DiagramSidebarGroupItem의 props. */
+interface DiagramSidebarGroupItemProps {
   /** 그룹 데이터 */
   group: TableGroup;
   /** 테이블 ID -> 라벨 매핑 */
@@ -34,7 +34,7 @@ interface SidebarGroupItemProps {
 /**
  * 사이드바 그룹 항목 컴포넌트.
  */
-export default function SidebarGroupItem({
+export default function DiagramSidebarGroupItem({
   group,
   tableMap,
   canEdit = true,
@@ -44,7 +44,7 @@ export default function SidebarGroupItem({
   onRemoveTable,
   onOpenTableSelect,
   isActive = false,
-}: SidebarGroupItemProps) {
+}: DiagramSidebarGroupItemProps) {
   const { t } = useTranslation();
   /** 확장/축소 상태 */
   const [open, setOpen] = useState(false);

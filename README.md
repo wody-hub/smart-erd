@@ -675,9 +675,26 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 | `components/dictionary/` | 사전 도메인 전용 컴포넌트 (DomainTab, TermTab, 폼 다이얼로그)                                |
 | `components/auth/`       | 인증 관련 컴포넌트 (ProtectedRoute)                                                          |
 | `components/erd/`        | ERD 도메인 전용 컴포넌트                                                                     |
-| `components/layout/`     | 페이지 구조 컴포넌트 (Header, Sidebar)                                                       |
+| `components/layout/`     | 페이지 구조용 공통 컴포넌트. ERD 전용 상태/협업/UI 책임 금지                                 |
 | `pages/`                 | 도메인별 서브디렉토리(`auth/`, `team/`, `project/`, `dictionary/`, `diagram/`)로 페이지 관리 |
 | `stores/`                | Zustand 클라이언트 상태 관리 (`use` prefix)                                                  |
+| `stores/erd/`            | ERD 전용 Zustand 진입 경로. ERD 화면/훅/컴포넌트는 이 경로를 우선 사용                       |
+
+### 프런트엔드 경계 가드레일
+
+- ERD는 사전 "관리 기능"이 아니라 사전 "조회 데이터 계약"만 소비한다.
+- `components/layout/`는 공통 프레임 역할만 수행하고, `useCanvasStore`, `useCollaborationStore`, `react-flow`, Yjs에 직접 의존하지 않는다.
+- ERD 전용 UI는 `components/erd/` 아래에 둔다. 협업 바, 다이어그램 사이드바, 캔버스 보조 UI도 여기에 포함한다.
+- ERD 관련 페이지/훅/컴포넌트는 상태 접근 시 `stores/erd/*` 경로를 우선 사용한다.
+- `components/dictionary/`와 `pages/dictionary/`의 사전 생성/수정/삭제 절차를 ERD 내부에 직접 import하지 않는다.
+- 다이어그램이 사전 세트를 참조하더라도, ERD 내부 표현은 "사전 관리"가 아니라 "다이어그램 사전 컨텍스트"로 다룬다.
+
+### 리뷰 체크리스트
+
+- 공용 layout 수정이 ERD 캔버스/협업/사이드바 동작에 영향을 주지 않는가
+- ERD가 dictionary UI/절차를 직접 import하지 않는가
+- 새 ERD 기능이 `components/erd/` 또는 `stores/erd/` 경계 안에 배치되었는가
+- 사전 기능 변경 시 다이어그램 목록, 다이어그램 편집, 용어/도메인 조회 경로를 함께 점검했는가
 
 ## 엔티티 관계
 

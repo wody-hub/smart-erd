@@ -4,17 +4,18 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useHotkeys } from 'react-hotkeys-hook';
+import DiagramCollaboratorsBar from '@/components/erd/DiagramCollaboratorsBar';
 import Header from '@/components/layout/Header';
-import Sidebar from '@/components/layout/Sidebar';
 import ERDCanvas from '@/components/erd/ERDCanvas';
 import CanvasLoadingOverlay from '@/components/erd/CanvasLoadingOverlay';
+import DiagramSidebar from '@/components/erd/DiagramSidebar';
 import DiagramSyncStatusBanner from '@/components/erd/DiagramSyncStatusBanner';
 import ValidationPanel from '@/components/erd/ValidationPanel';
 import { ErdDictionaryProvider } from '@/components/erd/ErdDictionaryContext';
 import { ErdPermissionProvider } from '@/components/erd/ErdPermissionContext';
 import Spinner from '@/components/ui/spinner';
-import useCanvasStore from '@/stores/useCanvasStore';
-import useCollaborationStore from '@/stores/useCollaborationStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
+import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import { fetchDiagram, saveDiagram } from '@/api/diagramApi';
 import { isTextInputLikeTarget } from '@/constants/canvas-history';
 import { queryKeys } from '@/constants/query-keys';
@@ -498,11 +499,11 @@ export default function DiagramPage() {
     );
   }
 
-  const dictionarySetId = diagram?.dictionarySetId ? String(diagram.dictionarySetId) : '';
+  const dictionaryContextSetId = diagram?.dictionarySetId ? String(diagram.dictionarySetId) : '';
 
   return (
     <ReactFlowProvider>
-      <ErdDictionaryProvider teamId={teamId!} setId={dictionarySetId}>
+      <ErdDictionaryProvider teamId={teamId!} setId={dictionaryContextSetId}>
         <ErdPermissionProvider canEdit={effectiveCanEdit}>
           <div className="h-screen flex flex-col">
             <Header
@@ -512,13 +513,14 @@ export default function DiagramPage() {
               connectionStatus={connectionStatus}
               canEdit={effectiveCanEdit}
               readOnlyMessage={previewReadOnlyMessage}
+              diagramAccessory={<DiagramCollaboratorsBar />}
             />
             {canEdit && isPreviewMode && (
               <DiagramSyncStatusBanner connectionStatus={connectionStatus} />
             )}
             {diagram?.dictionarySetName && (
               <div className="px-4 py-1 text-xs text-muted-foreground border-b bg-background">
-                {t('diagram.edit.dictionarySet', { name: diagram.dictionarySetName })}
+                {t('diagram.edit.dictionaryContext', { name: diagram.dictionarySetName })}
               </div>
             )}
             <div className="flex flex-1 overflow-hidden">
@@ -528,7 +530,7 @@ export default function DiagramPage() {
                 style={{ width: sidebarWidth }}
               >
                 {leftPanel === 'sidebar' ? (
-                  <Sidebar
+                  <DiagramSidebar
                     canEdit={effectiveCanEdit}
                     activeGroupId={activeGroupId}
                     onViewGroup={handleViewGroup}

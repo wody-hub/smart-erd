@@ -26,7 +26,7 @@ import type { DslDictionary } from '@/lib/dsl-parser';
 import { generateDsl } from '@/lib/dsl-generator';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { TableNode, ERDEdge } from '@/types/erd';
 
 /** DslCodeEditorPanel 컴포넌트의 props */

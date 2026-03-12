@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import useCollaborationStore from '@/stores/useCollaborationStore';
-import useCanvasStore from '@/stores/useCanvasStore';
+import useCollaborationStore from '@/stores/erd/useCollaborationStore';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useAuthStore from '@/stores/useAuthStore';
 import { LOCK_HEARTBEAT_MS } from '@/constants/collab-lock';
 import { buildTableLockKeyFromNodeData } from '@/lib/table-lock-key';

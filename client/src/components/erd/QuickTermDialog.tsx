@@ -23,7 +23,7 @@ import {
 import { createTerm } from '@/api/termApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
-import { buildColumnUpdatesFromTerm } from '@/hooks/useDictionaryCache';
+import { buildColumnUpdatesFromTerm } from '@/components/erd/erdDictionaryData';
 import { useDictionarySuggest } from '@/hooks/useDictionarySuggest';
 import { useErdDictionary } from './ErdDictionaryContext';
 import type { Column } from '@/types/erd';

@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useInlineEdit } from '@/hooks/useInlineEdit';
 
-/** SidebarTableItem의 props. */
-interface SidebarTableItemProps {
+/** DiagramSidebarTableItem의 props. */
+interface DiagramSidebarTableItemProps {
   /** 노드 ID */
   nodeId: string;
   /** 항목 기본 이름(편집 시 초기값으로 사용) */
@@ -37,7 +37,7 @@ interface SidebarTableItemProps {
  * @param props.onDelete 삭제 핸들러
  * @param props.canEdit  편집 가능 여부
  */
-export default function SidebarTableItem({
+export default function DiagramSidebarTableItem({
   label,
   displayLabel,
   renameAriaLabel,
@@ -46,7 +46,7 @@ export default function SidebarTableItem({
   onRename,
   onDelete,
   canEdit = true,
-}: SidebarTableItemProps) {
+}: DiagramSidebarTableItemProps) {
   const { t } = useTranslation();
   const { editing, value, setValue, startEdit, confirmEdit, cancelEdit } = useInlineEdit(onRename);
   const rowLabel = displayLabel ?? label;

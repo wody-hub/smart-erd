@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import type { PresenceParticipant } from '@/types/collaboration';
-import { getInitial, getPresenceColor } from './collaboratorsUtils';
+import { getInitial, getPresenceColor } from './diagramCollaboratorsUtils';
 
-interface CollaboratorsPopoverProps {
+interface DiagramCollaboratorsPopoverProps {
   /** 정렬된 참여자 목록 */
   participants: PresenceParticipant[];
   /** 현재 사용자 ID */
@@ -14,11 +14,11 @@ interface CollaboratorsPopoverProps {
 /**
  * 접속자 목록 팝업 콘텐츠.
  */
-export default function CollaboratorsPopover({
+export default function DiagramCollaboratorsPopover({
   participants,
   selfUserId,
   selfLoginId,
-}: CollaboratorsPopoverProps) {
+}: DiagramCollaboratorsPopoverProps) {
   const { t } = useTranslation();
 
   return (
