@@ -1,5 +1,17 @@
 import * as Y from 'yjs';
-import { type Edge, type Node, type NodeChange, applyEdgeChanges, applyNodeChanges } from '@xyflow/react';
+import {
+  type Edge,
+  type Node,
+  type NodeChange,
+  applyEdgeChanges,
+  applyNodeChanges,
+} from '@xyflow/react';
+import {
+  CANVAS_HISTORY_ORIGIN,
+  createTrackedCanvasHistoryOrigins,
+  DRAG_TRANSACTION_ORIGIN,
+  UNDO_CAPTURE_TIMEOUT_MS,
+} from '@/constants/canvas-history';
 import { djb2 } from '@/lib/hash';
 import { extractColId } from '@/lib/handle-id';
 import type { TableGroup, TableNodeData } from '@/types/erd';
@@ -33,6 +45,9 @@ type CanvasSyncActionKeys =
   | 'setHighlightedNodes'
   | 'setHighlightedEdge'
   | 'clearHighlights'
+  | 'undo'
+  | 'redo'
+  | 'stopHistoryCapture'
   | 'removeEdge'
   | 'removeEdgeWithFkColumn'
   | 'applyLayout'
@@ -51,8 +66,6 @@ export function createCanvasSyncActions(
   set: CanvasSetState,
   get: CanvasGetState,
 ): Pick<CanvasState, CanvasSyncActionKeys> {
-  const POSITION_SYNC_ORIGIN = 'local-position-sync';
-
   /**
    * 노드 position 변경을 대기 큐에 적재한다.
    *
@@ -102,7 +115,7 @@ export function createCanvasSyncActions(
           posYMap.set('y', pos.y);
         }
       }
-    }, POSITION_SYNC_ORIGIN);
+    }, DRAG_TRANSACTION_ORIGIN);
     ctx.pending.clear();
   }
 
@@ -169,10 +182,28 @@ export function createCanvasSyncActions(
         lastBackupHash: djb2(yDocToJson(ydoc)),
       });
 
+      internal.undoManager = new Y.UndoManager([tablesMap, edgesMap, groupsMap], {
+        trackedOrigins: createTrackedCanvasHistoryOrigins(),
+        captureTimeout: UNDO_CAPTURE_TIMEOUT_MS,
+      });
+
+      /** undo/redo 버튼 활성 상태를 현재 스택 길이에 맞춰 동기화한다. @returns 없음 */
+      const syncUndoState = () => {
+        const undoManager = get().internal.undoManager;
+        set({
+          canUndo: !!undoManager && undoManager.undoStack.length > 0,
+          canRedo: !!undoManager && undoManager.redoStack.length > 0,
+        });
+      };
+      internal.undoManager.on('stack-item-added', syncUndoState);
+      internal.undoManager.on('stack-item-popped', syncUndoState);
+      internal.undoManager.on('stack-cleared', syncUndoState);
+      syncUndoState();
+
       internal.tablesObserver = (events) => {
         const isLocalPositionSync =
           events.length > 0 &&
-          events.every((event) => event.transaction.origin === POSITION_SYNC_ORIGIN);
+          events.every((event) => event.transaction.origin === DRAG_TRANSACTION_ORIGIN);
         if (isLocalPositionSync) {
           return;
         }
@@ -216,6 +247,7 @@ export function createCanvasSyncActions(
     destroyYDoc: () => {
       const { ydoc, internal } = get();
       if (ydoc) {
+        internal.undoManager?.destroy();
         const tablesMap = getTablesMap(ydoc);
         const edgesMap = getEdgesMap(ydoc);
         const groupsMap = getGroupsMap(ydoc);
@@ -234,6 +266,7 @@ export function createCanvasSyncActions(
       internal.tablesObserver = null;
       internal.edgesObserver = null;
       internal.groupsObserver = null;
+      internal.undoManager = null;
       internal.tablePositionQueue.pending.clear();
       internal.isNodeDragging = false;
       internal.hasDeferredTableSync = false;
@@ -246,6 +279,8 @@ export function createCanvasSyncActions(
         lastBackupHash: '',
         activeEditNodeId: null,
         codeEditingTableKey: null,
+        canUndo: false,
+        canRedo: false,
       });
     },
 
@@ -309,13 +344,46 @@ export function createCanvasSyncActions(
     setHighlightedNodes: (ids) => set({ highlightedNodeIds: ids }),
     setHighlightedEdge: (id) => set({ highlightedEdgeId: id }),
     clearHighlights: () => set({ highlightedNodeIds: [], highlightedEdgeId: null }),
+    undo: () => {
+      const undoManager = get().internal.undoManager;
+      if (!undoManager || undoManager.undoStack.length === 0) {
+        return;
+      }
+      undoManager.undo();
+      set({
+        activeEditNodeId: null,
+        highlightedEdgeId: null,
+        highlightedNodeIds: [],
+        canUndo: undoManager.undoStack.length > 0,
+        canRedo: undoManager.redoStack.length > 0,
+      });
+    },
+    redo: () => {
+      const undoManager = get().internal.undoManager;
+      if (!undoManager || undoManager.redoStack.length === 0) {
+        return;
+      }
+      undoManager.redo();
+      set({
+        activeEditNodeId: null,
+        highlightedEdgeId: null,
+        highlightedNodeIds: [],
+        canUndo: undoManager.undoStack.length > 0,
+        canRedo: undoManager.redoStack.length > 0,
+      });
+    },
+    stopHistoryCapture: () => {
+      get().internal.undoManager?.stopCapturing();
+    },
 
     removeEdge: (edgeId) => {
       const { ydoc } = get();
       if (!ydoc) {
         return;
       }
-      getEdgesMap(ydoc).delete(edgeId);
+      ydoc.transact(() => {
+        getEdgesMap(ydoc).delete(edgeId);
+      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
       set({ highlightedEdgeId: null, highlightedNodeIds: [] });
     },
 
@@ -344,7 +412,7 @@ export function createCanvasSyncActions(
             }
           }
         }
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
       set({ highlightedEdgeId: null, highlightedNodeIds: [] });
     },
 
@@ -366,7 +434,7 @@ export function createCanvasSyncActions(
             posYMap.set('y', node.position.y);
           }
         }
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_LAYOUT);
     },
 
     serialize: () => {

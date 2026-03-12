@@ -229,6 +229,8 @@
       }
     },
     "toolbar": {
+      "undo": "되돌리기",
+      "redo": "다시 실행",
       "fkConnect": "FK 연결",
       "fkConnectActive": "FK 연결 (활성)",
       "autoLayout": "자동 정렬",

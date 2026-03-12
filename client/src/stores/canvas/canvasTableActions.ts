@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
 import { applyDiffToYDoc } from '@/lib/erd-diff-apply';
 import {
   buildFkPrefix,
@@ -76,7 +77,7 @@ export function createCanvasTableActions(
             },
           ]),
         );
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_TABLE);
     },
 
     deleteTable: (nodeId) => {
@@ -104,7 +105,7 @@ export function createCanvasTableActions(
             removeTableIdFromYArray(tableIdsYArray, nodeId);
           }
         });
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_TABLE);
 
       if (get().activeEditNodeId === nodeId) {
         set({ activeEditNodeId: null });
@@ -142,7 +143,7 @@ export function createCanvasTableActions(
       const uniqueLabel = buildUniqueName(nextLabel, existingLabels);
       ydoc.transact(() => {
         tableYMap.set('label', uniqueLabel);
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_TABLE);
     },
 
     updateTableMeta: (nodeId, updates) => {
@@ -164,7 +165,7 @@ export function createCanvasTableActions(
             tableYMap.set(key, value);
           }
         }
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_TABLE);
     },
 
     addColumn: (nodeId) => {
@@ -178,14 +179,16 @@ export function createCanvasTableActions(
       }
       const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
       if (colsYArray) {
-        colsYArray.push([
-          createColumnYMap({
-            id: `col-${crypto.randomUUID()}`,
-            name: 'column',
-            type: 'VARCHAR(255)',
-            nullable: true,
-          }),
-        ]);
+        ydoc.transact(() => {
+          colsYArray.push([
+            createColumnYMap({
+              id: `col-${crypto.randomUUID()}`,
+              name: 'column',
+              type: 'VARCHAR(255)',
+              nullable: true,
+            }),
+          ]);
+        }, CANVAS_HISTORY_ORIGIN.USER_COLUMN);
       }
     },
 
@@ -213,7 +216,7 @@ export function createCanvasTableActions(
           }
         });
         toDelete.forEach((eid) => edgesMap.delete(eid));
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_COLUMN);
     },
 
     updateColumn: (nodeId, colId, updates) => {
@@ -252,7 +255,7 @@ export function createCanvasTableActions(
             }
           });
         }
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_COLUMN);
     },
 
     moveColumn: (nodeId, fromIndex, toIndex) => {
@@ -264,7 +267,10 @@ export function createCanvasTableActions(
       if (tableYMap) {
         const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
         if (colsYArray) {
-          ydoc.transact(() => moveColumnInYArray(colsYArray, fromIndex, toIndex));
+          ydoc.transact(
+            () => moveColumnInYArray(colsYArray, fromIndex, toIndex),
+            CANVAS_HISTORY_ORIGIN.USER_COLUMN,
+          );
         }
       }
     },
@@ -323,7 +329,7 @@ export function createCanvasTableActions(
           );
           count += 1;
         }
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
 
       return count;
     },
@@ -356,7 +362,7 @@ export function createCanvasTableActions(
             }
           }
         }
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
     },
 
     importDdl: (result) => {
@@ -378,7 +384,7 @@ export function createCanvasTableActions(
           },
           startY,
         });
-      });
+      }, CANVAS_HISTORY_ORIGIN.SYSTEM_DDL_IMPORT);
     },
 
     replaceFromDdl: (result) => {
@@ -412,7 +418,7 @@ export function createCanvasTableActions(
           },
           startY: 100,
         });
-      });
+      }, CANVAS_HISTORY_ORIGIN.SYSTEM_DDL_IMPORT);
     },
 
     applyDiffPlan: (plan) => {
@@ -421,7 +427,7 @@ export function createCanvasTableActions(
         return null;
       }
 
-      const result = applyDiffToYDoc(ydoc, plan);
+      const result = applyDiffToYDoc(ydoc, plan, CANVAS_HISTORY_ORIGIN.SYSTEM_CODE_SYNC);
       if (activeEditNodeId && !getTablesMap(ydoc).has(activeEditNodeId)) {
         set({ activeEditNodeId: null });
       }

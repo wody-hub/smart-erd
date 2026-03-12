@@ -230,6 +230,8 @@
       }
     },
     "toolbar": {
+      "undo": "Undo",
+      "redo": "Redo",
       "fkConnect": "FK Connect",
       "fkConnectActive": "FK Connect (Active)",
       "autoLayout": "Auto Layout",

@@ -4,6 +4,7 @@ import com.smarterd.api.auth.dto.AuthResponse;
 import com.smarterd.api.auth.dto.LoginRequest;
 import com.smarterd.api.auth.dto.RefreshRequest;
 import com.smarterd.api.auth.dto.SignupRequest;
+import com.smarterd.config.security.AuthSecurityProperties;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.exception.TooManyRequestsException;
@@ -41,6 +42,8 @@ public class AuthService {
 
     /** 사용자 레포지토리 */
     private final UserRepository userRepository;
+    /** 인증 보안 프로퍼티 */
+    private final AuthSecurityProperties authSecurityProperties;
 
     /** 비밀번호 인코더 */
     private final PasswordEncoder passwordEncoder;
@@ -56,6 +59,11 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse login(LoginRequest request, String clientIp) {
+        if (authSecurityProperties.getTestSupport().isSkipPasswordVerification()) {
+            loginRateLimitService.reset(request.loginId(), clientIp);
+            return issueTokens(findUserByLoginId(request.loginId()));
+        }
+
         if (loginRateLimitService.isBlocked(request.loginId(), clientIp)) {
             throw new TooManyRequestsException(MessageCode.ERROR_AUTH_LOGIN_RATE_LIMITED.code());
         }

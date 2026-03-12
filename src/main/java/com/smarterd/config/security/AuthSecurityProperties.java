@@ -15,6 +15,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "smart-erd.auth")
 public class AuthSecurityProperties {
 
+    /** 테스트 지원 설정 */
+    private TestSupport testSupport = new TestSupport();
     /** 로그인 Rate Limiting 설정 */
     private LoginRateLimit loginRateLimit = new LoginRateLimit();
     /** 클라이언트 IP 추출 설정 */
@@ -84,5 +86,16 @@ public class AuthSecurityProperties {
 
         /** consume 완료 토큰 보관 기간(초) */
         private long consumedRetentionSeconds = 86400L;
+    }
+
+    /**
+     * 테스트 프로파일에서만 사용하는 보조 설정값.
+     */
+    @Getter
+    @Setter
+    public static class TestSupport {
+
+        /** 로그인 비밀번호 검증 우회 여부 */
+        private boolean skipPasswordVerification = false;
     }
 }

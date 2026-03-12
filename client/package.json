@@ -14,6 +14,7 @@
     "test:unit": "node --input-type=module --eval \"import { rmSync } from 'node:fs'; rmSync('.tmp-test', { recursive: true, force: true });\" && tsc -p tsconfig.test.json && node --test .tmp-test/test/unit",
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test e2e/smoke",
+    "test:e2e:smoke:collaboration": "playwright test e2e/smoke/diagram-collaboration.spec.ts --browser=chromium --workers=1 --retries=0",
     "test:e2e:recovery": "playwright test e2e/recovery --workers=1",
     "lint": "eslint . && node ../scripts/verify-function-docs.mjs --frontend-only",
     "lint:docs": "node ../scripts/verify-function-docs.mjs --frontend-only",

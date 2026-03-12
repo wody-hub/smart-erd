@@ -148,6 +148,11 @@ function ERDCanvas({
   const removeEdge = useCanvasStore((s) => s.removeEdge);
   const removeEdgeWithFkColumn = useCanvasStore((s) => s.removeEdgeWithFkColumn);
   const applyLayout = useCanvasStore((s) => s.applyLayout);
+  const undo = useCanvasStore((s) => s.undo);
+  const redo = useCanvasStore((s) => s.redo);
+  const canUndo = useCanvasStore((s) => s.canUndo);
+  const canRedo = useCanvasStore((s) => s.canRedo);
+  const stopHistoryCapture = useCanvasStore((s) => s.stopHistoryCapture);
   const setActiveEditNodeId = useCanvasStore((s) => s.setActiveEditNodeId);
   const remoteEditLocks = useRemoteEditLocks();
   const { locksByNodeId } = remoteEditLocks;
@@ -377,7 +382,14 @@ function ERDCanvas({
             onConnect={effectiveCanEdit ? handleDragConnect : undefined}
             onNodeClick={handleNodeClick}
             onNodeDragStart={effectiveCanEdit ? () => setIsDraggingNode(true) : undefined}
-            onNodeDragStop={effectiveCanEdit ? () => setIsDraggingNode(false) : undefined}
+            onNodeDragStop={
+              effectiveCanEdit
+                ? () => {
+                    setIsDraggingNode(false);
+                    stopHistoryCapture();
+                  }
+                : undefined
+            }
             onEdgeClick={handleEdgeClick}
             onEdgeContextMenu={effectiveCanEdit ? handleEdgeContextMenu : undefined}
             onPaneClick={handlePaneClick}
@@ -421,6 +433,10 @@ function ERDCanvas({
               onToggleCodeEditor={onToggleCodeEditor}
               validationOpen={validationOpen}
               onToggleValidation={onToggleValidation}
+              canUndo={effectiveCanEdit && canUndo}
+              canRedo={effectiveCanEdit && canRedo}
+              onUndo={undo}
+              onRedo={redo}
               canEdit={effectiveCanEdit}
             />
           </ReactFlow>

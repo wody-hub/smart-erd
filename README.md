@@ -49,6 +49,7 @@ npm install
 npm run dev                # http://localhost:3000 (프록시 /api → :8190)
 npm run perf:erd:apply     # S50/S200/S500 parse/apply/layout/total p50/p95 리포트 생성 (/tmp/smart-erd/perf)
 npm run perf:erd:apply:sample  # 저장소 샘플 리포트 갱신 (client/perf-reports/erd-apply-report.json)
+npm run test:e2e:smoke:collaboration  # 협업 생성/undo 전파 스모크
 ```
 
 ### 환경변수
@@ -94,6 +95,23 @@ SMART_ERD_E2E_PASSWORD='your-password' \
 npm run test:e2e:smoke
 ```
 
+### 협업 smoke
+
+- 목적: 서로 다른 브라우저 컨텍스트 간 생성/undo 전파가 유지되는지 확인
+- 범위: 로그인, 동일 다이어그램 동시 접속, 테이블 생성 전파, undo 전파
+- 권장 시점: Yjs, websocket, history/undo, collaboration 관련 수정 후
+- 주의: `test` 프로파일에서 로그인 비밀번호 검증을 우회하려면 백엔드를 `SPRING_PROFILES_ACTIVE=test`로 띄운다.
+
+```bash
+SPRING_PROFILES_ACTIVE=test ./gradlew bootRun
+
+cd client
+SMART_ERD_E2E_LOGIN='your-login-id' \
+SMART_ERD_E2E_PASSWORD='any-value-in-test-profile' \
+SMART_ERD_E2E_BROWSER_CHANNEL='chrome' \
+npm run test:e2e:smoke:collaboration -- --headed
+```
+
 ### 무거운 recovery
 
 - 목적: 편집 내용이 백업되고 백엔드 graceful restart 이후에도 유지되는지 확인
@@ -125,6 +143,7 @@ npm run test:e2e:smoke
 ### 운영 규칙
 
 - `smoke`는 자주 돌리고, `recovery`는 저장/재기동 관련 변경 때만 돌린다.
+- 협업 smoke는 Yjs/undo 변경마다 우선적으로 돌린다.
 - `recovery`는 공용 데이터 충돌을 막기 위해 전용 다이어그램을 두는 편이 낫다.
 - 브라우저 채널을 강제하지 않으면 Playwright 기본 Chromium을 사용한다.
 - 실패 산출물은 `client/playwright-report/`, `client/test-results/`에 남는다.

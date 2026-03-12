@@ -41,9 +41,10 @@ interface DiffApplyContext {
  *
  * @param doc 대상 Y.Doc
  * @param plan 증분 반영 계획
+ * @param origin Yjs transaction origin
  * @returns 적용 결과 요약
  */
-export function applyDiffToYDoc(doc: Y.Doc, plan: DiffPlan): ApplyDiffResult {
+export function applyDiffToYDoc(doc: Y.Doc, plan: DiffPlan, origin?: unknown): ApplyDiffResult {
   const context: DiffApplyContext = {
     plan,
     tablesMap: doc.getMap('tables') as Y.Map<Y.Map<unknown>>,
@@ -85,7 +86,7 @@ export function applyDiffToYDoc(doc: Y.Doc, plan: DiffPlan): ApplyDiffResult {
       context.groupsMap,
       context.tablesMap,
     );
-  });
+  }, origin);
 
   const { appliedOperations, skippedOperations, droppedByPolicy, droppedByMissing } =
     context.counters;
@@ -103,6 +104,12 @@ export function applyDiffToYDoc(doc: Y.Doc, plan: DiffPlan): ApplyDiffResult {
   };
 }
 
+/**
+ * 테이블 delete diff를 적용한다.
+ *
+ * @param context diff 적용 컨텍스트
+ * @returns 없음
+ */
 function applyTableDeletes(context: DiffApplyContext): void {
   for (const tableDiff of context.plan.tables) {
     if (tableDiff.op !== 'delete') {
@@ -131,6 +138,12 @@ function applyTableDeletes(context: DiffApplyContext): void {
   }
 }
 
+/**
+ * 테이블 update diff를 적용한다.
+ *
+ * @param context diff 적용 컨텍스트
+ * @returns 없음
+ */
 function applyTableUpdates(context: DiffApplyContext): void {
   for (const tableDiff of context.plan.tables) {
     if (tableDiff.op !== 'update') {
@@ -157,6 +170,12 @@ function applyTableUpdates(context: DiffApplyContext): void {
   }
 }
 
+/**
+ * 테이블 add diff를 적용한다.
+ *
+ * @param context diff 적용 컨텍스트
+ * @returns 없음
+ */
 function applyTableAdds(context: DiffApplyContext): void {
   const nextPosition = computeNextTablePosition(context.tablesMap);
   for (const tableDiff of context.plan.tables) {
@@ -192,6 +211,12 @@ function applyTableAdds(context: DiffApplyContext): void {
   }
 }
 
+/**
+ * 컬럼 delete diff를 적용한다.
+ *
+ * @param context diff 적용 컨텍스트
+ * @returns 없음
+ */
 function applyColumnDeletes(context: DiffApplyContext): void {
   for (const columnDiff of context.plan.columns) {
     if (columnDiff.op !== 'delete') {
@@ -215,6 +240,12 @@ function applyColumnDeletes(context: DiffApplyContext): void {
   }
 }
 
+/**
+ * 컬럼 update diff를 적용한다.
+ *
+ * @param context diff 적용 컨텍스트
+ * @returns 없음
+ */
 function applyColumnUpdates(context: DiffApplyContext): void {
   for (const columnDiff of context.plan.columns) {
     if (columnDiff.op !== 'update') {
@@ -240,6 +271,12 @@ function applyColumnUpdates(context: DiffApplyContext): void {
   }
 }
 
+/**
+ * 컬럼 add diff를 적용한다.
+ *
+ * @param context diff 적용 컨텍스트
+ * @returns 없음
+ */
 function applyColumnAdds(context: DiffApplyContext): void {
   for (const columnDiff of context.plan.columns) {
     if (columnDiff.op !== 'add') {
@@ -271,6 +308,12 @@ function applyColumnAdds(context: DiffApplyContext): void {
   }
 }
 
+/**
+ * 엣지 delete/update diff를 적용한다.
+ *
+ * @param context diff 적용 컨텍스트
+ * @returns 없음
+ */
 function applyEdgeDeletesAndUpdates(context: DiffApplyContext): void {
   for (const edgeDiff of context.plan.edges) {
     if (edgeDiff.op === 'delete') {
@@ -294,6 +337,12 @@ function applyEdgeDeletesAndUpdates(context: DiffApplyContext): void {
   }
 }
 
+/**
+ * 엣지 add diff를 적용한다.
+ *
+ * @param context diff 적용 컨텍스트
+ * @returns 없음
+ */
 function applyEdgeAdds(context: DiffApplyContext): void {
   const tableIdByName = buildTableIdByName(context.tablesMap);
   for (const edgeDiff of context.plan.edges) {

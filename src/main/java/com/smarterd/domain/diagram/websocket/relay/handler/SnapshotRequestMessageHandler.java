@@ -53,22 +53,26 @@ public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
         try {
             final var loadStartedAt = System.nanoTime();
             final var roomSessionCount = roomManager.getSessionCount(context.diagramId());
-            final var pendingUpdates = roomSessionCount > 1 ? roomManager.peekMergedUpdates(context.diagramId()) : new byte[0];
-            final var cachedSnapshot = roomSessionCount > 1
-                ? snapshotService.getCachedSnapshot(context.diagramId()).orElse(null)
-                : null;
-            final var hasWarmBase = cachedSnapshot != null;
+            final var pendingUpdates =
+                roomSessionCount > 1 ? roomManager.peekMergedUpdates(context.diagramId()) : new byte[0];
+            final var cachedSnapshot =
+                roomSessionCount > 1
+                    ? snapshotService.getCachedSnapshot(context.diagramId())
+                    : java.util.Optional.<byte[]>empty();
+
             final byte[] snapshot;
             if (pendingUpdates.length > 0) {
-                snapshot = snapshotService.buildWarmHandoffSnapshot(context.diagramId(), pendingUpdates);
-            } else if (hasWarmBase) {
-                snapshot = cachedSnapshot;
+                snapshot = Objects.requireNonNull(
+                    snapshotService.buildWarmHandoffSnapshot(context.diagramId(), pendingUpdates)
+                );
             } else {
-                snapshot = snapshotService.loadSnapshot(context.diagramId());
+                snapshot = cachedSnapshot.orElseGet(
+                    () -> Objects.requireNonNull(snapshotService.loadSnapshot(context.diagramId()))
+                );
             }
             final var loadEndedAt = System.nanoTime();
             final var messageType = context.messageType();
-            final var snapshotSource = pendingUpdates.length > 0 || hasWarmBase ? "warm" : "db";
+            final var snapshotSource = pendingUpdates.length > 0 || !cachedSnapshot.isEmpty() ? "warm" : "db";
             if (snapshot.length == 0) {
                 log.info(
                     "snapshot-handoff diagramId={} session={} mode={} source={} snapshotBytes=0 loadMs={} decodeMs=0 sendMs=0 totalMs={}",

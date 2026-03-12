@@ -1,5 +1,6 @@
 import * as Y from 'yjs';
 import type { Edge, Node, OnEdgesChange, OnNodesChange } from '@xyflow/react';
+import type { CanvasUndoManager } from '@/constants/canvas-history';
 import type { DdlParseResult } from '@/lib/ddl-parser';
 import type { ApplyDiffResult } from '@/lib/erd-diff-apply';
 import type { DiffPlan } from '@/lib/erd-diff-plan';
@@ -44,6 +45,7 @@ export interface InternalState {
   tablesObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null;
   edgesObserver: (() => void) | null;
   groupsObserver: (() => void) | null;
+  undoManager: CanvasUndoManager | null;
   isNodeDragging: boolean;
   hasDeferredTableSync: boolean;
   tablePositionQueue: PositionQueueCtx;
@@ -66,6 +68,8 @@ export interface CanvasState {
   setActiveEditNodeId: (id: string | null) => void;
   /** 코드 에디터 편집 테이블 락 키를 설정한다. */
   setCodeEditingTableKey: (tableKey: string | null) => void;
+  canUndo: boolean;
+  canRedo: boolean;
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   setNodes: (nodes: Node<TableNodeData>[]) => void;
@@ -89,6 +93,9 @@ export interface CanvasState {
   setHighlightedNodes: (ids: string[]) => void;
   setHighlightedEdge: (id: string | null) => void;
   clearHighlights: () => void;
+  undo: () => void;
+  redo: () => void;
+  stopHistoryCapture: () => void;
   removeEdge: (edgeId: string) => void;
   removeEdgeWithFkColumn: (edgeId: string) => void;
   applyLayout: (nodes: Node<TableNodeData>[]) => void;

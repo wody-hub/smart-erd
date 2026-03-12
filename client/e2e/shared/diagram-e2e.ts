@@ -23,6 +23,12 @@ interface DiagramDetail {
   content: string | null;
 }
 
+interface DictionarySetSummary {
+  id: number;
+  name: string;
+  isDefault: boolean;
+}
+
 export interface DiagramTarget {
   teamId: number;
   teamName: string;
@@ -137,6 +143,22 @@ async function fetchJson<T>(url: string, token: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function postJson<T>(url: string, body: unknown, token?: string): Promise<T> {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept-Language': 'ko',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`Request failed ${response.status} for ${url}`);
+  }
+  return (await response.json()) as T;
+}
+
 function parseRenderableNodeCount(content: string | null | undefined): number {
   if (!content) {
     return 0;
@@ -168,6 +190,85 @@ export function getE2EConfig(): E2EConfig {
     repoDir,
     bootLogPath:
       process.env.SMART_ERD_E2E_BOOT_LOG_PATH ?? '/tmp/smart-erd-e2e-recovery-backend.log',
+  };
+}
+
+export function getE2EProvisioningConfig(): E2EConfig {
+  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:3000';
+  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? 'http://localhost:8190/api';
+  const repoDir = process.env.SMART_ERD_E2E_REPO_DIR ?? path.resolve(process.cwd(), '..');
+
+  return {
+    baseUrl,
+    apiBaseUrl,
+    loginId: process.env.SMART_ERD_E2E_LOGIN ?? 'e2e-provision@example.com',
+    password: process.env.SMART_ERD_E2E_PASSWORD ?? 'e2e-provision-password',
+    pinnedTeamId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_TEAM_ID),
+    pinnedProjectId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_PROJECT_ID),
+    pinnedDiagramId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_DIAGRAM_ID),
+    backendPort: parsePositiveInt(process.env.SMART_ERD_E2E_BACKEND_PORT, 8190),
+    frontendPort: parsePositiveInt(process.env.SMART_ERD_E2E_FRONTEND_PORT, 3000),
+    backendRestartCommand: process.env.SMART_ERD_E2E_BACKEND_RESTART_CMD ?? './gradlew bootRun',
+    repoDir,
+    bootLogPath:
+      process.env.SMART_ERD_E2E_BOOT_LOG_PATH ?? '/tmp/smart-erd-e2e-recovery-backend.log',
+  };
+}
+
+export async function provisionCollaborationFixture(
+  config: E2EConfig,
+): Promise<{ loginId: string; password: string; target: DiagramTarget }> {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const loginId = `e2e-collab-${suffix}@example.com`;
+  const password = `E2E-${suffix}`;
+  const signup = await postJson<{
+    accessToken: string;
+  }>(`${config.apiBaseUrl}/auth/signup`, {
+    loginId,
+    password,
+    name: `E2E ${suffix}`,
+  });
+
+  const team = await postJson<TeamSummary>(
+    `${config.apiBaseUrl}/teams`,
+    { name: `E2E Team ${suffix}` },
+    signup.accessToken,
+  );
+  const dictionarySets = await fetchJson<DictionarySetSummary[]>(
+    `${config.apiBaseUrl}/teams/${team.id}/dictionary-sets`,
+    signup.accessToken,
+  );
+  const dictionarySet =
+    dictionarySets.find((candidate) => candidate.isDefault) ??
+    dictionarySets[0] ??
+    (await postJson<DictionarySetSummary>(
+      `${config.apiBaseUrl}/teams/${team.id}/dictionary-sets`,
+      { name: `E2E Dictionary ${suffix}` },
+      signup.accessToken,
+    ));
+
+  const project = await postJson<ProjectSummary>(
+    `${config.apiBaseUrl}/teams/${team.id}/projects`,
+    { name: `E2E Project ${suffix}` },
+    signup.accessToken,
+  );
+  const diagram = await postJson<DiagramSummary>(
+    `${config.apiBaseUrl}/teams/${team.id}/projects/${project.id}/diagrams`,
+    { name: `E2E Diagram ${suffix}`, dictionarySetId: dictionarySet.id },
+    signup.accessToken,
+  );
+
+  return {
+    loginId,
+    password,
+    target: {
+      teamId: team.id,
+      teamName: team.name,
+      projectId: project.id,
+      projectName: project.name,
+      diagramId: diagram.id,
+      diagramName: diagram.name,
+    },
   };
 }
 

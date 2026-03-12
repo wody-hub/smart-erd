@@ -1,4 +1,14 @@
-import { Link2, LayoutGrid, Download, ClipboardCheck, Database, Upload, Code2 } from 'lucide-react';
+import {
+  Link2,
+  LayoutGrid,
+  Download,
+  ClipboardCheck,
+  Database,
+  Upload,
+  Code2,
+  Undo2,
+  Redo2,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@xyflow/react';
 import { Button } from '@/components/ui/button';
@@ -40,6 +50,14 @@ interface CanvasToolbarProps {
   onToggleValidation?: () => void;
   /** 편집 가능 여부 (VIEWER일 때 false — FK/자동배치 숨김) */
   canEdit?: boolean;
+  /** undo 가능 여부 */
+  canUndo?: boolean;
+  /** redo 가능 여부 */
+  canRedo?: boolean;
+  /** undo 핸들러 */
+  onUndo?: () => void;
+  /** redo 핸들러 */
+  onRedo?: () => void;
 }
 
 /**
@@ -61,6 +79,7 @@ interface CanvasToolbarProps {
  * @param props.validationOpen      유효성 검사 패널 열림 여부
  * @param props.onToggleValidation  유효성 검사 패널 토글 핸들러
  * @param props.canEdit             편집 가능 여부
+ * @returns ERD 캔버스 툴바 JSX
  */
 export default function CanvasToolbar({
   fkMode,
@@ -77,12 +96,42 @@ export default function CanvasToolbar({
   validationOpen,
   onToggleValidation,
   canEdit = true,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo,
 }: CanvasToolbarProps) {
   const { t } = useTranslation();
 
   return (
     <Panel position="top-center">
       <div className="bg-card border border-border rounded-lg shadow-md p-1 gap-1 flex">
+        {canEdit && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onUndo}
+            className="gap-1.5"
+            aria-label={t('erd.toolbar.undo')}
+            disabled={!canUndo}
+          >
+            <Undo2 className="h-4 w-4" />
+            {t('erd.toolbar.undo')}
+          </Button>
+        )}
+        {canEdit && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRedo}
+            className="gap-1.5"
+            aria-label={t('erd.toolbar.redo')}
+            disabled={!canRedo}
+          >
+            <Redo2 className="h-4 w-4" />
+            {t('erd.toolbar.redo')}
+          </Button>
+        )}
         {canEdit && (
           <Button
             variant={fkMode ? 'default' : 'ghost'}

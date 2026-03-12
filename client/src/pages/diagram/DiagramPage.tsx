@@ -16,6 +16,7 @@ import Spinner from '@/components/ui/spinner';
 import useCanvasStore from '@/stores/useCanvasStore';
 import useCollaborationStore from '@/stores/useCollaborationStore';
 import { fetchDiagram, saveDiagram } from '@/api/diagramApi';
+import { isTextInputLikeTarget } from '@/constants/canvas-history';
 import { queryKeys } from '@/constants/query-keys';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { getErrorMessage } from '@/lib/api-error';
@@ -26,7 +27,7 @@ import { useAutoBackup } from '@/hooks/useAutoBackup';
 
 const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPanel'));
 
-/** 빈 핸들러 (오버레이 retry prop용, 현재 syncStage 고정이므로 미사용) */
+/** 빈 핸들러 (오버레이 retry prop용, 현재 syncStage 고정이므로 미사용). @returns 없음 */
 const noop = () => {};
 
 /**
@@ -71,9 +72,7 @@ export default function DiagramPage() {
   /** 이전 래치 키 보관 ref */
   const prevLatchKeyRef = useRef(latchKey);
   /** 이전 preview 모드 상태 보관 ref (연결 완료 토스트 1회 제어용) */
-  const prevPreviewSyncStatusRef = useRef<'inactive' | 'syncing' | 'live' | 'degraded'>(
-    'inactive',
-  );
+  const prevPreviewSyncStatusRef = useRef<'inactive' | 'syncing' | 'live' | 'degraded'>('inactive');
   /** 다이어그램 전환 직후 1회 평가 스킵 가드 */
   const skipLatchEvalRef = useRef(false);
   /** 진행 중인 사이드바 리사이즈 정리 함수 */
@@ -95,12 +94,14 @@ export default function DiagramPage() {
 
   const prepareBackup = useCanvasStore((s) => s.prepareBackup);
   const markBackedUp = useCanvasStore((s) => s.markBackedUp);
+  const undo = useCanvasStore((s) => s.undo);
+  const redo = useCanvasStore((s) => s.redo);
+  const canUndo = useCanvasStore((s) => s.canUndo);
+  const canRedo = useCanvasStore((s) => s.canRedo);
   const groups = useCanvasStore((s) => s.groups);
   const connectionStatus = useCollaborationStore((s) => s.connectionStatus);
   /** store에 렌더 가능한 노드/엣지가 존재하는지 (boolean selector로 리렌더 최소화) */
-  const storeHasRenderableGraph = useCanvasStore(
-    (s) => s.nodes.length > 0 || s.edges.length > 0,
-  );
+  const storeHasRenderableGraph = useCanvasStore((s) => s.nodes.length > 0 || s.edges.length > 0);
 
   /** 현재 활성 그룹 객체 */
   const activeGroup = activeGroupId
@@ -163,6 +164,13 @@ export default function DiagramPage() {
 
   /** 유효성 검사 패널 토글 핸들러 */
   const handleToggleValidation = useCallback(() => setValidationOpen((prev) => !prev), []);
+
+  /**
+   * 현재 포커스가 캔버스 undo 단축키를 가로채면 안 되는 입력 필드인지 확인한다.
+   *
+   * @returns 텍스트 입력 계열 포커스면 true
+   */
+  const shouldBypassCanvasUndo = () => isTextInputLikeTarget(document.activeElement);
 
   /** 코드 에디터 토글 핸들러 */
   const handleToggleCodeEditor = useCallback(
@@ -380,6 +388,32 @@ export default function DiagramPage() {
   const previewReadOnlyMessage = isPreviewMode
     ? t('diagram.previewSync.headerReadonly')
     : undefined;
+
+  useHotkeys(
+    KEYBINDINGS.UNDO,
+    (event) => {
+      if (shouldBypassCanvasUndo()) {
+        return;
+      }
+      event.preventDefault();
+      undo();
+    },
+    { enabled: effectiveCanEdit && canUndo },
+    [effectiveCanEdit, canUndo, undo],
+  );
+
+  useHotkeys(
+    KEYBINDINGS.REDO,
+    (event) => {
+      if (shouldBypassCanvasUndo()) {
+        return;
+      }
+      event.preventDefault();
+      redo();
+    },
+    { enabled: effectiveCanEdit && canRedo },
+    [effectiveCanEdit, canRedo, redo],
+  );
 
   useEffect(() => {
     if (prevLatchKeyRef.current !== latchKey) {

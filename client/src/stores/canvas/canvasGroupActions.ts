@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
 import { createGroupYMap, getGroupsMap, removeTableIdFromYArray } from '@/collaboration/yjsBridge';
 import type { CanvasGetState, CanvasState } from './canvasStoreTypes';
 
@@ -33,7 +34,7 @@ export function createCanvasGroupActions(
       const groupLabel = label ?? `Group ${groups.length + 1}`;
       ydoc.transact(() => {
         getGroupsMap(ydoc).set(groupId, createGroupYMap(groupLabel));
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
     },
 
     deleteGroup: (groupId) => {
@@ -43,7 +44,7 @@ export function createCanvasGroupActions(
       }
       ydoc.transact(() => {
         getGroupsMap(ydoc).delete(groupId);
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
     },
 
     renameGroup: (groupId, newName) => {
@@ -57,7 +58,7 @@ export function createCanvasGroupActions(
       }
       ydoc.transact(() => {
         groupYMap.set('label', newName);
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
     },
 
     updateGroupColor: (groupId, color) => {
@@ -75,7 +76,7 @@ export function createCanvasGroupActions(
         } else {
           groupYMap.set('color', color);
         }
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
     },
 
     addTableToGroup: (groupId, tableId) => {
@@ -100,7 +101,7 @@ export function createCanvasGroupActions(
 
       ydoc.transact(() => {
         tableIdsYArray.push([tableId]);
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
     },
 
     addTablesToGroup: (groupId, tableIds) => {
@@ -124,7 +125,7 @@ export function createCanvasGroupActions(
         if (toInsert.length > 0) {
           tableIdsYArray.push(toInsert);
         }
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
     },
 
     removeTableFromGroup: (groupId, tableId) => {
@@ -143,7 +144,7 @@ export function createCanvasGroupActions(
 
       ydoc.transact(() => {
         removeTableIdFromYArray(tableIdsYArray, tableId);
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
     },
 
     removeTablesFromGroup: (groupId, tableIds) => {
@@ -164,7 +165,7 @@ export function createCanvasGroupActions(
         for (const tableId of tableIds) {
           removeTableIdFromYArray(tableIdsYArray, tableId);
         }
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
     },
 
     updateGroupTables: (groupId, toAdd, toRemove) => {
@@ -192,7 +193,7 @@ export function createCanvasGroupActions(
         if (toInsert.length > 0) {
           tableIdsYArray.push(toInsert);
         }
-      });
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
     },
   };
 }
