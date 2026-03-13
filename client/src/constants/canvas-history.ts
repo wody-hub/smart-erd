@@ -11,6 +11,7 @@ export const CANVAS_HISTORY_ORIGIN = {
   SYSTEM_FALLBACK: 'canvas-system-fallback',
   SYSTEM_CODE_SYNC: 'canvas-system-code-sync',
   SYSTEM_DDL_IMPORT: 'canvas-system-ddl-import',
+  SYSTEM_DICTIONARY_RECONCILE: 'canvas-system-dictionary-reconcile',
 } as const;
 
 /** 노드 drag flush용 shared origin token. observer skip과 undo 추적에서 함께 사용한다. */

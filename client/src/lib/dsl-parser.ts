@@ -4,10 +4,14 @@ import type {
   ParsedRelation,
   ParsedTable,
   ParsedTableRange,
-} from '@/lib/ddl-parser';
-import type { Term, Domain } from '@/types/dictionary';
-import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
-import { buildTableLockKey } from '@/lib/table-lock-key';
+} from './ddl-parser.js';
+import {
+  resolveLogicalName as resolveLogicalNameFromDictionary,
+  type LogicalNameResolverDictionary,
+} from './logical-name-resolution.js';
+import type { Term, Domain } from '../types/dictionary.js';
+import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from './dsl-keywords.js';
+import { buildTableLockKey } from './table-lock-key.js';
 
 /** DSL 파싱에 필요한 사전 데이터 */
 export interface DslDictionary {
@@ -17,6 +21,8 @@ export interface DslDictionary {
   domainByName: Map<string, Domain>;
   /** ID → Domain 매핑 */
   domainById: Map<number, Domain>;
+  /** 단어사전 매칭 인덱스 */
+  wordMatchIndex: LogicalNameResolverDictionary['wordMatchIndex'];
 }
 
 /** Monaco 마커용 에러 (위치 정보 포함, i18n 대응) */
@@ -135,15 +141,13 @@ const [OPT_PK, OPT_AI, OPT_NN] = DSL_COLUMN_OPTIONS;
 /** `::TYPE` 형식의 허용 패턴 */
 const EXPLICIT_TYPE_PATTERN =
   /^[A-Za-z][A-Za-z0-9_]*(?:\s+[A-Za-z][A-Za-z0-9_]*)*(?:\s*\([^)]+\))?$/;
-/** 복합 용어 분해 시 단일 그룹에서 시도할 최대 길이 */
-const MAX_TERM_LENGTH = 20;
-
 interface ResolvedDslTerm {
   physicalName: string;
   termId?: number;
   domainId?: number;
   physicalType?: string;
   matched: boolean;
+  wordCompleteMatch: boolean;
 }
 
 // ─── 유틸 함수 ────────────────────────────────────────────────────
@@ -185,117 +189,29 @@ function unwrapQuotedIdentifier(value: string): string {
 }
 
 /**
- * 공백 없는 문자열을 greedy longest-match로 기본 용어로 분해한다.
- *
- * useDictionaryCache의 복합 용어 분해 규칙과 동일한 방식으로 동작한다.
- *
- * @param group 공백 없는 연속 문자열
- * @param termByName 논리명 → Term 매핑
- * @returns 분해된 Term 배열(2개 이상) 또는 null
- */
-function decomposeGroup(group: string, termByName: Map<string, Term>): Term[] | null {
-  const result: Term[] = [];
-  let pos = 0;
-
-  while (pos < group.length) {
-    let matched = false;
-    const maxLen = Math.min(group.length - pos, MAX_TERM_LENGTH);
-
-    for (let len = maxLen; len >= 1; len--) {
-      const candidate = group.substring(pos, pos + len);
-      const term = termByName.get(candidate);
-      if (term) {
-        result.push(term);
-        pos += len;
-        matched = true;
-        break;
-      }
-    }
-
-    if (!matched) {
-      return null;
-    }
-  }
-
-  return result.length >= 2 ? result : null;
-}
-
-/**
  * 논리명을 사전 용어로 해석한다.
  *
- * 우선순위:
- * 1) 완전 일치 Term
- * 2) 공백 그룹 단위 복합 용어 분해(그룹 간 `_`, 그룹 내 concat)
+ * 단어사전 완전 조합으로 물리명을 산출하고,
+ * 전체 용어가 등록돼 있을 때만 term/domain/type을 연결한다.
  *
  * @param logicalName 논리명
  * @param dictionary DSL 사전
  * @returns 해석 결과
  */
 function resolveDslTerm(logicalName: string, dictionary: DslDictionary): ResolvedDslTerm {
-  const exact = dictionary.termByName.get(logicalName);
-  if (exact) {
-    const domainId = exact.domainId ?? undefined;
-    const physicalType = domainId ? dictionary.domainById.get(domainId)?.physicalType : undefined;
-    return {
-      physicalName: exact.physicalName,
-      termId: exact.id,
-      domainId,
-      physicalType,
-      matched: true,
-    };
-  }
-
-  const groups = logicalName
-    .trim()
-    .split(/\s+/)
-    .filter((group) => group.length > 0);
-  if (groups.length === 0) {
-    return {
-      physicalName: logicalName,
-      matched: false,
-    };
-  }
-
-  const baseTerms: Term[] = [];
-  const groupPhysicals: string[] = [];
-
-  for (const group of groups) {
-    const groupedExact = dictionary.termByName.get(group);
-    if (groupedExact) {
-      baseTerms.push(groupedExact);
-      groupPhysicals.push(groupedExact.physicalName);
-      continue;
-    }
-
-    const decomposed = decomposeGroup(group, dictionary.termByName);
-    if (!decomposed) {
-      return {
-        physicalName: logicalName,
-        matched: false,
-      };
-    }
-
-    baseTerms.push(...decomposed);
-    groupPhysicals.push(decomposed.map((term) => term.physicalName).join(''));
-  }
-
-  if (baseTerms.length < 2) {
-    return {
-      physicalName: logicalName,
-      matched: false,
-    };
-  }
-
-  const physicalName = groupPhysicals.join('_');
-  const lastTerm = baseTerms[baseTerms.length - 1];
-  const domainId = lastTerm?.domainId ?? undefined;
-  const physicalType = domainId ? dictionary.domainById.get(domainId)?.physicalType : undefined;
+  const resolution = resolveLogicalNameFromDictionary(logicalName, {
+    termByName: dictionary.termByName,
+    domainById: dictionary.domainById,
+    wordMatchIndex: dictionary.wordMatchIndex,
+  });
 
   return {
-    physicalName,
-    domainId,
-    physicalType,
-    matched: true,
+    physicalName: resolution.isWordCompleteMatch ? resolution.physicalName : logicalName,
+    termId: resolution.isRegisteredTerm ? resolution.termId : undefined,
+    domainId: resolution.isRegisteredTerm ? (resolution.domainId ?? undefined) : undefined,
+    physicalType: resolution.isRegisteredTerm ? resolution.physicalType : undefined,
+    matched: resolution.isRegisteredTerm,
+    wordCompleteMatch: resolution.isWordCompleteMatch,
   };
 }
 

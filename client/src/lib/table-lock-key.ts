@@ -1,5 +1,5 @@
-import { djb2 } from '@/lib/hash';
-import type { TableNodeData } from '@/types/erd';
+import { djb2 } from './hash.js';
+import type { TableNodeData } from '../types/erd.js';
 
 /** 락 키 계산에 필요한 최소 컬럼 정보 */
 export interface TableLockKeyColumn {

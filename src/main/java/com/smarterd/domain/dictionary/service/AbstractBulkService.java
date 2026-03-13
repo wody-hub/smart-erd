@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.api.dictionary.dto.BulkValidationRow;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.domain.dictionary.service.session.BulkValidationSessionStore;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
@@ -27,11 +28,16 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
+import org.apache.poi.ss.usermodel.BorderStyle;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.springframework.context.MessageSource;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -55,17 +61,10 @@ public abstract class AbstractBulkService<R> {
     /** 검증 세션 TTL */
     protected static final Duration VALIDATION_SESSION_TTL = Duration.ofMinutes(10);
 
-    private static final String CONSUME_SCRIPT_PATH = "lua/bulk-validation-consume.lua";
-    private static final String CONSUME_RESULT_CONSUMED = "__CONSUMED__";
-    private static final String CONSUME_RESULT_MISMATCH = "__MISMATCH__";
-    private static final DefaultRedisScript<String> CONSUME_SCRIPT = loadScript(CONSUME_SCRIPT_PATH, String.class);
-
     private final AuthService authService;
     private final TeamService teamService;
     private final MessageSource messageSource;
-
-    /** Redis 문자열 템플릿 */
-    protected final StringRedisTemplate redisTemplate;
+    private final BulkValidationSessionStore validationSessionStore;
 
     /** JSON 직렬화/역직렬화 */
     protected final ObjectMapper objectMapper;
@@ -74,20 +73,20 @@ public abstract class AbstractBulkService<R> {
      * @param authService    인증 서비스
      * @param teamService    팀 서비스
      * @param messageSource  메시지 소스
-     * @param redisTemplate  Redis 문자열 템플릿
+     * @param validationSessionStore 벌크 검증 세션 저장소
      * @param objectMapper   JSON 직렬화/역직렬화
      */
     protected AbstractBulkService(
         AuthService authService,
         TeamService teamService,
         MessageSource messageSource,
-        StringRedisTemplate redisTemplate,
+        BulkValidationSessionStore validationSessionStore,
         ObjectMapper objectMapper
     ) {
         this.authService = authService;
         this.teamService = teamService;
         this.messageSource = messageSource;
-        this.redisTemplate = redisTemplate;
+        this.validationSessionStore = validationSessionStore;
         this.objectMapper = objectMapper;
     }
 
@@ -454,7 +453,10 @@ public abstract class AbstractBulkService<R> {
         try (final var utils = new ExcelUtils<>(sampleRows, titles)) {
             utils.sheetName(msg(sheetNameCode, locale));
             final var excelData = utils.toExcel();
+            styleTemplateDataSheet(excelData.excelBook().getSheetAt(0));
             addGuideSheet(excelData.excelBook(), locale, templateType);
+            excelData.excelBook().setActiveSheet(0);
+            excelData.excelBook().setSelectedTab(0);
             return excelData;
         } catch (IOException e) {
             throw new java.io.UncheckedIOException("Failed to release Excel template resources", e);
@@ -462,23 +464,8 @@ public abstract class AbstractBulkService<R> {
     }
 
     // ─────────────────────────────────────────────────────────
-    // Redis 검증 세션 관리
+    // 검증 세션 관리
     // ─────────────────────────────────────────────────────────
-
-    /**
-     * classpath의 Lua 파일을 읽어 {@link DefaultRedisScript} 객체를 생성한다.
-     *
-     * @param path       classpath 기준 Lua 파일 경로
-     * @param resultType 스크립트 반환 타입
-     * @param <T>        스크립트 반환 제네릭 타입
-     * @return 로드된 Redis Lua 스크립트 객체
-     */
-    protected static <T> DefaultRedisScript<T> loadScript(String path, Class<T> resultType) {
-        final var script = new DefaultRedisScript<T>();
-        script.setLocation(new ClassPathResource(Objects.requireNonNull(path)));
-        script.setResultType(resultType);
-        return script;
-    }
 
     /**
      * 검증 세션 Redis 키를 생성한다.
@@ -519,10 +506,12 @@ public abstract class AbstractBulkService<R> {
             final var token = UUID.randomUUID().toString();
             final var key = Objects.requireNonNull(validationSessionKey(token));
             final var payload = Objects.requireNonNull(serializeSession(session));
-            final var stored = redisTemplate
-                .opsForValue()
-                .setIfAbsent(key, payload, Objects.requireNonNull(VALIDATION_SESSION_TTL));
-            if (Boolean.TRUE.equals(stored)) {
+            final var stored = validationSessionStore.putIfAbsent(
+                key,
+                payload,
+                Objects.requireNonNull(VALIDATION_SESSION_TTL)
+            );
+            if (stored) {
                 return token;
             }
         }
@@ -551,20 +540,22 @@ public abstract class AbstractBulkService<R> {
         Class<S> sessionClass
     ) {
         final var normalizedToken = normalizeValidationToken(token);
-        final var consumeResult = redisTemplate.execute(
-            Objects.requireNonNull(CONSUME_SCRIPT),
-            Objects.requireNonNull(List.of(validationSessionKey(normalizedToken))),
+        final var consumeResult = validationSessionStore.consume(
+            validationSessionKey(normalizedToken),
             loginId,
-            String.valueOf(teamId),
-            String.valueOf(setId)
+            teamId,
+            setId
         );
-        if (consumeResult == null || consumeResult.isEmpty()) {
+        if (consumeResult.status() == BulkValidationSessionStore.ConsumeStatus.MISSING) {
             throw new BusinessException(MessageCode.ERROR_BULK_VALIDATION_TOKEN_INVALID.code());
         }
-        if (CONSUME_RESULT_CONSUMED.equals(consumeResult) || CONSUME_RESULT_MISMATCH.equals(consumeResult)) {
+        if (
+            consumeResult.status() == BulkValidationSessionStore.ConsumeStatus.ALREADY_CONSUMED ||
+            consumeResult.status() == BulkValidationSessionStore.ConsumeStatus.OWNERSHIP_MISMATCH
+        ) {
             throw new BusinessException(MessageCode.ERROR_BULK_VALIDATION_TOKEN_INVALID.code());
         }
-        return parseSessionOrThrow(consumeResult, sessionClass);
+        return parseSessionOrThrow(Objects.requireNonNull(consumeResult.payload()), sessionClass);
     }
 
     /**
@@ -588,13 +579,13 @@ public abstract class AbstractBulkService<R> {
     ) {
         final var normalizedToken = normalizeValidationToken(token);
         final var key = Objects.requireNonNull(validationSessionKey(normalizedToken));
-        final var payload = redisTemplate.opsForValue().get(key);
+        final var payload = validationSessionStore.get(key);
         if (payload == null || payload.isEmpty()) {
             throw new BusinessException(MessageCode.ERROR_BULK_VALIDATION_TOKEN_INVALID.code());
         }
         final var session = parseSessionOrThrow(payload, sessionClass);
         if (session instanceof SessionExpirable expirable && expirable.expiresAt().isBefore(Instant.now())) {
-            redisTemplate.delete(key);
+            validationSessionStore.delete(key);
             throw new BusinessException(MessageCode.ERROR_BULK_VALIDATION_TOKEN_INVALID.code());
         }
         if (session instanceof SessionOwnership ownership) {
@@ -683,34 +674,340 @@ public abstract class AbstractBulkService<R> {
     protected void addGuideSheet(Workbook workbook, Locale locale, TemplateType templateType) {
         final var sheetName = msg("template.guide.sheet-name", locale);
         final var guideSheet = workbook.createSheet(sheetName);
+        guideSheet.setDisplayGridlines(false);
+        guideSheet.setColumnWidth(0, 18 * 256);
+        guideSheet.setColumnWidth(1, 20 * 256);
+        guideSheet.setColumnWidth(2, 18 * 256);
+        guideSheet.setColumnWidth(3, 44 * 256);
 
         var rowIdx = 0;
 
-        // 타이틀
+        final var heroTitleStyle = createGuideHeroTitleStyle(workbook);
+        final var heroSubtitleStyle = createGuideHeroSubtitleStyle(workbook);
+        final var sectionStyle = createGuideSectionStyle(workbook);
+        final var labelStyle = createGuideLabelStyle(workbook);
+        final var valueStyle = createGuideValueStyle(workbook);
+        final var bulletIndexStyle = createGuideBulletIndexStyle(workbook);
+        final var bulletTextStyle = createGuideBulletTextStyle(workbook);
+
+        // 타이틀 배너
+        guideSheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 3));
         final var titleRow = guideSheet.createRow(rowIdx++);
+        titleRow.setHeightInPoints(24);
         final var titleCell = titleRow.createCell(0);
         titleCell.setCellValue(msg("template.guide.title", locale));
-        final var font = workbook.createFont();
-        font.setBold(true);
-        font.setFontHeightInPoints((short) 14);
-        final var titleStyle = workbook.createCellStyle();
-        titleStyle.setFont(font);
-        titleCell.setCellStyle(titleStyle);
+        titleCell.setCellStyle(heroTitleStyle);
+        applyMergedRegionStyle(guideSheet, 0, 0, 0, 3, heroTitleStyle);
 
-        rowIdx++; // 빈 행
+        guideSheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 3));
+        final var subtitleRow = guideSheet.createRow(rowIdx++);
+        subtitleRow.setHeightInPoints(20);
+        final var subtitleCell = subtitleRow.createCell(0);
+        subtitleCell.setCellValue(msg("template.guide.subtitle", locale));
+        subtitleCell.setCellStyle(heroSubtitleStyle);
+        applyMergedRegionStyle(guideSheet, 1, 1, 0, 3, heroSubtitleStyle);
+
+        rowIdx++;
+
+        final var summaryTitleRow = guideSheet.createRow(rowIdx++);
+        summaryTitleRow.createCell(0).setCellValue(msg("template.guide.summary.title", locale));
+        summaryTitleRow.getCell(0).setCellStyle(sectionStyle);
+        applyMergedRegionStyle(guideSheet, summaryTitleRow.getRowNum(), summaryTitleRow.getRowNum(), 0, 3, sectionStyle);
+        guideSheet.addMergedRegion(
+            new CellRangeAddress(summaryTitleRow.getRowNum(), summaryTitleRow.getRowNum(), 0, 3)
+        );
+
+        rowIdx = createGuideSummaryRow(
+            guideSheet,
+            rowIdx,
+            msg("template.guide.summary.sheet", locale),
+            msg(templateType.sheetNameCode(), locale),
+            labelStyle,
+            valueStyle
+        );
+        rowIdx = createGuideSummaryRow(
+            guideSheet,
+            rowIdx,
+            msg("template.guide.summary.formats", locale),
+            ".xlsx, .csv",
+            labelStyle,
+            valueStyle
+        );
+        rowIdx = createGuideSummaryRow(
+            guideSheet,
+            rowIdx,
+            msg("template.guide.summary.max-rows", locale),
+            String.valueOf(MAX_ROWS),
+            labelStyle,
+            valueStyle
+        );
+
+        rowIdx++;
+
+        final var instructionTitleRow = guideSheet.createRow(rowIdx++);
+        instructionTitleRow.createCell(0).setCellValue(msg("template.guide.instructions.title", locale));
+        instructionTitleRow.getCell(0).setCellStyle(sectionStyle);
+        applyMergedRegionStyle(guideSheet, instructionTitleRow.getRowNum(), instructionTitleRow.getRowNum(), 0, 3, sectionStyle);
+        guideSheet.addMergedRegion(
+            new CellRangeAddress(instructionTitleRow.getRowNum(), instructionTitleRow.getRowNum(), 0, 3)
+        );
 
         // 안내 항목
         final var prefix = "template.guide." + templateType.key() + ".instruction.";
         for (var i = 1; i <= templateType.instructionCount(); i++) {
             final var row = guideSheet.createRow(rowIdx++);
+            row.setHeightInPoints(22);
             final var messageCode = prefix + i;
             final var message = templateType.isMaxRowsInstruction(i)
                 ? msg(messageCode, locale, MAX_ROWS)
                 : msg(messageCode, locale);
-            row.createCell(0).setCellValue(message);
+            final var indexCell = row.createCell(0);
+            indexCell.setCellValue(i);
+            indexCell.setCellStyle(bulletIndexStyle);
+
+            final var messageCell = row.createCell(1);
+            messageCell.setCellValue(stripInstructionNumber(message));
+            messageCell.setCellStyle(bulletTextStyle);
+            applyMergedRegionStyle(row, 1, 3, bulletTextStyle);
+            guideSheet.addMergedRegion(new CellRangeAddress(row.getRowNum(), row.getRowNum(), 1, 3));
+        }
+    }
+
+    private void styleTemplateDataSheet(Sheet dataSheet) {
+        if (dataSheet == null) {
+            return;
         }
 
-        guideSheet.autoSizeColumn(0);
+        dataSheet.setDisplayGridlines(false);
+        dataSheet.createFreezePane(0, 1);
+        dataSheet.setZoom(120);
+
+        final var workbook = dataSheet.getWorkbook();
+        final var headerRequiredStyle = createTemplateHeaderStyle(workbook, true);
+        final var headerOptionalStyle = createTemplateHeaderStyle(workbook, false);
+        final var sampleStyle = createTemplateSampleStyle(workbook);
+
+        final var headerRow = dataSheet.getRow(0);
+        if (headerRow == null || headerRow.getLastCellNum() < 0) {
+            return;
+        }
+
+        headerRow.setHeightInPoints(24);
+        final var lastColumnIndex = headerRow.getLastCellNum() - 1;
+        for (var columnIndex = 0; columnIndex <= lastColumnIndex; columnIndex++) {
+            final var headerCell = headerRow.getCell(columnIndex);
+            if (headerCell == null) {
+                continue;
+            }
+            final var headerValue = AppStringUtils.trimToEmpty(headerCell.getStringCellValue());
+            headerCell.setCellStyle(isRequiredHeader(headerValue) ? headerRequiredStyle : headerOptionalStyle);
+        }
+
+        for (var rowIndex = 1; rowIndex <= dataSheet.getLastRowNum(); rowIndex++) {
+            final var row = dataSheet.getRow(rowIndex);
+            if (row == null) {
+                continue;
+            }
+            row.setHeightInPoints(21);
+            for (var columnIndex = 0; columnIndex <= lastColumnIndex; columnIndex++) {
+                final var cell = row.getCell(columnIndex);
+                if (cell == null) {
+                    continue;
+                }
+                cell.setCellStyle(sampleStyle);
+            }
+        }
+
+        dataSheet.setAutoFilter(new CellRangeAddress(0, 0, 0, lastColumnIndex));
+        for (var columnIndex = 0; columnIndex <= lastColumnIndex; columnIndex++) {
+            dataSheet.autoSizeColumn(columnIndex);
+            final var currentWidth = dataSheet.getColumnWidth(columnIndex);
+            dataSheet.setColumnWidth(columnIndex, Math.min(currentWidth + 1024, 48 * 256));
+        }
+    }
+
+    private boolean isRequiredHeader(String headerValue) {
+        return headerValue.contains("필수") || AppStringUtils.containsIgnoreCase(headerValue, "required");
+    }
+
+    private int createGuideSummaryRow(
+        Sheet guideSheet,
+        int rowIndex,
+        String label,
+        String value,
+        org.apache.poi.ss.usermodel.CellStyle labelStyle,
+        org.apache.poi.ss.usermodel.CellStyle valueStyle
+    ) {
+        final var row = guideSheet.createRow(rowIndex);
+        final var labelCell = row.createCell(0);
+        labelCell.setCellValue(label);
+        labelCell.setCellStyle(labelStyle);
+
+        final var valueCell = row.createCell(1);
+        valueCell.setCellValue(value);
+        valueCell.setCellStyle(valueStyle);
+        applyMergedRegionStyle(row, 1, 3, valueStyle);
+        guideSheet.addMergedRegion(new CellRangeAddress(rowIndex, rowIndex, 1, 3));
+        return rowIndex + 1;
+    }
+
+    private void applyMergedRegionStyle(Sheet sheet, int firstRow, int lastRow, int firstColumn, int lastColumn, org.apache.poi.ss.usermodel.CellStyle style) {
+        for (var rowIndex = firstRow; rowIndex <= lastRow; rowIndex++) {
+            final var row = sheet.getRow(rowIndex) == null ? sheet.createRow(rowIndex) : sheet.getRow(rowIndex);
+            applyMergedRegionStyle(row, firstColumn, lastColumn, style);
+        }
+    }
+
+    private void applyMergedRegionStyle(Row row, int firstColumn, int lastColumn, org.apache.poi.ss.usermodel.CellStyle style) {
+        for (var columnIndex = firstColumn; columnIndex <= lastColumn; columnIndex++) {
+            final var cell = row.getCell(columnIndex) == null ? row.createCell(columnIndex) : row.getCell(columnIndex);
+            cell.setCellStyle(style);
+        }
+    }
+
+    private String stripInstructionNumber(String message) {
+        final var normalizedMessage = AppStringUtils.trimToEmpty(message);
+        final var separatorIndex = normalizedMessage.indexOf(". ");
+        if (separatorIndex < 0) {
+            return normalizedMessage;
+        }
+        return normalizedMessage.substring(separatorIndex + 2);
+    }
+
+    private org.apache.poi.ss.usermodel.CellStyle createTemplateHeaderStyle(Workbook workbook, boolean required) {
+        final var style = workbook.createCellStyle();
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setFillForegroundColor(required ? IndexedColors.DARK_BLUE.getIndex() : IndexedColors.BLUE_GREY.getIndex());
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setBorderBottom(BorderStyle.MEDIUM);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+
+        final var font = workbook.createFont();
+        font.setBold(true);
+        font.setColor(IndexedColors.WHITE.getIndex());
+        font.setFontHeightInPoints((short) 11);
+        style.setFont(font);
+        return style;
+    }
+
+    private org.apache.poi.ss.usermodel.CellStyle createTemplateSampleStyle(Workbook workbook) {
+        final var style = workbook.createCellStyle();
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setFillForegroundColor(IndexedColors.LEMON_CHIFFON.getIndex());
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setWrapText(true);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        final var font = workbook.createFont();
+        font.setFontHeightInPoints((short) 10);
+        style.setFont(font);
+        return style;
+    }
+
+    private org.apache.poi.ss.usermodel.CellStyle createGuideHeroTitleStyle(Workbook workbook) {
+        final var style = workbook.createCellStyle();
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
+        style.setAlignment(HorizontalAlignment.LEFT);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        final var font = workbook.createFont();
+        font.setBold(true);
+        font.setColor(IndexedColors.WHITE.getIndex());
+        font.setFontHeightInPoints((short) 16);
+        style.setFont(font);
+        return style;
+    }
+
+    private org.apache.poi.ss.usermodel.CellStyle createGuideHeroSubtitleStyle(Workbook workbook) {
+        final var style = workbook.createCellStyle();
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        style.setAlignment(HorizontalAlignment.LEFT);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        final var font = workbook.createFont();
+        font.setFontHeightInPoints((short) 10);
+        font.setColor(IndexedColors.GREY_80_PERCENT.getIndex());
+        style.setFont(font);
+        return style;
+    }
+
+    private org.apache.poi.ss.usermodel.CellStyle createGuideSectionStyle(Workbook workbook) {
+        final var style = workbook.createCellStyle();
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        style.setAlignment(HorizontalAlignment.LEFT);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        final var font = workbook.createFont();
+        font.setBold(true);
+        font.setFontHeightInPoints((short) 11);
+        style.setFont(font);
+        return style;
+    }
+
+    private org.apache.poi.ss.usermodel.CellStyle createGuideLabelStyle(Workbook workbook) {
+        final var style = workbook.createCellStyle();
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setFillForegroundColor(IndexedColors.PALE_BLUE.getIndex());
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        final var font = workbook.createFont();
+        font.setBold(true);
+        font.setFontHeightInPoints((short) 10);
+        style.setFont(font);
+        return style;
+    }
+
+    private org.apache.poi.ss.usermodel.CellStyle createGuideValueStyle(Workbook workbook) {
+        final var style = workbook.createCellStyle();
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        style.setWrapText(true);
+        final var font = workbook.createFont();
+        font.setFontHeightInPoints((short) 10);
+        style.setFont(font);
+        return style;
+    }
+
+    private org.apache.poi.ss.usermodel.CellStyle createGuideBulletIndexStyle(Workbook workbook) {
+        final var style = workbook.createCellStyle();
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        final var font = workbook.createFont();
+        font.setBold(true);
+        font.setFontHeightInPoints((short) 10);
+        style.setFont(font);
+        return style;
+    }
+
+    private org.apache.poi.ss.usermodel.CellStyle createGuideBulletTextStyle(Workbook workbook) {
+        final var style = workbook.createCellStyle();
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setWrapText(true);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        final var font = workbook.createFont();
+        font.setFontHeightInPoints((short) 10);
+        style.setFont(font);
+        return style;
     }
 
     /**
@@ -720,20 +1017,22 @@ public abstract class AbstractBulkService<R> {
      */
     protected enum TemplateType {
         /** 도메인 템플릿 */
-        DOMAIN("domain", 7, 7),
+        DOMAIN("domain", "template.domain.sheet-name", 7, 7),
 
         /** 용어 템플릿 */
-        TERM("term", 8, 8),
+        TERM("term", "template.term.sheet-name", 8, 8),
 
         /** 단어 템플릿 */
-        WORD("word", 7, 7);
+        WORD("word", "template.word.sheet-name", 7, 7);
 
         private final String key;
+        private final String sheetNameCode;
         private final int instructionCount;
         private final int maxRowsInstructionIndex;
 
-        TemplateType(String key, int instructionCount, int maxRowsInstructionIndex) {
+        TemplateType(String key, String sheetNameCode, int instructionCount, int maxRowsInstructionIndex) {
             this.key = key;
+            this.sheetNameCode = sheetNameCode;
             this.instructionCount = instructionCount;
             this.maxRowsInstructionIndex = maxRowsInstructionIndex;
         }
@@ -743,6 +1042,13 @@ public abstract class AbstractBulkService<R> {
          */
         public String key() {
             return key;
+        }
+
+        /**
+         * @return 데이터 시트명 메시지 코드
+         */
+        public String sheetNameCode() {
+            return sheetNameCode;
         }
 
         /**

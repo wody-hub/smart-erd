@@ -28,7 +28,7 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
             .fetchJoin()
             .join(diagram.project.team)
             .fetchJoin()
-            .where(diagram.id.eq(id))
+            .where(diagram.id.eq(id).and(diagram.deletedAt.isNull()))
             .fetchOne();
         return Optional.ofNullable(result);
     }
@@ -38,7 +38,7 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
         final var snapshot = queryFactory
             .select(diagram.ydocSnapshot)
             .from(diagram)
-            .where(diagram.id.eq(id))
+            .where(diagram.id.eq(id).and(diagram.deletedAt.isNull()))
             .fetchOne();
         return snapshot != null && snapshot.length > 0;
     }
@@ -46,7 +46,11 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
     @Override
     public Optional<byte[]> findYdocSnapshotById(Long id) {
         return Optional.ofNullable(
-            queryFactory.select(diagram.ydocSnapshot).from(diagram).where(diagram.id.eq(id)).fetchOne()
+            queryFactory
+                .select(diagram.ydocSnapshot)
+                .from(diagram)
+                .where(diagram.id.eq(id).and(diagram.deletedAt.isNull()))
+                .fetchOne()
         );
     }
 
@@ -56,7 +60,7 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
             .update(diagram)
             .set(diagram.ydocSnapshot, snapshot)
             .set(diagram.updatedAt, Instant.now())
-            .where(diagram.id.eq(id))
+            .where(diagram.id.eq(id).and(diagram.deletedAt.isNull()))
             .execute();
     }
 
@@ -65,7 +69,7 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
         return queryFactory
             .select(diagram.contentRevision)
             .from(diagram)
-            .where(diagram.id.eq(id))
+            .where(diagram.id.eq(id).and(diagram.deletedAt.isNull()))
             .setLockMode(LockModeType.PESSIMISTIC_WRITE)
             .fetchOne();
     }
@@ -78,7 +82,7 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
             .set(diagram.snapshotRevision, snapshotRevision)
             .set(diagram.snapshotUpdatedAt, Instant.now())
             .set(diagram.updatedAt, Instant.now())
-            .where(diagram.id.eq(id))
+            .where(diagram.id.eq(id).and(diagram.deletedAt.isNull()))
             .execute();
     }
 
@@ -87,7 +91,7 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
         final Tuple result = queryFactory
             .select(diagram.ydocSnapshot, diagram.snapshotRevision)
             .from(diagram)
-            .where(diagram.id.eq(id))
+            .where(diagram.id.eq(id).and(diagram.deletedAt.isNull()))
             .fetchOne();
         if (result == null) {
             return Optional.empty();
@@ -104,7 +108,7 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
         final Tuple result = queryFactory
             .select(diagram, hasSnapshotExpr)
             .from(diagram)
-            .where(diagram.project.eq(project).and(diagram.id.eq(diagramId)))
+            .where(diagram.project.eq(project).and(diagram.id.eq(diagramId)).and(diagram.deletedAt.isNull()))
             .fetchOne();
         if (result == null) {
             return Optional.empty();

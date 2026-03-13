@@ -20,7 +20,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { TableNode as TableNodeType, Column } from '@/types/erd';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
-import { useCompoundTermRegister } from '@/hooks/useCompoundTermRegister';
+import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
 import { useErdDictionary } from './ErdDictionaryContext';
 import { useErdPermission } from './ErdPermissionContext';
 import { useErdFkMode } from './ErdFkModeContext';
@@ -34,6 +34,8 @@ import StaticColumnRow from './StaticColumnRow';
 import TableNodeHeader from './TableNodeHeader';
 import EditableColumnRow from './EditableColumnRow';
 
+const DEFAULT_COLUMN_TYPE = 'VARCHAR(255)';
+
 /** 빠른 용어 등록 대상 정보 */
 interface QuickTermTarget {
   /** 노드 ID */
@@ -42,8 +44,6 @@ interface QuickTermTarget {
   colId: string;
   /** 초기 논리명 */
   logicalName: string;
-  /** true이면 등록만 하고 컬럼에 적용하지 않음 (부분 세그먼트 등록용) */
-  partialOnly?: boolean;
 }
 
 /** SortableColumnRow 컴포넌트 props */
@@ -124,7 +124,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const moveColumn = useCanvasStore((s) => s.moveColumn);
   const isHighlighted = useCanvasStore((s) => s.highlightedNodeIds.includes(id));
 
-  const { findTermById, findDomainById, resolveCompound } = useErdDictionary();
+  const { findTermById, findDomainById, resolveLogicalName } = useErdDictionary();
   const { canEdit: permissionCanEdit } = useErdPermission();
   const { locksByNodeId } = useRemoteEditLocksContext();
   const lockInfo = locksByNodeId.get(id);
@@ -134,7 +134,6 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   /** 편집 권한이 있고, 이 노드가 편집 모드로 활성화된 상태 */
   const isEditing = canEdit && isEditingState;
   const fkMode = useErdFkMode();
-  const registerCompound = useCompoundTermRegister(id);
 
   /** 연결된 Handle ID 셋 (이 노드에 연결된 핸들만 수집) */
   const connectedHandles = useStore(
@@ -207,9 +206,12 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
    * @param newValue 새 논리명 값
    */
   const handleTableLogicalNameChange = (newValue: string) => {
+    const trimmed = newValue.trim();
+    const resolution = resolveLogicalName(newValue);
     updateTableMeta(id, {
-      logicalTableName: newValue || undefined,
-      tableTermId: undefined,
+      logicalTableName: trimmed || undefined,
+      label: resolution.isWordCompleteMatch ? resolution.physicalName : label,
+      tableTermId: resolution.isRegisteredTerm ? resolution.termId : undefined,
     });
   };
 
@@ -227,17 +229,17 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   };
 
   /**
-   * 테이블 복합 용어 선택 핸들러.
+   * 테이블 단어사전 해석 결과 선택 핸들러.
    *
-   * 복합 해석 결과를 즉시 테이블 논리명/물리명에 반영하고, tableTermId는 해제한다.
+   * 단어사전 기반 물리명 유도 결과를 즉시 반영한다.
    *
-   * @param resolution 복합 용어 해석 결과
+   * @param resolution 논리명 해석 결과
    */
-  const handleTableSelectCompound = (resolution: { query: string; physicalName: string }) => {
+  const handleTableSelectDerived = (resolution: LogicalNameResolution) => {
     updateTableMeta(id, {
       logicalTableName: resolution.query,
       label: resolution.physicalName,
-      tableTermId: undefined,
+      tableTermId: resolution.isRegisteredTerm ? resolution.termId : undefined,
     });
   };
 
@@ -266,17 +268,46 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   };
 
   /**
-   * 논리명 변경 핸들러 — termId/domainId 초기화.
+   * 논리명 변경 핸들러.
+   *
+   * 단어사전 완전 조합이면 물리명을 즉시 반영하고,
+   * 전체 용어가 등록돼 있을 때만 term/domain/type을 연결한다.
    *
    * @param colId     컬럼 ID
    * @param newValue  새 논리명 값
    */
   const handleLogicalNameChange = (colId: string, newValue: string) => {
-    updateColumn(id, colId, {
+    const column = columns.find((item) => item.id === colId);
+    const resolution = resolveLogicalName(newValue);
+    const updates: Partial<Column> = {
       logicalName: newValue || undefined,
       termId: undefined,
       domainId: undefined,
-    });
+    };
+
+    if (resolution.isWordCompleteMatch) {
+      updates.name = resolution.physicalName;
+    }
+
+    if (resolution.isRegisteredTerm) {
+      updates.termId = resolution.termId;
+      updates.domainId = resolution.domainId ?? undefined;
+      if (resolution.physicalType) {
+        updates.type = resolution.physicalType;
+      } else if (column?.domainId != null) {
+        const previousDomain = findDomainById(column.domainId);
+        if (previousDomain && column.type === previousDomain.physicalType) {
+          updates.type = DEFAULT_COLUMN_TYPE;
+        }
+      }
+    } else if (column?.domainId != null) {
+      const previousDomain = findDomainById(column.domainId);
+      if (previousDomain && column.type === previousDomain.physicalType) {
+        updates.type = DEFAULT_COLUMN_TYPE;
+      }
+    }
+
+    updateColumn(id, colId, updates);
   };
 
   /**
@@ -286,6 +317,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
    * @param result 선택된 Term 결과
    */
   const handleSelectTerm = (colId: string, result: TermSelectResult) => {
+    const column = columns.find((item) => item.id === colId);
     const updates: Partial<Column> = {
       logicalName: result.logicalName,
       name: result.name,
@@ -294,6 +326,11 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
     };
     if (result.type) {
       updates.type = result.type;
+    } else if (column?.domainId != null) {
+      const previousDomain = findDomainById(column.domainId);
+      if (previousDomain && column.type === previousDomain.physicalType) {
+        updates.type = DEFAULT_COLUMN_TYPE;
+      }
     }
     updateColumn(id, colId, updates);
   };
@@ -315,15 +352,33 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   };
 
   /**
-   * 빠른 용어 등록 적용 핸들러.
+   * 단어사전 기반 해석 결과 적용 핸들러.
    *
-   * @param updates 컬럼 업데이트 데이터
+   * @param colId 대상 컬럼 ID
+   * @param resolution 논리명 해석 결과
    */
+  const handleDerivedSelect = (colId: string, resolution: LogicalNameResolution) => {
+    const column = columns.find((item) => item.id === colId);
+    const updates: Partial<Column> = {
+      logicalName: resolution.query || undefined,
+      name: resolution.physicalName,
+      termId: resolution.isRegisteredTerm ? resolution.termId : undefined,
+      domainId: resolution.isRegisteredTerm ? (resolution.domainId ?? undefined) : undefined,
+    };
+    if (resolution.isRegisteredTerm && resolution.physicalType) {
+      updates.type = resolution.physicalType;
+    } else if (column?.domainId != null) {
+      const previousDomain = findDomainById(column.domainId);
+      if (previousDomain && column.type === previousDomain.physicalType) {
+        updates.type = DEFAULT_COLUMN_TYPE;
+      }
+    }
+    updateColumn(id, colId, updates);
+  };
+
   const handleQuickTermApply = (updates: Partial<Column>) => {
     if (quickTermTarget) {
-      if (!quickTermTarget.partialOnly) {
-        updateColumn(quickTermTarget.nodeId, quickTermTarget.colId, updates);
-      }
+      updateColumn(quickTermTarget.nodeId, quickTermTarget.colId, updates);
       setQuickTermTarget(null);
     }
   };
@@ -361,11 +416,8 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
           lockInfo={lockInfo}
           onLogicalNameChange={handleTableLogicalNameChange}
           onSelectTerm={handleTableSelectTerm}
-          onSelectCompound={handleTableSelectCompound}
-          onRegisterNew={(newLogicalName, partialOnly) => {
-            if (partialOnly) {
-              return;
-            }
+          onSelectDerived={handleTableSelectDerived}
+          onRegisterNew={(newLogicalName) => {
             setTableQuickTermLogicalName(newLogicalName);
           }}
           onRename={handleRename}
@@ -389,7 +441,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                     col,
                     findTermById,
                     findDomainById,
-                    resolveCompound,
+                    resolveLogicalName,
                   );
                   const domain = col.domainId != null ? findDomainById(col.domainId) : undefined;
                   const normalizedLogicalName = col.logicalName?.trim() ?? '';
@@ -422,15 +474,12 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                         onDeleteColumn={(colId) => deleteColumn(id, colId)}
                         onLogicalNameChange={handleLogicalNameChange}
                         onSelectTerm={handleSelectTerm}
-                        onSelectCompound={(colId, resolution) =>
-                          registerCompound(colId, resolution)
-                        }
-                        onRegisterNew={(colId, logicalName, partialOnly) =>
+                        onSelectDerived={handleDerivedSelect}
+                        onRegisterNew={(colId, logicalName) =>
                           setQuickTermTarget({
                             nodeId: id,
                             colId,
                             logicalName,
-                            partialOnly,
                           })
                         }
                         onDomainChange={handleDomainChange}
@@ -451,7 +500,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                   col={col}
                   nodeId={id}
                   connected={isConnected(col.id)}
-                  warning={getColumnWarning(col, findTermById, findDomainById, resolveCompound)}
+                  warning={getColumnWarning(col, findTermById, findDomainById, resolveLogicalName)}
                   hasDuplicateLogicalName={
                     !!col.logicalName?.trim() && duplicatedLogicalNames.has(col.logicalName.trim())
                   }

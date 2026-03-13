@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
 import type { UseMutationResult } from '@tanstack/react-query';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 
@@ -272,7 +273,7 @@ export function useAutoBackup(
      * @returns 없음
      */
     const handleYDocUpdate = (_update: Uint8Array, origin: unknown) => {
-      if (origin === 'remote') {
+      if (origin === 'remote' || origin === CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE) {
         return;
       }
       hasLocalChangeRef.current = true;

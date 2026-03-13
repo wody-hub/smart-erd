@@ -47,6 +47,9 @@ decorator:
       logging: slf4j
 
 smart-erd:
+  dictionary:
+    bulk-validation:
+      store: in-memory # in-memory | redis (redis 사용 시: docker compose --profile redis up -d)
   websocket:
     max-sessions-per-room: 10
     max-messages-per-second: 100

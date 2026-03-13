@@ -89,6 +89,15 @@ export interface CanvasState {
   addColumn: (nodeId: string) => void;
   deleteColumn: (nodeId: string, colId: string) => void;
   updateColumn: (nodeId: string, colId: string, updates: Partial<Column>) => void;
+  applyDictionaryReconciliation: (
+    updates: {
+      tableMetaUpdates: Array<{
+        nodeId: string;
+        updates: Partial<Pick<TableNodeData, 'label' | 'logicalTableName' | 'tableTermId'>>;
+      }>;
+      columnUpdates: Array<{ nodeId: string; colId: string; updates: Partial<Column> }>;
+    },
+  ) => void;
   moveColumn: (nodeId: string, fromIndex: number, toIndex: number) => void;
   setHighlightedNodes: (ids: string[]) => void;
   setHighlightedEdge: (id: string | null) => void;

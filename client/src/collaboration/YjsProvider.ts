@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
 import { getWsBaseUrl } from '@/lib/platform';
 import { WS_MSG_TYPE, WS_PRESENCE, WS_RECONNECT } from '@/constants/ws';
 import type {
@@ -112,7 +113,9 @@ export class YjsProvider {
 
     // Y.Doc update 이벤트 -> 'remote' origin이 아닌 경우만 WebSocket 전송
     this.updateHandler = (update: Uint8Array, origin: unknown) => {
-      if (origin === 'remote') return;
+      if (origin === 'remote' || origin === CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE) {
+        return;
+      }
       this.sendMessage(WS_MSG_TYPE.YJS_UPDATE, update);
     };
 

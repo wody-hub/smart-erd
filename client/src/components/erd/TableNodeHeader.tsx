@@ -4,9 +4,9 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { useInlineEdit } from '@/hooks/useInlineEdit';
 import { KEYS } from '@/constants/keybindings';
 import { TABLE_COLORS } from '@/lib/table-colors';
+import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
 import type { TableHeaderColor } from '@/types/erd';
 import type { TermSelectResult } from './ColumnAutocomplete';
-import type { CompoundResolution } from '@/types/dictionary';
 import ColumnAutocomplete from './ColumnAutocomplete';
 import TableColorPicker from './TableColorPicker';
 
@@ -30,10 +30,10 @@ export interface TableNodeHeaderProps {
   onLogicalNameChange: (value: string) => void;
   /** 용어 선택 핸들러 */
   onSelectTerm: (result: TermSelectResult) => void;
-  /** 복합 용어 선택 핸들러 */
-  onSelectCompound: (resolution: CompoundResolution) => void;
-  /** 빠른 용어 등록 요청 핸들러 */
-  onRegisterNew: (logicalName: string, partialOnly?: boolean) => void;
+  /** 단어사전 기반 해석 결과 적용 핸들러 */
+  onSelectDerived: (resolution: LogicalNameResolution) => void;
+  /** 빠른 등록 흐름 요청 핸들러 */
+  onRegisterNew: (logicalName: string) => void;
   /** 테이블 물리명 변경 핸들러 */
   onRename: (value: string) => void;
   /** 헤더 색상 변경 핸들러 */
@@ -58,7 +58,7 @@ export default function TableNodeHeader({
   lockInfo,
   onLogicalNameChange,
   onSelectTerm,
-  onSelectCompound,
+  onSelectDerived,
   onRegisterNew,
   onRename,
   onColorChange,
@@ -113,7 +113,7 @@ export default function TableNodeHeader({
               value={logicalTableName ?? ''}
               onChange={onLogicalNameChange}
               onSelectTerm={onSelectTerm}
-              onSelectCompound={onSelectCompound}
+              onSelectDerived={onSelectDerived}
               onRegisterNew={onRegisterNew}
               termLinked={!!tableTermId}
               highlightOnHover={false}

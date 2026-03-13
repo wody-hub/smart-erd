@@ -25,11 +25,17 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { toast } from 'sonner';
 import { useYjsCollaboration } from '@/hooks/useYjsCollaboration';
 import { useAutoBackup } from '@/hooks/useAutoBackup';
+import { useDiagramDictionaryReconciliation } from '@/hooks/useDiagramDictionaryReconciliation';
 
 const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPanel'));
 
 /** 빈 핸들러 (오버레이 retry prop용, 현재 syncStage 고정이므로 미사용). @returns 없음 */
 const noop = () => {};
+
+function DiagramDictionaryReconciler({ diagramId }: { diagramId: string }) {
+  useDiagramDictionaryReconciliation({ diagramId });
+  return null;
+}
 
 /**
  * 다이어그램 편집 페이지.
@@ -504,6 +510,7 @@ export default function DiagramPage() {
   return (
     <ReactFlowProvider>
       <ErdDictionaryProvider teamId={teamId!} setId={dictionaryContextSetId}>
+        <DiagramDictionaryReconciler diagramId={diagramId!} />
         <ErdPermissionProvider canEdit={effectiveCanEdit}>
           <div className="h-screen flex flex-col">
             <Header

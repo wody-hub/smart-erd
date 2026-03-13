@@ -18,6 +18,7 @@ interface WordFormDialogProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: WordFormData) => Promise<void>;
   initialData?: Word | null;
+  draftData?: Partial<WordFormData> | null;
 }
 
 export default function WordFormDialog({
@@ -25,6 +26,7 @@ export default function WordFormDialog({
   onOpenChange,
   onSubmit,
   initialData,
+  draftData,
 }: WordFormDialogProps) {
   const { t } = useTranslation();
   const [logicalName, setLogicalName] = useState('');
@@ -36,11 +38,11 @@ export default function WordFormDialog({
 
   useEffect(() => {
     if (open) {
-      setLogicalName(initialData?.logicalName ?? '');
-      setPhysicalName(initialData?.physicalName ?? '');
-      setDescription(initialData?.description ?? '');
+      setLogicalName(initialData?.logicalName ?? draftData?.logicalName ?? '');
+      setPhysicalName(initialData?.physicalName ?? draftData?.physicalName ?? '');
+      setDescription(initialData?.description ?? draftData?.description ?? '');
     }
-  }, [open, initialData]);
+  }, [open, initialData, draftData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

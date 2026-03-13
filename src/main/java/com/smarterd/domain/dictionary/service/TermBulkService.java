@@ -13,6 +13,7 @@ import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.entity.Term;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
+import com.smarterd.domain.dictionary.service.session.BulkValidationSessionStore;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import com.smarterd.utils.AppStringUtils;
@@ -33,7 +34,6 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -74,13 +74,13 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
         TermRepository termRepository,
         DomainRepository domainRepository,
         DictionarySetService dictionarySetService,
-        StringRedisTemplate redisTemplate,
+        BulkValidationSessionStore validationSessionStore,
         ObjectMapper objectMapper,
         AuthService authService,
         TeamService teamService,
         MessageSource messageSource
     ) {
-        super(authService, teamService, messageSource, redisTemplate, objectMapper);
+        super(authService, teamService, messageSource, validationSessionStore, objectMapper);
         this.termRepository = termRepository;
         this.domainRepository = domainRepository;
         this.dictionarySetService = dictionarySetService;

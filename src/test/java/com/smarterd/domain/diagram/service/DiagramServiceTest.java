@@ -2,6 +2,8 @@ package com.smarterd.domain.diagram.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -9,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.ConflictException;
+import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
@@ -56,6 +59,9 @@ class DiagramServiceTest {
 
     @Mock
     private DiagramRoomManager roomManager;
+
+    @Mock
+    private DiagramSnapshotService diagramSnapshotService;
 
     @Mock
     private TermRepository termRepository;
@@ -111,7 +117,7 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(teamId)).thenReturn(team);
         when(projectService.findProjectById(projectId)).thenReturn(project);
-        when(diagramRepository.findByProjectAndId(project, diagramId)).thenReturn(Optional.of(diagram));
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
         when(roomManager.getSessionCount(diagramId)).thenReturn(0);
         when(dictionarySetService.findByTeamAndId(team, targetSetId)).thenReturn(targetSet);
         when(termRepository.findByDictionarySet(targetSet)).thenReturn(List.of(validTerm));
@@ -167,7 +173,7 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(teamId)).thenReturn(team);
         when(projectService.findProjectById(projectId)).thenReturn(project);
-        when(diagramRepository.findByProjectAndId(project, diagramId)).thenReturn(Optional.of(diagram));
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
         when(roomManager.getSessionCount(diagramId)).thenReturn(0);
         when(dictionarySetService.findByTeamAndId(team, targetSetId)).thenReturn(targetSet);
         when(termRepository.findByDictionarySet(targetSet)).thenReturn(List.of());
@@ -209,7 +215,7 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(teamId)).thenReturn(team);
         when(projectService.findProjectById(projectId)).thenReturn(project);
-        when(diagramRepository.findByProjectAndId(project, diagramId)).thenReturn(Optional.of(diagram));
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
         when(roomManager.getSessionCount(diagramId)).thenReturn(1);
 
         // when & then
@@ -222,6 +228,63 @@ class DiagramServiceTest {
                 new UpdateDiagramDictionarySetRequest(300L)
             )
         ).isInstanceOf(ConflictException.class);
+    }
+
+    @Test
+    @DisplayName("deleteDiagram - 다이어그램을 논리 삭제하고 협업 room/snapshot 정리를 수행한다")
+    void deleteDiagram_softDeletesDiagramAndClearsCollaborationState() {
+        // given
+        final var loginId = "tester";
+        final var teamId = 1L;
+        final var projectId = 10L;
+        final var diagramId = 100L;
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(teamId, user);
+        final var project = createProject(projectId, team);
+        final var diagram = Objects.requireNonNull(
+            Diagram.builder().name("D").project(project).content("{\"nodes\":[]}").build()
+        );
+        ReflectionTestUtils.setField(diagram, "id", diagramId);
+        diagram.updateYdocSnapshot(new byte[] { 1, 2, 3 });
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(teamId)).thenReturn(team);
+        when(projectService.findProjectById(projectId)).thenReturn(project);
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
+
+        // when
+        diagramService.deleteDiagram(loginId, teamId, projectId, diagramId);
+
+        // then
+        assertThat(diagram.isDeleted()).isTrue();
+        assertThat(diagram.getYdocSnapshot()).isNull();
+        assertThat(ReflectionTestUtils.getField(diagram, "deletedBy")).isEqualTo(loginId);
+        verify(roomManager).discardRoom(diagramId);
+        verify(diagramSnapshotService).clearCompactionCoolDown(diagramId);
+        verify(diagramRepository, never()).delete(diagram);
+    }
+
+    @Test
+    @DisplayName("getDiagram - 논리 삭제된 다이어그램은 조회되지 않는다")
+    void getDiagram_whenDiagramSoftDeleted_throwsEntityNotFoundException() {
+        // given
+        final var loginId = "tester";
+        final var teamId = 1L;
+        final var projectId = 10L;
+        final var diagramId = 100L;
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(teamId, user);
+        final var project = createProject(projectId, team);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(teamId)).thenReturn(team);
+        when(projectService.findProjectById(projectId)).thenReturn(project);
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> diagramService.getDiagram(loginId, teamId, projectId, diagramId))
+            .isInstanceOf(EntityNotFoundException.class)
+            .hasMessage(MessageCode.ERROR_NOT_FOUND_DIAGRAM.code());
     }
 
     private User createUser(Long id, String loginId) {

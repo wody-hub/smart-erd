@@ -118,7 +118,7 @@ public class DiagramService {
         final var pid = project.getId();
 
         return diagramRepository
-            .findByProject(project)
+            .findByProjectAndDeletedAtIsNull(project)
             .stream()
             .map((d) -> DiagramResponse.from(d, pid))
             .toList();
@@ -225,7 +225,7 @@ public class DiagramService {
     }
 
     /**
-     * 다이어그램을 삭제한다.
+     * 다이어그램을 논리 삭제한다.
      *
      * @param loginId    요청 사용자의 로그인 ID
      * @param teamId     팀 ID
@@ -236,8 +236,11 @@ public class DiagramService {
     public void deleteDiagram(String loginId, Long teamId, Long projectId, Long diagramId) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
-
-        diagramRepository.delete(Objects.requireNonNull(diagram));
+        final var resolvedDiagramId = Objects.requireNonNull(diagram.getId());
+        diagram.softDelete(loginId);
+        diagram.nullifySnapshot();
+        roomManager.discardRoom(resolvedDiagramId);
+        diagramSnapshotService.clearCompactionCoolDown(resolvedDiagramId);
     }
 
     /**
@@ -288,7 +291,7 @@ public class DiagramService {
      */
     private Diagram findDiagramByProjectAndId(Project project, Long diagramId) {
         return diagramRepository
-            .findByProjectAndId(project, diagramId)
+            .findByProjectAndIdAndDeletedAtIsNull(project, diagramId)
             .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_DIAGRAM.code(), diagramId));
     }
 

@@ -1,11 +1,11 @@
 import { Handle, Position } from '@xyflow/react';
 import { X, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
 import type { Column } from '@/types/erd';
 import type { ColumnWarning } from '@/hooks/useColumnValidation';
 import type { Domain } from '@/types/dictionary';
 import type { TermSelectResult } from './ColumnAutocomplete';
-import type { CompoundResolution } from '@/types/dictionary';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import ColumnAutocomplete from './ColumnAutocomplete';
@@ -43,10 +43,10 @@ export interface EditableColumnRowProps {
   onLogicalNameChange: (colId: string, value: string) => void;
   /** 용어 선택 핸들러 */
   onSelectTerm: (colId: string, result: TermSelectResult) => void;
-  /** 복합 용어 선택 핸들러 */
-  onSelectCompound: (colId: string, resolution: CompoundResolution) => void;
-  /** 빠른 용어 등록 요청 핸들러 */
-  onRegisterNew: (colId: string, logicalName: string, partialOnly?: boolean) => void;
+  /** 단어사전 기반 해석 결과 적용 핸들러 */
+  onSelectDerived: (colId: string, resolution: LogicalNameResolution) => void;
+  /** 빠른 등록 흐름 요청 핸들러 */
+  onRegisterNew: (colId: string, logicalName: string) => void;
   /** 도메인 변경 핸들러 */
   onDomainChange: (colId: string, domainId: number | null, physicalType?: string) => void;
 }
@@ -76,7 +76,7 @@ export default function EditableColumnRow({
   onDeleteColumn,
   onLogicalNameChange,
   onSelectTerm,
-  onSelectCompound,
+  onSelectDerived,
   onRegisterNew,
   onDomainChange,
 }: EditableColumnRowProps) {
@@ -171,10 +171,8 @@ export default function EditableColumnRow({
             value={col.logicalName ?? ''}
             onChange={(newValue) => onLogicalNameChange(col.id, newValue)}
             onSelectTerm={(result) => onSelectTerm(col.id, result)}
-            onSelectCompound={(resolution) => onSelectCompound(col.id, resolution)}
-            onRegisterNew={(logicalName, partialOnly) =>
-              onRegisterNew(col.id, logicalName, partialOnly)
-            }
+            onSelectDerived={(resolution) => onSelectDerived(col.id, resolution)}
+            onRegisterNew={(logicalName) => onRegisterNew(col.id, logicalName)}
             termLinked={!!col.termId}
           />
         ) : (

@@ -63,9 +63,11 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
   const {
     terms,
     domains,
+    words,
     termByNameMap,
     domainByNameMap,
     domainMap,
+    wordMatchIndex,
     findTermById,
     findDomainById,
   } = useErdDictionary();
@@ -75,6 +77,7 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     termByName: termByNameMap,
     domainByName: domainByNameMap,
     domainById: domainMap,
+    wordMatchIndex,
   };
 
   const { dslText, parseResult, parsing, handleDslChange } = useDslParse({ dictionary });
@@ -95,7 +98,7 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
   });
 
   /** 사전 데이터 로딩 완료 여부 (초기화 시 사전 없이 생성하면 빈 결과) */
-  const hasDictionary = terms.length > 0 || domains.length > 0;
+  const hasDictionary = terms.length > 0 || domains.length > 0 || words.length > 0;
 
   /** ERD → DSL 생성 함수 (useCodeEditorRefresh에 전달) */
   const generate = useCallback(

@@ -275,7 +275,7 @@ public class TeamService {
         final var projects = projectRepository.findByTeam(team);
         if (!projects.isEmpty()) {
             for (final var project : projects) {
-                for (final var diagram : diagramRepository.findByProject(project)) {
+                for (final var diagram : diagramRepository.findAllByProject(project)) {
                     final var diagramId = Objects.requireNonNull(diagram.getId());
                     roomManager.discardRoom(diagramId);
                     diagramSnapshotService.clearCompactionCoolDown(diagramId);

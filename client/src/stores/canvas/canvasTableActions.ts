@@ -30,6 +30,7 @@ type CanvasTableActionKeys =
   | 'addColumn'
   | 'deleteColumn'
   | 'updateColumn'
+  | 'applyDictionaryReconciliation'
   | 'moveColumn'
   | 'addFkRelation'
   | 'connectWithRelationType'
@@ -256,6 +257,53 @@ export function createCanvasTableActions(
           });
         }
       }, CANVAS_HISTORY_ORIGIN.USER_COLUMN);
+    },
+
+    applyDictionaryReconciliation: ({ tableMetaUpdates, columnUpdates }) => {
+      const { ydoc } = get();
+      if (!ydoc || (tableMetaUpdates.length === 0 && columnUpdates.length === 0)) {
+        return;
+      }
+
+      ydoc.transact(() => {
+        const tablesMap = getTablesMap(ydoc);
+
+        for (const tableUpdate of tableMetaUpdates) {
+          const tableYMap = tablesMap.get(tableUpdate.nodeId);
+          if (!tableYMap) {
+            continue;
+          }
+          for (const [key, value] of Object.entries(tableUpdate.updates)) {
+            if (value === undefined || value === null) {
+              tableYMap.delete(key);
+            } else {
+              tableYMap.set(key, value);
+            }
+          }
+        }
+
+        for (const columnUpdate of columnUpdates) {
+          const tableYMap = tablesMap.get(columnUpdate.nodeId);
+          if (!tableYMap) {
+            continue;
+          }
+          const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+          if (!colsYArray) {
+            continue;
+          }
+          const colYMap = findColumnYMap(colsYArray, columnUpdate.colId);
+          if (!colYMap) {
+            continue;
+          }
+          for (const [key, value] of Object.entries(columnUpdate.updates)) {
+            if (value === undefined) {
+              colYMap.delete(key);
+            } else {
+              colYMap.set(key, value);
+            }
+          }
+        }
+      }, CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE);
     },
 
     moveColumn: (nodeId, fromIndex, toIndex) => {

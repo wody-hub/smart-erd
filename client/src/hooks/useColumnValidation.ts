@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { useErdDictionary } from '@/components/erd/ErdDictionaryContext';
+import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
 
 /** 컬럼 유효성 검사 상태 */
 export type ValidationStatus =
@@ -64,32 +65,41 @@ export function getColumnWarning(
   col: { logicalName?: string; name: string; type: string; termId?: number },
   findTerm: (id: number) => { physicalName: string; domainId: number | null } | undefined,
   findDomain: (id: number) => { physicalType: string } | undefined,
-  resolveCompound?: (logicalName: string) => {
-    physicalName: string;
-    domainId: number | null;
-    physicalType?: string;
-  } | null,
+  resolveLogicalName?: (logicalName: string) => LogicalNameResolution,
 ): ColumnWarning {
   const logicalName = col.logicalName?.trim();
   if (!logicalName) {
     return { status: null };
   }
-  if (!col.termId) {
-    const compound = resolveCompound?.(logicalName);
-    if (!compound) {
+
+  const resolved = resolveLogicalName?.(logicalName);
+  if (resolved) {
+    if (resolved.isRegisteredTerm) {
+      if (col.name !== resolved.physicalName) {
+        return { status: 'name-mismatch', expectedName: resolved.physicalName };
+      }
+      if (resolved.domainId && resolved.physicalType && col.type !== resolved.physicalType) {
+        return {
+          status: 'type-mismatch',
+          expectedType: resolved.physicalType,
+          actualType: col.type,
+        };
+      }
+      return { status: null };
+    }
+
+    if (resolved.isWordCompleteMatch) {
+      if (col.name !== resolved.physicalName) {
+        return { status: 'name-mismatch', expectedName: resolved.physicalName };
+      }
       return { status: 'unregistered' };
     }
-    if (col.name !== compound.physicalName) {
-      return { status: 'name-mismatch', expectedName: compound.physicalName };
-    }
-    if (compound.domainId && compound.physicalType && col.type !== compound.physicalType) {
-      return {
-        status: 'type-mismatch',
-        expectedType: compound.physicalType,
-        actualType: col.type,
-      };
-    }
-    return { status: null };
+
+    return { status: 'unregistered' };
+  }
+
+  if (!col.termId) {
+    return { status: 'unregistered' };
   }
 
   const term = findTerm(col.termId);
@@ -121,10 +131,10 @@ export function getColumnWarning(
  */
 export function useColumnValidation() {
   const nodes = useCanvasStore((s) => s.nodes);
-  const { terms, findTermById, findDomainById, resolveCompound } = useErdDictionary();
+  const { terms, words, findTermById, findDomainById, resolveLogicalName } = useErdDictionary();
 
   /** 사전 데이터 존재 여부 */
-  const hasDictionary = terms.length > 0;
+  const hasDictionary = terms.length > 0 || words.length > 0;
 
   const result = useMemo(() => {
     let matchedCount = 0;
@@ -138,7 +148,7 @@ export function useColumnValidation() {
         }
 
         totalCount++;
-        const warning = getColumnWarning(col, findTermById, findDomainById, resolveCompound);
+        const warning = getColumnWarning(col, findTermById, findDomainById, resolveLogicalName);
 
         if (warning.status) {
           return {
@@ -164,7 +174,7 @@ export function useColumnValidation() {
     });
 
     return { tableValidations, matchedCount, totalCount };
-  }, [nodes, findTermById, findDomainById, resolveCompound]);
+  }, [nodes, findTermById, findDomainById, resolveLogicalName]);
 
   return { ...result, hasDictionary };
 }

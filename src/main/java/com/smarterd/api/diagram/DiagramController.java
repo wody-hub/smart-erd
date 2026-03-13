@@ -195,7 +195,7 @@ public class DiagramController {
     }
 
     /**
-     * 다이어그램을 삭제한다.
+     * 다이어그램을 논리 삭제한다.
      *
      * @param jwt        인증된 JWT 토큰
      * @param teamId     팀 ID
@@ -203,7 +203,7 @@ public class DiagramController {
      * @param diagramId  다이어그램 ID
      * @return 204 No Content
      */
-    @Operation(summary = "다이어그램 삭제", description = "다이어그램을 삭제한다. 팀 멤버만 가능.")
+    @Operation(summary = "다이어그램 삭제", description = "다이어그램을 논리 삭제한다. 삭제된 다이어그램은 목록/상세 조회에서 제외된다.")
     @ApiResponse(responseCode = "204", description = "삭제 성공")
     @ApiResponse(responseCode = "400", description = "다이어그램 미존재 또는 접근 권한 없음")
     @DeleteMapping("/{diagramId}")

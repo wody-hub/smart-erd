@@ -17,13 +17,22 @@ import org.springframework.data.repository.query.Param;
  */
 public interface DiagramRepository extends JpaRepository<Diagram, Long>, DiagramRepositoryCustom {
     /**
-     * 특정 프로젝트의 모든 다이어그램을 조회한다.
+     * 특정 프로젝트의 삭제되지 않은 다이어그램만 조회한다.
      *
      * @param project 프로젝트
      * @return 다이어그램 목록
      */
     @EntityGraph(attributePaths = { "dictionarySet" })
-    List<Diagram> findByProject(Project project);
+    List<Diagram> findByProjectAndDeletedAtIsNull(Project project);
+
+    /**
+     * 특정 프로젝트의 모든 다이어그램을 조회한다. 삭제된 다이어그램도 포함한다.
+     *
+     * @param project 프로젝트
+     * @return 다이어그램 목록
+     */
+    @EntityGraph(attributePaths = { "dictionarySet" })
+    List<Diagram> findAllByProject(Project project);
 
     /**
      * 특정 프로젝트에서 ID로 다이어그램을 조회한다.
@@ -33,9 +42,9 @@ public interface DiagramRepository extends JpaRepository<Diagram, Long>, Diagram
      * @return 다이어그램 Optional
      */
     @EntityGraph(attributePaths = { "dictionarySet" })
-    Optional<Diagram> findByProjectAndId(Project project, Long id);
+    Optional<Diagram> findByProjectAndIdAndDeletedAtIsNull(Project project, Long id);
 
-    long countByDictionarySet(DictionarySet dictionarySet);
+    long countByDictionarySetAndDeletedAtIsNull(DictionarySet dictionarySet);
 
     @Modifying
     @Query("update Diagram d set d.dictionarySet = null where d.dictionarySet = :dictionarySet")

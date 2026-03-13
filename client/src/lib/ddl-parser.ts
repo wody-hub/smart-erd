@@ -1,5 +1,5 @@
-import type { DbmsType } from '@/types/erd';
-import { buildTableLockKey } from '@/lib/table-lock-key';
+import type { DbmsType } from '../types/erd.js';
+import { buildTableLockKey } from './table-lock-key.js';
 
 /** DDL 파싱된 컬럼 정보 */
 export interface ParsedColumn {

@@ -75,6 +75,14 @@ public class Diagram extends BaseAuditEntity {
     @Column(name = "snapshot_updated_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
     private Instant snapshotUpdatedAt;
 
+    /** 논리 삭제 시각 */
+    @Column(name = "deleted_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
+    private Instant deletedAt;
+
+    /** 논리 삭제한 사용자 로그인 ID */
+    @Column(name = "deleted_by", length = 50)
+    private String deletedBy;
+
     /**
      * 다이어그램 엔티티를 생성한다.
      *
@@ -164,5 +172,24 @@ public class Diagram extends BaseAuditEntity {
         this.ydocSnapshot = null;
         this.snapshotRevision = null;
         this.snapshotUpdatedAt = null;
+    }
+
+    /**
+     * 다이어그램을 논리 삭제한다.
+     *
+     * @param loginId 삭제 수행자 로그인 ID
+     */
+    public void softDelete(String loginId) {
+        this.deletedAt = Instant.now();
+        this.deletedBy = loginId;
+    }
+
+    /**
+     * 논리 삭제 여부를 반환한다.
+     *
+     * @return 삭제 상태
+     */
+    public boolean isDeleted() {
+        return this.deletedAt != null;
     }
 }

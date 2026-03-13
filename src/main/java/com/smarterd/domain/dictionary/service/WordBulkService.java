@@ -9,6 +9,7 @@ import com.smarterd.api.dictionary.dto.BulkWordSaveRequest;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.dictionary.entity.Word;
+import com.smarterd.domain.dictionary.service.session.BulkValidationSessionStore;
 import com.smarterd.domain.dictionary.repository.WordRepository;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
@@ -27,7 +28,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.context.MessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,13 +48,13 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
     public WordBulkService(
         WordRepository wordRepository,
         DictionarySetService dictionarySetService,
-        StringRedisTemplate redisTemplate,
+        BulkValidationSessionStore validationSessionStore,
         ObjectMapper objectMapper,
         AuthService authService,
         TeamService teamService,
         MessageSource messageSource
     ) {
-        super(authService, teamService, messageSource, redisTemplate, objectMapper);
+        super(authService, teamService, messageSource, validationSessionStore, objectMapper);
         this.wordRepository = wordRepository;
         this.dictionarySetService = dictionarySetService;
     }
@@ -317,7 +317,15 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
     }
 
     private record ValidatedWordRow(int rowNumber, BulkWordRow row) {}
-    private record WordErrorReportRow(int rowNumber, String logicalName, String physicalName, String description, String errors) {}
+
+    public record WordErrorReportRow(
+        int rowNumber,
+        String logicalName,
+        String physicalName,
+        String description,
+        String errors
+    ) {}
+
     private record ValidationSession(
         String loginId,
         Long teamId,
@@ -327,7 +335,8 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         List<WordErrorReportRow> errorRows,
         boolean saveConsumed
     ) implements SessionExpirable, SessionOwnership {}
-    private record TemplateRow(String logicalName, String physicalName, String description) {}
+
+    public record TemplateRow(String logicalName, String physicalName, String description) {}
 
     @Getter
     @Setter
