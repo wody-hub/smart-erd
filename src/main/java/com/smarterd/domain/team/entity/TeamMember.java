@@ -1,6 +1,6 @@
 package com.smarterd.domain.team.entity;
 
-import com.smarterd.domain.common.entity.BaseTimeEntity;
+import com.smarterd.domain.common.entity.BaseAuditEntity;
 import com.smarterd.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -31,7 +31,7 @@ import lombok.NoArgsConstructor;
 @IdClass(TeamMemberId.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class TeamMember extends BaseTimeEntity {
+public class TeamMember extends BaseAuditEntity {
 
     /** 소속 팀 (복합 PK 구성 요소) */
     @Id

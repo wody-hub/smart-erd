@@ -15,6 +15,7 @@ import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.repository.DictionarySetRepository;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
+import com.smarterd.domain.dictionary.repository.WordRepository;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.entity.User;
@@ -44,6 +45,9 @@ class DictionarySetServiceTest {
 
     @Mock
     private TermRepository termRepository;
+
+    @Mock
+    private WordRepository wordRepository;
 
     @Mock
     private AuthService authService;
@@ -142,6 +146,7 @@ class DictionarySetServiceTest {
         // then
         verify(diagramRepository).clearDictionarySetReferences(dictionarySet);
         verify(termRepository).deleteByDictionarySet(dictionarySet);
+        verify(wordRepository).deleteByDictionarySet(dictionarySet);
         verify(domainRepository).deleteByDictionarySet(dictionarySet);
         verify(dictionarySetRepository).delete(dictionarySet);
     }
@@ -168,6 +173,7 @@ class DictionarySetServiceTest {
 
         verify(diagramRepository, never()).clearDictionarySetReferences(dictionarySet);
         verify(termRepository, never()).deleteByDictionarySet(dictionarySet);
+        verify(wordRepository, never()).deleteByDictionarySet(dictionarySet);
         verify(domainRepository, never()).deleteByDictionarySet(dictionarySet);
         verify(dictionarySetRepository, never()).delete(dictionarySet);
     }

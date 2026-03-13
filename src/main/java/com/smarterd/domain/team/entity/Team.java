@@ -1,6 +1,6 @@
 package com.smarterd.domain.team.entity;
 
-import com.smarterd.domain.common.entity.BaseTimeEntity;
+import com.smarterd.domain.common.entity.BaseAuditEntity;
 import com.smarterd.domain.user.entity.User;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -31,7 +31,7 @@ import org.hibernate.annotations.BatchSize;
 @Table(name = "teams")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Team extends BaseTimeEntity {
+public class Team extends BaseAuditEntity {
 
     /** 팀 고유 식별자 (자동 증가) */
     @Id

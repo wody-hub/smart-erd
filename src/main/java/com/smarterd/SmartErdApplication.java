@@ -9,10 +9,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * Smart ERD 애플리케이션의 진입점.
  *
  * <p>Spring Boot 자동 구성과 JPA Auditing({@code @EnableJpaAuditing})을 활성화하여
- * {@link com.smarterd.domain.common.entity.BaseTimeEntity}의 {@code createdAt}, {@code updatedAt} 자동 관리를 지원한다.</p>
+ * {@link com.smarterd.domain.common.entity.BaseTimeEntity}의 시각 감사와
+ * {@link com.smarterd.domain.common.entity.BaseAuditEntity}의 작성자 감사를 자동 관리한다.</p>
  */
 @SpringBootApplication
-@EnableJpaAuditing
+@EnableJpaAuditing(auditorAwareRef = "loginIdAuditorAware")
 @EnableScheduling
 public class SmartErdApplication {
 

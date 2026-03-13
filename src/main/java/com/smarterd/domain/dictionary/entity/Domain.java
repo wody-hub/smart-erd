@@ -1,6 +1,6 @@
 package com.smarterd.domain.dictionary.entity;
 
-import com.smarterd.domain.common.entity.BaseTimeEntity;
+import com.smarterd.domain.common.entity.BaseAuditEntity;
 import com.smarterd.domain.team.entity.Team;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -29,7 +29,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "domains", uniqueConstraints = @UniqueConstraint(columnNames = { "dictionary_set_id", "logical_name" }))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Domain extends BaseTimeEntity {
+public class Domain extends BaseAuditEntity {
 
     /** 도메인 고유 식별자 (자동 증가) */
     @Id

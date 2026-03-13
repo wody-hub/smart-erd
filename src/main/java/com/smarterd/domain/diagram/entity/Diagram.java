@@ -1,6 +1,6 @@
 package com.smarterd.domain.diagram.entity;
 
-import com.smarterd.domain.common.entity.BaseTimeEntity;
+import com.smarterd.domain.common.entity.BaseAuditEntity;
 import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.project.entity.Project;
 import jakarta.persistence.Basic;
@@ -31,7 +31,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "diagrams")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Diagram extends BaseTimeEntity {
+public class Diagram extends BaseAuditEntity {
 
     /** 다이어그램 고유 식별자 (자동 증가) */
     @Id

@@ -105,6 +105,7 @@ public class AuthService {
             .password(passwordEncoder.encode(request.password()))
             .name(request.name())
             .build();
+        user.initializeAuditActor(request.loginId());
 
         userRepository.save(Objects.requireNonNull(user));
 

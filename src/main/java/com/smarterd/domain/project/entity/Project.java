@@ -1,6 +1,6 @@
 package com.smarterd.domain.project.entity;
 
-import com.smarterd.domain.common.entity.BaseTimeEntity;
+import com.smarterd.domain.common.entity.BaseAuditEntity;
 import com.smarterd.domain.team.entity.Team;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,7 +26,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "projects")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Project extends BaseTimeEntity {
+public class Project extends BaseAuditEntity {
 
     /** 프로젝트 고유 식별자 (자동 증가) */
     @Id
