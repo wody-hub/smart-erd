@@ -5,6 +5,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ export default function FkTypeDialog({ open, onOpenChange, onSelect }: FkTypeDia
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t('erd.fkMode.fkTypeTitle')}</DialogTitle>
+          <DialogDescription>{t('erd.fkMode.fkTypeDescription')}</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-3 py-2">

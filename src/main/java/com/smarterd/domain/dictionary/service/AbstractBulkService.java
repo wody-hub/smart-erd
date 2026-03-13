@@ -11,6 +11,8 @@ import com.smarterd.domain.user.service.AuthService;
 import com.smarterd.utils.AppStringUtils;
 import com.smarterd.utils.CsvParser;
 import com.smarterd.utils.ExcelUtils;
+import com.smarterd.utils.excel.ExcelData;
+import com.smarterd.utils.excel.ExcelSheet;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -23,6 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.context.MessageSource;
@@ -295,6 +298,62 @@ public abstract class AbstractBulkService<R> {
     }
 
     /**
+     * 논리명 목록을 배치 단위로 정규화/조회하여 기존 엔티티를 반환한다.
+     *
+     * @param logicalNames   조회 대상 논리명 목록
+     * @param batchSize      배치 크기
+     * @param chunkFetcher   배치 조회 함수
+     * @param nameExtractor  엔티티에서 논리명을 추출하는 함수
+     * @param <T>            조회 대상 타입
+     * @return 논리명 기준 기존 엔티티 맵
+     */
+    protected <T> Map<String, T> findExistingByLogicalNames(
+        List<String> logicalNames,
+        int batchSize,
+        Function<List<String>, List<T>> chunkFetcher,
+        Function<T, String> nameExtractor
+    ) {
+        final var normalized = logicalNames
+            .stream()
+            .map(AppStringUtils::trimToEmpty)
+            .filter(AppStringUtils::isNotBlank)
+            .distinct()
+            .toList();
+        if (normalized.isEmpty()) {
+            return Map.of();
+        }
+
+        final var existingByLogicalName = new java.util.LinkedHashMap<String, T>();
+        for (var start = 0; start < normalized.size(); start += batchSize) {
+            final var end = Math.min(start + batchSize, normalized.size());
+            final var chunk = chunkFetcher.apply(normalized.subList(start, end));
+            for (final var entity : chunk) {
+                existingByLogicalName.putIfAbsent(nameExtractor.apply(entity), entity);
+            }
+        }
+        return Map.copyOf(existingByLogicalName);
+    }
+
+    /**
+     * 논리명 목록을 배치 조회하여 기존 논리명 집합을 반환한다.
+     *
+     * @param logicalNames   조회 대상 논리명 목록
+     * @param batchSize      배치 크기
+     * @param chunkFetcher   배치 조회 함수
+     * @param nameExtractor  엔티티에서 논리명을 추출하는 함수
+     * @param <T>            조회 대상 타입
+     * @return 기존 논리명 집합
+     */
+    protected <T> java.util.Set<String> findExistingLogicalNames(
+        List<String> logicalNames,
+        int batchSize,
+        Function<List<String>, List<T>> chunkFetcher,
+        Function<T, String> nameExtractor
+    ) {
+        return findExistingByLogicalNames(logicalNames, batchSize, chunkFetcher, nameExtractor).keySet();
+    }
+
+    /**
      * 행 수를 검증한다. 빈 파일이거나 최대 행 수를 초과하면 예외를 발생시킨다.
      *
      * @param rawRows 파싱된 행 목록
@@ -320,6 +379,86 @@ public abstract class AbstractBulkService<R> {
         final var nonNullCode = Objects.requireNonNull(code, "code must not be null");
         final var nonNullLocale = Objects.requireNonNull(locale, "locale must not be null");
         return messageSource.getMessage(nonNullCode, args, nonNullLocale);
+    }
+
+    /**
+     * 오류 리포트용 record accessor 메서드 목록을 해석한다.
+     *
+     * @param rowClass      오류 리포트 행 클래스
+     * @param methodNames   메서드 이름 순서
+     * @param errorMessage  해석 실패 시 예외 메시지
+     * @return accessor 메서드 목록
+     * @param <T>           오류 리포트 행 타입
+     */
+    protected <T> List<Method> resolveAccessorMethods(Class<T> rowClass, List<String> methodNames, String errorMessage) {
+        try {
+            final var methods = new ArrayList<Method>(methodNames.size());
+            for (final var methodName : methodNames) {
+                methods.add(rowClass.getMethod(methodName));
+            }
+            return List.copyOf(methods);
+        } catch (NoSuchMethodException e) {
+            throw new IllegalStateException(errorMessage, e);
+        }
+    }
+
+    /**
+     * 단일 시트 오류 리포트 엑셀을 생성한다.
+     *
+     * @param rows            오류 행 목록
+     * @param rowClass        오류 행 타입
+     * @param filePrefix      파일명 prefix
+     * @param locale          로케일
+     * @param titleCodes      컬럼 제목 메시지 코드
+     * @param accessorNames   record accessor 이름 순서
+     * @param accessorError   accessor 해석 실패 메시지
+     * @return 엑셀 데이터
+     * @param <T>             오류 행 타입
+     */
+    protected <T> ExcelData buildErrorReportExcel(
+        List<T> rows,
+        Class<T> rowClass,
+        String filePrefix,
+        Locale locale,
+        List<String> titleCodes,
+        List<String> accessorNames,
+        String accessorError
+    ) {
+        final var sheet = new ExcelSheet<T>();
+        sheet.setSheetName(msg("bulk.error-report.sheet-name", locale));
+        sheet.setTitles(titleCodes.stream().map((code) -> msg(code, locale)).toList());
+        sheet.setReqMethods(resolveAccessorMethods(rowClass, accessorNames, accessorError));
+        sheet.setDataList(rows);
+        return new ExcelUtils<T>().toExcel(List.of(sheet), null, filePrefix);
+    }
+
+    /**
+     * 데이터 시트와 가이드 시트를 포함한 템플릿 엑셀을 생성한다.
+     *
+     * @param locale        로케일
+     * @param templateType  템플릿 유형
+     * @param sheetNameCode 데이터 시트명 메시지 코드
+     * @param titleCodes    컬럼 제목 메시지 코드
+     * @param sampleRows    샘플 데이터
+     * @return 엑셀 데이터
+     * @param <T>           템플릿 행 타입
+     */
+    protected <T> ExcelData buildTemplateExcel(
+        Locale locale,
+        TemplateType templateType,
+        String sheetNameCode,
+        List<String> titleCodes,
+        List<T> sampleRows
+    ) {
+        final var titles = titleCodes.stream().map((code) -> msg(code, locale)).toList();
+        try (final var utils = new ExcelUtils<>(sampleRows, titles)) {
+            utils.sheetName(msg(sheetNameCode, locale));
+            final var excelData = utils.toExcel();
+            addGuideSheet(excelData.excelBook(), locale, templateType);
+            return excelData;
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException("Failed to release Excel template resources", e);
+        }
     }
 
     // ─────────────────────────────────────────────────────────
@@ -584,7 +723,10 @@ public abstract class AbstractBulkService<R> {
         DOMAIN("domain", 7, 7),
 
         /** 용어 템플릿 */
-        TERM("term", 8, 8);
+        TERM("term", 8, 8),
+
+        /** 단어 템플릿 */
+        WORD("word", 7, 7);
 
         private final String key;
         private final int instructionCount;

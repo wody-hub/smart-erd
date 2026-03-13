@@ -12,6 +12,7 @@ import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.repository.DictionarySetRepository;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
+import com.smarterd.domain.dictionary.repository.WordRepository;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
@@ -37,6 +38,8 @@ public class DictionarySetService {
     private final DomainRepository domainRepository;
     /** 용어 레포지토리 */
     private final TermRepository termRepository;
+    /** 단어 레포지토리 */
+    private final WordRepository wordRepository;
     /** 인증 서비스 */
     private final AuthService authService;
     /** 팀 서비스 */
@@ -165,6 +168,7 @@ public class DictionarySetService {
         diagramRepository.clearDictionarySetReferences(dictionarySet);
         // FK 제약 순서: Term -> Domain -> DictionarySet
         termRepository.deleteByDictionarySet(dictionarySet);
+        wordRepository.deleteByDictionarySet(dictionarySet);
         domainRepository.deleteByDictionarySet(dictionarySet);
         dictionarySetRepository.delete(dictionarySet);
     }

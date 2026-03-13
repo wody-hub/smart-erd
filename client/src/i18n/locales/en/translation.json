@@ -24,6 +24,9 @@
       "cancelRename": "Cancel rename",
       "language": "Language",
       "closeDialog": "Close dialog"
+    },
+    "dialog": {
+      "enterName": "Enter a name for the resource you want to create."
     }
   },
   "auth": {
@@ -343,6 +346,7 @@
       "success": "FK relationship created ({{count}} columns)",
       "cancelled": "FK connection cancelled",
       "fkTypeTitle": "Select Relationship Type",
+      "fkTypeDescription": "Choose the type of FK relationship to create.",
       "identifying": "Identifying",
       "identifyingDesc": "Parent PK becomes part of child's composite key. Child cannot exist without parent.",
       "nonIdentifying": "Non-identifying",
@@ -445,14 +449,22 @@
     },
     "quickTerm": {
       "title": "Quick Term Registration",
+      "description": "Register a term from word dictionary composition and apply it to the current column immediately.",
       "submit": "Register & Apply",
       "submitting": "Registering...",
       "createDomain": "New Domain",
+      "createWord": "New Word",
+      "wordCreated": "Word created",
+      "wordCreateFailed": "Failed to create word",
+      "wordRequiredTitle": "Word composition is required",
+      "wordRequiredDescription": "A term can only be registered from existing word dictionary entries.",
+      "wordRequiredDescriptionWithInitial": "If words for \"{{name}}\" do not exist, add the missing words first.",
       "success": "Term registered and applied",
       "failed": "Failed to register term"
     },
     "quickDomain": {
       "title": "Quick Domain Registration",
+      "description": "Register a new domain and link it to the current term immediately.",
       "success": "Domain registered",
       "failed": "Failed to register domain"
     },
@@ -664,6 +676,7 @@
     "title": "Data Dictionary",
     "backToProjects": "Back to Projects",
     "tabs": {
+      "words": "Words",
       "domains": "Domains",
       "terms": "Terms"
     },
@@ -672,8 +685,46 @@
       "page": "Page {{current}} / {{total}}"
     },
     "search": {
+      "wordPlaceholder": "Search words (logical/physical/description)",
       "domainPlaceholder": "Search domains (logical/physical type/description)",
       "termPlaceholder": "Search terms (logical/physical/description)"
+    },
+    "word": {
+      "table": {
+        "logicalName": "Logical Name",
+        "physicalName": "Physical Name",
+        "description": "Description",
+        "actions": "Actions",
+        "empty": "No words yet. Add your first word."
+      },
+      "form": {
+        "createTitle": "Add Word",
+        "editTitle": "Edit Word",
+        "createDescription": "Register a new word that will be used to compose terms.",
+        "editDescription": "Update the selected word's logical name, physical name, and description.",
+        "logicalName": "Logical Name",
+        "logicalNamePlaceholder": "e.g. User",
+        "physicalName": "Physical Name",
+        "physicalNamePlaceholder": "e.g. user",
+        "description": "Description",
+        "descriptionPlaceholder": "Optional description"
+      },
+      "toast": {
+        "created": "Word created",
+        "createFailed": "Failed to create word",
+        "updated": "Word updated",
+        "updateFailed": "Failed to update word",
+        "deleted": "Word deleted",
+        "deleteFailed": "Failed to delete word"
+      },
+      "delete": {
+        "dialogTitle": "Delete Word",
+        "dialogDescription": "Are you sure you want to delete this word?"
+      },
+      "aria": {
+        "editWord": "Edit word {{name}}",
+        "deleteWord": "Delete word {{name}}"
+      }
     },
     "set": {
       "placeholder": "Select dictionary set",
@@ -711,6 +762,8 @@
       "form": {
         "createTitle": "Add Domain",
         "editTitle": "Edit Domain",
+        "createDescription": "Register a new domain in the dictionary set.",
+        "editDescription": "Update the selected domain's logical name, physical type, and description.",
         "logicalName": "Logical Name",
         "logicalNamePlaceholder": "e.g. Amount",
         "physicalType": "Physical Type",
@@ -748,6 +801,17 @@
       "form": {
         "createTitle": "Add Term",
         "editTitle": "Edit Term",
+        "createDescription": "Register a new term in the dictionary set.",
+        "editDescription": "Update the selected term's name, domain, and description.",
+        "wordBuilder": "Word Builder",
+        "wordBuilderDescription": "Compose logical and physical names from registered words.",
+        "wordBuilderPlaceholder": "Select word",
+        "addWord": "Add Word",
+        "clearWords": "Clear all",
+        "wordSequence": "Selected word sequence",
+        "logicalPreview": "Logical result",
+        "physicalPreview": "Physical result",
+        "removeWord": "Remove word {{name}}",
         "logicalName": "Logical Name",
         "logicalNamePlaceholder": "e.g. Username",
         "physicalName": "Physical Name",
@@ -775,8 +839,10 @@
       }
     },
     "upload": {
+      "description": "Validate and save dictionary data in bulk from an Excel or CSV file.",
       "button": "Upload",
       "dialogTitle": {
+        "word": "Bulk Upload Words",
         "domain": "Bulk Upload Domains",
         "term": "Bulk Upload Terms"
       },

@@ -36,6 +36,18 @@ export interface Domain {
   updatedAt: string;
 }
 
+/** 단어(용어를 구성하는 기본 단위) 정보. */
+export interface Word {
+  id: number;
+  logicalName: string;
+  physicalName: string;
+  description: string | null;
+  teamId: number;
+  dictionarySetId: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** 용어(이름 사전) 정보. 팀에 속하며 논리명-물리명 매핑을 정의한다. */
 export interface Term {
   /** 용어 고유 ID */
@@ -88,6 +100,13 @@ export interface DomainFormData {
   description?: string;
 }
 
+/** 단어 생성/수정 요청 페이로드 */
+export interface WordFormData {
+  logicalName: string;
+  physicalName: string;
+  description?: string;
+}
+
 /** 용어 생성/수정 요청 페이로드 */
 export interface TermFormData {
   /** 논리명 */
@@ -98,6 +117,8 @@ export interface TermFormData {
   domainId?: number | null;
   /** 설명 (선택) */
   description?: string;
+  /** 조합에 사용한 단어 ID 목록 (선택, 저장은 하지 않고 폼 조립용) */
+  wordIds?: number[];
 }
 
 /** 용어 일괄 저장 행 데이터 */

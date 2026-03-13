@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchTerms } from '@/api/termApi';
 import { fetchDomains } from '@/api/domainApi';
+import { fetchWords } from '@/api/wordApi';
 import { queryKeys } from '@/constants/query-keys';
 import type {
   CompoundBaseTerm,
@@ -10,6 +11,7 @@ import type {
   Domain,
   PartialDecomposition,
   Term,
+  Word,
 } from '@/types/dictionary';
 import type { Column } from '@/types/erd';
 
@@ -132,6 +134,13 @@ export function useErdDictionaryData(teamId: string | undefined, setId: string |
     staleTime: 2 * 60 * 1000,
   });
 
+  const { data: words = [] } = useQuery({
+    queryKey: queryKeys.dictionary.words(teamId!, setId!),
+    queryFn: () => fetchWords(teamId!, setId!),
+    enabled: !!teamId && !!setId,
+    staleTime: 2 * 60 * 1000,
+  });
+
   const domainMap = useMemo(() => {
     const map = new Map<number, Domain>();
     for (const d of domains) {
@@ -164,6 +173,14 @@ export function useErdDictionaryData(teamId: string | undefined, setId: string |
     return map;
   }, [domains]);
 
+  const wordMap = useMemo(() => {
+    const map = new Map<number, Word>();
+    for (const word of words) {
+      map.set(word.id, word);
+    }
+    return map;
+  }, [words]);
+
   const searchTerms = useCallback(
     (query: string): Term[] => {
       if (!query.trim()) {
@@ -181,6 +198,8 @@ export function useErdDictionaryData(teamId: string | undefined, setId: string |
     (domainId: number): Domain | undefined => domainMap.get(domainId),
     [domainMap],
   );
+
+  const findWordById = useCallback((wordId: number): Word | undefined => wordMap.get(wordId), [wordMap]);
 
   const getTermWithType = useCallback(
     (term: Term): TermWithType => {
@@ -301,12 +320,14 @@ export function useErdDictionaryData(teamId: string | undefined, setId: string |
   return {
     terms,
     domains,
+    words,
     termByNameMap,
     domainByNameMap,
     domainMap,
     searchTerms,
     findTermById,
     findDomainById,
+    findWordById,
     getTermWithType,
     resolveCompound,
     partialDecompose,

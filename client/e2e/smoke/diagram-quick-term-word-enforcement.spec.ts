@@ -1,0 +1,75 @@
+import { expect, test } from '@playwright/test';
+import {
+  diagramUrl,
+  expectDiagramHeaderVisible,
+  getE2EProvisioningConfig,
+  loginViaUi,
+  provisionCollaborationFixture,
+  waitForEditableDiagram,
+} from '../shared/diagram-e2e';
+
+test('quick term registration in diagram requires word composition and supports inline word creation @smoke', async ({
+  page,
+}) => {
+  const config = getE2EProvisioningConfig();
+  const fixture = await provisionCollaborationFixture(config);
+
+  await loginViaUi(page, { ...config, ...fixture });
+
+  const target = fixture.target;
+  await page.goto(diagramUrl(config, target), { waitUntil: 'domcontentloaded' });
+  await expectDiagramHeaderVisible(page, target);
+  await waitForEditableDiagram(page, 30_000);
+
+  await page.getByRole('button', { name: /테이블 추가|add table/i }).click();
+
+  const node = page.locator('.react-flow__node-table').first();
+  await expect(node).toBeVisible({ timeout: 15_000 });
+  await node.getByText('Table 1', { exact: true }).dblclick();
+
+  const columnLogicalNameInput = node.getByLabel(/컬럼 논리명|column logical name/i).nth(1);
+  await columnLogicalNameInput.click();
+  await columnLogicalNameInput.fill('사용자식별자');
+
+  await page.getByText(/신규 용어 등록|register new term/i).click();
+
+  const quickTermDialog = page.getByRole('dialog', { name: /빠른 용어 등록|quick term registration/i });
+  await expect(quickTermDialog).toBeVisible();
+  await expect(
+    quickTermDialog.getByText(/단어 조합이 필수입니다|word composition is required/i),
+  ).toBeVisible();
+
+  const submitButton = quickTermDialog.getByRole('button', { name: /등록 및 적용|register & apply/i });
+  await expect(submitButton).toBeDisabled();
+
+  await quickTermDialog.getByRole('button', { name: /새 단어|new word/i }).click();
+
+  const wordDialog = page.getByRole('dialog', { name: /단어 추가|add word/i });
+  await expect(wordDialog).toBeVisible();
+  await wordDialog.getByLabel(/논리명|logical name/i).fill('사용자');
+  await wordDialog.getByLabel(/물리명|physical name/i).fill('user');
+  await wordDialog.getByRole('button', { name: /생성|create/i }).click();
+
+  await expect(wordDialog).toHaveCount(0);
+  await expect(quickTermDialog.getByRole('textbox', { name: /논리명|logical name/i })).toHaveValue(
+    '사용자',
+  );
+  await expect(quickTermDialog.getByRole('textbox', { name: /물리명|physical name/i })).toHaveValue(
+    'user',
+  );
+  await expect(submitButton).toBeEnabled();
+
+  await submitButton.evaluate((element: HTMLButtonElement) => element.click());
+
+  await expect(quickTermDialog).toHaveCount(0);
+  await expect(node.getByLabel(/컬럼 논리명|column logical name/i).nth(1)).toHaveValue('사용자');
+  await expect(node.getByLabel(/컬럼 이름|column name/i).first()).toHaveValue('user');
+
+  test
+    .info()
+    .annotations.push(
+      { type: 'target-team', description: `${target.teamId}:${target.teamName}` },
+      { type: 'target-project', description: `${target.projectId}:${target.projectName}` },
+      { type: 'target-diagram', description: `${target.diagramId}:${target.diagramName}` },
+    );
+});

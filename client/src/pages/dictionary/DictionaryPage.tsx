@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import DomainTab from '@/components/dictionary/DomainTab';
 import TermTab from '@/components/dictionary/TermTab';
+import WordTab from '@/components/dictionary/WordTab';
 import CreateResourceDialog from '@/components/ui/create-resource-dialog';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import TextInputDialog from '@/components/ui/text-input-dialog';
@@ -195,16 +196,20 @@ export default function DictionaryPage() {
               </div>
 
               {selectedSetId ? (
-                <Tabs defaultValue="domains">
+                <Tabs defaultValue="words">
                   <TabsList>
-                    <TabsTrigger value="domains">{t('dictionary.tabs.domains')}</TabsTrigger>
+                    <TabsTrigger value="words">{t('dictionary.tabs.words')}</TabsTrigger>
                     <TabsTrigger value="terms">{t('dictionary.tabs.terms')}</TabsTrigger>
+                    <TabsTrigger value="domains">{t('dictionary.tabs.domains')}</TabsTrigger>
                   </TabsList>
-                  <TabsContent value="domains">
-                    <DomainTab canEdit={canEdit} setId={selectedSetId} />
+                  <TabsContent value="words">
+                    <WordTab canEdit={canEdit} setId={selectedSetId} />
                   </TabsContent>
                   <TabsContent value="terms">
                     <TermTab canEdit={canEdit} setId={selectedSetId} />
+                  </TabsContent>
+                  <TabsContent value="domains">
+                    <DomainTab canEdit={canEdit} setId={selectedSetId} />
                   </TabsContent>
                 </Tabs>
               ) : (

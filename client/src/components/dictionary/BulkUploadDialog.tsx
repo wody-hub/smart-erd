@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,12 @@ import {
   downloadTermTemplate,
   downloadTermUploadErrors,
 } from '@/api/termApi';
+import {
+  bulkSaveWords,
+  downloadWordTemplate,
+  downloadWordUploadErrors,
+  validateWordUpload,
+} from '@/api/wordApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
 import type { BulkValidationResponse, BulkSaveResponse } from '@/types/dictionary';
@@ -48,7 +55,7 @@ interface BulkUploadDialogProps {
   /** 열림 상태 변경 핸들러 */
   onOpenChange: (open: boolean) => void;
   /** 업로드 모드 (도메인/용어) */
-  mode: 'domain' | 'term';
+  mode: 'domain' | 'term' | 'word';
   /** 선택된 사전 세트 ID */
   setId: string;
 }
@@ -94,7 +101,9 @@ export default function BulkUploadDialog({
     mutationFn: (f: File) =>
       mode === 'domain'
         ? validateDomainUpload(teamId!, setId, f)
-        : validateTermUpload(teamId!, setId, f),
+        : mode === 'term'
+          ? validateTermUpload(teamId!, setId, f)
+          : validateWordUpload(teamId!, setId, f),
     onSuccess: (result) => {
       setValidationResult(result);
       setExcludedRows(new Set());
@@ -117,9 +126,11 @@ export default function BulkUploadDialog({
           validationResult.validationToken,
           excludedRowNumbers,
         );
-      } else {
+      }
+      if (mode === 'term') {
         return bulkSaveTerms(teamId!, setId, validationResult.validationToken, excludedRowNumbers);
       }
+      return bulkSaveWords(teamId!, setId, validationResult.validationToken, excludedRowNumbers);
     },
     onSuccess: (result) => {
       setSaveResult(result);
@@ -187,8 +198,10 @@ export default function BulkUploadDialog({
     try {
       if (mode === 'domain') {
         await downloadDomainTemplate(teamId!, setId);
-      } else {
+      } else if (mode === 'term') {
         await downloadTermTemplate(teamId!, setId);
+      } else {
+        await downloadWordTemplate(teamId!, setId);
       }
     } catch (err) {
       toast.error(getErrorMessage(err, t('dictionary.upload.toast.templateFailed')));
@@ -202,8 +215,10 @@ export default function BulkUploadDialog({
     try {
       if (mode === 'domain') {
         await downloadDomainUploadErrors(teamId!, setId, validationResult.validationToken);
-      } else {
+      } else if (mode === 'term') {
         await downloadTermUploadErrors(teamId!, setId, validationResult.validationToken);
+      } else {
+        await downloadWordUploadErrors(teamId!, setId, validationResult.validationToken);
       }
     } catch (err) {
       toast.error(getErrorMessage(err, t('dictionary.upload.toast.errorDownloadFailed')));
@@ -232,7 +247,9 @@ export default function BulkUploadDialog({
       const key =
         mode === 'domain'
           ? queryKeys.dictionary.domains(teamId!, setId)
-          : queryKeys.dictionary.terms(teamId!, setId);
+          : mode === 'term'
+            ? queryKeys.dictionary.terms(teamId!, setId)
+            : queryKeys.dictionary.words(teamId!, setId);
       queryClient.invalidateQueries({ queryKey: key });
     }
     setTimeout(() => {
@@ -254,7 +271,9 @@ export default function BulkUploadDialog({
   const dialogTitle =
     mode === 'domain'
       ? t('dictionary.upload.dialogTitle.domain')
-      : t('dictionary.upload.dialogTitle.term');
+      : mode === 'term'
+        ? t('dictionary.upload.dialogTitle.term')
+        : t('dictionary.upload.dialogTitle.word');
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -271,6 +290,7 @@ export default function BulkUploadDialog({
             {step === 2 && ` — ${t('dictionary.upload.preview.title')}`}
             {step === 3 && ` — ${t('dictionary.upload.complete.title')}`}
           </DialogTitle>
+          <DialogDescription>{t('dictionary.upload.description')}</DialogDescription>
         </DialogHeader>
 
         {/* Step 1: 파일 선택 */}

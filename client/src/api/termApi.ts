@@ -72,9 +72,10 @@ export async function fetchTermsPage(
  * @returns 생성된 용어
  */
 export async function createTerm(teamId: string, setId: string, data: TermFormData): Promise<Term> {
+  const { wordIds: _wordIds, ...payload } = data;
   const res = await axiosInstance.post<Term>(
     `/teams/${teamId}/dictionary-sets/${setId}/terms`,
-    data,
+    payload,
   );
   return res.data;
 }
@@ -94,9 +95,10 @@ export async function updateTerm(
   termId: number,
   data: TermFormData,
 ): Promise<Term> {
+  const { wordIds: _wordIds, ...payload } = data;
   const res = await axiosInstance.put<Term>(
     `/teams/${teamId}/dictionary-sets/${setId}/terms/${termId}`,
-    data,
+    payload,
   );
   return res.data;
 }

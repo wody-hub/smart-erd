@@ -16,16 +16,12 @@ import com.smarterd.domain.dictionary.repository.TermRepository;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import com.smarterd.utils.AppStringUtils;
-import com.smarterd.utils.ExcelUtils;
 import com.smarterd.utils.excel.ExcelData;
-import com.smarterd.utils.excel.ExcelSheet;
-import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -56,6 +52,7 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
     private static final int PHYSICAL_NAME_MAX = 100;
     private static final int LOGICAL_NAME_QUERY_BATCH_SIZE = 5_000;
     private static final int PREVIEW_ROW_LIMIT = 2_000;
+    private static final String ERROR_REPORT_ACCESSOR_ERROR = "Failed to resolve term error report methods";
 
     /** 용어 레포지토리 */
     private final TermRepository termRepository;
@@ -442,28 +439,12 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
      * @return 논리명 기준 기존 용어 맵
      */
     private Map<String, Term> findExistingTermsByLogicalName(DictionarySet dictionarySet, List<String> logicalNames) {
-        final var normalized = logicalNames
-            .stream()
-            .map(AppStringUtils::trimToEmpty)
-            .filter(AppStringUtils::isNotBlank)
-            .collect(Collectors.toCollection(LinkedHashSet::new));
-        if (normalized.isEmpty()) {
-            return Map.of();
-        }
-
-        final var names = new ArrayList<>(normalized);
-        final var existingTerms = new HashMap<String, Term>();
-        for (var start = 0; start < names.size(); start += LOGICAL_NAME_QUERY_BATCH_SIZE) {
-            final var end = Math.min(start + LOGICAL_NAME_QUERY_BATCH_SIZE, names.size());
-            final var chunkTerms = termRepository.findByDictionarySetAndLogicalNameIn(
-                dictionarySet,
-                names.subList(start, end)
-            );
-            for (Term term : chunkTerms) {
-                existingTerms.putIfAbsent(term.getLogicalName(), term);
-            }
-        }
-        return existingTerms;
+        return findExistingByLogicalNames(
+            logicalNames,
+            LOGICAL_NAME_QUERY_BATCH_SIZE,
+            (names) -> termRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, names),
+            Term::getLogicalName
+        );
     }
 
     /**
@@ -487,40 +468,22 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
         dictionarySetService.findByTeamAndId(team, setId);
         final var session = resolveValidationSession(loginId, teamId, setId, validationToken, ValidationSession.class);
 
-        final var sheet = new ExcelSheet<TermErrorReportRow>();
-        sheet.setSheetName(msg("bulk.error-report.sheet-name", locale));
-        sheet.setTitles(
+        return buildErrorReportExcel(
+            session.errorRows(),
+            TermErrorReportRow.class,
+            "term-upload-errors",
+            locale,
             List.of(
-                msg("bulk.error-report.col.row", locale),
-                msg("bulk.error-report.col.logical-name", locale),
-                msg("bulk.error-report.col.physical-name", locale),
-                msg("bulk.error-report.col.domain-logical-name", locale),
-                msg("bulk.error-report.col.description", locale),
-                msg("bulk.error-report.col.errors", locale)
-            )
+                "bulk.error-report.col.row",
+                "bulk.error-report.col.logical-name",
+                "bulk.error-report.col.physical-name",
+                "bulk.error-report.col.domain-logical-name",
+                "bulk.error-report.col.description",
+                "bulk.error-report.col.errors"
+            ),
+            List.of("rowNumber", "logicalName", "physicalName", "domainLogicalName", "description", "errors"),
+            ERROR_REPORT_ACCESSOR_ERROR
         );
-        sheet.setReqMethods(errorReportMethods());
-        sheet.setDataList(session.errorRows());
-
-        return new ExcelUtils<TermErrorReportRow>().toExcel(List.of(sheet), null, "term-upload-errors");
-    }
-
-    /**
-     * 오류 보고서 엑셀 컬럼 순서 메서드를 반환한다.
-     */
-    private List<Method> errorReportMethods() {
-        try {
-            return List.of(
-                TermErrorReportRow.class.getMethod("rowNumber"),
-                TermErrorReportRow.class.getMethod("logicalName"),
-                TermErrorReportRow.class.getMethod("physicalName"),
-                TermErrorReportRow.class.getMethod("domainLogicalName"),
-                TermErrorReportRow.class.getMethod("description"),
-                TermErrorReportRow.class.getMethod("errors")
-            );
-        } catch (NoSuchMethodException e) {
-            throw new IllegalStateException("Failed to resolve term error report methods", e);
-        }
     }
 
     /**
@@ -537,28 +500,25 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
         final var team = verifyTeamAccess(loginId, teamId);
         dictionarySetService.findByTeamAndId(team, setId);
 
-        final var titles = List.of(
-            msg("template.term.col.logical-name", locale),
-            msg("template.term.col.physical-name", locale),
-            msg("template.term.col.domain-logical-name", locale),
-            msg("template.term.col.description", locale)
-        );
-        final var templateData = List.of(
-            new TemplateRow(
-                msg("template.term.sample.logical-name", locale),
-                msg("template.term.sample.physical-name", locale),
-                msg("template.term.sample.domain-logical-name", locale),
-                msg("template.term.sample.description", locale)
+        return buildTemplateExcel(
+            locale,
+            TemplateType.TERM,
+            "template.term.sheet-name",
+            List.of(
+                "template.term.col.logical-name",
+                "template.term.col.physical-name",
+                "template.term.col.domain-logical-name",
+                "template.term.col.description"
+            ),
+            List.of(
+                new TemplateRow(
+                    msg("template.term.sample.logical-name", locale),
+                    msg("template.term.sample.physical-name", locale),
+                    msg("template.term.sample.domain-logical-name", locale),
+                    msg("template.term.sample.description", locale)
+                )
             )
         );
-        try (final var utils = new ExcelUtils<>(templateData, titles)) {
-            utils.sheetName(msg("template.term.sheet-name", locale));
-            final var excelData = utils.toExcel();
-            addGuideSheet(excelData.excelBook(), locale, TemplateType.TERM);
-            return excelData;
-        } catch (java.io.IOException e) {
-            throw new java.io.UncheckedIOException("Failed to release Excel template resources", e);
-        }
     }
 
     /**

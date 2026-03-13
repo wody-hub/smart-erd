@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -21,9 +22,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { fetchDomains } from '@/api/domainApi';
+import { fetchWords } from '@/api/wordApi';
 import { queryKeys } from '@/constants/query-keys';
 import { useDictionarySuggest } from '@/hooks/useDictionarySuggest';
-import type { Term, TermFormData } from '@/types/dictionary';
+import type { Term, TermFormData, Word } from '@/types/dictionary';
+import WordComposer from '@/components/dictionary/WordComposer';
 
 /** "없음" 선택 시 사용하는 센티넬 값 */
 const NONE_VALUE = '__none__';
@@ -69,6 +72,10 @@ export default function TermFormDialog({
   const [description, setDescription] = useState('');
   /** 제출 중 여부 */
   const [submitting, setSubmitting] = useState(false);
+  /** 조합에 사용한 단어 ID 목록 */
+  const [selectedWordIds, setSelectedWordIds] = useState<string[]>([]);
+  /** 추가할 단어 ID */
+  const [wordToAdd, setWordToAdd] = useState<string>('');
   /** 물리명 사용자 수동 입력 플래그 */
   const [physicalNameDirty, setPhysicalNameDirty] = useState(false);
   /** 도메인 사용자 수동 입력 플래그 */
@@ -79,6 +86,12 @@ export default function TermFormDialog({
   const { data: domains = [] } = useQuery({
     queryKey: queryKeys.dictionary.domains(teamId!, setId),
     queryFn: () => fetchDomains(teamId!, setId),
+    enabled: open && !!teamId && !!setId,
+  });
+
+  const { data: words = [] } = useQuery({
+    queryKey: queryKeys.dictionary.words(teamId!, setId),
+    queryFn: () => fetchWords(teamId!, setId),
     enabled: open && !!teamId && !!setId,
   });
 
@@ -95,6 +108,8 @@ export default function TermFormDialog({
       setPhysicalName(initialData?.physicalName ?? '');
       setDomainId(initialData?.domainId != null ? String(initialData.domainId) : NONE_VALUE);
       setDescription(initialData?.description ?? '');
+      setSelectedWordIds([]);
+      setWordToAdd('');
       setPhysicalNameDirty(!!initialData);
       setDomainDirty(!!initialData);
     }
@@ -113,6 +128,46 @@ export default function TermFormDialog({
     }
   }, [suggestion, isEdit, physicalNameDirty, domainDirty]);
 
+  const buildWords = (wordIds: string[]): Word[] =>
+    wordIds
+      .map((wordId) => words.find((word) => String(word.id) === wordId))
+      .filter((word): word is Word => !!word);
+
+  const syncNamesFromWords = (nextWords: Word[]) => {
+    if (nextWords.length === 0) {
+      setLogicalName('');
+      setPhysicalName('');
+      setPhysicalNameDirty(false);
+      return;
+    }
+
+    setLogicalName(nextWords.map((word) => word.logicalName).join(' '));
+    setPhysicalName(nextWords.map((word) => word.physicalName).join('_'));
+    setPhysicalNameDirty(true);
+  };
+
+  const handleAddWord = (wordId: string) => {
+    if (!wordId || selectedWordIds.includes(wordId)) {
+      return;
+    }
+    const nextSelectedWordIds = [...selectedWordIds, wordId];
+    setSelectedWordIds(nextSelectedWordIds);
+    setWordToAdd('');
+    syncNamesFromWords(buildWords(nextSelectedWordIds));
+  };
+
+  const handleRemoveWord = (wordId: string) => {
+    const nextSelectedWordIds = selectedWordIds.filter((selectedId) => selectedId !== wordId);
+    setSelectedWordIds(nextSelectedWordIds);
+    syncNamesFromWords(buildWords(nextSelectedWordIds));
+  };
+
+  const handleClearWords = () => {
+    setSelectedWordIds([]);
+    setWordToAdd('');
+    syncNamesFromWords([]);
+  };
+
   /**
    * 폼 제출 핸들러.
    *
@@ -127,6 +182,7 @@ export default function TermFormDialog({
         physicalName,
         domainId: domainId !== NONE_VALUE ? Number(domainId) : null,
         description: description || undefined,
+        wordIds: selectedWordIds.map(Number),
       });
       onOpenChange(false);
     } finally {
@@ -162,8 +218,35 @@ export default function TermFormDialog({
           <DialogTitle>
             {isEdit ? t('dictionary.term.form.editTitle') : t('dictionary.term.form.createTitle')}
           </DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? t('dictionary.term.form.editDescription')
+              : t('dictionary.term.form.createDescription')}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!isEdit && (
+            <WordComposer
+              words={words}
+              selectedWordIds={selectedWordIds}
+              wordToAdd={wordToAdd}
+              onWordToAddChange={setWordToAdd}
+              onAddWord={handleAddWord}
+              onRemoveWord={handleRemoveWord}
+              onClear={handleClearWords}
+              title={t('dictionary.term.form.wordBuilder')}
+              description={t('dictionary.term.form.wordBuilderDescription')}
+              placeholder={t('dictionary.term.form.wordBuilderPlaceholder')}
+              addLabel={t('dictionary.term.form.addWord')}
+              clearLabel={t('dictionary.term.form.clearWords')}
+              sequenceLabel={t('dictionary.term.form.wordSequence')}
+              logicalPreviewLabel={t('dictionary.term.form.logicalPreview')}
+              physicalPreviewLabel={t('dictionary.term.form.physicalPreview')}
+              removeWordLabel={(logicalName) =>
+                t('dictionary.term.form.removeWord', { name: logicalName })
+              }
+            />
+          )}
           <div className="space-y-2">
             <Label htmlFor="term-logicalName">{t('dictionary.term.form.logicalName')}</Label>
             <Input

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -21,14 +22,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { createTerm } from '@/api/termApi';
+import { createWord } from '@/api/wordApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
 import { buildColumnUpdatesFromTerm } from '@/components/erd/erdDictionaryData';
 import { useDictionarySuggest } from '@/hooks/useDictionarySuggest';
 import { useErdDictionary } from './ErdDictionaryContext';
 import type { Column } from '@/types/erd';
-import type { Domain } from '@/types/dictionary';
+import type { Domain, Word } from '@/types/dictionary';
 import QuickDomainDialog from './QuickDomainDialog';
+import WordComposer from '@/components/dictionary/WordComposer';
+import WordFormDialog from '@/components/dictionary/WordFormDialog';
 
 /** "없음" 선택 시 사용하는 센티넬 값 */
 const NONE_VALUE = '__none__';
@@ -65,22 +69,38 @@ export default function QuickTermDialog({
 }: QuickTermDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { teamId, setId, domains, findDomainById } = useErdDictionary();
+  const { teamId, setId, domains, words, findDomainById } = useErdDictionary();
 
-  /** 논리명 입력값 */
-  const [logicalName, setLogicalName] = useState('');
-  /** 물리명 입력값 */
-  const [physicalName, setPhysicalName] = useState('');
   /** 연결 도메인 ID (문자열 — Select 호환) */
   const [domainId, setDomainId] = useState<string>(NONE_VALUE);
   /** 설명 입력값 */
   const [description, setDescription] = useState('');
-  /** 물리명 사용자 수동 입력 플래그 */
-  const [physicalNameDirty, setPhysicalNameDirty] = useState(false);
+  /** 조합에 사용한 단어 ID 목록 */
+  const [selectedWordIds, setSelectedWordIds] = useState<string[]>([]);
+  /** 추가할 단어 ID */
+  const [wordToAdd, setWordToAdd] = useState('');
   /** 도메인 사용자 수동 입력 플래그 */
   const [domainDirty, setDomainDirty] = useState(false);
   /** 빠른 도메인 등록 다이얼로그 열림 상태 */
   const [quickDomainOpen, setQuickDomainOpen] = useState(false);
+  /** 빠른 단어 등록 다이얼로그 열림 상태 */
+  const [quickWordOpen, setQuickWordOpen] = useState(false);
+
+  const selectedWords = useMemo(
+    () =>
+      selectedWordIds
+        .map((wordId) => words.find((word) => String(word.id) === wordId))
+        .filter((word): word is Word => !!word),
+    [selectedWordIds, words],
+  );
+  const logicalName = useMemo(
+    () => selectedWords.map((word) => word.logicalName).join(' '),
+    [selectedWords],
+  );
+  const physicalName = useMemo(
+    () => selectedWords.map((word) => word.physicalName).join('_'),
+    [selectedWords],
+  );
 
   const { suggestion, isLoading: suggestLoading } = useDictionarySuggest(
     teamId,
@@ -91,31 +111,27 @@ export default function QuickTermDialog({
 
   useEffect(() => {
     if (open) {
-      setLogicalName(initialLogicalName);
-      setPhysicalName('');
       setDomainId(NONE_VALUE);
       setDescription('');
-      setPhysicalNameDirty(false);
+      setSelectedWordIds([]);
+      setWordToAdd('');
       setDomainDirty(false);
+      setQuickWordOpen(false);
     }
   }, [open, initialLogicalName]);
 
-  // 추천 결과로 물리명/도메인 자동 채움 (다이얼로그가 열려 있을 때만)
+  // 추천 결과로 도메인 자동 채움 (다이얼로그가 열려 있을 때만)
   useEffect(() => {
     if (!open || !suggestion) {
       return;
     }
 
-    if (!physicalNameDirty && suggestion.physicalName) {
-      setPhysicalName(suggestion.physicalName);
-    }
-
     if (!domainDirty && suggestion.domainId != null) {
       setDomainId(String(suggestion.domainId));
     }
-  }, [open, suggestion, physicalNameDirty, domainDirty]);
+  }, [open, suggestion, domainDirty]);
 
-  const mutation = useMutation({
+  const createTermMutation = useMutation({
     mutationFn: () =>
       createTerm(teamId, setId, {
         logicalName,
@@ -132,6 +148,25 @@ export default function QuickTermDialog({
     onError: (err) => toast.error(getErrorMessage(err, t('erd.quickTerm.failed'))),
   });
 
+  const createWordMutation = useMutation({
+    mutationFn: (data: { logicalName: string; physicalName: string; description?: string }) =>
+      createWord(teamId, setId, data),
+    onSuccess: async (word) => {
+      queryClient.setQueryData<Word[]>(queryKeys.dictionary.words(teamId, setId), (current = []) => {
+        if (current.some((item) => item.id === word.id)) {
+          return current;
+        }
+        return [...current, word];
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.words(teamId, setId) });
+      setSelectedWordIds((prev) => [...prev, String(word.id)]);
+      setWordToAdd('');
+      toast.success(t('erd.quickTerm.wordCreated'));
+      setQuickWordOpen(false);
+    },
+    onError: (err) => toast.error(getErrorMessage(err, t('erd.quickTerm.wordCreateFailed'))),
+  });
+
   /**
    * 폼 제출 핸들러.
    *
@@ -139,7 +174,10 @@ export default function QuickTermDialog({
    */
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    mutation.mutate();
+    if (selectedWords.length === 0) {
+      return;
+    }
+    createTermMutation.mutate();
   };
 
   /**
@@ -176,6 +214,23 @@ export default function QuickTermDialog({
   };
 
   const hintText = getSuggestHintText();
+  const handleAddWord = (wordId: string) => {
+    if (!wordId || selectedWordIds.includes(wordId)) {
+      return;
+    }
+
+    setSelectedWordIds((prev) => [...prev, wordId]);
+    setWordToAdd('');
+  };
+
+  const handleRemoveWord = (wordId: string) => {
+    setSelectedWordIds((prev) => prev.filter((selectedId) => selectedId !== wordId));
+  };
+
+  const handleClearWords = () => {
+    setSelectedWordIds([]);
+    setWordToAdd('');
+  };
 
   return (
     <>
@@ -183,8 +238,52 @@ export default function QuickTermDialog({
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>{t('erd.quickTerm.title')}</DialogTitle>
+            <DialogDescription>
+              {t('erd.quickTerm.description')}
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <WordComposer
+              words={words}
+              selectedWordIds={selectedWordIds}
+              wordToAdd={wordToAdd}
+              onWordToAddChange={setWordToAdd}
+              onAddWord={handleAddWord}
+              onRemoveWord={handleRemoveWord}
+              onClear={handleClearWords}
+              title={t('dictionary.term.form.wordBuilder')}
+              description={t('dictionary.term.form.wordBuilderDescription')}
+              placeholder={t('dictionary.term.form.wordBuilderPlaceholder')}
+              addLabel={t('dictionary.term.form.addWord')}
+              clearLabel={t('dictionary.term.form.clearWords')}
+              sequenceLabel={t('dictionary.term.form.wordSequence')}
+              logicalPreviewLabel={t('dictionary.term.form.logicalPreview')}
+              physicalPreviewLabel={t('dictionary.term.form.physicalPreview')}
+              removeWordLabel={(logicalName) =>
+                t('dictionary.term.form.removeWord', { name: logicalName })
+              }
+            />
+            <div className="flex items-center justify-between gap-2 rounded-md border border-dashed border-border/70 bg-muted/30 px-3 py-2">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{t('erd.quickTerm.wordRequiredTitle')}</p>
+                <p className="text-xs text-muted-foreground">
+                  {initialLogicalName.trim()
+                    ? t('erd.quickTerm.wordRequiredDescriptionWithInitial', {
+                        name: initialLogicalName.trim(),
+                      })
+                    : t('erd.quickTerm.wordRequiredDescription')}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setQuickWordOpen(true)}
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                {t('erd.quickTerm.createWord')}
+              </Button>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="quick-term-logicalName">
                 {t('dictionary.term.form.logicalName')}
@@ -192,7 +291,7 @@ export default function QuickTermDialog({
               <Input
                 id="quick-term-logicalName"
                 value={logicalName}
-                onChange={(e) => setLogicalName(e.target.value)}
+                readOnly
                 placeholder={t('dictionary.term.form.logicalNamePlaceholder')}
                 required
                 maxLength={100}
@@ -220,10 +319,7 @@ export default function QuickTermDialog({
               <Input
                 id="quick-term-physicalName"
                 value={physicalName}
-                onChange={(e) => {
-                  setPhysicalName(e.target.value);
-                  setPhysicalNameDirty(true);
-                }}
+                readOnly
                 placeholder={t('dictionary.term.form.physicalNamePlaceholder')}
                 required
                 maxLength={100}
@@ -283,9 +379,11 @@ export default function QuickTermDialog({
               </Button>
               <Button
                 type="submit"
-                disabled={mutation.isPending || !logicalName.trim() || !physicalName.trim()}
+                disabled={createTermMutation.isPending || selectedWords.length === 0}
               >
-                {mutation.isPending ? t('erd.quickTerm.submitting') : t('erd.quickTerm.submit')}
+                {createTermMutation.isPending
+                  ? t('erd.quickTerm.submitting')
+                  : t('erd.quickTerm.submit')}
               </Button>
             </DialogFooter>
           </form>
@@ -296,6 +394,12 @@ export default function QuickTermDialog({
         open={quickDomainOpen}
         onOpenChange={setQuickDomainOpen}
         onCreated={handleDomainCreated}
+      />
+
+      <WordFormDialog
+        open={quickWordOpen}
+        onOpenChange={setQuickWordOpen}
+        onSubmit={(data) => createWordMutation.mutateAsync(data).then(() => undefined)}
       />
     </>
   );

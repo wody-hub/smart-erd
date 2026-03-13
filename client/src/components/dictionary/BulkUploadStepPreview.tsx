@@ -15,7 +15,7 @@ import type { BulkValidationResponse, BulkSaveResponse } from '@/types/dictionar
 /** BulkUploadStepPreview 컴포넌트 props */
 interface BulkUploadStepPreviewProps {
   /** 업로드 모드 (도메인/용어) */
-  mode: 'domain' | 'term';
+  mode: 'domain' | 'term' | 'word';
   /** 검증 결과 */
   validationResult: BulkValidationResponse;
   /** 저장에서 제외할 행 번호 Set */
@@ -43,6 +43,7 @@ const DOMAIN_COLUMNS = ['logicalName', 'physicalType', 'description'] as const;
 
 /** 용어 데이터 컬럼 키 */
 const TERM_COLUMNS = ['logicalName', 'physicalName', 'domainLogicalName', 'description'] as const;
+const WORD_COLUMNS = ['logicalName', 'physicalName', 'description'] as const;
 
 /**
  * 컬럼 키에 대응하는 i18n 헤더 키를 반환한다.
@@ -50,14 +51,26 @@ const TERM_COLUMNS = ['logicalName', 'physicalName', 'domainLogicalName', 'descr
  * @param col 컬럼 키
  * @returns i18n 헤더 키
  */
-function getColumnHeaderKey(col: string): string {
-  const headerMap: Record<string, string> = {
-    logicalName: 'dictionary.domain.table.logicalName',
-    physicalType: 'dictionary.domain.table.physicalType',
-    physicalName: 'dictionary.term.table.physicalName',
-    domainLogicalName: 'dictionary.term.table.domain',
-    description: 'dictionary.domain.table.description',
-  };
+function getColumnHeaderKey(mode: 'domain' | 'term' | 'word', col: string): string {
+  const headerMap: Record<string, string> =
+    mode === 'domain'
+      ? {
+          logicalName: 'dictionary.domain.table.logicalName',
+          physicalType: 'dictionary.domain.table.physicalType',
+          description: 'dictionary.domain.table.description',
+        }
+      : mode === 'term'
+        ? {
+            logicalName: 'dictionary.term.table.logicalName',
+            physicalName: 'dictionary.term.table.physicalName',
+            domainLogicalName: 'dictionary.term.table.domain',
+            description: 'dictionary.term.table.description',
+          }
+        : {
+            logicalName: 'dictionary.word.table.logicalName',
+            physicalName: 'dictionary.word.table.physicalName',
+            description: 'dictionary.word.table.description',
+          };
   return headerMap[col] ?? col;
 }
 
@@ -99,7 +112,7 @@ export default function BulkUploadStepPreview({
 }: BulkUploadStepPreviewProps) {
   const { t } = useTranslation();
 
-  const columns = mode === 'domain' ? DOMAIN_COLUMNS : TERM_COLUMNS;
+  const columns = mode === 'domain' ? DOMAIN_COLUMNS : mode === 'term' ? TERM_COLUMNS : WORD_COLUMNS;
   const previewRows = validationResult.rows;
   const isPreviewTruncated = validationResult.previewTruncated;
   const previewErrorCount = previewRows.filter((row) => !row.valid).length;
@@ -150,10 +163,10 @@ export default function BulkUploadStepPreview({
               <TableHead className="w-[40px]" />
               <TableHead className="w-[50px]">{t('dictionary.upload.preview.row')}</TableHead>
               {columns.map((col) => (
-                <TableHead key={col} className={getColumnWidthClass(col)}>
-                  {t(getColumnHeaderKey(col) as never)}
-                </TableHead>
-              ))}
+                  <TableHead key={col} className={getColumnWidthClass(col)}>
+                  {t(getColumnHeaderKey(mode, col) as never)}
+                  </TableHead>
+                ))}
               <TableHead className="w-[180px]">{t('dictionary.upload.preview.status')}</TableHead>
             </TableRow>
           </TableHeader>

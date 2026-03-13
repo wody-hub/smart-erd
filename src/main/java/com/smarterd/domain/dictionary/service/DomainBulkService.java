@@ -8,27 +8,21 @@ import com.smarterd.api.dictionary.dto.BulkValidationResponse;
 import com.smarterd.api.dictionary.dto.BulkValidationRow;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.message.MessageCode;
-import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import com.smarterd.utils.AppStringUtils;
-import com.smarterd.utils.ExcelUtils;
 import com.smarterd.utils.excel.ExcelData;
-import com.smarterd.utils.excel.ExcelSheet;
-import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +48,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     private static final int PHYSICAL_TYPE_MAX = 50;
     private static final int LOGICAL_NAME_QUERY_BATCH_SIZE = 5_000;
     private static final int PREVIEW_ROW_LIMIT = 2_000;
+    private static final String ERROR_REPORT_ACCESSOR_ERROR = "Failed to resolve domain error report methods";
 
     /** 도메인 레포지토리 */
     private final DomainRepository domainRepository;
@@ -140,11 +135,10 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
 
         // DB 기존 논리명 일괄 조회
         final var existingNames = findExistingLogicalNames(
-            dictionarySet,
-            rawRows
-                .stream()
-                .map((row) -> AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", "")))
-                .toList()
+            rawRows.stream().map((row) -> AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", ""))).toList(),
+            LOGICAL_NAME_QUERY_BATCH_SIZE,
+            (names) -> domainRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, names),
+            Domain::getLogicalName
         );
 
         // 행별 검증
@@ -371,8 +365,10 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
 
         // 기존 논리명 일괄 조회 (N+1 방지)
         final var existingNames = findExistingLogicalNames(
-            dictionarySet,
-            candidateRows.stream().map(BulkDomainRow::logicalName).toList()
+            candidateRows.stream().map(BulkDomainRow::logicalName).toList(),
+            LOGICAL_NAME_QUERY_BATCH_SIZE,
+            (names) -> domainRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, names),
+            Domain::getLogicalName
         );
 
         final var domainsToSave = new ArrayList<Domain>();
@@ -423,72 +419,21 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
         dictionarySetService.findByTeamAndId(team, setId);
         final var session = resolveValidationSession(loginId, teamId, setId, validationToken, ValidationSession.class);
 
-        final var sheet = new ExcelSheet<DomainErrorReportRow>();
-        sheet.setSheetName(msg("bulk.error-report.sheet-name", locale));
-        sheet.setTitles(
+        return buildErrorReportExcel(
+            session.errorRows(),
+            DomainErrorReportRow.class,
+            "domain-upload-errors",
+            locale,
             List.of(
-                msg("bulk.error-report.col.row", locale),
-                msg("bulk.error-report.col.logical-name", locale),
-                msg("bulk.error-report.col.physical-type", locale),
-                msg("bulk.error-report.col.description", locale),
-                msg("bulk.error-report.col.errors", locale)
-            )
+                "bulk.error-report.col.row",
+                "bulk.error-report.col.logical-name",
+                "bulk.error-report.col.physical-type",
+                "bulk.error-report.col.description",
+                "bulk.error-report.col.errors"
+            ),
+            List.of("rowNumber", "logicalName", "physicalType", "description", "errors"),
+            ERROR_REPORT_ACCESSOR_ERROR
         );
-        sheet.setReqMethods(errorReportMethods());
-        sheet.setDataList(session.errorRows());
-
-        return new ExcelUtils<DomainErrorReportRow>().toExcel(List.of(sheet), null, "domain-upload-errors");
-    }
-
-    /**
-     * 논리명 목록을 배치로 조회하여 기존 도메인 논리명을 반환한다.
-     *
-     * <p>대량 업로드에서 DB IN 절 파라미터 한도 초과를 피하기 위해 일정 크기로 분할 조회한다.</p>
-     *
-     * @param dictionarySet 사전 세트
-     * @param logicalNames  조회 대상 논리명 목록
-     * @return DB에 이미 존재하는 논리명 집합
-     */
-    private Set<String> findExistingLogicalNames(DictionarySet dictionarySet, List<String> logicalNames) {
-        final var normalized = logicalNames
-            .stream()
-            .map(AppStringUtils::trimToEmpty)
-            .filter(AppStringUtils::isNotBlank)
-            .collect(Collectors.toCollection(LinkedHashSet::new));
-        if (normalized.isEmpty()) {
-            return Set.of();
-        }
-
-        final var names = new ArrayList<>(normalized);
-        final var existing = new HashSet<String>();
-        for (var start = 0; start < names.size(); start += LOGICAL_NAME_QUERY_BATCH_SIZE) {
-            final var end = Math.min(start + LOGICAL_NAME_QUERY_BATCH_SIZE, names.size());
-            existing.addAll(
-                domainRepository
-                    .findByDictionarySetAndLogicalNameIn(dictionarySet, names.subList(start, end))
-                    .stream()
-                    .map(Domain::getLogicalName)
-                    .toList()
-            );
-        }
-        return existing;
-    }
-
-    /**
-     * 오류 보고서 엑셀 컬럼 순서 메서드를 반환한다.
-     */
-    private List<Method> errorReportMethods() {
-        try {
-            return List.of(
-                DomainErrorReportRow.class.getMethod("rowNumber"),
-                DomainErrorReportRow.class.getMethod("logicalName"),
-                DomainErrorReportRow.class.getMethod("physicalType"),
-                DomainErrorReportRow.class.getMethod("description"),
-                DomainErrorReportRow.class.getMethod("errors")
-            );
-        } catch (NoSuchMethodException e) {
-            throw new IllegalStateException("Failed to resolve domain error report methods", e);
-        }
     }
 
     /**
@@ -505,26 +450,23 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
         final var team = verifyTeamAccess(loginId, teamId);
         dictionarySetService.findByTeamAndId(team, setId);
 
-        final var titles = List.of(
-            msg("template.domain.col.logical-name", locale),
-            msg("template.domain.col.physical-type", locale),
-            msg("template.domain.col.description", locale)
-        );
-        final var templateData = List.of(
-            new TemplateRow(
-                msg("template.domain.sample.logical-name", locale),
-                msg("template.domain.sample.physical-type", locale),
-                msg("template.domain.sample.description", locale)
+        return buildTemplateExcel(
+            locale,
+            TemplateType.DOMAIN,
+            "template.domain.sheet-name",
+            List.of(
+                "template.domain.col.logical-name",
+                "template.domain.col.physical-type",
+                "template.domain.col.description"
+            ),
+            List.of(
+                new TemplateRow(
+                    msg("template.domain.sample.logical-name", locale),
+                    msg("template.domain.sample.physical-type", locale),
+                    msg("template.domain.sample.description", locale)
+                )
             )
         );
-        try (final var utils = new ExcelUtils<>(templateData, titles)) {
-            utils.sheetName(msg("template.domain.sheet-name", locale));
-            final var excelData = utils.toExcel();
-            addGuideSheet(excelData.excelBook(), locale, TemplateType.DOMAIN);
-            return excelData;
-        } catch (java.io.IOException e) {
-            throw new java.io.UncheckedIOException("Failed to release Excel template resources", e);
-        }
     }
 
     /**
