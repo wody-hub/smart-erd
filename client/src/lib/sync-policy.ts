@@ -30,7 +30,7 @@ const LARGE_DIAGRAM_FALLBACK_LAYOUT_MODE: SyncLayoutMode = 'incremental';
 /** 동기화 정책 기본값 */
 export const DEFAULT_SYNC_POLICY: SyncPolicy = {
   autoApplyEnabled: true,
-  layoutMode: 'full',
+  layoutMode: 'none',
   largeDiagramThreshold: LARGE_DIAGRAM_AUTO_APPLY_THRESHOLD,
 };
 
