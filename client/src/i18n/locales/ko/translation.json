@@ -246,6 +246,8 @@
       "validateActive": "유효성 검사 (활성)",
       "ddlExport": "SQL DDL",
       "ddlImport": "DDL 가져오기",
+      "dictionary": "사전 관리",
+      "dictionaryActive": "사전 관리 (활성)",
       "codeEditor": "코드",
       "codeEditorActive": "코드 에디터 닫기"
     },
@@ -432,6 +434,7 @@
       "allDomains": "전체 도메인",
       "none": "없음",
       "searchPlaceholder": "도메인 검색...",
+      "noResults": "매칭되는 도메인이 없습니다.",
       "registerNew": "+ 신규 도메인 등록"
     },
     "autocomplete": {

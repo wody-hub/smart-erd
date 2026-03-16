@@ -80,6 +80,15 @@
     --erd-validation-mismatch: 37.7 92.1% 50.2%;
     --erd-validation-unregistered: 0 84.2% 60.2%;
     --erd-validation-unchecked: 215.4 16.3% 46.9%;
+
+    --composition-valid-bg: 151.8 81% 95.9%;
+    --composition-valid-border: 148.6 60% 80%;
+    --composition-valid-foreground: 155.1 75% 9.4%;
+    --composition-valid-muted: 149.7 70.5% 17.8%;
+    --composition-warning-bg: 48 100% 96.1%;
+    --composition-warning-border: 48.5 95.8% 76.9%;
+    --composition-warning-foreground: 31.8 81% 4.3%;
+    --composition-warning-muted: 33.4 81% 12.7%;
   }
 
   .dark {
@@ -158,6 +167,15 @@
     --erd-validation-mismatch: 37.7 92.1% 50.2%;
     --erd-validation-unregistered: 0 62.8% 50.6%;
     --erd-validation-unchecked: 215 20.2% 65.1%;
+
+    --composition-valid-bg: 155.1 75% 12%;
+    --composition-valid-border: 149 60% 25%;
+    --composition-valid-foreground: 151.8 81% 85%;
+    --composition-valid-muted: 149.7 70.5% 72%;
+    --composition-warning-bg: 33.4 81% 10%;
+    --composition-warning-border: 45 60% 25%;
+    --composition-warning-foreground: 48 100% 88%;
+    --composition-warning-muted: 48 95% 76%;
   }
 }
 

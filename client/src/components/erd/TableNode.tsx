@@ -28,13 +28,12 @@ import { useRemoteEditLocksContext } from './RemoteEditLocksContext';
 import { getColumnWarning } from '@/hooks/useColumnValidation';
 import { cn } from '@/lib/utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { revertDomainTypeIfNeeded } from './erdDictionaryData';
 import type { TermSelectResult } from './ColumnAutocomplete';
 import QuickTermDialog from './QuickTermDialog';
 import StaticColumnRow from './StaticColumnRow';
 import TableNodeHeader from './TableNodeHeader';
 import EditableColumnRow from './EditableColumnRow';
-
-const DEFAULT_COLUMN_TYPE = 'VARCHAR(255)';
 
 /** 빠른 용어 등록 대상 정보 */
 interface QuickTermTarget {
@@ -294,17 +293,11 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
       updates.domainId = resolution.domainId ?? undefined;
       if (resolution.physicalType) {
         updates.type = resolution.physicalType;
-      } else if (column?.domainId != null) {
-        const previousDomain = findDomainById(column.domainId);
-        if (previousDomain && column.type === previousDomain.physicalType) {
-          updates.type = DEFAULT_COLUMN_TYPE;
-        }
+      } else {
+        updates.type = revertDomainTypeIfNeeded(column, findDomainById) ?? updates.type;
       }
-    } else if (column?.domainId != null) {
-      const previousDomain = findDomainById(column.domainId);
-      if (previousDomain && column.type === previousDomain.physicalType) {
-        updates.type = DEFAULT_COLUMN_TYPE;
-      }
+    } else {
+      updates.type = revertDomainTypeIfNeeded(column, findDomainById) ?? updates.type;
     }
 
     updateColumn(id, colId, updates);
@@ -326,11 +319,8 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
     };
     if (result.type) {
       updates.type = result.type;
-    } else if (column?.domainId != null) {
-      const previousDomain = findDomainById(column.domainId);
-      if (previousDomain && column.type === previousDomain.physicalType) {
-        updates.type = DEFAULT_COLUMN_TYPE;
-      }
+    } else {
+      updates.type = revertDomainTypeIfNeeded(column, findDomainById) ?? updates.type;
     }
     updateColumn(id, colId, updates);
   };
@@ -367,11 +357,8 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
     };
     if (resolution.isRegisteredTerm && resolution.physicalType) {
       updates.type = resolution.physicalType;
-    } else if (column?.domainId != null) {
-      const previousDomain = findDomainById(column.domainId);
-      if (previousDomain && column.type === previousDomain.physicalType) {
-        updates.type = DEFAULT_COLUMN_TYPE;
-      }
+    } else {
+      updates.type = revertDomainTypeIfNeeded(column, findDomainById) ?? updates.type;
     }
     updateColumn(id, colId, updates);
   };
@@ -401,11 +388,11 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
     <TooltipProvider delayDuration={300}>
       <div
         className={cn(
-          'bg-card border border-border rounded shadow-md min-w-[200px]',
+          'bg-card border border-border rounded shadow-md w-max min-w-[420px]',
           isHighlighted && 'ring-2 ring-primary shadow-lg',
         )}
       >
-        {/* Table header — 색상 적용 + 2줄 레이아웃 */}
+        {/* Table header */}
         <TableNodeHeader
           label={label}
           logicalTableName={logicalTableName}

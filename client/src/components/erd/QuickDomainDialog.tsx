@@ -100,9 +100,7 @@ export default function QuickDomainDialog({
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>{t('erd.quickDomain.title')}</DialogTitle>
-          <DialogDescription>
-            {t('erd.quickDomain.description')}
-          </DialogDescription>
+          <DialogDescription>{t('erd.quickDomain.description')}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

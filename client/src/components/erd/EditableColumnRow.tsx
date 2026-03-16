@@ -3,7 +3,11 @@ import { X, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
 import type { Column } from '@/types/erd';
-import type { ColumnWarning } from '@/hooks/useColumnValidation';
+import {
+  getValidationStatusI18nKey,
+  type ColumnWarning,
+  type WarningValidationStatus,
+} from '@/hooks/useColumnValidation';
 import type { Domain } from '@/types/dictionary';
 import type { TermSelectResult } from './ColumnAutocomplete';
 import { cn } from '@/lib/utils';
@@ -89,9 +93,8 @@ export default function EditableColumnRow({
         hasDuplicateLogicalName && 'bg-destructive/5',
       )}
     >
-      {/* Row 1: Handle + PK/FK + 논리명 + 경고 + N + X + Handle */}
       <div
-        className="flex items-center gap-1"
+        className="flex items-center gap-1.5"
         style={{ paddingLeft: canEdit ? '12px' : undefined }}
       >
         <Handle
@@ -165,21 +168,24 @@ export default function EditableColumnRow({
           </button>
         )}
 
-        {/* Logical name autocomplete */}
-        {canEdit ? (
-          <ColumnAutocomplete
-            value={col.logicalName ?? ''}
-            onChange={(newValue) => onLogicalNameChange(col.id, newValue)}
-            onSelectTerm={(result) => onSelectTerm(col.id, result)}
-            onSelectDerived={(resolution) => onSelectDerived(col.id, resolution)}
-            onRegisterNew={(logicalName) => onRegisterNew(col.id, logicalName)}
-            termLinked={!!col.termId}
-          />
-        ) : (
-          <span className="flex-1 text-xs truncate">{col.logicalName || ''}</span>
-        )}
+        <div
+          className="flex-[1.2] whitespace-nowrap"
+          style={{ minWidth: `${Math.max((col.logicalName?.length ?? 0) + 2, 10)}ch` }}
+        >
+          {canEdit ? (
+            <ColumnAutocomplete
+              value={col.logicalName ?? ''}
+              onChange={(newValue) => onLogicalNameChange(col.id, newValue)}
+              onSelectTerm={(result) => onSelectTerm(col.id, result)}
+              onSelectDerived={(resolution) => onSelectDerived(col.id, resolution)}
+              onRegisterNew={(logicalName) => onRegisterNew(col.id, logicalName)}
+              termLinked={!!col.termId}
+            />
+          ) : (
+            <span className="block whitespace-nowrap text-xs">{col.logicalName || ''}</span>
+          )}
+        </div>
 
-        {/* Validation warning icon */}
         {warning.status && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -191,14 +197,11 @@ export default function EditableColumnRow({
               />
             </TooltipTrigger>
             <TooltipContent side="top" className="text-xs">
-              {t(
-                `erd.validation.status.${warning.status === 'name-mismatch' ? 'nameMismatch' : warning.status === 'type-mismatch' ? 'typeMismatch' : 'unregistered'}`,
-              )}
+              {t(getValidationStatusI18nKey(warning.status as WarningValidationStatus))}
             </TooltipContent>
           </Tooltip>
         )}
 
-        {/* Duplicate logical name error icon */}
         {hasDuplicateLogicalName && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -217,48 +220,6 @@ export default function EditableColumnRow({
           </Tooltip>
         )}
 
-        {/* NN (NOT NULL) toggle */}
-        <button
-          className={cn(
-            'nodrag w-5 text-center font-bold text-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-            canEdit ? 'cursor-pointer' : 'cursor-default',
-            !col.nullable ? 'text-erd-nn' : 'text-muted-foreground/40 hover:text-erd-nn/80',
-          )}
-          onClick={canEdit ? () => onUpdateColumn(col.id, { nullable: !col.nullable }) : undefined}
-          title={t('erd.tableNode.title.toggleNotNull')}
-          aria-label={t('erd.tableNode.aria.toggleNotNull', { name: col.name })}
-        >
-          NN
-        </button>
-
-        {/* Delete column */}
-        {canEdit && (
-          <button
-            className="nodrag opacity-0 group-hover/col:opacity-100 transition-opacity text-muted-foreground hover:text-destructive cursor-pointer focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            onClick={() => onDeleteColumn(col.id)}
-            title={t('erd.tableNode.title.deleteColumn')}
-            aria-label={t('erd.tableNode.aria.deleteColumn', { name: col.name })}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        )}
-
-        <Handle
-          type="source"
-          position={Position.Right}
-          id={`${nodeId}-${col.id}-source`}
-          className={cn(
-            '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
-            !(connected || fkMode) && '!opacity-0',
-          )}
-        />
-      </div>
-
-      {/* Row 2: 도메인 배지 + 물리명 + 타입 */}
-      <div
-        className="flex items-center gap-1 mt-0.5"
-        style={{ paddingLeft: canEdit ? 'calc(12px + 3rem)' : '3rem' }}
-      >
         {canEdit ? (
           <DomainSelectPopover
             open={domainPopoverOpen}
@@ -300,19 +261,55 @@ export default function EditableColumnRow({
             </span>
           )
         )}
+
         <input
-          className="nodrag flex-1 font-mono text-muted-foreground bg-transparent outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring px-1 rounded min-w-0"
+          className="nodrag flex-1 rounded bg-transparent px-1 font-mono text-muted-foreground outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring"
           value={col.name}
           onChange={(e) => onUpdateColumn(col.id, { name: e.target.value })}
           readOnly={!canEdit}
           aria-label={t('erd.tableNode.aria.columnName')}
+          style={{ minWidth: `${Math.max(col.name.length + 2, 10)}ch` }}
         />
         <input
-          className="nodrag w-24 font-mono text-muted-foreground bg-transparent outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring px-1 rounded text-right"
+          className="nodrag w-24 shrink-0 rounded bg-transparent px-1 text-right font-mono text-muted-foreground outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring"
           value={col.type}
           onChange={(e) => onUpdateColumn(col.id, { type: e.target.value })}
           readOnly={!canEdit}
           aria-label={t('erd.tableNode.aria.columnType')}
+        />
+
+        <button
+          className={cn(
+            'nodrag w-5 text-center font-bold text-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+            canEdit ? 'cursor-pointer' : 'cursor-default',
+            !col.nullable ? 'text-erd-nn' : 'text-muted-foreground/40 hover:text-erd-nn/80',
+          )}
+          onClick={canEdit ? () => onUpdateColumn(col.id, { nullable: !col.nullable }) : undefined}
+          title={t('erd.tableNode.title.toggleNotNull')}
+          aria-label={t('erd.tableNode.aria.toggleNotNull', { name: col.name })}
+        >
+          NN
+        </button>
+
+        {canEdit && (
+          <button
+            className="nodrag opacity-0 group-hover/col:opacity-100 transition-opacity text-muted-foreground hover:text-destructive cursor-pointer focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            onClick={() => onDeleteColumn(col.id)}
+            title={t('erd.tableNode.title.deleteColumn')}
+            aria-label={t('erd.tableNode.aria.deleteColumn', { name: col.name })}
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
+
+        <Handle
+          type="source"
+          position={Position.Right}
+          id={`${nodeId}-${col.id}-source`}
+          className={cn(
+            '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
+            !(connected || fkMode) && '!opacity-0',
+          )}
         />
       </div>
     </div>

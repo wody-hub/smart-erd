@@ -27,7 +27,12 @@ function hasOwnKeys(value: object): boolean {
   return Object.keys(value).length > 0;
 }
 
-function setIfChanged<T extends object>(updates: Partial<T>, key: keyof T, current: unknown, next: unknown) {
+function setIfChanged<T extends object>(
+  updates: Partial<T>,
+  key: keyof T,
+  current: unknown,
+  next: unknown,
+) {
   if (current !== next) {
     (updates as Record<keyof T, unknown>)[key] = next;
   }
@@ -79,12 +84,10 @@ function clearDerivedTypeIfNeeded(
   }
 }
 
-function reconcileColumn(
-  column: Column,
-  runtime: DiagramDictionaryRuntime,
-): Partial<Column> {
+function reconcileColumn(column: Column, runtime: DiagramDictionaryRuntime): Partial<Column> {
   const updates: Partial<Column> = {};
-  const previousDomain = column.domainId != null ? runtime.findDomainById(column.domainId) : undefined;
+  const previousDomain =
+    column.domainId != null ? runtime.findDomainById(column.domainId) : undefined;
   const logicalName = column.logicalName?.trim() ?? '';
 
   if (column.termId != null) {

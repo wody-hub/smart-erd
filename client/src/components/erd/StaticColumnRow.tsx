@@ -3,7 +3,11 @@ import { Handle, Position } from '@xyflow/react';
 import { AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Column } from '@/types/erd';
-import type { ColumnWarning } from '@/hooks/useColumnValidation';
+import {
+  getValidationStatusI18nKey,
+  type ColumnWarning,
+  type WarningValidationStatus,
+} from '@/hooks/useColumnValidation';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useErdFkMode } from './ErdFkModeContext';
@@ -60,8 +64,7 @@ function StaticColumnRow({
         hasDuplicateLogicalName && 'bg-destructive/5',
       )}
     >
-      {/* Row 1: Handle + PK/FK + 논리명 + 경고 + N + Handle */}
-      <div className="flex items-center gap-1" style={{ paddingLeft: '12px' }}>
+      <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
         <Handle
           type="target"
           position={Position.Left}
@@ -74,14 +77,20 @@ function StaticColumnRow({
 
         {/* PK badge */}
         <span
-          className={`w-5 text-center font-bold text-2xs ${col.pk ? 'text-erd-pk' : 'text-muted-foreground/40'}`}
+          className={cn(
+            'w-5 text-center font-bold text-2xs',
+            col.pk ? 'text-erd-pk' : 'text-muted-foreground/40',
+          )}
         >
           PK
         </span>
 
         {/* FK badge */}
         <span
-          className={`w-5 text-center font-bold text-2xs ${col.fk ? 'text-erd-fk' : 'text-muted-foreground/40'}`}
+          className={cn(
+            'w-5 text-center font-bold text-2xs',
+            col.fk ? 'text-erd-fk' : 'text-muted-foreground/40',
+          )}
         >
           FK
         </span>
@@ -89,16 +98,22 @@ function StaticColumnRow({
         {/* AI badge — PK 컬럼에서만 표시 */}
         {col.pk && (
           <span
-            className={`w-5 text-center font-bold text-2xs ${col.autoIncrement ? 'text-erd-ai' : 'text-muted-foreground/40'}`}
+            className={cn(
+              'w-5 text-center font-bold text-2xs',
+              col.autoIncrement ? 'text-erd-ai' : 'text-muted-foreground/40',
+            )}
           >
             AI
           </span>
         )}
 
-        {/* Logical name (읽기 전용) */}
-        <span className="flex-1 text-xs truncate">{col.logicalName || ''}</span>
+        <span
+          className="flex-[1.2] whitespace-nowrap text-xs"
+          style={{ minWidth: `${Math.max((col.logicalName?.length ?? 0) + 2, 10)}ch` }}
+        >
+          {col.logicalName || ''}
+        </span>
 
-        {/* Validation warning icon */}
         {warning.status && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -110,9 +125,7 @@ function StaticColumnRow({
               />
             </TooltipTrigger>
             <TooltipContent side="top" className="text-xs">
-              {t(
-                `erd.validation.status.${warning.status === 'name-mismatch' ? 'nameMismatch' : warning.status === 'type-mismatch' ? 'typeMismatch' : 'unregistered'}`,
-              )}
+              {t(getValidationStatusI18nKey(warning.status as WarningValidationStatus))}
             </TooltipContent>
           </Tooltip>
         )}
@@ -135,9 +148,32 @@ function StaticColumnRow({
           </Tooltip>
         )}
 
+        {domainLogicalName && (
+          <span
+            className="text-2xs px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground shrink-0"
+            title={`${domainLogicalName} (${domainPhysicalType ?? ''})`}
+          >
+            {domainLogicalName}
+          </span>
+        )}
+
+        <span
+          className="flex-1 whitespace-nowrap px-1 font-mono text-muted-foreground"
+          style={{ minWidth: `${Math.max(col.name.length + 2, 10)}ch` }}
+        >
+          {col.name}
+        </span>
+
+        <span className="w-24 shrink-0 px-1 text-right font-mono text-muted-foreground">
+          {col.type}
+        </span>
+
         {/* NN (NOT NULL) badge */}
         <span
-          className={`w-5 text-center font-bold text-2xs ${!col.nullable ? 'text-erd-nn' : 'text-muted-foreground/40'}`}
+          className={cn(
+            'w-5 text-center font-bold text-2xs',
+            !col.nullable ? 'text-erd-nn' : 'text-muted-foreground/40',
+          )}
         >
           NN
         </span>
@@ -151,24 +187,6 @@ function StaticColumnRow({
             !(connected || fkMode) && '!opacity-0',
           )}
         />
-      </div>
-
-      {/* Row 2: 도메인 배지 + 물리명 + 타입 */}
-      <div className="flex items-center gap-1 mt-0.5" style={{ paddingLeft: 'calc(12px + 3rem)' }}>
-        {domainLogicalName && (
-          <span
-            className="text-2xs px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground shrink-0"
-            title={`${domainLogicalName} (${domainPhysicalType ?? ''})`}
-          >
-            {domainLogicalName}
-          </span>
-        )}
-        <span className="flex-1 font-mono text-muted-foreground px-1 truncate min-w-0">
-          {col.name}
-        </span>
-        <span className="w-24 font-mono text-muted-foreground px-1 text-right shrink-0">
-          {col.type}
-        </span>
       </div>
     </div>
   );

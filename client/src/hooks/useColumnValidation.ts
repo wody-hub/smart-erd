@@ -39,6 +39,28 @@ export interface TableValidation {
   columns: ColumnValidationResult[];
 }
 
+/** ValidationStatus 중 경고로 표시되는 상태의 i18n 키 매핑 */
+const VALIDATION_STATUS_I18N_MAP = {
+  'name-mismatch': 'erd.validation.status.nameMismatch',
+  'type-mismatch': 'erd.validation.status.typeMismatch',
+  unregistered: 'erd.validation.status.unregistered',
+} as const;
+
+/** 경고로 표시되는 유효성 검사 상태 */
+export type WarningValidationStatus = keyof typeof VALIDATION_STATUS_I18N_MAP;
+
+/**
+ * 경고 ValidationStatus를 i18n 번역 키로 변환한다.
+ *
+ * @param status 유효성 검사 상태
+ * @returns i18n 번역 키 (리터럴 타입)
+ */
+export function getValidationStatusI18nKey(
+  status: WarningValidationStatus,
+): (typeof VALIDATION_STATUS_I18N_MAP)[WarningValidationStatus] {
+  return VALIDATION_STATUS_I18N_MAP[status];
+}
+
 /** 컬럼 경고 검사 결과 */
 export interface ColumnWarning {
   /** 검사 상태 (null이면 문제 없음: matched 또는 unchecked) */

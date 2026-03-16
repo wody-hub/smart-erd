@@ -112,7 +112,8 @@ export default function BulkUploadStepPreview({
 }: BulkUploadStepPreviewProps) {
   const { t } = useTranslation();
 
-  const columns = mode === 'domain' ? DOMAIN_COLUMNS : mode === 'term' ? TERM_COLUMNS : WORD_COLUMNS;
+  const columns =
+    mode === 'domain' ? DOMAIN_COLUMNS : mode === 'term' ? TERM_COLUMNS : WORD_COLUMNS;
   const previewRows = validationResult.rows;
   const isPreviewTruncated = validationResult.previewTruncated;
   const previewErrorCount = previewRows.filter((row) => !row.valid).length;
@@ -163,10 +164,10 @@ export default function BulkUploadStepPreview({
               <TableHead className="w-[40px]" />
               <TableHead className="w-[50px]">{t('dictionary.upload.preview.row')}</TableHead>
               {columns.map((col) => (
-                  <TableHead key={col} className={getColumnWidthClass(col)}>
+                <TableHead key={col} className={getColumnWidthClass(col)}>
                   {t(getColumnHeaderKey(mode, col) as never)}
-                  </TableHead>
-                ))}
+                </TableHead>
+              ))}
               <TableHead className="w-[180px]">{t('dictionary.upload.preview.status')}</TableHead>
             </TableRow>
           </TableHeader>

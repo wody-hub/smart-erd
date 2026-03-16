@@ -78,7 +78,7 @@ export default function TableNodeHeader({
         color: `hsl(${colorConfig.fg})`,
       }}
     >
-      <div className="flex items-start gap-1">
+      <div className="flex items-start gap-2">
         {/* 색상 선택기 트리거 (hover/focus 시 표시, M-1: 터치 대응 추가) */}
         {isEditing && (
           <Popover>
@@ -107,45 +107,60 @@ export default function TableNodeHeader({
               {t('erd.lock.lockedBy', { name: lockInfo.name })}
             </div>
           )}
-          {/* 논리명 행 (있으면 표시, 없으면 더블클릭으로 추가) */}
-          {isEditing ? (
-            <ColumnAutocomplete
-              value={logicalTableName ?? ''}
-              onChange={onLogicalNameChange}
-              onSelectTerm={onSelectTerm}
-              onSelectDerived={onSelectDerived}
-              onRegisterNew={onRegisterNew}
-              termLinked={!!tableTermId}
-              highlightOnHover={false}
-            />
-          ) : logicalTableName ? (
-            <div className="text-2xs opacity-80 truncate" title={logicalTableName}>
-              {logicalTableName}
-            </div>
-          ) : null}
-
-          {/* 물리명 행 */}
-          {editing && isEditing ? (
-            <input
-              className="nodrag bg-transparent font-semibold text-sm w-full outline-none focus-visible:ring-1 focus-visible:ring-ring rounded placeholder-current/50"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onBlur={confirmEdit}
-              onKeyDown={(e) => {
-                if (e.key === KEYS.ENTER) confirmEdit();
-                if (e.key === KEYS.ESCAPE) cancelEdit();
-              }}
-              autoFocus
-              aria-label={t('erd.tableNode.aria.tableName')}
-            />
-          ) : (
+          <div className="flex items-center gap-4">
             <div
-              className="font-semibold text-sm cursor-pointer select-none truncate"
-              onDoubleClick={isEditing ? () => startEdit(label) : undefined}
+              className="flex-1 whitespace-nowrap"
+              style={{
+                minWidth: `${Math.max((logicalTableName?.length ?? 0) + 2, 12)}ch`,
+              }}
             >
-              {label}
+              {isEditing ? (
+                <ColumnAutocomplete
+                  value={logicalTableName ?? ''}
+                  onChange={onLogicalNameChange}
+                  onSelectTerm={onSelectTerm}
+                  onSelectDerived={onSelectDerived}
+                  onRegisterNew={onRegisterNew}
+                  termLinked={!!tableTermId}
+                  highlightOnHover={false}
+                />
+              ) : logicalTableName ? (
+                <div className="text-xs opacity-85 whitespace-nowrap" title={logicalTableName}>
+                  {logicalTableName}
+                </div>
+              ) : (
+                <div className="text-xs opacity-0 whitespace-nowrap">&nbsp;</div>
+              )}
             </div>
-          )}
+
+            <div
+              className="flex-1 text-right whitespace-nowrap"
+              style={{ minWidth: `${Math.max(label.length + 2, 12)}ch` }}
+            >
+              {editing && isEditing ? (
+                <input
+                  className="nodrag bg-transparent font-semibold text-base w-full text-right whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-ring rounded placeholder-current/50"
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  onBlur={confirmEdit}
+                  onKeyDown={(e) => {
+                    if (e.key === KEYS.ENTER) confirmEdit();
+                    if (e.key === KEYS.ESCAPE) cancelEdit();
+                  }}
+                  autoFocus
+                  aria-label={t('erd.tableNode.aria.tableName')}
+                />
+              ) : (
+                <div
+                  className="font-semibold text-base cursor-pointer select-none whitespace-nowrap"
+                  onDoubleClick={isEditing ? () => startEdit(label) : undefined}
+                  title={label}
+                >
+                  {label}
+                </div>
+              )}
+            </div>
+          </div>
 
           {duplicateLogicalNameColumnCount > 0 && (
             <div

@@ -14,29 +14,21 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { createTerm } from '@/api/termApi';
-import { createWord } from '@/api/wordApi';
 import { queryKeys } from '@/constants/query-keys';
+import { useCreateWordMutation } from '@/hooks/useCreateWordMutation';
 import { getErrorMessage } from '@/lib/api-error';
+import { buildSuggestHintText } from '@/lib/dictionary-suggest-utils';
 import { buildColumnUpdatesFromTerm } from '@/components/erd/erdDictionaryData';
 import { useDictionarySuggest } from '@/hooks/useDictionarySuggest';
-import {
-  analyzeWordComposition,
-  buildWordMatchIndex,
-} from '@/lib/word-composition';
+import { analyzeWordComposition, buildWordMatchIndex } from '@/lib/word-composition';
 import { useErdDictionary } from './ErdDictionaryContext';
 import type { Column } from '@/types/erd';
-import type { Domain, Word, WordFormData } from '@/types/dictionary';
+import type { Domain, WordFormData } from '@/types/dictionary';
 import QuickDomainDialog from './QuickDomainDialog';
 import WordFormDialog from '@/components/dictionary/WordFormDialog';
 import WordCompositionValidator from '@/components/dictionary/WordCompositionValidator';
+import DomainSearchSelect from '@/components/dictionary/DomainSearchSelect';
 
 const NONE_VALUE = '__none__';
 
@@ -118,21 +110,15 @@ export default function QuickTermDialog({
     onError: (err) => toast.error(getErrorMessage(err, t('erd.quickTerm.failed'))),
   });
 
-  const createWordMutation = useMutation({
-    mutationFn: (data: WordFormData) => createWord(teamId, setId, data),
-    onSuccess: async (word) => {
-      queryClient.setQueryData<Word[]>(queryKeys.dictionary.words(teamId, setId), (current = []) => {
-        if (current.some((item) => item.id === word.id)) {
-          return current;
-        }
-        return [...current, word];
-      });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.words(teamId, setId) });
-      toast.success(t('erd.quickTerm.wordCreated'));
+  const createWordMutation = useCreateWordMutation({
+    teamId,
+    setId,
+    onSuccess: () => {
       setQuickWordOpen(false);
       setDraftWord(null);
     },
-    onError: (err) => toast.error(getErrorMessage(err, t('erd.quickTerm.wordCreateFailed'))),
+    successMessageKey: 'erd.quickTerm.wordCreated',
+    errorMessageKey: 'erd.quickTerm.wordCreateFailed',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -148,25 +134,7 @@ export default function QuickTermDialog({
     setDomainDirty(true);
   };
 
-  const getSuggestHintText = (): string | null => {
-    if (!suggestion?.matches || suggestion.matches.length === 0) {
-      return null;
-    }
-    const matchedDetails = suggestion.matches
-      .filter((match) => match.matched)
-      .map((match) =>
-        t('dictionary.suggest.matchDetail', {
-          keyword: match.keyword,
-          physical: match.physicalName ?? '',
-        }),
-      );
-    if (matchedDetails.length === 0) {
-      return null;
-    }
-    return matchedDetails.join(', ');
-  };
-
-  const hintText = getSuggestHintText();
+  const hintText = buildSuggestHintText(suggestion, t);
 
   return (
     <>
@@ -178,7 +146,9 @@ export default function QuickTermDialog({
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="quick-term-logicalName">{t('dictionary.term.form.logicalName')}</Label>
+              <Label htmlFor="quick-term-logicalName">
+                {t('dictionary.term.form.logicalName')}
+              </Label>
               <Input
                 id="quick-term-logicalName"
                 value={logicalName}
@@ -229,7 +199,9 @@ export default function QuickTermDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="quick-term-physicalName">{t('dictionary.term.form.physicalName')}</Label>
+              <Label htmlFor="quick-term-physicalName">
+                {t('dictionary.term.form.physicalName')}
+              </Label>
               <Input
                 id="quick-term-physicalName"
                 value={physicalName}
@@ -246,27 +218,19 @@ export default function QuickTermDialog({
             <div className="space-y-2">
               <Label htmlFor="quick-term-domain">{t('dictionary.term.form.domain')}</Label>
               <div className="flex gap-2">
-                <Select
-                  value={domainId}
-                  onValueChange={(value) => {
-                    setDomainId(value);
+                <DomainSearchSelect
+                  id="quick-term-domain"
+                  domains={domains}
+                  selectedDomainId={domainId !== NONE_VALUE ? Number(domainId) : null}
+                  onSelect={(selectedDomainId) => {
+                    setDomainId(selectedDomainId != null ? String(selectedDomainId) : NONE_VALUE);
                     setDomainDirty(true);
                   }}
-                >
-                  <SelectTrigger id="quick-term-domain" className="flex-1">
-                    <SelectValue placeholder={t('dictionary.term.form.domainNone')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE_VALUE}>
-                      {t('dictionary.term.form.domainNone')}
-                    </SelectItem>
-                    {domains.map((domain) => (
-                      <SelectItem key={domain.id} value={String(domain.id)}>
-                        {domain.logicalName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  noneLabel={t('dictionary.term.form.domainNone')}
+                  searchPlaceholder={t('erd.domain.searchPlaceholder')}
+                  noResultsText={t('erd.domain.noResults')}
+                  className="flex-1"
+                />
                 <Button
                   type="button"
                   variant="outline"
@@ -300,7 +264,9 @@ export default function QuickTermDialog({
               <Button
                 type="submit"
                 disabled={
-                  createTermMutation.isPending || !logicalName.trim() || !composition.isCompleteMatch
+                  createTermMutation.isPending ||
+                  !logicalName.trim() ||
+                  !composition.isCompleteMatch
                 }
               >
                 {createTermMutation.isPending

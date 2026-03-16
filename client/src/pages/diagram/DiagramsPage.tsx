@@ -166,7 +166,10 @@ export default function DiagramsPage() {
             <h2 className="text-2xl font-bold">{t('diagram.list.title')}</h2>
             {canEdit && (
               <div className="flex items-center gap-2">
-                <Select value={createDictionaryContextId} onValueChange={setCreateDictionaryContextId}>
+                <Select
+                  value={createDictionaryContextId}
+                  onValueChange={setCreateDictionaryContextId}
+                >
                   <SelectTrigger className="w-[220px]">
                     <SelectValue placeholder={t('diagram.list.selectDictionaryContext')} />
                   </SelectTrigger>

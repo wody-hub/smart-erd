@@ -100,3 +100,20 @@ test('term registration alone is not enough when word composition cannot be reso
   assert.equal(resolution.physicalName, '');
   assert.equal(resolution.termId, undefined);
 });
+
+test('no-space input is not composed from smaller words when whitespace is missing', () => {
+  const words = [createWord(1, '등록', 'reg'), createWord(2, '일시', 'dt')];
+  const resolution = resolveLogicalName('등록일시', {
+    termByName: new Map<string, Term>(),
+    domainById: new Map<number, Domain>(),
+    wordMatchIndex: buildWordMatchIndex(words),
+  });
+
+  assert.equal(resolution.state, 'word-missing');
+  assert.equal(resolution.isWordCompleteMatch, false);
+  assert.equal(resolution.physicalName, '');
+  assert.deepEqual(
+    resolution.wordAnalysis.segments.map((segment) => [segment.text, segment.matched]),
+    [['등록일시', false]],
+  );
+});

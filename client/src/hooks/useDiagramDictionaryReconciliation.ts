@@ -20,8 +20,14 @@ interface UseDiagramDictionaryReconciliationParams {
 export function useDiagramDictionaryReconciliation({
   diagramId,
 }: UseDiagramDictionaryReconciliationParams): void {
-  const { setId, isDictionaryReady, dictionaryRevision, findTermById, findDomainById, resolveLogicalName } =
-    useErdDictionary();
+  const {
+    setId,
+    isDictionaryReady,
+    dictionaryRevision,
+    findTermById,
+    findDomainById,
+    resolveLogicalName,
+  } = useErdDictionary();
   const nodes = useCanvasStore((state) => state.nodes);
   const ydoc = useCanvasStore((state) => state.ydoc);
   const applyDictionaryReconciliation = useCanvasStore(
@@ -30,7 +36,13 @@ export function useDiagramDictionaryReconciliation({
   const appliedRevisionRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!ydoc || !setId || !isDictionaryReady || nodes.length === 0 || getTablesMap(ydoc).size === 0) {
+    if (
+      !ydoc ||
+      !setId ||
+      !isDictionaryReady ||
+      nodes.length === 0 ||
+      getTablesMap(ydoc).size === 0
+    ) {
       return;
     }
 

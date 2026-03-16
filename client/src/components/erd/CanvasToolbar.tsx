@@ -8,6 +8,7 @@ import {
   Code2,
   Undo2,
   Redo2,
+  BookText,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@xyflow/react';
@@ -48,6 +49,10 @@ interface CanvasToolbarProps {
   validationOpen?: boolean;
   /** 유효성 검사 패널 토글 핸들러 */
   onToggleValidation?: () => void;
+  /** 사전 관리 다이얼로그 열림 여부 */
+  dictionaryOpen?: boolean;
+  /** 사전 관리 다이얼로그 열기 핸들러 */
+  onOpenDictionary?: () => void;
   /** 편집 가능 여부 (VIEWER일 때 false — FK/자동배치 숨김) */
   canEdit?: boolean;
   /** undo 가능 여부 */
@@ -78,6 +83,8 @@ interface CanvasToolbarProps {
  * @param props.onToggleCodeEditor  코드 에디터 토글 핸들러
  * @param props.validationOpen      유효성 검사 패널 열림 여부
  * @param props.onToggleValidation  유효성 검사 패널 토글 핸들러
+ * @param props.dictionaryOpen      사전 관리 다이얼로그 열림 여부
+ * @param props.onOpenDictionary    사전 관리 다이얼로그 열기 핸들러
  * @param props.canEdit             편집 가능 여부
  * @returns ERD 캔버스 툴바 JSX
  */
@@ -95,6 +102,8 @@ export default function CanvasToolbar({
   onToggleCodeEditor,
   validationOpen,
   onToggleValidation,
+  dictionaryOpen,
+  onOpenDictionary,
   canEdit = true,
   canUndo = false,
   canRedo = false,
@@ -211,6 +220,20 @@ export default function CanvasToolbar({
           >
             <Upload className="h-4 w-4" />
             {t('erd.toolbar.ddlImport')}
+          </Button>
+        )}
+        {onOpenDictionary && (
+          <Button
+            variant={dictionaryOpen ? 'default' : 'ghost'}
+            size="sm"
+            onClick={onOpenDictionary}
+            className={cn('gap-1.5', dictionaryOpen && 'bg-primary text-primary-foreground')}
+            aria-label={
+              dictionaryOpen ? t('erd.toolbar.dictionaryActive') : t('erd.toolbar.dictionary')
+            }
+          >
+            <BookText className="h-4 w-4" />
+            {t('erd.toolbar.dictionary')}
           </Button>
         )}
         {onToggleValidation && (

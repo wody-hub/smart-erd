@@ -87,6 +87,23 @@ interface UseDslEditorCompletionReturn {
 type MatchScore = readonly [number, number, number, number];
 
 /**
+ * 빠른 등록 액션에서 사용할 논리명을 정규화한다.
+ *
+ * 진단 메시지와 현재 라인 파싱 컨텍스트가 같은 대상을 다른 문자열 형태
+ * (예: 따옴표 포함/미포함)로 반환할 수 있으므로, 빠른 등록 항목 중복을 막기 위해
+ * 바깥쪽 인용부호를 제거하고 공백을 정리한다.
+ *
+ * @param value 원본 논리명
+ * @returns 정규화된 논리명
+ */
+function normalizeQuickRegisterName(value: string): string {
+  return value
+    .trim()
+    .replace(/^['"]+|['"]+$/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+/**
  * 현재 행이 Table {} 블록 내부인지 판별한다.
  *
  * @param model   Monaco 텍스트 모델
@@ -202,7 +219,7 @@ export function useDslEditorCompletion({
        * @param name 후보 용어명
        */
       const addRegisterTerm = (name: string) => {
-        const normalized = name.trim();
+        const normalized = normalizeQuickRegisterName(name);
         if (!normalized) {
           return;
         }
@@ -224,7 +241,7 @@ export function useDslEditorCompletion({
        * @param name 후보 도메인명
        */
       const addRegisterDomain = (name: string) => {
-        const normalized = name.trim();
+        const normalized = normalizeQuickRegisterName(name);
         if (!normalized) {
           return;
         }

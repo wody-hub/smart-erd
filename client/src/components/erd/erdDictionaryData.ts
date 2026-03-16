@@ -9,8 +9,31 @@ import {
   resolveLogicalName as resolveLogicalNameFromDictionary,
   type LogicalNameResolution,
 } from '@/lib/logical-name-resolution';
+import { DEFAULT_COLUMN_TYPE } from '@/lib/diagram-dictionary-reconciliation';
 import type { Domain, Term, Word } from '@/types/dictionary';
 import type { Column } from '@/types/erd';
+
+/**
+ * 도메인 연결이 해제될 때, 이전 도메인의 물리 타입이 그대로 남아 있으면
+ * 기본 타입으로 롤백한다.
+ *
+ * @param column         현재 컬럼 (undefined 허용)
+ * @param findDomainById 도메인 ID로 도메인을 조회하는 함수
+ * @returns 롤백할 타입 값. 롤백이 불필요하면 undefined
+ */
+export function revertDomainTypeIfNeeded(
+  column: Column | undefined,
+  findDomainById: (id: number) => { physicalType: string } | undefined,
+): string | undefined {
+  if (column?.domainId == null) {
+    return undefined;
+  }
+  const previousDomain = findDomainById(column.domainId);
+  if (previousDomain && column.type === previousDomain.physicalType) {
+    return DEFAULT_COLUMN_TYPE;
+  }
+  return undefined;
+}
 
 export function buildColumnUpdatesFromTerm(
   term: { logicalName: string; physicalName: string; id: number; domainId?: number | null },
@@ -68,7 +91,8 @@ export function useErdDictionaryData(teamId: string | undefined, setId: string |
   const terms = termsQuery.data ?? [];
   const domains = domainsQuery.data ?? [];
   const words = wordsQuery.data ?? [];
-  const isDictionaryFetching = termsQuery.isFetching || domainsQuery.isFetching || wordsQuery.isFetching;
+  const isDictionaryFetching =
+    termsQuery.isFetching || domainsQuery.isFetching || wordsQuery.isFetching;
   const isDictionaryReady =
     !!teamId &&
     !!setId &&
@@ -141,14 +165,20 @@ export function useErdDictionaryData(teamId: string | undefined, setId: string |
     [terms],
   );
 
-  const findTermById = useCallback((termId: number): Term | undefined => termMap.get(termId), [termMap]);
+  const findTermById = useCallback(
+    (termId: number): Term | undefined => termMap.get(termId),
+    [termMap],
+  );
 
   const findDomainById = useCallback(
     (domainId: number): Domain | undefined => domainMap.get(domainId),
     [domainMap],
   );
 
-  const findWordById = useCallback((wordId: number): Word | undefined => wordMap.get(wordId), [wordMap]);
+  const findWordById = useCallback(
+    (wordId: number): Word | undefined => wordMap.get(wordId),
+    [wordMap],
+  );
 
   const getTermWithType = useCallback(
     (term: Term): TermWithType => {

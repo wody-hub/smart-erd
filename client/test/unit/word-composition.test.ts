@@ -19,21 +19,20 @@ function createWord(id: number, logicalName: string, physicalName: string): Word
   };
 }
 
-test('backtracking finds a valid composition even when the longest first match fails', () => {
+test('whitespace-delimited tokens are composed when each token exists as a whole word', () => {
   const matchIndex = buildWordMatchIndex([
-    createWord(1, '가나', 'ga_na'),
-    createWord(2, '가', 'ga'),
-    createWord(3, '나다', 'na_da'),
+    createWord(1, '등록', 'reg'),
+    createWord(2, '일시', 'dt'),
   ]);
 
-  const analysis = analyzeWordComposition('가나다', matchIndex);
+  const analysis = analyzeWordComposition('등록 일시', matchIndex);
 
   assert.equal(analysis.isCompleteMatch, true);
   assert.equal(analysis.isAmbiguous, false);
-  assert.equal(analysis.derivedPhysicalName, 'ga_na_da');
+  assert.equal(analysis.derivedPhysicalName, 'reg_dt');
   assert.deepEqual(
     analysis.matchedWords.map((word) => word.logicalName),
-    ['가', '나다'],
+    ['등록', '일시'],
   );
 });
 
@@ -64,19 +63,39 @@ test('no-space fully unknown input does not suggest creating the whole phrase as
   assert.deepEqual(analysis.creatableMissingSegments, []);
 });
 
-test('partial no-space matches expose only the missing suffix as creatable', () => {
-  const matchIndex = buildWordMatchIndex([createWord(1, '사용자', 'user')]);
+test('single-token input is not split into smaller words without whitespace', () => {
+  const matchIndex = buildWordMatchIndex([
+    createWord(1, '등록', 'reg'),
+    createWord(2, '일시', 'dt'),
+    createWord(3, '일', 'day'),
+    createWord(4, '시', 'hour'),
+  ]);
 
-  const analysis = analyzeWordComposition('사용자식별자', matchIndex);
+  const analysis = analyzeWordComposition('등록일시', matchIndex);
 
   assert.equal(analysis.isCompleteMatch, false);
   assert.equal(analysis.isAmbiguous, false);
   assert.deepEqual(
     analysis.segments.map((segment) => [segment.text, segment.matched]),
-    [
-      ['사용자', true],
-      ['식별자', false],
-    ],
+    [['등록일시', false]],
   );
-  assert.deepEqual(analysis.creatableMissingSegments, ['식별자']);
+  assert.deepEqual(analysis.matchedWords, []);
+  assert.deepEqual(analysis.creatableMissingSegments, []);
+});
+
+test('single-token exact word match prefers the full word instead of shorter normalized pieces', () => {
+  const matchIndex = buildWordMatchIndex([
+    createWord(1, '일시', 'dt'),
+    createWord(2, '일', 'day'),
+    createWord(3, '시', 'hour'),
+  ]);
+
+  const analysis = analyzeWordComposition('일시', matchIndex);
+
+  assert.equal(analysis.isCompleteMatch, true);
+  assert.equal(analysis.derivedPhysicalName, 'dt');
+  assert.deepEqual(
+    analysis.matchedWords.map((word) => word.logicalName),
+    ['일시'],
+  );
 });

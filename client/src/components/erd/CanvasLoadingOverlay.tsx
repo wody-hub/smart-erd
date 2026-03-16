@@ -43,15 +43,8 @@ export default function CanvasLoadingOverlay({
       <div className="flex flex-col items-center gap-3 text-center">
         {syncStage === 'yjs-failed-readonly' ? (
           <>
-            <p className="text-destructive text-sm">
-              {t('erd.collabSync.overlay.failed')}
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="pointer-events-auto"
-              onClick={onRetry}
-            >
+            <p className="text-destructive text-sm">{t('erd.collabSync.overlay.failed')}</p>
+            <Button variant="outline" size="sm" className="pointer-events-auto" onClick={onRetry}>
               {t('erd.collabSync.overlay.retry')}
             </Button>
           </>
@@ -68,9 +61,7 @@ export default function CanvasLoadingOverlay({
         ) : syncStage === 'api-preview' || syncStage === 'api-preview-empty' ? (
           <>
             <Spinner />
-            <p className="text-muted-foreground text-sm">
-              {t('erd.collabSync.overlay.loading')}
-            </p>
+            <p className="text-muted-foreground text-sm">{t('erd.collabSync.overlay.loading')}</p>
             <p className="text-muted-foreground/70 text-xs">
               {t('erd.collabSync.overlay.loadingDetail')}
             </p>

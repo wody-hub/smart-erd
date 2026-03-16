@@ -247,6 +247,8 @@
       "validateActive": "Validate (active)",
       "ddlExport": "SQL DDL",
       "ddlImport": "DDL Import",
+      "dictionary": "Dictionary",
+      "dictionaryActive": "Dictionary (active)",
       "codeEditor": "Code",
       "codeEditorActive": "Close code editor"
     },
@@ -433,6 +435,7 @@
       "allDomains": "All Domains",
       "none": "None",
       "searchPlaceholder": "Search domains...",
+      "noResults": "No matching domains.",
       "registerNew": "+ Register new domain"
     },
     "autocomplete": {

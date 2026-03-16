@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import { Lightbulb, Loader2, Plus } from 'lucide-react';
 import {
   Dialog,
@@ -15,25 +14,17 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { fetchDomains } from '@/api/domainApi';
-import { createWord, fetchWords } from '@/api/wordApi';
+import { fetchWords } from '@/api/wordApi';
 import { queryKeys } from '@/constants/query-keys';
+import { useCreateWordMutation } from '@/hooks/useCreateWordMutation';
 import { useDictionarySuggest } from '@/hooks/useDictionarySuggest';
-import { getErrorMessage } from '@/lib/api-error';
-import {
-  analyzeWordComposition,
-  buildWordMatchIndex,
-} from '@/lib/word-composition';
-import type { Term, TermFormData, Word, WordFormData } from '@/types/dictionary';
+import { buildSuggestHintText } from '@/lib/dictionary-suggest-utils';
+import { analyzeWordComposition, buildWordMatchIndex } from '@/lib/word-composition';
+import type { Term, TermFormData, WordFormData } from '@/types/dictionary';
 import WordCompositionValidator from '@/components/dictionary/WordCompositionValidator';
 import WordFormDialog from '@/components/dictionary/WordFormDialog';
+import DomainSearchSelect from '@/components/dictionary/DomainSearchSelect';
 
 const NONE_VALUE = '__none__';
 
@@ -54,7 +45,6 @@ export default function TermFormDialog({
 }: TermFormDialogProps) {
   const { teamId } = useParams<{ teamId: string }>();
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
 
   const [logicalName, setLogicalName] = useState('');
   const [physicalName, setPhysicalName] = useState('');
@@ -121,22 +111,13 @@ export default function TermFormDialog({
     }
   }, [suggestion, isEdit, domainDirty]);
 
-  const createWordMutation = useMutation({
-    mutationFn: (data: WordFormData) => createWord(teamId!, setId, data),
-    onSuccess: async (word) => {
-      queryClient.setQueryData<Word[]>(queryKeys.dictionary.words(teamId!, setId), (current = []) => {
-        if (current.some((item) => item.id === word.id)) {
-          return current;
-        }
-        return [...current, word];
-      });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.words(teamId!, setId) });
-      toast.success(t('dictionary.word.toast.created'));
+  const createWordMutation = useCreateWordMutation({
+    teamId: teamId!,
+    setId,
+    onSuccess: () => {
       setQuickWordOpen(false);
       setDraftWord(null);
     },
-    onError: (err) =>
-      toast.error(getErrorMessage(err, t('dictionary.word.toast.createFailed'))),
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -160,25 +141,7 @@ export default function TermFormDialog({
     }
   };
 
-  const getSuggestHintText = (): string | null => {
-    if (!suggestion || !suggestion.matches || suggestion.matches.length === 0) {
-      return null;
-    }
-    const matchedDetails = suggestion.matches
-      .filter((match) => match.matched)
-      .map((match) =>
-        t('dictionary.suggest.matchDetail', {
-          keyword: match.keyword,
-          physical: match.physicalName ?? '',
-        }),
-      );
-    if (matchedDetails.length === 0) {
-      return null;
-    }
-    return matchedDetails.join(', ');
-  };
-
-  const hintText = getSuggestHintText();
+  const hintText = buildSuggestHintText(suggestion, t);
 
   return (
     <>
@@ -272,25 +235,18 @@ export default function TermFormDialog({
 
             <div className="space-y-2">
               <Label htmlFor="term-domain">{t('dictionary.term.form.domain')}</Label>
-              <Select
-                value={domainId}
-                onValueChange={(value) => {
-                  setDomainId(value);
+              <DomainSearchSelect
+                id="term-domain"
+                domains={domains}
+                selectedDomainId={domainId !== NONE_VALUE ? Number(domainId) : null}
+                onSelect={(selectedDomainId) => {
+                  setDomainId(selectedDomainId != null ? String(selectedDomainId) : NONE_VALUE);
                   setDomainDirty(true);
                 }}
-              >
-                <SelectTrigger id="term-domain">
-                  <SelectValue placeholder={t('dictionary.term.form.domainNone')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE_VALUE}>{t('dictionary.term.form.domainNone')}</SelectItem>
-                  {domains.map((domain) => (
-                    <SelectItem key={domain.id} value={String(domain.id)}>
-                      {domain.logicalName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                noneLabel={t('dictionary.term.form.domainNone')}
+                searchPlaceholder={t('erd.domain.searchPlaceholder')}
+                noResultsText={t('erd.domain.noResults')}
+              />
             </div>
 
             <div className="space-y-2">

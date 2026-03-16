@@ -71,6 +71,10 @@ interface ERDCanvasProps {
   validationOpen?: boolean;
   /** 유효성 검사 패널 토글 핸들러 */
   onToggleValidation?: () => void;
+  /** 사전 관리 다이얼로그 열림 여부 */
+  dictionaryOpen?: boolean;
+  /** 사전 관리 다이얼로그 열기 핸들러 */
+  onOpenDictionary?: () => void;
   /** 편집 가능 여부 (VIEWER일 때 false) */
   canEdit?: boolean;
   /** 코드 에디터 활성 여부 */
@@ -116,6 +120,8 @@ function ERDCanvas({
   provider,
   validationOpen,
   onToggleValidation,
+  dictionaryOpen,
+  onOpenDictionary,
   canEdit = true,
   codeEditorActive,
   onToggleCodeEditor,
@@ -433,6 +439,8 @@ function ERDCanvas({
               onToggleCodeEditor={onToggleCodeEditor}
               validationOpen={validationOpen}
               onToggleValidation={onToggleValidation}
+              dictionaryOpen={dictionaryOpen}
+              onOpenDictionary={onOpenDictionary}
               canUndo={effectiveCanEdit && canUndo}
               canRedo={effectiveCanEdit && canRedo}
               onUndo={undo}

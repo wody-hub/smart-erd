@@ -52,6 +52,16 @@ export default {
           foreground: "hsl(var(--header-foreground))",
           muted: "hsl(var(--header-muted))",
         },
+        composition: {
+          "valid-bg": "hsl(var(--composition-valid-bg))",
+          "valid-border": "hsl(var(--composition-valid-border))",
+          "valid-foreground": "hsl(var(--composition-valid-foreground))",
+          "valid-muted": "hsl(var(--composition-valid-muted))",
+          "warning-bg": "hsl(var(--composition-warning-bg))",
+          "warning-border": "hsl(var(--composition-warning-border))",
+          "warning-foreground": "hsl(var(--composition-warning-foreground))",
+          "warning-muted": "hsl(var(--composition-warning-muted))",
+        },
         erd: {
           "table-header": "hsl(var(--erd-table-header))",
           "table-header-foreground": "hsl(var(--erd-table-header-foreground))",

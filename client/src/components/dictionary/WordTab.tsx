@@ -50,7 +50,11 @@ export default function WordTab({ canEdit = true, setId }: WordTabProps) {
   const { searchInput, setSearchInput, searchKeyword, page, setPage, adjustToTotalPages } =
     usePaginatedSearch({ resetKey: `${teamId ?? ''}:${setId}:words` });
 
-  const { data: wordPageData, isLoading, isFetching } = useQuery({
+  const {
+    data: wordPageData,
+    isLoading,
+    isFetching,
+  } = useQuery({
     queryKey: queryKeys.dictionary.wordsPage(teamId!, setId, page, PAGE_SIZE, searchKeyword),
     queryFn: () => fetchWordsPage(teamId!, setId, page, PAGE_SIZE, searchKeyword),
     enabled: !!teamId && !!setId,
@@ -206,7 +210,9 @@ export default function WordTab({ canEdit = true, setId }: WordTabProps) {
             <TableBody>
               {words.map((word) => (
                 <TableRow key={word.id}>
-                  <TableCell className="font-medium whitespace-nowrap">{word.logicalName}</TableCell>
+                  <TableCell className="font-medium whitespace-nowrap">
+                    {word.logicalName}
+                  </TableCell>
                   <TableCell className="font-mono whitespace-nowrap">{word.physicalName}</TableCell>
                   <TableCell className="max-w-[520px] whitespace-normal break-words text-muted-foreground">
                     {word.description ?? ''}
@@ -222,7 +228,9 @@ export default function WordTab({ canEdit = true, setId }: WordTabProps) {
                             setEditTarget(word);
                             setFormOpen(true);
                           }}
-                          aria-label={t('dictionary.word.aria.editWord', { name: word.logicalName })}
+                          aria-label={t('dictionary.word.aria.editWord', {
+                            name: word.logicalName,
+                          })}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -231,7 +239,9 @@ export default function WordTab({ canEdit = true, setId }: WordTabProps) {
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => setDeleteTarget(word.id)}
-                          aria-label={t('dictionary.word.aria.deleteWord', { name: word.logicalName })}
+                          aria-label={t('dictionary.word.aria.deleteWord', {
+                            name: word.logicalName,
+                          })}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
