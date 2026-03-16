@@ -4,6 +4,8 @@ import * as Y from 'yjs';
 import { applyDiffToYDoc } from '../../src/lib/erd-diff-apply.js';
 import { buildErdTableDiffPlan } from '../../src/lib/erd-diff-builder.js';
 import { buildFallbackGroupAssignments } from '../../src/lib/erd-fallback-group-remap.js';
+import { buildStableEdgeId } from '../../src/lib/edge-handles.js';
+import { extractColId } from '../../src/lib/handle-id.js';
 import type {
   CurrentEdgeSnapshot,
   CurrentTableSnapshot,
@@ -148,6 +150,20 @@ function createDocFromCurrent(
       if (edge.sourceHandle) edgeYMap.set('sourceHandle', edge.sourceHandle);
       if (edge.targetHandle) edgeYMap.set('targetHandle', edge.targetHandle);
       edgeYMap.set('relationType', edge.relationType);
+      if (edge.routingType) edgeYMap.set('routingType', edge.routingType);
+      if (edge.handleMode) edgeYMap.set('handleMode', edge.handleMode);
+      if (edge.sourceSide) edgeYMap.set('sourceSide', edge.sourceSide);
+      if (edge.targetSide) edgeYMap.set('targetSide', edge.targetSide);
+      if (edge.waypoints?.length) {
+        const waypointsYArray = new Y.Array<Y.Map<unknown>>();
+        for (const waypoint of edge.waypoints) {
+          const waypointYMap = new Y.Map<unknown>();
+          waypointYMap.set('x', waypoint.x);
+          waypointYMap.set('y', waypoint.y);
+          waypointsYArray.push([waypointYMap]);
+        }
+        edgeYMap.set('waypoints', waypointsYArray);
+      }
       edgesMap.set(edge.id, edgeYMap);
     }
 
@@ -190,12 +206,11 @@ function resolveTargetColumnName(
   if (typeof targetTableId !== 'string' || typeof targetHandle !== 'string') {
     return null;
   }
-  const suffix = '-target';
   const prefix = `${targetTableId}-`;
-  if (!targetHandle.endsWith(suffix) || !targetHandle.startsWith(prefix)) {
+  if (!targetHandle.startsWith(prefix)) {
     return null;
   }
-  const colId = targetHandle.slice(prefix.length, -suffix.length);
+  const colId = extractColId(targetHandle, targetTableId);
   const tableYMap = getTableById(doc, targetTableId);
   if (!tableYMap) {
     return null;
@@ -370,6 +385,175 @@ test('regression:partial-update 시나리오에서 컬럼/관계 변경이 누�
   });
   assert.equal(hasDeptRelation, true);
   assert.equal(hasLegacyPrevRelation, false);
+});
+
+test('regression:edge 재생성 시 기존 manual side 와 routingType 을 carry-over 한다', () => {
+  const fixture = createFixture(2);
+  fixture.currentEdges = [
+    {
+      id: 'legacy-edge',
+      source: 'table-1',
+      target: 'table-2',
+      sourceHandle: 'table-1-col-1-id-source-right',
+      targetHandle: 'table-2-col-2-prev_id-target-right',
+      relationType: 'non-identifying',
+      routingType: 'bezier',
+      handleMode: 'manual',
+      sourceSide: 'right',
+      targetSide: 'right',
+    },
+  ];
+
+  const doc = createDocFromCurrent(fixture.currentTables, fixture.currentEdges);
+  const currentEdge = fixture.currentEdges[0];
+  const nextEdgeId = buildStableEdgeId({
+    parentTable: 'table_1',
+    parentColumn: 'id',
+    childTable: 'table_2',
+    childColumn: 'prev_id',
+  });
+  const plan = {
+    meta: {
+      createdAt: 1700000000000,
+      version: 'v1' as const,
+      fallbackRequired: false,
+      fallbackReasons: [],
+    },
+    tables: [],
+    columns: [],
+    edges: [
+      {
+        entity: 'edge' as const,
+        op: 'delete' as const,
+        edgeId: currentEdge.id,
+        current: currentEdge,
+      },
+      {
+        entity: 'edge' as const,
+        op: 'add' as const,
+        next: {
+          parentTable: 'table_1',
+          parentColumn: 'id',
+          childTable: 'table_2',
+          childColumn: 'prev_id',
+        },
+        relationType: 'non-identifying' as const,
+        routingType: 'smoothstep' as const,
+      },
+    ],
+    summary: {
+      tableAdds: 0,
+      tableUpdates: 0,
+      tableDeletes: 0,
+      columnAdds: 0,
+      columnUpdates: 0,
+      columnDeletes: 0,
+      edgeAdds: 1,
+      edgeUpdates: 0,
+      edgeDeletes: 1,
+      totalOperations: 2,
+    },
+  };
+
+  applyDiffToYDoc(doc, plan);
+  const edgesMap = doc.getMap('edges') as Y.Map<Y.Map<unknown>>;
+  assert.equal(edgesMap.has('legacy-edge'), false);
+  const edgeYMap = edgesMap.get(nextEdgeId);
+  assert.equal(edgeYMap != null, true);
+  assert.equal(edgeYMap?.get('routingType'), 'bezier');
+  assert.equal(edgeYMap?.get('handleMode'), 'manual');
+  assert.equal(edgeYMap?.get('sourceSide'), 'right');
+  assert.equal(edgeYMap?.get('targetSide'), 'right');
+  assert.equal(edgeYMap?.get('sourceHandle'), 'table-1-col-1-id-source-right');
+  assert.equal(edgeYMap?.get('targetHandle'), 'table-2-col-2-prev_id-target-right');
+});
+
+test('regression:edge 재생성 시 same binding straight waypoint 를 carry-over 한다', () => {
+  const fixture = createFixture(2);
+  fixture.currentEdges = [
+    {
+      id: 'legacy-edge',
+      source: 'table-1',
+      target: 'table-2',
+      sourceHandle: 'table-1-col-1-id-source-right',
+      targetHandle: 'table-2-col-2-prev_id-target-right',
+      relationType: 'non-identifying',
+      routingType: 'straight',
+      handleMode: 'manual',
+      sourceSide: 'right',
+      targetSide: 'right',
+      waypoints: [
+        { x: 540, y: 120 },
+        { x: 540, y: 260 },
+      ],
+    },
+  ];
+
+  const doc = createDocFromCurrent(fixture.currentTables, fixture.currentEdges);
+  const nextEdgeId = buildStableEdgeId({
+    parentTable: 'table_1',
+    parentColumn: 'id',
+    childTable: 'table_2',
+    childColumn: 'prev_id',
+  });
+  const plan = {
+    meta: {
+      createdAt: 1700000000000,
+      version: 'v1' as const,
+      fallbackRequired: false,
+      fallbackReasons: [],
+    },
+    tables: [],
+    columns: [],
+    edges: [
+      {
+        entity: 'edge' as const,
+        op: 'delete' as const,
+        edgeId: 'legacy-edge',
+        current: fixture.currentEdges[0],
+      },
+      {
+        entity: 'edge' as const,
+        op: 'add' as const,
+        next: {
+          parentTable: 'table_1',
+          parentColumn: 'id',
+          childTable: 'table_2',
+          childColumn: 'prev_id',
+        },
+        relationType: 'non-identifying' as const,
+        routingType: 'smoothstep' as const,
+      },
+    ],
+    summary: {
+      tableAdds: 0,
+      tableUpdates: 0,
+      tableDeletes: 0,
+      columnAdds: 0,
+      columnUpdates: 0,
+      columnDeletes: 0,
+      edgeAdds: 1,
+      edgeUpdates: 0,
+      edgeDeletes: 1,
+      totalOperations: 2,
+    },
+  };
+
+  applyDiffToYDoc(doc, plan);
+  const edgeYMap = (doc.getMap('edges') as Y.Map<Y.Map<unknown>>).get(nextEdgeId);
+  assert.equal(edgeYMap?.get('routingType'), 'straight');
+  const waypointsYArray = edgeYMap?.get('waypoints') as Y.Array<Y.Map<unknown>> | undefined;
+  assert.equal(waypointsYArray?.length, 2);
+  assert.deepEqual(
+    waypointsYArray?.toArray().map((waypointYMap) => ({
+      x: waypointYMap.get('x'),
+      y: waypointYMap.get('y'),
+    })),
+    [
+      { x: 540, y: 120 },
+      { x: 540, y: 260 },
+    ],
+  );
 });
 
 test('regression:fallback 그룹 재매핑에서 고신뢰 매칭만 유지된다', () => {

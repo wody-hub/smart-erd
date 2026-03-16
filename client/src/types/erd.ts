@@ -4,7 +4,7 @@ import type { Edge, Node } from '@xyflow/react';
  * ERD 테이블의 개별 컬럼 정보.
  */
 export interface Column {
-  /** 컬럼 고유 식별자 (Handle ID 구성에 사용: `{nodeId}-{colId}-source/target`) */
+  /** 컬럼 고유 식별자 (Handle ID 구성에 사용: `{nodeId}-{colId}-{source|target}-{left|right}`) */
   id: string;
   /** 물리명 (예: "user_name") */
   name: string;
@@ -39,6 +39,9 @@ export type TableHeaderColor =
   | 'purple'
   | 'pink';
 
+/** 테이블 핸들 레이아웃 */
+export type TableHandleLayout = 'split' | 'left' | 'right';
+
 /**
  * 테이블 노드의 데이터 구조.
  *
@@ -54,6 +57,8 @@ export interface TableNodeData extends Record<string, unknown> {
   tableTermId?: number;
   /** 헤더 색상 프리셋 (Feature 4a: 테이블 색상) */
   headerColor?: TableHeaderColor;
+  /** 테이블 단위 핸들 레이아웃 */
+  handleLayout?: TableHandleLayout;
   /** 테이블 컬럼 목록 */
   columns: Column[];
 }
@@ -85,10 +90,35 @@ export interface TableGroup {
 /** 관계 유형: 식별(실선) / 비식별(점선) */
 export type RelationType = 'identifying' | 'non-identifying';
 
+/** 엣지 라우팅 유형 */
+export type EdgeRoutingType = 'smoothstep' | 'bezier' | 'straight';
+
+/** 엣지 연결 side */
+export type EdgeHandleSide = 'left' | 'right';
+
+/** 엣지 연결 side 모드 */
+export type EdgeHandleMode = 'auto' | 'manual';
+
+/** straight 엣지의 중간 경유점 */
+export interface Waypoint {
+  x: number;
+  y: number;
+}
+
 /** ERD 엣지 데이터 */
 export interface ERDEdgeData extends Record<string, unknown> {
   /** 관계 유형: 식별(실선) / 비식별(점선) */
   relationType: RelationType;
+  /** 라우팅 유형 */
+  routingType?: EdgeRoutingType;
+  /** handle side 선택 모드 */
+  handleMode?: EdgeHandleMode;
+  /** manual 모드일 때 source side */
+  sourceSide?: EdgeHandleSide;
+  /** manual 모드일 때 target side */
+  targetSide?: EdgeHandleSide;
+  /** straight 라우팅 경유점 */
+  waypoints?: Waypoint[];
 }
 
 /**

@@ -1,16 +1,18 @@
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle } from '@xyflow/react';
 import { AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { Column } from '@/types/erd';
+import type { Column, TableHandleLayout } from '@/types/erd';
 import {
   getValidationStatusI18nKey,
   type ColumnWarning,
   type WarningValidationStatus,
 } from '@/hooks/useColumnValidation';
 import { cn } from '@/lib/utils';
+import { buildColumnHandleId } from '@/lib/handle-id';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useErdFkMode } from './ErdFkModeContext';
+import { getColumnHandlePlacements } from './columnHandleLayout';
 
 /** StaticColumnRow 컴포넌트 props */
 interface StaticColumnRowProps {
@@ -18,6 +20,8 @@ interface StaticColumnRowProps {
   col: Column;
   /** 노드 ID */
   nodeId: string;
+  /** 핸들 레이아웃 */
+  handleLayout: TableHandleLayout;
   /** 엣지 연결 여부 (미리 계산된 값) */
   connected: boolean;
   /** 컬럼 유효성 경고 */
@@ -48,6 +52,7 @@ interface StaticColumnRowProps {
 function StaticColumnRow({
   col,
   nodeId,
+  handleLayout,
   connected,
   warning,
   hasDuplicateLogicalName = false,
@@ -56,6 +61,8 @@ function StaticColumnRow({
 }: StaticColumnRowProps) {
   const { t } = useTranslation();
   const fkMode = useErdFkMode();
+  const targetHandlePlacements = getColumnHandlePlacements(handleLayout, 'target');
+  const sourceHandlePlacements = getColumnHandlePlacements(handleLayout, 'source');
 
   return (
     <div
@@ -65,15 +72,19 @@ function StaticColumnRow({
       )}
     >
       <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
-        <Handle
-          type="target"
-          position={Position.Left}
-          id={`${nodeId}-${col.id}-target`}
-          className={cn(
-            '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
-            !(connected || fkMode) && '!opacity-0',
-          )}
-        />
+        {targetHandlePlacements.map((placement) => (
+          <Handle
+            key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+            type="target"
+            position={placement.position}
+            id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+            className={cn(
+              '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
+              !(connected || fkMode) && '!opacity-0 !pointer-events-none',
+            )}
+            style={placement.style}
+          />
+        ))}
 
         {/* PK badge */}
         <span
@@ -148,23 +159,25 @@ function StaticColumnRow({
           </Tooltip>
         )}
 
-        {domainLogicalName && (
-          <span
-            className="text-2xs px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground shrink-0"
-            title={`${domainLogicalName} (${domainPhysicalType ?? ''})`}
-          >
-            {domainLogicalName}
-          </span>
-        )}
-
         <span
-          className="flex-1 whitespace-nowrap px-1 font-mono text-muted-foreground"
+          className="flex-1 min-w-0 whitespace-nowrap px-1 font-mono text-left text-muted-foreground"
           style={{ minWidth: `${Math.max(col.name.length + 2, 10)}ch` }}
         >
           {col.name}
         </span>
 
-        <span className="w-24 shrink-0 px-1 text-right font-mono text-muted-foreground">
+        <div className="w-28 shrink-0 px-1 text-right">
+          {domainLogicalName && (
+            <span
+              className="inline-flex max-w-full truncate rounded-full bg-erd-domain px-1.5 text-2xs text-erd-domain-foreground align-middle"
+              title={`${domainLogicalName} (${domainPhysicalType ?? ''})`}
+            >
+              {domainLogicalName}
+            </span>
+          )}
+        </div>
+
+        <span className="w-24 shrink-0 px-1 text-left font-mono text-muted-foreground">
           {col.type}
         </span>
 
@@ -178,15 +191,19 @@ function StaticColumnRow({
           NN
         </span>
 
-        <Handle
-          type="source"
-          position={Position.Right}
-          id={`${nodeId}-${col.id}-source`}
-          className={cn(
-            '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
-            !(connected || fkMode) && '!opacity-0',
-          )}
-        />
+        {sourceHandlePlacements.map((placement) => (
+          <Handle
+            key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+            type="source"
+            position={placement.position}
+            id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+            className={cn(
+              '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
+              !(connected || fkMode) && '!opacity-0 !pointer-events-none',
+            )}
+            style={placement.style}
+          />
+        ))}
       </div>
     </div>
   );

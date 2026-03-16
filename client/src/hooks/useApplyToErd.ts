@@ -36,6 +36,8 @@ interface UseApplyToErdOptions {
   parsing: boolean;
   /** 다이어그램 단위 정책 스코프 */
   policyScope?: SyncPolicyScope;
+  /** 구조 변경 차단 여부 */
+  hasBlockingStructureLocks?: boolean;
 }
 
 /** useApplyToErd 훅 반환 타입 */
@@ -191,6 +193,7 @@ function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
 }
 
 interface ExecuteLayoutPhaseParams {
+  source: ApplySource;
   beforeNodes: Node<TableNodeData>[];
   estimatedNodeCount: number;
   syncPolicy: SyncPolicy;
@@ -209,7 +212,10 @@ interface ExecuteLayoutPhaseParams {
 function executeLayoutPhase(params: ExecuteLayoutPhaseParams): LayoutPhaseResult {
   const { nodes: freshNodes, edges: freshEdges } = params.getCurrentState();
   const shouldRunLayout = params.applyPath !== 'diff' || params.diffAppliedOperations > 0;
-  const effectiveLayoutMode = shouldRunLayout
+  const preserveExistingDiagram = params.source === 'auto' && params.beforeNodes.length > 0;
+  const effectiveLayoutMode = preserveExistingDiagram
+    ? 'none'
+    : shouldRunLayout
     ? resolveLayoutMode(
         params.syncPolicy.layoutMode,
         Math.max(params.estimatedNodeCount, freshNodes.length),
@@ -254,6 +260,7 @@ export function useApplyToErd({
   parseResult,
   parsing,
   policyScope = {},
+  hasBlockingStructureLocks = false,
 }: UseApplyToErdOptions): UseApplyToErdReturn {
   const { t } = useTranslation();
   const { teamId, projectId, diagramId } = policyScope;
@@ -323,6 +330,13 @@ export function useApplyToErd({
       const beforeLayoutNodes = beforeState.nodes as Node<TableNodeData>[];
       const estimatedNodeCount = Math.max(beforeNodes.length, parseResult.tables.length);
 
+      if (hasBlockingStructureLocks) {
+        if (source === 'manual') {
+          toast.info(t('erd.edge.structureBlockedApply'));
+        }
+        return false;
+      }
+
       if (source === 'auto') {
         const blockReason = getAutoApplyBlockReason(syncPolicy, estimatedNodeCount);
         if (blockReason) {
@@ -354,6 +368,7 @@ export function useApplyToErd({
         const replaceDurationMs = performance.now() - replaceStart;
 
         const layoutPhase = executeLayoutPhase({
+          source,
           beforeNodes: beforeLayoutNodes,
           estimatedNodeCount,
           syncPolicy,
@@ -399,6 +414,7 @@ export function useApplyToErd({
       parseResult,
       replaceFromDdl,
       syncPolicy,
+      hasBlockingStructureLocks,
       t,
       updateGroupTables,
     ],

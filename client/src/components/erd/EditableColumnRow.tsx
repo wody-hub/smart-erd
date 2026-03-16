@@ -1,8 +1,8 @@
-import { Handle, Position } from '@xyflow/react';
+import { Handle } from '@xyflow/react';
 import { X, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
-import type { Column } from '@/types/erd';
+import type { Column, TableHandleLayout } from '@/types/erd';
 import {
   getValidationStatusI18nKey,
   type ColumnWarning,
@@ -11,9 +11,11 @@ import {
 import type { Domain } from '@/types/dictionary';
 import type { TermSelectResult } from './ColumnAutocomplete';
 import { cn } from '@/lib/utils';
+import { buildColumnHandleId } from '@/lib/handle-id';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import ColumnAutocomplete from './ColumnAutocomplete';
 import DomainSelectPopover from './DomainSelectPopover';
+import { getColumnHandlePlacements } from './columnHandleLayout';
 
 /** EditableColumnRow 컴포넌트 props */
 export interface EditableColumnRowProps {
@@ -21,6 +23,8 @@ export interface EditableColumnRowProps {
   col: Column;
   /** 노드 ID */
   nodeId: string;
+  /** 핸들 레이아웃 */
+  handleLayout: TableHandleLayout;
   /** 편집 가능 여부 */
   canEdit: boolean;
   /** FK 모드 활성 여부 */
@@ -67,6 +71,7 @@ export interface EditableColumnRowProps {
 export default function EditableColumnRow({
   col,
   nodeId,
+  handleLayout,
   canEdit,
   fkMode,
   connected,
@@ -85,6 +90,8 @@ export default function EditableColumnRow({
   onDomainChange,
 }: EditableColumnRowProps) {
   const { t } = useTranslation();
+  const targetHandlePlacements = getColumnHandlePlacements(handleLayout, 'target');
+  const sourceHandlePlacements = getColumnHandlePlacements(handleLayout, 'source');
 
   return (
     <div
@@ -97,15 +104,19 @@ export default function EditableColumnRow({
         className="flex items-center gap-1.5"
         style={{ paddingLeft: canEdit ? '12px' : undefined }}
       >
-        <Handle
-          type="target"
-          position={Position.Left}
-          id={`${nodeId}-${col.id}-target`}
-          className={cn(
-            '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
-            !(connected || fkMode) && '!opacity-0',
-          )}
-        />
+        {targetHandlePlacements.map((placement) => (
+          <Handle
+            key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+            type="target"
+            position={placement.position}
+            id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+            className={cn(
+              '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
+              !(connected || fkMode) && '!opacity-0 !pointer-events-none',
+            )}
+            style={placement.style}
+          />
+        ))}
 
         {/* PK toggle */}
         <button
@@ -220,58 +231,63 @@ export default function EditableColumnRow({
           </Tooltip>
         )}
 
-        {canEdit ? (
-          <DomainSelectPopover
-            open={domainPopoverOpen}
-            onOpenChange={onDomainPopoverOpenChange}
-            selectedDomainId={col.domainId}
-            onSelect={(domainId, physicalType) => onDomainChange(col.id, domainId, physicalType)}
-            align="start"
-          >
-            {domain ? (
-              <button
-                className="nodrag text-2xs px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground hover:bg-erd-domain/80 cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                title={`${domain.logicalName} (${domain.physicalType})`}
-                aria-label={t('erd.tableNode.aria.domainBadge', {
-                  colName: col.name,
-                  domainName: domain.logicalName,
-                })}
-              >
-                {domain.logicalName}
-              </button>
-            ) : (
-              <button
-                className="nodrag text-2xs w-4 h-4 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground/40 opacity-0 group-hover/col:opacity-100 hover:!opacity-100 hover:border-muted-foreground hover:text-muted-foreground cursor-pointer shrink-0 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                title={t('erd.tableNode.selectDomain')}
-                aria-label={t('erd.tableNode.aria.selectDomain', {
-                  colName: col.name,
-                })}
-              >
-                D
-              </button>
-            )}
-          </DomainSelectPopover>
-        ) : (
-          domain && (
-            <span
-              className="text-2xs px-1.5 rounded-full bg-erd-domain text-erd-domain-foreground shrink-0"
-              title={`${domain.logicalName} (${domain.physicalType})`}
-            >
-              {domain.logicalName}
-            </span>
-          )
-        )}
-
         <input
-          className="nodrag flex-1 rounded bg-transparent px-1 font-mono text-muted-foreground outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring"
+          className="nodrag flex-1 min-w-0 rounded bg-transparent px-1 font-mono text-left text-muted-foreground outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring"
           value={col.name}
           onChange={(e) => onUpdateColumn(col.id, { name: e.target.value })}
           readOnly={!canEdit}
           aria-label={t('erd.tableNode.aria.columnName')}
           style={{ minWidth: `${Math.max(col.name.length + 2, 10)}ch` }}
         />
+
+        <div className="w-28 shrink-0 px-1 text-right">
+          {canEdit ? (
+            <DomainSelectPopover
+              open={domainPopoverOpen}
+              onOpenChange={onDomainPopoverOpenChange}
+              selectedDomainId={col.domainId}
+              onSelect={(domainId, physicalType) =>
+                onDomainChange(col.id, domainId, physicalType)
+              }
+              align="end"
+            >
+              {domain ? (
+                <button
+                  className="nodrag inline-flex max-w-full truncate rounded-full bg-erd-domain px-1.5 text-2xs text-erd-domain-foreground hover:bg-erd-domain/80 cursor-pointer align-middle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  title={`${domain.logicalName} (${domain.physicalType})`}
+                  aria-label={t('erd.tableNode.aria.domainBadge', {
+                    colName: col.name,
+                    domainName: domain.logicalName,
+                  })}
+                >
+                  {domain.logicalName}
+                </button>
+              ) : (
+                <button
+                  className="nodrag inline-flex h-4 w-4 items-center justify-center rounded-full border border-dashed border-muted-foreground/40 text-2xs text-muted-foreground/40 opacity-0 group-hover/col:opacity-100 hover:!opacity-100 hover:border-muted-foreground hover:text-muted-foreground cursor-pointer transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring align-middle"
+                  title={t('erd.tableNode.selectDomain')}
+                  aria-label={t('erd.tableNode.aria.selectDomain', {
+                    colName: col.name,
+                  })}
+                >
+                  D
+                </button>
+              )}
+            </DomainSelectPopover>
+          ) : (
+            domain && (
+              <span
+                className="inline-flex max-w-full truncate rounded-full bg-erd-domain px-1.5 text-2xs text-erd-domain-foreground align-middle"
+                title={`${domain.logicalName} (${domain.physicalType})`}
+              >
+                {domain.logicalName}
+              </span>
+            )
+          )}
+        </div>
+
         <input
-          className="nodrag w-24 shrink-0 rounded bg-transparent px-1 text-right font-mono text-muted-foreground outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring"
+          className="nodrag w-24 shrink-0 rounded bg-transparent px-1 text-left font-mono text-muted-foreground outline-none hover:bg-accent focus:bg-accent focus-visible:ring-1 focus-visible:ring-ring"
           value={col.type}
           onChange={(e) => onUpdateColumn(col.id, { type: e.target.value })}
           readOnly={!canEdit}
@@ -302,15 +318,19 @@ export default function EditableColumnRow({
           </button>
         )}
 
-        <Handle
-          type="source"
-          position={Position.Right}
-          id={`${nodeId}-${col.id}-source`}
-          className={cn(
-            '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
-            !(connected || fkMode) && '!opacity-0',
-          )}
-        />
+        {sourceHandlePlacements.map((placement) => (
+          <Handle
+            key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+            type="source"
+            position={placement.position}
+            id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+            className={cn(
+              '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
+              !(connected || fkMode) && '!opacity-0 !pointer-events-none',
+            )}
+            style={placement.style}
+          />
+        ))}
       </div>
     </div>
   );

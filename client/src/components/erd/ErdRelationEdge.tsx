@@ -1,36 +1,35 @@
 import { useCallback } from 'react';
 import {
   type EdgeProps,
+  EdgeLabelRenderer,
+  getBezierPath,
   getSmoothStepPath,
   useStore,
+  useReactFlow,
   BaseEdge,
   type Position,
 } from '@xyflow/react';
-import type { TableNodeData, RelationType } from '@/types/erd';
-import { extractColId } from '@/lib/handle-id';
+import { useTranslation } from 'react-i18next';
+import type { EdgeRoutingType, RelationType, TableNodeData, Waypoint } from '@/types/erd';
+import { extractColId, extractHandleSide } from '@/lib/handle-id';
+import { cn } from '@/lib/utils';
+import { useEdgeEditingContext } from './EdgeEditingContext';
+import {
+  buildRoundedOrthogonalSvgPath,
+  buildOrthogonalRouteSegments,
+  buildStraightEdgePoints,
+} from './edgeWaypointGeometry';
 
 /** 카디널리티 기호 유형 */
 type CardinalitySymbol = 'one' | 'many';
 
 /** 카디널리티 계산 결과 */
 interface Cardinality {
-  /** 부모 쪽 기호 */
   sourceSymbol: CardinalitySymbol;
-  /** 자식 쪽 기호 */
   targetSymbol: CardinalitySymbol;
-  /** FK nullable 여부 (optional = 원, mandatory = 표시 없음) */
   optional: boolean;
 }
 
-/**
- * 엣지의 카디널리티를 자동 판단한다.
- *
- * @param relationType 관계 유형
- * @param targetNodeId 자식 노드 ID
- * @param targetHandle 자식 Handle ID
- * @param childData    자식 노드의 테이블 데이터 (없으면 기본값 사용)
- * @returns 카디널리티 정보
- */
 function computeCardinality(
   relationType: RelationType,
   targetNodeId: string,
@@ -52,7 +51,6 @@ function computeCardinality(
     if (relationType === 'identifying') {
       const pkCols = childData.columns.filter((c) => c.pk);
       const fkPkCols = pkCols.filter((c) => c.fk);
-      // FK가 자식 PK 전체를 구성하면 1:1, 아니면 1:N
       targetSymbol = fkPkCols.length > 0 && fkPkCols.length === pkCols.length ? 'one' : 'many';
     }
   }
@@ -60,19 +58,75 @@ function computeCardinality(
   return { sourceSymbol, targetSymbol, optional };
 }
 
-/** 마커 영역 오프셋 — 엣지 경로를 단축하여 마커를 그릴 공간 확보 (px) */
-const MARKER_OFFSET = 20;
-/** Crow's foot 갈래의 수직 퍼짐 크기 (px) */
+const SOURCE_MARKER_OFFSET = 12;
+const TARGET_MARKER_OFFSET = 14;
 const CROW_FOOT_SPREAD = 8;
+const SEGMENT_HANDLE_THICKNESS = 18;
+const SEGMENT_GRIP_LENGTH = 24;
+const SEGMENT_GRIP_THICKNESS = 4;
 
-/**
- * 부모 쪽 "One" 마커 (| 수직선 하나)를 렌더링한다.
- *
- * @param x         기준 X 좌표
- * @param y         기준 Y 좌표
- * @param direction 방향 (1 = 오른쪽, -1 = 왼쪽)
- * @param stroke    선 색상
- */
+function buildSegmentHandleStyle(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+): React.CSSProperties {
+  const isHorizontal = start.y === end.y;
+  const width = isHorizontal ? Math.max(Math.abs(end.x - start.x), 12) : SEGMENT_HANDLE_THICKNESS;
+  const height = isHorizontal ? SEGMENT_HANDLE_THICKNESS : Math.max(Math.abs(end.y - start.y), 12);
+
+  return {
+    position: 'absolute',
+    transform: `translate(-50%, -50%) translate(${(start.x + end.x) / 2}px, ${(start.y + end.y) / 2}px)`,
+    pointerEvents: 'all',
+    zIndex: 40,
+    width,
+    height,
+  };
+}
+
+function getEdgePathByRoutingType(input: {
+  routingType: EdgeRoutingType;
+  sourceX: number;
+  sourceY: number;
+  targetX: number;
+  targetY: number;
+  sourcePosition: Position;
+  targetPosition: Position;
+  waypoints: Waypoint[];
+  sourceDirection: number;
+  targetDirection: number;
+}): string {
+  const { routingType, waypoints, sourceDirection, targetDirection, ...pathInput } = input;
+  const adjustedPathInput = {
+    ...pathInput,
+    sourceX: pathInput.sourceX + sourceDirection * SOURCE_MARKER_OFFSET,
+    targetX: pathInput.targetX + targetDirection * TARGET_MARKER_OFFSET,
+  };
+  if (routingType === 'bezier') {
+    const [path] = getBezierPath(adjustedPathInput);
+    return path;
+  }
+  if (routingType === 'straight') {
+    return buildRoundedOrthogonalSvgPath(
+      buildStraightEdgePoints({
+        sourceX: pathInput.sourceX,
+        sourceY: pathInput.sourceY,
+        targetX: pathInput.targetX,
+        targetY: pathInput.targetY,
+        sourceDirection,
+        targetDirection,
+        sourceMarkerOffset: SOURCE_MARKER_OFFSET,
+        targetMarkerOffset: TARGET_MARKER_OFFSET,
+        waypoints,
+      }),
+    );
+  }
+  const [path] = getSmoothStepPath({
+    ...adjustedPathInput,
+    borderRadius: 8,
+  });
+  return path;
+}
+
 function renderOneMarker(x: number, y: number, direction: number, stroke: string) {
   const lineX = x + direction * 8;
   return (
@@ -82,16 +136,6 @@ function renderOneMarker(x: number, y: number, direction: number, stroke: string
   );
 }
 
-/**
- * 자식 쪽 카디널리티 마커를 렌더링한다.
- *
- * @param x         기준 X 좌표
- * @param y         기준 Y 좌표
- * @param direction 방향 (1 = 오른쪽으로 향함, -1 = 왼쪽으로 향함)
- * @param symbol    카디널리티 기호 (one / many)
- * @param optional  선택 여부 (true = 원 표시, false = 표시 없음)
- * @param stroke    선 색상
- */
 function renderTargetMarker(
   x: number,
   y: number,
@@ -102,9 +146,8 @@ function renderTargetMarker(
 ) {
   const elements: React.ReactNode[] = [];
 
-  // Optional일 때만 원(○) 표시, mandatory일 때는 별도 기호 없음
   if (optional) {
-    const optX = x + direction * (MARKER_OFFSET - 2);
+    const optX = x + direction * (TARGET_MARKER_OFFSET - 2);
     elements.push(
       <circle
         key="opt"
@@ -119,7 +162,6 @@ function renderTargetMarker(
   }
 
   if (symbol === 'many') {
-    // Crow's foot — 갈래(spread)가 노드를 향하고, 수렴점(tip)이 엣지 경로를 향함
     const baseX = x;
     const tipX = x + direction * 12;
     elements.push(
@@ -144,7 +186,6 @@ function renderTargetMarker(
       </g>,
     );
   } else {
-    // One (|) — 수직선
     const lineX = x + direction * 8;
     elements.push(
       <line
@@ -162,27 +203,21 @@ function renderTargetMarker(
   return <g>{elements}</g>;
 }
 
-/**
- * Crow's Foot 표기법 커스텀 엣지 컴포넌트.
- *
- * 식별 관계는 실선, 비식별 관계는 점선으로 렌더링하며,
- * 양 끝에 카디널리티 마커(|, <, ○ 등)를 SVG로 그린다.
- */
 export default function ErdRelationEdge({
   id,
   sourceX,
   sourceY,
   targetX,
   targetY,
-  sourcePosition,
-  targetPosition,
+  sourceHandleId,
   data,
   target,
   targetHandleId,
   style,
   selected,
 }: EdgeProps) {
-  /** 자식 노드의 테이블 데이터만 구독 (전체 nodes 구독 방지) */
+  const { t } = useTranslation();
+  const reactFlowInstance = useReactFlow();
   const childData = useStore(
     useCallback(
       (s) => {
@@ -192,8 +227,19 @@ export default function ErdRelationEdge({
       [target],
     ),
   );
+  const { edgeLocksById, edgePreviewsById, localEdgeDrag, beginSegmentDrag, splitSegment } =
+    useEdgeEditingContext();
   const relationType: RelationType =
     (data as { relationType?: RelationType } | undefined)?.relationType ?? 'non-identifying';
+  const routingType: EdgeRoutingType =
+    (data as { routingType?: EdgeRoutingType } | undefined)?.routingType ?? 'smoothstep';
+  const committedWaypoints = ((data as { waypoints?: Waypoint[] } | undefined)?.waypoints ??
+    []) as Waypoint[];
+  const localPreviewWaypoints =
+    localEdgeDrag?.edgeId === id ? localEdgeDrag.previewWaypoints : null;
+  const remotePreviewWaypoints = edgePreviewsById.get(id)?.waypoints ?? null;
+  const displayWaypoints = localPreviewWaypoints ?? remotePreviewWaypoints ?? committedWaypoints;
+  const lockInfo = edgeLocksById.get(id) ?? null;
 
   const { sourceSymbol, targetSymbol, optional } = computeCardinality(
     relationType,
@@ -202,23 +248,25 @@ export default function ErdRelationEdge({
     childData,
   );
 
-  // sourceDirection: source에서 바깥쪽 방향
-  const sourceDirection = sourcePosition === ('left' as Position) ? -1 : 1;
-  // targetDirection: target에서 바깥쪽 방향
-  const targetDirection = targetPosition === ('left' as Position) ? -1 : 1;
+  const resolvedSourcePosition =
+    (extractHandleSide(sourceHandleId ?? '') === 'left' ? 'left' : 'right') as Position;
+  const resolvedTargetPosition =
+    (extractHandleSide(targetHandleId ?? '') === 'left' ? 'left' : 'right') as Position;
 
-  // 마커 공간만큼 offset을 적용하여 경로 단축
-  const adjustedSourceX = sourceX + sourceDirection * MARKER_OFFSET;
-  const adjustedTargetX = targetX + targetDirection * MARKER_OFFSET;
+  const sourceDirection = resolvedSourcePosition === ('left' as Position) ? -1 : 1;
+  const targetDirection = resolvedTargetPosition === ('left' as Position) ? -1 : 1;
 
-  const [edgePath] = getSmoothStepPath({
-    sourceX: adjustedSourceX,
+  const edgePath = getEdgePathByRoutingType({
+    routingType,
+    sourceX,
     sourceY,
-    targetX: adjustedTargetX,
+    targetX,
     targetY,
-    sourcePosition,
-    targetPosition,
-    borderRadius: 8,
+    sourcePosition: resolvedSourcePosition,
+    targetPosition: resolvedTargetPosition,
+    waypoints: displayWaypoints,
+    sourceDirection,
+    targetDirection,
   });
 
   const edgeStyle = style as React.CSSProperties | undefined;
@@ -226,6 +274,42 @@ export default function ErdRelationEdge({
     (edgeStyle?.stroke as string) ??
     (selected ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))');
   const strokeWidth = selected ? 2.5 : 1.5;
+
+  const routePoints =
+    routingType === 'straight'
+      ? buildStraightEdgePoints({
+          sourceX,
+          sourceY,
+          targetX,
+          targetY,
+          sourceDirection,
+          targetDirection,
+          sourceMarkerOffset: SOURCE_MARKER_OFFSET,
+          targetMarkerOffset: TARGET_MARKER_OFFSET,
+          waypoints: displayWaypoints,
+        })
+      : [];
+  const routeSegments =
+    routingType === 'straight'
+      ? buildOrthogonalRouteSegments({
+          sourceX,
+          sourceY,
+          targetX,
+          targetY,
+          sourceDirection,
+          targetDirection,
+          sourceMarkerOffset: SOURCE_MARKER_OFFSET,
+          targetMarkerOffset: TARGET_MARKER_OFFSET,
+          waypoints: displayWaypoints,
+        })
+      : [];
+  const lockBadgePoint =
+    routeSegments[Math.floor(routeSegments.length / 2)]?.center ?? {
+      x: (sourceX + targetX) / 2,
+      y: (sourceY + targetY) / 2,
+    };
+  const isEditing = selected || localEdgeDrag?.edgeId === id;
+  const showSegmentControls = routingType === 'straight' && isEditing;
 
   return (
     <g>
@@ -240,14 +324,106 @@ export default function ErdRelationEdge({
         }}
       />
 
-      {/* 부모 쪽 마커 (|) */}
       {sourceSymbol === 'one' && renderOneMarker(sourceX, sourceY, sourceDirection, strokeColor)}
-
-      {/* 자식 쪽 마커 */}
       {renderTargetMarker(targetX, targetY, targetDirection, targetSymbol, optional, strokeColor)}
 
-      {/* 투명한 넓은 히트영역 (클릭/선택용) */}
       <path d={edgePath} fill="none" stroke="transparent" strokeWidth={20} />
+
+      {selected && lockInfo && (
+        <g pointerEvents="none">
+          <rect
+            x={lockBadgePoint.x - 38}
+            y={lockBadgePoint.y - 26}
+            rx={8}
+            ry={8}
+            width={76}
+            height={20}
+            fill="hsl(var(--background))"
+            stroke={strokeColor}
+            strokeWidth={1}
+          />
+          <text
+            x={lockBadgePoint.x}
+            y={lockBadgePoint.y - 12}
+            textAnchor="middle"
+            fontSize="10"
+            fill={strokeColor}
+          >
+            {lockInfo.name}
+          </text>
+        </g>
+      )}
+
+      <EdgeLabelRenderer>
+        <>
+          {showSegmentControls &&
+            routeSegments.map((segment) => (
+              <button
+                key={`segment-${id}-${segment.segmentIndex}`}
+                type="button"
+                aria-label={t('erd.edge.segmentHandleAria', { index: segment.segmentIndex + 1 })}
+                title={t('erd.edge.segmentHandleHint')}
+                className={cn(
+                  'nodrag nopan absolute flex items-center justify-center rounded-full border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                  lockInfo
+                    ? 'cursor-not-allowed opacity-60'
+                    : segment.orientation === 'horizontal'
+                      ? 'cursor-row-resize'
+                      : 'cursor-col-resize',
+                )}
+                style={buildSegmentHandleStyle(segment.start, segment.end)}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (lockInfo) {
+                    return;
+                  }
+                  beginSegmentDrag({
+                    edgeId: id,
+                    pointerId: event.pointerId,
+                    segmentIndex: segment.segmentIndex,
+                    axis: segment.orientation === 'vertical' ? 'x' : 'y',
+                    kind: 'segment',
+                    routePoints,
+                    waypoints: displayWaypoints,
+                  });
+                }}
+                onDoubleClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (lockInfo) {
+                    return;
+                  }
+                  splitSegment({
+                    edgeId: id,
+                    segmentIndex: segment.segmentIndex,
+                    routePoints,
+                    clickPoint: reactFlowInstance.screenToFlowPosition({
+                      x: event.clientX,
+                      y: event.clientY,
+                    }),
+                  });
+                }}
+              >
+                <span
+                  className="block rounded-full border bg-background/90 shadow-sm"
+                  style={{
+                    width:
+                      segment.orientation === 'horizontal'
+                        ? SEGMENT_GRIP_LENGTH
+                        : SEGMENT_GRIP_THICKNESS,
+                    height:
+                      segment.orientation === 'horizontal'
+                        ? SEGMENT_GRIP_THICKNESS
+                        : SEGMENT_GRIP_LENGTH,
+                    borderColor: strokeColor,
+                    boxShadow: '0 0 0 3px hsl(var(--background) / 0.92)',
+                  }}
+                />
+              </button>
+            ))}
+        </>
+      </EdgeLabelRenderer>
     </g>
   );
 }

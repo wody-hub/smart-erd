@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { resolveRemoteEditLocks } from '../../src/lib/remote-edit-locks.js';
+import {
+  resolveRemoteEditLocks,
+  resolveRemoteEdgeEditLocks,
+} from '../../src/lib/remote-edit-locks.js';
 import type { AwarenessState, PresenceParticipant } from '../../src/types/collaboration.js';
 
 function awareness(
@@ -49,6 +52,19 @@ test('editingTableKey 가 있으면 selectedNodeId 보다 우선한다', () => {
   assert.equal(locks.size, 1);
   assert.equal(locks.has('table-lock-1'), true);
   assert.equal(locks.has('table-node-1'), false);
+});
+
+test('editingEdgeId 가 있으면 selectedNodeId fallback 테이블 락 후보에서 제외한다', () => {
+  const state: AwarenessState = {
+    ...awareness('u1', 'Alice', 'table-node-1'),
+    editingEdgeId: 'edge-1',
+    editingEdgeClientId: 1,
+    edgeLockHeartbeatAt: Date.now(),
+  };
+  const cursors = new Map<number, AwarenessState>([[1, state]]);
+
+  const locks = resolveRemoteEditLocks(cursors, new Map());
+  assert.equal(locks.size, 0);
 });
 
 test('participants 가 존재하면 미참여 userId 락은 무시한다', () => {
@@ -182,4 +198,38 @@ test('현재 사용자 loginId와 일치하는 락은 userId가 없어도 제외
   const locks = resolveRemoteEditLocks(cursors, new Map(), { selfLoginId: 'me@example.com' });
   assert.equal(locks.has('table-1'), false);
   assert.equal(locks.get('table-2')?.userId, 'u2');
+});
+
+test('resolveRemoteEdgeEditLocks 는 fresh edge lock과 preview를 edge별로 계산한다', () => {
+  const cursors = new Map<number, AwarenessState>([
+    [
+      1,
+      {
+        ...awareness('u1', 'Alice', null),
+        editingEdgeId: 'edge-1',
+        editingEdgeClientId: 1,
+        edgeLockHeartbeatAt: Date.now(),
+        edgeWaypointPreview: {
+          edgeId: 'edge-1',
+          waypoints: [
+            { x: 120, y: 140 },
+            { x: 240, y: 260 },
+          ],
+        },
+      },
+    ],
+  ]);
+
+  const locks = resolveRemoteEdgeEditLocks(cursors, new Map());
+  const resolved = locks.get('edge-1');
+
+  if (!resolved) {
+    assert.fail('resolved edge lock should exist');
+  }
+
+  assert.equal(resolved.info.userId, 'u1');
+  assert.deepEqual(resolved.preview?.waypoints, [
+    { x: 120, y: 140 },
+    { x: 240, y: 260 },
+  ]);
 });

@@ -1,3 +1,10 @@
+import type {
+  EdgeHandleMode,
+  EdgeHandleSide,
+  EdgeRoutingType,
+  Waypoint,
+} from '../types/erd.js';
+
 /** DiffPlan 스키마 버전 */
 export type DiffPlanVersion = 'v1';
 
@@ -93,6 +100,16 @@ export interface CurrentEdgeSnapshot {
   targetHandle?: string;
   /** 관계 유형 */
   relationType: DiffRelationType;
+  /** 라우팅 유형 */
+  routingType?: EdgeRoutingType;
+  /** handle side 선택 모드 */
+  handleMode?: EdgeHandleMode;
+  /** manual 모드일 때 source side */
+  sourceSide?: EdgeHandleSide;
+  /** manual 모드일 때 target side */
+  targetSide?: EdgeHandleSide;
+  /** straight 라우팅 waypoint */
+  waypoints?: Waypoint[];
 }
 
 /** 매칭 판정 메타 */
@@ -177,6 +194,11 @@ export interface EdgeDiffAdd {
   op: 'add';
   next: DiffParsedRelation;
   relationType: DiffRelationType;
+  routingType?: EdgeRoutingType;
+  waypoints?: Waypoint[];
+  handleMode?: EdgeHandleMode;
+  sourceSide?: EdgeHandleSide;
+  targetSide?: EdgeHandleSide;
 }
 
 /** 관계 update diff (관계 유형 변경) */
@@ -339,6 +361,11 @@ export function createCurrentSnapshots(
         sourceHandle: edge.sourceHandle,
         targetHandle: edge.targetHandle,
         relationType: edge.data?.relationType ?? 'non-identifying',
+        routingType: edge.data?.routingType ?? 'smoothstep',
+        handleMode: edge.data?.handleMode,
+        sourceSide: edge.data?.sourceSide,
+        targetSide: edge.data?.targetSide,
+        waypoints: edge.data?.waypoints,
       },
     ]),
   ) as Record<string, CurrentEdgeSnapshot>;
@@ -380,5 +407,10 @@ export interface DiffSourceEdge {
   targetHandle?: string | null;
   data?: {
     relationType?: DiffRelationType;
+    routingType?: EdgeRoutingType;
+    handleMode?: EdgeHandleMode;
+    sourceSide?: EdgeHandleSide;
+    targetSide?: EdgeHandleSide;
+    waypoints?: Waypoint[];
   };
 }

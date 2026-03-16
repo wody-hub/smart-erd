@@ -1,5 +1,5 @@
-import { memo, useMemo, useState } from 'react';
-import { useStore, type NodeProps } from '@xyflow/react';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { useStore, useUpdateNodeInternals, type NodeProps } from '@xyflow/react';
 import { Plus, GripVertical } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { TableNode as TableNodeType, Column } from '@/types/erd';
+import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
 import { useErdDictionary } from './ErdDictionaryContext';
@@ -114,13 +115,15 @@ function SortableColumnRow({ col, canEdit, children }: SortableColumnRowProps) {
  */
 function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const { t } = useTranslation();
-  const { label, columns, logicalTableName, tableTermId, headerColor } = data;
+  const { label, columns, logicalTableName, tableTermId, headerColor, handleLayout } = data;
+  const updateNodeInternals = useUpdateNodeInternals();
   const renameTable = useCanvasStore((s) => s.renameTable);
   const updateTableMeta = useCanvasStore((s) => s.updateTableMeta);
   const addColumn = useCanvasStore((s) => s.addColumn);
   const deleteColumn = useCanvasStore((s) => s.deleteColumn);
   const updateColumn = useCanvasStore((s) => s.updateColumn);
   const moveColumn = useCanvasStore((s) => s.moveColumn);
+  const normalizeEdgeHandles = useCanvasStore((s) => s.normalizeEdgeHandles);
   const isHighlighted = useCanvasStore((s) => s.highlightedNodeIds.includes(id));
 
   const { findTermById, findDomainById, resolveLogicalName } = useErdDictionary();
@@ -159,8 +162,15 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   );
 
   /** 해당 컬럼이 엣지에 연결되어 있는지 확인한다. */
-  const isConnected = (colId: string) =>
-    connectedHandles.has(`${id}-${colId}-source`) || connectedHandles.has(`${id}-${colId}-target`);
+  const isConnected = (colId: string) => {
+    const prefix = `${id}-${colId}-`;
+    for (const handleId of connectedHandles) {
+      if (handleId.startsWith(prefix)) {
+        return true;
+      }
+    }
+    return false;
+  };
 
   /** 빠른 용어 등록 대상 */
   const [quickTermTarget, setQuickTermTarget] = useState<QuickTermTarget | null>(null);
@@ -384,6 +394,10 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
     setTableQuickTermLogicalName(null);
   };
 
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [columns.length, handleLayout, id, updateNodeInternals]);
+
   return (
     <TooltipProvider delayDuration={300}>
       <div
@@ -398,6 +412,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
           logicalTableName={logicalTableName}
           tableTermId={tableTermId}
           headerColor={headerColor}
+          handleLayout={handleLayout}
           isEditing={isEditing}
           duplicateLogicalNameColumnCount={duplicateLogicalNameColumnCount}
           lockInfo={lockInfo}
@@ -409,6 +424,12 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
           }}
           onRename={handleRename}
           onColorChange={(color) => updateTableMeta(id, { headerColor: color })}
+          onHandleLayoutChange={(layout) => {
+            updateTableMeta(id, { handleLayout: layout });
+            requestAnimationFrame(() =>
+              normalizeEdgeHandles([id], undefined, CANVAS_HISTORY_ORIGIN.USER_TABLE),
+            );
+          }}
         />
 
         {/* Columns — 편집 모드: DnD 래핑, 정적 모드: StaticColumnRow */}
@@ -451,6 +472,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                         canEdit={canEdit}
                         fkMode={fkMode}
                         connected={isConnected(col.id)}
+                        handleLayout={handleLayout ?? 'split'}
                         warning={warning}
                         hasDuplicateLogicalName={hasDuplicateLogicalName}
                         normalizedLogicalName={normalizedLogicalName}
@@ -487,6 +509,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                   col={col}
                   nodeId={id}
                   connected={isConnected(col.id)}
+                  handleLayout={handleLayout ?? 'split'}
                   warning={getColumnWarning(col, findTermById, findDomainById, resolveLogicalName)}
                   hasDuplicateLogicalName={
                     !!col.logicalName?.trim() && duplicatedLogicalNames.has(col.logicalName.trim())

@@ -2,12 +2,17 @@ import * as Y from 'yjs';
 import { type Edge, type Node } from '@xyflow/react';
 import type {
   Column,
+  EdgeHandleMode,
+  EdgeHandleSide,
+  EdgeRoutingType,
   ERDEdgeData,
   RelationType,
   TableGroup,
   TableHeaderColor,
+  TableHandleLayout,
   TableNodeData,
-} from '@/types/erd';
+  Waypoint,
+} from '../types/erd.js';
 
 /**
  * Y.Doc에서 테이블 Y.Map을 반환한다.
@@ -82,6 +87,7 @@ export function yTablesMapToNodes(tablesMap: Y.Map<Y.Map<unknown>>): Node<TableN
         logicalTableName: (tableYMap.get('logicalTableName') as string) ?? undefined,
         tableTermId: (tableYMap.get('tableTermId') as number) ?? undefined,
         headerColor: (tableYMap.get('headerColor') as TableHeaderColor) ?? undefined,
+        handleLayout: (tableYMap.get('handleLayout') as TableHandleLayout) ?? undefined,
         columns,
       },
     });
@@ -100,6 +106,7 @@ export function yEdgesMapToEdges(edgesMap: Y.Map<Y.Map<unknown>>): Edge<ERDEdgeD
   const edges: Edge<ERDEdgeData>[] = [];
 
   edgesMap.forEach((edgeYMap, edgeId) => {
+    const waypoints = readWaypointsFromEdgeYMap(edgeYMap);
     edges.push({
       id: edgeId,
       source: edgeYMap.get('source') as string,
@@ -109,6 +116,11 @@ export function yEdgesMapToEdges(edgesMap: Y.Map<Y.Map<unknown>>): Edge<ERDEdgeD
       type: 'erdRelation',
       data: {
         relationType: (edgeYMap.get('relationType') as RelationType) ?? 'non-identifying',
+        routingType: (edgeYMap.get('routingType') as EdgeRoutingType) ?? 'smoothstep',
+        handleMode: (edgeYMap.get('handleMode') as EdgeHandleMode) ?? 'auto',
+        sourceSide: (edgeYMap.get('sourceSide') as EdgeHandleSide) ?? undefined,
+        targetSide: (edgeYMap.get('targetSide') as EdgeHandleSide) ?? undefined,
+        waypoints: waypoints.length > 0 ? waypoints : undefined,
       },
     });
   });
@@ -162,7 +174,7 @@ export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
   try {
     const parsed = JSON.parse(json) as {
       nodes?: Node<TableNodeData>[];
-      edges?: Edge[];
+      edges?: Edge<ERDEdgeData>[];
       groups?: unknown[];
     };
 
@@ -184,12 +196,14 @@ export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
             logicalTableName: node.data?.logicalTableName,
             tableTermId: node.data?.tableTermId,
             headerColor: node.data?.headerColor,
+            handleLayout: node.data?.handleLayout,
           },
         );
         tablesMap.set(node.id, tableYMap);
       }
 
       for (const edge of edgesArray) {
+        const edgeData = edge.data;
         edgesMap.set(
           edge.id,
           createEdgeYMap(
@@ -197,6 +211,12 @@ export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
             edge.target,
             edge.sourceHandle ?? undefined,
             edge.targetHandle ?? undefined,
+            edgeData?.relationType,
+            edgeData?.routingType,
+            edgeData?.waypoints,
+            edgeData?.handleMode,
+            edgeData?.sourceSide,
+            edgeData?.targetSide,
           ),
         );
       }
@@ -354,6 +374,56 @@ export function createColumnYMap(column: Column): Y.Map<unknown> {
 }
 
 /**
+ * waypoint를 Y.Map으로 변환한다.
+ *
+ * @param waypoint flow 좌표 waypoint
+ * @returns waypoint Y.Map
+ */
+export function createWaypointYMap(waypoint: Waypoint): Y.Map<unknown> {
+  const waypointYMap = new Y.Map<unknown>();
+  waypointYMap.set('x', waypoint.x);
+  waypointYMap.set('y', waypoint.y);
+  return waypointYMap;
+}
+
+/**
+ * waypoint 배열을 Y.Array로 변환한다.
+ *
+ * @param waypoints flow 좌표 waypoint 배열
+ * @returns waypoint Y.Array
+ */
+export function createWaypointsYArray(waypoints: Waypoint[]): Y.Array<Y.Map<unknown>> {
+  const waypointsYArray = new Y.Array<Y.Map<unknown>>();
+  for (const waypoint of waypoints) {
+    waypointsYArray.push([createWaypointYMap(waypoint)]);
+  }
+  return waypointsYArray;
+}
+
+/**
+ * edge Y.Map에서 waypoint 배열을 읽는다.
+ *
+ * @param edgeYMap edge Y.Map
+ * @returns waypoint 배열
+ */
+export function readWaypointsFromEdgeYMap(edgeYMap: Y.Map<unknown>): Waypoint[] {
+  const waypointsYArray = edgeYMap.get('waypoints') as Y.Array<Y.Map<unknown>> | undefined;
+  if (!waypointsYArray || waypointsYArray.length === 0) {
+    return [];
+  }
+
+  const waypoints: Waypoint[] = [];
+  waypointsYArray.forEach((waypointYMap) => {
+    const x = waypointYMap.get('x');
+    const y = waypointYMap.get('y');
+    if (typeof x === 'number' && typeof y === 'number') {
+      waypoints.push({ x, y });
+    }
+  });
+  return waypoints;
+}
+
+/**
  * 엣지 데이터를 Y.Map으로 변환한다.
  *
  * @param source       소스 노드 ID
@@ -368,14 +438,28 @@ export function createEdgeYMap(
   target: string,
   sourceHandle?: string,
   targetHandle?: string,
-  relationType?: RelationType,
+  relationType: RelationType = 'non-identifying',
+  routingType: EdgeRoutingType = 'smoothstep',
+  waypoints?: Waypoint[],
+  handleMode?: EdgeHandleMode,
+  sourceSide?: EdgeHandleSide,
+  targetSide?: EdgeHandleSide,
 ): Y.Map<unknown> {
   const edgeYMap = new Y.Map<unknown>();
   edgeYMap.set('source', source);
   edgeYMap.set('target', target);
   if (sourceHandle) edgeYMap.set('sourceHandle', sourceHandle);
   if (targetHandle) edgeYMap.set('targetHandle', targetHandle);
-  if (relationType) edgeYMap.set('relationType', relationType);
+  edgeYMap.set('relationType', relationType);
+  edgeYMap.set('routingType', routingType);
+  if (handleMode === 'manual' && sourceSide && targetSide) {
+    edgeYMap.set('handleMode', handleMode);
+    edgeYMap.set('sourceSide', sourceSide);
+    edgeYMap.set('targetSide', targetSide);
+  }
+  if (Array.isArray(waypoints) && waypoints.length > 0) {
+    edgeYMap.set('waypoints', createWaypointsYArray(waypoints));
+  }
   return edgeYMap;
 }
 
@@ -387,6 +471,8 @@ interface CreateTableOptions {
   tableTermId?: number;
   /** 헤더 색상 프리셋 */
   headerColor?: TableHeaderColor;
+  /** 핸들 레이아웃 */
+  handleLayout?: TableHandleLayout;
 }
 
 /**
@@ -422,6 +508,9 @@ export function createTableYMap(
   if (options?.tableTermId != null) tableYMap.set('tableTermId', options.tableTermId);
   if (options?.headerColor && options.headerColor !== 'default') {
     tableYMap.set('headerColor', options.headerColor);
+  }
+  if (options?.handleLayout && options.handleLayout !== 'split') {
+    tableYMap.set('handleLayout', options.handleLayout);
   }
 
   return tableYMap;

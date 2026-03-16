@@ -1,3 +1,13 @@
+import type { Waypoint } from './erd.js';
+
+/** 원격 edge waypoint preview payload */
+export interface EdgeWaypointPreview {
+  /** preview 대상 edge ID */
+  edgeId: string;
+  /** flow 좌표 기준 preview 경유점 */
+  waypoints: Waypoint[];
+}
+
 /**
  * 원격 사용자의 Awareness 상태.
  */
@@ -27,6 +37,14 @@ export interface AwarenessState {
   editingClientId?: number | null;
   /** 락 heartbeat 타임스탬프 (epoch ms) */
   lockHeartbeatAt?: number | null;
+  /** 현재 편집 중인 edge ID */
+  editingEdgeId?: string | null;
+  /** edge 편집 클라이언트 ID */
+  editingEdgeClientId?: number | null;
+  /** edge 락 heartbeat 타임스탬프 (epoch ms) */
+  edgeLockHeartbeatAt?: number | null;
+  /** 현재 edge waypoint preview */
+  edgeWaypointPreview?: EdgeWaypointPreview | null;
 }
 
 /**

@@ -360,7 +360,25 @@
       "fkColumns": "FK columns: {{columns}}",
       "removeFk": "Remove FK",
       "keepFk": "Keep FK",
-      "contextDelete": "Delete connection"
+      "contextDelete": "Delete connection",
+      "contextMenuAria": "Edge context menu",
+      "contextRouting": "Routing type",
+      "contextHandleSide": "Connection side",
+      "contextResetPath": "Reset path",
+      "lockedBy": "{{name}} is editing this path",
+      "blockedEditToast": "{{name}} is editing this path",
+      "editCancelledBySync": "Path editing was cancelled by a code or DDL sync",
+      "structureBlockedApply": "A structure-changing apply is blocked while another user is editing an edge path",
+      "segmentHandleHint": "Drag to move the segment and double-click to split or simplify it",
+      "segmentHandleAria": "Path segment {{index}}",
+      "handleAuto": "Auto",
+      "handleLeftLeft": "Left-Left",
+      "handleLeftRight": "Left-Right",
+      "handleRightLeft": "Right-Left",
+      "handleRightRight": "Right-Right",
+      "routingSmoothstep": "Orthogonal",
+      "routingBezier": "Bezier",
+      "routingStraight": "Straight"
     },
     "tableNode": {
       "addColumn": "Add Column",
@@ -368,6 +386,12 @@
       "tableLogicalName": "Enter table logical name...",
       "duplicateLogicalNameWarning": "Duplicate column logical name: {{name}}",
       "duplicateLogicalNameCount": "{{count}} duplicate logical names",
+      "handleLayout": {
+        "label": "Handle layout",
+        "split": "Split",
+        "left": "Left",
+        "right": "Right"
+      },
       "title": {
         "togglePk": "Toggle PK",
         "toggleFk": "Toggle FK",
@@ -391,6 +415,7 @@
         "domainBadge": "{{colName}} domain: {{domainName}}",
         "selectDomain": "Select domain for {{colName}}",
         "changeColor": "Change table color",
+        "changeHandleLayout": "Change table handle layout",
         "reorderColumn": "Reorder column {{name}}"
       }
     },

@@ -54,6 +54,7 @@ export default function DomainSearchSelect({
   /** 팝오버 열림 여부 */
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   /** 포탈 컨테이너 (Dialog 내부 렌더링 시 사용) */
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
 
@@ -68,6 +69,16 @@ export default function DomainSearchSelect({
     }
     const nextContainer = triggerRef.current?.closest('[role="dialog"]') as HTMLElement | null;
     setPortalContainer(nextContainer);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const timerId = window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(timerId);
   }, [open]);
 
   return (
@@ -102,7 +113,7 @@ export default function DomainSearchSelect({
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <Command>
-          <CommandInput placeholder={searchPlaceholder} />
+          <CommandInput ref={inputRef} placeholder={searchPlaceholder} />
           <CommandList>
             <CommandEmpty>{noResultsText}</CommandEmpty>
             <CommandGroup>

@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -17,9 +17,18 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
+import useCollaborationStore from '@/stores/erd/useCollaborationStore';
+import {
+  getAllowedEdgeHandleSelectionValues,
+  getCurrentEdgeHandleSelectionValue,
+} from '@/lib/edge-handles';
 import { extractColId } from '@/lib/handle-id';
-import type { TableNodeData } from '@/types/erd';
+import type { EdgeRoutingType, TableNodeData, Waypoint } from '@/types/erd';
 import type { YjsProvider } from '@/collaboration/YjsProvider';
+import {
+  CANVAS_HISTORY_ORIGIN,
+  DRAG_TRANSACTION_ORIGIN,
+} from '@/constants/canvas-history';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { applyDagreLayout } from '@/lib/auto-layout';
 import { cn } from '@/lib/utils';
@@ -37,6 +46,16 @@ import FkTypeDialog from './FkTypeDialog';
 import ErdRelationEdge from './ErdRelationEdge';
 import RemoteCursors from './RemoteCursors';
 import { ErdFkModeProvider } from './ErdFkModeContext';
+import {
+  EdgeEditingProvider,
+  type BeginSegmentDragParams,
+  type SplitSegmentParams,
+} from './EdgeEditingContext';
+import {
+  routePointsToWaypoints,
+  shiftOrthogonalSegment,
+  toggleOrthogonalSegmentDetail,
+} from './edgeWaypointGeometry';
 
 const DdlImportDialog = lazy(() => import('./DdlImportDialog'));
 
@@ -52,6 +71,15 @@ const edgeTypes: EdgeTypes = {
 
 /** 노드 수가 임계치를 넘으면 MiniMap을 자동 숨김하여 드래그 성능을 우선한다. */
 const MINIMAP_NODE_LIMIT = 80;
+const EMPTY_EDGE_LOCKS = new Map();
+const EMPTY_EDGE_PREVIEWS = new Map();
+
+function areRoutePointsEqual(left: Waypoint[], right: Waypoint[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((point, index) => point.x === right[index]?.x && point.y === right[index]?.y);
+}
 
 /** 엣지 컨텍스트 메뉴 상태 */
 interface ContextMenuState {
@@ -153,6 +181,11 @@ function ERDCanvas({
   const clearHighlights = useCanvasStore((s) => s.clearHighlights);
   const removeEdge = useCanvasStore((s) => s.removeEdge);
   const removeEdgeWithFkColumn = useCanvasStore((s) => s.removeEdgeWithFkColumn);
+  const updateEdgeRoutingType = useCanvasStore((s) => s.updateEdgeRoutingType);
+  const updateEdgeHandleSelection = useCanvasStore((s) => s.updateEdgeHandleSelection);
+  const updateEdgeWaypoints = useCanvasStore((s) => s.updateEdgeWaypoints);
+  const resetEdgeWaypoints = useCanvasStore((s) => s.resetEdgeWaypoints);
+  const normalizeEdgeHandles = useCanvasStore((s) => s.normalizeEdgeHandles);
   const applyLayout = useCanvasStore((s) => s.applyLayout);
   const undo = useCanvasStore((s) => s.undo);
   const redo = useCanvasStore((s) => s.redo);
@@ -160,8 +193,13 @@ function ERDCanvas({
   const canRedo = useCanvasStore((s) => s.canRedo);
   const stopHistoryCapture = useCanvasStore((s) => s.stopHistoryCapture);
   const setActiveEditNodeId = useCanvasStore((s) => s.setActiveEditNodeId);
+  const localEdgeDrag = useCollaborationStore((s) => s.localEdgeDrag);
+  const setLocalEdgeDrag = useCollaborationStore((s) => s.setLocalEdgeDrag);
+  const updateLocalEdgeDragPreview = useCollaborationStore((s) => s.updateLocalEdgeDragPreview);
+  const clearLocalEdgeDrag = useCollaborationStore((s) => s.clearLocalEdgeDrag);
   const remoteEditLocks = useRemoteEditLocks();
   const { locksByNodeId } = remoteEditLocks;
+  const localEdgeDragRef = useRef(localEdgeDrag);
 
   const {
     fkMode,
@@ -209,6 +247,47 @@ function ERDCanvas({
     );
   }, [edges, activeGroupTableIds]);
 
+  const contextMenuEdge = useMemo(
+    () => (contextMenu ? edges.find((edge) => edge.id === contextMenu.edgeId) ?? null : null),
+    [contextMenu, edges],
+  );
+  const contextMenuSourceNode = useMemo(
+    () => (contextMenuEdge ? nodes.find((node) => node.id === contextMenuEdge.source) ?? null : null),
+    [contextMenuEdge, nodes],
+  );
+  const contextMenuTargetNode = useMemo(
+    () => (contextMenuEdge ? nodes.find((node) => node.id === contextMenuEdge.target) ?? null : null),
+    [contextMenuEdge, nodes],
+  );
+  const contextMenuHandleSelection = useMemo(() => {
+    if (!contextMenuEdge) {
+      return 'auto';
+    }
+    return getCurrentEdgeHandleSelectionValue({
+      handleMode: (
+        contextMenuEdge.data as { handleMode?: 'auto' | 'manual' } | undefined
+      )?.handleMode,
+      sourceSide: (
+        contextMenuEdge.data as { sourceSide?: 'left' | 'right' } | undefined
+      )?.sourceSide,
+      targetSide: (
+        contextMenuEdge.data as { targetSide?: 'left' | 'right' } | undefined
+      )?.targetSide,
+      sourceHandle: contextMenuEdge.sourceHandle,
+      targetHandle: contextMenuEdge.targetHandle,
+    });
+  }, [contextMenuEdge]);
+  const contextMenuAllowedHandleSelections = useMemo(() => {
+    return getAllowedEdgeHandleSelectionValues(
+      contextMenuSourceNode?.data.handleLayout,
+      contextMenuTargetNode?.data.handleLayout,
+    );
+  }, [contextMenuSourceNode, contextMenuTargetNode]);
+
+  useEffect(() => {
+    localEdgeDragRef.current = localEdgeDrag;
+  }, [localEdgeDrag]);
+
   // 그룹 뷰 전환 시 필터링된 노드에 맞춰 뷰포트를 보정한다.
   useEffect(() => {
     if (!isGroupView || displayNodes.length === 0) {
@@ -226,6 +305,11 @@ function ERDCanvas({
    * @returns 없음
    */
   const openDeleteDialog = (edgeId: string) => {
+    const edgeLockInfo = remoteEditLocks.edgeLocksById.get(edgeId);
+    if (edgeLockInfo) {
+      toast.info(t('erd.edge.blockedEditToast', { name: edgeLockInfo.name }));
+      return;
+    }
     const edge = edges.find((e) => e.id === edgeId);
     if (!edge) {
       return;
@@ -263,6 +347,96 @@ function ERDCanvas({
     setHighlightedEdge(edge.id);
     setHighlightedNodes([edge.source, edge.target]);
   };
+
+  const finishLocalEdgeDrag = useCallback(
+    (commit: boolean) => {
+      const drag = localEdgeDragRef.current;
+      if (!drag) {
+        return;
+      }
+      if (commit) {
+        const edge = useCanvasStore.getState().edges.find((candidate) => candidate.id === drag.edgeId);
+        const routingType =
+          ((edge?.data as { routingType?: EdgeRoutingType } | undefined)?.routingType ??
+            'smoothstep') as EdgeRoutingType;
+        if (edge && routingType === 'straight') {
+          updateEdgeWaypoints(drag.edgeId, drag.previewWaypoints);
+        }
+      }
+      clearLocalEdgeDrag();
+    },
+    [clearLocalEdgeDrag, updateEdgeWaypoints],
+  );
+
+  const beginSegmentDrag = useCallback(
+    ({ edgeId, pointerId, segmentIndex, axis, kind, routePoints, waypoints }: BeginSegmentDragParams) => {
+      const edgeLockInfo = remoteEditLocks.edgeLocksById.get(edgeId);
+      if (edgeLockInfo) {
+        toast.info(t('erd.edge.blockedEditToast', { name: edgeLockInfo.name }));
+        return;
+      }
+      const edge = edges.find((candidate) => candidate.id === edgeId);
+      setActiveEditNodeId(null);
+      lastBlockedNodeRef.current = null;
+      if (edge) {
+        setHighlightedEdge(edge.id);
+        setHighlightedNodes([edge.source, edge.target]);
+      }
+      setLocalEdgeDrag({
+        edgeId,
+        pointerId,
+        segmentIndex,
+        axis,
+        kind,
+        routePoints,
+        initialWaypoints: waypoints,
+        previewWaypoints: waypoints,
+      });
+    },
+    [
+      edges,
+      remoteEditLocks.edgeLocksById,
+      setActiveEditNodeId,
+      setHighlightedEdge,
+      setHighlightedNodes,
+      setLocalEdgeDrag,
+      t,
+    ],
+  );
+
+  const splitSegment = useCallback(
+    ({ edgeId, segmentIndex, routePoints, clickPoint }: SplitSegmentParams) => {
+      const edgeLockInfo = remoteEditLocks.edgeLocksById.get(edgeId);
+      if (edgeLockInfo) {
+        toast.info(t('erd.edge.blockedEditToast', { name: edgeLockInfo.name }));
+        return;
+      }
+      const edge = edges.find((candidate) => candidate.id === edgeId);
+      if (!edge) {
+        return;
+      }
+      setActiveEditNodeId(null);
+      lastBlockedNodeRef.current = null;
+      setHighlightedEdge(edge.id);
+      setHighlightedNodes([edge.source, edge.target]);
+      const nextRoutePoints = toggleOrthogonalSegmentDetail(routePoints, segmentIndex, clickPoint);
+      if (areRoutePointsEqual(nextRoutePoints, routePoints)) {
+        return;
+      }
+      clearLocalEdgeDrag();
+      updateEdgeWaypoints(edgeId, routePointsToWaypoints(nextRoutePoints));
+    },
+    [
+      clearLocalEdgeDrag,
+      edges,
+      remoteEditLocks.edgeLocksById,
+      setActiveEditNodeId,
+      setHighlightedEdge,
+      setHighlightedNodes,
+      t,
+      updateEdgeWaypoints,
+    ],
+  );
 
   /**
    * 노드 클릭을 처리한다.
@@ -325,8 +499,95 @@ function ERDCanvas({
    */
   const handleEdgeContextMenu = (event: React.MouseEvent, edge: Edge) => {
     event.preventDefault();
+    setHighlightedEdge(edge.id);
+    setHighlightedNodes([edge.source, edge.target]);
     setContextMenu({ edgeId: edge.id, position: { x: event.clientX, y: event.clientY } });
   };
+
+  useEffect(() => {
+    if (!localEdgeDrag) {
+      return;
+    }
+
+    const handlePointerMove = (event: MouseEvent | PointerEvent) => {
+      const drag = localEdgeDragRef.current;
+      if (!drag) {
+        return;
+      }
+      const nextPoint = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      const nextRoutePoints = shiftOrthogonalSegment(
+        drag.routePoints,
+        drag.segmentIndex,
+        drag.axis === 'x' ? nextPoint.x : nextPoint.y,
+      );
+      const nextWaypoints = routePointsToWaypoints(nextRoutePoints);
+      localEdgeDragRef.current = {
+        ...drag,
+        routePoints: nextRoutePoints,
+        previewWaypoints: nextWaypoints,
+      };
+      updateLocalEdgeDragPreview(nextWaypoints, nextRoutePoints);
+    };
+
+    const handlePointerUp = () => {
+      if (!localEdgeDragRef.current) {
+        return;
+      }
+      finishLocalEdgeDrag(true);
+    };
+
+    const handlePointerCancel = () => {
+      if (!localEdgeDragRef.current) {
+        return;
+      }
+      finishLocalEdgeDrag(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        finishLocalEdgeDrag(false);
+      }
+    };
+
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerCancel);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerCancel);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [
+    clearLocalEdgeDrag,
+    finishLocalEdgeDrag,
+    localEdgeDrag,
+    reactFlowInstance,
+    updateLocalEdgeDragPreview,
+  ]);
+
+  useEffect(() => {
+    if (!localEdgeDrag) {
+      return;
+    }
+    const edge = edges.find((candidate) => candidate.id === localEdgeDrag.edgeId);
+    const routingType =
+      ((edge?.data as { routingType?: EdgeRoutingType } | undefined)?.routingType ??
+        'smoothstep') as EdgeRoutingType;
+    if (edge && routingType === 'straight') {
+      return;
+    }
+    clearLocalEdgeDrag();
+    toast.info(t('erd.edge.editCancelledBySync'));
+  }, [clearLocalEdgeDrag, edges, localEdgeDrag, t]);
 
   /**
    * 자동 배치를 실행한다.
@@ -336,6 +597,13 @@ function ERDCanvas({
   const handleAutoLayout = () => {
     const layoutedNodes = applyDagreLayout(nodes, edges);
     applyLayout(layoutedNodes);
+    requestAnimationFrame(() => {
+      normalizeEdgeHandles(
+        undefined,
+        reactFlowInstance.getNodes() as Node<TableNodeData>[],
+        CANVAS_HISTORY_ORIGIN.USER_LAYOUT,
+      );
+    });
   };
 
   /** Delete 키 — 하이라이트된 엣지 삭제 다이얼로그 */
@@ -363,6 +631,36 @@ function ERDCanvas({
     [displayEdges, highlightedEdgeId, isDraggingNode],
   );
 
+  const tableLockContextValue = useMemo(
+    () => ({
+      locksByTableKey: remoteEditLocks.locksByTableKey,
+      locksByNodeId: remoteEditLocks.locksByNodeId,
+      edgeLocksById: EMPTY_EDGE_LOCKS,
+      edgePreviewsById: EMPTY_EDGE_PREVIEWS,
+      hasTableLocks: remoteEditLocks.hasTableLocks,
+      hasAnyActiveEdgeDrag: false,
+      hasBlockingStructureLocks: remoteEditLocks.hasTableLocks,
+    }),
+    [remoteEditLocks.hasTableLocks, remoteEditLocks.locksByNodeId, remoteEditLocks.locksByTableKey],
+  );
+
+  const edgeEditingContextValue = useMemo(
+    () => ({
+      edgeLocksById: remoteEditLocks.edgeLocksById,
+      edgePreviewsById: remoteEditLocks.edgePreviewsById,
+      localEdgeDrag,
+      beginSegmentDrag,
+      splitSegment,
+    }),
+    [
+      beginSegmentDrag,
+      localEdgeDrag,
+      remoteEditLocks.edgeLocksById,
+      remoteEditLocks.edgePreviewsById,
+      splitSegment,
+    ],
+  );
+
   const showOverlayWidgets = !isDraggingNode;
   const showPerformanceOverlays = showOverlayWidgets && !isSidebarResizing;
   const showMiniMap = showPerformanceOverlays && displayNodes.length <= MINIMAP_NODE_LIMIT;
@@ -379,8 +677,9 @@ function ERDCanvas({
       }
     >
       <ErdFkModeProvider value={fkMode}>
-        <RemoteEditLocksProvider value={remoteEditLocks}>
-          <ReactFlow
+        <RemoteEditLocksProvider value={tableLockContextValue}>
+      <EdgeEditingProvider value={edgeEditingContextValue}>
+            <ReactFlow
             nodes={displayNodes}
             edges={styledEdges}
             onNodesChange={effectiveCanEdit ? onNodesChange : undefined}
@@ -390,9 +689,15 @@ function ERDCanvas({
             onNodeDragStart={effectiveCanEdit ? () => setIsDraggingNode(true) : undefined}
             onNodeDragStop={
               effectiveCanEdit
-                ? () => {
+                ? (_event, node) => {
                     setIsDraggingNode(false);
-                    stopHistoryCapture();
+                    requestAnimationFrame(() => {
+                      const latestNode =
+                        (reactFlowInstance.getNode(node.id) as Node<TableNodeData> | undefined) ??
+                        node;
+                      normalizeEdgeHandles([node.id], [latestNode], DRAG_TRANSACTION_ORIGIN);
+                      stopHistoryCapture();
+                    });
                   }
                 : undefined
             }
@@ -447,15 +752,56 @@ function ERDCanvas({
               onRedo={redo}
               canEdit={effectiveCanEdit}
             />
-          </ReactFlow>
+            </ReactFlow>
+          </EdgeEditingProvider>
         </RemoteEditLocksProvider>
       </ErdFkModeProvider>
 
       {showPerformanceOverlays && <RemoteCursors />}
 
-      {contextMenu && (
+      {contextMenu && contextMenuEdge && (
         <EdgeContextMenu
           position={contextMenu.position}
+          routingType={
+            ((contextMenuEdge.data as { routingType?: EdgeRoutingType } | undefined)?.routingType ??
+              'smoothstep') as EdgeRoutingType
+          }
+          handleSelection={contextMenuHandleSelection}
+          allowedHandleSelections={contextMenuAllowedHandleSelections}
+          canResetPath={
+            (((contextMenuEdge.data as { routingType?: EdgeRoutingType } | undefined)?.routingType ??
+              'smoothstep') as EdgeRoutingType) === 'straight' &&
+            (((contextMenuEdge.data as { waypoints?: Waypoint[] } | undefined)?.waypoints?.length ?? 0) >
+              0)
+          }
+          onResetPath={() => {
+            if (remoteEditLocks.edgeLocksById.has(contextMenu.edgeId)) {
+              return;
+            }
+            resetEdgeWaypoints(contextMenu.edgeId);
+            setContextMenu(null);
+          }}
+          lockedByName={remoteEditLocks.edgeLocksById.get(contextMenu.edgeId)?.name ?? null}
+          onRoutingTypeChange={(routingType) => {
+            if (remoteEditLocks.edgeLocksById.has(contextMenu.edgeId)) {
+              return;
+            }
+            updateEdgeRoutingType(contextMenu.edgeId, routingType);
+            setContextMenu(null);
+          }}
+          onHandleSelectionChange={(selection) => {
+            if (remoteEditLocks.edgeLocksById.has(contextMenu.edgeId)) {
+              return;
+            }
+            const nodeOverrides = [
+              reactFlowInstance.getNode(contextMenuEdge.source),
+              reactFlowInstance.getNode(contextMenuEdge.target),
+            ].filter(
+              (node): node is Node<TableNodeData> => !!node,
+            );
+            updateEdgeHandleSelection(contextMenu.edgeId, selection, nodeOverrides);
+            setContextMenu(null);
+          }}
           onDelete={() => {
             openDeleteDialog(contextMenu.edgeId);
             setContextMenu(null);

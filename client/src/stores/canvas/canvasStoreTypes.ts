@@ -4,12 +4,15 @@ import type { CanvasUndoManager } from '@/constants/canvas-history';
 import type { DdlParseResult } from '@/lib/ddl-parser';
 import type { ApplyDiffResult } from '@/lib/erd-diff-apply';
 import type { DiffPlan } from '@/lib/erd-diff-plan';
+import type { EdgeHandleSelectionValue } from '@/lib/edge-handles';
 import type {
   Column,
+  EdgeRoutingType,
   RelationType,
   TableGroup,
   TableHeaderColor,
   TableNodeData,
+  Waypoint,
 } from '@/types/erd';
 
 /** FK 관계 추가 파라미터 */
@@ -83,7 +86,10 @@ export interface CanvasState {
   updateTableMeta: (
     nodeId: string,
     updates: Partial<
-      Pick<TableNodeData, 'label' | 'logicalTableName' | 'tableTermId' | 'headerColor'>
+      Pick<
+        TableNodeData,
+        'label' | 'logicalTableName' | 'tableTermId' | 'headerColor' | 'handleLayout'
+      >
     >,
   ) => void;
   addColumn: (nodeId: string) => void;
@@ -105,6 +111,19 @@ export interface CanvasState {
   stopHistoryCapture: () => void;
   removeEdge: (edgeId: string) => void;
   removeEdgeWithFkColumn: (edgeId: string) => void;
+  updateEdgeRoutingType: (edgeId: string, routingType: EdgeRoutingType) => void;
+  updateEdgeHandleSelection: (
+    edgeId: string,
+    selection: EdgeHandleSelectionValue,
+    nodeOverrides?: Node<TableNodeData>[],
+  ) => void;
+  updateEdgeWaypoints: (edgeId: string, waypoints: Waypoint[]) => void;
+  resetEdgeWaypoints: (edgeId: string) => void;
+  normalizeEdgeHandles: (
+    nodeIds?: string[],
+    nodeOverrides?: Node<TableNodeData>[],
+    origin?: unknown,
+  ) => void;
   applyLayout: (nodes: Node<TableNodeData>[]) => void;
   serialize: () => string;
   addFkRelation: (params: AddFkRelationParams) => number;

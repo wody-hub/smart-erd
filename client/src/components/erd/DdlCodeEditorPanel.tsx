@@ -264,7 +264,8 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
     projectId: string;
     diagramId: string;
   }>();
-  const { hasLocks: hasRemoteEditLocks } = useRemoteEditLocks();
+  const remoteEditLocks = useRemoteEditLocks();
+  const hasRemoteEditLocks = remoteEditLocks.hasTableLocks;
 
   const { dbms, ddlText, parseResult, parsing, handleDdlChange, handleDbmsChange } = useDdlParse({
     persistDbms: true,
@@ -283,6 +284,7 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
     parseResult,
     parsing,
     policyScope: { teamId, projectId, diagramId },
+    hasBlockingStructureLocks: remoteEditLocks.hasBlockingStructureLocks,
   });
 
   /** ERD → SQL DDL 생성 함수 (useCodeEditorRefresh에 전달) */

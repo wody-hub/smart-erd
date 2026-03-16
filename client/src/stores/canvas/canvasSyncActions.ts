@@ -14,9 +14,10 @@ import {
 } from '@/constants/canvas-history';
 import { djb2 } from '@/lib/hash';
 import { extractColId } from '@/lib/handle-id';
-import type { TableGroup, TableNodeData } from '@/types/erd';
+import type { ERDEdgeData, TableGroup, TableNodeData } from '@/types/erd';
 import {
   deleteColumnFromYArray,
+  createWaypointsYArray,
   getEdgesMap,
   getGroupsMap,
   getTablesMap,
@@ -25,6 +26,11 @@ import {
   yGroupsMapToTableGroups,
   yTablesMapToNodes,
 } from '@/collaboration/yjsBridge';
+import type { EdgeRoutingType, Waypoint } from '@/types/erd';
+import {
+  parseEdgeHandleSelectionValue,
+  resolveEdgeHandlesFromPreference,
+} from '@/lib/edge-handles';
 import type {
   CanvasGetState,
   CanvasSetState,
@@ -50,6 +56,11 @@ type CanvasSyncActionKeys =
   | 'stopHistoryCapture'
   | 'removeEdge'
   | 'removeEdgeWithFkColumn'
+  | 'updateEdgeRoutingType'
+  | 'updateEdgeHandleSelection'
+  | 'updateEdgeWaypoints'
+  | 'resetEdgeWaypoints'
+  | 'normalizeEdgeHandles'
   | 'applyLayout'
   | 'serialize';
 
@@ -165,6 +176,34 @@ export function createCanvasSyncActions(
       return { ...node, position: nextPosition, dragging: nextDragging } as T;
     });
     return mutated ? next : current;
+  }
+
+  function buildNodeLookup(nodeOverrides?: Node<TableNodeData>[]) {
+    const nodeById = new Map(get().nodes.map((node) => [node.id, node]));
+    for (const node of nodeOverrides ?? []) {
+      const existingNode = nodeById.get(node.id);
+      nodeById.set(node.id, existingNode ? { ...existingNode, ...node } : node);
+    }
+    return nodeById;
+  }
+
+  function syncEdgeHandlePreference(
+    edgeYMap: Y.Map<unknown>,
+    resolution: {
+      handleMode: 'auto' | 'manual';
+      sourceSide: 'left' | 'right';
+      targetSide: 'left' | 'right';
+    },
+  ) {
+    if (resolution.handleMode === 'manual') {
+      edgeYMap.set('handleMode', 'manual');
+      edgeYMap.set('sourceSide', resolution.sourceSide);
+      edgeYMap.set('targetSide', resolution.targetSide);
+      return;
+    }
+    edgeYMap.delete('handleMode');
+    edgeYMap.delete('sourceSide');
+    edgeYMap.delete('targetSide');
   }
 
   return {
@@ -414,6 +453,189 @@ export function createCanvasSyncActions(
         }
       }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
       set({ highlightedEdgeId: null, highlightedNodeIds: [] });
+    },
+
+    updateEdgeRoutingType: (edgeId, routingType) => {
+      const { ydoc } = get();
+      if (!ydoc) {
+        return;
+      }
+      ydoc.transact(() => {
+        const edgeYMap = getEdgesMap(ydoc).get(edgeId);
+        if (!edgeYMap) {
+          return;
+        }
+        edgeYMap.set('routingType', routingType as EdgeRoutingType);
+        if (routingType !== 'straight') {
+          edgeYMap.delete('waypoints');
+        }
+      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
+    },
+
+    updateEdgeHandleSelection: (edgeId, selection, nodeOverrides) => {
+      const { ydoc, edges } = get();
+      if (!ydoc) {
+        return;
+      }
+      const edge = edges.find((candidate) => candidate.id === edgeId);
+      if (!edge?.sourceHandle || !edge.targetHandle) {
+        return;
+      }
+
+      const nodeById = buildNodeLookup(nodeOverrides);
+      const sourceNode = nodeById.get(edge.source);
+      const targetNode = nodeById.get(edge.target);
+      if (!sourceNode || !targetNode) {
+        return;
+      }
+
+      const sourceColId = extractColId(edge.sourceHandle, edge.source);
+      const targetColId = extractColId(edge.targetHandle, edge.target);
+      const preference = parseEdgeHandleSelectionValue(selection);
+      const resolution = resolveEdgeHandlesFromPreference({
+        sourceNode,
+        targetNode,
+        sourceColId,
+        targetColId,
+        handleMode: preference.handleMode,
+        sourceSide: preference.sourceSide,
+        targetSide: preference.targetSide,
+      });
+      const routingType =
+        ((edge.data as ERDEdgeData | undefined)?.routingType ?? 'smoothstep') as EdgeRoutingType;
+      const handlesChanged =
+        edge.sourceHandle !== resolution.sourceHandle || edge.targetHandle !== resolution.targetHandle;
+
+      ydoc.transact(() => {
+        const edgeYMap = getEdgesMap(ydoc).get(edgeId);
+        if (!edgeYMap) {
+          return;
+        }
+        edgeYMap.set('sourceHandle', resolution.sourceHandle);
+        edgeYMap.set('targetHandle', resolution.targetHandle);
+        syncEdgeHandlePreference(edgeYMap, resolution);
+        if (routingType === 'straight' && handlesChanged) {
+          edgeYMap.delete('waypoints');
+        }
+      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
+    },
+
+    updateEdgeWaypoints: (edgeId, waypoints) => {
+      const { ydoc, internal } = get();
+      if (!ydoc) {
+        return;
+      }
+      internal.undoManager?.stopCapturing();
+      ydoc.transact(() => {
+        const edgeYMap = getEdgesMap(ydoc).get(edgeId);
+        if (!edgeYMap) {
+          return;
+        }
+        const nextWaypoints = waypoints.filter(
+          (waypoint): waypoint is Waypoint =>
+            Number.isFinite(waypoint.x) && Number.isFinite(waypoint.y),
+        );
+        if (nextWaypoints.length === 0) {
+          edgeYMap.delete('waypoints');
+          return;
+        }
+        edgeYMap.set('waypoints', createWaypointsYArray(nextWaypoints));
+      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
+      internal.undoManager?.stopCapturing();
+    },
+
+    resetEdgeWaypoints: (edgeId) => {
+      const { ydoc, internal } = get();
+      if (!ydoc) {
+        return;
+      }
+      internal.undoManager?.stopCapturing();
+      ydoc.transact(() => {
+        const edgeYMap = getEdgesMap(ydoc).get(edgeId);
+        edgeYMap?.delete('waypoints');
+      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
+      internal.undoManager?.stopCapturing();
+    },
+
+    normalizeEdgeHandles: (nodeIds, nodeOverrides, origin = CANVAS_HISTORY_ORIGIN.USER_EDGE) => {
+      const { ydoc, edges } = get();
+      if (!ydoc || edges.length === 0) {
+        return;
+      }
+
+      const filterIds = nodeIds ? new Set(nodeIds) : null;
+      const nodeById = buildNodeLookup(nodeOverrides);
+      let mutated = false;
+
+      ydoc.transact(() => {
+        const edgesMap = getEdgesMap(ydoc);
+        for (const edge of edges) {
+          if (
+            filterIds &&
+            !filterIds.has(edge.source) &&
+            !filterIds.has(edge.target)
+          ) {
+            continue;
+          }
+          if (!edge.sourceHandle || !edge.targetHandle) {
+            continue;
+          }
+
+          const sourceNode = nodeById.get(edge.source);
+          const targetNode = nodeById.get(edge.target);
+          if (!sourceNode || !targetNode) {
+            continue;
+          }
+
+          const sourceColId = extractColId(edge.sourceHandle, edge.source);
+          const targetColId = extractColId(edge.targetHandle, edge.target);
+          const edgeData = (edge.data as ERDEdgeData | undefined) ?? undefined;
+          const resolution = resolveEdgeHandlesFromPreference({
+            sourceNode,
+            targetNode,
+            sourceColId,
+            targetColId,
+            handleMode: edgeData?.handleMode,
+            sourceSide: edgeData?.sourceSide,
+            targetSide: edgeData?.targetSide,
+          });
+          const { sourceHandle, targetHandle } = resolution;
+
+          const handlesChanged =
+            sourceHandle !== edge.sourceHandle || targetHandle !== edge.targetHandle;
+          const manualChanged =
+            resolution.handleMode === 'manual'
+              ? edgeData?.handleMode !== 'manual' ||
+                edgeData?.sourceSide !== resolution.sourceSide ||
+                edgeData?.targetSide !== resolution.targetSide
+              : edgeData?.handleMode === 'manual' ||
+                edgeData?.sourceSide !== undefined ||
+                edgeData?.targetSide !== undefined;
+
+          if (!handlesChanged && !manualChanged) {
+            continue;
+          }
+
+          const edgeYMap = edgesMap.get(edge.id);
+          if (!edgeYMap) {
+            continue;
+          }
+
+          edgeYMap.set('sourceHandle', sourceHandle);
+          edgeYMap.set('targetHandle', targetHandle);
+          syncEdgeHandlePreference(edgeYMap, resolution);
+          const routingType =
+            (edgeYMap.get('routingType') as EdgeRoutingType | undefined) ?? 'smoothstep';
+          if (routingType === 'straight' && handlesChanged) {
+            edgeYMap.delete('waypoints');
+          }
+          mutated = true;
+        }
+      }, origin);
+
+      if (mutated) {
+        get().internal.undoManager?.stopCapturing();
+      }
     },
 
     applyLayout: (nodes) => {

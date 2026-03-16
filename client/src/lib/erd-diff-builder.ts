@@ -426,6 +426,7 @@ function buildEdgeDiffs(input: {
         op: 'add',
         next: relation,
         relationType: 'non-identifying',
+        routingType: 'smoothstep',
       });
       continue;
     }
@@ -750,7 +751,8 @@ function resolveEdgeColumnName(
 /**
  * Edge handle에서 컬럼 ID를 추출한다.
  *
- * handle 포맷: `${tableId}-${columnId}-source|target`
+ * handle 포맷: `${tableId}-${columnId}-${source|target}` 또는
+ * `${tableId}-${columnId}-${source|target}-${left|right}`
  *
  * @param handle handle 문자열
  * @param tableId 테이블 ID
@@ -765,11 +767,11 @@ function extractColumnIdFromHandle(
   if (!handle) {
     return null;
   }
-  const suffix = `-${side}`;
-  if (!handle.endsWith(suffix)) {
+  const match = handle.match(new RegExp(`-(?:${side})(?:-(left|right))?$`));
+  if (!match) {
     return null;
   }
-  const noSuffix = handle.slice(0, -suffix.length);
+  const noSuffix = handle.slice(0, -match[0].length);
   const prefix = `${tableId}-`;
   if (!noSuffix.startsWith(prefix)) {
     return null;

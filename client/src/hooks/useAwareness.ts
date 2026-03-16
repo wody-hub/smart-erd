@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import useAuthStore from '@/stores/useAuthStore';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
+import useCollaborationStore, {
+  type LocalEdgeWaypointDrag,
+} from '@/stores/erd/useCollaborationStore';
 import { CURSOR_COLORS } from '@/constants/ws';
 import { LOCK_HEARTBEAT_MS } from '@/constants/collab-lock';
 import { buildTableLockKeyFromNodeData } from '@/lib/table-lock-key';
@@ -10,6 +13,8 @@ import type { AwarenessState } from '@/types/collaboration';
 
 /** 커서 위치 발행 throttle 간격 (ms) */
 const CURSOR_THROTTLE_MS = 100;
+/** edge waypoint preview 발행 상한 (ms) */
+const EDGE_PREVIEW_THROTTLE_MS = 80;
 
 /** buildAwarenessState 파라미터 */
 interface BuildAwarenessStateParams {
@@ -33,6 +38,8 @@ interface BuildAwarenessStateParams {
   codeEditingTableKey: string | null;
   /** ERD 편집 테이블 키 */
   activeErdTableKey: string | null;
+  /** 로컬 edge waypoint drag 세션 */
+  localEdgeDrag: LocalEdgeWaypointDrag | null;
 }
 
 /**
@@ -45,6 +52,31 @@ interface BuildAwarenessStateParams {
  * @returns Awareness 상태 객체
  */
 function buildAwarenessState(params: BuildAwarenessStateParams): AwarenessState {
+  if (params.localEdgeDrag) {
+    return {
+      user: {
+        userId: params.userId,
+        name: params.name,
+        loginId: params.loginId,
+        color: params.color,
+      },
+      cursor: params.cursor,
+      selectedNodeId: null,
+      editingNodeId: null,
+      editingTableKey: null,
+      editingSource: null,
+      editingClientId: null,
+      lockHeartbeatAt: null,
+      editingEdgeId: params.localEdgeDrag.edgeId,
+      editingEdgeClientId: params.clientId,
+      edgeLockHeartbeatAt: Date.now(),
+      edgeWaypointPreview: {
+        edgeId: params.localEdgeDrag.edgeId,
+        waypoints: params.localEdgeDrag.previewWaypoints,
+      },
+    };
+  }
+
   const editingTableKey = params.codeEditingTableKey ?? params.activeErdTableKey;
   const editingSource = params.codeEditingTableKey ? 'code' : editingTableKey ? 'erd' : null;
   return {
@@ -81,12 +113,14 @@ export function useAwareness(
   const name = useAuthStore((s) => s.name);
   const activeEditNodeId = useCanvasStore((s) => s.activeEditNodeId);
   const codeEditingTableKey = useCanvasStore((s) => s.codeEditingTableKey);
+  const localEdgeDrag = useCollaborationStore((s) => s.localEdgeDrag);
   const nodes = useCanvasStore((s) => s.nodes);
   const { screenToFlowPosition } = useReactFlow();
   const screenToFlowPositionRef = useRef(screenToFlowPosition);
   const activeEditNodeIdRef = useRef(activeEditNodeId);
   const activeErdTableKeyRef = useRef<string | null>(null);
   const codeEditingTableKeyRef = useRef<string | null>(codeEditingTableKey);
+  const localEdgeDragRef = useRef<LocalEdgeWaypointDrag | null>(localEdgeDrag);
   const emitAwarenessRef = useRef<
     ((cursor: { x: number; y: number } | null, selectedNodeId?: string | null) => void) | null
   >(null);
@@ -97,6 +131,10 @@ export function useAwareness(
   const lastCursorRef = useRef<{ x: number; y: number } | null>(null);
   /** ERD 편집 중 락 키 스냅샷 */
   const activeErdLockSnapshotRef = useRef<{ nodeId: string; tableKey: string } | null>(null);
+  /** preview awareness trailing emit 타이머 */
+  const previewEmitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 마지막 preview emit 시각 */
+  const lastPreviewEmitRef = useRef(0);
 
   const activeErdTableKey = useMemo(() => {
     if (!activeEditNodeId) {
@@ -139,6 +177,10 @@ export function useAwareness(
     codeEditingTableKeyRef.current = codeEditingTableKey;
   }, [codeEditingTableKey]);
 
+  useEffect(() => {
+    localEdgeDragRef.current = localEdgeDrag;
+  }, [localEdgeDrag]);
+
   // --- Awareness 발행 + 마우스 이벤트 + heartbeat 통합 Effect ---
   useEffect(() => {
     if (!provider || !canvasRef.current || !loginId || !name) {
@@ -156,7 +198,7 @@ export function useAwareness(
      */
     const emitAwareness = (
       cursor: { x: number; y: number } | null,
-      selectedNodeId: string | null = activeEditNodeIdRef.current,
+      selectedNodeId: string | null = localEdgeDragRef.current ? null : activeEditNodeIdRef.current,
     ) => {
       lastCursorRef.current = cursor;
       const state = buildAwarenessState({
@@ -170,6 +212,7 @@ export function useAwareness(
         activeEditNodeId: activeEditNodeIdRef.current,
         codeEditingTableKey: codeEditingTableKeyRef.current,
         activeErdTableKey: activeErdTableKeyRef.current,
+        localEdgeDrag: localEdgeDragRef.current,
       });
       provider.setLocalAwareness(state);
     };
@@ -209,7 +252,11 @@ export function useAwareness(
     // --- 편집 락 heartbeat 타이머 ---
 
     const heartbeatTimer = setInterval(() => {
-      if (!codeEditingTableKeyRef.current && !activeErdTableKeyRef.current) {
+      if (
+        !codeEditingTableKeyRef.current &&
+        !activeErdTableKeyRef.current &&
+        !localEdgeDragRef.current
+      ) {
         return;
       }
       emitAwareness(lastCursorRef.current);
@@ -221,10 +268,15 @@ export function useAwareness(
       el.removeEventListener('mousemove', handleMouseMove);
       el.removeEventListener('mouseleave', handleMouseLeave);
       clearInterval(heartbeatTimer);
+      if (previewEmitTimerRef.current) {
+        clearTimeout(previewEmitTimerRef.current);
+        previewEmitTimerRef.current = null;
+      }
       emitAwarenessRef.current = null;
       activeEditNodeIdRef.current = null;
       activeErdTableKeyRef.current = null;
       codeEditingTableKeyRef.current = null;
+      localEdgeDragRef.current = null;
       lastCursorRef.current = null;
       emitAwareness(null, null);
     };
@@ -232,6 +284,48 @@ export function useAwareness(
 
   // 편집 상태 변경 시 awareness를 즉시 갱신한다.
   useEffect(() => {
+    if (localEdgeDrag) {
+      return;
+    }
     emitAwarenessRef.current?.(lastCursorRef.current, activeEditNodeId);
-  }, [activeEditNodeId, activeErdTableKey, codeEditingTableKey]);
+  }, [activeEditNodeId, activeErdTableKey, codeEditingTableKey, localEdgeDrag]);
+
+  useEffect(() => {
+    const emitAwareness = emitAwarenessRef.current;
+    if (!emitAwareness) {
+      return;
+    }
+
+    if (!localEdgeDrag) {
+      if (previewEmitTimerRef.current) {
+        clearTimeout(previewEmitTimerRef.current);
+        previewEmitTimerRef.current = null;
+      }
+      lastPreviewEmitRef.current = Date.now();
+      emitAwareness(lastCursorRef.current, null);
+      return;
+    }
+
+    const now = Date.now();
+    const elapsed = now - lastPreviewEmitRef.current;
+    if (elapsed >= EDGE_PREVIEW_THROTTLE_MS) {
+      if (previewEmitTimerRef.current) {
+        clearTimeout(previewEmitTimerRef.current);
+        previewEmitTimerRef.current = null;
+      }
+      lastPreviewEmitRef.current = now;
+      emitAwareness(lastCursorRef.current, null);
+      return;
+    }
+
+    if (previewEmitTimerRef.current) {
+      return;
+    }
+
+    previewEmitTimerRef.current = setTimeout(() => {
+      previewEmitTimerRef.current = null;
+      lastPreviewEmitRef.current = Date.now();
+      emitAwarenessRef.current?.(lastCursorRef.current, null);
+    }, EDGE_PREVIEW_THROTTLE_MS - elapsed);
+  }, [localEdgeDrag]);
 }

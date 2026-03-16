@@ -28,14 +28,12 @@ test('buildRevisionHash 는 입력 순서가 달라도 동일 해시를 반환�
     id: 'n-a',
     type: 'table',
     parentId: null,
-    position: { x: 10, y: 20 },
     data: { label: 'A', columns: [{ id: 'c1', name: 'id' }] },
   };
   const nodeB: RevisionSnapshotNode = {
     id: 'n-b',
     type: 'table',
     parentId: null,
-    position: { x: 30, y: 40 },
     data: { label: 'B', columns: [{ id: 'c1', name: 'id' }] },
   };
   const edge: RevisionSnapshotEdge = {
@@ -59,7 +57,6 @@ test('buildRevisionHash 는 의미 있는 변경 시 다른 해시를 반환한�
     id: 'n-a',
     type: 'table',
     parentId: null,
-    position: { x: 10, y: 20 },
     data: { label: 'A', columns: [{ id: 'c1', name: 'id' }] },
   };
 

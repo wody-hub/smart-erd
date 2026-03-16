@@ -359,7 +359,25 @@
       "fkColumns": "FK 컬럼: {{columns}}",
       "removeFk": "FK 제거",
       "keepFk": "FK 유지",
-      "contextDelete": "연결 삭제"
+      "contextDelete": "연결 삭제",
+      "contextMenuAria": "엣지 컨텍스트 메뉴",
+      "contextRouting": "라우팅 타입",
+      "contextHandleSide": "연결 위치",
+      "contextResetPath": "경로 초기화",
+      "lockedBy": "{{name}} 님이 이 경로를 편집 중입니다",
+      "blockedEditToast": "{{name}} 님이 이 경로를 편집 중입니다",
+      "editCancelledBySync": "코드/DDL 동기화로 경로 편집이 취소되었습니다",
+      "structureBlockedApply": "다른 사용자의 경로 편집이 진행 중이라 구조 변경을 적용할 수 없습니다",
+      "segmentHandleHint": "드래그로 세그먼트를 이동하고 더블클릭으로 분할하거나 정리합니다",
+      "segmentHandleAria": "경로 세그먼트 {{index}}",
+      "handleAuto": "자동",
+      "handleLeftLeft": "왼쪽-왼쪽",
+      "handleLeftRight": "왼쪽-오른쪽",
+      "handleRightLeft": "오른쪽-왼쪽",
+      "handleRightRight": "오른쪽-오른쪽",
+      "routingSmoothstep": "직각",
+      "routingBezier": "곡선",
+      "routingStraight": "직선"
     },
     "tableNode": {
       "addColumn": "컬럼 추가",
@@ -367,6 +385,12 @@
       "tableLogicalName": "테이블 논리명 입력...",
       "duplicateLogicalNameWarning": "중복 컬럼 논리명: {{name}}",
       "duplicateLogicalNameCount": "중복 논리명 {{count}}건",
+      "handleLayout": {
+        "label": "핸들 배치",
+        "split": "기본",
+        "left": "왼쪽",
+        "right": "오른쪽"
+      },
       "title": {
         "togglePk": "PK 토글",
         "toggleFk": "FK 토글",
@@ -390,6 +414,7 @@
         "domainBadge": "{{colName}} 도메인: {{domainName}}",
         "selectDomain": "{{colName}} 도메인 선택",
         "changeColor": "테이블 색상 변경",
+        "changeHandleLayout": "테이블 핸들 배치 변경",
         "reorderColumn": "컬럼 {{name}} 순서 변경"
       }
     },

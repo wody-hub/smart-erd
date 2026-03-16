@@ -1,5 +1,14 @@
 import * as Y from 'yjs';
+import type {
+  EdgeHandleMode,
+  EdgeHandleSide,
+  EdgeRoutingType,
+  Waypoint,
+} from '../types/erd.js';
 import type { DiffPlan, DiffParsedColumn, DiffRelationType } from './erd-diff-plan.js';
+import { createWaypointsYArray, readWaypointsFromEdgeYMap } from '../collaboration/yjsBridge.js';
+import { buildStableEdgeId, resolveEdgeHandlesFromPreference } from './edge-handles.js';
+import { extractColId } from './handle-id.js';
 
 /** DiffPlan 적용 결과 요약 */
 export interface ApplyDiffResult {
@@ -31,7 +40,18 @@ interface DiffApplyContext {
   edgesMap: Y.Map<Y.Map<unknown>>;
   groupsMap: Y.Map<Y.Map<unknown>>;
   columnLookup: Map<string, Map<string, string>>;
+  edgePresentationByBinding: Map<string, EdgePresentationSnapshot>;
   counters: DiffApplyCounters;
+}
+
+interface EdgePresentationSnapshot {
+  routingType?: EdgeRoutingType;
+  sourceHandle: string;
+  targetHandle: string;
+  waypoints?: Waypoint[];
+  handleMode?: EdgeHandleMode;
+  sourceSide?: EdgeHandleSide;
+  targetSide?: EdgeHandleSide;
 }
 
 /**
@@ -51,6 +71,7 @@ export function applyDiffToYDoc(doc: Y.Doc, plan: DiffPlan, origin?: unknown): A
     edgesMap: doc.getMap('edges') as Y.Map<Y.Map<unknown>>,
     groupsMap: doc.getMap('groups') as Y.Map<Y.Map<unknown>>,
     columnLookup: new Map<string, Map<string, string>>(),
+    edgePresentationByBinding: new Map<string, EdgePresentationSnapshot>(),
     counters: {
       appliedOperations: 0,
       skippedOperations: 0,
@@ -71,6 +92,7 @@ export function applyDiffToYDoc(doc: Y.Doc, plan: DiffPlan, origin?: unknown): A
     refreshColumnNameLookup(context.tablesMap, context.columnLookup);
     applyColumnAdds(context);
 
+    captureExistingEdgePresentation(context);
     applyEdgeDeletesAndUpdates(context);
 
     refreshColumnNameLookup(context.tablesMap, context.columnLookup);
@@ -362,9 +384,39 @@ function applyEdgeAdds(context: DiffApplyContext): void {
       continue;
     }
 
-    const sourceHandle = `${parentTableId}-${parentColId}-source`;
-    const targetHandle = `${childTableId}-${childColId}-target`;
-    const edgeId = `e-${sourceHandle}-${targetHandle}`;
+    const sourceNode = buildTableNodeLike(context.tablesMap, parentTableId);
+    const targetNode = buildTableNodeLike(context.tablesMap, childTableId);
+    if (!sourceNode || !targetNode) {
+      context.counters.skippedOperations += 1;
+      continue;
+    }
+    const carriedPresentation =
+      context.edgePresentationByBinding.get(
+        buildEdgeBindingKey(parentTableId, parentColId, childTableId, childColId),
+      ) ?? null;
+    const resolution = resolveEdgeHandlesFromPreference({
+      sourceNode,
+      targetNode,
+      sourceColId: parentColId,
+      targetColId: childColId,
+      handleMode: carriedPresentation?.handleMode ?? edgeDiff.handleMode,
+      sourceSide: carriedPresentation?.sourceSide ?? edgeDiff.sourceSide,
+      targetSide: carriedPresentation?.targetSide ?? edgeDiff.targetSide,
+    });
+    const { sourceHandle, targetHandle } = resolution;
+    const edgeId = buildStableEdgeId({
+      parentTable: edgeDiff.next.parentTable,
+      parentColumn: edgeDiff.next.parentColumn,
+      childTable: edgeDiff.next.childTable,
+      childColumn: edgeDiff.next.childColumn,
+    });
+    const nextRoutingType = carriedPresentation?.routingType ?? edgeDiff.routingType ?? 'smoothstep';
+    const preservedWaypoints =
+      nextRoutingType === 'straight' &&
+      carriedPresentation?.sourceHandle === sourceHandle &&
+      carriedPresentation?.targetHandle === targetHandle
+        ? carriedPresentation.waypoints
+        : edgeDiff.waypoints;
     context.edgesMap.set(
       edgeId,
       createEdgeYMap(
@@ -373,10 +425,56 @@ function applyEdgeAdds(context: DiffApplyContext): void {
         sourceHandle,
         targetHandle,
         edgeDiff.relationType,
+        nextRoutingType,
+        preservedWaypoints,
+        resolution.handleMode,
+        resolution.sourceSide,
+        resolution.targetSide,
       ),
     );
     context.counters.appliedOperations += 1;
   }
+}
+
+function captureExistingEdgePresentation(context: DiffApplyContext): void {
+  context.edgePresentationByBinding.clear();
+  context.edgesMap.forEach((edgeYMap) => {
+    const source = edgeYMap.get('source');
+    const target = edgeYMap.get('target');
+    const sourceHandle = edgeYMap.get('sourceHandle');
+    const targetHandle = edgeYMap.get('targetHandle');
+    if (
+      typeof source !== 'string' ||
+      typeof target !== 'string' ||
+      typeof sourceHandle !== 'string' ||
+      typeof targetHandle !== 'string'
+    ) {
+      return;
+    }
+    const sourceColId = extractColId(sourceHandle, source);
+    const targetColId = extractColId(targetHandle, target);
+    context.edgePresentationByBinding.set(
+      buildEdgeBindingKey(source, sourceColId, target, targetColId),
+      {
+        routingType: (edgeYMap.get('routingType') as EdgeRoutingType | undefined) ?? 'smoothstep',
+        sourceHandle,
+        targetHandle,
+        waypoints: readWaypointsFromEdgeYMap(edgeYMap),
+        handleMode: (edgeYMap.get('handleMode') as EdgeHandleMode | undefined) ?? undefined,
+        sourceSide: (edgeYMap.get('sourceSide') as EdgeHandleSide | undefined) ?? undefined,
+        targetSide: (edgeYMap.get('targetSide') as EdgeHandleSide | undefined) ?? undefined,
+      },
+    );
+  });
+}
+
+function buildEdgeBindingKey(
+  sourceTableId: string,
+  sourceColId: string,
+  targetTableId: string,
+  targetColId: string,
+): string {
+  return `${sourceTableId}:${sourceColId}->${targetTableId}:${targetColId}`;
 }
 
 /**
@@ -417,6 +515,33 @@ function buildTableIdByName(tablesMap: Y.Map<Y.Map<unknown>>): Map<string, strin
     }
   });
   return index;
+}
+
+function buildTableNodeLike(
+  tablesMap: Y.Map<Y.Map<unknown>>,
+  tableId: string,
+): {
+  id: string;
+  position: { x: number; y: number };
+  width?: number;
+  data: { handleLayout?: 'split' | 'left' | 'right' };
+} | null {
+  const tableYMap = tablesMap.get(tableId);
+  if (!tableYMap) {
+    return null;
+  }
+  const positionYMap = tableYMap.get('position') as Y.Map<number> | undefined;
+  return {
+    id: tableId,
+    position: {
+      x: (positionYMap?.get('x') as number | undefined) ?? 100,
+      y: (positionYMap?.get('y') as number | undefined) ?? 100,
+    },
+    data: {
+      handleLayout: (tableYMap.get('handleLayout') as 'split' | 'left' | 'right' | undefined) ??
+        'split',
+    },
+  };
 }
 
 /**
@@ -594,6 +719,11 @@ function createEdgeYMap(
   sourceHandle: string,
   targetHandle: string,
   relationType: DiffRelationType,
+  routingType: EdgeRoutingType = 'smoothstep',
+  waypoints?: Waypoint[],
+  handleMode?: EdgeHandleMode,
+  sourceSide?: EdgeHandleSide,
+  targetSide?: EdgeHandleSide,
 ): Y.Map<unknown> {
   const edgeYMap = new Y.Map<unknown>();
   edgeYMap.set('source', source);
@@ -601,6 +731,15 @@ function createEdgeYMap(
   edgeYMap.set('sourceHandle', sourceHandle);
   edgeYMap.set('targetHandle', targetHandle);
   edgeYMap.set('relationType', relationType);
+  edgeYMap.set('routingType', routingType);
+  if (Array.isArray(waypoints) && waypoints.length > 0) {
+    edgeYMap.set('waypoints', createWaypointsYArray(waypoints));
+  }
+  if (handleMode === 'manual' && sourceSide && targetSide) {
+    edgeYMap.set('handleMode', handleMode);
+    edgeYMap.set('sourceSide', sourceSide);
+    edgeYMap.set('targetSide', targetSide);
+  }
   return edgeYMap;
 }
 
@@ -811,11 +950,11 @@ function extractColumnIdFromHandle(
   tableId: string,
   side: 'source' | 'target',
 ): string | null {
-  const suffix = `-${side}`;
-  if (!handle.endsWith(suffix)) {
+  const match = handle.match(new RegExp(`-(?:${side})(?:-(left|right))?$`));
+  if (!match) {
     return null;
   }
-  const noSuffix = handle.slice(0, -suffix.length);
+  const noSuffix = handle.slice(0, -match[0].length);
   const prefix = `${tableId}-`;
   if (!noSuffix.startsWith(prefix)) {
     return null;

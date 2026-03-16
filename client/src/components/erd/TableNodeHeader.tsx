@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next';
-import { Palette } from 'lucide-react';
+import { ArrowLeftRight, Palette } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { useInlineEdit } from '@/hooks/useInlineEdit';
 import { KEYS } from '@/constants/keybindings';
 import { TABLE_COLORS } from '@/lib/table-colors';
 import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
-import type { TableHeaderColor } from '@/types/erd';
+import type { TableHandleLayout, TableHeaderColor } from '@/types/erd';
 import type { TermSelectResult } from './ColumnAutocomplete';
+import { cn } from '@/lib/utils';
 import ColumnAutocomplete from './ColumnAutocomplete';
 import TableColorPicker from './TableColorPicker';
 
@@ -20,6 +21,8 @@ export interface TableNodeHeaderProps {
   tableTermId?: number;
   /** 헤더 색상 프리셋 */
   headerColor?: TableHeaderColor;
+  /** 핸들 레이아웃 */
+  handleLayout?: TableHandleLayout;
   /** 편집 모드 활성 여부 */
   isEditing: boolean;
   /** 중복 논리명 컬럼 개수 */
@@ -38,6 +41,8 @@ export interface TableNodeHeaderProps {
   onRename: (value: string) => void;
   /** 헤더 색상 변경 핸들러 */
   onColorChange: (color: TableHeaderColor) => void;
+  /** 핸들 레이아웃 변경 핸들러 */
+  onHandleLayoutChange: (layout: TableHandleLayout) => void;
 }
 
 /**
@@ -53,6 +58,7 @@ export default function TableNodeHeader({
   logicalTableName,
   tableTermId,
   headerColor,
+  handleLayout,
   isEditing,
   duplicateLogicalNameColumnCount,
   lockInfo,
@@ -62,6 +68,7 @@ export default function TableNodeHeader({
   onRegisterNew,
   onRename,
   onColorChange,
+  onHandleLayoutChange,
 }: TableNodeHeaderProps) {
   const { t } = useTranslation();
 
@@ -81,20 +88,58 @@ export default function TableNodeHeader({
       <div className="flex items-start gap-2">
         {/* 색상 선택기 트리거 (hover/focus 시 표시, M-1: 터치 대응 추가) */}
         {isEditing && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                className="nodrag opacity-0 group-hover:opacity-100 focus-within:opacity-100 h-4 w-4 rounded-sm hover:bg-foreground/20 transition-opacity shrink-0 mt-0.5"
-                style={{ touchAction: 'manipulation' }}
-                aria-label={t('erd.tableNode.aria.changeColor')}
-              >
-                <Palette className="h-3 w-3" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="bottom" align="start" className="w-auto p-2">
-              <TableColorPicker currentColor={headerColor ?? 'default'} onSelect={onColorChange} />
-            </PopoverContent>
-          </Popover>
+          <div className="mt-0.5 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className="nodrag h-4 w-4 rounded-sm hover:bg-foreground/20"
+                  style={{ touchAction: 'manipulation' }}
+                  aria-label={t('erd.tableNode.aria.changeColor')}
+                >
+                  <Palette className="h-3 w-3" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="start" className="w-auto p-2">
+                <TableColorPicker
+                  currentColor={headerColor ?? 'default'}
+                  onSelect={onColorChange}
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className="nodrag h-4 w-4 rounded-sm hover:bg-foreground/20"
+                  style={{ touchAction: 'manipulation' }}
+                  aria-label={t('erd.tableNode.aria.changeHandleLayout')}
+                >
+                  <ArrowLeftRight className="h-3 w-3" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="start" className="w-auto p-2">
+                <div className="mb-2 text-2xs font-medium text-muted-foreground">
+                  {t('erd.tableNode.handleLayout.label')}
+                </div>
+                <div className="flex items-center gap-1">
+                  {(['split', 'left', 'right'] as const).map((layout) => (
+                    <button
+                      key={layout}
+                      className={cn(
+                        'nodrag rounded px-2 py-1 text-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                        (handleLayout ?? 'split') === layout
+                          ? 'bg-accent text-accent-foreground'
+                          : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                      )}
+                      onClick={() => onHandleLayoutChange(layout)}
+                    >
+                      {t(`erd.tableNode.handleLayout.${layout}`)}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         )}
 
         <div className="flex-1 min-w-0">

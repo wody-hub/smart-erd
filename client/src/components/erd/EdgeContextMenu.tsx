@@ -1,13 +1,39 @@
 import { useEffect, useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { KEYBINDINGS } from '@/constants/keybindings';
+import type { EdgeRoutingType } from '@/types/erd';
+import type { EdgeHandleSelectionValue } from '@/lib/edge-handles';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 /** EdgeContextMenu 컴포넌트의 props. */
 interface EdgeContextMenuProps {
   /** 메뉴 표시 위치 (화면 좌표) */
   position: { x: number; y: number };
+  /** 현재 라우팅 타입 */
+  routingType: EdgeRoutingType;
+  /** 현재 handle selection */
+  handleSelection: EdgeHandleSelectionValue;
+  /** 현재 테이블 layout 기준으로 허용되는 handle selection */
+  allowedHandleSelections: EdgeHandleSelectionValue[];
+  /** 라우팅 타입 변경 핸들러 */
+  onRoutingTypeChange: (routingType: EdgeRoutingType) => void;
+  /** handle selection 변경 핸들러 */
+  onHandleSelectionChange: (selection: EdgeHandleSelectionValue) => void;
+  /** 경로 초기화 가능 여부 */
+  canResetPath: boolean;
+  /** 경로 초기화 핸들러 */
+  onResetPath: () => void;
+  /** 원격 락 상태 */
+  lockedByName?: string | null;
   /** 삭제 클릭 핸들러 */
   onDelete: () => void;
   /** 메뉴 닫기 핸들러 */
@@ -17,45 +43,128 @@ interface EdgeContextMenuProps {
 /**
  * 엣지 우클릭 컨텍스트 메뉴.
  *
- * 마우스 위치에 "Delete connection" 메뉴를 표시한다.
- * 외부 클릭 또는 Escape 키로 닫힌다.
+ * 우클릭 좌표 기준으로 라우팅 타입 선택과 연결 삭제를 제공한다.
  *
  * @param props.position 메뉴 표시 위치 (화면 좌표)
+ * @param props.routingType 현재 라우팅 타입
+ * @param props.onRoutingTypeChange 라우팅 타입 변경 핸들러
  * @param props.onDelete 삭제 클릭 핸들러
- * @param props.onClose  메뉴 닫기 핸들러
+ * @param props.onClose 메뉴 닫기 핸들러
  */
-export default function EdgeContextMenu({ position, onDelete, onClose }: EdgeContextMenuProps) {
+export default function EdgeContextMenu({
+  position,
+  routingType,
+  handleSelection,
+  allowedHandleSelections,
+  onRoutingTypeChange,
+  onHandleSelectionChange,
+  canResetPath,
+  onResetPath,
+  lockedByName,
+  onDelete,
+  onClose,
+}: EdgeContextMenuProps) {
   const { t } = useTranslation();
-
-  /** 최신 onClose 콜백을 추적하여 리스너 재등록 없이 안정적으로 호출한다. */
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-
-  useHotkeys(KEYBINDINGS.ESCAPE, onClose);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const isLocked = !!lockedByName;
 
   useEffect(() => {
-    const handler = () => onCloseRef.current();
-    document.addEventListener('click', handler);
-    return () => {
-      document.removeEventListener('click', handler);
-    };
+    const frameId = requestAnimationFrame(() => {
+      triggerRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(frameId);
   }, []);
 
   return (
-    <div
-      className="fixed z-50 bg-popover text-popover-foreground border border-border rounded-md shadow-md py-1 min-w-[160px]"
-      style={{ left: position.x, top: position.y }}
-    >
-      <button
-        className="w-full px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-accent cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-      >
-        <Trash2 className="h-4 w-4" />
-        {t('erd.edge.contextDelete')}
-      </button>
-    </div>
+    <DropdownMenu open onOpenChange={(open) => !open && onClose()}>
+      <DropdownMenuTrigger asChild>
+        <button
+          ref={triggerRef}
+          className="fixed h-0 w-0 opacity-0 pointer-events-none"
+          style={{ left: position.x, top: position.y }}
+          aria-label={t('erd.edge.contextMenuAria')}
+          tabIndex={-1}
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="bottom" sideOffset={6} className="min-w-[220px]">
+        {isLocked && <DropdownMenuLabel>{t('erd.edge.lockedBy', { name: lockedByName })}</DropdownMenuLabel>}
+        <DropdownMenuLabel>{t('erd.edge.contextRouting')}</DropdownMenuLabel>
+        <DropdownMenuRadioGroup
+          value={routingType}
+          onValueChange={(value) => onRoutingTypeChange(value as EdgeRoutingType)}
+        >
+          <DropdownMenuRadioItem value="smoothstep" disabled={isLocked}>
+            {t('erd.edge.routingSmoothstep')}
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="bezier" disabled={isLocked}>
+            {t('erd.edge.routingBezier')}
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="straight" disabled={isLocked}>
+            {t('erd.edge.routingStraight')}
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>{t('erd.edge.contextHandleSide')}</DropdownMenuLabel>
+        <DropdownMenuRadioGroup
+          value={handleSelection}
+          onValueChange={(value) => onHandleSelectionChange(value as EdgeHandleSelectionValue)}
+        >
+          <DropdownMenuRadioItem value="auto" disabled={isLocked}>
+            {t('erd.edge.handleAuto')}
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem
+            value="left-left"
+            disabled={isLocked || !allowedHandleSelections.includes('left-left')}
+          >
+            {t('erd.edge.handleLeftLeft')}
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem
+            value="left-right"
+            disabled={isLocked || !allowedHandleSelections.includes('left-right')}
+          >
+            {t('erd.edge.handleLeftRight')}
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem
+            value="right-left"
+            disabled={isLocked || !allowedHandleSelections.includes('right-left')}
+          >
+            {t('erd.edge.handleRightLeft')}
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem
+            value="right-right"
+            disabled={isLocked || !allowedHandleSelections.includes('right-right')}
+          >
+            {t('erd.edge.handleRightRight')}
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          disabled={isLocked || !canResetPath}
+          onSelect={(event) => {
+            event.preventDefault();
+            if (isLocked || !canResetPath) {
+              return;
+            }
+            onResetPath();
+          }}
+        >
+          {t('erd.edge.contextResetPath')}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          disabled={isLocked}
+          onSelect={(event) => {
+            event.preventDefault();
+            if (isLocked) {
+              return;
+            }
+            onDelete();
+          }}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          {t('erd.edge.contextDelete')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

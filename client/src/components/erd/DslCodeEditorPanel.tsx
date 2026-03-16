@@ -109,7 +109,8 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     projectId: string;
     diagramId: string;
   }>();
-  const { hasLocks: hasRemoteEditLocks } = useRemoteEditLocks();
+  const remoteEditLocks = useRemoteEditLocks();
+  const hasRemoteEditLocks = remoteEditLocks.hasTableLocks;
 
   const {
     terms,
@@ -146,6 +147,7 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     parseResult: parseResult?.result ?? null,
     parsing,
     policyScope: { teamId, projectId, diagramId },
+    hasBlockingStructureLocks: remoteEditLocks.hasBlockingStructureLocks,
   });
 
   /** 사전 데이터 로딩 완료 여부 (초기화 시 사전 없이 생성하면 빈 결과) */
