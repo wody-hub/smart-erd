@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { parseDsl, type DslDictionary, type DslParseResult } from '@/lib/dsl-parser';
+import { buildParseQueueKey } from '@/lib/parse-queue-key';
 
 /** useDslParse 훅 옵션 */
 interface UseDslParseOptions {
@@ -17,6 +18,8 @@ interface UseDslParseReturn {
   parsing: boolean;
   /** DSL 텍스트 변경 핸들러 (Monaco Editor onChange 호환) */
   handleDslChange: (value: string | undefined) => void;
+  /** 현재 DSL 텍스트를 강제로 다시 파싱한다. */
+  reparseDsl: () => void;
 }
 
 /** 빈 코드 입력 시 사용하는 빈 스키마 파싱 결과 */
@@ -55,6 +58,11 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
   /** 최신 dictionary 참조 */
   const dictionaryRef = useRef(dictionary);
   dictionaryRef.current = dictionary;
+  /** 최신 dslText 참조 */
+  const dslTextRef = useRef(dslText);
+  dslTextRef.current = dslText;
+  /** 마지막으로 큐잉한 DSL 파싱 요청 키 */
+  const lastQueuedParseKeyRef = useRef<string | null>(null);
 
   // 컴포넌트 언마운트 시 디바운스 타이머 정리
   useEffect(() => {
@@ -71,10 +79,15 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
    *
    * @param text DSL 텍스트
    */
-  const debouncedParse = useCallback((text: string) => {
+  const debouncedParse = useCallback((text: string, force = false) => {
+    const parseKey = buildParseQueueKey(text);
+    if (!force && lastQueuedParseKeyRef.current === parseKey) {
+      return;
+    }
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
+    lastQueuedParseKeyRef.current = parseKey;
     const seq = ++parseSeqRef.current;
 
     if (!text.trim()) {
@@ -107,16 +120,30 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
   const handleDslChange = useCallback(
     (value: string | undefined) => {
       const text = value ?? '';
+      const parseKey = buildParseQueueKey(text);
+      if (text === dslTextRef.current && lastQueuedParseKeyRef.current === parseKey) {
+        return;
+      }
       setDslText(text);
       debouncedParse(text);
     },
     [debouncedParse],
   );
 
+  /**
+   * 현재 DSL 텍스트를 강제로 다시 파싱한다.
+   *
+   * 사전 갱신처럼 동일 텍스트 재평가가 필요한 경우에 사용한다.
+   */
+  const reparseDsl = useCallback(() => {
+    debouncedParse(dslTextRef.current, true);
+  }, [debouncedParse]);
+
   return {
     dslText,
     parseResult,
     parsing,
     handleDslChange,
+    reparseDsl,
   };
 }

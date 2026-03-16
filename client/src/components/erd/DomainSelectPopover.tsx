@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Plus } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -179,9 +179,20 @@ export default function DomainSelectPopover({
   children,
 }: DomainSelectPopoverProps) {
   const { t } = useTranslation();
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   /** 빠른 도메인 등록 다이얼로그 열림 상태 */
   const [quickDomainOpen, setQuickDomainOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const frameId = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [open]);
 
   return (
     <>
@@ -193,7 +204,7 @@ export default function DomainSelectPopover({
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <Command>
-            <CommandInput placeholder={t('erd.domain.searchPlaceholder')} />
+            <CommandInput ref={inputRef} placeholder={t('erd.domain.searchPlaceholder')} />
             <CommandList>
               <DomainCommandList
                 suggestedDomains={suggestedDomains}

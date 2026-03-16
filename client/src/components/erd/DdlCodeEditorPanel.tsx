@@ -307,7 +307,7 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
 
   // ERD→Code 동기화 시 커서/스크롤 보존 가드
-  const { syncCodeChange, isSyncing } = useEditorCursorGuard(editorRef, handleDdlChange);
+  const { syncCodeChange, shouldIgnoreChange } = useEditorCursorGuard(editorRef, handleDdlChange);
 
   const { handleUserCodeChange, handleGeneratedCodeChange, clearQueueTimeoutHold, syncStatus } =
     useBidirectionalCodeSync({
@@ -356,12 +356,12 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
    */
   const guardedOnChange = useCallback(
     (value: string | undefined) => {
-      if (isSyncing()) {
+      if (shouldIgnoreChange(value)) {
         return;
       }
       handleUserCodeChange(value);
     },
-    [handleUserCodeChange, isSyncing],
+    [handleUserCodeChange, shouldIgnoreChange],
   );
 
   /**

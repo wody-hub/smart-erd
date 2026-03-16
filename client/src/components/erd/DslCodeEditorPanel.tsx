@@ -132,7 +132,9 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     wordMatchIndex,
   };
 
-  const { dslText, parseResult, parsing, handleDslChange } = useDslParse({ dictionary });
+  const { dslText, parseResult, parsing, handleDslChange, reparseDsl } = useDslParse({
+    dictionary,
+  });
 
   const {
     handleApply,
@@ -175,7 +177,10 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
 
   // ERD→Code 동기화 시 커서/스크롤 보존 가드
-  const { syncCodeChange, isSyncing } = useEditorCursorGuard(editorRef, handleDslChange);
+  const { syncCodeChange, isSyncing, shouldIgnoreChange } = useEditorCursorGuard(
+    editorRef,
+    handleDslChange,
+  );
 
   const { handleUserCodeChange, handleGeneratedCodeChange, clearQueueTimeoutHold, syncStatus } =
     useBidirectionalCodeSync({
@@ -295,12 +300,12 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
    */
   const guardedOnChange = useCallback(
     (value: string | undefined) => {
-      if (isSyncing()) {
+      if (shouldIgnoreChange(value)) {
         return;
       }
       handleUserCodeChange(value);
     },
-    [handleUserCodeChange, isSyncing],
+    [handleUserCodeChange, shouldIgnoreChange],
   );
 
   /**
@@ -375,8 +380,8 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     if (!dslText.trim()) {
       return;
     }
-    handleDslChange(dslText);
-  }, [terms, domains, dslText, handleDslChange]);
+    reparseDsl();
+  }, [terms, domains, reparseDsl]);
 
   return (
     <div className="h-full flex flex-col">

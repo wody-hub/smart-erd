@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { parseDdl, type DdlParseResult } from '@/lib/ddl-parser';
 import { STORAGE_KEYS } from '@/constants/storage';
+import { buildParseQueueKey } from '@/lib/parse-queue-key';
 import type { DbmsType } from '@/types/erd';
 
 /** useDdlParse 훅 옵션 */
@@ -69,6 +70,8 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
   /** 최신 dbms 참조 (useCallback 안정화용) */
   const dbmsRef = useRef(dbms);
   dbmsRef.current = dbms;
+  /** 마지막으로 큐잉한 DDL 파싱 요청 키 (text + dbms) */
+  const lastQueuedParseKeyRef = useRef<string | null>(null);
 
   // 컴포넌트 언마운트 시 디바운스 타이머 정리
   useEffect(() => {
@@ -86,10 +89,15 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
    * @param text      DDL 텍스트
    * @param targetDbms 대상 DBMS
    */
-  const debouncedParse = useCallback((text: string, targetDbms: DbmsType) => {
+  const debouncedParse = useCallback((text: string, targetDbms: DbmsType, force = false) => {
+    const parseKey = buildParseQueueKey(targetDbms, text);
+    if (!force && lastQueuedParseKeyRef.current === parseKey) {
+      return;
+    }
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
+    lastQueuedParseKeyRef.current = parseKey;
     const seq = ++parseSeqRef.current;
 
     if (!text.trim()) {
@@ -135,6 +143,10 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
   const handleDdlChange = useCallback(
     (value: string | undefined) => {
       const text = value ?? '';
+      const parseKey = buildParseQueueKey(dbmsRef.current, text);
+      if (text === ddlTextRef.current && lastQueuedParseKeyRef.current === parseKey) {
+        return;
+      }
       setDdlText(text);
       debouncedParse(text, dbmsRef.current);
     },
@@ -165,6 +177,7 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
     setDdlText('');
     setParseResult(null);
     setParsing(false);
+    lastQueuedParseKeyRef.current = null;
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }

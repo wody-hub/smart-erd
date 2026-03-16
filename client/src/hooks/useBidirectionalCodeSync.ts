@@ -185,6 +185,7 @@ export function useBidirectionalCodeSync({
 
   const handleUserCodeChange = useCallback(
     (value: string | undefined) => {
+      codeTextRef.current = value ?? '';
       autoApplyBlockedRef.current = false;
       // Code 편집이 시작되면 직전 ERD->Code 대기열은 취소해 역방향 덮어쓰기를 방지한다.
       clearErdToCodeTimer();
@@ -204,6 +205,7 @@ export function useBidirectionalCodeSync({
         return;
       }
       originRef.current = 'erd-auto-sync';
+      codeTextRef.current = text;
       syncUpdate(text);
       setStatus('synced');
     },
@@ -343,14 +345,16 @@ export function useBidirectionalCodeSync({
 
       // Code 편집 흐름이 우선이므로 최소 codeIdle 기간이 지나기 전에는 역방향 동기화를 보류한다.
       const minQuietMs = Math.max(erdIdleMs, codeIdleMs);
-      if (Date.now() - lastUserEditAtRef.current < minQuietMs) {
+      const hasRecentUserCodeEdit = Date.now() - lastUserEditAtRef.current < minQuietMs;
+      if (hasRecentUserCodeEdit) {
         setStatus('idle-wait');
         erdToCodeTimerRef.current = setTimeout(runErdToCode, erdIdleMs);
         return;
       }
 
-      // 코드 파싱/검증이 불안정한 구간에서는 ERD->Code 역방향 반영으로 사용자 입력을 덮어쓰지 않는다.
-      if (parsing || hasBlockingErrors) {
+      // 사용자 코드 편집 흐름이 살아있는 동안에만 parse/error 상태를 보호 조건으로 사용한다.
+      const shouldProtectUserCode = originRef.current === 'user-code';
+      if (shouldProtectUserCode && (parsing || hasBlockingErrors)) {
         if (hasBlockingErrors) {
           setStatus('hold-parse-error');
         } else {
@@ -368,6 +372,7 @@ export function useBidirectionalCodeSync({
       }
 
       originRef.current = 'erd-auto-sync';
+      codeTextRef.current = generated;
       syncUpdate(generated);
       pendingErdSyncRevisionRef.current = null;
       setStatus('synced');

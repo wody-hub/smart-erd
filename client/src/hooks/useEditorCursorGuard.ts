@@ -11,7 +11,8 @@ import type * as Monaco from 'monaco-editor';
  * @param editorRef      Monaco 에디터 인스턴스 ref
  * @param onCodeTextChange React 상태 동기화 함수 (예: handleDslChange)
  * @returns syncCodeChange — 커서 보존 코드 업데이트 함수,
- *          isSyncing — 내부 동기화 중 여부 (Editor onChange 가드용)
+ *          isSyncing — 내부 동기화 중 여부,
+ *          shouldIgnoreChange — 내부 동기화로 발생한 onChange 무시 여부
  */
 export function useEditorCursorGuard(
   editorRef: React.RefObject<Monaco.editor.IStandaloneCodeEditor | null>,
@@ -19,6 +20,10 @@ export function useEditorCursorGuard(
 ) {
   /** 내부 동기화 중 onChange 억제 플래그 */
   const isSyncingRef = useRef(false);
+  /** 다음 onChange에서 무시해야 하는 프로그램적 텍스트 */
+  const pendingProgrammaticValueRef = useRef<string | null>(null);
+  /** 내부 동기화 플래그 해제 예약 */
+  const releaseFrameRef = useRef<number | null>(null);
 
   /**
    * 프로그래밍적 코드 업데이트 — 커서/스크롤 보존.
@@ -49,11 +54,18 @@ export function useEditorCursorGuard(
 
       // 2) onChange 억제 후 모델 직접 갱신
       isSyncingRef.current = true;
+      pendingProgrammaticValueRef.current = text;
+      if (releaseFrameRef.current != null) {
+        cancelAnimationFrame(releaseFrameRef.current);
+      }
       editor.executeEdits('erd-sync', [
         { range: model.getFullModelRange(), text, forceMoveMarkers: false },
       ]);
       editor.pushUndoStop();
-      isSyncingRef.current = false;
+      releaseFrameRef.current = requestAnimationFrame(() => {
+        isSyncingRef.current = false;
+        releaseFrameRef.current = null;
+      });
 
       // 3) 커서 복원 (문서 범위 내로 클램프)
       if (position) {
@@ -80,5 +92,20 @@ export function useEditorCursorGuard(
    */
   const isSyncing = useCallback(() => isSyncingRef.current, []);
 
-  return { syncCodeChange, isSyncing };
+  /**
+   * 프로그램적 변경으로 발생한 Editor onChange를 무시해야 하는지 판정한다.
+   *
+   * @param value Editor onChange 값
+   * @returns 내부 동기화로 발생한 변경이면 true
+   */
+  const shouldIgnoreChange = useCallback((value: string | undefined) => {
+    const text = value ?? '';
+    if (pendingProgrammaticValueRef.current != null && text === pendingProgrammaticValueRef.current) {
+      pendingProgrammaticValueRef.current = null;
+      return true;
+    }
+    return isSyncingRef.current;
+  }, []);
+
+  return { syncCodeChange, isSyncing, shouldIgnoreChange };
 }
