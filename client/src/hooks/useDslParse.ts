@@ -87,6 +87,7 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
+    setParsing(false);
     lastQueuedParseKeyRef.current = parseKey;
     const seq = ++parseSeqRef.current;
 
@@ -96,8 +97,8 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
       return;
     }
 
-    setParsing(true);
     debounceTimerRef.current = setTimeout(() => {
+      setParsing(true);
       if (seq !== parseSeqRef.current) {
         setParsing(false);
         return;

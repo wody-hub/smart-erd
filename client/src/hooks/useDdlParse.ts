@@ -97,6 +97,7 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
+    setParsing(false);
     lastQueuedParseKeyRef.current = parseKey;
     const seq = ++parseSeqRef.current;
 
@@ -106,9 +107,9 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
       return;
     }
 
-    setParsing(true);
     debounceTimerRef.current = setTimeout(async () => {
       const isCurrentRequest = () => seq === parseSeqRef.current;
+      setParsing(true);
       try {
         const result = await parseDdl(text, targetDbms);
         if (!isCurrentRequest()) {
