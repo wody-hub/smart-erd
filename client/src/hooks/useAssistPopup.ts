@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type * as Monaco from 'monaco-editor';
 import type { AssistPopupItem } from '@/hooks/useDslEditorCompletion';
 import type { AssistPopupState } from '@/components/erd/DslAssistPopup';
+import { filterAssistItemsForTrigger, type AssistPopupTrigger } from '@/lib/dsl-assist';
 
 /** 보조 팝업 최초 노출 건수 */
 const ASSIST_POPUP_INITIAL_VISIBLE = 10;
@@ -19,8 +20,9 @@ interface UseAssistPopupOptions {
   /** 보조 항목 빌드 함수 */
   buildAssistItems: (
     model: Monaco.editor.ITextModel,
-    position: Monaco.Position,
+    position: Monaco.IPosition,
     includeSnippets: boolean,
+    trigger?: AssistPopupTrigger,
   ) => AssistPopupItem[];
   /** 용어 등록 요청 핸들러 */
   onRegisterTerm: (logicalName: string, lineNumber?: number | null) => void;
@@ -35,7 +37,7 @@ interface UseAssistPopupReturn {
   /** 보조 팝업 리스트 DOM ref */
   assistPopupListRef: React.MutableRefObject<HTMLUListElement | null>;
   /** 보조 팝업을 연다 */
-  openAssistPopup: (options?: { position?: Monaco.Position; autoOnly?: boolean }) => void;
+  openAssistPopup: (options?: { position?: Monaco.IPosition; trigger?: AssistPopupTrigger }) => void;
   /** 보조 팝업을 닫는다 */
   closeAssistPopup: () => void;
   /** 보조 팝업을 불투명(강조) 모드로 승격한다 */
@@ -136,7 +138,7 @@ export function useAssistPopup({
 
   /** 보조 팝업을 연다. */
   const openAssistPopup = useCallback(
-    (options?: { position?: Monaco.Position; autoOnly?: boolean }) => {
+    (options?: { position?: Monaco.IPosition; trigger?: AssistPopupTrigger }) => {
       const editor = editorRef.current;
       if (!editor) {
         return;
@@ -151,11 +153,10 @@ export function useAssistPopup({
         return;
       }
 
-      const items = buildAssistItems(model, position, true);
-      if (options?.autoOnly && !items.some((item) => item.type.startsWith('register'))) {
-        return;
-      }
-      if (options?.autoOnly && assistPopupRef.current && !assistPopupRef.current.preview) {
+      const trigger = options?.trigger ?? 'manual';
+      const preview = trigger !== 'manual';
+      const items = filterAssistItemsForTrigger(buildAssistItems(model, position, true, trigger), trigger);
+      if (preview && assistPopupRef.current && !assistPopupRef.current.preview) {
         return;
       }
       if (items.length === 0) {
@@ -185,7 +186,7 @@ export function useAssistPopup({
         selectedIndex: 0,
         left,
         top,
-        preview: Boolean(options?.autoOnly),
+        preview,
         visibleCount: Math.min(ASSIST_POPUP_INITIAL_VISIBLE, items.length),
       });
     },
@@ -280,7 +281,7 @@ export function useAssistPopup({
         event.keyCode === monaco.KeyCode.Space && (browserEvent.ctrlKey || browserEvent.metaKey);
       if (isCtrlSpace) {
         consume();
-        openAssistPopup({ autoOnly: false });
+        openAssistPopup({ trigger: 'manual' });
         return;
       }
 

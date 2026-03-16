@@ -1,8 +1,11 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type * as Monaco from 'monaco-editor';
+import {
+  AUTO_ASSIST_TRIGGER_DELAY_MS,
+  type AssistPopupTrigger,
+} from '@/lib/dsl-assist';
 
-/** 커서 정지 시 빠른 등록 팝업 노출 대기 시간(ms) */
-const QUICK_ACTION_IDLE_DELAY_MS = 700;
+type AutoAssistTrigger = Exclude<AssistPopupTrigger, 'manual'>;
 
 /** useIdleCursorAction 훅 옵션 */
 interface UseIdleCursorActionOptions {
@@ -11,7 +14,7 @@ interface UseIdleCursorActionOptions {
   /** 편집 가능 여부 */
   canEdit: boolean;
   /** 보조 팝업 열기 함수 */
-  openAssistPopup: (options?: { position?: Monaco.Position; autoOnly?: boolean }) => void;
+  openAssistPopup: (options?: { position?: Monaco.IPosition; trigger?: AssistPopupTrigger }) => void;
   /** 보조 팝업 닫기 함수 */
   closeAssistPopup: () => void;
   /** 내부 동기화 중 여부 판별 함수 */
@@ -33,82 +36,152 @@ export function useIdleCursorAction({
   closeAssistPopup,
   isSyncing,
 }: UseIdleCursorActionOptions): void {
-  /** 커서 정지 기반 빠른 등록 팝업 타이머 */
-  const idleQuickActionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** 커서 정지 판정용 마지막 커서 위치 */
-  const idleCursorSnapshotRef = useRef<{ lineNumber: number; column: number } | null>(null);
+  /** 자동 보조 팝업 타이머 */
+  const autoAssistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 현재 예약된 자동 보조 팝업 스냅샷 */
+  const scheduledAssistRef = useRef<{
+    trigger: AutoAssistTrigger;
+    position: Monaco.IPosition;
+  } | null>(null);
+  /** 직전 변경이 실제 텍스트 수정이었는지 여부 */
+  const pendingTypingCursorRef = useRef(false);
+  /** 마우스 클릭으로 포커스 예정인지 여부 */
+  const pendingMouseFocusRef = useRef(false);
+  /** 클릭 직후 hover 자동완성 1회를 억제한다. */
+  const suppressHoverUntilMoveRef = useRef(false);
 
   /** 커서 정지 팝업 타이머를 정리한다. */
-  const clearIdleQuickActionTimer = useCallback(() => {
-    if (idleQuickActionTimerRef.current) {
-      clearTimeout(idleQuickActionTimerRef.current);
-      idleQuickActionTimerRef.current = null;
+  const clearAutoAssistTimer = useCallback(() => {
+    if (autoAssistTimerRef.current) {
+      clearTimeout(autoAssistTimerRef.current);
+      autoAssistTimerRef.current = null;
     }
+    scheduledAssistRef.current = null;
   }, []);
 
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor || !canEdit) {
-      clearIdleQuickActionTimer();
+      clearAutoAssistTimer();
       closeAssistPopup();
       return;
     }
 
     /**
-     * 커서 정지 후 자동 보조 팝업을 띄우기 위한 타이머를 예약한다.
+     * 트리거 유형별 자동 보조 팝업을 예약한다.
      */
-    const scheduleIdleQuickAction = () => {
-      clearIdleQuickActionTimer();
-      const pos = editor.getPosition();
-      if (!pos) {
-        return;
-      }
-      idleCursorSnapshotRef.current = { lineNumber: pos.lineNumber, column: pos.column };
+    const scheduleAutoAssist = (trigger: AutoAssistTrigger, position: Monaco.IPosition) => {
+      clearAutoAssistTimer();
+      const snapshot = {
+        trigger,
+        position: { lineNumber: position.lineNumber, column: position.column },
+      };
+      scheduledAssistRef.current = snapshot;
 
-      idleQuickActionTimerRef.current = setTimeout(() => {
+      autoAssistTimerRef.current = setTimeout(() => {
+        const current = scheduledAssistRef.current;
+        if (!current || current.trigger !== trigger) {
+          return;
+        }
+
+        if (trigger === 'hover') {
+          if (
+            current.position.lineNumber !== snapshot.position.lineNumber ||
+            current.position.column !== snapshot.position.column
+          ) {
+            return;
+          }
+          openAssistPopup({ position: current.position, trigger });
+          return;
+        }
+
         const currentPos = editor.getPosition();
-        const snapshot = idleCursorSnapshotRef.current;
-        if (!currentPos || !snapshot) {
+        if (!currentPos) {
           return;
         }
         if (
-          currentPos.lineNumber !== snapshot.lineNumber ||
-          currentPos.column !== snapshot.column
+          currentPos.lineNumber !== snapshot.position.lineNumber ||
+          currentPos.column !== snapshot.position.column
         ) {
           return;
         }
 
-        openAssistPopup({ position: currentPos, autoOnly: true });
-      }, QUICK_ACTION_IDLE_DELAY_MS);
+        openAssistPopup({ position: currentPos, trigger });
+      }, AUTO_ASSIST_TRIGGER_DELAY_MS[trigger]);
     };
 
     const changeDisposable = editor.onDidChangeModelContent(() => {
-      // ERD→Code 동기화(커서 가드)에 의한 콘텐츠 변경 시 팝업을 유지한다.
-      if (!isSyncing()) {
+      pendingTypingCursorRef.current = true;
+      if (isSyncing()) {
+        clearAutoAssistTimer();
         closeAssistPopup();
+        return;
       }
-      scheduleIdleQuickAction();
+      closeAssistPopup();
+      const pos = editor.getPosition();
+      if (pos) {
+        scheduleAutoAssist('typing', pos);
+      }
     });
     const cursorDisposable = editor.onDidChangeCursorPosition(() => {
+      if (pendingTypingCursorRef.current) {
+        pendingTypingCursorRef.current = false;
+        return;
+      }
       closeAssistPopup();
-      scheduleIdleQuickAction();
+      clearAutoAssistTimer();
     });
-    const focusDisposable = editor.onDidFocusEditorText(scheduleIdleQuickAction);
-    const scrollDisposable = editor.onDidScrollChange(closeAssistPopup);
+    const mouseDownDisposable = editor.onMouseDown(() => {
+      pendingMouseFocusRef.current = true;
+      suppressHoverUntilMoveRef.current = true;
+      clearAutoAssistTimer();
+      closeAssistPopup();
+    });
+    const focusDisposable = editor.onDidFocusEditorText(() => {
+      if (!pendingMouseFocusRef.current) {
+        return;
+      }
+      pendingMouseFocusRef.current = false;
+      const pos = editor.getPosition();
+      if (pos) {
+        scheduleAutoAssist('focus', pos);
+      }
+    });
+    const mouseMoveDisposable = editor.onMouseMove((event) => {
+      const pos = event.target.position;
+      if (!pos) {
+        return;
+      }
+      if (suppressHoverUntilMoveRef.current) {
+        suppressHoverUntilMoveRef.current = false;
+        return;
+      }
+      scheduleAutoAssist('hover', pos);
+    });
+    const mouseLeaveDisposable = editor.onMouseLeave(() => {
+      clearAutoAssistTimer();
+    });
+    const scrollDisposable = editor.onDidScrollChange(() => {
+      clearAutoAssistTimer();
+      closeAssistPopup();
+    });
     const blurDisposable = editor.onDidBlurEditorText(() => {
-      clearIdleQuickActionTimer();
+      pendingMouseFocusRef.current = false;
+      suppressHoverUntilMoveRef.current = false;
+      clearAutoAssistTimer();
       closeAssistPopup();
     });
-
-    scheduleIdleQuickAction();
 
     return () => {
-      clearIdleQuickActionTimer();
+      clearAutoAssistTimer();
       changeDisposable.dispose();
       cursorDisposable.dispose();
+      mouseDownDisposable.dispose();
       focusDisposable.dispose();
+      mouseMoveDisposable.dispose();
+      mouseLeaveDisposable.dispose();
       scrollDisposable.dispose();
       blurDisposable.dispose();
     };
-  }, [canEdit, clearIdleQuickActionTimer, closeAssistPopup, editorRef, isSyncing, openAssistPopup]);
+  }, [canEdit, clearAutoAssistTimer, closeAssistPopup, editorRef, isSyncing, openAssistPopup]);
 }

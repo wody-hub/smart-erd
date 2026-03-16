@@ -25,6 +25,7 @@ import QuickDomainDialog from './QuickDomainDialog';
 import { DSL_LANGUAGE_ID, registerDslLanguage } from '@/lib/monaco-dsl-language';
 import type { DslDictionary } from '@/lib/dsl-parser';
 import { generateDsl } from '@/lib/dsl-generator';
+import { formatDslIdentifier } from '@/lib/dsl-format';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
@@ -37,29 +38,6 @@ interface DslCodeEditorPanelProps {
 }
 
 const DSL_TABLE_PREFIX_REGEX = /^\s*Table\b/;
-
-/**
- * 공백이 포함된 DSL 식별자는 인용부호로 감싼다.
- *
- * @param raw 원본 논리명
- * @returns DSL 출력용 식별자
- */
-function formatDslIdentifier(raw: string): string {
-  const value = raw.trim();
-  if (!value) {
-    return value;
-  }
-  if (!/\s/.test(value)) {
-    return value;
-  }
-  if (!value.includes("'")) {
-    return `'${value}'`;
-  }
-  if (!value.includes('"')) {
-    return `"${value}"`;
-  }
-  return `'${value.replace(/'/g, "''")}'`;
-}
 
 /**
  * 컬럼 DSL 한 줄에 선택한 도메인을 명시 반영한다.

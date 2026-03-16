@@ -1,9 +1,9 @@
 import type { TableNode, ERDEdge } from '@/types/erd';
 import { extractColId } from '@/lib/handle-id';
 import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
+import { formatDslIdentifier } from '@/lib/dsl-format';
 
 const [OPT_PK, OPT_AI, OPT_NN] = DSL_COLUMN_OPTIONS;
-const IDENTIFIER_WHITESPACE_REGEX = /\s/;
 
 /** DSL 생성에 필요한 사전 역조회 인터페이스 */
 export interface DslGeneratorDictionary {
@@ -31,33 +31,6 @@ interface DslFkRef {
  */
 function resolveTableLogicalName(node: TableNode): string {
   return node.data.logicalTableName || node.data.label;
-}
-
-/**
- * DSL 식별자 문자열을 출력용으로 정규화한다.
- *
- * 공백이 포함된 식별자는 단일 인용부호로 감싸 파서 토큰 경계를 명확히 한다.
- * (예: 사용자 이름 -> '사용자 이름')
- */
-function formatDslIdentifier(raw: string): string {
-  const value = raw.trim();
-  if (!value) {
-    return value;
-  }
-
-  if (!IDENTIFIER_WHITESPACE_REGEX.test(value)) {
-    return value;
-  }
-
-  if (!value.includes("'")) {
-    return `'${value}'`;
-  }
-
-  if (!value.includes('"')) {
-    return `"${value}"`;
-  }
-
-  return `'${value.replace(/'/g, "''")}'`;
 }
 
 /**

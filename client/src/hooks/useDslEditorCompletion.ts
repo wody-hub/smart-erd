@@ -15,6 +15,14 @@ import {
   DSL_FK_CAPTURE_REGEX,
   DSL_BLOCK_TERM_CAPTURE_REGEX,
 } from '@/lib/dsl-keywords';
+import { formatDslIdentifier } from '@/lib/dsl-format';
+import {
+  buildTermAssistInsertText,
+  extractColumnTermAssistContext,
+  sortAssistItems,
+  type AssistPopupTrigger,
+  type AssistPopupItemCategory,
+} from '@/lib/dsl-assist';
 import type { DslError, DslParseResult } from '@/lib/dsl-parser';
 import type { Domain, Term } from '@/types/dictionary';
 
@@ -27,6 +35,8 @@ export interface AssistPopupItem {
   id: string;
   /** 항목 유형 */
   type: AssistPopupItemType;
+  /** 항목 카테고리 */
+  category: AssistPopupItemCategory;
   /** 표시 라벨 */
   label: string;
   /** 보조 설명 */
@@ -65,8 +75,9 @@ interface UseDslEditorCompletionReturn {
    */
   buildAssistItems: (
     model: Monaco.editor.ITextModel,
-    position: Monaco.Position,
+    position: Monaco.IPosition,
     includeContextCompletions: boolean,
+    trigger?: AssistPopupTrigger,
   ) => AssistPopupItem[];
 
   /**
@@ -189,16 +200,19 @@ export function useDslEditorCompletion({
   const buildAssistItems = useCallback(
     (
       model: Monaco.editor.ITextModel,
-      position: Monaco.Position,
+      position: Monaco.IPosition,
       includeContextCompletions: boolean,
+      trigger: AssistPopupTrigger = 'manual',
     ): AssistPopupItem[] => {
       const lineContent = model.getLineContent(position.lineNumber);
       const textUntilPosition = lineContent.substring(0, position.column - 1);
       const word = model.getWordUntilPosition(position);
       const defaultStart = word.startColumn;
       const defaultEnd = word.endColumn;
+      const inBlock = isInsideTableBlock(model, position.lineNumber);
       const items: AssistPopupItem[] = [];
       const seen = new Set<string>();
+      const finalizeItems = () => sortAssistItems(items).slice(0, 40);
 
       /**
        * 보조 팝업 후보 목록에 항목을 중복 없이 추가한다.
@@ -226,6 +240,7 @@ export function useDslEditorCompletion({
         addItem({
           id: `register-term:${normalized}`,
           type: 'registerTerm',
+          category: 'register',
           label: t('erd.dsl.assist.registerTerm'),
           description: t('erd.dsl.errorGuide.quickAction.registerTerm', { name: normalized }),
           lineNumber: position.lineNumber,
@@ -248,6 +263,7 @@ export function useDslEditorCompletion({
         addItem({
           id: `register-domain:${normalized}`,
           type: 'registerDomain',
+          category: 'register',
           label: t('erd.dsl.assist.registerDomain'),
           description: t('erd.dsl.errorGuide.quickAction.registerDomain', { name: normalized }),
           lineNumber: position.lineNumber,
@@ -271,6 +287,7 @@ export function useDslEditorCompletion({
         id: string,
         label: string,
         insertText: string,
+        category: AssistPopupItemCategory,
         description?: string,
         startColumn = defaultStart,
         endColumn = defaultEnd,
@@ -278,6 +295,7 @@ export function useDslEditorCompletion({
         addItem({
           id,
           type: 'insert',
+          category,
           label,
           description,
           lineNumber: position.lineNumber,
@@ -285,6 +303,60 @@ export function useDslEditorCompletion({
           endColumn,
           insertText,
         });
+      };
+
+      /**
+       * 현재 입력값으로 매칭되는 기존 용어 후보를 추가한다.
+       *
+       * @param termInputRaw       사용자가 입력 중인 원본 논리명
+       * @param replaceStartColumn 치환 시작 컬럼
+       * @param replaceEndColumn   치환 종료 컬럼
+       * @returns 정규화된 입력 논리명
+       */
+      const addMatchedTerms = (
+        termInputRaw: string,
+        replaceStartColumn: number,
+        replaceEndColumn: number,
+      ): string => {
+        const termInput = termInputRaw.trim();
+        const normalizedTermInput = termInput.toLowerCase();
+        const rankedTerms: Array<{ term: (typeof terms)[number]; score: MatchScore }> = [];
+        for (const term of terms) {
+          if (!normalizedTermInput) {
+            rankedTerms.push({ term, score: [1, 1, 0, term.logicalName.length] });
+            continue;
+          }
+          const logicalScore = scoreMatch(term.logicalName, normalizedTermInput);
+          const physicalScore = scoreMatch(term.physicalName, normalizedTermInput);
+          const score = logicalScore ?? physicalScore;
+          if (score) {
+            rankedTerms.push({ term, score });
+          }
+        }
+        const matchedTerms = rankedTerms
+          .sort((a, b) => {
+            for (let i = 0; i < a.score.length; i++) {
+              if (a.score[i] !== b.score[i]) {
+                return a.score[i] - b.score[i];
+              }
+            }
+            return a.term.logicalName.localeCompare(b.term.logicalName);
+          })
+          .map((item) => item.term);
+
+        for (const term of matchedTerms) {
+          addInsert(
+            `term:${term.id}`,
+            term.logicalName,
+            buildTermAssistInsertText(term.logicalName, term.domainLogicalName, inBlock),
+            'term',
+            `${term.physicalName}${term.domainLogicalName ? ` (${term.domainLogicalName})` : ''}`,
+            replaceStartColumn,
+            replaceEndColumn,
+          );
+        }
+
+        return termInput;
       };
 
       const diagnosticAtCursor =
@@ -306,12 +378,12 @@ export function useDslEditorCompletion({
       }
 
       if (!includeContextCompletions) {
-        return items;
+        return finalizeItems();
       }
 
       if (/::\s*\S*$/.test(textUntilPosition) && !textUntilPosition.includes('//')) {
         for (const type of DSL_TYPE_SUGGESTIONS) {
-          addInsert(`type:${type}`, type, type, t('erd.dsl.assist.typeSuggestion'));
+          addInsert(`type:${type}`, type, type, 'type', t('erd.dsl.assist.typeSuggestion'));
         }
       }
 
@@ -320,8 +392,25 @@ export function useDslEditorCompletion({
         const optionsUsed = bracketIdx >= 0 ? lineContent.substring(bracketIdx).toUpperCase() : '';
         for (const option of DSL_COLUMN_OPTIONS) {
           if (!optionsUsed.includes(option)) {
-            addInsert(`option:${option}`, option, option, t('erd.dsl.assist.optionSuggestion'));
+            addInsert(
+              `option:${option}`,
+              option,
+              option,
+              'option',
+              t('erd.dsl.assist.optionSuggestion'),
+            );
           }
+        }
+      }
+
+      if (trigger === 'manual' && inBlock) {
+        const manualTermContext = extractColumnTermAssistContext(lineContent);
+        if (manualTermContext) {
+          addMatchedTerms(
+            manualTermContext.logicalName,
+            manualTermContext.replaceStartColumn,
+            manualTermContext.replaceEndColumn,
+          );
         }
       }
 
@@ -363,14 +452,15 @@ export function useDslEditorCompletion({
           addInsert(
             `domain:${domain.id}`,
             domain.logicalName,
-            domain.logicalName,
+            formatDslIdentifier(domain.logicalName),
+            'domain',
             domain.physicalType,
             replaceStart,
             position.column,
           );
         }
         addRegisterDomain(domainInput || diagnosticAtCursor?.messageArgs?.name || '');
-        return items;
+        return finalizeItems();
       }
 
       if (DSL_FK_CONTEXT_REGEX.test(textUntilPosition)) {
@@ -388,7 +478,8 @@ export function useDslEditorCompletion({
             addInsert(
               `fk-table:${table.logicalName}`,
               table.logicalName,
-              table.logicalName,
+              formatDslIdentifier(table.logicalName),
+              'fk',
               undefined,
               tableStart,
               position.column,
@@ -401,15 +492,22 @@ export function useDslEditorCompletion({
           const table = parsedTables?.find((item) => item.logicalName === tableName);
           for (const col of table?.columns ?? []) {
             hasFkSuggestions = true;
-            addInsert(`fk-col:${tableName}.${col}`, col, col, undefined, colStart, position.column);
+            addInsert(
+              `fk-col:${tableName}.${col}`,
+              col,
+              formatDslIdentifier(col),
+              'fk',
+              undefined,
+              colStart,
+              position.column,
+            );
           }
         }
         if (hasFkSuggestions) {
-          return items;
+          return finalizeItems();
         }
       }
 
-      const inBlock = isInsideTableBlock(model, position.lineNumber);
       if (/^\s*\S*$/.test(textUntilPosition) && !inBlock) {
         const typed = word.word.toLowerCase();
         if (typed.length > 0 && DSL_TABLE_KEYWORD.toLowerCase().startsWith(typed)) {
@@ -417,6 +515,7 @@ export function useDslEditorCompletion({
             'keyword:table',
             DSL_TABLE_KEYWORD,
             `${DSL_TABLE_KEYWORD} `,
+            'keyword',
             t('erd.dsl.assist.tableKeyword'),
           );
         }
@@ -426,43 +525,8 @@ export function useDslEditorCompletion({
         const termInputRaw = DSL_TABLE_AFTER_REGEX.test(textUntilPosition)
           ? (textUntilPosition.match(DSL_TABLE_TERM_CAPTURE_REGEX)?.[1] ?? word.word.trim())
           : (textUntilPosition.match(DSL_BLOCK_TERM_CAPTURE_REGEX)?.[1] ?? word.word.trim());
-        const termInput = termInputRaw.trim();
         const termStart = Math.max(1, position.column - termInputRaw.length);
-        const normalizedTermInput = termInput.toLowerCase();
-        const rankedTerms: Array<{ term: (typeof terms)[number]; score: MatchScore }> = [];
-        for (const term of terms) {
-          if (!normalizedTermInput) {
-            rankedTerms.push({ term, score: [1, 1, 0, term.logicalName.length] });
-            continue;
-          }
-          const logicalScore = scoreMatch(term.logicalName, normalizedTermInput);
-          const physicalScore = scoreMatch(term.physicalName, normalizedTermInput);
-          const score = logicalScore ?? physicalScore;
-          if (score) {
-            rankedTerms.push({ term, score });
-          }
-        }
-        const matchedTerms = rankedTerms
-          .sort((a, b) => {
-            for (let i = 0; i < a.score.length; i++) {
-              if (a.score[i] !== b.score[i]) {
-                return a.score[i] - b.score[i];
-              }
-            }
-            return a.term.logicalName.localeCompare(b.term.logicalName);
-          })
-          .map((item) => item.term);
-
-        for (const term of matchedTerms) {
-          addInsert(
-            `term:${term.id}`,
-            term.logicalName,
-            term.logicalName,
-            `${term.physicalName}${term.domainLogicalName ? ` (${term.domainLogicalName})` : ''}`,
-            termStart,
-            position.column,
-          );
-        }
+        const termInput = addMatchedTerms(termInputRaw, termStart, position.column);
         const isCurrentLineMapped = (() => {
           const tables = parseResult?.result.tables;
           const ranges = parseResult?.result.tableRanges;
@@ -492,9 +556,7 @@ export function useDslEditorCompletion({
         }
       }
 
-      const registerItems = items.filter((item) => item.type !== 'insert');
-      const insertItems = items.filter((item) => item.type === 'insert');
-      return [...registerItems, ...insertItems].slice(0, 40);
+      return finalizeItems();
     },
     [domains, findQuickRegisterDiagnostic, parseResult, t, terms],
   );

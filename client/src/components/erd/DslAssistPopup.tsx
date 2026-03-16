@@ -63,6 +63,7 @@ export default function DslAssistPopup({
             ? 'border-border/60 bg-card/70 opacity-40 hover:opacity-100'
             : 'border-border/80 bg-card/100 opacity-100',
         )}
+        onMouseEnter={onPromote}
         onMouseDown={onPromote}
       >
         <div className="mb-2 flex items-center justify-between border-b border-border/70 pb-2">
