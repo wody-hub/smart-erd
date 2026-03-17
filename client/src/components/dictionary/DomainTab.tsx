@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +28,7 @@ import {
 } from '@/api/domainApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
+import { rankDictionarySearchResults } from '@/lib/dictionary-search-ranking';
 import { usePaginatedSearch } from '@/hooks/usePaginatedSearch';
 import type { Domain, DomainFormData } from '@/types/dictionary';
 
@@ -77,7 +78,14 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
     enabled: !!teamId && !!setId,
     placeholderData: (previousData) => previousData,
   });
-  const domains = domainPageData?.content ?? [];
+  const domains = useMemo(
+    () =>
+      rankDictionarySearchResults(domainPageData?.content ?? [], searchKeyword, (domain) => [
+        domain.physicalType,
+        domain.description,
+      ]),
+    [domainPageData?.content, searchKeyword],
+  );
   const totalElements = domainPageData?.totalElements ?? 0;
   const totalPages = domainPageData?.totalPages ?? 0;
   const isLastPage = domainPageData?.last ?? true;

@@ -28,6 +28,7 @@ import {
   updateDictionarySet,
 } from '@/api/dictionarySetApi';
 import { getErrorMessage } from '@/lib/api-error';
+import { cn } from '@/lib/utils';
 import type { DictionarySet } from '@/types/dictionary';
 
 /** DictionaryWorkspace 컴포넌트 props */
@@ -136,6 +137,7 @@ export default function DictionaryWorkspace({
   const selectedSet: DictionarySet | undefined = dictionarySets.find(
     (set) => String(set.id) === selectedSetId,
   );
+  const isFixedDialogMode = !!fixedSetId;
 
   const handleSetDefault = () => {
     if (!selectedSet || selectedSet.isDefault) {
@@ -149,7 +151,7 @@ export default function DictionaryWorkspace({
   }
 
   return (
-    <>
+    <div className={cn(isFixedDialogMode && 'flex min-h-0 flex-1 flex-col')}>
       {fixedSetId ? (
         <div className="mb-4 rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
           {t('diagram.edit.dictionaryContext', { name: fixedSetLabel ?? selectedSet?.name ?? '-' })}
@@ -206,19 +208,22 @@ export default function DictionaryWorkspace({
       )}
 
       {selectedSetId ? (
-        <Tabs defaultValue="words">
+        <Tabs
+          defaultValue="words"
+          className={cn(isFixedDialogMode && 'flex min-h-0 flex-1 flex-col')}
+        >
           <TabsList>
             <TabsTrigger value="words">{t('dictionary.tabs.words')}</TabsTrigger>
             <TabsTrigger value="terms">{t('dictionary.tabs.terms')}</TabsTrigger>
             <TabsTrigger value="domains">{t('dictionary.tabs.domains')}</TabsTrigger>
           </TabsList>
-          <TabsContent value="words">
+          <TabsContent value="words" className={cn(isFixedDialogMode && 'mt-4')}>
             <WordTab canEdit={canEdit} setId={selectedSetId} />
           </TabsContent>
-          <TabsContent value="terms">
+          <TabsContent value="terms" className={cn(isFixedDialogMode && 'mt-4')}>
             <TermTab canEdit={canEdit} setId={selectedSetId} />
           </TabsContent>
-          <TabsContent value="domains">
+          <TabsContent value="domains" className={cn(isFixedDialogMode && 'mt-4')}>
             <DomainTab canEdit={canEdit} setId={selectedSetId} />
           </TabsContent>
         </Tabs>
@@ -267,6 +272,6 @@ export default function DictionaryWorkspace({
           />
         </>
       )}
-    </>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +28,7 @@ import {
 } from '@/api/wordApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
+import { rankDictionarySearchResults } from '@/lib/dictionary-search-ranking';
 import { usePaginatedSearch } from '@/hooks/usePaginatedSearch';
 import type { Word, WordFormData } from '@/types/dictionary';
 
@@ -61,7 +62,14 @@ export default function WordTab({ canEdit = true, setId }: WordTabProps) {
     placeholderData: (previousData) => previousData,
   });
 
-  const words = wordPageData?.content ?? [];
+  const words = useMemo(
+    () =>
+      rankDictionarySearchResults(wordPageData?.content ?? [], searchKeyword, (word) => [
+        word.physicalName,
+        word.description,
+      ]),
+    [searchKeyword, wordPageData?.content],
+  );
   const totalElements = wordPageData?.totalElements ?? 0;
   const totalPages = wordPageData?.totalPages ?? 0;
   const isLastPage = wordPageData?.last ?? true;

@@ -393,6 +393,8 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
             wordWrap: 'on',
             tabSize: 2,
             renderLineHighlight: 'gutter',
+            autoClosingQuotes: 'always',
+            autoSurround: 'quotes',
             quickSuggestions: false,
             wordBasedSuggestions: 'off',
             suggestOnTriggerCharacters: false,

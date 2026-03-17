@@ -42,14 +42,17 @@ export default function DictionaryManagementDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[1400px] w-[min(96vw,1400px)] max-h-[88vh] overflow-hidden p-0">
-        <DialogHeader className="border-b px-6 py-4">
+      <DialogContent className="!flex h-[88vh] max-h-[88vh] w-[min(96vw,1400px)] max-w-[1400px] flex-col overflow-hidden gap-0 p-0">
+        <DialogHeader className="shrink-0 border-b px-6 py-4">
           <DialogTitle>{t('dictionary.title')}</DialogTitle>
           <DialogDescription>
             {t('diagram.edit.dictionaryContext', { name: dictionarySetName ?? '-' })}
           </DialogDescription>
         </DialogHeader>
-        <div className="overflow-auto px-6 py-5">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5"
+          data-testid="dictionary-management-body"
+        >
           <DictionaryWorkspace
             teamId={teamId}
             canEdit={canEdit}

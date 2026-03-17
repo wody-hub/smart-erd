@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +28,7 @@ import {
 } from '@/api/termApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
+import { rankDictionarySearchResults } from '@/lib/dictionary-search-ranking';
 import { usePaginatedSearch } from '@/hooks/usePaginatedSearch';
 import type { Term, TermFormData } from '@/types/dictionary';
 
@@ -77,7 +78,15 @@ export default function TermTab({ canEdit = true, setId }: TermTabProps) {
     enabled: !!teamId && !!setId,
     placeholderData: (previousData) => previousData,
   });
-  const terms = termPageData?.content ?? [];
+  const terms = useMemo(
+    () =>
+      rankDictionarySearchResults(termPageData?.content ?? [], searchKeyword, (term) => [
+        term.physicalName,
+        term.domainLogicalName,
+        term.description,
+      ]),
+    [searchKeyword, termPageData?.content],
+  );
   const totalElements = termPageData?.totalElements ?? 0;
   const totalPages = termPageData?.totalPages ?? 0;
   const isLastPage = termPageData?.last ?? true;
