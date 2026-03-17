@@ -1,29 +1,87 @@
-spring:
-  datasource:
-    url: jdbc:h2:mem:smarterd
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+server:
+  port: 8190
+  shutdown: graceful
 
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+logging:
+  level:
+    p6spy: info
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  lifecycle:
+    timeout-per-shutdown-phase: ${SMART_ERD_SHUTDOWN_PHASE_TIMEOUT:20s}
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  docker:
+    compose:
+      lifecycle-management: start-only
+
+  messages:
+    basename: i18n/messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
+
+  jackson:
+    time-zone: UTC
+    serialization:
+      write-dates-as-timestamps: false
 
   jpa:
     hibernate:
-      ddl-auto: create-drop
-    show-sql: true
+      ddl-auto: update
     properties:
-      hibernate:
-        format_sql: true
+      '[hibernate.jdbc.time_zone]': UTC
+
+decorator:
+  datasource:
+    p6spy:
+      enable-logging: true
+      multiline: false
+      logging: slf4j
 
 smart-erd:
+  dictionary:
+    bulk-validation:
+      store: in-memory # in-memory | redis (redis 사용 시: docker compose --profile redis up -d)
+  websocket:
+    max-sessions-per-room: 10
+    max-messages-per-second: 100
+    binary-message-size-limit: 1048576 # 1MB
+    snapshot-flush-interval: ${SMART_ERD_WEBSOCKET_SNAPSHOT_FLUSH_INTERVAL:5000} # 기본 5초
+    max-connections-per-user: 5
+    max-accumulated-updates-size: 10485760 # 10MB
+    session-max-duration: 1800000 # 30분
+    shutdown-flush-timeout-millis: ${SMART_ERD_WEBSOCKET_SHUTDOWN_FLUSH_TIMEOUT_MILLIS:15000}
+    ticket-store: in-memory # in-memory | redis (redis 사용 시: docker compose --profile redis up -d)
   cors:
-    allowed-origins: http://localhost:3000
+    allowed-origins: ${SMART_ERD_CORS_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
     allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
-    allowed-headers: "*"
+    allowed-headers: '*'
     allow-credentials: true
   jwt:
     secret: ${SMART_ERD_JWT_SECRET:c21hcnQtZXJkLWp3dC1zZWNyZXQta2V5LXRoYXQtaXMtbG9uZy1lbm91Z2gtZm9yLWhtYWMtc2hhMjU2}
-    expiration: 86400000
+    access-expiration: ${SMART_ERD_JWT_ACCESS_EXPIRATION:1800000}
+    refresh-expiration: ${SMART_ERD_JWT_REFRESH_EXPIRATION:86400000}
+  auth:
+    csp:
+      connect-sources: []
+    client-ip:
+      trusted-proxy-cidrs:
+        - 127.0.0.1/32
+        - ::1/128
+    login-rate-limit:
+      max-failed-attempts: 5
+      window-seconds: 60
+      block-seconds: 300
+      cleanup-interval-millis: 600000
+      stale-retention-seconds: 3600
+    refresh-token-cleanup:
+      cleanup-interval-millis: 3600000
+      consumed-retention-seconds: 86400

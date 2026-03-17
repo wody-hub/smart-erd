@@ -1,6 +1,6 @@
 package com.smarterd.domain.user.entity;
 
-import com.smarterd.domain.common.entity.BaseTimeEntity;
+import com.smarterd.domain.common.entity.BaseAuditEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -22,7 +22,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "users")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class User extends BaseTimeEntity {
+public class User extends BaseAuditEntity {
 
     /** 사용자 고유 식별자 (자동 증가) */
     @Id

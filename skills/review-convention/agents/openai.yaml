@@ -1,0 +1,4 @@
+interface:
+  display_name: "Convention Reviewer"
+  short_description: "Review coding conventions and project standards"
+  default_prompt: "Use $review-convention to inspect changed files for backend/frontend convention violations with file:line fixes and MUST-first prioritization."

@@ -1,6 +1,6 @@
 package com.smarterd.domain.dictionary.entity;
 
-import com.smarterd.domain.common.entity.BaseTimeEntity;
+import com.smarterd.domain.common.entity.BaseAuditEntity;
 import com.smarterd.domain.team.entity.Team;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,10 +27,10 @@ import lombok.NoArgsConstructor;
  * @see Domain
  */
 @Entity
-@Table(name = "terms")
+@Table(name = "terms", uniqueConstraints = @UniqueConstraint(columnNames = { "dictionary_set_id", "logical_name" }))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Term extends BaseTimeEntity {
+public class Term extends BaseAuditEntity {
 
     /** 용어 고유 식별자 (자동 증가) */
     @Id
@@ -49,10 +50,19 @@ public class Term extends BaseTimeEntity {
     @JoinColumn(name = "team_id", nullable = false)
     private Team team;
 
+    /** 소속 사전 세트 */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dictionary_set_id")
+    private DictionarySet dictionarySet;
+
     /** 연결된 도메인 (nullable — 타입 매핑 없이 이름만 관리 가능) */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "domain_id")
     private Domain domain;
+
+    /** 설명 (선택) — 최대 500자 */
+    @Column(length = 500)
+    private String description;
 
     /**
      * 용어 엔티티를 생성한다.
@@ -61,12 +71,38 @@ public class Term extends BaseTimeEntity {
      * @param physicalName 물리명
      * @param team         소속 팀
      * @param domain       연결된 도메인 (nullable)
+     * @param description   설명 (nullable)
+     * @param dictionarySet 소속 사전 세트
      */
     @Builder
-    public Term(String logicalName, String physicalName, Team team, Domain domain) {
+    public Term(
+        String logicalName,
+        String physicalName,
+        Team team,
+        Domain domain,
+        String description,
+        DictionarySet dictionarySet
+    ) {
         this.logicalName = logicalName;
         this.physicalName = physicalName;
         this.team = team;
         this.domain = domain;
+        this.description = description;
+        this.dictionarySet = dictionarySet;
+    }
+
+    /**
+     * 용어 정보를 수정한다.
+     *
+     * @param logicalName  논리명
+     * @param physicalName 물리명
+     * @param domain       연결된 도메인 (nullable)
+     * @param description  설명 (nullable)
+     */
+    public void update(String logicalName, String physicalName, Domain domain, String description) {
+        this.logicalName = logicalName;
+        this.physicalName = physicalName;
+        this.domain = domain;
+        this.description = description;
     }
 }

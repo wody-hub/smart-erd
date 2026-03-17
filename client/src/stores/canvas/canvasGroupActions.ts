@@ -1,0 +1,199 @@
+import * as Y from 'yjs';
+import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
+import { createGroupYMap, getGroupsMap, removeTableIdFromYArray } from '@/collaboration/yjsBridge';
+import type { CanvasGetState, CanvasState } from './canvasStoreTypes';
+
+type CanvasGroupActionKeys =
+  | 'addGroup'
+  | 'deleteGroup'
+  | 'renameGroup'
+  | 'updateGroupColor'
+  | 'addTableToGroup'
+  | 'addTablesToGroup'
+  | 'removeTableFromGroup'
+  | 'removeTablesFromGroup'
+  | 'updateGroupTables';
+
+/**
+ * 캔버스 논리적 그룹 액션 팩토리.
+ *
+ * @param get Zustand 상태 getter
+ * @returns 논리적 그룹 액션 맵
+ */
+export function createCanvasGroupActions(
+  get: CanvasGetState,
+): Pick<CanvasState, CanvasGroupActionKeys> {
+  return {
+    addGroup: (label) => {
+      const { ydoc, groups } = get();
+      if (!ydoc) {
+        return;
+      }
+
+      const groupId = `group-${crypto.randomUUID()}`;
+      const groupLabel = label ?? `Group ${groups.length + 1}`;
+      ydoc.transact(() => {
+        getGroupsMap(ydoc).set(groupId, createGroupYMap(groupLabel));
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
+    },
+
+    deleteGroup: (groupId) => {
+      const { ydoc } = get();
+      if (!ydoc) {
+        return;
+      }
+      ydoc.transact(() => {
+        getGroupsMap(ydoc).delete(groupId);
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
+    },
+
+    renameGroup: (groupId, newName) => {
+      const { ydoc } = get();
+      if (!ydoc) {
+        return;
+      }
+      const groupYMap = getGroupsMap(ydoc).get(groupId);
+      if (!groupYMap) {
+        return;
+      }
+      ydoc.transact(() => {
+        groupYMap.set('label', newName);
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
+    },
+
+    updateGroupColor: (groupId, color) => {
+      const { ydoc } = get();
+      if (!ydoc) {
+        return;
+      }
+      const groupYMap = getGroupsMap(ydoc).get(groupId);
+      if (!groupYMap) {
+        return;
+      }
+      ydoc.transact(() => {
+        if (color === 'default') {
+          groupYMap.delete('color');
+        } else {
+          groupYMap.set('color', color);
+        }
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
+    },
+
+    addTableToGroup: (groupId, tableId) => {
+      const { ydoc } = get();
+      if (!ydoc) {
+        return;
+      }
+      const groupYMap = getGroupsMap(ydoc).get(groupId);
+      if (!groupYMap) {
+        return;
+      }
+      const tableIdsYArray = groupYMap.get('tableIds') as Y.Array<string> | undefined;
+      if (!tableIdsYArray) {
+        return;
+      }
+
+      for (let i = 0; i < tableIdsYArray.length; i++) {
+        if (tableIdsYArray.get(i) === tableId) {
+          return;
+        }
+      }
+
+      ydoc.transact(() => {
+        tableIdsYArray.push([tableId]);
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
+    },
+
+    addTablesToGroup: (groupId, tableIds) => {
+      const { ydoc } = get();
+      if (!ydoc) {
+        return;
+      }
+      const groupYMap = getGroupsMap(ydoc).get(groupId);
+      if (!groupYMap) {
+        return;
+      }
+      const tableIdsYArray = groupYMap.get('tableIds') as Y.Array<string> | undefined;
+      if (!tableIdsYArray) {
+        return;
+      }
+
+      ydoc.transact(() => {
+        const existing = new Set<string>();
+        tableIdsYArray.forEach((id) => existing.add(id));
+        const toInsert = tableIds.filter((id) => !existing.has(id));
+        if (toInsert.length > 0) {
+          tableIdsYArray.push(toInsert);
+        }
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
+    },
+
+    removeTableFromGroup: (groupId, tableId) => {
+      const { ydoc } = get();
+      if (!ydoc) {
+        return;
+      }
+      const groupYMap = getGroupsMap(ydoc).get(groupId);
+      if (!groupYMap) {
+        return;
+      }
+      const tableIdsYArray = groupYMap.get('tableIds') as Y.Array<string> | undefined;
+      if (!tableIdsYArray) {
+        return;
+      }
+
+      ydoc.transact(() => {
+        removeTableIdFromYArray(tableIdsYArray, tableId);
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
+    },
+
+    removeTablesFromGroup: (groupId, tableIds) => {
+      const { ydoc } = get();
+      if (!ydoc) {
+        return;
+      }
+      const groupYMap = getGroupsMap(ydoc).get(groupId);
+      if (!groupYMap) {
+        return;
+      }
+      const tableIdsYArray = groupYMap.get('tableIds') as Y.Array<string> | undefined;
+      if (!tableIdsYArray) {
+        return;
+      }
+
+      ydoc.transact(() => {
+        for (const tableId of tableIds) {
+          removeTableIdFromYArray(tableIdsYArray, tableId);
+        }
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
+    },
+
+    updateGroupTables: (groupId, toAdd, toRemove) => {
+      const { ydoc } = get();
+      if (!ydoc) {
+        return;
+      }
+      const groupYMap = getGroupsMap(ydoc).get(groupId);
+      if (!groupYMap) {
+        return;
+      }
+      const tableIdsYArray = groupYMap.get('tableIds') as Y.Array<string> | undefined;
+      if (!tableIdsYArray) {
+        return;
+      }
+
+      ydoc.transact(() => {
+        for (const tableId of toRemove) {
+          removeTableIdFromYArray(tableIdsYArray, tableId);
+        }
+
+        const existing = new Set<string>();
+        tableIdsYArray.forEach((id) => existing.add(id));
+        const toInsert = toAdd.filter((id) => !existing.has(id));
+        if (toInsert.length > 0) {
+          tableIdsYArray.push(toInsert);
+        }
+      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
+    },
+  };
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Team Creator"
+  short_description: "Create phase-based virtual Codex team workflows"
+  default_prompt: "Use $create-codex-team to organize this request into scenarios, phases, role handoffs, and validation gates."

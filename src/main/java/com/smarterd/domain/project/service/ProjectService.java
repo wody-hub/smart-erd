@@ -2,13 +2,17 @@ package com.smarterd.domain.project.service;
 
 import com.smarterd.api.project.dto.CreateProjectRequest;
 import com.smarterd.api.project.dto.ProjectResponse;
+import com.smarterd.api.project.dto.UpdateProjectRequest;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
+import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.repository.ProjectRepository;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,11 +27,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class ProjectService {
 
     /** 프로젝트 레포지토리 */
     private final ProjectRepository projectRepository;
+
+    /** 다이어그램 레포지토리 (프로젝트 삭제 시 cascade용) */
+    private final DiagramRepository diagramRepository;
 
     /** 인증 서비스 (사용자 조회) */
     private final AuthService authService;
@@ -47,10 +53,10 @@ public class ProjectService {
     public ProjectResponse createProject(String loginId, Long teamId, CreateProjectRequest request) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
-        teamService.verifyMembership(team, user);
+        teamService.verifyEditable(team, user);
 
         final var project = Project.builder().name(request.name()).team(team).build();
-        projectRepository.save(project);
+        projectRepository.save(Objects.requireNonNull(project));
 
         return ProjectResponse.from(project);
     }
@@ -100,12 +106,35 @@ public class ProjectService {
     public void deleteProject(String loginId, Long teamId, Long projectId) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
-        teamService.verifyMembership(team, user);
+        teamService.verifyEditable(team, user);
+
+        final var project = Objects.requireNonNull(findProjectById(projectId));
+        verifyProjectBelongsToTeam(project, teamId);
+
+        diagramRepository.deleteByProjectIn(List.of(project));
+        projectRepository.delete(project);
+    }
+
+    /**
+     * 프로젝트를 수정한다. (ADMIN/MEMBER 전용)
+     *
+     * @param loginId   요청 사용자의 로그인 ID
+     * @param teamId    팀 ID
+     * @param projectId 프로젝트 ID
+     * @param request   프로젝트 수정 요청
+     * @return 수정된 프로젝트 응답
+     */
+    @Transactional
+    public ProjectResponse updateProject(String loginId, Long teamId, Long projectId, UpdateProjectRequest request) {
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = teamService.findTeamById(teamId);
+        teamService.verifyEditable(team, user);
 
         final var project = findProjectById(projectId);
         verifyProjectBelongsToTeam(project, teamId);
 
-        projectRepository.delete(project);
+        project.update(request.name(), request.description());
+        return ProjectResponse.from(project);
     }
 
     /**
@@ -117,8 +146,8 @@ public class ProjectService {
      */
     public Project findProjectById(Long projectId) {
         return projectRepository
-            .findById(projectId)
-            .orElseThrow(() -> new EntityNotFoundException("Project not found: " + projectId));
+            .findById(Objects.requireNonNull(projectId))
+            .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_PROJECT.code(), projectId));
     }
 
     /**
@@ -130,7 +159,7 @@ public class ProjectService {
      */
     public void verifyProjectBelongsToTeam(Project project, Long teamId) {
         if (!project.getTeam().getId().equals(teamId)) {
-            throw new BusinessException("Project does not belong to this team");
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_PROJECT_TEAM_MISMATCH.code());
         }
     }
 }

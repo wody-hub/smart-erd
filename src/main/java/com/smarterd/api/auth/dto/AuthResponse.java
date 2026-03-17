@@ -3,15 +3,18 @@ package com.smarterd.api.auth.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
- * 인증 응답 DTO (로그인·회원가입 공통).
+ * 인증 응답 DTO (로그인·회원가입·토큰 갱신 공통).
  *
- * @param token   발급된 JWT 토큰
- * @param loginId 사용자 로그인 ID
- * @param name    사용자 표시 이름
+ * @param accessToken  JWT Access Token
+ * @param refreshToken UUID Refresh Token
+ * @param loginId      사용자 로그인 ID
+ * @param name         사용자 표시 이름
  */
-@Schema(description = "인증 응답 (로그인·회원가입 공통)")
+@Schema(description = "인증 응답 (로그인·회원가입·토큰 갱신 공통)")
 public record AuthResponse(
-    @Schema(description = "JWT 토큰", example = "eyJhbGciOiJIUzI1NiJ9...") String token,
+    @Schema(description = "JWT Access Token", example = "eyJhbGciOiJIUzI1NiJ9...") String accessToken,
+
+    @Schema(description = "UUID Refresh Token", example = "550e8400-e29b-41d4-a716-446655440000") String refreshToken,
 
     @Schema(description = "로그인 ID", example = "hong") String loginId,
 

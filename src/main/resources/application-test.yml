@@ -1,0 +1,4 @@
+smart-erd:
+  auth:
+    test-support:
+      skip-password-verification: true

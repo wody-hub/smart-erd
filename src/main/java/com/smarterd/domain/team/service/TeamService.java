@@ -2,12 +2,23 @@ package com.smarterd.domain.team.service;
 
 import com.smarterd.api.team.dto.AddMemberRequest;
 import com.smarterd.api.team.dto.CreateTeamRequest;
+import com.smarterd.api.team.dto.MyRoleResponse;
 import com.smarterd.api.team.dto.TeamMemberResponse;
 import com.smarterd.api.team.dto.TeamResponse;
 import com.smarterd.api.team.dto.UpdateMemberRoleRequest;
-import com.smarterd.domain.common.exception.AccessDeniedException;
+import com.smarterd.api.team.dto.UpdateTeamRequest;
 import com.smarterd.domain.common.exception.BusinessException;
+import com.smarterd.domain.common.exception.DomainAccessDeniedException;
+import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
+import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.domain.diagram.repository.DiagramRepository;
+import com.smarterd.domain.diagram.service.DiagramSnapshotService;
+import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
+import com.smarterd.domain.dictionary.repository.DictionarySetRepository;
+import com.smarterd.domain.dictionary.repository.DomainRepository;
+import com.smarterd.domain.dictionary.repository.TermRepository;
+import com.smarterd.domain.project.repository.ProjectRepository;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.entity.TeamMember;
 import com.smarterd.domain.team.entity.TeamMemberRole;
@@ -17,6 +28,7 @@ import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.repository.UserRepository;
 import com.smarterd.domain.user.service.AuthService;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,10 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@SuppressWarnings("null")
 public class TeamService {
-
-    private static final String NOT_A_MEMBER = "User is not a member of this team";
 
     /** 팀 레포지토리 */
     private final TeamRepository teamRepository;
@@ -48,6 +57,27 @@ public class TeamService {
     /** 인증 서비스 (사용자 조회) */
     private final AuthService authService;
 
+    /** 프로젝트 레포지토리 (팀 삭제 cascade용) */
+    private final ProjectRepository projectRepository;
+
+    /** 다이어그램 레포지토리 (팀 삭제 cascade용) */
+    private final DiagramRepository diagramRepository;
+
+    /** 다이어그램 방 관리자 (팀 삭제 시 WebSocket 세션 정리용) */
+    private final DiagramRoomManager roomManager;
+
+    /** 다이어그램 스냅샷 서비스 (팀 삭제 시 컴팩션 쿨다운 정리용) */
+    private final DiagramSnapshotService diagramSnapshotService;
+
+    /** 도메인 레포지토리 (팀 삭제 cascade용) */
+    private final DomainRepository domainRepository;
+
+    /** 용어 레포지토리 (팀 삭제 cascade용) */
+    private final TermRepository termRepository;
+
+    /** 사전 세트 레포지토리 (팀 삭제 cascade용) */
+    private final DictionarySetRepository dictionarySetRepository;
+
     /**
      * 새 팀을 생성한다.
      *
@@ -60,10 +90,10 @@ public class TeamService {
         final var user = authService.findUserByLoginId(loginId);
 
         final var team = Team.builder().name(request.name()).owner(user).build();
-        teamRepository.save(team);
+        teamRepository.save(Objects.requireNonNull(team));
 
         final var member = TeamMember.builder().team(team).user(user).role(TeamMemberRole.ADMIN).build();
-        teamMemberRepository.save(member);
+        teamMemberRepository.save(Objects.requireNonNull(member));
 
         return TeamResponse.from(team);
     }
@@ -77,7 +107,7 @@ public class TeamService {
     public List<TeamResponse> getMyTeams(String loginId) {
         final var user = authService.findUserByLoginId(loginId);
         return teamMemberRepository
-            .findByUser(user)
+            .findByUserWithTeamAndOwner(user)
             .stream()
             .map((m) -> TeamResponse.from(m.getTeam()))
             .toList();
@@ -113,8 +143,12 @@ public class TeamService {
 
         final var targetUser = authService.findUserByLoginId(request.loginId());
 
+        if (teamMemberRepository.existsByTeamAndUser(team, targetUser)) {
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_MEMBER.code(), request.loginId());
+        }
+
         final var member = TeamMember.builder().team(team).user(targetUser).role(request.role()).build();
-        teamMemberRepository.save(member);
+        teamMemberRepository.save(Objects.requireNonNull(member));
 
         return TeamMemberResponse.from(member);
     }
@@ -135,13 +169,13 @@ public class TeamService {
         final var targetUser = findUserById(userId);
 
         if (team.getOwner().getId().equals(targetUser.getId())) {
-            throw new BusinessException("Cannot remove team owner");
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_REMOVE_OWNER.code());
         }
 
         final var member = teamMemberRepository
             .findByTeamAndUser(team, targetUser)
-            .orElseThrow(() -> new EntityNotFoundException(NOT_A_MEMBER));
-        teamMemberRepository.delete(member);
+            .orElseThrow(() -> new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
+        teamMemberRepository.delete(Objects.requireNonNull(member));
     }
 
     /**
@@ -167,12 +201,12 @@ public class TeamService {
         final var targetUser = findUserById(userId);
 
         if (team.getOwner().getId().equals(targetUser.getId())) {
-            throw new BusinessException("Cannot change team owner's role");
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_CHANGE_OWNER_ROLE.code());
         }
 
         final var member = teamMemberRepository
             .findByTeamAndUser(team, targetUser)
-            .orElseThrow(() -> new EntityNotFoundException(NOT_A_MEMBER));
+            .orElseThrow(() -> new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
         member.changeRole(request.role());
 
         return TeamMemberResponse.from(member);
@@ -193,6 +227,70 @@ public class TeamService {
     }
 
     /**
+     * 현재 사용자의 팀 내 역할을 조회한다.
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId  팀 ID
+     * @return 역할 응답
+     */
+    public MyRoleResponse getMyRole(String loginId, Long teamId) {
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = findTeamById(teamId);
+        final var member = teamMemberRepository
+            .findByTeamAndUser(team, user)
+            .orElseThrow(() -> new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
+        return new MyRoleResponse(member.getRole());
+    }
+
+    /**
+     * 팀 이름을 변경한다. (ADMIN 전용)
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId  팀 ID
+     * @param request 팀 수정 요청
+     * @return 수정된 팀 응답
+     */
+    @Transactional
+    public TeamResponse updateTeam(String loginId, Long teamId, UpdateTeamRequest request) {
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = findTeamById(teamId);
+        verifyAdmin(team, user);
+        team.rename(request.name());
+        return TeamResponse.from(team);
+    }
+
+    /**
+     * 팀을 삭제한다. 모든 하위 리소스를 함께 삭제한다. (ADMIN 전용)
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId  팀 ID
+     */
+    @Transactional
+    public void deleteTeam(String loginId, Long teamId) {
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = Objects.requireNonNull(findTeamById(teamId));
+        verifyAdmin(team, user);
+
+        // WebSocket 세션 정리 + CASCADE 삭제: Diagram → Project → Term → Domain → Team(+Members)
+        final var projects = projectRepository.findByTeam(team);
+        if (!projects.isEmpty()) {
+            for (final var project : projects) {
+                for (final var diagram : diagramRepository.findAllByProject(project)) {
+                    final var diagramId = Objects.requireNonNull(diagram.getId());
+                    roomManager.discardRoom(diagramId);
+                    diagramSnapshotService.clearCompactionCoolDown(diagramId);
+                }
+            }
+            diagramRepository.deleteByProjectIn(projects);
+            projectRepository.deleteByTeam(team);
+        }
+        termRepository.deleteByTeam(team);
+        domainRepository.deleteByTeam(team);
+        dictionarySetRepository.deleteByTeam(team);
+        teamRepository.delete(team); // members는 orphanRemoval
+    }
+
+    /**
      * 팀 ID로 팀을 조회한다.
      *
      * @param teamId 팀 ID
@@ -201,8 +299,23 @@ public class TeamService {
      */
     public Team findTeamById(Long teamId) {
         return teamRepository
-            .findById(teamId)
-            .orElseThrow(() -> new EntityNotFoundException("Team not found: " + teamId));
+            .findByIdWithOwner(teamId)
+            .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_TEAM.code(), teamId));
+    }
+
+    /**
+     * 팀 ID로 팀을 비관적 락과 함께 조회한다.
+     *
+     * <p>동일 팀 범위의 동시 쓰기 경쟁을 직렬화해야 할 때 사용한다.</p>
+     *
+     * @param teamId 팀 ID
+     * @return 팀 엔티티
+     * @throws EntityNotFoundException 팀이 존재하지 않는 경우
+     */
+    public Team findTeamByIdForUpdate(Long teamId) {
+        return teamRepository
+            .findByIdForUpdate(teamId)
+            .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_TEAM.code(), teamId));
     }
 
     /**
@@ -210,26 +323,43 @@ public class TeamService {
      *
      * @param team 팀 엔티티
      * @param user 사용자 엔티티
-     * @throws AccessDeniedException 팀 멤버가 아닌 경우
+     * @throws DomainAccessDeniedException 팀 멤버가 아닌 경우
      */
     public void verifyMembership(Team team, User user) {
         if (!teamMemberRepository.existsByTeamAndUser(team, user)) {
-            throw new AccessDeniedException(NOT_A_MEMBER);
+            throw new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code());
+        }
+    }
+
+    /**
+     * 사용자가 팀에서 편집 가능한 역할(ADMIN 또는 MEMBER)인지 확인한다.
+     * VIEWER는 읽기 전용이므로 DomainAccessDeniedException을 발생시킨다.
+     *
+     * @param team 팀 엔티티
+     * @param user 사용자 엔티티
+     * @throws DomainAccessDeniedException 팀 멤버가 아니거나 VIEWER인 경우
+     */
+    public void verifyEditable(Team team, User user) {
+        final var member = teamMemberRepository
+            .findByTeamAndUser(team, user)
+            .orElseThrow(() -> new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
+        if (member.getRole() == TeamMemberRole.VIEWER) {
+            throw new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_VIEWER_READONLY.code());
         }
     }
 
     private User findUserById(Long userId) {
         return userRepository
-            .findById(userId)
-            .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+            .findById(Objects.requireNonNull(userId))
+            .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_USER.code(), userId));
     }
 
     private void verifyAdmin(Team team, User user) {
         final var member = teamMemberRepository
             .findByTeamAndUser(team, user)
-            .orElseThrow(() -> new AccessDeniedException(NOT_A_MEMBER));
+            .orElseThrow(() -> new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
         if (member.getRole() != TeamMemberRole.ADMIN) {
-            throw new AccessDeniedException("Only ADMIN can perform this action");
+            throw new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_ADMIN.code());
         }
     }
 }

@@ -1,0 +1,27 @@
+appId: com.smarterd.app
+productName: Smart ERD
+copyright: Copyright (c) 2026 Smart ERD
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - out/**/*
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch: [universal]
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

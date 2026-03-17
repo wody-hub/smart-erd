@@ -24,6 +24,71 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+
+    --header-bg: 222.2 84% 4.9%;
+    --header-foreground: 210 40% 98%;
+    --header-muted: 215 20.2% 65.1%;
+
+    --erd-table-header: 221.2 83.2% 53.3%;
+    --erd-table-header-foreground: 0 0% 100%;
+    --erd-pk: 45.4 93.4% 47.5%;
+    --erd-fk: 221.2 83.2% 53.3%;
+    --erd-nn: 142.1 76.2% 36.3%;
+    --erd-handle: 215 16.3% 46.9%;
+    --erd-handle-border: 215.4 16.3% 36.9%;
+    --erd-warning: 47.9 95.8% 53.1%;
+    --erd-ai: 24 95% 53%;
+    --erd-domain: 270 60% 55%;
+    --erd-domain-foreground: 0 0% 100%;
+
+    --erd-status-connected: 142.1 76.2% 36.3%;
+    --erd-status-connecting: 47.9 95.8% 53.1%;
+    --erd-status-disconnected: 0 84.2% 60.2%;
+
+    --erd-cursor-foreground: 0 0% 100%;
+
+    --cursor-color-1: 0 80% 60%;
+    --cursor-color-2: 210 80% 60%;
+    --cursor-color-3: 120 60% 50%;
+    --cursor-color-4: 45 90% 55%;
+    --cursor-color-5: 280 70% 60%;
+    --cursor-color-6: 180 60% 50%;
+
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 210 40% 98%;
+
+    --erd-color-red: 0 72% 51%;
+    --erd-color-red-foreground: 0 0% 100%;
+    --erd-color-orange: 25 95% 53%;
+    --erd-color-orange-foreground: 0 0% 0%;
+    --erd-color-amber: 45 93% 47%;
+    --erd-color-amber-foreground: 0 0% 0%;
+    --erd-color-green: 142 76% 36%;
+    --erd-color-green-foreground: 0 0% 100%;
+    --erd-color-teal: 173 80% 35%;
+    --erd-color-teal-foreground: 0 0% 100%;
+    --erd-color-blue: 221 83% 53%;
+    --erd-color-blue-foreground: 0 0% 100%;
+    --erd-color-indigo: 239 84% 67%;
+    --erd-color-indigo-foreground: 0 0% 100%;
+    --erd-color-purple: 270 60% 55%;
+    --erd-color-purple-foreground: 0 0% 100%;
+    --erd-color-pink: 330 81% 60%;
+    --erd-color-pink-foreground: 0 0% 0%;
+
+    --erd-validation-matched: 142.1 76.2% 36.3%;
+    --erd-validation-mismatch: 37.7 92.1% 50.2%;
+    --erd-validation-unregistered: 0 84.2% 60.2%;
+    --erd-validation-unchecked: 215.4 16.3% 46.9%;
+
+    --composition-valid-bg: 151.8 81% 95.9%;
+    --composition-valid-border: 148.6 60% 80%;
+    --composition-valid-foreground: 155.1 75% 9.4%;
+    --composition-valid-muted: 149.7 70.5% 17.8%;
+    --composition-warning-bg: 48 100% 96.1%;
+    --composition-warning-border: 48.5 95.8% 76.9%;
+    --composition-warning-foreground: 31.8 81% 4.3%;
+    --composition-warning-muted: 33.4 81% 12.7%;
   }
 
   .dark {
@@ -46,6 +111,71 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    --header-bg: 222.2 84% 4.9%;
+    --header-foreground: 210 40% 98%;
+    --header-muted: 215 20.2% 65.1%;
+
+    --erd-table-header: 217.2 91.2% 59.8%;
+    --erd-table-header-foreground: 0 0% 100%;
+    --erd-pk: 47.9 95.8% 53.1%;
+    --erd-fk: 217.2 91.2% 59.8%;
+    --erd-nn: 142.1 70.6% 45.3%;
+    --erd-handle: 215 20.2% 65.1%;
+    --erd-handle-border: 215 20.2% 55.1%;
+    --erd-warning: 47.9 95.8% 53.1%;
+    --erd-ai: 24 90% 58%;
+    --erd-domain: 270 50% 65%;
+    --erd-domain-foreground: 0 0% 100%;
+
+    --erd-status-connected: 142.1 70.6% 45.3%;
+    --erd-status-connecting: 47.9 95.8% 53.1%;
+    --erd-status-disconnected: 0 62.8% 50.6%;
+
+    --erd-cursor-foreground: 0 0% 100%;
+
+    --cursor-color-1: 0 80% 60%;
+    --cursor-color-2: 210 80% 60%;
+    --cursor-color-3: 120 60% 50%;
+    --cursor-color-4: 45 90% 55%;
+    --cursor-color-5: 280 70% 60%;
+    --cursor-color-6: 180 60% 50%;
+
+    --success: 142.1 70.6% 45.3%;
+    --success-foreground: 210 40% 98%;
+
+    --erd-color-red: 0 62% 40%;
+    --erd-color-red-foreground: 0 0% 100%;
+    --erd-color-orange: 25 80% 42%;
+    --erd-color-orange-foreground: 0 0% 100%;
+    --erd-color-amber: 45 80% 38%;
+    --erd-color-amber-foreground: 0 0% 100%;
+    --erd-color-green: 142 60% 32%;
+    --erd-color-green-foreground: 0 0% 100%;
+    --erd-color-teal: 173 65% 35%;
+    --erd-color-teal-foreground: 0 0% 100%;
+    --erd-color-blue: 221 70% 48%;
+    --erd-color-blue-foreground: 0 0% 100%;
+    --erd-color-indigo: 239 65% 55%;
+    --erd-color-indigo-foreground: 0 0% 100%;
+    --erd-color-purple: 270 50% 48%;
+    --erd-color-purple-foreground: 0 0% 100%;
+    --erd-color-pink: 330 65% 50%;
+    --erd-color-pink-foreground: 0 0% 100%;
+
+    --erd-validation-matched: 142.1 70.6% 45.3%;
+    --erd-validation-mismatch: 37.7 92.1% 50.2%;
+    --erd-validation-unregistered: 0 62.8% 50.6%;
+    --erd-validation-unchecked: 215 20.2% 65.1%;
+
+    --composition-valid-bg: 155.1 75% 12%;
+    --composition-valid-border: 149 60% 25%;
+    --composition-valid-foreground: 151.8 81% 85%;
+    --composition-valid-muted: 149.7 70.5% 72%;
+    --composition-warning-bg: 33.4 81% 10%;
+    --composition-warning-border: 45 60% 25%;
+    --composition-warning-foreground: 48 100% 88%;
+    --composition-warning-muted: 48 95% 76%;
   }
 }
 

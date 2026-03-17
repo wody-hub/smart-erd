@@ -1,50 +1,103 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import LoginPage from './pages/LoginPage';
-import SignupPage from './pages/SignupPage';
-import TeamsPage from './pages/TeamsPage';
-import ProjectsPage from './pages/ProjectsPage';
-import DiagramPage from './pages/DiagramPage';
+import { Suspense, lazy } from 'react';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/query-client';
+import { isElectron, getServerUrl } from '@/lib/platform';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import { Toaster } from './components/ui/sonner';
+import Spinner from './components/ui/spinner';
+import { ROUTES } from '@/constants/routes';
+
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const SignupPage = lazy(() => import('./pages/auth/SignupPage'));
+const TeamsPage = lazy(() => import('./pages/team/TeamsPage'));
+const ProjectsPage = lazy(() => import('./pages/project/ProjectsPage'));
+const DiagramsPage = lazy(() => import('./pages/diagram/DiagramsPage'));
+const DiagramPage = lazy(() => import('./pages/diagram/DiagramPage'));
+const DictionaryPage = lazy(() => import('./pages/dictionary/DictionaryPage'));
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
+
+/** Electron에서는 HashRouter, 웹에서는 BrowserRouter를 사용한다. */
+const Router = isElectron() ? HashRouter : BrowserRouter;
+
+/** Electron 환경 여부 (렌더링 분기용 캐시) */
+const isElectronEnv = isElectron();
 
 /**
  * 애플리케이션 루트 컴포넌트.
  *
- * BrowserRouter로 SPA 라우팅을 구성하고,
+ * Electron에서는 HashRouter, 웹에서는 BrowserRouter로 SPA 라우팅을 구성하고,
  * 인증이 필요한 경로에 ProtectedRoute 가드를 적용한다.
  */
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route
-          path="/teams"
-          element={
-            <ProtectedRoute>
-              <TeamsPage />
-            </ProtectedRoute>
+    <QueryClientProvider client={queryClient}>
+      <Toaster />
+      <Router>
+        <Suspense
+          fallback={
+            <div className="h-screen flex items-center justify-center">
+              <Spinner />
+            </div>
           }
-        />
-        <Route
-          path="/teams/:teamId/projects"
-          element={
-            <ProtectedRoute>
-              <ProjectsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/teams/:teamId/projects/:projectId/diagrams/:diagramId"
-          element={
-            <ProtectedRoute>
-              <DiagramPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/" element={<Navigate to="/teams" replace />} />
-        <Route path="*" element={<Navigate to="/teams" replace />} />
-      </Routes>
-    </BrowserRouter>
+        >
+          <Routes>
+            {/* ── Electron 전용 (ProtectedRoute 이전에 배치) ── */}
+            {isElectronEnv && <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />}
+            {isElectronEnv && !getServerUrl() && (
+              <Route path="*" element={<Navigate to={ROUTES.SETTINGS} replace />} />
+            )}
+
+            {/* ── 공개 라우트 ── */}
+            <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+            <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
+
+            {/* ── 인증 필요 라우트 ── */}
+            <Route
+              path={ROUTES.TEAMS}
+              element={
+                <ProtectedRoute>
+                  <TeamsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={ROUTES.PROJECTS_PATTERN}
+              element={
+                <ProtectedRoute>
+                  <ProjectsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={ROUTES.DICTIONARY_PATTERN}
+              element={
+                <ProtectedRoute>
+                  <DictionaryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={ROUTES.DIAGRAMS_PATTERN}
+              element={
+                <ProtectedRoute>
+                  <DiagramsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={ROUTES.DIAGRAM_PATTERN}
+              element={
+                <ProtectedRoute>
+                  <DiagramPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/" element={<Navigate to={ROUTES.TEAMS} replace />} />
+            <Route path="*" element={<Navigate to={ROUTES.TEAMS} replace />} />
+          </Routes>
+        </Suspense>
+      </Router>
+    </QueryClientProvider>
   );
 }

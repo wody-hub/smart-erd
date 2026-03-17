@@ -9,7 +9,7 @@ bin/
 *.iml
 *.ipr
 *.iws
-.vscode/
+.vscode/settings.local.json
 *.swp
 *.swo
 
@@ -49,7 +49,11 @@ Thumbs.db
 node_modules/
 client/node_modules/
 client/dist/
+client/out/
 client/.cache/
+client/.tmp-test/
+client/playwright-report/
+client/test-results/
 
 # Logs
 *.log

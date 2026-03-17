@@ -2,9 +2,11 @@ package com.smarterd.api.team;
 
 import com.smarterd.api.team.dto.AddMemberRequest;
 import com.smarterd.api.team.dto.CreateTeamRequest;
+import com.smarterd.api.team.dto.MyRoleResponse;
 import com.smarterd.api.team.dto.TeamMemberResponse;
 import com.smarterd.api.team.dto.TeamResponse;
 import com.smarterd.api.team.dto.UpdateMemberRoleRequest;
+import com.smarterd.api.team.dto.UpdateTeamRequest;
 import com.smarterd.api.team.validator.AddMemberRequestValidator;
 import com.smarterd.domain.team.service.TeamService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -56,7 +59,9 @@ public class TeamController {
      */
     @InitBinder
     public void initBinder(WebDataBinder binder) {
-        binder.addValidators(addMemberRequestValidator);
+        if (binder.getTarget() instanceof AddMemberRequest) {
+            binder.addValidators(addMemberRequestValidator);
+        }
     }
 
     /**
@@ -97,6 +102,75 @@ public class TeamController {
     @GetMapping
     public ResponseEntity<List<TeamResponse>> getMyTeams(@AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(teamService.getMyTeams(jwt.getSubject()));
+    }
+
+    /**
+     * 현재 사용자의 팀 내 역할을 조회한다.
+     *
+     * @param jwt    인증된 JWT 토큰
+     * @param teamId 팀 ID
+     * @return 200 OK + MyRoleResponse
+     */
+    @Operation(summary = "내 역할 조회", description = "현재 사용자의 팀 내 역할을 조회한다.")
+    @ApiResponse(
+        responseCode = "200",
+        description = "조회 성공",
+        content = @Content(schema = @Schema(implementation = MyRoleResponse.class))
+    )
+    @ApiResponse(responseCode = "403", description = "팀 멤버가 아님", content = @Content)
+    @ApiResponse(responseCode = "404", description = "팀 미존재", content = @Content)
+    @GetMapping("/{teamId}/me")
+    public ResponseEntity<MyRoleResponse> getMyRole(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId
+    ) {
+        return ResponseEntity.ok(teamService.getMyRole(jwt.getSubject(), teamId));
+    }
+
+    /**
+     * 팀 이름을 변경한다.
+     *
+     * @param jwt     인증된 JWT 토큰
+     * @param teamId  팀 ID
+     * @param request 팀 수정 요청
+     * @return 200 OK + TeamResponse
+     */
+    @Operation(summary = "팀 이름 변경", description = "팀 이름을 변경한다. ADMIN 권한 필요.")
+    @ApiResponse(
+        responseCode = "200",
+        description = "변경 성공",
+        content = @Content(schema = @Schema(implementation = TeamResponse.class))
+    )
+    @ApiResponse(responseCode = "400", description = "유효성 검증 실패", content = @Content)
+    @ApiResponse(responseCode = "403", description = "ADMIN 아님", content = @Content)
+    @ApiResponse(responseCode = "404", description = "팀 미존재", content = @Content)
+    @PutMapping("/{teamId}")
+    public ResponseEntity<TeamResponse> updateTeam(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Valid @RequestBody UpdateTeamRequest request
+    ) {
+        return ResponseEntity.ok(teamService.updateTeam(jwt.getSubject(), teamId, request));
+    }
+
+    /**
+     * 팀을 삭제한다.
+     *
+     * @param jwt    인증된 JWT 토큰
+     * @param teamId 팀 ID
+     * @return 204 No Content
+     */
+    @Operation(summary = "팀 삭제", description = "팀과 모든 하위 리소스를 삭제한다. ADMIN 권한 필요.")
+    @ApiResponse(responseCode = "204", description = "삭제 성공")
+    @ApiResponse(responseCode = "403", description = "ADMIN 아님", content = @Content)
+    @ApiResponse(responseCode = "404", description = "팀 미존재", content = @Content)
+    @DeleteMapping("/{teamId}")
+    public ResponseEntity<Void> deleteTeam(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId
+    ) {
+        teamService.deleteTeam(jwt.getSubject(), teamId);
+        return ResponseEntity.noContent().build();
     }
 
     /**

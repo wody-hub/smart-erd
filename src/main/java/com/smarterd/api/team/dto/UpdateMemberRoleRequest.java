@@ -11,5 +11,7 @@ import jakarta.validation.constraints.NotNull;
  */
 @Schema(description = "멤버 역할 변경 요청")
 public record UpdateMemberRoleRequest(
-    @Schema(description = "변경할 역할 (ADMIN, MEMBER, VIEWER)", example = "VIEWER") @NotNull TeamMemberRole role
+    @Schema(description = "변경할 역할 (ADMIN, MEMBER, VIEWER)", example = "VIEWER")
+    @NotNull(message = "{validation.not-null.role}")
+    TeamMemberRole role
 ) {}

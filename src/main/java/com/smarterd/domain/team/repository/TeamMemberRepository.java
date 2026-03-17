@@ -13,7 +13,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
  *
  * <p>복합 기본키 {@link TeamMemberId}(팀 ID + 사용자 ID)를 사용한다.</p>
  */
-public interface TeamMemberRepository extends JpaRepository<TeamMember, TeamMemberId> {
+public interface TeamMemberRepository extends JpaRepository<TeamMember, TeamMemberId>, TeamMemberRepositoryCustom {
     /**
      * 특정 사용자가 속한 모든 팀 멤버십을 조회한다.
      *

@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023"],
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "outDir": ".tmp-test",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "test/**/*.ts",
+    "test/types/**/*.d.ts",
+    "src/lib/code-sync-revision.ts",
+    "src/lib/code-sync-apply-gate.ts",
+    "src/lib/ddl-parser.ts",
+    "src/lib/dsl-parser.ts",
+    "src/lib/dsl-keywords.ts",
+    "src/lib/diff-apply-rollout.ts",
+    "src/lib/erd-diff-apply.ts",
+    "src/lib/erd-diff-builder.ts",
+    "src/lib/erd-fallback-group-remap.ts",
+    "src/lib/erd-diff-plan.ts",
+    "src/lib/word-composition.ts",
+    "src/lib/logical-name-resolution.ts",
+    "src/lib/handle-id.ts",
+    "src/lib/edge-handles.ts",
+    "src/lib/sync-policy.ts",
+    "src/lib/remote-edit-locks.ts",
+    "src/lib/hash.ts",
+    "src/lib/table-lock-key.ts",
+    "src/collaboration/yjsBridge.ts",
+    "src/constants/storage.ts",
+    "src/constants/sync-status.ts",
+    "src/types/collaboration.ts",
+    "src/types/erd.ts"
+  ]
+}

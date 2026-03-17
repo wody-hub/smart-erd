@@ -1,0 +1,172 @@
+import * as Y from 'yjs';
+import type { Edge, Node, OnEdgesChange, OnNodesChange } from '@xyflow/react';
+import type { CanvasUndoManager } from '@/constants/canvas-history';
+import type { DdlParseResult } from '@/lib/ddl-parser';
+import type { ApplyDiffResult } from '@/lib/erd-diff-apply';
+import type { DiffPlan } from '@/lib/erd-diff-plan';
+import type { EdgeHandleSelectionValue } from '@/lib/edge-handles';
+import type {
+  Column,
+  EdgeRoutingType,
+  RelationType,
+  TableGroup,
+  TableHeaderColor,
+  TableNodeData,
+  Waypoint,
+} from '@/types/erd';
+
+/** FK 관계 추가 파라미터 */
+export interface AddFkRelationParams {
+  /** 부모(참조 대상) 노드 ID */
+  parentNodeId: string;
+  /** 자식(FK 소유) 노드 ID */
+  childNodeId: string;
+  /** 부모 테이블의 PK 컬럼 목록 */
+  pkColumns: Column[];
+  /** 부모 테이블 라벨 (FK 컬럼 접두어 생성용) */
+  parentLabel: string;
+  /** 자식 테이블의 기존 컬럼 이름 목록 (중복 방지용) */
+  existingNames: string[];
+  /** 관계 유형 (식별/비식별) */
+  relationType: RelationType;
+}
+
+/** 드래그 중인 position 대기 큐 컨텍스트 */
+export interface PositionQueueCtx {
+  pending: Map<string, { x: number; y: number }>;
+}
+
+/**
+ * 렌더링과 무관한 스토어 내부 상태.
+ *
+ * 이 객체의 필드들은 Zustand `set()`을 거치지 않고 직접 변이(mutate)한다.
+ * 이는 의도적인 설계로, React 리렌더링을 트리거하지 않아야 하는 상태
+ * (드래그 중 플래그, Observer 참조, 위치 대기 큐 등)를 Zustand 구독 범위 밖에서 관리한다.
+ * Zustand DevTools에는 추적되지 않으므로 디버깅 시 유의한다.
+ */
+export interface InternalState {
+  tablesObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null;
+  edgesObserver: (() => void) | null;
+  groupsObserver: (() => void) | null;
+  undoManager: CanvasUndoManager | null;
+  isNodeDragging: boolean;
+  hasDeferredTableSync: boolean;
+  tablePositionQueue: PositionQueueCtx;
+}
+
+/**
+ * ERD 캔버스 상태를 관리하는 Zustand 스토어의 상태 인터페이스.
+ */
+export interface CanvasState {
+  nodes: Node<TableNodeData>[];
+  groups: TableGroup[];
+  edges: Edge[];
+  highlightedNodeIds: string[];
+  highlightedEdgeId: string | null;
+  /** 현재 편집 모드로 활성화된 노드 ID (null이면 모든 노드가 정적 뷰) */
+  activeEditNodeId: string | null;
+  /** 코드 에디터 기준 현재 편집 테이블 락 키 */
+  codeEditingTableKey: string | null;
+  /** 편집 모드 노드를 설정한다. */
+  setActiveEditNodeId: (id: string | null) => void;
+  /** 코드 에디터 편집 테이블 락 키를 설정한다. */
+  setCodeEditingTableKey: (tableKey: string | null) => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onNodesChange: OnNodesChange;
+  onEdgesChange: OnEdgesChange;
+  setNodes: (nodes: Node<TableNodeData>[]) => void;
+  setEdges: (edges: Edge[]) => void;
+  lastBackupHash: string;
+  markBackedUp: (hash: string) => void;
+  prepareBackup: () => { content: string; hash: string } | null;
+  addTable: (name?: string) => void;
+  deleteTable: (nodeId: string) => void;
+  renameTable: (nodeId: string, newName: string) => void;
+  updateTableMeta: (
+    nodeId: string,
+    updates: Partial<
+      Pick<
+        TableNodeData,
+        'label' | 'logicalTableName' | 'tableTermId' | 'headerColor' | 'handleLayout'
+      >
+    >,
+  ) => void;
+  addColumn: (nodeId: string) => void;
+  deleteColumn: (nodeId: string, colId: string) => void;
+  updateColumn: (nodeId: string, colId: string, updates: Partial<Column>) => void;
+  applyDictionaryReconciliation: (updates: {
+    tableMetaUpdates: Array<{
+      nodeId: string;
+      updates: Partial<Pick<TableNodeData, 'label' | 'logicalTableName' | 'tableTermId'>>;
+    }>;
+    columnUpdates: Array<{ nodeId: string; colId: string; updates: Partial<Column> }>;
+  }) => void;
+  moveColumn: (nodeId: string, fromIndex: number, toIndex: number) => void;
+  setHighlightedNodes: (ids: string[]) => void;
+  setHighlightedEdge: (id: string | null) => void;
+  clearHighlights: () => void;
+  undo: () => void;
+  redo: () => void;
+  stopHistoryCapture: () => void;
+  removeEdge: (edgeId: string) => void;
+  removeEdgeWithFkColumn: (edgeId: string) => void;
+  updateEdgeRoutingType: (edgeId: string, routingType: EdgeRoutingType) => void;
+  updateEdgeHandleSelection: (
+    edgeId: string,
+    selection: EdgeHandleSelectionValue,
+    nodeOverrides?: Node<TableNodeData>[],
+  ) => void;
+  updateEdgeWaypoints: (edgeId: string, waypoints: Waypoint[]) => void;
+  resetEdgeWaypoints: (edgeId: string) => void;
+  normalizeEdgeHandles: (
+    nodeIds?: string[],
+    nodeOverrides?: Node<TableNodeData>[],
+    origin?: unknown,
+  ) => void;
+  applyLayout: (nodes: Node<TableNodeData>[]) => void;
+  serialize: () => string;
+  addFkRelation: (params: AddFkRelationParams) => number;
+  connectWithRelationType: (
+    source: string,
+    target: string,
+    sourceHandle: string | undefined,
+    targetHandle: string | undefined,
+    relationType: RelationType,
+  ) => void;
+  importDdl: (result: DdlParseResult) => void;
+  replaceFromDdl: (result: DdlParseResult) => void;
+  applyDiffPlan: (plan: DiffPlan) => ApplyDiffResult | null;
+  /** 새 논리적 그룹을 생성한다. */
+  addGroup: (label?: string) => void;
+  /** 논리적 그룹을 삭제한다. 소속 테이블에는 영향이 없다. */
+  deleteGroup: (groupId: string) => void;
+  /** 그룹 이름을 변경한다. */
+  renameGroup: (groupId: string, newName: string) => void;
+  /** 그룹 색상을 변경한다. */
+  updateGroupColor: (groupId: string, color: TableHeaderColor | 'default') => void;
+  /** 그룹에 테이블을 추가한다. 이미 존재하면 무시한다. */
+  addTableToGroup: (groupId: string, tableId: string) => void;
+  /** 그룹에 여러 테이블을 추가한다. */
+  addTablesToGroup: (groupId: string, tableIds: string[]) => void;
+  /** 그룹에서 테이블을 제거한다. */
+  removeTableFromGroup: (groupId: string, tableId: string) => void;
+  /** 그룹에서 여러 테이블을 제거한다. */
+  removeTablesFromGroup: (groupId: string, tableIds: string[]) => void;
+  /** 그룹 테이블 목록을 원자적으로 갱신한다. */
+  updateGroupTables: (groupId: string, toAdd: string[], toRemove: string[]) => void;
+  ydoc: Y.Doc | null;
+  internal: InternalState;
+  initYDoc: (ydoc: Y.Doc) => void;
+  destroyYDoc: () => void;
+  /** API JSON을 Y.Doc을 거치지 않고 Zustand에 직접 주입한다 (프리뷰 전용). */
+  loadPreview: (json: string) => void;
+}
+
+/** Canvas 스토어 set 함수 타입 */
+export type CanvasSetState = (
+  partial: Partial<CanvasState> | ((state: CanvasState) => Partial<CanvasState>),
+) => void;
+
+/** Canvas 스토어 get 함수 타입 */
+export type CanvasGetState = () => CanvasState;

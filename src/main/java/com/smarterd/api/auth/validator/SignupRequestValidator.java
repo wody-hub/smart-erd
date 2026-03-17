@@ -1,8 +1,11 @@
 package com.smarterd.api.auth.validator;
 
 import com.smarterd.api.auth.dto.SignupRequest;
+import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.user.repository.UserRepository;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.Errors;
 import org.springframework.validation.Validator;
@@ -25,17 +28,21 @@ public class SignupRequestValidator implements Validator {
     private final UserRepository userRepository;
 
     @Override
-    public boolean supports(@SuppressWarnings("null") Class<?> clazz) {
+    public boolean supports(@NonNull Class<?> clazz) {
         return SignupRequest.class.isAssignableFrom(clazz);
     }
 
     @Override
-    @SuppressWarnings("null")
-    public void validate(Object target, Errors errors) {
+    public void validate(@NonNull Object target, @NonNull Errors errors) {
         final var request = (SignupRequest) target;
 
         if (request.loginId() != null && userRepository.existsByLoginId(request.loginId())) {
-            errors.rejectValue("loginId", "duplicate", "Login ID already exists: " + request.loginId());
+            errors.rejectValue(
+                "loginId",
+                Objects.requireNonNull(MessageCode.ERROR_DUPLICATE_LOGIN_ID.code()),
+                new Object[] { request.loginId() },
+                "Login ID already exists"
+            );
         }
     }
 }

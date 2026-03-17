@@ -24,6 +24,12 @@
         "printWidth": 100,
         "singleQuote": true
       }
+    },
+    {
+      "files": ["*.yml", "*.json"],
+      "options": {
+        "tabWidth": 2
+      }
     }
   ]
 }

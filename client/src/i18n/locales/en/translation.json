@@ -1,0 +1,985 @@
+{
+  "common": {
+    "appName": "Smart ERD",
+    "button": {
+      "cancel": "Cancel",
+      "create": "Create",
+      "creating": "Creating...",
+      "delete": "Delete",
+      "save": "Save",
+      "saving": "Saving...",
+      "backup": "Backup",
+      "backingUp": "Backing up...",
+      "invite": "Invite",
+      "processing": "Processing...",
+      "pending": "...",
+      "next": "Next",
+      "previous": "Previous",
+      "close": "Close",
+      "confirm": "Confirm"
+    },
+    "loading": "Loading...",
+    "aria": {
+      "confirmRename": "Confirm rename",
+      "cancelRename": "Cancel rename",
+      "language": "Language",
+      "closeDialog": "Close dialog"
+    },
+    "dialog": {
+      "enterName": "Enter a name for the resource you want to create."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Smart ERD",
+      "loginId": "Login ID",
+      "password": "Password",
+      "loginIdPlaceholder": "Enter your login ID",
+      "passwordPlaceholder": "Enter your password",
+      "submit": "Login",
+      "submitting": "Logging in...",
+      "error": "Login ID or password is incorrect.",
+      "noAccount": "Don't have an account?",
+      "signupLink": "Sign up"
+    },
+    "signup": {
+      "title": "Sign Up",
+      "loginId": "Login ID",
+      "loginIdPlaceholder": "2~50 characters",
+      "name": "Name",
+      "namePlaceholder": "Your display name",
+      "password": "Password",
+      "passwordPlaceholder": "8+ characters",
+      "submit": "Sign Up",
+      "submitting": "Signing up...",
+      "error": "Signup failed. Login ID may already exist.",
+      "hasAccount": "Already have an account?",
+      "loginLink": "Login"
+    },
+    "logout": "Logout"
+  },
+  "team": {
+    "list": {
+      "title": "My Teams",
+      "newButton": "New Team",
+      "createButton": "Create Team",
+      "empty": "No teams yet. Create your first team to get started.",
+      "memberCount_one": "{{count}} member",
+      "memberCount_other": "{{count}} members",
+      "owner": "Owner: {{name}}"
+    },
+    "create": {
+      "dialogTitle": "Create New Team",
+      "inputLabel": "Team Name",
+      "placeholder": "Enter team name"
+    },
+    "toast": {
+      "created": "Team created",
+      "createFailed": "Failed to create team",
+      "updated": "Team name updated",
+      "updateFailed": "Failed to update team name",
+      "deleted": "Team deleted",
+      "deleteFailed": "Failed to delete team"
+    },
+    "settings": {
+      "title": "Team Settings",
+      "description": "Manage team name and deletion settings.",
+      "nameLabel": "Team Name",
+      "save": "Save",
+      "dangerZone": "Danger Zone",
+      "deleteWarning": "This team and all its resources (projects, diagrams, dictionaries) will be permanently deleted.",
+      "deleteButton": "Delete Team",
+      "deleteConfirmTitle": "Confirm Team Deletion",
+      "deleteConfirmDescription": "Type the team name \"{{name}}\" to confirm.",
+      "deleteConfirmPlaceholder": "Type team name"
+    },
+    "aria": {
+      "settings": "Team settings"
+    },
+    "members": {
+      "dialogTitle": "Team Members",
+      "dialogDescription": "Manage members of this team.",
+      "loginIdLabel": "Login ID",
+      "loginIdPlaceholder": "Login ID",
+      "roleLabel": "Role",
+      "roleAdmin": "Admin",
+      "roleMember": "Member",
+      "roleViewer": "Viewer",
+      "inviteFailed": "Failed to invite member",
+      "removed": "Member removed",
+      "removeFailed": "Failed to remove member",
+      "aria": {
+        "removeMember": "Remove member {{name}}"
+      }
+    }
+  },
+  "project": {
+    "list": {
+      "backToTeams": "Back to Teams",
+      "newButton": "New Project",
+      "createButton": "Create Project",
+      "membersButton": "Members",
+      "dictionaryButton": "Data Dictionary",
+      "empty": "No projects yet. Create your first project.",
+      "createdAt": "Created: {{date}}",
+      "noDescription": "No description"
+    },
+    "create": {
+      "dialogTitle": "Create New Project",
+      "inputLabel": "Project Name",
+      "placeholder": "Enter project name"
+    },
+    "delete": {
+      "dialogTitle": "Delete Project",
+      "dialogDescription": "Are you sure you want to delete this project?"
+    },
+    "toast": {
+      "created": "Project created",
+      "createFailed": "Failed to create project",
+      "deleted": "Project deleted",
+      "deleteFailed": "Failed to delete project",
+      "updated": "Project updated",
+      "updateFailed": "Failed to update project"
+    },
+    "settings": {
+      "title": "Project Settings",
+      "nameLabel": "Project Name",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Enter project description (optional)"
+    },
+    "aria": {
+      "deleteProject": "Delete project {{name}}",
+      "settingsProject": "Settings for project {{name}}"
+    }
+  },
+  "diagram": {
+    "list": {
+      "title": "Diagrams",
+      "backToProjects": "Back to Projects",
+      "newButton": "New Diagram",
+      "createButton": "Create Diagram",
+      "empty": "No diagrams yet. Create your first diagram.",
+      "updatedAt": "Updated: {{date}}",
+      "selectDictionarySet": "Select dictionary set",
+      "selectDictionaryContext": "Select dictionary context"
+    },
+    "create": {
+      "dialogTitle": "Create New Diagram",
+      "inputLabel": "Diagram Name",
+      "placeholder": "Enter diagram name"
+    },
+    "delete": {
+      "dialogTitle": "Delete Diagram",
+      "dialogDescription": "Are you sure you want to delete this diagram?"
+    },
+    "edit": {
+      "loadError": "Failed to load diagram. Please try again later.",
+      "loadingDiagram": "Loading diagram...",
+      "dictionarySet": "Applied dictionary set: {{name}}",
+      "dictionaryContext": "Diagram dictionary context: {{name}}"
+    },
+    "previewSync": {
+      "headerReadonly": "Real-time sync in progress",
+      "banner": {
+        "title": "Preview is already visible",
+        "description": "Editing will unlock automatically once real-time sync finishes.",
+        "descriptionDisconnected": "Real-time sync is delayed. Editing will unlock automatically once the connection recovers.",
+        "locked": "Editing locked until sync completes"
+      },
+      "toast": {
+        "connected": "Real-time sync connected. Editing is now enabled."
+      }
+    },
+    "toast": {
+      "created": "Diagram created",
+      "createFailed": "Failed to create diagram",
+      "deleted": "Diagram deleted",
+      "deleteFailed": "Failed to delete diagram",
+      "renamed": "Diagram renamed",
+      "renameFailed": "Failed to rename diagram",
+      "dictionarySetUpdated": "Diagram dictionary set updated",
+      "dictionarySetUpdateFailed": "Failed to update diagram dictionary set",
+      "dictionaryContextUpdated": "Diagram dictionary context updated",
+      "dictionaryContextUpdateFailed": "Failed to update diagram dictionary context",
+      "backupSynced": "Backup synced",
+      "noChanges": "No changes to backup",
+      "backupFailed": "Failed to sync backup"
+    },
+    "aria": {
+      "renameDiagram": "Rename diagram {{name}}",
+      "deleteDiagram": "Delete diagram {{name}}"
+    }
+  },
+  "erd": {
+    "sidebar": {
+      "tables": "Tables",
+      "noTables": "No tables yet",
+      "addTable": "Add table",
+      "resize": "Resize sidebar width",
+      "groups": "Groups",
+      "viewGroup": "View group",
+      "addTableToGroup": "Add tables",
+      "removeFromGroup": "Remove from group",
+      "noGroups": "No groups yet",
+      "addGroup": "Add group",
+      "aria": {
+        "addTable": "Add table",
+        "renameTable": "Rename table {{name}}",
+        "deleteTable": "Delete table {{name}}",
+        "addGroup": "Add group",
+        "renameGroup": "Rename group {{name}}",
+        "deleteGroup": "Delete group {{name}}",
+        "viewGroup": "View group {{name}}",
+        "viewGroupEmpty": "View group {{name}} (empty)",
+        "removeFromGroup": "Remove {{table}} from group {{group}}",
+        "toggleGroup": "Toggle group {{name}}",
+        "groupNameInput": "Group name for {{name}}"
+      }
+    },
+    "toolbar": {
+      "undo": "Undo",
+      "redo": "Redo",
+      "fkConnect": "FK Connect",
+      "fkConnectActive": "FK Connect (Active)",
+      "autoLayout": "Auto Layout",
+      "export": "Export",
+      "validate": "Validate",
+      "validateActive": "Validate (active)",
+      "ddlExport": "SQL DDL",
+      "ddlImport": "DDL Import",
+      "dictionary": "Dictionary",
+      "dictionaryActive": "Dictionary (active)",
+      "codeEditor": "Code",
+      "codeEditorActive": "Close code editor"
+    },
+    "ddlExport": {
+      "title": "Export SQL DDL",
+      "dbmsLabel": "Target DBMS",
+      "dbms": {
+        "postgresql": "PostgreSQL",
+        "mysql": "MySQL",
+        "oracle": "Oracle",
+        "sqlserver": "SQL Server",
+        "ansi": "Generic SQL (ANSI)"
+      },
+      "preview": "Preview",
+      "copy": "Copy to Clipboard",
+      "download": "Download File",
+      "copied": "Copied to clipboard",
+      "copyFailed": "Failed to copy to clipboard",
+      "noTables": "No tables to export"
+    },
+    "codeEditor": {
+      "placeholder": "-- Enter SQL DDL here...\n-- Example:\n-- CREATE TABLE users (\n--   id SERIAL PRIMARY KEY,\n--   name VARCHAR(100) NOT NULL\n-- );",
+      "applyButton": "Apply to ERD",
+      "applying": "Applying...",
+      "confirmTitle": "Replace ERD",
+      "confirmDescription": "Applying DDL will replace all existing tables and relationships. This action cannot be undone. Do you want to continue?",
+      "confirmDescriptionLarge": "This is a large diagram ({{count}} tables, threshold {{threshold}}). Applying may trigger a full replacement. Continue?",
+      "largeDiagramWarning": "Large diagram range detected ({{count}} tables). Auto-apply is limited; manual apply is recommended.",
+      "diffFallbackApplied": "Incremental apply failed, so full replacement was used. {{dropped}} group memberships were excluded.",
+      "success": "Applied {{count}} tables to ERD",
+      "failed": "Failed to apply DDL",
+      "refreshButton": "Refresh from ERD",
+      "refreshConfirmTitle": "Refresh Code",
+      "refreshConfirmDescription": "Current edits will be replaced with code generated from the ERD. Continue?"
+    },
+    "lock": {
+      "lockedBy": "{{name}} is editing",
+      "badgeAria": "{{name}} is editing this table",
+      "blockedEditToast": "{{name}} is currently editing this table"
+    },
+    "sync": {
+      "statusAria": "Code sync status",
+      "status": {
+        "idlePending": "Waiting for auto-apply",
+        "syntaxErrorHold": "On hold due to syntax errors",
+        "remoteLockHold": "On hold due to remote edit lock",
+        "staleDrop": "Auto-apply skipped. Will retry on next edit.",
+        "queueTimeoutManual": "Queue timeout: manual apply required",
+        "manualConfirmHold": "Auto-apply paused for large diagram (manual apply required)",
+        "synced": "Sync complete"
+      }
+    },
+    "collabSync": {
+      "connecting": "Connecting real-time sync...",
+      "degraded": "Sync delayed — retrying ({{current}}/{{max}})",
+      "failed": "Real-time sync failed. Editing is disabled.",
+      "retry": "Retry",
+      "editDisabledTooltip": "Editing is disabled until real-time sync completes",
+      "previewParseFailed": "Unable to parse diagram preview data",
+      "overlay": {
+        "loading": "Preparing diagram...",
+        "loadingDetail": "Waiting for real-time sync connection",
+        "loadingGeneric": "Loading diagram...",
+        "degraded": "Connection delayed. Retrying automatically. ({{current}}/{{max}})",
+        "failed": "Connection failed. Please try again.",
+        "retry": "Retry"
+      }
+    },
+    "ddlImport": {
+      "title": "Import SQL DDL",
+      "description": "Paste or type SQL DDL to automatically parse tables and relationships.",
+      "dbmsLabel": "Target DBMS",
+      "parsing": "Parsing...",
+      "preview": "{{tables}} tables, {{relations}} relations detected",
+      "warnings": "{{count}} warnings",
+      "parseError": "Failed to parse DDL",
+      "parseErrorDetails": "DDL parse error: {{details}}",
+      "duplicateColumnInTable": "Duplicate column: {{table}}.{{column}} (first at line {{firstLine}})",
+      "duplicateLogicalColumnInTable": "Duplicate logical column: {{table}}.{{logicalName}} (first at line {{firstLine}})",
+      "errorDetails": "Parse error details",
+      "moreErrors": "{{count}} more errors",
+      "import": "Import",
+      "success": "Imported {{count}} tables",
+      "failed": "Failed to import DDL"
+    },
+    "export": {
+      "noNodes": "No tables to export",
+      "success": "Diagram exported successfully",
+      "failed": "Failed to export diagram",
+      "largeDiagramHint": "This diagram is very large, so PNG/JPG quality may be limited. Use SVG or PDF for higher clarity.",
+      "pdfTiled": "Large diagram exported as a tiled PDF ({{count}} pages)"
+    },
+    "fkMode": {
+      "selectParent": "Select parent table (PK source)",
+      "selectChild": "Select child table (FK target)",
+      "noPk": "Selected table has no primary key columns",
+      "success": "FK relationship created ({{count}} columns)",
+      "cancelled": "FK connection cancelled",
+      "fkTypeTitle": "Select Relationship Type",
+      "fkTypeDescription": "Choose the type of FK relationship to create.",
+      "identifying": "Identifying",
+      "identifyingDesc": "Parent PK becomes part of child's composite key. Child cannot exist without parent.",
+      "nonIdentifying": "Non-identifying",
+      "nonIdentifyingDesc": "Parent PK is added as a regular FK column in child. Child can exist independently."
+    },
+    "edge": {
+      "deleteTitle": "Delete Connection",
+      "deleteDescription": "How would you like to handle the FK columns in \"{{childTable}}\"?",
+      "fkColumns": "FK columns: {{columns}}",
+      "removeFk": "Remove FK",
+      "keepFk": "Keep FK",
+      "contextDelete": "Delete connection",
+      "contextMenuAria": "Edge context menu",
+      "contextRouting": "Routing type",
+      "contextHandleSide": "Connection side",
+      "contextResetPath": "Reset path",
+      "lockedBy": "{{name}} is editing this path",
+      "blockedEditToast": "{{name}} is editing this path",
+      "editCancelledBySync": "Path editing was cancelled by a code or DDL sync",
+      "structureBlockedApply": "A structure-changing apply is blocked while another user is editing an edge path",
+      "segmentHandleHint": "Drag to move the segment and double-click to split or simplify it",
+      "segmentHandleAria": "Path segment {{index}}",
+      "handleAuto": "Auto",
+      "handleLeftLeft": "Left-Left",
+      "handleLeftRight": "Left-Right",
+      "handleRightLeft": "Right-Left",
+      "handleRightRight": "Right-Right",
+      "routingSmoothstep": "Orthogonal",
+      "routingBezier": "Bezier",
+      "routingStraight": "Straight"
+    },
+    "tableNode": {
+      "addColumn": "Add Column",
+      "selectDomain": "Select domain",
+      "tableLogicalName": "Enter table logical name...",
+      "duplicateLogicalNameWarning": "Duplicate column logical name: {{name}}",
+      "duplicateLogicalNameCount": "{{count}} duplicate logical names",
+      "handleLayout": {
+        "label": "Handle layout",
+        "split": "Split",
+        "left": "Left",
+        "right": "Right"
+      },
+      "title": {
+        "togglePk": "Toggle PK",
+        "toggleFk": "Toggle FK",
+        "toggleNotNull": "Toggle NOT NULL",
+        "toggleAutoIncrement": "Toggle auto increment",
+        "deleteColumn": "Delete column"
+      },
+      "aria": {
+        "tableName": "Table name",
+        "tableLogicalName": "Table logical name",
+        "logicalName": "Column logical name",
+        "columnName": "Column name",
+        "columnType": "Column type",
+        "togglePk": "Toggle primary key for {{name}}",
+        "toggleFk": "Toggle foreign key for {{name}}",
+        "toggleNotNull": "Toggle NOT NULL for {{name}}",
+        "toggleAutoIncrement": "Toggle auto increment for {{name}}",
+        "deleteColumn": "Delete column {{name}}",
+        "validationWarning": "{{name}} dictionary mismatch warning",
+        "duplicateLogicalNameWarning": "{{name}} duplicate logical name error",
+        "domainBadge": "{{colName}} domain: {{domainName}}",
+        "selectDomain": "Select domain for {{colName}}",
+        "changeColor": "Change table color",
+        "changeHandleLayout": "Change table handle layout",
+        "reorderColumn": "Reorder column {{name}}"
+      }
+    },
+    "colorPicker": {
+      "title": "Color picker",
+      "aria": {
+        "selectColor": "Select {{color}} color"
+      }
+    },
+    "color": {
+      "default": "Default",
+      "red": "Red",
+      "orange": "Orange",
+      "amber": "Amber",
+      "green": "Green",
+      "teal": "Teal",
+      "blue": "Blue",
+      "indigo": "Indigo",
+      "purple": "Purple",
+      "pink": "Pink"
+    },
+    "group": {
+      "readonly": "Read-only view",
+      "selectTables": "Select tables",
+      "selectTablesDesc": "Select tables to add to \"{{name}}\"",
+      "noTables": "No tables in this group",
+      "deleteConfirm": {
+        "title": "Delete group \"{{name}}\"?",
+        "description": "Tables will not be affected."
+      },
+      "toast": {
+        "groupDeleted": "The group you were viewing has been deleted"
+      },
+      "aria": {
+        "backToAll": "Exit group view and return to full diagram",
+        "readonlyCanvas": "Read-only group view: {{name}}",
+        "addTableToGroup": "Add tables to group {{name}}"
+      }
+    },
+    "domain": {
+      "baseTermDomains": "Term Domains",
+      "allDomains": "All Domains",
+      "none": "None",
+      "searchPlaceholder": "Search domains...",
+      "noResults": "No matching domains.",
+      "registerNew": "+ Register new domain"
+    },
+    "autocomplete": {
+      "placeholder": "Enter logical name...",
+      "noResults": "No matching terms",
+      "registerNew": "+ Register new term",
+      "registerFlow": "+ Register words/term",
+      "compoundHeading": "Compound term",
+      "partialHeading": "Partial analysis",
+      "partialUnregistered": "(unregistered)",
+      "termMissing": "The full term is not registered in the term dictionary",
+      "compoundRegistered": "Compound term registered and applied",
+      "compoundExisting": "Existing term applied",
+      "compoundFailed": "Failed to register compound term",
+      "compoundRetry": "Term already registered. Please select again"
+    },
+    "quickTerm": {
+      "title": "Quick Term Registration",
+      "description": "Type a logical name, validate it against the word dictionary, and apply it to the current column immediately.",
+      "submit": "Register & Apply",
+      "submitting": "Registering...",
+      "createDomain": "New Domain",
+      "createWord": "New Word",
+      "wordCreated": "Word created",
+      "wordCreateFailed": "Failed to create word",
+      "wordRequiredTitle": "Word composition is required",
+      "wordRequiredDescription": "A term can only be registered from existing word dictionary entries.",
+      "wordRequiredDescriptionWithInitial": "If words for \"{{name}}\" do not exist, add the missing words first.",
+      "success": "Term registered and applied",
+      "failed": "Failed to register term"
+    },
+    "quickDomain": {
+      "title": "Quick Domain Registration",
+      "description": "Register a new domain and link it to the current term immediately.",
+      "success": "Domain registered",
+      "failed": "Failed to register domain"
+    },
+    "dsl": {
+      "tabLabel": "Logical DSL",
+      "errorCount": "{{count}} errors",
+      "warningCount": "{{count}} warnings",
+      "noTables": "No table declarations found",
+      "assist": {
+        "title": "Code Assist",
+        "keyboardHint": "↑/↓ move · Enter/Tab select · Esc close",
+        "moreCount": "{{shown}} / {{total}}",
+        "loadMore": "Load more",
+        "badgeNew": "NEW",
+        "registerTerm": "Register term",
+        "registerDomain": "Register domain",
+        "typeSuggestion": "Type suggestion",
+        "optionSuggestion": "Option suggestion",
+        "tableKeyword": "Table keyword"
+      },
+      "error": {
+        "syntaxError": "Syntax error",
+        "unknownTerm": "Unknown term: {{name}}",
+        "unknownDomain": "Unknown domain: {{name}}",
+        "unknownFkTable": "Undeclared table: {{name}}",
+        "unknownFkColumn": "Undeclared column: {{table}}.{{column}}",
+        "domainAndTypeConflict": "A column cannot declare both domain(:) and type(::) at once",
+        "invalidTypeFormat": "Invalid type format: {{type}}",
+        "duplicateColumnLogicalName": "Duplicate column logical name: {{name}} (first declared at line {{firstLine}})",
+        "duplicateColumnPhysicalName": "Duplicate column physical name: {{name}} (first declared at line {{firstLine}})"
+      },
+      "warning": {
+        "noDomain": "No domain linked: {{name}}"
+      },
+      "syntaxGuide": {
+        "openButton": "Syntax Guide",
+        "ariaOpen": "Open DSL syntax guide",
+        "title": "Logical DSL Syntax Guide",
+        "description": "DSL is written in Table blocks. Missing or mismatched braces are treated as syntax errors.",
+        "structureTitle": "1) Basic Structure",
+        "structureRule1": "A table must be declared as '{{tableKeyword}} logicalTableName' with a brace block.",
+        "structureRule2": "Write one column per line inside the block.",
+        "structureRule3": "Use '//' for inline comments.",
+        "columnTitle": "2) Column Syntax",
+        "columnRule1": "Use options in brackets: '{{pk}}' primary key, '{{ai}}' auto increment, '{{nn}}' NOT NULL.",
+        "columnRule2": "Domain mapping: 'columnLogicalName :domainLogicalName'",
+        "columnRule3": "Type mapping (when no domain): 'columnLogicalName ::VARCHAR(200)'",
+        "columnRule4": "FK reference: 'columnLogicalName > parentTableLogicalName.parentColumnLogicalName'",
+        "examplesTitle": "3) Examples",
+        "exampleBasicLabel": "Basic example",
+        "exampleBasicCode": "{{tableKeyword}} User {\n  Id [{{pk}}, {{ai}}]\n  Name [{{nn}}]\n  Email :EmailDomain\n}",
+        "exampleRelationLabel": "Domain + FK + Type example",
+        "exampleRelationCode": "{{tableKeyword}} Team {\n  Id [{{pk}}, {{ai}}]\n  TeamName [{{nn}}]\n}\n\n{{tableKeyword}} User {\n  Id [{{pk}}, {{ai}}]\n  TeamId > Team.Id [{{nn}}]\n  Memo ::VARCHAR(500)\n}",
+        "invalidTitle": "4) Common Syntax Errors",
+        "invalidRule1": "'Table User' without a block is invalid. Always write '{' and '}' together.",
+        "invalidRule2": "Unclosed blocks or standalone '{' are marked as syntax errors.",
+        "invalidRule3": "Using ':Domain' and '::Type' together on the same column is invalid."
+      },
+      "errorGuide": {
+        "openButton": "Error Guide",
+        "ariaOpen": "Open DSL error guide",
+        "title": "DSL Error Explanation & Fix Guide",
+        "description": "Select a diagnostic to see the cause and recommended fixes step by step.",
+        "summaryTotal": "Total {{count}}",
+        "summaryError": "Errors {{count}}",
+        "summaryWarning": "Warnings {{count}}",
+        "filter": {
+          "all": "All",
+          "error": "Error",
+          "warning": "Warning"
+        },
+        "parsing": "Calculating parse diagnostics...",
+        "emptyNoIssues": "No diagnostics for the current filter.",
+        "emptyNoInput": "Enter DSL code to see diagnostic guidance.",
+        "selectHint": "Select a diagnostic item from the left list.",
+        "severity": {
+          "error": "ERROR",
+          "warning": "WARNING"
+        },
+        "lineLabel": "Line {{line}}",
+        "sectionCause": "Cause",
+        "sectionFix": "How to fix",
+        "sectionExample": "Example",
+        "sectionRule": "Related rule",
+        "badExample": "Bad example",
+        "goodExample": "Fixed example",
+        "moveToLine": "Move to this line",
+        "quickAction": {
+          "registerTerm": "Register term '{{name}}'",
+          "registerDomain": "Register domain '{{name}}'",
+          "keyboardHint": "Press Enter to run · Esc to close"
+        },
+        "guides": {
+          "syntaxError": {
+            "cause": "The parser could not read the line because the DSL syntax format (table block, column expression, braces/symbols) is invalid.",
+            "action1": "Check if table declaration follows 'Table TableName {' and has a closing '}'.",
+            "action2": "Check each column line matches one of: 'LogicalName', 'LogicalName :Domain', 'LogicalName > Table.Column', '[PK, AI, NN]'.",
+            "action3": "Remove typos/unnecessary symbols, then re-check line by line.",
+            "badExample": "Table User\n  Id [PK]\n}",
+            "goodExample": "Table User {\n  Id [PK, AI]\n}",
+            "rule": "In strict mode, a Table declaration must always include both '{' and '}'."
+          },
+          "unknownTerm": {
+            "cause": "The logical name is not registered in the term dictionary, so physical name/domain cannot be resolved.",
+            "action1": "Register the term first in the data dictionary.",
+            "action2": "If it already exists, verify spelling, spaces, and casing.",
+            "action3": "For quick progress, replace it with an already registered logical term.",
+            "badExample": "Table User {\n  ResidentNumber\n}",
+            "goodExample": "Table User {\n  UserIdentifier\n}",
+            "rule": "DSL logical names should match dictionary terms for stable physical/domain mapping."
+          },
+          "unknownDomain": {
+            "cause": "The domain logical name specified on the column does not exist in the dictionary.",
+            "action1": "Check whether the domain exists in the domain dictionary.",
+            "action2": "Fix the domain name to an existing exact logical name.",
+            "action3": "If missing, create the domain first and parse again.",
+            "badExample": "Table User {\n  Email :EmailFormat\n}",
+            "goodExample": "Table User {\n  Email :EmailDomain\n}",
+            "rule": "':DomainName' only accepts domain logical names that exist in the dictionary."
+          },
+          "unknownFkTable": {
+            "cause": "The parent table in the FK expression is not declared in the current DSL document.",
+            "action1": "Declare the referenced table in the DSL first.",
+            "action2": "Verify the parent table logical name spelling.",
+            "action3": "If FK is not needed, remove '>' and keep it as a regular column.",
+            "badExample": "Table User {\n  TeamId > Team.Id\n}",
+            "goodExample": "Table Team {\n  Id [PK]\n}\n\nTable User {\n  TeamId > Team.Id\n}",
+            "rule": "FK parent tables must be declared in the same DSL document."
+          },
+          "unknownFkColumn": {
+            "cause": "The referenced parent table exists, but the referenced parent column is not declared in that table.",
+            "action1": "Check whether the target column exists in the parent table block.",
+            "action2": "Fix typo in the referenced column logical name.",
+            "action3": "Add the missing column to parent table if needed, then parse again.",
+            "badExample": "Table Team {\n  Id [PK]\n}\n\nTable User {\n  TeamId > Team.Code\n}",
+            "goodExample": "Table Team {\n  Id [PK]\n}\n\nTable User {\n  TeamId > Team.Id\n}",
+            "rule": "FK requires both 'ParentTable.ParentColumn' to exactly match declared names."
+          },
+          "domainAndTypeConflict": {
+            "cause": "The same column line declares both a domain (:DomainName) and an explicit type (::TYPE).",
+            "action1": "If you want domain-based typing, remove '::TYPE'.",
+            "action2": "If you want explicit typing, remove ':DomainName'.",
+            "badExample": "Table User {\n  Name :NameDomain ::VARCHAR(200)\n}",
+            "goodExample": "Table User {\n  Name :NameDomain\n  Nickname ::VARCHAR(200)\n}",
+            "rule": "A single column can use either ':domain' or '::type', not both."
+          },
+          "invalidTypeFormat": {
+            "cause": "The type string after '::' does not match the accepted format.",
+            "action1": "Use an identifier-based SQL type form, e.g. VARCHAR(200), BIGINT.",
+            "action2": "Remove invalid symbols or malformed parentheses and retry.",
+            "badExample": "Table User {\n  Score ::@@@\n}",
+            "goodExample": "Table User {\n  Score ::NUMERIC(10,2)\n}",
+            "rule": "Explicit type mapping must follow '::TYPE' format, typically SQL type notation."
+          },
+          "noDomainWarning": {
+            "cause": "No domain is linked to this term, so a default physical type is used.",
+            "action1": "Link a domain to the term in dictionary to keep type consistency.",
+            "action2": "Or explicitly assign ':DomainName' in DSL for deterministic type mapping.",
+            "rule": "Warnings do not block apply, but resolving them improves schema quality."
+          },
+          "duplicateColumnLogicalNameError": {
+            "cause": "The same column logical name is declared more than once in a single table block.",
+            "action1": "Rename one of the duplicated column logical names so each column is unique in the table.",
+            "action2": "If unintentional, remove or merge the duplicated line.",
+            "badExample": "Table User {\n  Id [PK]\n  Id [NN]\n}",
+            "goodExample": "Table User {\n  Id [PK]\n  UserId [NN]\n}",
+            "rule": "Column logical names must be unique within the same table."
+          },
+          "duplicateColumnPhysicalNameError": {
+            "cause": "Duplicate physical column names exist in the same table, which will fail at DB schema level.",
+            "action1": "Change one column's term/logical name or update mapped dictionary physical name to remove collision.",
+            "action2": "If accidental, remove or merge the duplicated column line.",
+            "badExample": "Table User {\n  UserId\n  Id\n}",
+            "goodExample": "Table User {\n  UserId\n  UserNumber\n}",
+            "rule": "Physical column names must be unique within a table."
+          },
+          "genericError": {
+            "cause": "An unclassified parser error occurred.",
+            "action1": "Reduce surrounding syntax to isolate the smallest failing fragment.",
+            "action2": "Compare with syntax guide examples and fix differences.",
+            "rule": "When unsure, narrow down input and validate incrementally."
+          },
+          "genericWarning": {
+            "cause": "This is a recommended check warning.",
+            "action1": "You may proceed first and clean up later if not blocking.",
+            "action2": "Align dictionary/reference rules when possible to remove warnings.",
+            "rule": "Fewer warnings generally improve team-level DSL quality and reuse."
+          }
+        }
+      }
+    },
+    "validation": {
+      "panelTitle": "Dictionary Validation",
+      "summary": "{{matched}}/{{total}} columns matched",
+      "status": {
+        "matched": "Matched",
+        "nameMismatch": "Name mismatch",
+        "typeMismatch": "Type mismatch",
+        "unregistered": "Not registered",
+        "unchecked": "Unchecked"
+      },
+      "emptyDictionary": "No dictionary data. Register terms in the data dictionary first.",
+      "allMatched": "All columns match the dictionary.",
+      "expected": "Expected: {{value}}",
+      "actual": "Actual: {{value}}"
+    }
+  },
+  "dictionary": {
+    "title": "Data Dictionary",
+    "backToProjects": "Back to Projects",
+    "tabs": {
+      "words": "Words",
+      "domains": "Domains",
+      "terms": "Terms"
+    },
+    "pagination": {
+      "total": "{{count}} total",
+      "page": "Page {{current}} / {{total}}"
+    },
+    "search": {
+      "wordPlaceholder": "Search words (logical/physical/description)",
+      "domainPlaceholder": "Search domains (logical/physical type/description)",
+      "termPlaceholder": "Search terms (logical/physical/description)"
+    },
+    "word": {
+      "table": {
+        "logicalName": "Logical Name",
+        "physicalName": "Physical Name",
+        "description": "Description",
+        "actions": "Actions",
+        "empty": "No words yet. Add your first word."
+      },
+      "form": {
+        "createTitle": "Add Word",
+        "editTitle": "Edit Word",
+        "createDescription": "Register a new word that will be used to compose terms.",
+        "editDescription": "Update the selected word's logical name, physical name, and description.",
+        "logicalName": "Logical Name",
+        "logicalNamePlaceholder": "e.g. User",
+        "physicalName": "Physical Name",
+        "physicalNamePlaceholder": "e.g. user",
+        "description": "Description",
+        "descriptionPlaceholder": "Optional description"
+      },
+      "toast": {
+        "created": "Word created",
+        "createFailed": "Failed to create word",
+        "updated": "Word updated",
+        "updateFailed": "Failed to update word",
+        "deleted": "Word deleted",
+        "deleteFailed": "Failed to delete word"
+      },
+      "delete": {
+        "dialogTitle": "Delete Word",
+        "dialogDescription": "Are you sure you want to delete this word?"
+      },
+      "aria": {
+        "editWord": "Edit word {{name}}",
+        "deleteWord": "Delete word {{name}}"
+      }
+    },
+    "set": {
+      "placeholder": "Select dictionary set",
+      "defaultBadge": "Default",
+      "newButton": "Add Set",
+      "renameButton": "Rename",
+      "setDefaultButton": "Set Default",
+      "deleteButton": "Delete Set",
+      "createTitle": "Add Dictionary Set",
+      "inputLabel": "Set name",
+      "empty": "No dictionary sets available.",
+      "prompt": {
+        "rename": "Enter a new set name.",
+        "delete": "Delete \"{{name}}\" set?"
+      },
+      "toast": {
+        "created": "Dictionary set created",
+        "createFailed": "Failed to create dictionary set",
+        "updated": "Dictionary set updated",
+        "updateFailed": "Failed to update dictionary set",
+        "deleted": "Dictionary set deleted",
+        "deleteFailed": "Failed to delete dictionary set",
+        "defaultUpdated": "Default dictionary set updated",
+        "defaultUpdateFailed": "Failed to update default dictionary set"
+      }
+    },
+    "domain": {
+      "table": {
+        "logicalName": "Logical Name",
+        "physicalType": "Physical Type",
+        "description": "Description",
+        "actions": "Actions",
+        "empty": "No domains yet. Add your first domain."
+      },
+      "form": {
+        "createTitle": "Add Domain",
+        "editTitle": "Edit Domain",
+        "createDescription": "Register a new domain in the dictionary set.",
+        "editDescription": "Update the selected domain's logical name, physical type, and description.",
+        "logicalName": "Logical Name",
+        "logicalNamePlaceholder": "e.g. Amount",
+        "physicalType": "Physical Type",
+        "physicalTypePlaceholder": "e.g. DECIMAL(15,2)",
+        "description": "Description",
+        "descriptionPlaceholder": "Optional description"
+      },
+      "toast": {
+        "created": "Domain created",
+        "createFailed": "Failed to create domain",
+        "updated": "Domain updated",
+        "updateFailed": "Failed to update domain",
+        "deleted": "Domain deleted",
+        "deleteFailed": "Failed to delete domain"
+      },
+      "delete": {
+        "dialogTitle": "Delete Domain",
+        "dialogDescription": "Are you sure you want to delete this domain?"
+      },
+      "aria": {
+        "editDomain": "Edit domain {{name}}",
+        "deleteDomain": "Delete domain {{name}}"
+      }
+    },
+    "term": {
+      "table": {
+        "logicalName": "Logical Name",
+        "physicalName": "Physical Name",
+        "domain": "Domain",
+        "description": "Description",
+        "actions": "Actions",
+        "empty": "No terms yet. Add your first term.",
+        "noDomain": "-"
+      },
+      "form": {
+        "createTitle": "Add Term",
+        "editTitle": "Edit Term",
+        "createDescription": "Register a new term in the dictionary set.",
+        "editDescription": "Update the selected term's name, domain, and description.",
+        "compositionTitle": "Word Dictionary Validation",
+        "compositionDescription": "Type a logical name to validate whether it can be composed from registered words.",
+        "compositionEmpty": "Once you type a logical name, it will be checked against registered words.",
+        "compositionValid": "This logical name is valid with the registered word composition.",
+        "compositionInvalid": "Some words are missing. Add the missing words first.",
+        "compositionAmbiguous": "This input matches multiple word compositions.",
+        "compositionAmbiguousHint": "Conflicting physical-name candidates were found: {{names}}. Add spaces or clean up the word dictionary.",
+        "compositionSegments": "Analysis",
+        "compositionMissing": "Missing words",
+        "createMissingWord": "Add word \"{{name}}\"",
+        "derivedPhysicalName": "Generated physical name",
+        "physicalNameDerivedHint": "The physical name is generated automatically when the word composition is valid.",
+        "wordBuilder": "Word Builder",
+        "wordBuilderDescription": "Compose logical and physical names from registered words.",
+        "wordBuilderPlaceholder": "Select word",
+        "addWord": "Add Word",
+        "clearWords": "Clear all",
+        "wordSequence": "Selected word sequence",
+        "logicalPreview": "Logical result",
+        "physicalPreview": "Physical result",
+        "removeWord": "Remove word {{name}}",
+        "logicalName": "Logical Name",
+        "logicalNamePlaceholder": "e.g. Username",
+        "physicalName": "Physical Name",
+        "physicalNamePlaceholder": "e.g. user_name",
+        "domain": "Domain",
+        "domainNone": "None",
+        "description": "Description",
+        "descriptionPlaceholder": "Optional description"
+      },
+      "toast": {
+        "created": "Term created",
+        "createFailed": "Failed to create term",
+        "updated": "Term updated",
+        "updateFailed": "Failed to update term",
+        "deleted": "Term deleted",
+        "deleteFailed": "Failed to delete term"
+      },
+      "delete": {
+        "dialogTitle": "Delete Term",
+        "dialogDescription": "Are you sure you want to delete this term?"
+      },
+      "aria": {
+        "editTerm": "Edit term {{name}}",
+        "deleteTerm": "Delete term {{name}}"
+      }
+    },
+    "upload": {
+      "description": "Validate and save dictionary data in bulk from an Excel or CSV file.",
+      "button": "Upload",
+      "dialogTitle": {
+        "word": "Bulk Upload Words",
+        "domain": "Bulk Upload Domains",
+        "term": "Bulk Upload Terms"
+      },
+      "dropzone": {
+        "title": "Drag and drop or click to select a file",
+        "formats": "Supports .xlsx, .csv",
+        "selected": "Selected: {{fileName}}"
+      },
+      "template": "Download Template",
+      "preview": {
+        "title": "Preview",
+        "summary": "{{success}} valid, {{error}} errors ({{total}} total)",
+        "limitNotice": "For performance, up to {{max}} rows are shown with error rows prioritized. Hidden valid rows are still included for saving.",
+        "errorOnly": "Show error rows only ({{count}} in preview)",
+        "downloadErrors": "Download error rows (Excel)",
+        "emptyFiltered": "No preview rows match the current filter.",
+        "row": "Row",
+        "status": "Status",
+        "errorNote": "Rows with errors will be excluded from saving.",
+        "savedWithErrors": "{{saved}} rows were saved. {{error}} error rows were excluded, and you can still download the error report."
+      },
+      "save": "Save ({{count}})",
+      "saveExcludingErrors": "Save excluding errors ({{count}})",
+      "saved": "Saved",
+      "complete": {
+        "title": "Upload Complete",
+        "success": "{{count}} items successfully registered.",
+        "excluded": "{{count}} items were excluded due to errors."
+      },
+      "toast": {
+        "success": "Bulk upload completed",
+        "failed": "Bulk upload failed",
+        "templateFailed": "Failed to download template",
+        "partialSaved": "{{count}} rows were saved. Error rows were excluded.",
+        "errorDownloadFailed": "Failed to download error rows"
+      },
+      "error": {
+        "unsupportedFormat": "Unsupported file format",
+        "fileTooLarge": "File size exceeds limit (max {{max}}MB)",
+        "emptyFile": "File contains no data",
+        "tooManyRows": "Maximum {{max}} rows can be uploaded",
+        "missingColumns": "Required columns are missing",
+        "requiredField": "Required field missing",
+        "tooLong": "Cannot exceed {{max}} characters",
+        "duplicateInFile": "Duplicate logical name in file",
+        "duplicateInDb": "Logical name already exists",
+        "domainNotFound": "Domain not found"
+      },
+      "validating": "Validating file...",
+      "aria": {
+        "dropzone": "File upload area",
+        "selectRow": "Select row {{row}}"
+      }
+    },
+    "suggest": {
+      "hint": "Suggestion: {{details}}",
+      "noMatch": "No matching terms found",
+      "matchDetail": "\"{{keyword}}\"→{{physical}}",
+      "autoFilled": "Auto-filled"
+    }
+  },
+  "collaboration": {
+    "status": {
+      "connected": "Connected",
+      "connecting": "Connecting...",
+      "disconnected": "Disconnected"
+    },
+    "participants": {
+      "title": "Collaborators {{count}}",
+      "online": "Online",
+      "me": "Me"
+    }
+  },
+  "permission": {
+    "viewerReadonly": "You have view-only access"
+  },
+  "settings": {
+    "title": "Server Settings",
+    "description": "Configure the backend server URL for Smart ERD.",
+    "serverUrlLabel": "Server URL",
+    "serverUrlPlaceholder": "e.g. http://localhost:8190",
+    "testConnection": "Test Connection",
+    "testing": "Testing...",
+    "testSuccess": "Connection successful",
+    "testFailed": "Connection failed",
+    "testFailedDetail": "Could not reach the server. Please check the URL.",
+    "testServerError": "Server responded with an error ({{status}})",
+    "save": "Save & Continue",
+    "saved": "Server URL saved",
+    "aria": {
+      "settings": "Server settings"
+    }
+  },
+  "language": {
+    "ko": "한국어",
+    "en": "English"
+  }
+}

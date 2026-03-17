@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.5.10'
+    id 'org.springframework.boot' version '3.5.11'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -26,6 +26,7 @@ repositories {
 dependencies {
     // Spring Boot
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -33,6 +34,7 @@ dependencies {
     // Lombok (must be declared before QueryDSL annotation processor)
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
 
     // QueryDSL 5.1.0 jakarta
     implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
@@ -52,15 +54,44 @@ dependencies {
     // Springdoc OpenAPI (Swagger UI)
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
 
-    // H2 Database
-    runtimeOnly 'com.h2database:h2'
+    // PostgreSQL
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // SQL 로깅 (p6spy — 개발 전용, 커스텀 포맷터 컴파일에 필요)
+    implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.12.1'
+
+    // Redis (WebSocket ticket 저장소 — 선택적 사용)
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // Excel import/export
+    implementation 'org.apache.poi:poi-ooxml:5.4.1'
+    implementation 'org.apache.commons:commons-lang3:3.17.0'
+    implementation 'org.apache.commons:commons-collections4:4.4'
+
+    // Spring Boot Docker Compose (개발 전용 — JAR에 포함 안 됨)
+    developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // Testcontainers (테스트용 PostgreSQL)
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+tasks.register('verifyFunctionDocs', Exec) {
+    group = 'verification'
+    description = 'Verifies Javadoc/JSDoc presence on changed backend/frontend functions.'
+    commandLine 'node', 'scripts/verify-function-docs.mjs'
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyFunctionDocs')
 }

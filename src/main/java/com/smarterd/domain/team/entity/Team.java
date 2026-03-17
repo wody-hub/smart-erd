@@ -1,6 +1,6 @@
 package com.smarterd.domain.team.entity;
 
-import com.smarterd.domain.common.entity.BaseTimeEntity;
+import com.smarterd.domain.common.entity.BaseAuditEntity;
 import com.smarterd.domain.user.entity.User;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -19,6 +19,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 
 /**
  * 팀 엔티티.
@@ -30,7 +31,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "teams")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Team extends BaseTimeEntity {
+public class Team extends BaseAuditEntity {
 
     /** 팀 고유 식별자 (자동 증가) */
     @Id
@@ -46,8 +47,9 @@ public class Team extends BaseTimeEntity {
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
-    /** 팀 구성원 목록 (cascade PERSIST/MERGE, orphanRemoval) */
+    /** 팀 구성원 목록 (cascade PERSIST/MERGE, orphanRemoval, 배치 로딩 50) */
     @OneToMany(mappedBy = "team", cascade = { CascadeType.PERSIST, CascadeType.MERGE }, orphanRemoval = true)
+    @BatchSize(size = 50)
     private List<TeamMember> members = new ArrayList<>();
 
     /**
@@ -60,5 +62,14 @@ public class Team extends BaseTimeEntity {
     public Team(String name, User owner) {
         this.name = name;
         this.owner = owner;
+    }
+
+    /**
+     * 팀 이름을 변경한다.
+     *
+     * @param name 새 팀 이름
+     */
+    public void rename(String name) {
+        this.name = name;
     }
 }

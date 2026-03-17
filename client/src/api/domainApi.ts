@@ -1,0 +1,209 @@
+import axiosInstance from './axiosInstance';
+import { downloadBlob } from '@/lib/download';
+import type {
+  Domain,
+  DomainFormData,
+  PagedResponse,
+  BulkValidationResponse,
+  BulkSaveResponse,
+} from '@/types/dictionary';
+
+const BULK_FETCH_PAGE_SIZE = 5_000;
+
+/**
+ * 팀의 도메인 목록을 조회한다.
+ *
+ * @param teamId 조회할 팀 ID
+ * @param setId  조회할 사전 세트 ID
+ * @returns 도메인 목록
+ */
+export async function fetchDomains(teamId: string, setId: string): Promise<Domain[]> {
+  const allDomains: Domain[] = [];
+  const MAX_PAGES = 100;
+
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const pageResult = await fetchDomainsPage(teamId, setId, page, BULK_FETCH_PAGE_SIZE);
+    allDomains.push(...pageResult.content);
+    if (pageResult.last) {
+      return allDomains;
+    }
+  }
+  console.warn('[fetchDomains] 페이지 상한 초과, 조회 중단');
+  return allDomains;
+}
+
+/**
+ * 팀의 도메인 목록을 페이지 단위로 조회한다.
+ *
+ * @param teamId 조회할 팀 ID
+ * @param setId  조회할 사전 세트 ID
+ * @param page   페이지 번호 (0-base)
+ * @param size   페이지 크기
+ * @param keyword 검색 키워드 (선택)
+ * @returns 페이징 응답
+ */
+export async function fetchDomainsPage(
+  teamId: string,
+  setId: string,
+  page: number,
+  size: number,
+  keyword?: string,
+): Promise<PagedResponse<Domain>> {
+  const normalizedKeyword = keyword?.trim();
+  const res = await axiosInstance.get<PagedResponse<Domain>>(
+    `/teams/${teamId}/dictionary-sets/${setId}/domains`,
+    {
+      params: {
+        page,
+        size,
+        ...(normalizedKeyword ? { q: normalizedKeyword } : {}),
+      },
+    },
+  );
+  return res.data;
+}
+
+/**
+ * 새 도메인을 생성한다.
+ *
+ * @param teamId 도메인을 생성할 팀 ID
+ * @param setId  생성 대상 사전 세트 ID
+ * @param data   도메인 생성 데이터
+ * @returns 생성된 도메인
+ */
+export async function createDomain(
+  teamId: string,
+  setId: string,
+  data: DomainFormData,
+): Promise<Domain> {
+  const res = await axiosInstance.post<Domain>(
+    `/teams/${teamId}/dictionary-sets/${setId}/domains`,
+    data,
+  );
+  return res.data;
+}
+
+/**
+ * 도메인을 수정한다.
+ *
+ * @param teamId   도메인이 속한 팀 ID
+ * @param setId    도메인이 속한 사전 세트 ID
+ * @param domainId 수정할 도메인 ID
+ * @param data     도메인 수정 데이터
+ * @returns 수정된 도메인
+ */
+export async function updateDomain(
+  teamId: string,
+  setId: string,
+  domainId: number,
+  data: DomainFormData,
+): Promise<Domain> {
+  const res = await axiosInstance.put<Domain>(
+    `/teams/${teamId}/dictionary-sets/${setId}/domains/${domainId}`,
+    data,
+  );
+  return res.data;
+}
+
+/**
+ * 도메인을 삭제한다.
+ *
+ * @param teamId   도메인이 속한 팀 ID
+ * @param setId    도메인이 속한 사전 세트 ID
+ * @param domainId 삭제할 도메인 ID
+ * @returns 없음
+ */
+export async function deleteDomain(teamId: string, setId: string, domainId: number): Promise<void> {
+  await axiosInstance.delete(`/teams/${teamId}/dictionary-sets/${setId}/domains/${domainId}`);
+}
+
+/**
+ * 도메인 업로드 파일을 검증한다.
+ *
+ * @param teamId 대상 팀 ID
+ * @param setId  대상 사전 세트 ID
+ * @param file   업로드할 파일 (.xlsx 또는 .csv)
+ * @returns 검증 결과
+ */
+export async function validateDomainUpload(
+  teamId: string,
+  setId: string,
+  file: File,
+): Promise<BulkValidationResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await axiosInstance.post<BulkValidationResponse>(
+    `/teams/${teamId}/dictionary-sets/${setId}/domains/upload/validate`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return res.data;
+}
+
+/**
+ * 검증 통과한 도메인을 일괄 저장한다.
+ *
+ * @param teamId            대상 팀 ID
+ * @param setId             대상 사전 세트 ID
+ * @param validationToken   검증 세션 토큰
+ * @param excludedRowNumbers 저장에서 제외할 행 번호 목록
+ * @returns 저장 결과
+ */
+export async function bulkSaveDomains(
+  teamId: string,
+  setId: string,
+  validationToken: string,
+  excludedRowNumbers: number[],
+): Promise<BulkSaveResponse> {
+  const res = await axiosInstance.post<BulkSaveResponse>(
+    `/teams/${teamId}/dictionary-sets/${setId}/domains/upload`,
+    {
+      validationToken,
+      excludedRowNumbers,
+    },
+  );
+  return res.data;
+}
+
+/**
+ * 도메인 템플릿 엑셀을 다운로드한다.
+ *
+ * Content-Disposition 헤더에서 서버가 전달한 파일명을 추출하여 사용한다.
+ * Accept-Language 헤더가 자동 전송되므로 선택 언어에 맞는 템플릿이 반환된다.
+ *
+ * @param teamId 대상 팀 ID
+ * @param setId  대상 사전 세트 ID
+ * @returns 없음
+ */
+export async function downloadDomainTemplate(teamId: string, setId: string): Promise<void> {
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/dictionary-sets/${setId}/domains/upload/template`,
+    {
+      responseType: 'blob',
+    },
+  );
+  downloadBlob(res, 'domain-template.xlsx');
+}
+
+/**
+ * 업로드 검증 오류 행 엑셀을 다운로드한다.
+ *
+ * @param teamId          대상 팀 ID
+ * @param setId           대상 사전 세트 ID
+ * @param validationToken 검증 세션 토큰
+ * @returns 없음
+ */
+export async function downloadDomainUploadErrors(
+  teamId: string,
+  setId: string,
+  validationToken: string,
+): Promise<void> {
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/dictionary-sets/${setId}/domains/upload/errors`,
+    {
+      params: { validationToken },
+      responseType: 'blob',
+    },
+  );
+  downloadBlob(res, 'domain-upload-errors.xlsx');
+}

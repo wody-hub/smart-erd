@@ -1,0 +1,10 @@
+/** 코드 동기화 상태 값 */
+export type SyncStatus =
+  | 'idle-wait'
+  | 'hold-parse-error'
+  | 'hold-remote-lock'
+  | 'hold-queue-timeout'
+  | 'hold-manual-confirm'
+  | 'dropped-stale'
+  | 'synced'
+  | null;

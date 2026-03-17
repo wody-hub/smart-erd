@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design Publisher Reviewer"
+  short_description: "Review token usage, a11y, and UI consistency"
+  default_prompt: "Use $review-design to audit frontend files for design-token compliance, dark-mode safety, accessibility, and publishing quality with file:line fixes."
