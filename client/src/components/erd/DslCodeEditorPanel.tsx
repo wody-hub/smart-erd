@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
+import { useShallow } from 'zustand/react/shallow';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import { useDslParse } from '@/hooks/useDslParse';
 import { useApplyToErd } from '@/hooks/useApplyToErd';
@@ -16,6 +17,7 @@ import { useDslEditorCompletion } from '@/hooks/useDslEditorCompletion';
 import { useDslDiagnosticMarkers } from '@/hooks/useDslDiagnosticMarkers';
 import { useAssistPopup } from '@/hooks/useAssistPopup';
 import { useIdleCursorAction } from '@/hooks/useIdleCursorAction';
+import { useDslPhysicalNameHints } from '@/hooks/useDslPhysicalNameHints';
 import { useErdDictionary } from './ErdDictionaryContext';
 import CodeEditorFooter from './CodeEditorFooter';
 import DslDiagnosticGuideDialog from './DslDiagnosticGuideDialog';
@@ -25,7 +27,11 @@ import QuickDomainDialog from './QuickDomainDialog';
 import { DSL_LANGUAGE_ID, registerDslLanguage } from '@/lib/monaco-dsl-language';
 import type { DslDictionary } from '@/lib/dsl-parser';
 import { generateDsl } from '@/lib/dsl-generator';
-import { formatDslIdentifier } from '@/lib/dsl-format';
+import { applyQuickTermToDslLine } from '@/lib/dsl-line-edit';
+import {
+  buildDslPhysicalNameHints,
+  buildErdPhysicalNameSourceEntries,
+} from '@/lib/dsl-physical-name-hints';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
@@ -35,40 +41,6 @@ import type { TableNode, ERDEdge } from '@/types/erd';
 interface DslCodeEditorPanelProps {
   /** 편집 가능 여부 (VIEWER일 때 false) */
   canEdit?: boolean;
-}
-
-const DSL_TABLE_PREFIX_REGEX = /^\s*Table\b/;
-
-/**
- * 컬럼 DSL 한 줄에 선택한 도메인을 명시 반영한다.
- *
- * 기존 `:도메인` 또는 `::타입` 구간은 제거하고,
- * 옵션(`[PK]`, `[NN]`)은 유지한 채 `:도메인`을 재삽입한다.
- *
- * @param lineContent 원본 한 줄
- * @param domainLogicalName 도메인 논리명
- * @returns 변경된 한 줄
- */
-function applyDomainToDslLine(lineContent: string, domainLogicalName: string): string {
-  if (
-    !domainLogicalName.trim() ||
-    DSL_TABLE_PREFIX_REGEX.test(lineContent) ||
-    lineContent.trim().startsWith('//')
-  ) {
-    return lineContent;
-  }
-
-  const indent = lineContent.match(/^\s*/)?.[0] ?? '';
-  const trimmed = lineContent.trim();
-
-  const optionsMatch = trimmed.match(/\s+(\[[^\]]*\])\s*$/);
-  const optionsPart = optionsMatch ? ` ${optionsMatch[1]}` : '';
-  let working = optionsMatch ? trimmed.slice(0, optionsMatch.index).trimEnd() : trimmed;
-
-  working = working.replace(/\s+::\s*.+$/u, '').trimEnd();
-  working = working.replace(/\s+:(?!:)\s*.+$/u, '').trimEnd();
-
-  return `${indent}${working} :${formatDslIdentifier(domainLogicalName)}${optionsPart}`;
 }
 
 /**
@@ -101,14 +73,20 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     findTermById,
     findDomainById,
   } = useErdDictionary();
+  const erdPhysicalNameSourceEntries = useCanvasStore(
+    useShallow((state) => buildErdPhysicalNameSourceEntries(state.nodes as TableNode[])),
+  );
 
   /** 사전 데이터 객체 (SSOT — Ref 대입만 하므로 참조 동일성 불필요) */
-  const dictionary: DslDictionary = {
-    termByName: termByNameMap,
-    domainByName: domainByNameMap,
-    domainById: domainMap,
-    wordMatchIndex,
-  };
+  const dictionary: DslDictionary = useMemo(
+    () => ({
+      termByName: termByNameMap,
+      domainByName: domainByNameMap,
+      domainById: domainMap,
+      wordMatchIndex,
+    }),
+    [domainByNameMap, domainMap, termByNameMap, wordMatchIndex],
+  );
 
   const { dslText, parseResult, parsing, handleDslChange, reparseDsl } = useDslParse({
     dictionary,
@@ -153,6 +131,10 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
 
   /** 에디터 인스턴스 ref (커서 가드용으로 sync 훅보다 앞에 선언) */
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  /** Monaco 인스턴스 ref */
+  const monacoRef = useRef<typeof Monaco | null>(null);
+  /** Monaco mount 완료 여부 */
+  const [monacoReady, setMonacoReady] = useState(false);
 
   // ERD→Code 동기화 시 커서/스크롤 보존 가드
   const { syncCodeChange, isSyncing, shouldIgnoreChange } = useEditorCursorGuard(
@@ -194,6 +176,14 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     });
 
   const syncStatusMeta = getSyncStatusMeta(t, syncStatus);
+  const physicalNameHints = useMemo(
+    () =>
+      buildDslPhysicalNameHints(
+        parseResult?.physicalNameHints ?? [],
+        erdPhysicalNameSourceEntries,
+      ),
+    [erdPhysicalNameSourceEntries, parseResult?.physicalNameHints],
+  );
 
   // --- Quick Register Dialogs ---
   /** DSL 오류 가이드에서 사용하는 빠른 용어 등록 다이얼로그 상태 */
@@ -209,11 +199,6 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
   /** 사전 갱신 후 1회 재파싱 플래그 */
   const pendingDictionaryReparseRef = useRef(false);
 
-  /** Monaco 인스턴스 ref */
-  const monacoRef = useRef<typeof Monaco | null>(null);
-  /** Monaco mount 완료 여부 */
-  const [monacoReady, setMonacoReady] = useState(false);
-
   // 자동완성 훅
   const { buildAssistItems } = useDslEditorCompletion({
     terms,
@@ -223,6 +208,12 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
 
   // 진단 마커 동기화 훅
   useDslDiagnosticMarkers({ monacoRef, editorRef, parseResult });
+  useDslPhysicalNameHints({
+    editorReady: monacoReady,
+    editorRef,
+    monacoRef,
+    physicalNameHints,
+  });
 
   /** 오류 가이드/보조 팝업에서 용어 등록 요청 시 빠른 등록 다이얼로그를 연다. */
   const handleQuickRegisterTerm = useCallback((logicalName: string, lineNumber?: number | null) => {
@@ -359,7 +350,7 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
       return;
     }
     reparseDsl();
-  }, [terms, domains, reparseDsl]);
+  }, [dslText, reparseDsl, terms, domains]);
 
   return (
     <div className="h-full flex flex-col">
@@ -493,17 +484,22 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
           const editor = editorRef.current;
           const monaco = monacoRef.current;
           const lineNumber = quickTermLineNumberRef.current;
+          const logicalName = updates.logicalName?.trim();
           const domainLogicalName =
             updates.domainId != null ? findDomainById(updates.domainId)?.logicalName : undefined;
 
-          if (editor && monaco && lineNumber != null && domainLogicalName) {
+          if (editor && monaco && lineNumber != null && logicalName) {
             const model = editor.getModel();
             if (model && lineNumber >= 1 && lineNumber <= model.getLineCount()) {
               const originalLine = model.getLineContent(lineNumber);
-              const nextLine = applyDomainToDslLine(originalLine, domainLogicalName);
+              const nextLine = applyQuickTermToDslLine(
+                originalLine,
+                logicalName,
+                domainLogicalName,
+              );
 
               if (nextLine !== originalLine) {
-                editor.executeEdits('dsl-quick-term-domain-sync', [
+                editor.executeEdits('dsl-quick-term-sync', [
                   {
                     range: new monaco.Range(
                       lineNumber,

@@ -42,6 +42,7 @@ import CanvasToolbar from './CanvasToolbar';
 import EdgeContextMenu from './EdgeContextMenu';
 import DeleteEdgeDialog from './DeleteEdgeDialog';
 import DdlExportDialog from './DdlExportDialog';
+import ExportProgressDialog from './ExportProgressDialog';
 import FkTypeDialog from './FkTypeDialog';
 import ErdRelationEdge from './ErdRelationEdge';
 import RemoteCursors from './RemoteCursors';
@@ -73,6 +74,54 @@ const edgeTypes: EdgeTypes = {
 const MINIMAP_NODE_LIMIT = 80;
 const EMPTY_EDGE_LOCKS = new Map();
 const EMPTY_EDGE_PREVIEWS = new Map();
+const TABLE_HEADER_ZOOM_COMPENSATION_DELAY_MS = 160;
+const TABLE_HEADER_ZOOM_CHANGE_EPSILON = 0.01;
+
+/**
+ * 현재 zoom에 따라 테이블 헤더 폰트 크기 토큰을 계산한다.
+ *
+ * 확대/축소 중 개별 노드를 리렌더하지 않도록, 캔버스 루트 CSS 변수로만 전달할 값을 만든다.
+ *
+ * @param zoom 현재 React Flow zoom 배율
+ * @returns 논리명/물리명 폰트 크기와 line-height 토큰
+ */
+function resolveHeaderFontSizeTokens(zoom: number): {
+  logicalFontSize: string;
+  logicalLineHeight: string;
+  physicalFontSize: string;
+  physicalLineHeight: string;
+} {
+  const clampedZoom = Math.max(0.35, Math.min(zoom, 1));
+  const compensation = clampedZoom >= 0.85 ? 1 : Math.min(1.8, 0.85 / clampedZoom);
+  const logical = Math.round(12 * compensation);
+  const physical = Math.round(16 * compensation);
+
+  return {
+    logicalFontSize: `${logical}px`,
+    logicalLineHeight: `${logical + 2}px`,
+    physicalFontSize: `${physical}px`,
+    physicalLineHeight: `${physical + 4}px`,
+  };
+}
+
+/**
+ * 캔버스 루트에 테이블 헤더 폰트 보정 CSS 변수를 적용한다.
+ *
+ * @param container CSS 변수를 적용할 캔버스 루트 요소
+ * @param zoom 현재 React Flow zoom 배율
+ * @returns 없음
+ */
+function applyHeaderZoomCssVariables(container: HTMLDivElement | null, zoom: number): void {
+  if (!container) {
+    return;
+  }
+
+  const tokens = resolveHeaderFontSizeTokens(zoom);
+  container.style.setProperty('--erd-table-header-logical-font-size', tokens.logicalFontSize);
+  container.style.setProperty('--erd-table-header-logical-line-height', tokens.logicalLineHeight);
+  container.style.setProperty('--erd-table-header-physical-font-size', tokens.physicalFontSize);
+  container.style.setProperty('--erd-table-header-physical-line-height', tokens.physicalLineHeight);
+}
 
 function areRoutePointsEqual(left: Waypoint[], right: Waypoint[]): boolean {
   if (left.length !== right.length) {
@@ -200,6 +249,28 @@ function ERDCanvas({
   const remoteEditLocks = useRemoteEditLocks();
   const { locksByNodeId } = remoteEditLocks;
   const localEdgeDragRef = useRef(localEdgeDrag);
+  const headerZoomCompensationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAppliedHeaderZoomRef = useRef<number | null>(null);
+  const applyZoomTextCompensation = useCallback((zoom: number) => {
+    applyHeaderZoomCssVariables(canvasRef.current, zoom);
+    lastAppliedHeaderZoomRef.current = zoom;
+  }, []);
+  const clearZoomCompensationTimer = useCallback(() => {
+    if (headerZoomCompensationTimerRef.current) {
+      clearTimeout(headerZoomCompensationTimerRef.current);
+      headerZoomCompensationTimerRef.current = null;
+    }
+  }, []);
+  const scheduleZoomTextCompensation = useCallback(
+    (zoom: number) => {
+      clearZoomCompensationTimer();
+      headerZoomCompensationTimerRef.current = setTimeout(() => {
+        applyZoomTextCompensation(zoom);
+        headerZoomCompensationTimerRef.current = null;
+      }, TABLE_HEADER_ZOOM_COMPENSATION_DELAY_MS);
+    },
+    [applyZoomTextCompensation, clearZoomCompensationTimer],
+  );
 
   const {
     fkMode,
@@ -211,7 +282,8 @@ function ERDCanvas({
     handleFkTypeSelect,
     handleFkTypeDialogClose,
   } = useFkConnectMode();
-  const { exportPng, exportJpg, exportSvg, exportPdf } = useExportDiagram(diagramName);
+  const { exportPng, exportJpg, exportSvg, exportPdf, exportProgress } =
+    useExportDiagram(diagramName);
 
   /** 엣지 컨텍스트 메뉴 상태 */
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -287,6 +359,16 @@ function ERDCanvas({
   useEffect(() => {
     localEdgeDragRef.current = localEdgeDrag;
   }, [localEdgeDrag]);
+
+  useEffect(() => {
+    applyZoomTextCompensation(reactFlowInstance.getZoom());
+  }, [applyZoomTextCompensation, reactFlowInstance]);
+
+  useEffect(() => {
+    return () => {
+      clearZoomCompensationTimer();
+    };
+  }, [clearZoomCompensationTimer]);
 
   // 그룹 뷰 전환 시 필터링된 노드에 맞춰 뷰포트를 보정한다.
   useEffect(() => {
@@ -704,6 +786,19 @@ function ERDCanvas({
             onEdgeClick={handleEdgeClick}
             onEdgeContextMenu={effectiveCanEdit ? handleEdgeContextMenu : undefined}
             onPaneClick={handlePaneClick}
+            onInit={(instance) => {
+              applyZoomTextCompensation(instance.getZoom());
+            }}
+            onMoveEnd={(_event, viewport) => {
+              const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
+              if (
+                lastAppliedZoom != null &&
+                Math.abs(viewport.zoom - lastAppliedZoom) <= TABLE_HEADER_ZOOM_CHANGE_EPSILON
+              ) {
+                return;
+              }
+              scheduleZoomTextCompensation(viewport.zoom);
+            }}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             deleteKeyCode={null}
@@ -751,11 +846,14 @@ function ERDCanvas({
               onUndo={undo}
               onRedo={redo}
               canEdit={effectiveCanEdit}
+              isExporting={exportProgress.isExporting}
             />
             </ReactFlow>
           </EdgeEditingProvider>
         </RemoteEditLocksProvider>
       </ErdFkModeProvider>
+
+      <ExportProgressDialog progress={exportProgress} />
 
       {showPerformanceOverlays && <RemoteCursors />}
 

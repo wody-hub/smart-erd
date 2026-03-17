@@ -216,6 +216,7 @@ export function useAssistPopup({
       if (!monaco || !item.insertText) {
         return;
       }
+      const insertText = item.insertText;
       editor.executeEdits('dsl-assist', [
         {
           range: new monaco.Range(
@@ -224,7 +225,7 @@ export function useAssistPopup({
             item.lineNumber,
             item.endColumn,
           ),
-          text: item.insertText,
+          text: insertText,
           forceMoveMarkers: true,
         },
       ]);

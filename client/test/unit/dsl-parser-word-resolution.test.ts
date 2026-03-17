@@ -86,3 +86,39 @@ test('DSL parser attaches domain metadata only after the full term is registered
   assert.equal(parsed.result.tables[0]?.columns[0]?.domainId, 10);
   assert.equal(parsed.result.tables[0]?.columns[0]?.type, 'BIGINT');
 });
+
+test('DSL parser exposes physical name hints for resolved table and column names', () => {
+  const words = [
+    createWord(1, '사용자', 'user'),
+    createWord(2, '아이디', 'id'),
+  ];
+  const parsed = parseDsl('Table 사용자 {\n  사용자 아이디\n}', {
+    termByName: new Map<string, Term>(),
+    domainByName: new Map<string, Domain>(),
+    domainById: new Map<number, Domain>(),
+    wordMatchIndex: buildWordMatchIndex(words),
+  });
+
+  assert.deepEqual(
+    parsed.physicalNameHints.map((hint) => ({
+      kind: hint.kind,
+      line: hint.line,
+      logicalName: hint.logicalName,
+      physicalName: hint.physicalName,
+    })),
+    [
+      {
+        kind: 'table',
+        line: 1,
+        logicalName: '사용자',
+        physicalName: 'user',
+      },
+      {
+        kind: 'column',
+        line: 2,
+        logicalName: '사용자 아이디',
+        physicalName: 'user_id',
+      },
+    ],
+  );
+});

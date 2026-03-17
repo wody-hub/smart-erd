@@ -79,6 +79,7 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
       parseSeqRef.current += 1;
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
       }
     };
   }, []);
@@ -96,6 +97,7 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
     }
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
     }
     setParsing(false);
     lastQueuedParseKeyRef.current = parseKey;
@@ -108,6 +110,7 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
     }
 
     debounceTimerRef.current = setTimeout(async () => {
+      debounceTimerRef.current = null;
       const isCurrentRequest = () => seq === parseSeqRef.current;
       setParsing(true);
       try {
@@ -135,6 +138,17 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
       }
     }, 500);
   }, []);
+
+  useEffect(() => {
+    const parseKey = buildParseQueueKey(dbms, ddlText);
+    if (!ddlText.trim()) {
+      return;
+    }
+    if (lastQueuedParseKeyRef.current === parseKey && debounceTimerRef.current) {
+      return;
+    }
+    debouncedParse(ddlText, dbms, true);
+  }, [dbms, ddlText, debouncedParse]);
 
   /**
    * DDL 텍스트 변경 핸들러.
@@ -181,6 +195,7 @@ export function useDdlParse({ persistDbms = false }: UseDdlParseOptions = {}): U
     lastQueuedParseKeyRef.current = null;
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
     }
   }, []);
 

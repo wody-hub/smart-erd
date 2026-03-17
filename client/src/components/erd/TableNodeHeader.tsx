@@ -170,11 +170,26 @@ export default function TableNodeHeader({
                   highlightOnHover={false}
                 />
               ) : logicalTableName ? (
-                <div className="text-xs opacity-85 whitespace-nowrap" title={logicalTableName}>
+                <div
+                  className="opacity-85 whitespace-nowrap"
+                  style={{
+                    fontSize: 'var(--erd-table-header-logical-font-size, 12px)',
+                    lineHeight: 'var(--erd-table-header-logical-line-height, 14px)',
+                  }}
+                  title={logicalTableName}
+                >
                   {logicalTableName}
                 </div>
               ) : (
-                <div className="text-xs opacity-0 whitespace-nowrap">&nbsp;</div>
+                <div
+                  className="opacity-0 whitespace-nowrap"
+                  style={{
+                    fontSize: 'var(--erd-table-header-logical-font-size, 12px)',
+                    lineHeight: 'var(--erd-table-header-logical-line-height, 14px)',
+                  }}
+                >
+                  &nbsp;
+                </div>
               )}
             </div>
 
@@ -184,7 +199,11 @@ export default function TableNodeHeader({
             >
               {editing && isEditing ? (
                 <input
-                  className="nodrag bg-transparent font-semibold text-base w-full text-right whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-ring rounded placeholder-current/50"
+                  className="nodrag bg-transparent font-semibold w-full text-right whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-ring rounded placeholder-current/50"
+                  style={{
+                    fontSize: 'var(--erd-table-header-physical-font-size, 16px)',
+                    lineHeight: 'var(--erd-table-header-physical-line-height, 20px)',
+                  }}
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   onBlur={confirmEdit}
@@ -197,7 +216,11 @@ export default function TableNodeHeader({
                 />
               ) : (
                 <div
-                  className="font-semibold text-base cursor-pointer select-none whitespace-nowrap"
+                  className="font-semibold cursor-pointer select-none whitespace-nowrap"
+                  style={{
+                    fontSize: 'var(--erd-table-header-physical-font-size, 16px)',
+                    lineHeight: 'var(--erd-table-header-physical-line-height, 20px)',
+                  }}
                   onDoubleClick={isEditing ? () => startEdit(label) : undefined}
                   title={label}
                 >

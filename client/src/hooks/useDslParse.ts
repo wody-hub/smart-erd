@@ -32,6 +32,7 @@ const EMPTY_PARSE_RESULT: DslParseResult = {
     tableRanges: [],
   },
   diagnostics: [],
+  physicalNameHints: [],
 };
 
 /**
@@ -58,11 +59,15 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
   /** 최신 dictionary 참조 */
   const dictionaryRef = useRef(dictionary);
   dictionaryRef.current = dictionary;
+  /** 마지막으로 반영한 dictionary 참조 */
+  const lastDictionaryRef = useRef(dictionary);
   /** 최신 dslText 참조 */
   const dslTextRef = useRef(dslText);
   dslTextRef.current = dslText;
   /** 마지막으로 큐잉한 DSL 파싱 요청 키 */
   const lastQueuedParseKeyRef = useRef<string | null>(null);
+  /** 마지막으로 실제 실행된 DSL 파싱 요청 키 */
+  const lastExecutedParseKeyRef = useRef<string | null>(null);
 
   // 컴포넌트 언마운트 시 디바운스 타이머 정리
   useEffect(() => {
@@ -70,6 +75,7 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
       parseSeqRef.current += 1;
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
       }
     };
   }, []);
@@ -86,6 +92,7 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
     }
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
     }
     setParsing(false);
     lastQueuedParseKeyRef.current = parseKey;
@@ -98,11 +105,13 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
     }
 
     debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
       setParsing(true);
       if (seq !== parseSeqRef.current) {
         setParsing(false);
         return;
       }
+      lastExecutedParseKeyRef.current = parseKey;
       const result = parseDsl(text, dictionaryRef.current);
       if (seq !== parseSeqRef.current) {
         setParsing(false);
@@ -112,6 +121,28 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
       setParsing(false);
     }, 300);
   }, []);
+
+  useEffect(() => {
+    const parseKey = buildParseQueueKey(dslText);
+    if (!dslText.trim()) {
+      return;
+    }
+    if (lastExecutedParseKeyRef.current === parseKey || debounceTimerRef.current) {
+      return;
+    }
+    debouncedParse(dslText, true);
+  }, [debouncedParse, dslText]);
+
+  useEffect(() => {
+    if (lastDictionaryRef.current === dictionary) {
+      return;
+    }
+    lastDictionaryRef.current = dictionary;
+    if (!dslTextRef.current.trim()) {
+      return;
+    }
+    debouncedParse(dslTextRef.current, true);
+  }, [debouncedParse, dictionary]);
 
   /**
    * DSL 텍스트 변경 핸들러.

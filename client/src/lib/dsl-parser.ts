@@ -47,6 +47,24 @@ export interface DslParseResult {
   result: DdlParseResult;
   /** Monaco 마커용 진단 목록 */
   diagnostics: DslError[];
+  /** 코드창에 표시할 물리명 힌트 */
+  physicalNameHints: DslPhysicalNameHint[];
+}
+
+/** DSL 코드창에 물리명을 view hint로 표시하기 위한 메타데이터 */
+export interface DslPhysicalNameHint {
+  /** 힌트 종류 */
+  kind: 'table' | 'column';
+  /** 소속 테이블 논리명 (column 힌트일 때만 사용) */
+  tableLogicalName?: string;
+  /** 1-based 행 번호 */
+  line: number;
+  /** 1-based 표시 열 */
+  column: number;
+  /** 논리명 */
+  logicalName: string;
+  /** 표시할 물리명 */
+  physicalName: string;
 }
 
 /** Pass 1에서 수집된 테이블 정보 */
@@ -121,6 +139,8 @@ interface Pass2Result {
   relations: ParsedRelation[];
   /** 테이블 범위 정보 (코드 에디터 락 용) */
   tableRanges: ParsedTableRange[];
+  /** 물리명 표시 힌트 */
+  physicalNameHints: DslPhysicalNameHint[];
   /** 사전 해석/FK 진단 목록 */
   diagnostics: DslError[];
   /** 에러 메시지 목록 */
@@ -148,6 +168,52 @@ interface ResolvedDslTerm {
   physicalType?: string;
   matched: boolean;
   wordCompleteMatch: boolean;
+}
+
+/**
+ * 물리명 힌트 메타데이터를 수집할지 판정한다.
+ *
+ * @param logicalName 논리명
+ * @param physicalName 물리명
+ * @returns 메타데이터 수집 여부
+ */
+function shouldCollectPhysicalNameHint(logicalName: string, physicalName: string): boolean {
+  return logicalName.trim().length > 0 && physicalName.trim().length > 0;
+}
+
+/**
+ * 물리명 view hint 메타데이터를 누적 배열에 추가한다.
+ *
+ * @param physicalNameHints 누적 배열
+ * @param kind 힌트 종류
+ * @param tableLogicalName 소속 테이블 논리명
+ * @param line 1-based 행 번호
+ * @param column 1-based 표시 열
+ * @param logicalName 논리명
+ * @param physicalName 물리명
+ * @returns 없음
+ */
+function pushPhysicalNameHint(
+  physicalNameHints: DslPhysicalNameHint[],
+  kind: DslPhysicalNameHint['kind'],
+  tableLogicalName: string | undefined,
+  line: number,
+  column: number,
+  logicalName: string,
+  physicalName: string,
+): void {
+  if (!shouldCollectPhysicalNameHint(logicalName, physicalName)) {
+    return;
+  }
+
+  physicalNameHints.push({
+    kind,
+    tableLogicalName,
+    line,
+    column,
+    logicalName,
+    physicalName,
+  });
 }
 
 // ─── 유틸 함수 ────────────────────────────────────────────────────
@@ -546,6 +612,7 @@ function parsePass2(rawTables: RawTable[], dictionary: DslDictionary): Pass2Resu
   const tables: ParsedTable[] = [];
   const relations: ParsedRelation[] = [];
   const tableRanges: ParsedTableRange[] = [];
+  const physicalNameHints: DslPhysicalNameHint[] = [];
 
   // 논리명 → 물리 테이블명 매핑 (FK 참조 해석용)
   const tablePhysicalMap = new Map<string, string>();
@@ -557,6 +624,16 @@ function parsePass2(rawTables: RawTable[], dictionary: DslDictionary): Pass2Resu
     const tableTerm = resolveDslTerm(rawTable.logicalName, dictionary);
     const physicalTableName = tableTerm.physicalName;
     const tableTermId = tableTerm.termId;
+
+    pushPhysicalNameHint(
+      physicalNameHints,
+      'table',
+      rawTable.logicalName,
+      rawTable.line,
+      rawTable.nameEndCol,
+      rawTable.logicalName,
+      physicalTableName,
+    );
 
     if (!tableTerm.matched) {
       diagnostics.push({
@@ -587,6 +664,7 @@ function parsePass2(rawTables: RawTable[], dictionary: DslDictionary): Pass2Resu
         colPhysicalMap,
         seenLogicalColumns,
         seenPhysicalColumns,
+        physicalNameHints,
       );
     }
 
@@ -626,7 +704,7 @@ function parsePass2(rawTables: RawTable[], dictionary: DslDictionary): Pass2Resu
     errors,
   );
 
-  return { tables, relations, tableRanges, diagnostics, errors };
+  return { tables, relations, tableRanges, physicalNameHints, diagnostics, errors };
 }
 
 /**
@@ -644,6 +722,7 @@ function parsePass2(rawTables: RawTable[], dictionary: DslDictionary): Pass2Resu
  * @param colPhysicalMap      컬럼 논리명→물리명 매핑
  * @param seenLogicalColumns  이미 등장한 논리 컬럼명 추적
  * @param seenPhysicalColumns 이미 등장한 물리 컬럼명 추적
+ * @param physicalNameHints   물리명 힌트 누적 배열
  */
 function resolveColumn(
   rawCol: RawColumn,
@@ -656,6 +735,7 @@ function resolveColumn(
   colPhysicalMap: Map<string, string>,
   seenLogicalColumns: Map<string, RawColumn>,
   seenPhysicalColumns: Map<string, RawColumn>,
+  physicalNameHints: DslPhysicalNameHint[],
 ): void {
   const duplicated = seenLogicalColumns.get(rawCol.logicalName);
   if (duplicated) {
@@ -683,6 +763,16 @@ function resolveColumn(
   const termId = colTerm.termId;
   let domainId = colTerm.domainId;
   let physicalType = 'VARCHAR(255)';
+
+  pushPhysicalNameHint(
+    physicalNameHints,
+    'column',
+    rawTable.logicalName,
+    rawCol.line,
+    rawCol.nameEndCol,
+    rawCol.logicalName,
+    physicalName,
+  );
 
   if (colTerm.physicalType) {
     physicalType = colTerm.physicalType;
@@ -917,5 +1007,6 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
       tableRanges: pass2.tableRanges,
     },
     diagnostics,
+    physicalNameHints: pass2.physicalNameHints,
   };
 }

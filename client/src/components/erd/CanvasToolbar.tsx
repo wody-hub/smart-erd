@@ -63,6 +63,8 @@ interface CanvasToolbarProps {
   onUndo?: () => void;
   /** redo 핸들러 */
   onRedo?: () => void;
+  /** export 진행 여부 */
+  isExporting?: boolean;
 }
 
 /**
@@ -109,6 +111,7 @@ export default function CanvasToolbar({
   canRedo = false,
   onUndo,
   onRedo,
+  isExporting = false,
 }: CanvasToolbarProps) {
   const { t } = useTranslation();
 
@@ -185,17 +188,26 @@ export default function CanvasToolbar({
               variant="ghost"
               size="sm"
               className="gap-1.5"
-              aria-label={t('erd.toolbar.export')}
+              aria-label={isExporting ? t('erd.toolbar.exporting') : t('erd.toolbar.export')}
+              disabled={isExporting}
             >
               <Download className="h-4 w-4" />
-              {t('erd.toolbar.export')}
+              {isExporting ? t('erd.toolbar.exporting') : t('erd.toolbar.export')}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onExportPng}>PNG</DropdownMenuItem>
-            <DropdownMenuItem onClick={onExportJpg}>JPG</DropdownMenuItem>
-            <DropdownMenuItem onClick={onExportSvg}>SVG</DropdownMenuItem>
-            <DropdownMenuItem onClick={onExportPdf}>PDF</DropdownMenuItem>
+            <DropdownMenuItem onClick={onExportPng} disabled={isExporting}>
+              PNG
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onExportJpg} disabled={isExporting}>
+              JPG
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onExportSvg} disabled={isExporting}>
+              SVG
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onExportPdf} disabled={isExporting}>
+              PDF
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         {onExportDdl && (
