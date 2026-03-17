@@ -7,6 +7,7 @@ import useAuthStore from '@/stores/useAuthStore';
 import { applyDagreLayout, applyIncrementalLayoutByLabel } from '@/lib/auto-layout';
 import type { DdlParseResult } from '@/lib/ddl-parser';
 import { buildErdTableDiffPlan } from '@/lib/erd-diff-builder';
+import { buildScopedDiffPlan } from '@/lib/erd-scoped-diff-builder';
 import { buildFallbackGroupAssignments } from '@/lib/erd-fallback-group-remap';
 import { loadDiffApplyLocalOverride, resolveDiffApplyRollout } from '@/lib/diff-apply-rollout';
 import {
@@ -122,6 +123,7 @@ interface LayoutPhaseResult {
 
 interface ExecuteDiffPhaseParams {
   diffApplyEnabled: boolean;
+  source: ApplySource;
   beforeNodes: TableNode[];
   beforeEdges: ERDEdge[];
   beforeGroups: TableGroup[];
@@ -153,12 +155,26 @@ function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
   let diffTableDiffs: TableDiff[] = [];
   try {
     const currentSnapshots = createCurrentSnapshots(params.beforeNodes, params.beforeEdges);
-    const diffPlan = buildErdTableDiffPlan({
-      currentTables: currentSnapshots.tables,
-      currentEdges: Object.values(currentSnapshots.edgeById),
-      nextTables: toDiffParsedTables(params.parseResult),
-      nextRelations: toDiffParsedRelations(params.parseResult),
-    });
+    const nextTables = toDiffParsedTables(params.parseResult);
+    const nextRelations = toDiffParsedRelations(params.parseResult);
+    const scopedDiffResult =
+      params.source === 'auto'
+        ? buildScopedDiffPlan(
+            currentSnapshots.tables,
+            Object.values(currentSnapshots.edgeById),
+            nextTables,
+            nextRelations,
+          )
+        : null;
+    const diffPlan =
+      scopedDiffResult?.safe === true
+        ? scopedDiffResult.plan
+        : buildErdTableDiffPlan({
+            currentTables: currentSnapshots.tables,
+            currentEdges: Object.values(currentSnapshots.edgeById),
+            nextTables,
+            nextRelations,
+          });
     diffTableDiffs = diffPlan.tables;
     const diffResult = params.applyDiffPlan(diffPlan);
     if (!diffResult) {
@@ -350,6 +366,7 @@ export function useApplyToErd({
         const replaceStart = performance.now();
         const diffPhase = executeDiffPhase({
           diffApplyEnabled: diffApplyRollout.enabled,
+          source,
           beforeNodes,
           beforeEdges,
           beforeGroups,
