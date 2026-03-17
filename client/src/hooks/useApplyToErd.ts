@@ -157,15 +157,12 @@ function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
     const currentSnapshots = createCurrentSnapshots(params.beforeNodes, params.beforeEdges);
     const nextTables = toDiffParsedTables(params.parseResult);
     const nextRelations = toDiffParsedRelations(params.parseResult);
-    const scopedDiffResult =
-      params.source === 'auto'
-        ? buildScopedDiffPlan(
-            currentSnapshots.tables,
-            Object.values(currentSnapshots.edgeById),
-            nextTables,
-            nextRelations,
-          )
-        : null;
+    const scopedDiffResult = buildScopedDiffPlan(
+      currentSnapshots.tables,
+      Object.values(currentSnapshots.edgeById),
+      nextTables,
+      nextRelations,
+    );
     const diffPlan =
       scopedDiffResult?.safe === true
         ? scopedDiffResult.plan
@@ -228,7 +225,7 @@ interface ExecuteLayoutPhaseParams {
 function executeLayoutPhase(params: ExecuteLayoutPhaseParams): LayoutPhaseResult {
   const { nodes: freshNodes, edges: freshEdges } = params.getCurrentState();
   const shouldRunLayout = params.applyPath !== 'diff' || params.diffAppliedOperations > 0;
-  const preserveExistingDiagram = params.source === 'auto' && params.beforeNodes.length > 0;
+  const preserveExistingDiagram = params.beforeNodes.length > 0;
   const effectiveLayoutMode = preserveExistingDiagram
     ? 'none'
     : shouldRunLayout
