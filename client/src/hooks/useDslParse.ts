@@ -1,5 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { parseDsl, type DslDictionary, type DslParseResult } from '@/lib/dsl-parser';
+import type {
+  DslParserWorkerRequest,
+  DslParserWorkerResponse,
+} from '@/lib/dsl-parser-worker-contract';
 import { buildParseQueueKey } from '@/lib/parse-queue-key';
 
 /** useDslParse 훅 옵션 */
@@ -68,6 +72,10 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
   const lastQueuedParseKeyRef = useRef<string | null>(null);
   /** 마지막으로 실제 실행된 DSL 파싱 요청 키 */
   const lastExecutedParseKeyRef = useRef<string | null>(null);
+  /** DSL parser worker 참조 */
+  const workerRef = useRef<Worker | null>(null);
+  /** 워커 사용 가능 여부 */
+  const workerEnabledRef = useRef(false);
 
   // 컴포넌트 언마운트 시 디바운스 타이머 정리
   useEffect(() => {
@@ -76,6 +84,84 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;
+      }
+      if (workerRef.current) {
+        workerRef.current.terminate();
+        workerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof Worker === 'undefined') {
+      workerEnabledRef.current = false;
+      return;
+    }
+
+    const worker = new Worker(new URL('../workers/dslParser.worker.ts', import.meta.url), {
+      type: 'module',
+    });
+    workerRef.current = worker;
+    workerEnabledRef.current = true;
+    worker.postMessage({
+      type: 'set-dictionary',
+      dictionary: dictionaryRef.current,
+    } satisfies DslParserWorkerRequest);
+
+    const handleWorkerMessage = (event: MessageEvent<DslParserWorkerResponse>) => {
+      const message = event.data;
+      if (message.requestId !== parseSeqRef.current) {
+        return;
+      }
+      if (message.type === 'parsed') {
+        lastExecutedParseKeyRef.current = message.parseKey;
+        setParseResult(message.result);
+        setParsing(false);
+        return;
+      }
+
+      workerEnabledRef.current = false;
+      workerRef.current?.terminate();
+      workerRef.current = null;
+      const fallbackResult = parseDsl(dslTextRef.current, dictionaryRef.current);
+      if (message.requestId !== parseSeqRef.current) {
+        setParsing(false);
+        return;
+      }
+      lastExecutedParseKeyRef.current = message.parseKey;
+      setParseResult(fallbackResult);
+      setParsing(false);
+    };
+
+    const handleWorkerError = () => {
+      workerEnabledRef.current = false;
+      worker.terminate();
+      workerRef.current = null;
+      const latestText = dslTextRef.current;
+      if (!latestText.trim()) {
+        setParsing(false);
+        return;
+      }
+      const parseKey = buildParseQueueKey(latestText);
+      const result = parseDsl(latestText, dictionaryRef.current);
+      if (parseKey !== lastQueuedParseKeyRef.current) {
+        setParsing(false);
+        return;
+      }
+      lastExecutedParseKeyRef.current = parseKey;
+      setParseResult(result);
+      setParsing(false);
+    };
+
+    worker.addEventListener('message', handleWorkerMessage);
+    worker.addEventListener('error', handleWorkerError);
+
+    return () => {
+      worker.removeEventListener('message', handleWorkerMessage);
+      worker.removeEventListener('error', handleWorkerError);
+      worker.terminate();
+      if (workerRef.current === worker) {
+        workerRef.current = null;
       }
     };
   }, []);
@@ -111,6 +197,16 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
         setParsing(false);
         return;
       }
+      const worker = workerRef.current;
+      if (workerEnabledRef.current && worker) {
+        worker.postMessage({
+          type: 'parse',
+          requestId: seq,
+          parseKey,
+          text,
+        } satisfies DslParserWorkerRequest);
+        return;
+      }
       lastExecutedParseKeyRef.current = parseKey;
       const result = parseDsl(text, dictionaryRef.current);
       if (seq !== parseSeqRef.current) {
@@ -138,6 +234,12 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
       return;
     }
     lastDictionaryRef.current = dictionary;
+    if (workerEnabledRef.current && workerRef.current) {
+      workerRef.current.postMessage({
+        type: 'set-dictionary',
+        dictionary,
+      } satisfies DslParserWorkerRequest);
+    }
     if (!dslTextRef.current.trim()) {
       return;
     }

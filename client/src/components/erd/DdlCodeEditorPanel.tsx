@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useCallback, useRef, useEffect } from 'react';
+import { lazy, Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle, CircleHelp } from 'lucide-react';
@@ -31,6 +31,7 @@ import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
 import { useEditorCursorGuard } from '@/hooks/useEditorCursorGuard';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
+import { buildParsedSchemaHash } from '@/lib/code-sync-schema-hash';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import { generateDdl } from '@/lib/ddl-generator';
@@ -305,6 +306,10 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
 
   /** 에디터 인스턴스 ref (커서 가드용으로 sync 훅보다 앞에 선언) */
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const parsedSchemaHash = useMemo(
+    () => (parseResult ? buildParsedSchemaHash(parseResult) : null),
+    [parseResult],
+  );
 
   // ERD→Code 동기화 시 커서/스크롤 보존 가드
   const { syncCodeChange, shouldIgnoreChange } = useEditorCursorGuard(editorRef, handleDdlChange);
@@ -317,6 +322,7 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
       hasBlockingErrors,
       hasParsedTables: parseResult != null && !hasBlockingErrors,
       hasRemoteEditLocks,
+      parsedSchemaHash,
       onCodeTextChange: handleDdlChange,
       onSyncCodeTextChange: syncCodeChange,
       generateCodeFromErd: generateFromErd,

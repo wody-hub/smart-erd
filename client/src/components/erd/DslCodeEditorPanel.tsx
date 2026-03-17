@@ -27,6 +27,7 @@ import QuickDomainDialog from './QuickDomainDialog';
 import { DSL_LANGUAGE_ID, registerDslLanguage } from '@/lib/monaco-dsl-language';
 import type { DslDictionary } from '@/lib/dsl-parser';
 import { generateDsl } from '@/lib/dsl-generator';
+import { buildParsedSchemaHash } from '@/lib/code-sync-schema-hash';
 import { applyQuickTermToDslLine } from '@/lib/dsl-line-edit';
 import {
   buildDslPhysicalNameHints,
@@ -141,6 +142,10 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     editorRef,
     handleDslChange,
   );
+  const parsedSchemaHash = useMemo(
+    () => (parseResult?.result ? buildParsedSchemaHash(parseResult.result) : null),
+    [parseResult?.result],
+  );
 
   const { handleUserCodeChange, handleGeneratedCodeChange, clearQueueTimeoutHold, syncStatus } =
     useBidirectionalCodeSync({
@@ -151,6 +156,7 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
       hasBlockingErrors: errorCount > 0,
       hasParsedTables: parseResult != null && errorCount === 0,
       hasRemoteEditLocks,
+      parsedSchemaHash,
       onCodeTextChange: handleDslChange,
       onSyncCodeTextChange: syncCodeChange,
       generateCodeFromErd: generateFromErd,

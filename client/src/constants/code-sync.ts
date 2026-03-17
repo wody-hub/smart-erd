@@ -1,6 +1,9 @@
 /** 코드 입력 idle 대기 시간 (ms) */
 export const CODE_SYNC_IDLE_MS = 1200;
 
+/** 코드 입력 후 Code→ERD 자동반영 대기 시간 (ms) */
+export const CODE_AUTO_APPLY_IDLE_MS = 1800;
+
 /** ERD 변경 후 코드 자동 갱신 대기 시간 (ms) */
 export const ERD_SYNC_IDLE_MS = 600;
 

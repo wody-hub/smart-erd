@@ -5,6 +5,7 @@ import { buildRevisionHash } from '@/lib/code-sync-revision';
 import { resolveCodeAutoApplyStatus } from '@/lib/code-sync-apply-gate';
 import type { SyncStatus } from '@/constants/sync-status';
 import {
+  CODE_AUTO_APPLY_IDLE_MS,
   CODE_SYNC_IDLE_MS,
   CODE_SYNC_MAX_QUEUE_WAIT_MS,
   ERD_SYNC_IDLE_MS,
@@ -37,8 +38,12 @@ interface UseBidirectionalCodeSyncOptions {
   generateCodeFromErd: () => string;
   /** 코드 -> ERD 반영 함수 */
   applyParsedToErd: () => boolean;
+  /** 현재 파싱 결과의 구조 해시 */
+  parsedSchemaHash: string | null;
   /** 코드 idle 대기 시간 (ms) */
   codeIdleMs?: number;
+  /** 코드 -> ERD 자동반영 idle 대기 시간 (ms) */
+  autoApplyIdleMs?: number;
   /** ERD idle 대기 시간 (ms) */
   erdIdleMs?: number;
   /** 원격 락 대기 최대 시간 (ms) */
@@ -78,7 +83,9 @@ export function useBidirectionalCodeSync({
   onSyncCodeTextChange,
   generateCodeFromErd,
   applyParsedToErd,
+  parsedSchemaHash,
   codeIdleMs = CODE_SYNC_IDLE_MS,
+  autoApplyIdleMs = CODE_AUTO_APPLY_IDLE_MS,
   erdIdleMs = ERD_SYNC_IDLE_MS,
   maxQueueWaitMs = CODE_SYNC_MAX_QUEUE_WAIT_MS,
 }: UseBidirectionalCodeSyncOptions): UseBidirectionalCodeSyncReturn {
@@ -93,7 +100,7 @@ export function useBidirectionalCodeSync({
   const erdToCodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lockBlockedSinceRef = useRef<number | null>(null);
   const autoApplyBlockedRef = useRef(false);
-  const lastAppliedCodeHashRef = useRef<string | null>(null);
+  const lastAppliedSchemaHashRef = useRef<string | null>(null);
   const lastObservedErdRevisionRef = useRef<string | null>(null);
   const pendingErdSyncRevisionRef = useRef<string | null>(null);
   const suppressNextErdSyncRef = useRef(false);
@@ -240,7 +247,7 @@ export function useBidirectionalCodeSync({
           return;
         }
 
-        if (!isClearRequest && Date.now() - lastUserEditAtRef.current < codeIdleMs) {
+        if (!isClearRequest && Date.now() - lastUserEditAtRef.current < autoApplyIdleMs) {
           setStatus('idle-wait');
           return;
         }
@@ -266,8 +273,7 @@ export function useBidirectionalCodeSync({
           return;
         }
 
-        const codeHash = djb2(codeText);
-        if (lastAppliedCodeHashRef.current === codeHash) {
+        if (parsedSchemaHash && lastAppliedSchemaHashRef.current === parsedSchemaHash) {
           return;
         }
 
@@ -286,7 +292,7 @@ export function useBidirectionalCodeSync({
             setStatus(resolveCodeAutoApplyStatus(false));
             return;
           }
-          lastAppliedCodeHashRef.current = codeHash;
+          lastAppliedSchemaHashRef.current = parsedSchemaHash;
           setStatus(resolveCodeAutoApplyStatus(true));
         } finally {
           inFlightApplyRef.current = false;
@@ -295,7 +301,7 @@ export function useBidirectionalCodeSync({
           }
         }
       },
-      isClearRequest ? 0 : codeIdleMs,
+      isClearRequest ? 0 : autoApplyIdleMs,
     );
 
     return clearCodeToErdTimer;
@@ -309,8 +315,10 @@ export function useBidirectionalCodeSync({
     hasBlockingErrors,
     hasParsedTables,
     hasRemoteEditLocks,
+    autoApplyIdleMs,
     maxQueueWaitMs,
     parsing,
+    parsedSchemaHash,
     ready,
     setStatus,
   ]);
