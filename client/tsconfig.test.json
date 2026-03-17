@@ -36,6 +36,7 @@
     "src/lib/hash.ts",
     "src/lib/table-lock-key.ts",
     "src/collaboration/yjsBridge.ts",
+    "src/lib/edge-presentation-restore.ts",
     "src/constants/storage.ts",
     "src/constants/sync-status.ts",
     "src/types/collaboration.ts",

@@ -1,4 +1,5 @@
 import { djb2 } from './hash.js';
+import { extractColId } from './handle-id.js';
 
 /** ERD 리비전 해시 계산용 노드 스냅샷 — 구조 변경만 감지 (position 제외) */
 export interface RevisionSnapshotNode {
@@ -17,6 +18,62 @@ export interface RevisionSnapshotEdge {
   targetHandle: string | null;
   type: string;
   data: unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function sanitizeColumnForRevision(column: unknown): unknown {
+  if (!isRecord(column)) {
+    return column;
+  }
+
+  return {
+    id: column.id,
+    name: column.name,
+    type: column.type,
+    pk: column.pk,
+    fk: column.fk,
+    autoIncrement: column.autoIncrement,
+    nullable: column.nullable,
+    logicalName: column.logicalName,
+    termId: column.termId,
+    domainId: column.domainId,
+  };
+}
+
+function sanitizeNodeDataForRevision(data: unknown): unknown {
+  if (!isRecord(data)) {
+    return data;
+  }
+
+  return {
+    label: data.label,
+    logicalTableName: data.logicalTableName,
+    tableTermId: data.tableTermId,
+    columns: Array.isArray(data.columns)
+      ? data.columns.map((column) => sanitizeColumnForRevision(column))
+      : undefined,
+  };
+}
+
+function extractRevisionColumnId(handleId: string | null, nodeId: string): string | null {
+  if (!handleId) {
+    return null;
+  }
+
+  return extractColId(handleId, nodeId);
+}
+
+function sanitizeEdgeDataForRevision(edge: RevisionSnapshotEdge): unknown {
+  const edgeData = isRecord(edge.data) ? edge.data : null;
+
+  return {
+    relationType: edgeData?.relationType,
+    sourceColumnId: extractRevisionColumnId(edge.sourceHandle, edge.source),
+    targetColumnId: extractRevisionColumnId(edge.targetHandle, edge.target),
+  };
 }
 
 /**
@@ -50,8 +107,23 @@ export function buildRevisionHash(
   edges: RevisionSnapshotEdge[],
 ): string {
   const payload = {
-    nodes: [...nodes].sort((a, b) => a.id.localeCompare(b.id)),
-    edges: [...edges].sort((a, b) => a.id.localeCompare(b.id)),
+    nodes: [...nodes]
+      .map((node) => ({
+        id: node.id,
+        type: node.type,
+        parentId: node.parentId,
+        data: sanitizeNodeDataForRevision(node.data),
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    edges: [...edges]
+      .map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: edge.type,
+        data: sanitizeEdgeDataForRevision(edge),
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
   };
   return djb2(JSON.stringify(sortObjectKeys(payload)));
 }

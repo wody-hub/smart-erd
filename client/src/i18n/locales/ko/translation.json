@@ -361,7 +361,7 @@
       "keepFk": "FK 유지",
       "contextDelete": "연결 삭제",
       "contextMenuAria": "엣지 컨텍스트 메뉴",
-      "contextRouting": "라우팅 타입",
+      "contextRouting": "경로 형태",
       "contextHandleSide": "연결 위치",
       "contextResetPath": "경로 초기화",
       "lockedBy": "{{name}} 님이 이 경로를 편집 중입니다",
@@ -375,9 +375,12 @@
       "handleLeftRight": "왼쪽-오른쪽",
       "handleRightLeft": "오른쪽-왼쪽",
       "handleRightRight": "오른쪽-오른쪽",
-      "routingSmoothstep": "직각",
-      "routingBezier": "곡선",
-      "routingStraight": "직선"
+      "routingSmoothstep": "자동 직각 경로",
+      "routingSmoothstepDescription": "자동으로 직각 경로를 계산합니다",
+      "routingBezier": "자동 곡선 경로",
+      "routingBezierDescription": "자동으로 부드러운 곡선 경로를 계산합니다",
+      "routingStraight": "수동 편집 경로",
+      "routingStraightDescription": "세그먼트를 직접 드래그해 경로를 정리합니다"
     },
     "tableNode": {
       "addColumn": "컬럼 추가",

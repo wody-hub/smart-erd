@@ -362,7 +362,7 @@
       "keepFk": "Keep FK",
       "contextDelete": "Delete connection",
       "contextMenuAria": "Edge context menu",
-      "contextRouting": "Routing type",
+      "contextRouting": "Path mode",
       "contextHandleSide": "Connection side",
       "contextResetPath": "Reset path",
       "lockedBy": "{{name}} is editing this path",
@@ -376,9 +376,12 @@
       "handleLeftRight": "Left-Right",
       "handleRightLeft": "Right-Left",
       "handleRightRight": "Right-Right",
-      "routingSmoothstep": "Orthogonal",
-      "routingBezier": "Bezier",
-      "routingStraight": "Straight"
+      "routingSmoothstep": "Auto orthogonal",
+      "routingSmoothstepDescription": "Automatically calculates an orthogonal path",
+      "routingBezier": "Auto curved",
+      "routingBezierDescription": "Automatically calculates a smooth curved path",
+      "routingStraight": "Manual path edit",
+      "routingStraightDescription": "Lets you drag segments to tidy the path"
     },
     "tableNode": {
       "addColumn": "Add Column",

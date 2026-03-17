@@ -7,10 +7,12 @@ import type {
   TableHeaderColor,
   TableHandleLayout,
   TableNodeData,
+  Waypoint,
 } from '@/types/erd';
-import type { DdlParseResult } from '@/lib/ddl-parser';
+import type { DdlParseResult, ParsedColumn, ParsedRelation, ParsedTable } from '@/lib/ddl-parser';
 import { createEdgeYMap, createTableYMap } from '@/collaboration/yjsBridge';
 import { extractColId } from '@/lib/handle-id';
+import { extractHandleSide } from '@/lib/handle-id';
 import {
   getCurrentEdgeHandleSelectionValue,
   buildRelationKey,
@@ -18,6 +20,7 @@ import {
   parseEdgeHandleSelectionValue,
   resolveEdgeHandlesFromPreference,
 } from '@/lib/edge-handles';
+import { resolvePreservedWaypoints } from '@/lib/edge-presentation-restore';
 
 /** DDL 파싱 결과를 Y.Map에 반영할 때의 옵션 */
 export interface PopulateDdlOptions {
@@ -44,6 +47,11 @@ interface RestoredEdgePresentation {
   handleMode?: EdgeHandleMode;
   sourceSide?: EdgeHandleSide;
   targetSide?: EdgeHandleSide;
+  sourceHandle?: string;
+  targetHandle?: string;
+  waypoints?: Waypoint[];
+  resolvedSourceSide?: EdgeHandleSide;
+  resolvedTargetSide?: EdgeHandleSide;
 }
 
 export function buildEdgePresentationByRelationKey(
@@ -79,6 +87,11 @@ export function buildEdgePresentationByRelationKey(
         routingType:
           (edge.data as { routingType?: EdgeRoutingType } | undefined)?.routingType ??
           'smoothstep',
+        sourceHandle: edge.sourceHandle,
+        targetHandle: edge.targetHandle,
+        waypoints: (edge.data as { waypoints?: Waypoint[] } | undefined)?.waypoints,
+        resolvedSourceSide: extractHandleSide(edge.sourceHandle) ?? undefined,
+        resolvedTargetSide: extractHandleSide(edge.targetHandle) ?? undefined,
         ...parseEdgeHandleSelectionValue(
           getCurrentEdgeHandleSelectionValue({
             handleMode: (
@@ -213,12 +226,12 @@ export function populateFromDdl(
     !!tableMetaByPhysicalName || !!tableMetaByUniqueLogicalName;
   const placedPositions: Array<{ x: number; y: number }> = [];
 
-  result.tables.forEach((table, idx) => {
+  result.tables.forEach((table: ParsedTable, idx: number) => {
     const name = resolveTableName(table.name);
     const nodeId = `table-${crypto.randomUUID()}`;
     const colMap = new Map<string, string>();
 
-    const columns = table.columns.map((col) => {
+    const columns = table.columns.map((col: ParsedColumn) => {
       const colId = `col-${crypto.randomUUID()}`;
       colMap.set(col.name, colId);
       return {
@@ -272,7 +285,7 @@ export function populateFromDdl(
     });
   });
 
-  result.relations.forEach((relation) => {
+  result.relations.forEach((relation: ParsedRelation) => {
     const parent = tableMap.get(relation.parentTable);
     const child = tableMap.get(relation.childTable);
     if (!parent || !child) {
@@ -305,15 +318,27 @@ export function populateFromDdl(
     const restoredEdgePresentation = edgePresentationByRelationKey?.get(relationKey);
     const { sourceHandle, targetHandle, handleMode, sourceSide, targetSide } =
       resolveEdgeHandlesFromPreference({
-      sourceNode: parent.node,
-      targetNode: child.node,
-      sourceColId: parentColId,
-      targetColId: childColId,
+        sourceNode: parent.node,
+        targetNode: child.node,
+        sourceColId: parentColId,
+        targetColId: childColId,
         handleMode: restoredEdgePresentation?.handleMode,
         sourceSide: restoredEdgePresentation?.sourceSide,
         targetSide: restoredEdgePresentation?.targetSide,
       });
     const routingType = restoredEdgePresentation?.routingType ?? 'smoothstep';
+    const preservedWaypoints = resolvePreservedWaypoints({
+      routingType,
+      previousSourceHandle: restoredEdgePresentation?.sourceHandle,
+      previousTargetHandle: restoredEdgePresentation?.targetHandle,
+      nextSourceHandle: sourceHandle,
+      nextTargetHandle: targetHandle,
+      previousSourceSide: restoredEdgePresentation?.resolvedSourceSide,
+      previousTargetSide: restoredEdgePresentation?.resolvedTargetSide,
+      nextSourceSide: sourceSide,
+      nextTargetSide: targetSide,
+      waypoints: restoredEdgePresentation?.waypoints,
+    });
     edgesMap.set(
       buildStableEdgeId({
         parentTable: relation.parentTable,
@@ -328,7 +353,7 @@ export function populateFromDdl(
         targetHandle,
         'non-identifying',
         routingType,
-        undefined,
+        preservedWaypoints,
         handleMode,
         sourceSide,
         targetSide,

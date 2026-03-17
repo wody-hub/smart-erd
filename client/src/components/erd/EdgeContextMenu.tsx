@@ -94,13 +94,28 @@ export default function EdgeContextMenu({
           onValueChange={(value) => onRoutingTypeChange(value as EdgeRoutingType)}
         >
           <DropdownMenuRadioItem value="smoothstep" disabled={isLocked}>
-            {t('erd.edge.routingSmoothstep')}
+            <div className="flex flex-col">
+              <span>{t('erd.edge.routingSmoothstep')}</span>
+              <span className="text-xs text-muted-foreground">
+                {t('erd.edge.routingSmoothstepDescription')}
+              </span>
+            </div>
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="bezier" disabled={isLocked}>
-            {t('erd.edge.routingBezier')}
+            <div className="flex flex-col">
+              <span>{t('erd.edge.routingBezier')}</span>
+              <span className="text-xs text-muted-foreground">
+                {t('erd.edge.routingBezierDescription')}
+              </span>
+            </div>
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="straight" disabled={isLocked}>
-            {t('erd.edge.routingStraight')}
+            <div className="flex flex-col">
+              <span>{t('erd.edge.routingStraight')}</span>
+              <span className="text-xs text-muted-foreground">
+                {t('erd.edge.routingStraightDescription')}
+              </span>
+            </div>
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />

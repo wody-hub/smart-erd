@@ -8,7 +8,8 @@ import type {
 import type { DiffPlan, DiffParsedColumn, DiffRelationType } from './erd-diff-plan.js';
 import { createWaypointsYArray, readWaypointsFromEdgeYMap } from '../collaboration/yjsBridge.js';
 import { buildStableEdgeId, resolveEdgeHandlesFromPreference } from './edge-handles.js';
-import { extractColId } from './handle-id.js';
+import { extractColId, extractHandleSide } from './handle-id.js';
+import { resolvePreservedWaypoints } from './edge-presentation-restore.js';
 
 /** DiffPlan 적용 결과 요약 */
 export interface ApplyDiffResult {
@@ -52,6 +53,8 @@ interface EdgePresentationSnapshot {
   handleMode?: EdgeHandleMode;
   sourceSide?: EdgeHandleSide;
   targetSide?: EdgeHandleSide;
+  resolvedSourceSide?: EdgeHandleSide;
+  resolvedTargetSide?: EdgeHandleSide;
 }
 
 /**
@@ -412,11 +415,18 @@ function applyEdgeAdds(context: DiffApplyContext): void {
     });
     const nextRoutingType = carriedPresentation?.routingType ?? edgeDiff.routingType ?? 'smoothstep';
     const preservedWaypoints =
-      nextRoutingType === 'straight' &&
-      carriedPresentation?.sourceHandle === sourceHandle &&
-      carriedPresentation?.targetHandle === targetHandle
-        ? carriedPresentation.waypoints
-        : edgeDiff.waypoints;
+      resolvePreservedWaypoints({
+        routingType: nextRoutingType,
+        previousSourceHandle: carriedPresentation?.sourceHandle,
+        previousTargetHandle: carriedPresentation?.targetHandle,
+        nextSourceHandle: sourceHandle,
+        nextTargetHandle: targetHandle,
+        previousSourceSide: carriedPresentation?.resolvedSourceSide,
+        previousTargetSide: carriedPresentation?.resolvedTargetSide,
+        nextSourceSide: resolution.sourceSide,
+        nextTargetSide: resolution.targetSide,
+        waypoints: carriedPresentation?.waypoints,
+      }) ?? edgeDiff.waypoints;
     context.edgesMap.set(
       edgeId,
       createEdgeYMap(
@@ -463,6 +473,8 @@ function captureExistingEdgePresentation(context: DiffApplyContext): void {
         handleMode: (edgeYMap.get('handleMode') as EdgeHandleMode | undefined) ?? undefined,
         sourceSide: (edgeYMap.get('sourceSide') as EdgeHandleSide | undefined) ?? undefined,
         targetSide: (edgeYMap.get('targetSide') as EdgeHandleSide | undefined) ?? undefined,
+        resolvedSourceSide: extractHandleSide(sourceHandle) ?? undefined,
+        resolvedTargetSide: extractHandleSide(targetHandle) ?? undefined,
       },
     );
   });
