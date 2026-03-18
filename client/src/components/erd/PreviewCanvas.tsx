@@ -13,6 +13,7 @@ import {
 import { BookText, Download, LayoutGrid } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -23,11 +24,12 @@ import {
 import ExportProgressDialog from './ExportProgressDialog';
 import type { DslPreviewCanvasState, DslPreviewNode } from '@/lib/dsl-preview-graph';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
+import { buildPreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
 import { buildPersistedPreviewPositionChanges } from '@/lib/preview-position-sync';
 import { writeCodeModeSharedDraftGraph } from '@/lib/code-mode-shared-draft';
 import { useExportDiagram } from '@/hooks/useExportDiagram';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
-import type { TableNode } from '@/types/erd';
+import type { ERDEdge, TableNode } from '@/types/erd';
 import ErdRelationEdge from './ErdRelationEdge';
 import { previewNodeTypes } from './PreviewTableNodes';
 
@@ -236,6 +238,12 @@ export default function PreviewCanvas({
 }: PreviewCanvasProps) {
   const { t } = useTranslation();
   const ydoc = useCanvasStore((state) => state.ydoc);
+  const { persistedNodes, persistedEdges } = useCanvasStore(
+    useShallow((state) => ({
+      persistedNodes: state.nodes as TableNode[],
+      persistedEdges: state.edges as ERDEdge[],
+    })),
+  );
   const message = resolvePreviewMessage(t, previewState);
   const graph = previewState?.graph;
   const hasGraph = !!graph && graph.nodes.length > 0;
@@ -298,14 +306,25 @@ export default function PreviewCanvas({
       nodes: displayNodes,
       edges: graph.edges,
     };
-    const serializedGraph = JSON.stringify(nextGraph);
-    if (serializedGraph === lastSharedPreviewGraphRef.current) {
+    const nextOverlayGraph = buildPreviewDraftOverlayGraph(
+      nextGraph,
+      persistedNodes,
+      persistedEdges,
+    );
+    if (!nextOverlayGraph) {
+      lastSharedPreviewGraphRef.current = null;
+      writeCodeModeSharedDraftGraph(ydoc, null, 'code-preview-shared-draft');
       return;
     }
 
-    lastSharedPreviewGraphRef.current = serializedGraph;
+    const serializedOverlayGraph = JSON.stringify(nextOverlayGraph);
+    if (serializedOverlayGraph === lastSharedPreviewGraphRef.current) {
+      return;
+    }
+
+    lastSharedPreviewGraphRef.current = serializedOverlayGraph;
     writeCodeModeSharedDraftGraph(ydoc, nextGraph, 'code-preview-shared-draft');
-  }, [displayNodes, graph, previewState?.hasContent, ydoc]);
+  }, [displayNodes, graph, persistedEdges, persistedNodes, previewState?.hasContent, ydoc]);
 
   /**
    * preview 노드 위치 변경을 화면 상태에 반영한다.

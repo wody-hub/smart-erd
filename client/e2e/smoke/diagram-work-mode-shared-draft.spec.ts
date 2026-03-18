@@ -183,6 +183,14 @@ test('code mode shared draft is visible across sessions and matched node moves p
       undefined,
       { timeout: 15_000 },
     );
+    await ownerPage.waitForFunction(
+      () => {
+        const model = window.monaco?.editor?.getModels?.()[0];
+        return model?.getValue().includes('Table users {') ?? false;
+      },
+      undefined,
+      { timeout: 15_000 },
+    );
 
     await ownerPage.evaluate(() => {
       const model = window.monaco?.editor?.getModels?.()[0];
@@ -192,11 +200,13 @@ test('code mode shared draft is visible across sessions and matched node moves p
       model.setValue('Table users {\n  id\n}\n\nTable orders {\n  order_id\n}');
     });
 
-    const ownerOrdersPreview = ownerPage.locator('.react-flow__node-previewTable', { hasText: 'orders' }).first();
-    await expect(ownerOrdersPreview).toBeVisible({ timeout: PROPAGATION_TIMEOUT_MS });
+    await expect(
+      ownerPage.locator('.react-flow__node-previewTable', { hasText: 'orders' }),
+    ).toHaveCount(1, { timeout: PROPAGATION_TIMEOUT_MS });
 
-    const peerOrdersOverlay = peerPage.locator('.react-flow__node-previewTable', { hasText: 'orders' }).first();
-    await expect(peerOrdersOverlay).toBeVisible({ timeout: PROPAGATION_TIMEOUT_MS });
+    await expect(
+      peerPage.locator('.react-flow__node-previewTable', { hasText: 'orders' }),
+    ).toHaveCount(1, { timeout: PROPAGATION_TIMEOUT_MS });
 
     const ownerUsersNode = ownerPage.locator('.react-flow__node-previewTable', { hasText: 'users' }).first();
     const peerUsersNode = peerPage.locator('.react-flow__node-table', { hasText: 'users' }).first();
@@ -223,6 +233,21 @@ test('code mode shared draft is visible across sessions and matched node moves p
         },
       )
       .toBe(true);
+
+    await ownerPage.getByRole('button', { name: /ERD 적용|Apply to ERD/i }).click();
+    const applyConfirmDialog = ownerPage.getByRole('dialog', { name: /ERD 교체|Replace ERD/i });
+    await expect(applyConfirmDialog).toBeVisible();
+    await applyConfirmDialog.getByRole('button', { name: /삭제|Delete/i }).click();
+
+    await expect(
+      peerPage.locator('.react-flow__node-table', { hasText: 'orders' }),
+    ).toHaveCount(1, { timeout: PROPAGATION_TIMEOUT_MS });
+
+    await expect(
+      peerPage.locator('.react-flow__node-previewTable', { hasText: 'orders' }),
+    ).toHaveCount(0, {
+      timeout: PROPAGATION_TIMEOUT_MS,
+    });
   } finally {
     await ownerContext.close();
     await peerContext.close();

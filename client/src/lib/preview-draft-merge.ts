@@ -12,6 +12,60 @@ export interface PreviewDraftOverlayGraph {
 }
 
 /**
+ * preview 컬럼과 persisted 컬럼의 시각적으로 의미 있는 필드를 비교용 문자열로 직렬화한다.
+ *
+ * @param column 비교할 컬럼
+ * @returns 안정적인 비교용 직렬화 문자열
+ */
+function serializeComparableColumn(column: TableNodeData['columns'][number]): string {
+  return JSON.stringify([
+    column.name,
+    column.type,
+    column.pk ?? false,
+    column.fk ?? false,
+    column.autoIncrement ?? false,
+    column.nullable ?? false,
+    column.logicalName ?? '',
+    column.termId ?? null,
+    column.domainId ?? null,
+  ]);
+}
+
+/**
+ * preview 노드 데이터가 persisted 테이블 데이터와 동일한지 판정한다.
+ *
+ * 위치와 노드 ID는 제외하고, 화면에 드러나는 테이블/컬럼 메타만 비교한다.
+ *
+ * @param previewNode preview 노드
+ * @param persistedNode persisted 테이블 노드
+ * @returns 동일하면 true
+ */
+function isPreviewNodeEquivalentToPersistedNode(
+  previewNode: DslPreviewNode,
+  persistedNode: TableNode,
+): boolean {
+  if (
+    previewNode.data.label !== persistedNode.data.label ||
+    (previewNode.data.logicalTableName ?? '') !== (persistedNode.data.logicalTableName ?? '') ||
+    (previewNode.data.tableTermId ?? null) !== (persistedNode.data.tableTermId ?? null) ||
+    (previewNode.data.headerColor ?? '') !== (persistedNode.data.headerColor ?? '') ||
+    (previewNode.data.handleLayout ?? 'split') !== (persistedNode.data.handleLayout ?? 'split')
+  ) {
+    return false;
+  }
+
+  if (previewNode.data.columns.length !== persistedNode.data.columns.length) {
+    return false;
+  }
+
+  return previewNode.data.columns.every(
+    (column, index) =>
+      serializeComparableColumn(column) ===
+      serializeComparableColumn(persistedNode.data.columns[index]),
+  );
+}
+
+/**
  * shared preview draft graph를 persisted 캔버스용 overlay 그래프로 변환한다.
  *
  * persisted와 중복되는 테이블/관계는 제외하고, draft 전용 객체와
@@ -50,13 +104,14 @@ export function buildPreviewDraftOverlayGraph(
   const overlayNodes = previewGraph.nodes.flatMap((node) => {
     const matchedPersistedNode = matchedNodes.get(node.id);
     if (matchedPersistedNode) {
-      if (!referencedNodeIds.has(node.id)) {
+      const shouldRenderVisibleOverlay = !isPreviewNodeEquivalentToPersistedNode(node, matchedPersistedNode);
+      if (!shouldRenderVisibleOverlay && !referencedNodeIds.has(node.id)) {
         return [];
       }
       return [
         {
           ...node,
-          type: 'previewGhostTable',
+          type: shouldRenderVisibleOverlay ? 'previewTable' : 'previewGhostTable',
           draggable: false,
           selectable: false,
           connectable: false,
