@@ -37,6 +37,11 @@ import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { ERDEdge, TableNode } from '@/types/erd';
 import ErdRelationEdge from './ErdRelationEdge';
 import { previewNodeTypes } from './PreviewTableNodes';
+import {
+  applyHeaderZoomCssVariables,
+  TABLE_HEADER_ZOOM_CHANGE_EPSILON,
+  TABLE_HEADER_ZOOM_COMPENSATION_DELAY_MS,
+} from './tableHeaderZoom';
 
 /** preview 캔버스에서 MiniMap을 숨길 노드 수 임계치 */
 const PREVIEW_MINIMAP_NODE_LIMIT = 80;
@@ -318,10 +323,61 @@ export default function PreviewCanvas({
   const lastSharedPreviewGraphRef = useRef<string | null>(null);
   const reactFlowInstanceRef = useRef<ReactFlowInstance<DslPreviewNode, ERDEdge> | null>(null);
   const lastHandledFocusRequestIdRef = useRef<number | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const headerZoomCompensationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAppliedHeaderZoomRef = useRef<number | null>(null);
+
+  /**
+   * preview 캔버스 루트에 zoom 보정 CSS 변수를 즉시 적용한다.
+   *
+   * @param zoom 현재 React Flow zoom 배율
+   * @returns 없음
+   */
+  const applyZoomTextCompensation = useCallback((zoom: number) => {
+    applyHeaderZoomCssVariables(canvasRef.current, zoom);
+    lastAppliedHeaderZoomRef.current = zoom;
+  }, []);
+
+  /**
+   * 예약된 zoom 보정 타이머를 정리한다.
+   *
+   * @returns 없음
+   */
+  const clearZoomCompensationTimer = useCallback(() => {
+    if (headerZoomCompensationTimerRef.current) {
+      clearTimeout(headerZoomCompensationTimerRef.current);
+      headerZoomCompensationTimerRef.current = null;
+    }
+  }, []);
+
+  /**
+   * zoom 변경이 확정된 뒤 헤더 보정 CSS 변수를 지연 적용한다.
+   *
+   * pan 종료처럼 zoom이 그대로인 경우엔 호출하지 않는다.
+   *
+   * @param zoom 현재 React Flow zoom 배율
+   * @returns 없음
+   */
+  const scheduleZoomTextCompensation = useCallback(
+    (zoom: number) => {
+      clearZoomCompensationTimer();
+      headerZoomCompensationTimerRef.current = setTimeout(() => {
+        applyZoomTextCompensation(zoom);
+        headerZoomCompensationTimerRef.current = null;
+      }, TABLE_HEADER_ZOOM_COMPENSATION_DELAY_MS);
+    },
+    [applyZoomTextCompensation, clearZoomCompensationTimer],
+  );
 
   useEffect(() => {
     positionOverridesRef.current = positionOverrides;
   }, [positionOverrides]);
+
+  useEffect(() => {
+    return () => {
+      clearZoomCompensationTimer();
+    };
+  }, [clearZoomCompensationTimer]);
 
   useEffect(() => {
     const sourceGraph = graph ?? (fallbackGraph.nodes.length > 0 ? fallbackGraph : null);
@@ -466,7 +522,7 @@ export default function PreviewCanvas({
   }, [displayNodes, tableFocusRequest]);
 
   return (
-    <div className="h-full w-full bg-background relative">
+    <div ref={canvasRef} className="h-full w-full bg-background relative">
       <PreviewCanvasToolbar
         diagramName={diagramName}
         onResetLayout={handleResetLayout}
@@ -481,6 +537,17 @@ export default function PreviewCanvas({
           edges={effectiveGraph!.edges}
           onInit={(instance) => {
             reactFlowInstanceRef.current = instance;
+            applyZoomTextCompensation(instance.getZoom());
+          }}
+          onMoveEnd={(_event, viewport) => {
+            const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
+            if (
+              lastAppliedZoom != null &&
+              Math.abs(viewport.zoom - lastAppliedZoom) <= TABLE_HEADER_ZOOM_CHANGE_EPSILON
+            ) {
+              return;
+            }
+            scheduleZoomTextCompensation(viewport.zoom);
           }}
           onNodesChange={handleNodesChange}
           onNodeDragStop={handleNodeDragStop}
