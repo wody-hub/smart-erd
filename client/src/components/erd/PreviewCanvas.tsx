@@ -7,6 +7,7 @@ import {
   MiniMap,
   Panel,
   ReactFlow,
+  type ReactFlowInstance,
   type NodeChange,
   type EdgeTypes,
 } from '@xyflow/react';
@@ -24,6 +25,8 @@ import {
 import ExportProgressDialog from './ExportProgressDialog';
 import type { DslPreviewCanvasState, DslPreviewNode } from '@/lib/dsl-preview-graph';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
+import type { CodeEditorTableFocusRequest } from '@/lib/code-editor-table-navigation';
+import { findPreviewTableNodeForFocus } from '@/lib/diagram-table-focus';
 import { buildPreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
 import { buildPersistedPreviewPositionChanges } from '@/lib/preview-position-sync';
 import { writeCodeModeSharedDraftGraph } from '@/lib/code-mode-shared-draft';
@@ -87,6 +90,8 @@ interface PreviewCanvasProps {
   previewState: DslPreviewCanvasState | null;
   /** export 파일명에 사용할 다이어그램 이름 */
   diagramName: string;
+  /** 코드 에디터 테이블 포커스 요청 */
+  tableFocusRequest?: CodeEditorTableFocusRequest | null;
   /** code 모드 로컬 preview 위치 override */
   positionOverrides: DiagramPreviewPositionRecord;
   /** code 모드 로컬 preview 위치 override 변경 핸들러 */
@@ -231,6 +236,7 @@ function mergePreviewNodesWithLocalOverrides(
 export default function PreviewCanvas({
   previewState,
   diagramName,
+  tableFocusRequest,
   positionOverrides,
   onPositionOverridesChange,
   canOpenDictionary,
@@ -254,6 +260,8 @@ export default function PreviewCanvas({
   const [displayNodes, setDisplayNodes] = useState<DslPreviewNode[]>([]);
   const positionOverridesRef = useRef<DiagramPreviewPositionRecord>(positionOverrides);
   const lastSharedPreviewGraphRef = useRef<string | null>(null);
+  const reactFlowInstanceRef = useRef<ReactFlowInstance<DslPreviewNode, ERDEdge> | null>(null);
+  const lastHandledFocusRequestIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     positionOverridesRef.current = positionOverrides;
@@ -382,6 +390,33 @@ export default function PreviewCanvas({
     setDisplayNodes(graph?.nodes ?? []);
   }, [graph?.nodes, onPositionOverridesChange]);
 
+  useEffect(() => {
+    if (!tableFocusRequest || displayNodes.length === 0) {
+      return;
+    }
+    if (lastHandledFocusRequestIdRef.current === tableFocusRequest.requestId) {
+      return;
+    }
+
+    const targetNode = findPreviewTableNodeForFocus(displayNodes, tableFocusRequest);
+    if (!targetNode) {
+      return;
+    }
+    lastHandledFocusRequestIdRef.current = tableFocusRequest.requestId;
+
+    const reactFlowNode = reactFlowInstanceRef.current?.getNode(targetNode.id);
+    const width = reactFlowNode?.width ?? 420;
+    const height = reactFlowNode?.height ?? 80;
+    reactFlowInstanceRef.current?.setCenter(
+      targetNode.position.x + width / 2,
+      targetNode.position.y + height / 2,
+      {
+        duration: 300,
+        zoom: Math.max(reactFlowInstanceRef.current?.getZoom() ?? 0.8, 0.8),
+      },
+    );
+  }, [displayNodes, tableFocusRequest]);
+
   return (
     <div className="h-full w-full bg-background relative">
       <PreviewCanvasToolbar
@@ -396,10 +431,15 @@ export default function PreviewCanvas({
         <ReactFlow
           nodes={displayNodes}
           edges={graph!.edges}
+          onInit={(instance) => {
+            reactFlowInstanceRef.current = instance;
+          }}
           onNodesChange={handleNodesChange}
           onNodeDragStop={handleNodeDragStop}
           nodeTypes={previewNodeTypes}
           edgeTypes={previewEdgeTypes}
+          deleteKeyCode={null}
+          panActivationKeyCode={null}
           nodesDraggable
           nodesConnectable={false}
           elementsSelectable={false}

@@ -46,6 +46,7 @@ export default function DiagramSidebarGroupItem({
   isActive = false,
 }: DiagramSidebarGroupItemProps) {
   const { t } = useTranslation();
+  const tableIds = group.tableIds ?? [];
   /** 확장/축소 상태 */
   const [open, setOpen] = useState(false);
   /** 삭제 확인 다이얼로그 상태 */
@@ -107,7 +108,7 @@ export default function DiagramSidebarGroupItem({
                 )}
                 <span className="truncate">{group.label}</span>
                 <span className="text-xs text-muted-foreground ml-1">
-                  ({group.tableIds.length})
+                  ({tableIds.length})
                 </span>
               </button>
             </CollapsibleTrigger>
@@ -118,9 +119,9 @@ export default function DiagramSidebarGroupItem({
                 size="icon"
                 className="h-6 w-6 text-muted-foreground hover:text-foreground"
                 onClick={() => onViewGroup?.(group.id)}
-                disabled={group.tableIds.length === 0}
+                disabled={tableIds.length === 0}
                 aria-label={
-                  group.tableIds.length === 0
+                  tableIds.length === 0
                     ? t('erd.sidebar.aria.viewGroupEmpty', { name: group.label })
                     : t('erd.sidebar.aria.viewGroup', { name: group.label })
                 }
@@ -162,10 +163,10 @@ export default function DiagramSidebarGroupItem({
 
       <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
         <div className="pl-6 space-y-0.5 py-1">
-          {group.tableIds.length === 0 ? (
+          {tableIds.length === 0 ? (
             <p className="text-xs text-muted-foreground">{t('erd.group.noTables')}</p>
           ) : (
-            group.tableIds.map((tableId) => {
+            tableIds.map((tableId) => {
               const tableName = tableMap.get(tableId) ?? tableId;
               return (
                 <div

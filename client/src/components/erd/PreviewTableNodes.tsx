@@ -6,6 +6,7 @@ import type { DslPreviewNode } from '@/lib/dsl-preview-graph';
 import { getColumnWarning } from '@/hooks/useColumnValidation';
 import TableNodeHeader from './TableNodeHeader';
 import StaticColumnRow from './StaticColumnRow';
+import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
 
 /**
  * preview 테이블 노드에서 연결된 핸들을 수집한다.
@@ -59,6 +60,24 @@ function PreviewTableNodeFrame({
   children: ReactNode;
   ghost?: boolean;
 }) {
+  const { canNavigateToCode, navigateToCode } = useDiagramCodeNavigation();
+
+  /**
+   * preview 테이블에 대응되는 코드 줄로 이동한다.
+   *
+   * @returns 없음
+   */
+  const handleNavigateToCode = () => {
+    if (!canNavigateToCode || !navigateToCode || ghost) {
+      return;
+    }
+    navigateToCode({
+      requestId: Date.now(),
+      physicalName: node.data.label,
+      logicalName: node.data.logicalTableName?.trim() || null,
+    });
+  };
+
   return (
     <TooltipProvider delayDuration={300}>
       <div
@@ -78,6 +97,7 @@ function PreviewTableNodeFrame({
           onSelectTerm={() => {}}
           onSelectDerived={() => {}}
           onRegisterNew={() => {}}
+          onNavigateToCode={canNavigateToCode && !ghost ? handleNavigateToCode : undefined}
           onRename={() => {}}
           onColorChange={() => {}}
           onHandleLayoutChange={() => {}}

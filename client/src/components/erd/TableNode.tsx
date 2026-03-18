@@ -35,6 +35,7 @@ import QuickTermDialog from './QuickTermDialog';
 import StaticColumnRow from './StaticColumnRow';
 import TableNodeHeader from './TableNodeHeader';
 import EditableColumnRow from './EditableColumnRow';
+import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
 
 /** 빠른 용어 등록 대상 정보 */
 interface QuickTermTarget {
@@ -127,6 +128,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const isHighlighted = useCanvasStore((s) => s.highlightedNodeIds.includes(id));
 
   const { findTermById, findDomainById, resolveLogicalName } = useErdDictionary();
+  const { canNavigateToCode, navigateToCode } = useDiagramCodeNavigation();
   const { canEdit: permissionCanEdit } = useErdPermission();
   const { locksByNodeId } = useRemoteEditLocksContext();
   const lockInfo = locksByNodeId.get(id);
@@ -394,6 +396,22 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
     setTableQuickTermLogicalName(null);
   };
 
+  /**
+   * 현재 테이블과 대응되는 코드 줄로 이동한다.
+   *
+   * @returns 없음
+   */
+  const handleNavigateToCode = () => {
+    if (!canNavigateToCode || !navigateToCode) {
+      return;
+    }
+    navigateToCode({
+      requestId: Date.now(),
+      physicalName: label,
+      logicalName: logicalTableName?.trim() || null,
+    });
+  };
+
   useEffect(() => {
     updateNodeInternals(id);
   }, [columns.length, handleLayout, id, updateNodeInternals]);
@@ -422,6 +440,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
           onRegisterNew={(newLogicalName) => {
             setTableQuickTermLogicalName(newLogicalName);
           }}
+          onNavigateToCode={canNavigateToCode ? handleNavigateToCode : undefined}
           onRename={handleRename}
           onColorChange={(color) => updateTableMeta(id, { headerColor: color })}
           onHandleLayoutChange={(layout) => {

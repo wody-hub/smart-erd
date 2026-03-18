@@ -453,6 +453,7 @@
         "selectDomain": "{{colName}} 도메인 선택",
         "changeColor": "테이블 색상 변경",
         "changeHandleLayout": "테이블 핸들 배치 변경",
+        "navigateToCode": "이 테이블에 해당하는 코드로 이동",
         "reorderColumn": "컬럼 {{name}} 순서 변경"
       }
     },

@@ -23,7 +23,7 @@ import {
   getCurrentEdgeHandleSelectionValue,
 } from '@/lib/edge-handles';
 import { extractColId } from '@/lib/handle-id';
-import type { EdgeRoutingType, TableNodeData, Waypoint } from '@/types/erd';
+import type { EdgeRoutingType, TableNode as ERDTableNode, TableNodeData, Waypoint } from '@/types/erd';
 import type { YjsProvider } from '@/collaboration/YjsProvider';
 import {
   CANVAS_HISTORY_ORIGIN,
@@ -31,6 +31,8 @@ import {
 } from '@/constants/canvas-history';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { applyDagreLayout } from '@/lib/auto-layout';
+import type { CodeEditorTableFocusRequest } from '@/lib/code-editor-table-navigation';
+import { findPersistedTableNodeForFocus } from '@/lib/diagram-table-focus';
 import type { PreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
 import { cn } from '@/lib/utils';
 import { useFkConnectMode } from '@/hooks/useFkConnectMode';
@@ -171,6 +173,8 @@ interface ERDCanvasProps {
   activeGroupTableIds?: Set<string> | null;
   /** code 모드 shared draft overlay 그래프 */
   draftOverlayGraph?: PreviewDraftOverlayGraph | null;
+  /** 코드 에디터 테이블 포커스 요청 */
+  tableFocusRequest?: CodeEditorTableFocusRequest | null;
 }
 
 /** 삭제 다이얼로그 상태 */
@@ -212,6 +216,7 @@ function ERDCanvas({
   activeGroupName,
   activeGroupTableIds,
   draftOverlayGraph,
+  tableFocusRequest,
 }: ERDCanvasProps) {
   const { t } = useTranslation();
   const reactFlowInstance = useReactFlow();
@@ -257,6 +262,7 @@ function ERDCanvas({
   const localEdgeDragRef = useRef(localEdgeDrag);
   const headerZoomCompensationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAppliedHeaderZoomRef = useRef<number | null>(null);
+  const lastHandledTableFocusRequestIdRef = useRef<number | null>(null);
   const applyZoomTextCompensation = useCallback((zoom: number) => {
     applyHeaderZoomCssVariables(canvasRef.current, zoom);
     lastAppliedHeaderZoomRef.current = zoom;
@@ -669,6 +675,31 @@ function ERDCanvas({
     reactFlowInstance,
     updateLocalEdgeDragPreview,
   ]);
+
+  useEffect(() => {
+    if (!tableFocusRequest) {
+      return;
+    }
+    if (lastHandledTableFocusRequestIdRef.current === tableFocusRequest.requestId) {
+      return;
+    }
+
+    const targetNode = findPersistedTableNodeForFocus(nodes as ERDTableNode[], tableFocusRequest);
+    if (!targetNode) {
+      return;
+    }
+    lastHandledTableFocusRequestIdRef.current = tableFocusRequest.requestId;
+
+    const reactFlowNode = reactFlowInstance.getNode(targetNode.id) as Node<TableNodeData> | undefined;
+    const width = reactFlowNode?.width ?? 420;
+    const height = reactFlowNode?.height ?? 80;
+    setHighlightedEdge(null);
+    setHighlightedNodes([targetNode.id]);
+    reactFlowInstance.setCenter(targetNode.position.x + width / 2, targetNode.position.y + height / 2, {
+      duration: 300,
+      zoom: Math.max(reactFlowInstance.getZoom(), 0.8),
+    });
+  }, [nodes, reactFlowInstance, setHighlightedEdge, setHighlightedNodes, tableFocusRequest]);
 
   useEffect(() => {
     if (!localEdgeDrag) {

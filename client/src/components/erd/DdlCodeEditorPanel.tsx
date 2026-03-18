@@ -27,11 +27,19 @@ import { useApplyToErd } from '@/hooks/useApplyToErd';
 import { useBidirectionalCodeSync } from '@/hooks/useBidirectionalCodeSync';
 import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
 import { useCodeEditorTableLock } from '@/hooks/useCodeEditorTableLock';
+import { useCodeEditorTableNavigation } from '@/hooks/useCodeEditorTableNavigation';
+import { useCodeEditorTableReveal } from '@/hooks/useCodeEditorTableReveal';
 import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
 import { useEditorCursorGuard } from '@/hooks/useEditorCursorGuard';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
 import { buildParsedSchemaHash } from '@/lib/code-sync-schema-hash';
+import type {
+  CodeEditorNavigableTable,
+  CodeEditorTableFocusRequest,
+  CodeEditorTableRevealRequest,
+} from '@/lib/code-editor-table-navigation';
+import { buildCodeEditorNavigableTables } from '@/lib/code-editor-table-navigation';
 import type { DiagramWorkMode } from '@/lib/diagram-work-mode';
 import type { DslPreviewCanvasState } from '@/lib/dsl-preview-graph';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
@@ -91,6 +99,10 @@ interface DdlCodeEditorPanelProps {
   previewPositionOverrides?: DiagramPreviewPositionRecord;
   /** code 모드 preview 위치 override 변경 핸들러 */
   onPreviewPositionOverridesChange?: (next: DiagramPreviewPositionRecord) => void;
+  /** 코드 에디터에서 테이블 포커스 요청 핸들러 */
+  onNavigateToTable?: (request: CodeEditorTableFocusRequest) => void;
+  /** ERD에서 요청한 코드 reveal 대상 */
+  tableRevealRequest?: CodeEditorTableRevealRequest | null;
 }
 
 /**
@@ -113,6 +125,8 @@ export default function DdlCodeEditorPanel({
   persistDraft = false,
   previewPositionOverrides,
   onPreviewPositionOverridesChange,
+  onNavigateToTable,
+  tableRevealRequest,
 }: DdlCodeEditorPanelProps) {
   const { t } = useTranslation();
 
@@ -180,12 +194,14 @@ export default function DdlCodeEditorPanel({
       {/* 모드별 에디터 */}
       <div className="flex-1 min-h-0" role="tabpanel">
         {mode === 'sql' ? (
-          <SqlDdlEditor
-            canEdit={canEdit}
-            enableCodeToErdAutoSync={enableCodeToErdAutoSync}
-            enableErdToCodeAutoSync={enableErdToCodeAutoSync}
-            enableTableLock={enableTableLock}
-          />
+            <SqlDdlEditor
+              canEdit={canEdit}
+              enableCodeToErdAutoSync={enableCodeToErdAutoSync}
+              enableErdToCodeAutoSync={enableErdToCodeAutoSync}
+              enableTableLock={enableTableLock}
+              onNavigateToTable={onNavigateToTable}
+              tableRevealRequest={tableRevealRequest}
+            />
         ) : (
           <Suspense fallback={<Spinner text={t('common.loading')} />}>
             <DslCodeEditorPanel
@@ -197,6 +213,8 @@ export default function DdlCodeEditorPanel({
               persistDraft={persistDraft}
               previewPositionOverrides={previewPositionOverrides}
               onPreviewPositionOverridesChange={onPreviewPositionOverridesChange}
+              onNavigateToTable={onNavigateToTable}
+              tableRevealRequest={tableRevealRequest}
             />
           </Suspense>
         )}
@@ -326,11 +344,15 @@ function SqlDdlEditor({
   enableCodeToErdAutoSync = true,
   enableErdToCodeAutoSync = true,
   enableTableLock = true,
+  onNavigateToTable,
+  tableRevealRequest,
 }: {
   canEdit?: boolean;
   enableCodeToErdAutoSync?: boolean;
   enableErdToCodeAutoSync?: boolean;
   enableTableLock?: boolean;
+  onNavigateToTable?: (request: CodeEditorTableFocusRequest) => void;
+  tableRevealRequest?: CodeEditorTableRevealRequest | null;
 }) {
   const { t } = useTranslation();
   const { teamId, projectId, diagramId } = useParams<{
@@ -421,6 +443,10 @@ function SqlDdlEditor({
     });
 
   const syncStatusMeta = getSyncStatusMeta(t, syncStatus);
+  const navigableTables = useMemo<CodeEditorNavigableTable[]>(
+    () => buildCodeEditorNavigableTables(parseResult?.tables ?? [], parseResult?.tableRanges ?? []),
+    [parseResult?.tableRanges, parseResult?.tables],
+  );
 
   /** 다크 모드 감지 (반응형) */
   const isDark = useDarkMode();
@@ -464,6 +490,35 @@ function SqlDdlEditor({
     tableRanges: parseResult?.tableRanges ?? [],
     hasParseErrors: hasBlockingErrors,
   });
+  useCodeEditorTableNavigation({
+    enabled: !!onNavigateToTable,
+    editorReady,
+    editorRef,
+    monacoRef,
+    tables: navigableTables,
+    onNavigate: (table) => {
+      onNavigateToTable?.({
+        ...table,
+        requestId: Date.now(),
+      });
+    },
+  });
+  useCodeEditorTableReveal({
+    enabled: !!tableRevealRequest,
+    editorReady,
+    editorRef,
+    tables: navigableTables,
+    request: tableRevealRequest,
+  });
+  useEffect(() => {
+    if (!tableRevealRequest || !editorReady) {
+      return;
+    }
+    if (ddlText.trim().length > 0 || navigableTables.length > 0 || !hasNodes) {
+      return;
+    }
+    executeRefresh();
+  }, [ddlText, editorReady, executeRefresh, hasNodes, navigableTables.length, tableRevealRequest]);
 
   // diagnostics 변경 시 SQL 에러 마커 갱신 (라인 전체 마킹 정책)
   useEffect(() => {

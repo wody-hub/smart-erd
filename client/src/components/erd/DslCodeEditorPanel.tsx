@@ -13,6 +13,8 @@ import { useApplyToErd } from '@/hooks/useApplyToErd';
 import { useBidirectionalCodeSync } from '@/hooks/useBidirectionalCodeSync';
 import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
 import { useCodeEditorTableLock } from '@/hooks/useCodeEditorTableLock';
+import { useCodeEditorTableNavigation } from '@/hooks/useCodeEditorTableNavigation';
+import { useCodeEditorTableReveal } from '@/hooks/useCodeEditorTableReveal';
 import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
 import { useEditorCursorGuard } from '@/hooks/useEditorCursorGuard';
 import { useDslEditorCompletion } from '@/hooks/useDslEditorCompletion';
@@ -48,6 +50,12 @@ import {
   CODE_DRAFT_PERSIST_IDLE_MS,
   CODE_PREVIEW_GRAPH_IDLE_MS,
 } from '@/constants/code-sync';
+import type {
+  CodeEditorNavigableTable,
+  CodeEditorTableFocusRequest,
+  CodeEditorTableRevealRequest,
+} from '@/lib/code-editor-table-navigation';
+import { buildCodeEditorNavigableTables } from '@/lib/code-editor-table-navigation';
 import { applyQuickTermToDslLine } from '@/lib/dsl-line-edit';
 import {
   buildPreviewGraphFromDslParsedSchema,
@@ -85,6 +93,10 @@ interface DslCodeEditorPanelProps {
   previewPositionOverrides?: DiagramPreviewPositionRecord;
   /** code 모드 preview 위치 override 변경 핸들러 */
   onPreviewPositionOverridesChange?: (next: DiagramPreviewPositionRecord) => void;
+  /** 코드 에디터에서 테이블 포커스 요청 핸들러 */
+  onNavigateToTable?: (request: CodeEditorTableFocusRequest) => void;
+  /** ERD에서 요청한 코드 reveal 대상 */
+  tableRevealRequest?: CodeEditorTableRevealRequest | null;
 }
 
 /**
@@ -107,6 +119,8 @@ export default function DslCodeEditorPanel({
   persistDraft = false,
   previewPositionOverrides = {},
   onPreviewPositionOverridesChange,
+  onNavigateToTable,
+  tableRevealRequest,
 }: DslCodeEditorPanelProps) {
   const { t } = useTranslation();
   const { teamId, projectId, diagramId } = useParams<{
@@ -416,6 +430,14 @@ export default function DslCodeEditorPanel({
         erdPhysicalNameSourceEntries,
       ),
     [erdPhysicalNameSourceEntries, parseResult?.physicalNameHints],
+  );
+  const navigableTables = useMemo<CodeEditorNavigableTable[]>(
+    () =>
+      buildCodeEditorNavigableTables(
+        parseResult?.result.tables ?? [],
+        parseResult?.result.tableRanges ?? [],
+      ),
+    [parseResult?.result.tables, parseResult?.result.tableRanges],
   );
 
   // --- Quick Register Dialogs ---
@@ -817,6 +839,36 @@ export default function DslCodeEditorPanel({
     tableRanges: parseResult?.result.tableRanges ?? [],
     hasParseErrors: errorCount > 0,
   });
+  useCodeEditorTableNavigation({
+    enabled: !!onNavigateToTable,
+    editorReady: monacoReady,
+    editorRef,
+    monacoRef,
+    tables: navigableTables,
+    onNavigate: (table) => {
+      onNavigateToTable?.({
+        ...table,
+        requestId: Date.now(),
+      });
+    },
+  });
+  useCodeEditorTableReveal({
+    enabled: !!tableRevealRequest,
+    editorReady: monacoReady,
+    editorRef,
+    tables: navigableTables,
+    request: tableRevealRequest,
+  });
+
+  useEffect(() => {
+    if (!tableRevealRequest || !monacoReady) {
+      return;
+    }
+    if (dslText.trim().length > 0 || navigableTables.length > 0 || !hasNodes) {
+      return;
+    }
+    executeRefresh();
+  }, [dslText, executeRefresh, hasNodes, monacoReady, navigableTables.length, tableRevealRequest]);
 
   /**
    * 진단 항목 위치로 에디터 포커스를 이동한다.
