@@ -14,7 +14,7 @@ export const CODE_SHARED_DRAFT_SYNC_IDLE_MS = 200;
 export const CODE_SHARED_DRAFT_SERVER_PERSIST_IDLE_MS = 1500;
 
 /** code 모드 remote shared draft bootstrap 대기 시간 (ms) */
-export const CODE_SHARED_DRAFT_BOOTSTRAP_WAIT_MS = 1200;
+export const CODE_SHARED_DRAFT_BOOTSTRAP_WAIT_MS = 300;
 
 /** code 모드 preview graph 생성 대기 시간 (ms) */
 export const CODE_PREVIEW_GRAPH_IDLE_MS = 300;
