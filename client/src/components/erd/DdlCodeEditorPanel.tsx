@@ -107,8 +107,8 @@ interface DdlCodeEditorPanelProps {
   delayDraftHydration?: boolean;
   /** 현재 persisted 다이어그램에 저장된 내용 존재 여부 */
   persistedDiagramHasContent?: boolean;
-  /** code 모드 shared draft snapshot keepalive 저장 요청 */
-  onPersistCodeModeSnapshot?: () => void;
+  /** code 모드 shared draft snapshot 서버 저장 예약 요청 */
+  onScheduleCodeModeSnapshotPersist?: () => void;
 }
 
 /**
@@ -135,7 +135,7 @@ export default function DdlCodeEditorPanel({
   tableRevealRequest,
   delayDraftHydration = false,
   persistedDiagramHasContent = false,
-  onPersistCodeModeSnapshot,
+  onScheduleCodeModeSnapshotPersist,
 }: DdlCodeEditorPanelProps) {
   const { t } = useTranslation();
 
@@ -226,7 +226,7 @@ export default function DdlCodeEditorPanel({
               tableRevealRequest={tableRevealRequest}
               delayDraftHydration={delayDraftHydration}
               persistedDiagramHasContent={persistedDiagramHasContent}
-              onPersistCodeModeSnapshot={onPersistCodeModeSnapshot}
+              onScheduleCodeModeSnapshotPersist={onScheduleCodeModeSnapshotPersist}
             />
           </Suspense>
         )}

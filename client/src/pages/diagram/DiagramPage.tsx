@@ -456,23 +456,6 @@ export default function DiagramPage() {
     }, CODE_SHARED_DRAFT_SERVER_PERSIST_IDLE_MS);
   }, [persistCodeModeSnapshotNow]);
 
-  /**
-   * code 모드 shared draft text flush 직후 snapshot 저장을 즉시 시작한다.
-   *
-   * 일반 입력 경로에서는 keepalive 대신 즉시 서버 저장을 시작해
-   * 재접속 직후에도 draft가 복원될 가능성을 높인다.
-   *
-   * @returns 없음
-   */
-  const requestImmediateCodeModeSnapshotPersist = useCallback(() => {
-    if (codeModeSnapshotPersistTimerRef.current) {
-      clearTimeout(codeModeSnapshotPersistTimerRef.current);
-      codeModeSnapshotPersistTimerRef.current = null;
-    }
-    codeModeSnapshotPersistDirtyRef.current = false;
-    void persistCodeModeSnapshotNow();
-  }, [persistCodeModeSnapshotNow]);
-
   useHotkeys(
     KEYBINDINGS.UNDO,
     (event) => {
@@ -743,9 +726,9 @@ export default function DiagramPage() {
                             isPreviewMode
                           }
                           persistedDiagramHasContent={!!diagram?.content}
-                          onPersistCodeModeSnapshot={
+                          onScheduleCodeModeSnapshotPersist={
                             workModeCapabilities.persistCodeDraft
-                              ? requestImmediateCodeModeSnapshotPersist
+                              ? scheduleCodeModeSnapshotPersist
                               : undefined
                           }
                           onDslPreviewStateChange={

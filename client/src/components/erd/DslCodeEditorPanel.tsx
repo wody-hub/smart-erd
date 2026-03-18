@@ -103,8 +103,8 @@ interface DslCodeEditorPanelProps {
   delayDraftHydration?: boolean;
   /** 현재 persisted 다이어그램에 저장된 내용 존재 여부 */
   persistedDiagramHasContent?: boolean;
-  /** code 모드 shared draft snapshot keepalive 저장 요청 */
-  onPersistCodeModeSnapshot?: () => void;
+  /** code 모드 shared draft snapshot 서버 저장 예약 요청 */
+  onScheduleCodeModeSnapshotPersist?: () => void;
 }
 
 /**
@@ -174,7 +174,7 @@ export default function DslCodeEditorPanel({
   tableRevealRequest,
   delayDraftHydration = false,
   persistedDiagramHasContent = false,
-  onPersistCodeModeSnapshot,
+  onScheduleCodeModeSnapshotPersist,
 }: DslCodeEditorPanelProps) {
   const { t } = useTranslation();
   const { teamId, projectId, diagramId } = useParams<{
@@ -348,10 +348,10 @@ export default function DslCodeEditorPanel({
       readCurrentDslText().trim().length === 0,
       CODE_MODE_SHARED_DRAFT_TEXT_ORIGIN,
     );
-    onPersistCodeModeSnapshot?.();
+    onScheduleCodeModeSnapshotPersist?.();
   }, [
     draftHydrated,
-    onPersistCodeModeSnapshot,
+    onScheduleCodeModeSnapshotPersist,
     persistDraft,
     readCurrentDslText,
     shouldSkipGeneratedFallbackSharedDraftWrite,

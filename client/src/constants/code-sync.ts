@@ -11,7 +11,7 @@ export const CODE_DRAFT_PERSIST_IDLE_MS = 500;
 export const CODE_SHARED_DRAFT_SYNC_IDLE_MS = 200;
 
 /** code 모드 shared draft Y.Doc snapshot 서버 영속화 대기 시간 (ms) */
-export const CODE_SHARED_DRAFT_SERVER_PERSIST_IDLE_MS = 100;
+export const CODE_SHARED_DRAFT_SERVER_PERSIST_IDLE_MS = 1500;
 
 /** code 모드 remote shared draft bootstrap 대기 시간 (ms) */
 export const CODE_SHARED_DRAFT_BOOTSTRAP_WAIT_MS = 1200;
