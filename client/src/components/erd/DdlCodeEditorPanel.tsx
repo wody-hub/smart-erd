@@ -34,6 +34,7 @@ import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
 import { buildParsedSchemaHash } from '@/lib/code-sync-schema-hash';
 import type { DiagramWorkMode } from '@/lib/diagram-work-mode';
 import type { DslPreviewCanvasState } from '@/lib/dsl-preview-graph';
+import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import { generateDdl } from '@/lib/ddl-generator';
@@ -86,6 +87,10 @@ interface DdlCodeEditorPanelProps {
   onDslPreviewStateChange?: (previewState: DslPreviewCanvasState | null) => void;
   /** 코드 draft 저장 활성 여부 */
   persistDraft?: boolean;
+  /** code 모드 preview 위치 override */
+  previewPositionOverrides?: DiagramPreviewPositionRecord;
+  /** code 모드 preview 위치 override 변경 핸들러 */
+  onPreviewPositionOverridesChange?: (next: DiagramPreviewPositionRecord) => void;
 }
 
 /**
@@ -106,6 +111,8 @@ export default function DdlCodeEditorPanel({
   workMode = 'sync',
   onDslPreviewStateChange,
   persistDraft = false,
+  previewPositionOverrides,
+  onPreviewPositionOverridesChange,
 }: DdlCodeEditorPanelProps) {
   const { t } = useTranslation();
 
@@ -188,6 +195,8 @@ export default function DdlCodeEditorPanel({
               enableTableLock={enableTableLock}
               onPreviewStateChange={onDslPreviewStateChange}
               persistDraft={persistDraft}
+              previewPositionOverrides={previewPositionOverrides}
+              onPreviewPositionOverridesChange={onPreviewPositionOverridesChange}
             />
           </Suspense>
         )}

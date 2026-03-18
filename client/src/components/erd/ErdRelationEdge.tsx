@@ -255,7 +255,12 @@ export default function ErdRelationEdge({
         }
 
         return s.nodes
-          .filter((node) => node.id !== source && node.id !== target && node.type === 'table')
+          .filter(
+            (node) =>
+              node.id !== source &&
+              node.id !== target &&
+              (node.type === 'table' || node.type === 'previewTable'),
+          )
           .map((node) => {
             const tableData = node.data as TableNodeData | undefined;
             const width = node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH;

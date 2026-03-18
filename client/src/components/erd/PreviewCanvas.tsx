@@ -1,166 +1,38 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   applyNodeChanges,
   Background,
   BackgroundVariant,
   Controls,
   MiniMap,
+  Panel,
   ReactFlow,
-  type EdgeTypes,
   type NodeChange,
-  type NodeProps,
-  type NodeTypes,
-  type XYPosition,
-  useStore,
+  type EdgeTypes,
 } from '@xyflow/react';
+import { BookText, Download, LayoutGrid } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { useErdDictionary } from './ErdDictionaryContext';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import ExportProgressDialog from './ExportProgressDialog';
 import type { DslPreviewCanvasState, DslPreviewNode } from '@/lib/dsl-preview-graph';
-import { getColumnWarning } from '@/hooks/useColumnValidation';
-import TableNodeHeader from './TableNodeHeader';
-import StaticColumnRow from './StaticColumnRow';
+import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
+import { buildPersistedPreviewPositionChanges } from '@/lib/preview-position-sync';
+import { writeCodeModeSharedDraftGraph } from '@/lib/code-mode-shared-draft';
+import { useExportDiagram } from '@/hooks/useExportDiagram';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
+import type { TableNode } from '@/types/erd';
 import ErdRelationEdge from './ErdRelationEdge';
+import { previewNodeTypes } from './PreviewTableNodes';
 
 /** preview 캔버스에서 MiniMap을 숨길 노드 수 임계치 */
 const PREVIEW_MINIMAP_NODE_LIMIT = 80;
-
-/**
- * preview 테이블 노드에서 연결된 핸들을 수집한다.
- *
- * @param nodeId preview 노드 ID
- * @returns 연결된 핸들 ID 집합
- */
-function useConnectedHandles(nodeId: string): Set<string> {
-  return useStore(
-    (state) => {
-      const handleIds = new Set<string>();
-      const prefix = `${nodeId}-`;
-      for (const edge of state.edges) {
-        if (edge.sourceHandle?.startsWith(prefix)) {
-          handleIds.add(edge.sourceHandle);
-        }
-        if (edge.targetHandle?.startsWith(prefix)) {
-          handleIds.add(edge.targetHandle);
-        }
-      }
-      return handleIds;
-    },
-    (left, right) => {
-      if (left.size !== right.size) {
-        return false;
-      }
-      for (const value of left) {
-        if (!right.has(value)) {
-          return false;
-        }
-      }
-      return true;
-    },
-  );
-}
-
-/**
- * code 모드 전용 read-only preview 테이블 노드.
- *
- * @param props React Flow 노드 props
- * @returns preview 테이블 노드 JSX
- */
-function PreviewTableNode({ id, data }: NodeProps<DslPreviewNode>) {
-  const { findDomainById, findTermById, resolveLogicalName } = useErdDictionary();
-  const connectedHandles = useConnectedHandles(id);
-
-  const duplicatedLogicalNames = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const column of data.columns) {
-      const key = column.logicalName?.trim();
-      if (!key) {
-        continue;
-      }
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-
-    return new Set(
-      Array.from(counts.entries())
-        .filter(([, count]) => count > 1)
-        .map(([logicalName]) => logicalName),
-    );
-  }, [data.columns]);
-
-  /**
-   * 컬럼이 관계선에 연결되어 있는지 판정한다.
-   *
-   * @param columnId preview 컬럼 ID
-   * @returns 연결 여부
-   */
-  const isConnected = (columnId: string): boolean => {
-    const prefix = `${id}-${columnId}-`;
-    for (const handleId of connectedHandles) {
-      if (handleId.startsWith(prefix)) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  return (
-    <TooltipProvider delayDuration={300}>
-      <div className="bg-card border border-border rounded shadow-md w-max min-w-[420px]">
-        <TableNodeHeader
-          label={data.label}
-          logicalTableName={data.logicalTableName}
-          tableTermId={data.tableTermId}
-          headerColor={data.headerColor}
-          handleLayout={data.handleLayout}
-          isEditing={false}
-          duplicateLogicalNameColumnCount={0}
-          lockInfo={undefined}
-          onLogicalNameChange={() => {}}
-          onSelectTerm={() => {}}
-          onSelectDerived={() => {}}
-          onRegisterNew={() => {}}
-          onRename={() => {}}
-          onColorChange={() => {}}
-          onHandleLayoutChange={() => {}}
-        />
-
-        <div className="divide-y divide-border">
-          {data.columns.map((column) => {
-            const resolution = column.logicalName ? resolveLogicalName(column.logicalName) : null;
-            const resolvedDomain =
-              column.domainId != null
-                ? findDomainById(column.domainId)
-                : resolution?.domainId
-                  ? findDomainById(resolution.domainId)
-                  : undefined;
-
-            return (
-              <StaticColumnRow
-                key={column.id}
-                col={column}
-                nodeId={id}
-                connected={isConnected(column.id)}
-                handleLayout={data.handleLayout ?? 'split'}
-                warning={getColumnWarning(column, findTermById, findDomainById, resolveLogicalName)}
-                hasDuplicateLogicalName={
-                  !!column.logicalName?.trim() &&
-                  duplicatedLogicalNames.has(column.logicalName.trim())
-                }
-                domainLogicalName={resolvedDomain?.logicalName}
-                domainPhysicalType={resolvedDomain?.physicalType}
-              />
-            );
-          })}
-        </div>
-      </div>
-    </TooltipProvider>
-  );
-}
-
-const previewNodeTypes: NodeTypes = {
-  previewTable: memo(PreviewTableNode),
-};
 
 const previewEdgeTypes: EdgeTypes = {
   erdRelation: ErdRelationEdge,
@@ -211,12 +83,123 @@ function resolvePreviewMessage(
 interface PreviewCanvasProps {
   /** DSL preview 상태 */
   previewState: DslPreviewCanvasState | null;
+  /** export 파일명에 사용할 다이어그램 이름 */
+  diagramName: string;
+  /** code 모드 로컬 preview 위치 override */
+  positionOverrides: DiagramPreviewPositionRecord;
+  /** code 모드 로컬 preview 위치 override 변경 핸들러 */
+  onPositionOverridesChange: (next: DiagramPreviewPositionRecord) => void;
+  /** 사전 관리 진입 허용 여부 */
+  canOpenDictionary: boolean;
+  /** 사전 관리 열기 핸들러 */
+  onOpenDictionary?: () => void;
+}
+
+interface PreviewCanvasToolbarProps {
+  /** export 파일명에 사용할 다이어그램 이름 */
+  diagramName: string;
+  /** 로컬 preview 위치를 기본 배치로 되돌린다. */
+  onResetLayout: () => void;
+  /** preview 그래프가 있는지 여부 */
+  hasGraph: boolean;
+  /** 사전 관리 진입 허용 여부 */
+  canOpenDictionary: boolean;
+  /** 사전 관리 열기 핸들러 */
+  onOpenDictionary?: () => void;
+}
+
+/**
+ * code 모드 preview 상단 액션 바.
+ *
+ * code 모드에서 preview 전용 액션만 제공한다.
+ * 현재는 위치 초기화, export, 사전 관리 진입을 지원한다.
+ *
+ * @param props.diagramName export 파일명
+ * @param props.onResetLayout preview 배치 초기화 핸들러
+ * @param props.hasGraph preview 그래프 존재 여부
+ * @param props.canOpenDictionary 사전 관리 진입 허용 여부
+ * @param props.onOpenDictionary 사전 관리 열기 핸들러
+ * @returns preview 툴바 JSX
+ */
+function PreviewCanvasToolbar({
+  diagramName,
+  onResetLayout,
+  hasGraph,
+  canOpenDictionary,
+  onOpenDictionary,
+}: PreviewCanvasToolbarProps) {
+  const { t } = useTranslation();
+  const { exportPng, exportJpg, exportSvg, exportPdf, exportProgress } = useExportDiagram(diagramName);
+
+  return (
+    <>
+      <Panel position="top-center">
+        <div className="bg-card border border-border rounded-lg shadow-md p-1 gap-1 flex">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onResetLayout}
+            className="gap-1.5"
+            aria-label={t('erd.toolbar.autoLayout')}
+            disabled={!hasGraph}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            {t('erd.toolbar.autoLayout')}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5"
+                aria-label={
+                  exportProgress.isExporting
+                    ? t('erd.toolbar.exporting')
+                    : t('erd.toolbar.export')
+                }
+                disabled={exportProgress.isExporting}
+              >
+                <Download className="h-4 w-4" />
+                {exportProgress.isExporting ? t('erd.toolbar.exporting') : t('erd.toolbar.export')}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportPng} disabled={exportProgress.isExporting}>
+                PNG
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportJpg} disabled={exportProgress.isExporting}>
+                JPG
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportSvg} disabled={exportProgress.isExporting}>
+                SVG
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportPdf} disabled={exportProgress.isExporting}>
+                PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5"
+            aria-label={t('erd.toolbar.dictionary')}
+            onClick={onOpenDictionary}
+            disabled={!canOpenDictionary || !onOpenDictionary}
+          >
+            <BookText className="h-4 w-4" />
+            {t('erd.toolbar.dictionary')}
+          </Button>
+        </div>
+      </Panel>
+      <ExportProgressDialog progress={exportProgress} />
+    </>
+  );
 }
 
 /**
  * preview 노드에 로컬 위치 override를 병합한다.
  *
- * code 모드에서 사용자가 드래그한 위치를 유지하되, 실제 persisted ERD는 건드리지 않는다.
+ * code 모드에서 사용자가 드래그한 위치를 유지한다.
  *
  * @param nodes incoming preview 노드 목록
  * @param positionOverrides 로컬 위치 override 맵
@@ -224,11 +207,11 @@ interface PreviewCanvasProps {
  */
 function mergePreviewNodesWithLocalOverrides(
   nodes: readonly DslPreviewNode[],
-  positionOverrides: ReadonlyMap<string, XYPosition>,
+  positionOverrides: DiagramPreviewPositionRecord,
 ): DslPreviewNode[] {
   return nodes.map((node) => ({
     ...node,
-    position: positionOverrides.get(node.id) ?? node.position,
+    position: positionOverrides[node.id] ?? node.position,
   }));
 }
 
@@ -236,45 +219,160 @@ function mergePreviewNodesWithLocalOverrides(
  * code 모드에서 DSL parse 결과를 읽기 전용 그래프로 보여주는 preview 캔버스.
  *
  * @param props.previewState 현재 DSL preview 상태
+ * @param props.diagramName export 파일명에 사용할 다이어그램 이름
+ * @param props.positionOverrides code 모드 로컬 preview 위치 override
+ * @param props.onPositionOverridesChange code 모드 로컬 preview 위치 override 변경 핸들러
+ * @param props.canOpenDictionary 사전 관리 진입 허용 여부
+ * @param props.onOpenDictionary 사전 관리 열기 핸들러
  * @returns read-only preview canvas JSX
  */
-export default function PreviewCanvas({ previewState }: PreviewCanvasProps) {
+export default function PreviewCanvas({
+  previewState,
+  diagramName,
+  positionOverrides,
+  onPositionOverridesChange,
+  canOpenDictionary,
+  onOpenDictionary,
+}: PreviewCanvasProps) {
   const { t } = useTranslation();
+  const ydoc = useCanvasStore((state) => state.ydoc);
   const message = resolvePreviewMessage(t, previewState);
   const graph = previewState?.graph;
   const hasGraph = !!graph && graph.nodes.length > 0;
+  const blockingBannerMessage =
+    hasGraph && previewState?.hasBlockingErrors
+      ? translatePreviewMessage(t, 'diagram.workMode.codePreviewBlocked')
+      : null;
   const [displayNodes, setDisplayNodes] = useState<DslPreviewNode[]>([]);
-  const positionOverridesRef = useRef<Map<string, XYPosition>>(new Map());
+  const positionOverridesRef = useRef<DiagramPreviewPositionRecord>(positionOverrides);
+  const lastSharedPreviewGraphRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    positionOverridesRef.current = positionOverrides;
+  }, [positionOverrides]);
 
   useEffect(() => {
     if (!graph) {
-      positionOverridesRef.current.clear();
       setDisplayNodes([]);
       return;
     }
 
     const nextNodeIds = new Set(graph.nodes.map((node) => node.id));
-    for (const nodeId of Array.from(positionOverridesRef.current.keys())) {
-      if (!nextNodeIds.has(nodeId)) {
-        positionOverridesRef.current.delete(nodeId);
+    const nextOverrides: DiagramPreviewPositionRecord = {};
+    let changed = false;
+
+    for (const [nodeId, position] of Object.entries(positionOverridesRef.current)) {
+      if (nextNodeIds.has(nodeId)) {
+        nextOverrides[nodeId] = position;
+      } else {
+        changed = true;
       }
     }
 
-    setDisplayNodes(
-      mergePreviewNodesWithLocalOverrides(graph.nodes, positionOverridesRef.current),
-    );
-  }, [graph]);
+    if (changed) {
+      positionOverridesRef.current = nextOverrides;
+      onPositionOverridesChange(nextOverrides);
+    }
 
+    setDisplayNodes(
+      mergePreviewNodesWithLocalOverrides(graph.nodes, changed ? nextOverrides : positionOverridesRef.current),
+    );
+  }, [graph, onPositionOverridesChange, positionOverrides]);
+
+  useEffect(() => {
+    if (!ydoc) {
+      return;
+    }
+
+    if (!previewState?.hasContent) {
+      lastSharedPreviewGraphRef.current = null;
+      writeCodeModeSharedDraftGraph(ydoc, null, 'code-preview-shared-draft');
+      return;
+    }
+
+    if (!graph || displayNodes.length === 0) {
+      return;
+    }
+
+    const nextGraph = {
+      nodes: displayNodes,
+      edges: graph.edges,
+    };
+    const serializedGraph = JSON.stringify(nextGraph);
+    if (serializedGraph === lastSharedPreviewGraphRef.current) {
+      return;
+    }
+
+    lastSharedPreviewGraphRef.current = serializedGraph;
+    writeCodeModeSharedDraftGraph(ydoc, nextGraph, 'code-preview-shared-draft');
+  }, [displayNodes, graph, previewState?.hasContent, ydoc]);
+
+  /**
+   * preview 노드 위치 변경을 화면 상태에 반영한다.
+   *
+   * @param changes React Flow 노드 변경 목록
+   * @returns 없음
+   */
   const handleNodesChange = useCallback((changes: NodeChange<DslPreviewNode>[]) => {
     setDisplayNodes((currentNodes) => applyNodeChanges(changes, currentNodes));
   }, []);
 
+  /**
+   * 드래그가 끝난 preview 노드의 위치를 로컬 override로 저장한다.
+   *
+   * @param _event React Flow drag stop 이벤트
+   * @param node 드래그가 끝난 preview 노드
+   * @returns 없음
+   */
   const handleNodeDragStop = useCallback((_event: unknown, node: DslPreviewNode) => {
-    positionOverridesRef.current.set(node.id, node.position);
-  }, []);
+    const canvasState = useCanvasStore.getState();
+    const persistedPositionChanges = buildPersistedPreviewPositionChanges(
+      [node],
+      canvasState.nodes as TableNode[],
+      { [node.id]: node.position },
+    );
+    const nextOverrides = { ...positionOverridesRef.current };
+    if (persistedPositionChanges.length > 0) {
+      delete nextOverrides[node.id];
+    } else {
+      nextOverrides[node.id] = node.position;
+    }
+    positionOverridesRef.current = nextOverrides;
+    onPositionOverridesChange(nextOverrides);
+    if (persistedPositionChanges.length === 0) {
+      return;
+    }
+
+    const reactFlowPositionChanges: NodeChange[] = persistedPositionChanges.map((change) => ({
+      id: change.nodeId,
+      type: 'position',
+      position: change.position,
+      dragging: false,
+    }));
+    canvasState.onNodesChange(reactFlowPositionChanges);
+  }, [onPositionOverridesChange]);
+
+  /**
+   * 사용자가 조정한 로컬 preview 위치를 기본 배치로 되돌린다.
+   *
+   * @returns 없음
+   */
+  const handleResetLayout = useCallback(() => {
+    positionOverridesRef.current = {};
+    onPositionOverridesChange({});
+    setDisplayNodes(graph?.nodes ?? []);
+  }, [graph?.nodes, onPositionOverridesChange]);
 
   return (
     <div className="h-full w-full bg-background relative">
+      <PreviewCanvasToolbar
+        diagramName={diagramName}
+        onResetLayout={handleResetLayout}
+        hasGraph={hasGraph}
+        canOpenDictionary={canOpenDictionary}
+        onOpenDictionary={onOpenDictionary}
+      />
+
       {hasGraph ? (
         <ReactFlow
           nodes={displayNodes}
@@ -310,6 +408,14 @@ export default function PreviewCanvas({ previewState }: PreviewCanvasProps) {
         </ReactFlow>
       ) : (
         <div className="h-full w-full bg-background" />
+      )}
+
+      {blockingBannerMessage && (
+        <div className="pointer-events-none absolute left-1/2 top-4 z-20 -translate-x-1/2 px-4">
+          <div className="rounded-md border border-amber-500/30 bg-background/92 px-3 py-2 text-xs text-amber-700 shadow-sm backdrop-blur dark:text-amber-300">
+            {blockingBannerMessage}
+          </div>
+        </div>
       )}
 
       {message && (

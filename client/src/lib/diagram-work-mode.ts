@@ -227,7 +227,8 @@ export function createDiagramWorkModeCapabilities(
  * 작업 모드 capability와 현재 런타임 상태를 결합해 실제 화면 정책을 계산한다.
  *
  * code 모드는 persisted ERD preview 상태와 무관하게 로컬 코드 작업을 허용하고,
- * persisted 수정 계열(surface save, canvas edit, dictionary edit)만 preview 상태에 묶는다.
+ * persisted 수정 계열(surface save, canvas edit)만 preview 상태에 묶는다.
+ * 사전 관리는 별도 관리 surface로 보고 code 모드에서도 허용한다.
  *
  * @param options 작업 모드/권한/preview 상태 입력
  * @returns 현재 화면에서 사용할 런타임 정책
@@ -261,7 +262,7 @@ export function resolveDiagramWorkModeRuntimeState({
       capabilities.showCodePanel &&
       capabilities.forcedLeftPanel == null &&
       !hasActiveGroupView,
-    canOpenDictionaryManagement: mode !== 'code',
-    canEditDictionaryManagement: persistedEditingAllowed && mode !== 'code',
+    canOpenDictionaryManagement: canEdit,
+    canEditDictionaryManagement: canEdit,
   };
 }

@@ -1,10 +1,25 @@
 import dagre from 'dagre';
 import type { Node } from '@xyflow/react';
 import type { DdlParseResult, ParsedRelation, ParsedTable } from './ddl-parser.js';
-import type { ERDEdge, TableNodeData } from '../types/erd.js';
+import type {
+  ERDEdge,
+  EdgeHandleMode,
+  EdgeHandleSide,
+  EdgeRoutingType,
+  TableNodeData,
+  Waypoint,
+} from '../types/erd.js';
 import type { Column } from '../types/erd.js';
 import type { TableNode } from '../types/erd.js';
-import { buildStableEdgeId, resolveAutoEdgeHandles } from './edge-handles.js';
+import { resolvePreservedWaypoints } from './edge-presentation-restore.js';
+import {
+  buildRelationKey,
+  buildStableEdgeId,
+  getCurrentEdgeHandleSelectionValue,
+  parseEdgeHandleSelectionValue,
+  resolveEdgeHandlesFromPreference,
+} from './edge-handles.js';
+import { extractColId, extractHandleSide } from './handle-id.js';
 
 /** preview 테이블 노드 폭 (px) */
 const PREVIEW_NODE_WIDTH = 420;
@@ -20,6 +35,8 @@ const PREVIEW_RANK_SEPARATION = 120;
 const PREVIEW_LAYOUT_MARGIN = 40;
 /** persisted preview source entry 접두사 */
 const PREVIEW_LAYOUT_SOURCE_ENTRY = 'table';
+/** persisted preview edge presentation source entry 접두사 */
+const PREVIEW_EDGE_PRESENTATION_SOURCE_ENTRY = 'edge';
 /** persisted preview source entry 구분자 */
 const PREVIEW_LAYOUT_SOURCE_SEPARATOR = '\t';
 
@@ -53,6 +70,19 @@ interface PreviewLayoutSource {
   position: { x: number; y: number };
   headerColor?: TableNodeData['headerColor'];
   handleLayout?: TableNodeData['handleLayout'];
+}
+
+/** persisted preview edge presentation source */
+interface PreviewEdgePresentationSource {
+  routingType: EdgeRoutingType;
+  handleMode?: EdgeHandleMode;
+  sourceSide?: EdgeHandleSide;
+  targetSide?: EdgeHandleSide;
+  sourceHandle?: string;
+  targetHandle?: string;
+  resolvedSourceSide?: EdgeHandleSide;
+  resolvedTargetSide?: EdgeHandleSide;
+  waypoints?: Waypoint[];
 }
 
 /**
@@ -98,6 +128,74 @@ export function buildPreviewLayoutSourceEntries(nodes: TableNode[]): string[] {
         node.data.handleLayout ?? '',
       ].join(PREVIEW_LAYOUT_SOURCE_SEPARATOR),
     );
+}
+
+/**
+ * 현재 persisted ERD 엣지에서 preview 선 표현 source entry 목록을 만든다.
+ *
+ * relation key 기준으로 routing/manual handle/waypoint 정보를 직렬화한다.
+ *
+ * @param nodes persisted ERD 테이블 노드 목록
+ * @param edges persisted ERD 엣지 목록
+ * @returns preview 선 표현 source entry 목록
+ */
+export function buildPreviewEdgePresentationEntries(
+  nodes: TableNode[],
+  edges: ERDEdge[],
+): string[] {
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const entries: string[] = [];
+
+  for (const edge of edges) {
+    const sourceNode = nodeById.get(edge.source);
+    const targetNode = nodeById.get(edge.target);
+    if (!sourceNode || !targetNode || !edge.sourceHandle || !edge.targetHandle) {
+      continue;
+    }
+
+    const sourceColumnId = extractColId(edge.sourceHandle, sourceNode.id);
+    const targetColumnId = extractColId(edge.targetHandle, targetNode.id);
+    const sourceColumn = sourceNode.data.columns.find((column) => column.id === sourceColumnId);
+    const targetColumn = targetNode.data.columns.find((column) => column.id === targetColumnId);
+    if (!sourceColumn || !targetColumn) {
+      continue;
+    }
+
+    const relationKey = buildRelationKey({
+      parentTable: sourceNode.data.label,
+      parentColumn: sourceColumn.name,
+      childTable: targetNode.data.label,
+      childColumn: targetColumn.name,
+    });
+    const edgeData = (edge.data ?? {}) as Partial<NonNullable<ERDEdge['data']>>;
+    const handleSelection = parseEdgeHandleSelectionValue(
+      getCurrentEdgeHandleSelectionValue({
+        handleMode: edgeData.handleMode,
+        sourceSide: edgeData.sourceSide,
+        targetSide: edgeData.targetSide,
+        sourceHandle: edge.sourceHandle,
+        targetHandle: edge.targetHandle,
+      }),
+    );
+
+    entries.push(
+      [
+        PREVIEW_EDGE_PRESENTATION_SOURCE_ENTRY,
+        relationKey,
+        edgeData.routingType ?? 'smoothstep',
+        handleSelection.handleMode,
+        handleSelection.sourceSide ?? '',
+        handleSelection.targetSide ?? '',
+        edge.sourceHandle,
+        edge.targetHandle,
+        extractHandleSide(edge.sourceHandle) ?? '',
+        extractHandleSide(edge.targetHandle) ?? '',
+        JSON.stringify(edgeData.waypoints ?? []),
+      ].join(PREVIEW_LAYOUT_SOURCE_SEPARATOR),
+    );
+  }
+
+  return entries;
 }
 
 /**
@@ -187,6 +285,78 @@ function resolvePreviewLayoutSourceMaps(sourceEntries: readonly string[]): {
 }
 
 /**
+ * source entry 목록에서 relation key 기준 preview 선 표현 맵을 복원한다.
+ *
+ * @param sourceEntries persisted preview edge presentation source entry 목록
+ * @returns relation key 기준 preview 선 표현 맵
+ */
+function resolvePreviewEdgePresentationSourceMap(
+  sourceEntries: readonly string[],
+): Map<string, PreviewEdgePresentationSource> {
+  const edgePresentationByRelationKey = new Map<string, PreviewEdgePresentationSource>();
+
+  for (const entry of sourceEntries) {
+    const [
+      kind,
+      relationKey,
+      routingTypeRaw,
+      handleModeRaw,
+      sourceSideRaw,
+      targetSideRaw,
+      sourceHandleRaw,
+      targetHandleRaw,
+      resolvedSourceSideRaw,
+      resolvedTargetSideRaw,
+      waypointsRaw,
+    ] = entry.split(PREVIEW_LAYOUT_SOURCE_SEPARATOR);
+    if (kind !== PREVIEW_EDGE_PRESENTATION_SOURCE_ENTRY || !relationKey) {
+      continue;
+    }
+
+    let waypoints: PreviewEdgePresentationSource['waypoints'];
+    try {
+      const parsed = JSON.parse(waypointsRaw ?? '[]');
+      if (
+        Array.isArray(parsed) &&
+        parsed.every(
+          (waypoint) =>
+            waypoint &&
+            typeof waypoint.x === 'number' &&
+            typeof waypoint.y === 'number',
+        )
+      ) {
+        waypoints = parsed;
+      }
+    } catch {
+      waypoints = undefined;
+    }
+
+    edgePresentationByRelationKey.set(relationKey, {
+      routingType:
+        routingTypeRaw === 'bezier' || routingTypeRaw === 'straight'
+          ? routingTypeRaw
+          : 'smoothstep',
+      handleMode: handleModeRaw === 'manual' ? 'manual' : 'auto',
+      sourceSide: sourceSideRaw === 'left' || sourceSideRaw === 'right' ? sourceSideRaw : undefined,
+      targetSide: targetSideRaw === 'left' || targetSideRaw === 'right' ? targetSideRaw : undefined,
+      sourceHandle: sourceHandleRaw || undefined,
+      targetHandle: targetHandleRaw || undefined,
+      resolvedSourceSide:
+        resolvedSourceSideRaw === 'left' || resolvedSourceSideRaw === 'right'
+          ? resolvedSourceSideRaw
+          : undefined,
+      resolvedTargetSide:
+        resolvedTargetSideRaw === 'left' || resolvedTargetSideRaw === 'right'
+          ? resolvedTargetSideRaw
+          : undefined,
+      waypoints,
+    });
+  }
+
+  return edgePresentationByRelationKey;
+}
+
+/**
  * parsed table에 대응하는 persisted preview 배치 source를 찾는다.
  *
  * 논리명이 유일하게 매칭되면 논리명을 우선하고, 아니면 물리명으로 fallback 한다.
@@ -199,7 +369,26 @@ function resolvePreviewLayoutSource(
   table: ParsedTable,
   sourceMaps: ReturnType<typeof resolvePreviewLayoutSourceMaps>,
 ): PreviewLayoutSource | null {
-  const logicalTableName = table.logicalTableName?.trim() || table.comment?.trim() || null;
+  return resolvePreviewLayoutSourceByNames(
+    table.name,
+    table.logicalTableName?.trim() || table.comment?.trim() || null,
+    sourceMaps,
+  );
+}
+
+/**
+ * 물리명/논리명으로 persisted preview 배치 source를 찾는다.
+ *
+ * @param physicalTableName 테이블 물리명
+ * @param logicalTableName 테이블 논리명
+ * @param sourceMaps persisted preview source maps
+ * @returns 대응 배치 source 또는 null
+ */
+function resolvePreviewLayoutSourceByNames(
+  physicalTableName: string,
+  logicalTableName: string | null,
+  sourceMaps: ReturnType<typeof resolvePreviewLayoutSourceMaps>,
+): PreviewLayoutSource | null {
   if (logicalTableName) {
     const matchedByLogicalName = sourceMaps.byLogicalName.get(logicalTableName);
     if (matchedByLogicalName) {
@@ -207,7 +396,7 @@ function resolvePreviewLayoutSource(
     }
   }
 
-  return sourceMaps.byPhysicalName.get(table.name) ?? null;
+  return sourceMaps.byPhysicalName.get(physicalTableName) ?? null;
 }
 
 /**
@@ -387,7 +576,11 @@ function applyPreviewPersistedLayout(
  * @param relations parsed relation 목록
  * @returns preview 엣지 목록
  */
-function buildPreviewEdges(nodes: DslPreviewNode[], relations: ParsedRelation[]): ERDEdge[] {
+function buildPreviewEdges(
+  nodes: DslPreviewNode[],
+  relations: ParsedRelation[],
+  edgePresentationByRelationKey: ReadonlyMap<string, PreviewEdgePresentationSource>,
+): ERDEdge[] {
   const nodeByTableName = new Map(nodes.map((node) => [node.data.label, node]));
 
   return relations.flatMap((relation) => {
@@ -407,11 +600,34 @@ function buildPreviewEdges(nodes: DslPreviewNode[], relations: ParsedRelation[])
       return [];
     }
 
-    const handleResolution = resolveAutoEdgeHandles({
+    const relationKey = buildRelationKey({
+      parentTable: relation.parentTable,
+      parentColumn: relation.parentColumn,
+      childTable: relation.childTable,
+      childColumn: relation.childColumn,
+    });
+    const restoredEdgePresentation = edgePresentationByRelationKey.get(relationKey);
+    const handleResolution = resolveEdgeHandlesFromPreference({
       sourceNode,
       targetNode,
       sourceColId: sourceColumn.id,
       targetColId: targetColumn.id,
+      handleMode: restoredEdgePresentation?.handleMode,
+      sourceSide: restoredEdgePresentation?.sourceSide,
+      targetSide: restoredEdgePresentation?.targetSide,
+    });
+    const routingType = restoredEdgePresentation?.routingType ?? 'smoothstep';
+    const preservedWaypoints = resolvePreservedWaypoints({
+      routingType,
+      previousSourceHandle: restoredEdgePresentation?.sourceHandle,
+      previousTargetHandle: restoredEdgePresentation?.targetHandle,
+      nextSourceHandle: handleResolution.sourceHandle,
+      nextTargetHandle: handleResolution.targetHandle,
+      previousSourceSide: restoredEdgePresentation?.resolvedSourceSide,
+      previousTargetSide: restoredEdgePresentation?.resolvedTargetSide,
+      nextSourceSide: handleResolution.sourceSide,
+      nextTargetSide: handleResolution.targetSide,
+      waypoints: restoredEdgePresentation?.waypoints,
     });
 
     return [
@@ -429,7 +645,13 @@ function buildPreviewEdges(nodes: DslPreviewNode[], relations: ParsedRelation[])
         targetHandle: handleResolution.targetHandle,
         data: {
           relationType: 'non-identifying',
-          routingType: 'smoothstep',
+          routingType,
+          handleMode: handleResolution.handleMode,
+          sourceSide:
+            handleResolution.handleMode === 'manual' ? handleResolution.sourceSide : undefined,
+          targetSide:
+            handleResolution.handleMode === 'manual' ? handleResolution.targetSide : undefined,
+          waypoints: preservedWaypoints,
         },
       },
     ];
@@ -445,8 +667,11 @@ function buildPreviewEdges(nodes: DslPreviewNode[], relations: ParsedRelation[])
 export function buildPreviewGraphFromDslParsedSchema(
   parsedSchema: DdlParseResult,
   previewLayoutSourceEntries: readonly string[] = [],
+  previewEdgePresentationEntries: readonly string[] = [],
 ): DslPreviewGraph {
   const sourceMaps = resolvePreviewLayoutSourceMaps(previewLayoutSourceEntries);
+  const edgePresentationByRelationKey =
+    resolvePreviewEdgePresentationSourceMap(previewEdgePresentationEntries);
   const baseNodes = buildPreviewNodes(parsedSchema.tables, parsedSchema.relations, sourceMaps);
   const persistedNodeIds = new Set(
     parsedSchema.tables
@@ -457,7 +682,155 @@ export function buildPreviewGraphFromDslParsedSchema(
     persistedNodeIds.size > 0
       ? applyPreviewPersistedLayout(baseNodes, persistedNodeIds)
       : applyPreviewDagreLayout(baseNodes, parsedSchema.relations);
-  const edges = buildPreviewEdges(nodes, parsedSchema.relations);
+  const edges = buildPreviewEdges(nodes, parsedSchema.relations, edgePresentationByRelationKey);
 
   return { nodes, edges };
+}
+
+/**
+ * 마지막 성공 preview graph에 최신 persisted 좌표/선 표현을 다시 입힌다.
+ *
+ * DSL 오류로 graph 재생성이 멈춰도 협업/타 모드에서 바뀐 persisted 표현은 계속 반영한다.
+ *
+ * @param graph 현재 preview graph
+ * @param previewLayoutSourceEntries persisted preview 배치 source entry 목록
+ * @param previewEdgePresentationEntries persisted preview edge presentation source entry 목록
+ * @returns 최신 persisted 표현이 반영된 preview graph
+ */
+export function refreshPreviewGraphFromPersistedSources(
+  graph: DslPreviewGraph,
+  previewLayoutSourceEntries: readonly string[] = [],
+  previewEdgePresentationEntries: readonly string[] = [],
+): DslPreviewGraph {
+  const sourceMaps = resolvePreviewLayoutSourceMaps(previewLayoutSourceEntries);
+  const edgePresentationByRelationKey =
+    resolvePreviewEdgePresentationSourceMap(previewEdgePresentationEntries);
+
+  let nodesChanged = false;
+  const nextNodes = graph.nodes.map((node) => {
+    const layoutSource = resolvePreviewLayoutSourceByNames(
+      node.data.label,
+      node.data.logicalTableName?.trim() || null,
+      sourceMaps,
+    );
+    if (!layoutSource) {
+      return node;
+    }
+
+    const nextHeaderColor = layoutSource.headerColor;
+    const nextHandleLayout = layoutSource.handleLayout ?? node.data.handleLayout ?? 'split';
+    const positionChanged =
+      node.position.x !== layoutSource.position.x || node.position.y !== layoutSource.position.y;
+    const presentationChanged =
+      node.data.headerColor !== nextHeaderColor || node.data.handleLayout !== nextHandleLayout;
+
+    if (!positionChanged && !presentationChanged) {
+      return node;
+    }
+
+    nodesChanged = true;
+    return {
+      ...node,
+      position: layoutSource.position,
+      data: {
+        ...node.data,
+        headerColor: nextHeaderColor,
+        handleLayout: nextHandleLayout,
+      },
+    };
+  });
+
+  const nodeById = new Map(nextNodes.map((node) => [node.id, node]));
+  let edgesChanged = false;
+  const nextEdges = graph.edges.map((edge) => {
+    const sourceNode = nodeById.get(edge.source);
+    const targetNode = nodeById.get(edge.target);
+    if (!sourceNode || !targetNode || !edge.sourceHandle || !edge.targetHandle) {
+      return edge;
+    }
+
+    const sourceColumnId = extractColId(edge.sourceHandle, sourceNode.id);
+    const targetColumnId = extractColId(edge.targetHandle, targetNode.id);
+    const sourceColumn = sourceNode.data.columns.find((column) => column.id === sourceColumnId);
+    const targetColumn = targetNode.data.columns.find((column) => column.id === targetColumnId);
+    if (!sourceColumn || !targetColumn) {
+      return edge;
+    }
+
+    const relationKey = buildRelationKey({
+      parentTable: sourceNode.data.label,
+      parentColumn: sourceColumn.name,
+      childTable: targetNode.data.label,
+      childColumn: targetColumn.name,
+    });
+    const restoredEdgePresentation = edgePresentationByRelationKey.get(relationKey);
+    if (!restoredEdgePresentation) {
+      return edge;
+    }
+
+    const handleResolution = resolveEdgeHandlesFromPreference({
+      sourceNode,
+      targetNode,
+      sourceColId: sourceColumn.id,
+      targetColId: targetColumn.id,
+      handleMode: restoredEdgePresentation.handleMode,
+      sourceSide: restoredEdgePresentation.sourceSide,
+      targetSide: restoredEdgePresentation.targetSide,
+    });
+    const routingType = restoredEdgePresentation.routingType;
+    const preservedWaypoints = resolvePreservedWaypoints({
+      routingType,
+      previousSourceHandle: restoredEdgePresentation.sourceHandle,
+      previousTargetHandle: restoredEdgePresentation.targetHandle,
+      nextSourceHandle: handleResolution.sourceHandle,
+      nextTargetHandle: handleResolution.targetHandle,
+      previousSourceSide: restoredEdgePresentation.resolvedSourceSide,
+      previousTargetSide: restoredEdgePresentation.resolvedTargetSide,
+      nextSourceSide: handleResolution.sourceSide,
+      nextTargetSide: handleResolution.targetSide,
+      waypoints: restoredEdgePresentation.waypoints,
+    });
+
+    const edgeData = edge.data ?? { relationType: 'non-identifying' as const };
+    const changed =
+      edge.sourceHandle !== handleResolution.sourceHandle ||
+      edge.targetHandle !== handleResolution.targetHandle ||
+      edgeData.routingType !== routingType ||
+      edgeData.handleMode !== handleResolution.handleMode ||
+      edgeData.sourceSide !==
+        (handleResolution.handleMode === 'manual' ? handleResolution.sourceSide : undefined) ||
+      edgeData.targetSide !==
+        (handleResolution.handleMode === 'manual' ? handleResolution.targetSide : undefined) ||
+      JSON.stringify(edgeData.waypoints ?? []) !== JSON.stringify(preservedWaypoints ?? []);
+
+    if (!changed) {
+      return edge;
+    }
+
+    edgesChanged = true;
+    return {
+      ...edge,
+      sourceHandle: handleResolution.sourceHandle,
+      targetHandle: handleResolution.targetHandle,
+      data: {
+        ...edgeData,
+        routingType,
+        handleMode: handleResolution.handleMode,
+        sourceSide:
+          handleResolution.handleMode === 'manual' ? handleResolution.sourceSide : undefined,
+        targetSide:
+          handleResolution.handleMode === 'manual' ? handleResolution.targetSide : undefined,
+        waypoints: preservedWaypoints,
+      },
+    };
+  });
+
+  if (!nodesChanged && !edgesChanged) {
+    return graph;
+  }
+
+  return {
+    nodes: nextNodes,
+    edges: nextEdges,
+  };
 }

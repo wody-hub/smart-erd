@@ -4,6 +4,8 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useHotkeys } from 'react-hotkeys-hook';
+import type * as Y from 'yjs';
+import { useShallow } from 'zustand/react/shallow';
 import DiagramCollaboratorsBar from '@/components/erd/DiagramCollaboratorsBar';
 import DiagramWorkModeSwitcher from '@/components/erd/DiagramWorkModeSwitcher';
 import PreviewCanvas from '@/components/erd/PreviewCanvas';
@@ -39,6 +41,14 @@ import {
   type DiagramWorkMode,
 } from '@/lib/diagram-work-mode';
 import type { DslPreviewCanvasState } from '@/lib/dsl-preview-graph';
+import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
+import {
+  readCodeModeSharedDraftSnapshot,
+  getCodeModeSharedDraftMap,
+  type CodeModeSharedDraftSnapshot,
+} from '@/lib/code-mode-shared-draft';
+import { buildPreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
+import type { TableNode, ERDEdge } from '@/types/erd';
 
 const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPanel'));
 
@@ -83,6 +93,16 @@ export default function DiagramPage() {
   const [workModeHydrated, setWorkModeHydrated] = useState(false);
   /** code 모드의 DSL preview 상태 */
   const [dslPreviewState, setDslPreviewState] = useState<DslPreviewCanvasState | null>(null);
+  /** code 모드의 로컬 preview 위치 override */
+  const [dslPreviewPositionOverrides, setDslPreviewPositionOverrides] =
+    useState<DiagramPreviewPositionRecord>({});
+  /** shared code mode preview draft snapshot */
+  const [sharedCodeModeDraft, setSharedCodeModeDraft] = useState<CodeModeSharedDraftSnapshot>(() => ({
+    text: '',
+    baselineRevision: null,
+    graph: null,
+    updatedAt: null,
+  }));
   /** 활성 그룹 ID (null이면 전체 보기) */
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   /** 초기 진입 렌더 완료 래치 (한 번 true가 되면 동일 다이어그램 세션에서 유지) */
@@ -120,6 +140,13 @@ export default function DiagramPage() {
   const connectionStatus = useCollaborationStore((s) => s.connectionStatus);
   /** store에 렌더 가능한 노드/엣지가 존재하는지 (boolean selector로 리렌더 최소화) */
   const storeHasRenderableGraph = useCanvasStore((s) => s.nodes.length > 0 || s.edges.length > 0);
+  const { canvasNodes, canvasEdges, ydoc } = useCanvasStore(
+    useShallow((state) => ({
+      canvasNodes: state.nodes as TableNode[],
+      canvasEdges: state.edges as ERDEdge[],
+      ydoc: state.ydoc,
+    })),
+  );
 
   /** 현재 활성 그룹 객체 */
   const activeGroup = activeGroupId
@@ -221,6 +248,30 @@ export default function DiagramPage() {
 
   // Y.Doc + YjsProvider 라이프사이클 관리
   const { providerRef, isPreviewMode, previewSyncStatus } = useYjsCollaboration(diagram, diagramId);
+  useEffect(() => {
+    if (!ydoc) {
+      setSharedCodeModeDraft({ text: '', baselineRevision: null, graph: null, updatedAt: null });
+      return;
+    }
+
+    const draftMap = getCodeModeSharedDraftMap(ydoc);
+    const syncDraft = (_events?: Y.YEvent<Y.AbstractType<unknown>>[]) => {
+      setSharedCodeModeDraft(readCodeModeSharedDraftSnapshot(ydoc));
+    };
+
+    syncDraft();
+    draftMap.observeDeep(syncDraft);
+    return () => {
+      draftMap.unobserveDeep(syncDraft);
+    };
+  }, [ydoc]);
+
+  const sharedDraftOverlayGraph = useMemo(() => {
+    if (workModeCapabilities.canvasSource === 'preview' || activeGroupId) {
+      return null;
+    }
+    return buildPreviewDraftOverlayGraph(sharedCodeModeDraft.graph, canvasNodes, canvasEdges);
+  }, [activeGroupId, canvasEdges, canvasNodes, sharedCodeModeDraft.graph, workModeCapabilities.canvasSource]);
   const workModeRuntimeState = useMemo(
     () =>
       resolveDiagramWorkModeRuntimeState({
@@ -246,6 +297,10 @@ export default function DiagramPage() {
     setWorkModeHydrated(false);
     setWorkMode(loadDiagramWorkMode({ teamId, projectId, diagramId }));
     setWorkModeHydrated(true);
+  }, [diagramId, projectId, teamId]);
+
+  useEffect(() => {
+    setDslPreviewPositionOverrides({});
   }, [diagramId, projectId, teamId]);
 
   useEffect(() => {
@@ -449,6 +504,8 @@ export default function DiagramPage() {
                       persistDraft={workModeCapabilities.persistCodeDraft}
                       dslOnly={workModeCapabilities.dslOnlyCodeEditor}
                       workMode={workMode}
+                      previewPositionOverrides={dslPreviewPositionOverrides}
+                      onPreviewPositionOverridesChange={setDslPreviewPositionOverrides}
                       onDslPreviewStateChange={
                         workModeCapabilities.canvasSource === 'preview'
                           ? setDslPreviewState
@@ -477,11 +534,25 @@ export default function DiagramPage() {
               </div>
               <main className="flex-1 relative">
                 {workModeCapabilities.canvasSource === 'preview' ? (
-                  <PreviewCanvas previewState={dslPreviewState} />
+                  <PreviewCanvas
+                    previewState={dslPreviewState}
+                    diagramName={diagramName || 'diagram'}
+                    positionOverrides={dslPreviewPositionOverrides}
+                    onPositionOverridesChange={setDslPreviewPositionOverrides}
+                    canOpenDictionary={
+                      !!dictionaryContextSetId && workModeRuntimeState.canOpenDictionaryManagement
+                    }
+                    onOpenDictionary={
+                      dictionaryContextSetId && workModeRuntimeState.canOpenDictionaryManagement
+                        ? () => setDictionaryDialogOpen(true)
+                        : undefined
+                    }
+                  />
                 ) : (
                   <>
                     <ERDCanvas
                       diagramName={diagramName || 'diagram'}
+                      draftOverlayGraph={sharedDraftOverlayGraph}
                       provider={providerRef.current}
                       validationOpen={validationOpen}
                       onToggleValidation={handleToggleValidation}

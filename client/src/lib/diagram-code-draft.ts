@@ -16,12 +16,43 @@ interface StorageLike {
   setItem: (key: string, value: string) => void;
 }
 
+/** code 모드 preview 캔버스 로컬 위치 저장 포맷 */
+export type DiagramPreviewPositionRecord = Record<string, { x: number; y: number }>;
+
 /** 다이어그램 단위 DSL draft 저장 레코드 */
 export interface DiagramDslDraftRecord {
   /** 저장된 DSL 코드 */
   text: string;
   /** draft가 생성된 시점의 persisted ERD baseline revision */
   baselineRevision: string | null;
+  /** code 모드 preview 캔버스의 로컬 위치 override */
+  previewPositions: DiagramPreviewPositionRecord;
+}
+
+/**
+ * preview 위치 저장값을 정규화한다.
+ *
+ * @param value 외부 입력 값
+ * @returns 유효한 preview 위치 레코드
+ */
+function normalizePreviewPositions(value: unknown): DiagramPreviewPositionRecord {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  const normalized: DiagramPreviewPositionRecord = {};
+  for (const [nodeId, position] of Object.entries(value)) {
+    if (!position || typeof position !== 'object') {
+      continue;
+    }
+    const x = (position as { x?: unknown }).x;
+    const y = (position as { y?: unknown }).y;
+    if (typeof x !== 'number' || !Number.isFinite(x) || typeof y !== 'number' || !Number.isFinite(y)) {
+      continue;
+    }
+    normalized[nodeId] = { x, y };
+  }
+  return normalized;
 }
 
 /**
@@ -53,6 +84,7 @@ function parseDiagramDslDraftRecord(raw: string | null): DiagramDslDraftRecord |
       return {
         text: parsed,
         baselineRevision: null,
+        previewPositions: {},
       };
     }
     if (typeof parsed?.text === 'string') {
@@ -60,12 +92,14 @@ function parseDiagramDslDraftRecord(raw: string | null): DiagramDslDraftRecord |
         text: parsed.text,
         baselineRevision:
           typeof parsed.baselineRevision === 'string' ? parsed.baselineRevision : null,
+        previewPositions: normalizePreviewPositions(parsed.previewPositions),
       };
     }
   } catch {
     return {
       text: raw,
       baselineRevision: null,
+      previewPositions: {},
     };
   }
 
@@ -126,6 +160,7 @@ export function saveDiagramDslDraft(scope: DiagramCodeDraftScope, draft: string)
   saveDiagramDslDraftRecord(scope, {
     text: draft,
     baselineRevision: null,
+    previewPositions: {},
   });
 }
 

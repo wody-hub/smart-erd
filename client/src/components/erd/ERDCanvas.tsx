@@ -31,6 +31,7 @@ import {
 } from '@/constants/canvas-history';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { applyDagreLayout } from '@/lib/auto-layout';
+import type { PreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
 import { cn } from '@/lib/utils';
 import { useFkConnectMode } from '@/hooks/useFkConnectMode';
 import { useExportDiagram } from '@/hooks/useExportDiagram';
@@ -45,6 +46,7 @@ import DdlExportDialog from './DdlExportDialog';
 import ExportProgressDialog from './ExportProgressDialog';
 import FkTypeDialog from './FkTypeDialog';
 import ErdRelationEdge from './ErdRelationEdge';
+import { previewNodeTypes } from './PreviewTableNodes';
 import RemoteCursors from './RemoteCursors';
 import { ErdFkModeProvider } from './ErdFkModeContext';
 import {
@@ -63,6 +65,7 @@ const DdlImportDialog = lazy(() => import('./DdlImportDialog'));
 /** React Flow에 등록할 커스텀 노드 타입 매핑 */
 const nodeTypes: NodeTypes = {
   table: TableNode,
+  ...previewNodeTypes,
 };
 
 /** React Flow에 등록할 커스텀 엣지 타입 매핑 */
@@ -166,6 +169,8 @@ interface ERDCanvasProps {
   activeGroupName?: string | null;
   /** 활성 그룹의 테이블 ID 집합 */
   activeGroupTableIds?: Set<string> | null;
+  /** code 모드 shared draft overlay 그래프 */
+  draftOverlayGraph?: PreviewDraftOverlayGraph | null;
 }
 
 /** 삭제 다이얼로그 상태 */
@@ -206,6 +211,7 @@ function ERDCanvas({
   activeGroupId,
   activeGroupName,
   activeGroupTableIds,
+  draftOverlayGraph,
 }: ERDCanvasProps) {
   const { t } = useTranslation();
   const reactFlowInstance = useReactFlow();
@@ -303,21 +309,29 @@ function ERDCanvas({
 
   /** 그룹 뷰일 때 필터링된 노드, 아닐 때 전체 노드 */
   const displayNodes = useMemo(() => {
+    const overlayNodes = draftOverlayGraph?.nodes ?? [];
     if (!activeGroupTableIds) {
-      return nodes;
+      return [...nodes, ...overlayNodes];
     }
-    return nodes.filter((node) => activeGroupTableIds.has(node.id));
-  }, [nodes, activeGroupTableIds]);
+    return [
+      ...nodes.filter((node) => activeGroupTableIds.has(node.id)),
+      ...overlayNodes,
+    ];
+  }, [nodes, activeGroupTableIds, draftOverlayGraph?.nodes]);
 
   /** 그룹 뷰일 때 양쪽 노드가 모두 속한 엣지만 노출한다. */
   const displayEdges = useMemo(() => {
+    const overlayEdges = draftOverlayGraph?.edges ?? [];
     if (!activeGroupTableIds) {
-      return edges;
+      return [...edges, ...overlayEdges];
     }
-    return edges.filter(
-      (edge) => activeGroupTableIds.has(edge.source) && activeGroupTableIds.has(edge.target),
-    );
-  }, [edges, activeGroupTableIds]);
+    return [
+      ...edges.filter(
+        (edge) => activeGroupTableIds.has(edge.source) && activeGroupTableIds.has(edge.target),
+      ),
+      ...overlayEdges,
+    ];
+  }, [edges, activeGroupTableIds, draftOverlayGraph?.edges]);
 
   const contextMenuEdge = useMemo(
     () => (contextMenu ? edges.find((edge) => edge.id === contextMenu.edgeId) ?? null : null),

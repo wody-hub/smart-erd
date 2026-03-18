@@ -31,7 +31,7 @@ test('createDiagramWorkModeCapabilities 는 code 모드에서 자동동기화를
   assert.equal(capabilities.forcedLeftPanel, 'code');
 });
 
-test('resolveDiagramWorkModeRuntimeState 는 code 모드에서 preview 중이어도 코드 편집을 허용한다', () => {
+test('resolveDiagramWorkModeRuntimeState 는 code 모드에서 preview 중이어도 코드 편집과 사전 관리를 허용한다', () => {
   const runtime = resolveDiagramWorkModeRuntimeState({
     mode: 'code',
     capabilities: createDiagramWorkModeCapabilities('code'),
@@ -45,7 +45,8 @@ test('resolveDiagramWorkModeRuntimeState 는 code 모드에서 preview 중이어
   assert.equal(runtime.effectiveCodeCanEdit, true);
   assert.equal(runtime.canPersistDiagramSave, false);
   assert.equal(runtime.showPreviewSyncBanner, false);
-  assert.equal(runtime.canOpenDictionaryManagement, false);
+  assert.equal(runtime.canOpenDictionaryManagement, true);
+  assert.equal(runtime.canEditDictionaryManagement, true);
 });
 
 test('resolveDiagramWorkModeRuntimeState 는 sync 모드에서 preview 중 코드/캔버스를 함께 잠근다', () => {
