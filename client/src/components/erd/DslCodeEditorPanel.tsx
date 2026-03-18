@@ -5,6 +5,7 @@ import { Loader2, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
 import type { NodeChange } from '@xyflow/react';
 import type * as Monaco from 'monaco-editor';
+import type * as Y from 'yjs';
 import { toast } from 'sonner';
 import { useShallow } from 'zustand/react/shallow';
 import { useDarkMode } from '@/hooks/useDarkMode';
@@ -34,11 +35,12 @@ import { generateDsl } from '@/lib/dsl-generator';
 import { buildParsedSchemaHash } from '@/lib/code-sync-schema-hash';
 import { buildRevisionHash } from '@/lib/code-sync-revision';
 import {
+  CODE_MODE_SHARED_DRAFT_TEXT_ORIGIN,
   getCodeModeSharedDraftText,
   readCodeModeSharedDraftBaselineRevision,
   readCodeModeSharedDraftText,
-  replaceCodeModeSharedDraftText,
   writeCodeModeSharedDraftBaselineRevision,
+  writeCodeModeSharedDraftTextSnapshot,
 } from '@/lib/code-mode-shared-draft';
 import {
   type DiagramPreviewPositionRecord,
@@ -97,6 +99,22 @@ interface DslCodeEditorPanelProps {
   onNavigateToTable?: (request: CodeEditorTableFocusRequest) => void;
   /** ERD에서 요청한 코드 reveal 대상 */
   tableRevealRequest?: CodeEditorTableRevealRequest | null;
+}
+
+/**
+ * preview 노드를 DSL generator 입력용 table 노드로 정규화한다.
+ *
+ * preview graph는 React Flow 상에서 `previewTable` 타입을 쓰지만,
+ * DSL 생성기는 persisted ERD와 같은 `table` 타입 노드를 기대한다.
+ *
+ * @param nodes preview 노드 목록
+ * @returns DSL generator 에 전달 가능한 table 노드 목록
+ */
+function normalizePreviewNodesForDslGeneration(nodes: DslPreviewGraph['nodes']): TableNode[] {
+  return nodes.map((node) => ({
+    ...node,
+    type: 'table',
+  }));
 }
 
 /**
@@ -233,6 +251,50 @@ export default function DslCodeEditorPanel({
     return generate(nodes as TableNode[], edges as ERDEdge[]);
   }, [generate]);
 
+  /** 에러 건수 */
+  const errorCount = parseResult?.diagnostics.filter((d) => d.severity === 'error').length ?? 0;
+  /** 경고 건수 */
+  const warningCount = parseResult?.diagnostics.filter((d) => d.severity === 'warning').length ?? 0;
+
+  /**
+   * ERD 적용 직전에 사용할 canonical DSL 문자열을 계산한다.
+   *
+   * 현재 파싱 결과를 기준으로만 재생성하므로, 의미를 바꾸지 않고
+   * 공백/정렬만 정리한 DSL 텍스트를 반환한다.
+   *
+   * @returns 적용 직전 사용할 formatted DSL. 포맷 불가 시 null
+   */
+  const getFormattedDslTextForApply = useCallback((): string | null => {
+    if (!parseResult?.result || errorCount > 0) {
+      return null;
+    }
+
+    const graphForFormat =
+      previewGraph ??
+      buildPreviewGraphFromDslParsedSchema(
+        parseResult.result,
+        previewLayoutSourceEntries,
+        previewEdgePresentationEntries,
+      );
+
+    return generateDsl(
+      normalizePreviewNodesForDslGeneration(graphForFormat.nodes),
+      graphForFormat.edges,
+      {
+        findTermById,
+        findDomainById,
+      },
+    );
+  }, [
+    errorCount,
+    findDomainById,
+    findTermById,
+    parseResult?.result,
+    previewEdgePresentationEntries,
+    previewGraph,
+    previewLayoutSourceEntries,
+  ]);
+
   /**
    * 현재 persisted ERD 상태의 리비전 해시를 계산한다.
    *
@@ -289,6 +351,12 @@ export default function DslCodeEditorPanel({
 
       return true;
     }, [buildCurrentPersistedRevisionHash, persistDraft, t]),
+    beforeExecuteManualApply: useCallback(() => {
+      const formattedDsl = getFormattedDslTextForApply();
+      if (formattedDsl && formattedDsl !== dslText) {
+        handleDslChange(formattedDsl);
+      }
+    }, [dslText, getFormattedDslTextForApply, handleDslChange]),
     onManualApplySuccess: useCallback(() => {
       const previewPositionChanges = previewGraph
         ? buildPersistedPreviewPositionChanges(
@@ -349,11 +417,6 @@ export default function DslCodeEditorPanel({
       ydoc,
     ]),
   });
-
-  /** 에러 건수 */
-  const errorCount = parseResult?.diagnostics.filter((d) => d.severity === 'error').length ?? 0;
-  /** 경고 건수 */
-  const warningCount = parseResult?.diagnostics.filter((d) => d.severity === 'warning').length ?? 0;
 
   /** 에디터 인스턴스 ref (커서 가드용으로 sync 훅보다 앞에 선언) */
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -439,6 +502,23 @@ export default function DslCodeEditorPanel({
       ),
     [parseResult?.result.tables, parseResult?.result.tableRanges],
   );
+
+  /**
+   * 현재 DSL 파싱 결과를 canonical DSL 문자열로 다시 생성한다.
+   *
+   * persisted ERD 기준 refresh와 달리, 현재 코드 parse 결과를 기준으로 정렬한다.
+   *
+   * @returns 없음
+   */
+  const handleFormatDsl = useCallback(() => {
+    const nextDsl = getFormattedDslTextForApply();
+
+    if (!nextDsl || nextDsl === dslText) {
+      return;
+    }
+
+    syncCodeChange(nextDsl);
+  }, [dslText, getFormattedDslTextForApply, syncCodeChange]);
 
   // --- Quick Register Dialogs ---
   /** DSL 오류 가이드에서 사용하는 빠른 용어 등록 다이얼로그 상태 */
@@ -597,9 +677,15 @@ export default function DslCodeEditorPanel({
     }
 
     const yText = getCodeModeSharedDraftText(ydoc);
-    const handleSharedDraftText = () => {
+    const handleSharedDraftText = (event: Y.YTextEvent) => {
+      if (event.transaction.origin === CODE_MODE_SHARED_DRAFT_TEXT_ORIGIN) {
+        return;
+      }
       const nextText = yText.toString();
-      if (nextText === dslTextValueRef.current) {
+      if (
+        nextText === dslTextValueRef.current ||
+        editorRef.current?.getModel()?.getValue() === nextText
+      ) {
         return;
       }
       syncCodeChange(nextText);
@@ -642,11 +728,11 @@ export default function DslCodeEditorPanel({
     }
 
     sharedDraftTextSyncTimerRef.current = setTimeout(() => {
-      replaceCodeModeSharedDraftText(ydoc, dslText, 'code-mode-shared-draft');
-      writeCodeModeSharedDraftBaselineRevision(
+      writeCodeModeSharedDraftTextSnapshot(
         ydoc,
+        dslText,
         draftBaselineRevisionRef.current,
-        'code-mode-shared-draft',
+        CODE_MODE_SHARED_DRAFT_TEXT_ORIGIN,
       );
       sharedDraftTextSyncTimerRef.current = null;
     }, CODE_DRAFT_PERSIST_IDLE_MS);
@@ -782,7 +868,9 @@ export default function DslCodeEditorPanel({
     editorRef,
     monacoRef,
     canEdit,
+    getCurrentText: () => dslTextValueRef.current,
     buildAssistItems,
+    onSyncInsertedText: handleUserCodeChange,
     onRegisterTerm: handleQuickRegisterTerm,
     onRegisterDomain: handleQuickRegisterDomain,
   });
@@ -979,6 +1067,8 @@ export default function DslCodeEditorPanel({
         setConfirmOpen={setConfirmOpen}
         confirmDescription={confirmDescription}
         onRefresh={handleRefresh}
+        onFormat={handleFormatDsl}
+        canFormat={Boolean(parseResult?.result && errorCount === 0 && dslText.trim().length > 0)}
         executeRefresh={executeRefresh}
         hasNodes={hasNodes}
         refreshConfirmOpen={refreshConfirmOpen}

@@ -48,12 +48,10 @@ import type {
 import type { DslPreviewCanvasState } from '@/lib/dsl-preview-graph';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import {
-  readCodeModeSharedDraftSnapshot,
+  readCodeModeSharedDraftGraph,
   getCodeModeSharedDraftMap,
-  type CodeModeSharedDraftSnapshot,
 } from '@/lib/code-mode-shared-draft';
-import { buildPreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
-import type { TableNode, ERDEdge } from '@/types/erd';
+import type { PreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
 
 const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPanel'));
 
@@ -101,13 +99,9 @@ export default function DiagramPage() {
   /** code 모드의 로컬 preview 위치 override */
   const [dslPreviewPositionOverrides, setDslPreviewPositionOverrides] =
     useState<DiagramPreviewPositionRecord>({});
-  /** shared code mode preview draft snapshot */
-  const [sharedCodeModeDraft, setSharedCodeModeDraft] = useState<CodeModeSharedDraftSnapshot>(() => ({
-    text: '',
-    baselineRevision: null,
-    graph: null,
-    updatedAt: null,
-  }));
+  /** shared code mode preview draft overlay graph */
+  const [sharedCodeModeDraftGraph, setSharedCodeModeDraftGraph] =
+    useState<PreviewDraftOverlayGraph | null>(null);
   /** 코드 에디터에서 요청한 테이블 포커스 대상 */
   const [tableFocusRequest, setTableFocusRequest] = useState<CodeEditorTableFocusRequest | null>(null);
   /** ERD에서 요청한 코드 reveal 대상 */
@@ -150,10 +144,8 @@ export default function DiagramPage() {
   const connectionStatus = useCollaborationStore((s) => s.connectionStatus);
   /** store에 렌더 가능한 노드/엣지가 존재하는지 (boolean selector로 리렌더 최소화) */
   const storeHasRenderableGraph = useCanvasStore((s) => s.nodes.length > 0 || s.edges.length > 0);
-  const { canvasNodes, canvasEdges, ydoc } = useCanvasStore(
+  const { ydoc } = useCanvasStore(
     useShallow((state) => ({
-      canvasNodes: state.nodes as TableNode[],
-      canvasEdges: state.edges as ERDEdge[],
       ydoc: state.ydoc,
     })),
   );
@@ -294,19 +286,19 @@ export default function DiagramPage() {
   const { providerRef, isPreviewMode, previewSyncStatus } = useYjsCollaboration(diagram, diagramId);
   useEffect(() => {
     if (!ydoc) {
-      setSharedCodeModeDraft({ text: '', baselineRevision: null, graph: null, updatedAt: null });
+      setSharedCodeModeDraftGraph(null);
       return;
     }
 
     const draftMap = getCodeModeSharedDraftMap(ydoc);
-    const syncDraft = (_events?: Y.YEvent<Y.AbstractType<unknown>>[]) => {
-      setSharedCodeModeDraft(readCodeModeSharedDraftSnapshot(ydoc));
+    const syncDraftGraph = (_event?: Y.YMapEvent<unknown>) => {
+      setSharedCodeModeDraftGraph(readCodeModeSharedDraftGraph(ydoc));
     };
 
-    syncDraft();
-    draftMap.observeDeep(syncDraft);
+    syncDraftGraph();
+    draftMap.observe(syncDraftGraph);
     return () => {
-      draftMap.unobserveDeep(syncDraft);
+      draftMap.unobserve(syncDraftGraph);
     };
   }, [ydoc]);
 
@@ -314,8 +306,8 @@ export default function DiagramPage() {
     if (workModeCapabilities.canvasSource === 'preview' || activeGroupId) {
       return null;
     }
-    return buildPreviewDraftOverlayGraph(sharedCodeModeDraft.graph, canvasNodes, canvasEdges);
-  }, [activeGroupId, canvasEdges, canvasNodes, sharedCodeModeDraft.graph, workModeCapabilities.canvasSource]);
+    return sharedCodeModeDraftGraph;
+  }, [activeGroupId, sharedCodeModeDraftGraph, workModeCapabilities.canvasSource]);
   const workModeRuntimeState = useMemo(
     () =>
       resolveDiagramWorkModeRuntimeState({

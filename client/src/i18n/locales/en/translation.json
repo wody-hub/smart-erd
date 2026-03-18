@@ -293,6 +293,7 @@
       "diffFallbackApplied": "Incremental apply failed, so full replacement was used. {{dropped}} group memberships were excluded.",
       "success": "Applied {{count}} tables to ERD",
       "failed": "Failed to apply DDL",
+      "formatButton": "Format code",
       "refreshButton": "Refresh from ERD",
       "refreshConfirmTitle": "Refresh Code",
       "refreshConfirmDescription": "Current edits will be replaced with code generated from the ERD. Continue?"

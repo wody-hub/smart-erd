@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Play, RefreshCw } from 'lucide-react';
+import { Play, RefreshCw, WandSparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 
@@ -24,6 +24,10 @@ interface CodeEditorFooterProps {
   confirmDescription?: string;
   /** Refresh 버튼 클릭 핸들러 */
   onRefresh: () => void;
+  /** Format 버튼 클릭 핸들러 */
+  onFormat?: () => void;
+  /** Format 버튼 활성화 여부 */
+  canFormat?: boolean;
   /** Refresh 실행 함수 (확인 다이얼로그에서 사용) */
   executeRefresh: () => void;
   /** ERD에 노드가 있는지 여부 (Refresh 비활성화 판단) */
@@ -55,6 +59,8 @@ export default function CodeEditorFooter({
   confirmTitle,
   confirmDescription,
   onRefresh,
+  onFormat,
+  canFormat = false,
   executeRefresh,
   hasNodes,
   refreshConfirmOpen,
@@ -75,6 +81,17 @@ export default function CodeEditorFooter({
             <Play className="h-3.5 w-3.5" />
             {t('erd.codeEditor.applyButton')}
           </Button>
+          {onFormat && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onFormat}
+              disabled={!canFormat}
+              aria-label={t('erd.codeEditor.formatButton')}
+            >
+              <WandSparkles className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"

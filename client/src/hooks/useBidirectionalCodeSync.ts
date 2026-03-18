@@ -11,6 +11,11 @@ import {
   ERD_SYNC_IDLE_MS,
 } from '@/constants/code-sync';
 
+/** sync 비활성 모드에서 store 구독 churn을 막기 위한 빈 노드 배열 */
+const EMPTY_NODES: never[] = [];
+/** sync 비활성 모드에서 store 구독 churn을 막기 위한 빈 엣지 배열 */
+const EMPTY_EDGES: never[] = [];
+
 /** 동기화 origin */
 type SyncOrigin = 'user-code' | 'code-auto-sync' | 'erd-auto-sync' | null;
 
@@ -94,8 +99,9 @@ export function useBidirectionalCodeSync({
 }: UseBidirectionalCodeSyncOptions): UseBidirectionalCodeSyncReturn {
   /** 프로그래밍적 업데이트 함수 — 커서 보존 콜백이 있으면 그쪽으로 라우팅 */
   const syncUpdate = onSyncCodeTextChange ?? onCodeTextChange;
-  const nodes = useCanvasStore((s) => s.nodes);
-  const edges = useCanvasStore((s) => s.edges);
+  const syncEnabled = enableCodeToErdSync || enableErdToCodeSync;
+  const nodes = useCanvasStore((s) => (syncEnabled ? s.nodes : EMPTY_NODES));
+  const edges = useCanvasStore((s) => (syncEnabled ? s.edges : EMPTY_EDGES));
 
   const originRef = useRef<SyncOrigin>(null);
   const lastUserEditAtRef = useRef(0);
@@ -164,6 +170,11 @@ export function useBidirectionalCodeSync({
   }, [codeText]);
 
   useEffect(() => {
+    if (!syncEnabled) {
+      lastObservedErdRevisionRef.current = null;
+      pendingErdSyncRevisionRef.current = null;
+      return;
+    }
     if (lastObservedErdRevisionRef.current == null) {
       lastObservedErdRevisionRef.current = currentRevisionHash;
       return;
@@ -180,22 +191,36 @@ export function useBidirectionalCodeSync({
       }
       pendingErdSyncRevisionRef.current = currentRevisionHash;
     }
-  }, [currentRevisionHash]);
+  }, [currentRevisionHash, syncEnabled]);
 
   const clearQueueTimeoutHold = useCallback(() => {
     autoApplyBlockedRef.current = false;
     lockBlockedSinceRef.current = null;
+    if (!syncEnabled) {
+      setStatus(null);
+      return;
+    }
     if (
       syncStatusRef.current === 'hold-queue-timeout' ||
       syncStatusRef.current === 'hold-manual-confirm'
     ) {
       setStatus('idle-wait');
     }
-  }, [setStatus]);
+  }, [setStatus, syncEnabled]);
 
   const handleUserCodeChange = useCallback(
     (value: string | undefined) => {
       codeTextRef.current = value ?? '';
+      if (!syncEnabled) {
+        autoApplyBlockedRef.current = false;
+        clearErdToCodeTimer();
+        pendingErdSyncRevisionRef.current = null;
+        originRef.current = null;
+        parseBaseRevisionHashRef.current = null;
+        setStatus(null);
+        onCodeTextChange(value);
+        return;
+      }
       autoApplyBlockedRef.current = false;
       // Code 편집이 시작되면 직전 ERD->Code 대기열은 취소해 역방향 덮어쓰기를 방지한다.
       clearErdToCodeTimer();
@@ -206,7 +231,7 @@ export function useBidirectionalCodeSync({
       setStatus('idle-wait');
       onCodeTextChange(value);
     },
-    [clearErdToCodeTimer, currentRevisionHash, onCodeTextChange, setStatus],
+    [clearErdToCodeTimer, currentRevisionHash, onCodeTextChange, setStatus, syncEnabled],
   );
 
   const handleGeneratedCodeChange = useCallback(
@@ -214,12 +239,16 @@ export function useBidirectionalCodeSync({
       if (text === codeText) {
         return;
       }
-      originRef.current = 'erd-auto-sync';
       codeTextRef.current = text;
+      if (syncEnabled) {
+        originRef.current = 'erd-auto-sync';
+      } else {
+        originRef.current = null;
+      }
       syncUpdate(text);
-      setStatus('synced');
+      setStatus(syncEnabled ? 'synced' : null);
     },
-    [codeText, syncUpdate, setStatus],
+    [codeText, syncEnabled, syncUpdate, setStatus],
   );
 
   // 코드 -> ERD 자동 반영

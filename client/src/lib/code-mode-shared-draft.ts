@@ -1,8 +1,12 @@
 import * as Y from 'yjs';
-import type { DslPreviewGraph } from './dsl-preview-graph.js';
+import type { PreviewDraftOverlayGraph } from './preview-draft-merge.js';
 
 /** code 모드 shared draft Y.Map 키 */
 const CODE_MODE_SHARED_DRAFT_KEY = 'codeModeSharedDraft';
+/** code 모드 shared draft text write origin */
+export const CODE_MODE_SHARED_DRAFT_TEXT_ORIGIN = 'code-mode-shared-draft';
+/** code 모드 shared draft preview graph write origin */
+export const CODE_MODE_SHARED_DRAFT_GRAPH_ORIGIN = 'code-preview-shared-draft';
 /** code 모드 shared draft text 키 */
 const CODE_MODE_SHARED_DRAFT_TEXT_KEY = 'text';
 /** code 모드 shared draft preview graph 키 */
@@ -18,8 +22,8 @@ export interface CodeModeSharedDraftSnapshot {
   text: string;
   /** draft 생성 시점의 persisted baseline revision */
   baselineRevision: string | null;
-  /** 공유 preview graph snapshot */
-  graph: DslPreviewGraph | null;
+  /** 공유 preview overlay graph snapshot */
+  graph: PreviewDraftOverlayGraph | null;
   /** 마지막 갱신 시각 (epoch ms) */
   updatedAt: number | null;
 }
@@ -129,24 +133,69 @@ export function writeCodeModeSharedDraftBaselineRevision(
 }
 
 /**
- * raw preview graph JSON을 DslPreviewGraph로 역직렬화한다.
+ * code 모드 shared draft text와 baseline revision을 한 번의 트랜잭션으로 저장한다.
+ *
+ * 텍스트와 baseline이 모두 동일하면 아무 작업도 하지 않는다.
+ *
+ * @param doc 대상 Y.Doc
+ * @param text 저장할 DSL text
+ * @param baselineRevision 저장할 baseline revision
+ * @param origin Yjs transaction origin
+ * @returns 없음
+ */
+export function writeCodeModeSharedDraftTextSnapshot(
+  doc: Y.Doc,
+  text: string,
+  baselineRevision: string | null,
+  origin: unknown,
+): void {
+  const draftMap = getCodeModeSharedDraftMap(doc);
+  const yText = getCodeModeSharedDraftText(doc);
+  const currentText = yText.toString();
+  const currentBaseline = readCodeModeSharedDraftBaselineRevision(doc);
+  if (currentText === text && currentBaseline === baselineRevision) {
+    return;
+  }
+
+  doc.transact(() => {
+    if (currentText !== text) {
+      if (yText.length > 0) {
+        yText.delete(0, yText.length);
+      }
+      if (text.length > 0) {
+        yText.insert(0, text);
+      }
+    }
+
+    if (baselineRevision) {
+      draftMap.set(CODE_MODE_SHARED_DRAFT_BASELINE_KEY, baselineRevision);
+    } else {
+      draftMap.delete(CODE_MODE_SHARED_DRAFT_BASELINE_KEY);
+    }
+
+    draftMap.set(CODE_MODE_SHARED_DRAFT_UPDATED_AT_KEY, Date.now());
+  }, origin);
+}
+
+/**
+ * raw preview overlay graph JSON을 역직렬화한다.
  *
  * @param raw 저장된 raw JSON
- * @returns preview graph 또는 null
+ * @returns preview overlay graph 또는 null
  */
-function parseCodeModeSharedDraftGraph(raw: unknown): DslPreviewGraph | null {
+function parseCodeModeSharedDraftGraph(raw: unknown): PreviewDraftOverlayGraph | null {
   if (typeof raw !== 'string' || raw.trim().length === 0) {
     return null;
   }
 
   try {
-    const parsed = JSON.parse(raw) as Partial<DslPreviewGraph>;
+    const parsed = JSON.parse(raw) as Partial<PreviewDraftOverlayGraph>;
     if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) {
       return null;
     }
     return {
-      nodes: parsed.nodes as DslPreviewGraph['nodes'],
-      edges: parsed.edges as DslPreviewGraph['edges'],
+      nodes: parsed.nodes as PreviewDraftOverlayGraph['nodes'],
+      edges: parsed.edges as PreviewDraftOverlayGraph['edges'],
     };
   } catch {
     return null;
@@ -154,29 +203,29 @@ function parseCodeModeSharedDraftGraph(raw: unknown): DslPreviewGraph | null {
 }
 
 /**
- * code 모드 shared draft preview graph snapshot을 읽는다.
+ * code 모드 shared draft preview overlay graph snapshot을 읽는다.
  *
  * @param doc 대상 Y.Doc
- * @returns preview graph 또는 null
+ * @returns preview overlay graph 또는 null
  */
-export function readCodeModeSharedDraftGraph(doc: Y.Doc): DslPreviewGraph | null {
+export function readCodeModeSharedDraftGraph(doc: Y.Doc): PreviewDraftOverlayGraph | null {
   const raw = getCodeModeSharedDraftMap(doc).get(CODE_MODE_SHARED_DRAFT_GRAPH_KEY);
   return parseCodeModeSharedDraftGraph(raw);
 }
 
 /**
- * code 모드 shared draft preview graph snapshot을 저장한다.
+ * code 모드 shared draft preview overlay graph snapshot을 저장한다.
  *
  * graph가 null이면 preview graph snapshot을 제거한다.
  *
  * @param doc 대상 Y.Doc
- * @param graph 저장할 preview graph
+ * @param graph 저장할 preview overlay graph
  * @param origin Yjs transaction origin
  * @returns 없음
  */
 export function writeCodeModeSharedDraftGraph(
   doc: Y.Doc,
-  graph: DslPreviewGraph | null,
+  graph: PreviewDraftOverlayGraph | null,
   origin: unknown,
 ): void {
   const draftMap = getCodeModeSharedDraftMap(doc);

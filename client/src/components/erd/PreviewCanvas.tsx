@@ -29,7 +29,10 @@ import type { CodeEditorTableFocusRequest } from '@/lib/code-editor-table-naviga
 import { findPreviewTableNodeForFocus } from '@/lib/diagram-table-focus';
 import { buildPreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
 import { buildPersistedPreviewPositionChanges } from '@/lib/preview-position-sync';
-import { writeCodeModeSharedDraftGraph } from '@/lib/code-mode-shared-draft';
+import {
+  CODE_MODE_SHARED_DRAFT_GRAPH_ORIGIN,
+  writeCodeModeSharedDraftGraph,
+} from '@/lib/code-mode-shared-draft';
 import { useExportDiagram } from '@/hooks/useExportDiagram';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { ERDEdge, TableNode } from '@/types/erd';
@@ -302,7 +305,7 @@ export default function PreviewCanvas({
 
     if (!previewState?.hasContent) {
       lastSharedPreviewGraphRef.current = null;
-      writeCodeModeSharedDraftGraph(ydoc, null, 'code-preview-shared-draft');
+      writeCodeModeSharedDraftGraph(ydoc, null, CODE_MODE_SHARED_DRAFT_GRAPH_ORIGIN);
       return;
     }
 
@@ -321,7 +324,7 @@ export default function PreviewCanvas({
     );
     if (!nextOverlayGraph) {
       lastSharedPreviewGraphRef.current = null;
-      writeCodeModeSharedDraftGraph(ydoc, null, 'code-preview-shared-draft');
+      writeCodeModeSharedDraftGraph(ydoc, null, CODE_MODE_SHARED_DRAFT_GRAPH_ORIGIN);
       return;
     }
 
@@ -331,7 +334,7 @@ export default function PreviewCanvas({
     }
 
     lastSharedPreviewGraphRef.current = serializedOverlayGraph;
-    writeCodeModeSharedDraftGraph(ydoc, nextGraph, 'code-preview-shared-draft');
+    writeCodeModeSharedDraftGraph(ydoc, nextOverlayGraph, CODE_MODE_SHARED_DRAFT_GRAPH_ORIGIN);
   }, [displayNodes, graph, persistedEdges, persistedNodes, previewState?.hasContent, ydoc]);
 
   /**

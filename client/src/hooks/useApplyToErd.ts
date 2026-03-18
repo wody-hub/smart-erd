@@ -41,6 +41,8 @@ interface UseApplyToErdOptions {
   hasBlockingStructureLocks?: boolean;
   /** 수동 ERD 적용 직전 실행할 사전 검증 */
   beforeManualApply?: () => boolean;
+  /** 수동 ERD 적용을 실제 실행하기 직전 수행할 후처리 */
+  beforeExecuteManualApply?: () => void;
   /** 수동 ERD 적용 성공 직후 실행할 후처리 */
   onManualApplySuccess?: () => void;
 }
@@ -279,6 +281,7 @@ export function useApplyToErd({
   policyScope = {},
   hasBlockingStructureLocks = false,
   beforeManualApply,
+  beforeExecuteManualApply,
   onManualApplySuccess,
 }: UseApplyToErdOptions): UseApplyToErdReturn {
   const { t } = useTranslation();
@@ -456,9 +459,10 @@ export function useApplyToErd({
     if (!parseResult) {
       return;
     }
+    beforeExecuteManualApply?.();
     runApply('manual');
     setConfirmOpen(false);
-  }, [parseResult, runApply]);
+  }, [beforeExecuteManualApply, parseResult, runApply]);
 
   /**
    * 파싱 결과를 코드 자동 동기화 경로에서 ERD에 반영한다.
