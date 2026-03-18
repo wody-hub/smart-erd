@@ -190,6 +190,18 @@
         "connected": "Real-time sync connected. Editing is now enabled."
       }
     },
+    "workMode": {
+      "label": "Work mode",
+      "sync": "Two-way",
+      "code": "Code-first",
+      "erd": "ERD-only",
+      "codeInfo": "In code-first mode, the canvas shows a read-only ERD preview generated from the DSL. Changes are reflected only after you click 'Apply to ERD'.",
+      "codeDslOnly": "Phase 1 supports the DSL tab only",
+      "codePreviewParsing": "Building the DSL preview ERD.",
+      "codePreviewBlocked": "Fix the DSL errors to show the preview ERD.",
+      "codePreviewEmpty": "Add DSL tables to show the preview ERD.",
+      "codeDraftConflict": "The persisted ERD changed since this code draft started. Refresh the code before applying."
+    },
     "toast": {
       "created": "Diagram created",
       "createFailed": "Failed to create diagram",

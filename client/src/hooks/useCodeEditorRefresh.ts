@@ -20,6 +20,10 @@ interface UseCodeEditorRefreshOptions {
   currentText: string;
   /** 초기화 가능 여부 (사전 데이터 로딩 등 선행 조건) */
   ready?: boolean;
+  /** 초기 ERD -> 코드 자동 채우기를 건너뛸지 여부 */
+  skipInitialRefresh?: boolean;
+  /** 실제 Refresh 실행 직전 호출할 콜백 */
+  beforeExecuteRefresh?: () => void;
 }
 
 /**
@@ -52,6 +56,8 @@ export function useCodeEditorRefresh({
   onGenerated,
   currentText,
   ready = true,
+  skipInitialRefresh = false,
+  beforeExecuteRefresh,
 }: UseCodeEditorRefreshOptions): UseCodeEditorRefreshReturn {
   /** Refresh 확인 다이얼로그 열림 상태 */
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
@@ -61,11 +67,12 @@ export function useCodeEditorRefresh({
 
   /** ERD → 코드 생성을 실행한다 */
   const executeRefresh = useCallback(() => {
+    beforeExecuteRefresh?.();
     const nodes = useCanvasStore.getState().nodes as TableNode[];
     const edges = useCanvasStore.getState().edges as ERDEdge[];
     const generated = generate(nodes, edges);
     onGenerated(generated);
-  }, [generate, onGenerated]);
+  }, [beforeExecuteRefresh, generate, onGenerated]);
 
   /** Refresh 버튼 핸들러 (편집 내용이 있으면 확인 다이얼로그) */
   const handleRefresh = useCallback(() => {
@@ -81,6 +88,10 @@ export function useCodeEditorRefresh({
 
   // 마운트 시 ERD → 코드 초기 채우기 (1회)
   useEffect(() => {
+    if (skipInitialRefresh) {
+      initializedRef.current = true;
+      return;
+    }
     if (!initializedRef.current && ready) {
       initializedRef.current = true;
       const nodes = useCanvasStore.getState().nodes as TableNode[];
@@ -88,7 +99,7 @@ export function useCodeEditorRefresh({
         executeRefresh();
       }
     }
-  }, [executeRefresh, ready]);
+  }, [executeRefresh, ready, skipInitialRefresh]);
 
   return {
     executeRefresh,

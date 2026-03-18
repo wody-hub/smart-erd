@@ -16,8 +16,10 @@ type SyncOrigin = 'user-code' | 'code-auto-sync' | 'erd-auto-sync' | null;
 
 /** useBidirectionalCodeSync 옵션 */
 interface UseBidirectionalCodeSyncOptions {
-  /** 자동 동기화 활성 여부 */
-  enabled: boolean;
+  /** 코드 -> ERD 자동 동기화 활성 여부 */
+  enableCodeToErdSync: boolean;
+  /** ERD -> 코드 자동 동기화 활성 여부 */
+  enableErdToCodeSync: boolean;
   /** 선행 조건 충족 여부 (사전 로딩 등) */
   ready?: boolean;
   /** 현재 코드 텍스트 */
@@ -72,7 +74,8 @@ interface UseBidirectionalCodeSyncReturn {
  * @returns 코드/ERD 동기화 핸들러와 상태
  */
 export function useBidirectionalCodeSync({
-  enabled,
+  enableCodeToErdSync,
+  enableErdToCodeSync,
   ready = true,
   codeText,
   parsing,
@@ -222,7 +225,7 @@ export function useBidirectionalCodeSync({
   // 코드 -> ERD 자동 반영
   useEffect(() => {
     clearCodeToErdTimer();
-    if (!enabled || !ready) {
+    if (!enableCodeToErdSync || !ready) {
       setStatus(null);
       return;
     }
@@ -311,7 +314,7 @@ export function useBidirectionalCodeSync({
     codeIdleMs,
     codeText,
     currentRevisionHash,
-    enabled,
+    enableCodeToErdSync,
     hasBlockingErrors,
     hasParsedTables,
     hasRemoteEditLocks,
@@ -334,7 +337,7 @@ export function useBidirectionalCodeSync({
   // ERD -> 코드 자동 반영 (ERD 스냅샷이 실제로 변경된 경우에만 실행)
   useEffect(() => {
     clearErdToCodeTimer();
-    if (!enabled || !ready) {
+    if (!enableErdToCodeSync || !ready) {
       return;
     }
     if (!pendingErdSyncRevisionRef.current) {
@@ -391,7 +394,7 @@ export function useBidirectionalCodeSync({
     return clearErdToCodeTimer;
   }, [
     codeIdleMs,
-    enabled,
+    enableErdToCodeSync,
     erdIdleMs,
     generateCodeFromErd,
     hasBlockingErrors,

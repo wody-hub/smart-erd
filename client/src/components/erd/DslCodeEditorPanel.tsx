@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { startTransition, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
+import { toast } from 'sonner';
 import { useShallow } from 'zustand/react/shallow';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import { useDslParse } from '@/hooks/useDslParse';
@@ -28,7 +29,23 @@ import { DSL_LANGUAGE_ID, registerDslLanguage } from '@/lib/monaco-dsl-language'
 import type { DslDictionary } from '@/lib/dsl-parser';
 import { generateDsl } from '@/lib/dsl-generator';
 import { buildParsedSchemaHash } from '@/lib/code-sync-schema-hash';
+import { buildRevisionHash } from '@/lib/code-sync-revision';
+import {
+  type DiagramDslDraftRecord,
+  loadDiagramDslDraftRecord,
+  saveDiagramDslDraftRecord,
+} from '@/lib/diagram-code-draft';
+import {
+  CODE_DRAFT_PERSIST_IDLE_MS,
+  CODE_PREVIEW_GRAPH_IDLE_MS,
+} from '@/constants/code-sync';
 import { applyQuickTermToDslLine } from '@/lib/dsl-line-edit';
+import {
+  buildPreviewGraphFromDslParsedSchema,
+  buildPreviewLayoutSourceEntries,
+  type DslPreviewGraph,
+  type DslPreviewCanvasState,
+} from '@/lib/dsl-preview-graph';
 import {
   buildDslPhysicalNameHints,
   buildErdPhysicalNameSourceEntries,
@@ -42,6 +59,16 @@ import type { TableNode, ERDEdge } from '@/types/erd';
 interface DslCodeEditorPanelProps {
   /** 편집 가능 여부 (VIEWER일 때 false) */
   canEdit?: boolean;
+  /** 코드 -> ERD 자동동기화 활성 여부 */
+  enableCodeToErdAutoSync?: boolean;
+  /** ERD -> 코드 자동생성 활성 여부 */
+  enableErdToCodeAutoSync?: boolean;
+  /** 코드 에디터 테이블 락 발행 여부 */
+  enableTableLock?: boolean;
+  /** DSL preview 상태 변경 핸들러 */
+  onPreviewStateChange?: (previewState: DslPreviewCanvasState | null) => void;
+  /** 코드 draft 저장 활성 여부 */
+  persistDraft?: boolean;
 }
 
 /**
@@ -53,15 +80,64 @@ interface DslCodeEditorPanelProps {
  * @param props.canEdit 편집 가능 여부
  * @returns 논리명 DSL 에디터 패널 JSX
  */
-export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPanelProps) {
+export default function DslCodeEditorPanel({
+  canEdit = true,
+  enableCodeToErdAutoSync = true,
+  enableErdToCodeAutoSync = true,
+  enableTableLock = true,
+  onPreviewStateChange,
+  persistDraft = false,
+}: DslCodeEditorPanelProps) {
   const { t } = useTranslation();
   const { teamId, projectId, diagramId } = useParams<{
     teamId: string;
     projectId: string;
     diagramId: string;
   }>();
+  const draftScope = useMemo(
+    () => ({ teamId, projectId, diagramId }),
+    [diagramId, projectId, teamId],
+  );
   const remoteEditLocks = useRemoteEditLocks();
   const hasRemoteEditLocks = remoteEditLocks.hasTableLocks;
+  const [draftHydrated, setDraftHydrated] = useState(!persistDraft);
+  const [previewGraph, setPreviewGraph] = useState<DslPreviewGraph | null>(null);
+  const draftBaselineRevisionRef = useRef<string | null>(null);
+  const pendingDraftPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingDraftRecordRef = useRef<DiagramDslDraftRecord | null>(null);
+  const lastPersistedDraftRecordRef = useRef<string | null>(null);
+  const previewGraphBuildTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewGraphBuildSeqRef = useRef(0);
+
+  /**
+   * 현재 draft 레코드를 즉시 localStorage에 반영한다.
+   *
+   * @param nextRecord 저장할 draft 레코드
+   * @returns 없음
+   */
+  const persistDraftRecordImmediately = useCallback(
+    (nextRecord: DiagramDslDraftRecord | null) => {
+      if (!persistDraft || !nextRecord) {
+        return;
+      }
+
+      if (pendingDraftPersistTimerRef.current) {
+        clearTimeout(pendingDraftPersistTimerRef.current);
+        pendingDraftPersistTimerRef.current = null;
+      }
+
+      const serializedRecord = JSON.stringify(nextRecord);
+      if (serializedRecord === lastPersistedDraftRecordRef.current) {
+        pendingDraftRecordRef.current = null;
+        return;
+      }
+
+      saveDiagramDslDraftRecord(draftScope, nextRecord);
+      lastPersistedDraftRecordRef.current = serializedRecord;
+      pendingDraftRecordRef.current = null;
+    },
+    [draftScope, persistDraft],
+  );
 
   const {
     terms,
@@ -76,6 +152,9 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
   } = useErdDictionary();
   const erdPhysicalNameSourceEntries = useCanvasStore(
     useShallow((state) => buildErdPhysicalNameSourceEntries(state.nodes as TableNode[])),
+  );
+  const previewLayoutSourceEntries = useCanvasStore(
+    useShallow((state) => buildPreviewLayoutSourceEntries(state.nodes as TableNode[])),
   );
 
   /** 사전 데이터 객체 (SSOT — Ref 대입만 하므로 참조 동일성 불필요) */
@@ -93,22 +172,6 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     dictionary,
   });
 
-  const {
-    handleApply,
-    executeApply,
-    applyParsedToErd,
-    confirmOpen,
-    setConfirmOpen,
-    confirmDescription,
-    canApply,
-  } = useApplyToErd({
-    canEdit,
-    parseResult: parseResult?.result ?? null,
-    parsing,
-    policyScope: { teamId, projectId, diagramId },
-    hasBlockingStructureLocks: remoteEditLocks.hasBlockingStructureLocks,
-  });
-
   /** 사전 데이터 로딩 완료 여부 (초기화 시 사전 없이 생성하면 빈 결과) */
   const hasDictionary = terms.length > 0 || domains.length > 0 || words.length > 0;
 
@@ -124,6 +187,82 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     const { nodes, edges } = useCanvasStore.getState();
     return generate(nodes as TableNode[], edges as ERDEdge[]);
   }, [generate]);
+
+  /**
+   * 현재 persisted ERD 상태의 리비전 해시를 계산한다.
+   *
+   * @returns 현재 store 기준 persisted ERD 리비전 해시
+   */
+  const buildCurrentPersistedRevisionHash = useCallback(() => {
+    const { nodes, edges } = useCanvasStore.getState();
+    return buildRevisionHash(
+      (nodes as TableNode[]).map((node) => ({
+        id: node.id,
+        type: node.type ?? 'table',
+        parentId: node.parentId ?? null,
+        data: node.data,
+      })),
+      (edges as ERDEdge[]).map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceHandle ?? null,
+        targetHandle: edge.targetHandle ?? null,
+        type: edge.type ?? 'default',
+        data: edge.data,
+      })),
+    );
+  }, []);
+
+  const {
+    handleApply,
+    executeApply,
+    applyParsedToErd,
+    confirmOpen,
+    setConfirmOpen,
+    confirmDescription,
+    canApply,
+  } = useApplyToErd({
+    canEdit,
+    parseResult: parseResult?.result ?? null,
+    parsing,
+    policyScope: { teamId, projectId, diagramId },
+    hasBlockingStructureLocks: remoteEditLocks.hasBlockingStructureLocks,
+    beforeManualApply: useCallback(() => {
+      if (!persistDraft) {
+        return true;
+      }
+
+      const currentRevision = buildCurrentPersistedRevisionHash();
+      const baselineRevision = draftBaselineRevisionRef.current ?? currentRevision;
+      draftBaselineRevisionRef.current = baselineRevision;
+
+      if (currentRevision !== baselineRevision) {
+        toast.error(t('diagram.workMode.codeDraftConflict'));
+        return false;
+      }
+
+      return true;
+    }, [buildCurrentPersistedRevisionHash, persistDraft, t]),
+    onManualApplySuccess: useCallback(() => {
+      if (!persistDraft || !draftHydrated) {
+        return;
+      }
+
+      const nextBaselineRevision = buildCurrentPersistedRevisionHash();
+      draftBaselineRevisionRef.current = nextBaselineRevision;
+      persistDraftRecordImmediately({
+        text: dslText,
+        baselineRevision: nextBaselineRevision,
+      });
+    }, [
+      buildCurrentPersistedRevisionHash,
+      draftHydrated,
+      dslText,
+      persistDraft,
+      persistDraftRecordImmediately,
+    ]),
+  });
 
   /** 에러 건수 */
   const errorCount = parseResult?.diagnostics.filter((d) => d.severity === 'error').length ?? 0;
@@ -146,10 +285,20 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
     () => (parseResult?.result ? buildParsedSchemaHash(parseResult.result) : null),
     [parseResult?.result],
   );
+  const previewState = useMemo<DslPreviewCanvasState>(
+    () => ({
+      graph: previewGraph,
+      parsing,
+      hasBlockingErrors: errorCount > 0,
+      hasContent: dslText.trim().length > 0,
+    }),
+    [dslText, errorCount, parsing, previewGraph],
+  );
 
   const { handleUserCodeChange, handleGeneratedCodeChange, clearQueueTimeoutHold, syncStatus } =
     useBidirectionalCodeSync({
-      enabled: canEdit,
+      enableCodeToErdSync: canEdit && enableCodeToErdAutoSync,
+      enableErdToCodeSync: canEdit && enableErdToCodeAutoSync,
       ready: hasDictionary,
       codeText: dslText,
       parsing,
@@ -179,6 +328,12 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
       onGenerated: handleGeneratedCodeChange,
       currentText: dslText,
       ready: hasDictionary,
+      skipInitialRefresh: persistDraft,
+      beforeExecuteRefresh: persistDraft
+        ? () => {
+            draftBaselineRevisionRef.current = buildCurrentPersistedRevisionHash();
+          }
+        : undefined,
     });
 
   const syncStatusMeta = getSyncStatusMeta(t, syncStatus);
@@ -239,6 +394,158 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
   const requestDictionaryReparse = useCallback(() => {
     pendingDictionaryReparseRef.current = true;
   }, []);
+
+  useEffect(() => {
+    setDraftHydrated(!persistDraft);
+    draftBaselineRevisionRef.current = null;
+    pendingDraftRecordRef.current = null;
+    lastPersistedDraftRecordRef.current = null;
+    previewGraphBuildSeqRef.current += 1;
+    if (pendingDraftPersistTimerRef.current) {
+      clearTimeout(pendingDraftPersistTimerRef.current);
+      pendingDraftPersistTimerRef.current = null;
+    }
+    if (previewGraphBuildTimerRef.current) {
+      clearTimeout(previewGraphBuildTimerRef.current);
+      previewGraphBuildTimerRef.current = null;
+    }
+  }, [diagramId, persistDraft, projectId, teamId]);
+
+  useEffect(() => {
+    if (!persistDraft || !draftHydrated) {
+      return;
+    }
+
+    pendingDraftRecordRef.current = {
+      text: dslText,
+      baselineRevision: draftBaselineRevisionRef.current,
+    };
+
+    if (pendingDraftPersistTimerRef.current) {
+      clearTimeout(pendingDraftPersistTimerRef.current);
+    }
+
+    pendingDraftPersistTimerRef.current = setTimeout(() => {
+      persistDraftRecordImmediately(pendingDraftRecordRef.current);
+    }, CODE_DRAFT_PERSIST_IDLE_MS);
+
+    return () => {
+      if (pendingDraftPersistTimerRef.current) {
+        clearTimeout(pendingDraftPersistTimerRef.current);
+        pendingDraftPersistTimerRef.current = null;
+      }
+    };
+  }, [draftHydrated, dslText, persistDraft, persistDraftRecordImmediately]);
+
+  useEffect(() => {
+    if (!persistDraft || draftHydrated || !hasDictionary) {
+      return;
+    }
+
+    const storedDraft = loadDiagramDslDraftRecord(draftScope);
+    const currentBaselineRevision = buildCurrentPersistedRevisionHash();
+
+    if (storedDraft != null) {
+      draftBaselineRevisionRef.current = storedDraft.baselineRevision ?? currentBaselineRevision;
+      lastPersistedDraftRecordRef.current = JSON.stringify({
+        text: storedDraft.text,
+        baselineRevision: draftBaselineRevisionRef.current,
+      });
+      syncCodeChange(storedDraft.text);
+    } else {
+      draftBaselineRevisionRef.current = currentBaselineRevision;
+      executeRefresh();
+    }
+    setDraftHydrated(true);
+  }, [
+    buildCurrentPersistedRevisionHash,
+    draftHydrated,
+    draftScope,
+    executeRefresh,
+    hasDictionary,
+    persistDraft,
+    syncCodeChange,
+  ]);
+
+  useEffect(() => {
+    if (!persistDraft) {
+      return;
+    }
+
+    const flushPendingDraft = () => {
+      persistDraftRecordImmediately(pendingDraftRecordRef.current);
+    };
+
+    if (typeof globalThis.addEventListener === 'function') {
+      globalThis.addEventListener('pagehide', flushPendingDraft);
+    }
+
+    return () => {
+      if (typeof globalThis.removeEventListener === 'function') {
+        globalThis.removeEventListener('pagehide', flushPendingDraft);
+      }
+      flushPendingDraft();
+    };
+  }, [persistDraft, persistDraftRecordImmediately]);
+
+  useEffect(() => {
+    if (!onPreviewStateChange) {
+      previewGraphBuildSeqRef.current += 1;
+      if (previewGraphBuildTimerRef.current) {
+        clearTimeout(previewGraphBuildTimerRef.current);
+        previewGraphBuildTimerRef.current = null;
+      }
+      setPreviewGraph(null);
+      return;
+    }
+
+    if (!parseResult?.result || errorCount > 0 || dslText.trim().length === 0) {
+      previewGraphBuildSeqRef.current += 1;
+      if (previewGraphBuildTimerRef.current) {
+        clearTimeout(previewGraphBuildTimerRef.current);
+        previewGraphBuildTimerRef.current = null;
+      }
+      setPreviewGraph(null);
+      return;
+    }
+
+    const buildSeq = previewGraphBuildSeqRef.current + 1;
+    previewGraphBuildSeqRef.current = buildSeq;
+    previewGraphBuildTimerRef.current = setTimeout(() => {
+      const nextGraph = buildPreviewGraphFromDslParsedSchema(
+        parseResult.result,
+        previewLayoutSourceEntries,
+      );
+      if (previewGraphBuildSeqRef.current !== buildSeq) {
+        return;
+      }
+
+      startTransition(() => {
+        setPreviewGraph(nextGraph);
+      });
+    }, CODE_PREVIEW_GRAPH_IDLE_MS);
+
+    return () => {
+      if (previewGraphBuildTimerRef.current) {
+        clearTimeout(previewGraphBuildTimerRef.current);
+        previewGraphBuildTimerRef.current = null;
+      }
+    };
+  }, [dslText, errorCount, onPreviewStateChange, parseResult?.result, previewLayoutSourceEntries]);
+
+  useEffect(() => {
+    if (!onPreviewStateChange) {
+      return;
+    }
+    onPreviewStateChange(previewState);
+  }, [onPreviewStateChange, previewState]);
+
+  useEffect(
+    () => () => {
+      onPreviewStateChange?.(null);
+    },
+    [onPreviewStateChange],
+  );
 
   // --- Assist Popup (extracted hook) ---
   const {
@@ -305,7 +612,7 @@ export default function DslCodeEditorPanel({ canEdit = true }: DslCodeEditorPane
   };
 
   useCodeEditorTableLock({
-    enabled: canEdit,
+    enabled: canEdit && enableTableLock,
     editorReady: monacoReady,
     editorRef,
     tableRanges: parseResult?.result.tableRanges ?? [],

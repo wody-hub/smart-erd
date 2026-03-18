@@ -39,6 +39,10 @@ interface UseApplyToErdOptions {
   policyScope?: SyncPolicyScope;
   /** 구조 변경 차단 여부 */
   hasBlockingStructureLocks?: boolean;
+  /** 수동 ERD 적용 직전 실행할 사전 검증 */
+  beforeManualApply?: () => boolean;
+  /** 수동 ERD 적용 성공 직후 실행할 후처리 */
+  onManualApplySuccess?: () => void;
 }
 
 /** useApplyToErd 훅 반환 타입 */
@@ -274,6 +278,8 @@ export function useApplyToErd({
   parsing,
   policyScope = {},
   hasBlockingStructureLocks = false,
+  beforeManualApply,
+  onManualApplySuccess,
 }: UseApplyToErdOptions): UseApplyToErdReturn {
   const { t } = useTranslation();
   const { teamId, projectId, diagramId } = policyScope;
@@ -350,6 +356,10 @@ export function useApplyToErd({
         return false;
       }
 
+      if (source === 'manual' && beforeManualApply && !beforeManualApply()) {
+        return false;
+      }
+
       if (source === 'auto') {
         const blockReason = getAutoApplyBlockReason(syncPolicy, estimatedNodeCount);
         if (blockReason) {
@@ -410,6 +420,7 @@ export function useApplyToErd({
         });
 
         if (source === 'manual') {
+          onManualApplySuccess?.();
           toast.success(t('erd.codeEditor.success', { count: parseResult.tables.length }));
         }
         return true;
@@ -429,6 +440,8 @@ export function useApplyToErd({
       replaceFromDdl,
       syncPolicy,
       hasBlockingStructureLocks,
+      beforeManualApply,
+      onManualApplySuccess,
       t,
       updateGroupTables,
     ],

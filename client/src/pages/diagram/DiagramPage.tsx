@@ -5,6 +5,8 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useHotkeys } from 'react-hotkeys-hook';
 import DiagramCollaboratorsBar from '@/components/erd/DiagramCollaboratorsBar';
+import DiagramWorkModeSwitcher from '@/components/erd/DiagramWorkModeSwitcher';
+import PreviewCanvas from '@/components/erd/PreviewCanvas';
 import Header from '@/components/layout/Header';
 import ERDCanvas from '@/components/erd/ERDCanvas';
 import CanvasLoadingOverlay from '@/components/erd/CanvasLoadingOverlay';
@@ -14,6 +16,7 @@ import ValidationPanel from '@/components/erd/ValidationPanel';
 import DictionaryManagementDialog from '@/components/erd/DictionaryManagementDialog';
 import { ErdDictionaryProvider } from '@/components/erd/ErdDictionaryContext';
 import { ErdPermissionProvider } from '@/components/erd/ErdPermissionContext';
+import { DiagramWorkModeProvider } from '@/components/erd/DiagramWorkModeContext';
 import Spinner from '@/components/ui/spinner';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useCollaborationStore from '@/stores/erd/useCollaborationStore';
@@ -28,6 +31,14 @@ import { toast } from 'sonner';
 import { useYjsCollaboration } from '@/hooks/useYjsCollaboration';
 import { useAutoBackup } from '@/hooks/useAutoBackup';
 import { useDiagramDictionaryReconciliation } from '@/hooks/useDiagramDictionaryReconciliation';
+import {
+  createDiagramWorkModeCapabilities,
+  loadDiagramWorkMode,
+  resolveDiagramWorkModeRuntimeState,
+  saveDiagramWorkMode,
+  type DiagramWorkMode,
+} from '@/lib/diagram-work-mode';
+import type { DslPreviewCanvasState } from '@/lib/dsl-preview-graph';
 
 const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPanel'));
 
@@ -66,6 +77,12 @@ export default function DiagramPage() {
   const [dictionaryDialogOpen, setDictionaryDialogOpen] = useState(false);
   /** 좌측 패널 모드 ('sidebar' | 'code') */
   const [leftPanel, setLeftPanel] = useState<'sidebar' | 'code'>('sidebar');
+  /** 다이어그램 작업 모드 */
+  const [workMode, setWorkMode] = useState<DiagramWorkMode>('sync');
+  /** 현재 다이어그램 스코프의 작업 모드 로드 완료 여부 */
+  const [workModeHydrated, setWorkModeHydrated] = useState(false);
+  /** code 모드의 DSL preview 상태 */
+  const [dslPreviewState, setDslPreviewState] = useState<DslPreviewCanvasState | null>(null);
   /** 활성 그룹 ID (null이면 전체 보기) */
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   /** 초기 진입 렌더 완료 래치 (한 번 true가 되면 동일 다이어그램 세션에서 유지) */
@@ -80,6 +97,10 @@ export default function DiagramPage() {
   const skipLatchEvalRef = useRef(false);
 
   const { canEdit } = useTeamRole(teamId);
+  const workModeCapabilities = useMemo(
+    () => createDiagramWorkModeCapabilities(workMode),
+    [workMode],
+  );
   const {
     sidebarWidth,
     isSidebarResizing,
@@ -198,16 +219,45 @@ export default function DiagramPage() {
     setActiveGroupId(null);
   };
 
-  useAutoBackup(saveMutation, teamId!, projectId!, diagramId!);
-  useHotkeys(KEYBINDINGS.SAVE, handleSave, { preventDefault: true });
-
   // Y.Doc + YjsProvider 라이프사이클 관리
   const { providerRef, isPreviewMode, previewSyncStatus } = useYjsCollaboration(diagram, diagramId);
-  /** 프리뷰 중에는 전반적 편집을 잠근다. */
-  const effectiveCanEdit = canEdit && !isPreviewMode;
+  const workModeRuntimeState = useMemo(
+    () =>
+      resolveDiagramWorkModeRuntimeState({
+        mode: workMode,
+        capabilities: workModeCapabilities,
+        canEdit,
+        isPersistedPreviewMode: isPreviewMode,
+        hasActiveGroupView: !!activeGroupId,
+      }),
+    [activeGroupId, canEdit, isPreviewMode, workMode, workModeCapabilities],
+  );
   const previewReadOnlyMessage = isPreviewMode
     ? t('diagram.previewSync.headerReadonly')
     : undefined;
+
+  useAutoBackup(saveMutation, teamId!, projectId!, diagramId!);
+  useHotkeys(KEYBINDINGS.SAVE, handleSave, {
+    preventDefault: true,
+    enabled: workModeRuntimeState.canPersistDiagramSave,
+  });
+
+  useEffect(() => {
+    setWorkModeHydrated(false);
+    setWorkMode(loadDiagramWorkMode({ teamId, projectId, diagramId }));
+    setWorkModeHydrated(true);
+  }, [diagramId, projectId, teamId]);
+
+  useEffect(() => {
+    if (!workModeHydrated) {
+      return;
+    }
+    saveDiagramWorkMode({ teamId, projectId, diagramId }, workMode);
+  }, [diagramId, projectId, teamId, workMode, workModeHydrated]);
+
+  const handleWorkModeChange = useCallback((nextMode: DiagramWorkMode) => {
+    setWorkMode(nextMode);
+  }, []);
 
   useHotkeys(
     KEYBINDINGS.UNDO,
@@ -218,8 +268,8 @@ export default function DiagramPage() {
       event.preventDefault();
       undo();
     },
-    { enabled: effectiveCanEdit && canUndo },
-    [effectiveCanEdit, canUndo, undo],
+    { enabled: workModeRuntimeState.effectiveCanvasCanEdit && canUndo },
+    [workModeRuntimeState.effectiveCanvasCanEdit, canUndo, undo],
   );
 
   useHotkeys(
@@ -231,9 +281,27 @@ export default function DiagramPage() {
       event.preventDefault();
       redo();
     },
-    { enabled: effectiveCanEdit && canRedo },
-    [effectiveCanEdit, canRedo, redo],
+    { enabled: workModeRuntimeState.effectiveCanvasCanEdit && canRedo },
+    [workModeRuntimeState.effectiveCanvasCanEdit, canRedo, redo],
   );
+
+  useEffect(() => {
+    if (workModeCapabilities.forcedLeftPanel && leftPanel !== workModeCapabilities.forcedLeftPanel) {
+      setLeftPanel(workModeCapabilities.forcedLeftPanel);
+    }
+  }, [leftPanel, workModeCapabilities.forcedLeftPanel]);
+
+  useEffect(() => {
+    if (!workModeRuntimeState.canOpenDictionaryManagement && dictionaryDialogOpen) {
+      setDictionaryDialogOpen(false);
+    }
+  }, [dictionaryDialogOpen, workModeRuntimeState.canOpenDictionaryManagement]);
+
+  useEffect(() => {
+    if (workModeCapabilities.canvasSource !== 'preview') {
+      setDslPreviewState(null);
+    }
+  }, [workModeCapabilities.canvasSource]);
 
   useEffect(() => {
     if (prevLatchKeyRef.current !== latchKey) {
@@ -324,20 +392,35 @@ export default function DiagramPage() {
     <ReactFlowProvider>
       <ErdDictionaryProvider teamId={teamId!} setId={dictionaryContextSetId}>
         <DiagramDictionaryReconciler diagramId={diagramId!} />
-        <ErdPermissionProvider canEdit={effectiveCanEdit}>
-          <div className="h-screen flex flex-col">
-            <Header
-              diagramName={diagramName}
-              onSave={effectiveCanEdit ? handleSave : undefined}
-              saving={saveMutation.isPending}
-              connectionStatus={connectionStatus}
-              canEdit={effectiveCanEdit}
-              readOnlyMessage={previewReadOnlyMessage}
-              diagramAccessory={<DiagramCollaboratorsBar />}
-            />
-            {canEdit && isPreviewMode && (
-              <DiagramSyncStatusBanner connectionStatus={connectionStatus} />
-            )}
+        <DiagramWorkModeProvider
+          mode={workMode}
+          capabilities={workModeCapabilities}
+          setMode={handleWorkModeChange}
+        >
+          <ErdPermissionProvider canEdit={workModeRuntimeState.effectiveCanvasCanEdit}>
+            <div className="h-screen flex flex-col">
+              <Header
+                diagramName={diagramName}
+                onSave={workModeRuntimeState.canPersistDiagramSave ? handleSave : undefined}
+                saving={saveMutation.isPending}
+                connectionStatus={connectionStatus}
+                canEdit={workModeRuntimeState.headerCanEdit}
+                readOnlyMessage={!workModeRuntimeState.headerCanEdit ? previewReadOnlyMessage : undefined}
+                diagramAccessory={
+                  <div className="flex items-center gap-3">
+                    <DiagramWorkModeSwitcher mode={workMode} onModeChange={handleWorkModeChange} />
+                    <DiagramCollaboratorsBar />
+                  </div>
+                }
+              />
+              {workModeRuntimeState.showPreviewSyncBanner && (
+                <DiagramSyncStatusBanner connectionStatus={connectionStatus} />
+              )}
+              {workModeRuntimeState.showCodeModeInfoBanner && (
+                <div className="px-4 py-1 text-xs text-muted-foreground border-b bg-background">
+                  {t('diagram.workMode.codeInfo')}
+                </div>
+              )}
             {diagram?.dictionarySetName && (
               <div className="px-4 py-1 text-xs text-muted-foreground border-b bg-background">
                 {t('diagram.edit.dictionaryContext', { name: diagram.dictionarySetName })}
@@ -351,14 +434,27 @@ export default function DiagramPage() {
               >
                 {leftPanel === 'sidebar' ? (
                   <DiagramSidebar
-                    canEdit={effectiveCanEdit}
+                    canEdit={workModeRuntimeState.effectiveCanvasCanEdit}
                     activeGroupId={activeGroupId}
                     onViewGroup={handleViewGroup}
                     onBackToAll={handleBackToAll}
                   />
                 ) : (
                   <Suspense fallback={<Spinner />}>
-                    <DdlCodeEditorPanel canEdit={effectiveCanEdit} />
+                    <DdlCodeEditorPanel
+                      canEdit={workModeRuntimeState.effectiveCodeCanEdit}
+                      enableCodeToErdAutoSync={workModeCapabilities.enableCodeToErdAutoSync}
+                      enableErdToCodeAutoSync={workModeCapabilities.enableErdToCodeAutoSync}
+                      enableTableLock={workModeCapabilities.enableCodeEditorTableLock}
+                      persistDraft={workModeCapabilities.persistCodeDraft}
+                      dslOnly={workModeCapabilities.dslOnlyCodeEditor}
+                      workMode={workMode}
+                      onDslPreviewStateChange={
+                        workModeCapabilities.canvasSource === 'preview'
+                          ? setDslPreviewState
+                          : undefined
+                      }
+                    />
                   </Suspense>
                 )}
               </div>
@@ -380,32 +476,40 @@ export default function DiagramPage() {
                 <div className="w-px h-full bg-border/80 group-hover:bg-primary/80 group-active:bg-primary transition-colors" />
               </div>
               <main className="flex-1 relative">
-                <ERDCanvas
-                  diagramName={diagramName || 'diagram'}
-                  provider={providerRef.current}
-                  validationOpen={validationOpen}
-                  onToggleValidation={handleToggleValidation}
-                  dictionaryOpen={dictionaryDialogOpen}
-                  onOpenDictionary={
-                    dictionaryContextSetId ? () => setDictionaryDialogOpen(true) : undefined
-                  }
-                  canEdit={effectiveCanEdit}
-                  activeGroupId={activeGroupId}
-                  activeGroupName={activeGroup?.label}
-                  activeGroupTableIds={activeGroupTableIds}
-                  codeEditorActive={leftPanel === 'code'}
-                  onToggleCodeEditor={
-                    effectiveCanEdit && !activeGroupId ? handleToggleCodeEditor : undefined
-                  }
-                  isSidebarResizing={isSidebarResizing}
-                />
-                {showOverlay && (
-                  <CanvasLoadingOverlay
-                    syncStage="yjs-live"
-                    retryCount={0}
-                    maxRetries={0}
-                    onRetry={noop}
-                  />
+                {workModeCapabilities.canvasSource === 'preview' ? (
+                  <PreviewCanvas previewState={dslPreviewState} />
+                ) : (
+                  <>
+                    <ERDCanvas
+                      diagramName={diagramName || 'diagram'}
+                      provider={providerRef.current}
+                      validationOpen={validationOpen}
+                      onToggleValidation={handleToggleValidation}
+                      dictionaryOpen={dictionaryDialogOpen}
+                      onOpenDictionary={
+                        dictionaryContextSetId && workModeRuntimeState.canOpenDictionaryManagement
+                          ? () => setDictionaryDialogOpen(true)
+                          : undefined
+                      }
+                      canEdit={workModeRuntimeState.effectiveCanvasCanEdit}
+                      activeGroupId={activeGroupId}
+                      activeGroupName={activeGroup?.label}
+                      activeGroupTableIds={activeGroupTableIds}
+                      codeEditorActive={leftPanel === 'code'}
+                      onToggleCodeEditor={
+                        workModeRuntimeState.canToggleCodeEditor ? handleToggleCodeEditor : undefined
+                      }
+                      isSidebarResizing={isSidebarResizing}
+                    />
+                    {showOverlay && (
+                      <CanvasLoadingOverlay
+                        syncStage="yjs-live"
+                        retryCount={0}
+                        maxRetries={0}
+                        onRetry={noop}
+                      />
+                    )}
+                  </>
                 )}
               </main>
               {validationOpen && <ValidationPanel onClose={() => setValidationOpen(false)} />}
@@ -416,13 +520,14 @@ export default function DiagramPage() {
                 open={dictionaryDialogOpen}
                 onOpenChange={setDictionaryDialogOpen}
                 teamId={teamId!}
-                canEdit={canEdit}
+                canEdit={workModeRuntimeState.canEditDictionaryManagement}
                 dictionarySetId={dictionaryContextSetId}
                 dictionarySetName={diagram?.dictionarySetName}
               />
             )}
-          </div>
-        </ErdPermissionProvider>
+            </div>
+          </ErdPermissionProvider>
+        </DiagramWorkModeProvider>
       </ErdDictionaryProvider>
     </ReactFlowProvider>
   );

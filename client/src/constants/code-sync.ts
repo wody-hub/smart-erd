@@ -4,6 +4,12 @@ export const CODE_SYNC_IDLE_MS = 1200;
 /** 코드 입력 후 Code→ERD 자동반영 대기 시간 (ms) */
 export const CODE_AUTO_APPLY_IDLE_MS = 1800;
 
+/** code 모드 DSL draft localStorage 저장 대기 시간 (ms) */
+export const CODE_DRAFT_PERSIST_IDLE_MS = 500;
+
+/** code 모드 preview graph 생성 대기 시간 (ms) */
+export const CODE_PREVIEW_GRAPH_IDLE_MS = 300;
+
 /** ERD 변경 후 코드 자동 갱신 대기 시간 (ms) */
 export const ERD_SYNC_IDLE_MS = 600;
 

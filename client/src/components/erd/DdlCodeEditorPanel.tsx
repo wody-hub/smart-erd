@@ -32,6 +32,8 @@ import { useEditorCursorGuard } from '@/hooks/useEditorCursorGuard';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
 import { buildParsedSchemaHash } from '@/lib/code-sync-schema-hash';
+import type { DiagramWorkMode } from '@/lib/diagram-work-mode';
+import type { DslPreviewCanvasState } from '@/lib/dsl-preview-graph';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import { generateDdl } from '@/lib/ddl-generator';
@@ -70,6 +72,20 @@ const [OPT_PK, OPT_AI, OPT_NN] = DSL_COLUMN_OPTIONS;
 interface DdlCodeEditorPanelProps {
   /** 편집 가능 여부 (VIEWER일 때 false) */
   canEdit?: boolean;
+  /** 코드 -> ERD 자동동기화 활성 여부 */
+  enableCodeToErdAutoSync?: boolean;
+  /** ERD -> 코드 자동생성 활성 여부 */
+  enableErdToCodeAutoSync?: boolean;
+  /** 코드 에디터 테이블 락 발행 여부 */
+  enableTableLock?: boolean;
+  /** DSL 탭만 허용 여부 */
+  dslOnly?: boolean;
+  /** 현재 작업 모드 */
+  workMode?: DiagramWorkMode;
+  /** DSL preview 상태 변경 핸들러 */
+  onDslPreviewStateChange?: (previewState: DslPreviewCanvasState | null) => void;
+  /** 코드 draft 저장 활성 여부 */
+  persistDraft?: boolean;
 }
 
 /**
@@ -81,46 +97,72 @@ interface DdlCodeEditorPanelProps {
  * @param props.canEdit 편집 가능 여부
  * @returns 코드 에디터 패널 JSX
  */
-export default function DdlCodeEditorPanel({ canEdit = true }: DdlCodeEditorPanelProps) {
+export default function DdlCodeEditorPanel({
+  canEdit = true,
+  enableCodeToErdAutoSync = true,
+  enableErdToCodeAutoSync = true,
+  enableTableLock = true,
+  dslOnly = false,
+  workMode = 'sync',
+  onDslPreviewStateChange,
+  persistDraft = false,
+}: DdlCodeEditorPanelProps) {
   const { t } = useTranslation();
 
   /** 에디터 모드 (기본값: DSL) */
   const [mode, setMode] = useState<EditorMode>('dsl');
 
+  useEffect(() => {
+    if (dslOnly && mode !== 'dsl') {
+      setMode('dsl');
+    }
+  }, [dslOnly, mode]);
+
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
       {/* 모드 탭 */}
       <div className="flex items-center border-b border-border shrink-0">
-        <div className="flex flex-1" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === 'sql'}
-            className={cn(
-              'flex-1 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-              mode === 'sql'
-                ? 'bg-background text-foreground border-b-2 border-primary'
-                : 'bg-muted text-muted-foreground hover:text-foreground',
+        {dslOnly ? (
+          <div className="flex flex-1 items-center justify-between px-3 py-1.5">
+            <div className="text-xs font-medium text-foreground">{t('erd.dsl.tabLabel')}</div>
+            {workMode === 'code' && (
+              <span className="text-[11px] text-muted-foreground">
+                {t('diagram.workMode.codeDslOnly')}
+              </span>
             )}
-            onClick={() => setMode('sql')}
-          >
-            SQL DDL
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === 'dsl'}
-            className={cn(
-              'flex-1 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-              mode === 'dsl'
-                ? 'bg-background text-foreground border-b-2 border-primary'
-                : 'bg-muted text-muted-foreground hover:text-foreground',
-            )}
-            onClick={() => setMode('dsl')}
-          >
-            {t('erd.dsl.tabLabel')}
-          </button>
-        </div>
+          </div>
+        ) : (
+          <div className="flex flex-1" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'sql'}
+              className={cn(
+                'flex-1 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                mode === 'sql'
+                  ? 'bg-background text-foreground border-b-2 border-primary'
+                  : 'bg-muted text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setMode('sql')}
+            >
+              SQL DDL
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'dsl'}
+              className={cn(
+                'flex-1 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                mode === 'dsl'
+                  ? 'bg-background text-foreground border-b-2 border-primary'
+                  : 'bg-muted text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setMode('dsl')}
+            >
+              {t('erd.dsl.tabLabel')}
+            </button>
+          </div>
+        )}
         {mode === 'dsl' && (
           <div className="px-2">
             <DslSyntaxGuideDialog />
@@ -131,10 +173,22 @@ export default function DdlCodeEditorPanel({ canEdit = true }: DdlCodeEditorPane
       {/* 모드별 에디터 */}
       <div className="flex-1 min-h-0" role="tabpanel">
         {mode === 'sql' ? (
-          <SqlDdlEditor canEdit={canEdit} />
+          <SqlDdlEditor
+            canEdit={canEdit}
+            enableCodeToErdAutoSync={enableCodeToErdAutoSync}
+            enableErdToCodeAutoSync={enableErdToCodeAutoSync}
+            enableTableLock={enableTableLock}
+          />
         ) : (
           <Suspense fallback={<Spinner text={t('common.loading')} />}>
-            <DslCodeEditorPanel canEdit={canEdit} />
+            <DslCodeEditorPanel
+              canEdit={canEdit}
+              enableCodeToErdAutoSync={enableCodeToErdAutoSync}
+              enableErdToCodeAutoSync={enableErdToCodeAutoSync}
+              enableTableLock={enableTableLock}
+              onPreviewStateChange={onDslPreviewStateChange}
+              persistDraft={persistDraft}
+            />
           </Suspense>
         )}
       </div>
@@ -258,7 +312,17 @@ function DslSyntaxGuideDialog() {
  * @param props.canEdit 편집 가능 여부
  * @returns SQL DDL 에디터 JSX
  */
-function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
+function SqlDdlEditor({
+  canEdit = true,
+  enableCodeToErdAutoSync = true,
+  enableErdToCodeAutoSync = true,
+  enableTableLock = true,
+}: {
+  canEdit?: boolean;
+  enableCodeToErdAutoSync?: boolean;
+  enableErdToCodeAutoSync?: boolean;
+  enableTableLock?: boolean;
+}) {
   const { t } = useTranslation();
   const { teamId, projectId, diagramId } = useParams<{
     teamId: string;
@@ -316,7 +380,8 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
 
   const { handleUserCodeChange, handleGeneratedCodeChange, clearQueueTimeoutHold, syncStatus } =
     useBidirectionalCodeSync({
-      enabled: canEdit,
+      enableCodeToErdSync: canEdit && enableCodeToErdAutoSync,
+      enableErdToCodeSync: canEdit && enableErdToCodeAutoSync,
       codeText: ddlText,
       parsing,
       hasBlockingErrors,
@@ -384,7 +449,7 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
   };
 
   useCodeEditorTableLock({
-    enabled: canEdit,
+    enabled: canEdit && enableTableLock,
     editorReady,
     editorRef,
     tableRanges: parseResult?.tableRanges ?? [],
