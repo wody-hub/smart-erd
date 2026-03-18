@@ -473,7 +473,7 @@ export default function PreviewCanvas({
       )}
 
       {blockingBannerMessage && (
-        <div className="pointer-events-none absolute left-1/2 top-4 z-20 -translate-x-1/2 px-4">
+        <div className="pointer-events-none absolute left-1/2 top-16 z-20 max-w-[calc(100%-2rem)] -translate-x-1/2 px-4">
           <div className="rounded-md border border-amber-500/30 bg-background/92 px-3 py-2 text-xs text-amber-700 shadow-sm backdrop-blur dark:text-amber-300">
             {blockingBannerMessage}
           </div>
