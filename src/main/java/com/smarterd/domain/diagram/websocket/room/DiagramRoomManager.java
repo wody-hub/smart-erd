@@ -392,6 +392,21 @@ public class DiagramRoomManager {
     }
 
     /**
+     * 다이어그램의 누적 update 버퍼를 최신 단일 update 기준으로 교체한다.
+     *
+     * 클라이언트가 전체 Y.Doc 상태를 서버 persisted snapshot으로 밀어넣은 직후,
+     * room warm handoff/연결 종료 flush도 같은 기준을 보도록 맞춘다.
+     *
+     * @param diagramId 다이어그램 ID
+     * @param update 최신 전체 상태를 나타내는 raw Yjs update
+     */
+    public void replaceUpdates(Long diagramId, byte[] update) {
+        synchronized (getFlushLock(diagramId)) {
+            updateBuffer.replaceWithSingleUpdate(diagramId, update);
+        }
+    }
+
+    /**
      * 세션에 매핑된 사용자 ID를 조회한다.
      *
      * @param session WebSocket 세션

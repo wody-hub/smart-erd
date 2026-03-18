@@ -41,6 +41,7 @@ test('loadDiagramDslDraft 와 saveDiagramDslDraftRecord 는 localStorage 를 rou
         previewPositions: {
           'preview-table:user': { x: 120, y: 240 },
         },
+        isIntentionalBlank: false,
       },
     );
     assert.equal(
@@ -55,6 +56,7 @@ test('loadDiagramDslDraft 와 saveDiagramDslDraftRecord 는 localStorage 를 rou
         previewPositions: {
           'preview-table:user': { x: 120, y: 240 },
         },
+        isIntentionalBlank: false,
       },
     );
   } finally {
@@ -87,6 +89,7 @@ test('loadDiagramDslDraftRecord 는 legacy plain string 저장값도 호환한�
         text: "Table '레거시' {}",
         baselineRevision: null,
         previewPositions: {},
+        isIntentionalBlank: false,
       },
     );
   } finally {
@@ -133,6 +136,49 @@ test('loadDiagramDslDraftRecord 는 잘못된 previewPositions 값을 무시한�
         previewPositions: {
           valid: { x: 10, y: 20 },
         },
+        isIntentionalBlank: false,
+      },
+    );
+  } finally {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: original,
+    });
+  }
+});
+
+test('loadDiagramDslDraftRecord 는 intentional blank draft 를 복원한다', () => {
+  const storage = new Map<string, string>();
+  const original = globalThis.localStorage;
+
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        storage.set(key, value);
+      },
+    },
+  });
+
+  try {
+    storage.set(
+      'smart-erd-dsl-draft:team:project:diagram',
+      JSON.stringify({
+        text: '',
+        baselineRevision: 'rev-3',
+        previewPositions: {},
+        isIntentionalBlank: true,
+      }),
+    );
+
+    assert.deepEqual(
+      loadDiagramDslDraftRecord({ teamId: 'team', projectId: 'project', diagramId: 'diagram' }),
+      {
+        text: '',
+        baselineRevision: 'rev-3',
+        previewPositions: {},
+        isIntentionalBlank: true,
       },
     );
   } finally {

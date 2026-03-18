@@ -103,6 +103,12 @@ interface DdlCodeEditorPanelProps {
   onNavigateToTable?: (request: CodeEditorTableFocusRequest) => void;
   /** ERD에서 요청한 코드 reveal 대상 */
   tableRevealRequest?: CodeEditorTableRevealRequest | null;
+  /** remote Y.Doc snapshot/bootstrap 완료 전 draft hydrate 보류 여부 */
+  delayDraftHydration?: boolean;
+  /** 현재 persisted 다이어그램에 저장된 내용 존재 여부 */
+  persistedDiagramHasContent?: boolean;
+  /** code 모드 shared draft snapshot keepalive 저장 요청 */
+  onPersistCodeModeSnapshot?: () => void;
 }
 
 /**
@@ -127,6 +133,9 @@ export default function DdlCodeEditorPanel({
   onPreviewPositionOverridesChange,
   onNavigateToTable,
   tableRevealRequest,
+  delayDraftHydration = false,
+  persistedDiagramHasContent = false,
+  onPersistCodeModeSnapshot,
 }: DdlCodeEditorPanelProps) {
   const { t } = useTranslation();
 
@@ -215,6 +224,9 @@ export default function DdlCodeEditorPanel({
               onPreviewPositionOverridesChange={onPreviewPositionOverridesChange}
               onNavigateToTable={onNavigateToTable}
               tableRevealRequest={tableRevealRequest}
+              delayDraftHydration={delayDraftHydration}
+              persistedDiagramHasContent={persistedDiagramHasContent}
+              onPersistCodeModeSnapshot={onPersistCodeModeSnapshot}
             />
           </Suspense>
         )}

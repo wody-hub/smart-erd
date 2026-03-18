@@ -80,8 +80,8 @@ test('code mode shared draft is visible across sessions and matched node moves p
   const config = getE2EProvisioningConfig();
   const fixture = await provisionCollaborationFixture(config);
 
-  const ownerContext = await browser.newContext();
-  const peerContext = await browser.newContext();
+    const ownerContext = await browser.newContext();
+    const peerContext = await browser.newContext();
 
   try {
     const ownerPage = await ownerContext.newPage();
@@ -251,5 +251,154 @@ test('code mode shared draft is visible across sessions and matched node moves p
   } finally {
     await ownerContext.close();
     await peerContext.close();
+  }
+});
+
+test('code mode draft survives session restart via Y.Doc snapshot @smoke', async ({
+  browser,
+  request,
+}) => {
+  const config = getE2EProvisioningConfig();
+  const fixture = await provisionCollaborationFixture(config);
+
+  const firstContext = await browser.newContext();
+
+  try {
+    const firstPage = await firstContext.newPage();
+    const ownerToken = await loginViaUi(firstPage, { ...config, ...fixture });
+
+    const dictionarySets = await apiJson<DictionarySetSummary[]>(
+      request,
+      'GET',
+      `${config.apiBaseUrl}/teams/${fixture.target.teamId}/dictionary-sets`,
+      ownerToken,
+    );
+    const dictionarySetId =
+      dictionarySets.find((candidate) => candidate.isDefault)?.id ?? dictionarySets[0]?.id;
+    if (!dictionarySetId) {
+      throw new Error('Dictionary set was not provisioned');
+    }
+
+    for (const word of [
+      { logicalName: 'users', physicalName: 'users' },
+      { logicalName: 'id', physicalName: 'id' },
+      { logicalName: 'orders', physicalName: 'orders' },
+      { logicalName: 'order_id', physicalName: 'order_id' },
+    ]) {
+      await apiJson(
+        request,
+        'POST',
+        `${config.apiBaseUrl}/teams/${fixture.target.teamId}/dictionary-sets/${dictionarySetId}/words`,
+        ownerToken,
+        word,
+      );
+    }
+
+    for (const term of [
+      { logicalName: 'users', physicalName: 'users' },
+      { logicalName: 'id', physicalName: 'id' },
+      { logicalName: 'orders', physicalName: 'orders' },
+      { logicalName: 'order_id', physicalName: 'order_id' },
+    ]) {
+      await apiJson(
+        request,
+        'POST',
+        `${config.apiBaseUrl}/teams/${fixture.target.teamId}/dictionary-sets/${dictionarySetId}/terms`,
+        ownerToken,
+        term,
+      );
+    }
+
+    const initialContent = {
+      nodes: [
+        {
+          id: 'table-users',
+          type: 'table',
+          position: { x: 640, y: 280 },
+          data: {
+            label: 'users',
+            logicalTableName: 'users',
+            columns: [
+              {
+                id: 'col-id',
+                logicalName: 'id',
+                name: 'id',
+                type: 'BIGINT',
+                nullable: false,
+                pk: true,
+              },
+            ],
+          },
+        },
+      ],
+      edges: [],
+      groups: [],
+    };
+
+    await apiJson(
+      request,
+      'PUT',
+      `${config.apiBaseUrl}/teams/${fixture.target.teamId}/projects/${fixture.target.projectId}/diagrams/${fixture.target.diagramId}`,
+      ownerToken,
+      {
+        content: JSON.stringify(initialContent),
+      },
+    );
+
+    const targetUrl = diagramUrl(config, fixture.target);
+    await firstPage.goto(targetUrl, { waitUntil: 'domcontentloaded' });
+    await expectDiagramHeaderVisible(firstPage, fixture.target);
+    await waitForEditableDiagram(firstPage, 30_000);
+    await switchWorkMode(firstPage, /코드 우선|code-first/i);
+
+    await firstPage.waitForFunction(
+      () => Boolean(window.monaco?.editor?.getModels?.().length),
+      undefined,
+      { timeout: 15_000 },
+    );
+
+    await firstPage.evaluate(() => {
+      const model = window.monaco?.editor?.getModels?.()[0];
+      if (!model) {
+        throw new Error('Monaco model not found');
+      }
+      model.setValue('Table users {\n  id\n}\n\nTable orders {\n  order_id\n}');
+    });
+
+    await firstPage.waitForTimeout(350);
+  } finally {
+    await firstContext.close();
+  }
+
+  const secondContext = await browser.newContext();
+  try {
+    const secondPage = await secondContext.newPage();
+    await loginViaUi(secondPage, { ...config, ...fixture });
+
+    const targetUrl = diagramUrl(config, fixture.target);
+    await secondPage.goto(targetUrl, { waitUntil: 'domcontentloaded' });
+    await expectDiagramHeaderVisible(secondPage, fixture.target);
+    await waitForEditableDiagram(secondPage, 30_000);
+    await switchWorkMode(secondPage, /코드 우선|code-first/i);
+
+    await secondPage.waitForFunction(
+      () => Boolean(window.monaco?.editor?.getModels?.().length),
+      undefined,
+      { timeout: 15_000 },
+    );
+    await secondPage.waitForFunction(
+      () => {
+        const model = window.monaco?.editor?.getModels?.()[0];
+        return model?.getValue().includes('Table orders {') ?? false;
+      },
+      undefined,
+      { timeout: PROPAGATION_TIMEOUT_MS },
+    );
+
+    await expect(
+      secondPage.locator('.react-flow__node-previewTable', { hasText: 'orders' }),
+    ).toHaveCount(1, { timeout: PROPAGATION_TIMEOUT_MS });
+  } finally {
+    await secondContext.close();
   }
 });

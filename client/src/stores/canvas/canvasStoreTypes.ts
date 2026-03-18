@@ -2,9 +2,11 @@ import * as Y from 'yjs';
 import type { Edge, Node, OnEdgesChange, OnNodesChange } from '@xyflow/react';
 import type { CanvasUndoManager } from '@/constants/canvas-history';
 import type { DdlParseResult } from '@/lib/ddl-parser';
+import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import type { ApplyDiffResult } from '@/lib/erd-diff-apply';
 import type { DiffPlan } from '@/lib/erd-diff-plan';
 import type { EdgeHandleSelectionValue } from '@/lib/edge-handles';
+import type { DslPreviewNode } from '@/lib/dsl-preview-graph';
 import type {
   Column,
   EdgeRoutingType,
@@ -125,6 +127,10 @@ export interface CanvasState {
     origin?: unknown,
   ) => void;
   applyLayout: (nodes: Node<TableNodeData>[]) => void;
+  applyPreviewPositionChangesToPersisted: (
+    previewNodes: readonly DslPreviewNode[],
+    positionOverrides: DiagramPreviewPositionRecord,
+  ) => string[];
   serialize: () => string;
   addFkRelation: (params: AddFkRelationParams) => number;
   connectWithRelationType: (

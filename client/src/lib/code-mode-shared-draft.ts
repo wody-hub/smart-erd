@@ -15,6 +15,8 @@ const CODE_MODE_SHARED_DRAFT_GRAPH_KEY = 'previewGraph';
 const CODE_MODE_SHARED_DRAFT_BASELINE_KEY = 'baselineRevision';
 /** code 모드 shared draft updatedAt 키 */
 const CODE_MODE_SHARED_DRAFT_UPDATED_AT_KEY = 'updatedAt';
+/** code 모드 shared draft intentional blank 키 */
+const CODE_MODE_SHARED_DRAFT_INTENTIONAL_BLANK_KEY = 'isIntentionalBlank';
 
 /** code 모드 shared draft snapshot */
 export interface CodeModeSharedDraftSnapshot {
@@ -22,6 +24,8 @@ export interface CodeModeSharedDraftSnapshot {
   text: string;
   /** draft 생성 시점의 persisted baseline revision */
   baselineRevision: string | null;
+  /** 사용자가 의도적으로 빈 코드를 저장했는지 여부 */
+  isIntentionalBlank: boolean;
   /** 공유 preview overlay graph snapshot */
   graph: PreviewDraftOverlayGraph | null;
   /** 마지막 갱신 시각 (epoch ms) */
@@ -109,6 +113,16 @@ export function readCodeModeSharedDraftBaselineRevision(doc: Y.Doc): string | nu
 }
 
 /**
+ * code 모드 shared draft intentional blank 여부를 읽는다.
+ *
+ * @param doc 대상 Y.Doc
+ * @returns intentional blank 여부
+ */
+export function readCodeModeSharedDraftIntentionalBlank(doc: Y.Doc): boolean {
+  return getCodeModeSharedDraftMap(doc).get(CODE_MODE_SHARED_DRAFT_INTENTIONAL_BLANK_KEY) === true;
+}
+
+/**
  * code 모드 shared draft baseline revision을 저장한다.
  *
  * @param doc 대상 Y.Doc
@@ -147,13 +161,19 @@ export function writeCodeModeSharedDraftTextSnapshot(
   doc: Y.Doc,
   text: string,
   baselineRevision: string | null,
+  isIntentionalBlank: boolean,
   origin: unknown,
 ): void {
   const draftMap = getCodeModeSharedDraftMap(doc);
   const yText = getCodeModeSharedDraftText(doc);
   const currentText = yText.toString();
   const currentBaseline = readCodeModeSharedDraftBaselineRevision(doc);
-  if (currentText === text && currentBaseline === baselineRevision) {
+  const currentIntentionalBlank = readCodeModeSharedDraftIntentionalBlank(doc);
+  if (
+    currentText === text &&
+    currentBaseline === baselineRevision &&
+    currentIntentionalBlank === isIntentionalBlank
+  ) {
     return;
   }
 
@@ -171,6 +191,12 @@ export function writeCodeModeSharedDraftTextSnapshot(
       draftMap.set(CODE_MODE_SHARED_DRAFT_BASELINE_KEY, baselineRevision);
     } else {
       draftMap.delete(CODE_MODE_SHARED_DRAFT_BASELINE_KEY);
+    }
+
+    if (isIntentionalBlank) {
+      draftMap.set(CODE_MODE_SHARED_DRAFT_INTENTIONAL_BLANK_KEY, true);
+    } else {
+      draftMap.delete(CODE_MODE_SHARED_DRAFT_INTENTIONAL_BLANK_KEY);
     }
 
     draftMap.set(CODE_MODE_SHARED_DRAFT_UPDATED_AT_KEY, Date.now());
@@ -258,6 +284,7 @@ export function readCodeModeSharedDraftSnapshot(doc: Y.Doc): CodeModeSharedDraft
   return {
     text: readCodeModeSharedDraftText(doc),
     baselineRevision: readCodeModeSharedDraftBaselineRevision(doc),
+    isIntentionalBlank: readCodeModeSharedDraftIntentionalBlank(doc),
     graph: readCodeModeSharedDraftGraph(doc),
     updatedAt: typeof updatedAt === 'number' && Number.isFinite(updatedAt) ? updatedAt : null,
   };

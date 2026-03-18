@@ -3,7 +3,6 @@ import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
-import type { NodeChange } from '@xyflow/react';
 import type * as Monaco from 'monaco-editor';
 import type * as Y from 'yjs';
 import { toast } from 'sonner';
@@ -38,7 +37,7 @@ import {
   CODE_MODE_SHARED_DRAFT_TEXT_ORIGIN,
   getCodeModeSharedDraftText,
   readCodeModeSharedDraftBaselineRevision,
-  readCodeModeSharedDraftText,
+  readCodeModeSharedDraftIntentionalBlank,
   writeCodeModeSharedDraftBaselineRevision,
   writeCodeModeSharedDraftTextSnapshot,
 } from '@/lib/code-mode-shared-draft';
@@ -49,8 +48,10 @@ import {
   saveDiagramDslDraftRecord,
 } from '@/lib/diagram-code-draft';
 import {
+  CODE_SHARED_DRAFT_BOOTSTRAP_WAIT_MS,
   CODE_DRAFT_PERSIST_IDLE_MS,
   CODE_PREVIEW_GRAPH_IDLE_MS,
+  CODE_SHARED_DRAFT_SYNC_IDLE_MS,
 } from '@/constants/code-sync';
 import type {
   CodeEditorNavigableTable,
@@ -71,7 +72,6 @@ import {
   buildDslPhysicalNameHints,
   buildErdPhysicalNameSourceEntries,
 } from '@/lib/dsl-physical-name-hints';
-import { buildPersistedPreviewPositionChanges } from '@/lib/preview-position-sync';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
@@ -99,6 +99,12 @@ interface DslCodeEditorPanelProps {
   onNavigateToTable?: (request: CodeEditorTableFocusRequest) => void;
   /** ERD에서 요청한 코드 reveal 대상 */
   tableRevealRequest?: CodeEditorTableRevealRequest | null;
+  /** remote Y.Doc snapshot/bootstrap 완료 전 draft hydrate를 보류할지 여부 */
+  delayDraftHydration?: boolean;
+  /** 현재 persisted 다이어그램에 저장된 내용 존재 여부 */
+  persistedDiagramHasContent?: boolean;
+  /** code 모드 shared draft snapshot keepalive 저장 요청 */
+  onPersistCodeModeSnapshot?: () => void;
 }
 
 /**
@@ -115,6 +121,33 @@ function normalizePreviewNodesForDslGeneration(nodes: DslPreviewGraph['nodes']):
     ...node,
     type: 'table',
   }));
+}
+
+/**
+ * persisted 다이어그램이 존재할 때 hydrate 대상으로 사용할 로컬 draft를 정제한다.
+ *
+ * 과거 버그로 저장된 빈 문자열 draft는 실제 persisted ERD/코드를 덮어쓰지 않도록
+ * 부트스트랩 단계에서 무시한다.
+ *
+ * @param draft 저장된 로컬 draft 레코드
+ * @param persistedDiagramHasContent persisted 다이어그램 내용 존재 여부
+ * @returns hydrate에 사용할 draft. 무시 대상이면 null
+ */
+function sanitizeHydrationDraftRecord(
+  draft: DiagramDslDraftRecord | null,
+  persistedDiagramHasContent: boolean,
+): DiagramDslDraftRecord | null {
+  if (!draft) {
+    return null;
+  }
+
+  if (!persistedDiagramHasContent) {
+    return draft;
+  }
+
+  const hasText = draft.text.trim().length > 0;
+  const hasPreviewPositions = Object.keys(draft.previewPositions).length > 0;
+  return hasText || hasPreviewPositions || draft.isIntentionalBlank ? draft : null;
 }
 
 /**
@@ -139,6 +172,9 @@ export default function DslCodeEditorPanel({
   onPreviewPositionOverridesChange,
   onNavigateToTable,
   tableRevealRequest,
+  delayDraftHydration = false,
+  persistedDiagramHasContent = false,
+  onPersistCodeModeSnapshot,
 }: DslCodeEditorPanelProps) {
   const { t } = useTranslation();
   const { teamId, projectId, diagramId } = useParams<{
@@ -154,15 +190,30 @@ export default function DslCodeEditorPanel({
   const hasRemoteEditLocks = remoteEditLocks.hasTableLocks;
   const ydoc = useCanvasStore((state) => state.ydoc);
   const [draftHydrated, setDraftHydrated] = useState(!persistDraft);
+  const [draftFallbackHydrationReady, setDraftFallbackHydrationReady] = useState(
+    !persistDraft || !delayDraftHydration,
+  );
   const [previewGraph, setPreviewGraph] = useState<DslPreviewGraph | null>(null);
+  const [sharedDraftBootstrapText, setSharedDraftBootstrapText] = useState('');
+  const [sharedDraftBootstrapIntentionalBlank, setSharedDraftBootstrapIntentionalBlank] =
+    useState(false);
   const draftBaselineRevisionRef = useRef<string | null>(null);
   const pendingDraftPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingDraftRecordRef = useRef<DiagramDslDraftRecord | null>(null);
   const lastPersistedDraftRecordRef = useRef<string | null>(null);
+  const pendingHydratedTextRef = useRef<string | null>(null);
+  const generatedFallbackTextRef = useRef<string | null>(null);
+  const draftHydrationSourceRef = useRef<'shared' | 'local' | 'generated' | null>(null);
   const previewGraphBuildTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewGraphBuildSeqRef = useRef(0);
   const sharedDraftTextSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dslTextValueRef = useRef('');
+  /** 에디터 인스턴스 ref */
+  const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  /** Monaco 인스턴스 ref */
+  const monacoRef = useRef<typeof Monaco | null>(null);
+  /** Monaco mount 완료 여부 */
+  const [monacoReady, setMonacoReady] = useState(false);
 
   /**
    * 현재 draft 레코드를 즉시 localStorage에 반영한다.
@@ -197,7 +248,7 @@ export default function DslCodeEditorPanel({
   const {
     terms,
     domains,
-    words,
+    isDictionaryReady,
     termByNameMap,
     domainByNameMap,
     domainMap,
@@ -235,8 +286,80 @@ export default function DslCodeEditorPanel({
   });
   dslTextValueRef.current = dslText;
 
-  /** 사전 데이터 로딩 완료 여부 (초기화 시 사전 없이 생성하면 빈 결과) */
-  const hasDictionary = terms.length > 0 || domains.length > 0 || words.length > 0;
+  /**
+   * 에디터 모델 기준 현재 DSL 문자열을 읽는다.
+   *
+   * React state가 아직 동기화되지 않은 직전 입력도 포함하기 위해
+   * Monaco 모델 값을 우선 사용한다.
+   *
+   * @returns 현재 DSL 문자열
+   */
+  const readCurrentDslText = useCallback(() => {
+    return editorRef.current?.getModel()?.getValue() ?? dslTextValueRef.current;
+  }, []);
+
+  /**
+   * 현재 텍스트가 persisted ERD에서 생성한 bootstrap fallback 그대로인지 판단한다.
+   *
+   * 이 경우에는 shared draft가 아직 bootstrap되지 않은 상태에서 로컬 fallback을
+   * 다시 Y.Doc shared draft로 덮어쓰면 안 된다.
+   *
+   * @returns generated fallback write를 건너뛰어야 하면 true
+   */
+  const shouldSkipGeneratedFallbackSharedDraftWrite = useCallback(() => {
+    if (draftHydrationSourceRef.current !== 'generated') {
+      return false;
+    }
+
+    const generatedFallbackText = generatedFallbackTextRef.current;
+    if (!generatedFallbackText) {
+      return false;
+    }
+
+    return readCurrentDslText() === generatedFallbackText;
+  }, [readCurrentDslText]);
+
+  /**
+   * code 모드 shared draft text/baseline을 즉시 Y.Doc에 반영한다.
+   *
+   * debounce 대기 중 페이지 이탈/모드 전환/언마운트가 발생해도
+   * 최신 초안이 세션 간 복원 경로에 남도록 사용한다.
+   *
+   * @returns 없음
+   */
+  const flushSharedDraftTextImmediately = useCallback(() => {
+    if (!persistDraft || !draftHydrated || !ydoc) {
+      return;
+    }
+
+    if (shouldSkipGeneratedFallbackSharedDraftWrite()) {
+      return;
+    }
+
+    if (sharedDraftTextSyncTimerRef.current) {
+      clearTimeout(sharedDraftTextSyncTimerRef.current);
+      sharedDraftTextSyncTimerRef.current = null;
+    }
+
+    writeCodeModeSharedDraftTextSnapshot(
+      ydoc,
+      readCurrentDslText(),
+      draftBaselineRevisionRef.current,
+      readCurrentDslText().trim().length === 0,
+      CODE_MODE_SHARED_DRAFT_TEXT_ORIGIN,
+    );
+    onPersistCodeModeSnapshot?.();
+  }, [
+    draftHydrated,
+    onPersistCodeModeSnapshot,
+    persistDraft,
+    readCurrentDslText,
+    shouldSkipGeneratedFallbackSharedDraftWrite,
+    ydoc,
+  ]);
+
+  /** 사전 데이터 로딩 완료 여부 */
+  const hasDictionary = isDictionaryReady;
 
   /** ERD → DSL 생성 함수 (useCodeEditorRefresh에 전달) */
   const generate = useCallback(
@@ -359,24 +482,13 @@ export default function DslCodeEditorPanel({
     }, [dslText, getFormattedDslTextForApply, handleDslChange]),
     onManualApplySuccess: useCallback(() => {
       const previewPositionChanges = previewGraph
-        ? buildPersistedPreviewPositionChanges(
-            previewGraph.nodes,
-            useCanvasStore.getState().nodes as TableNode[],
-            previewPositionOverrides,
-          )
+        ? useCanvasStore
+            .getState()
+            .applyPreviewPositionChangesToPersisted(previewGraph.nodes, previewPositionOverrides)
         : [];
-      if (previewPositionChanges.length > 0) {
-        const persistedPositionChanges: NodeChange[] = previewPositionChanges.map((change) => ({
-          id: change.nodeId,
-          type: 'position',
-          position: change.position,
-          dragging: false,
-        }));
-        useCanvasStore.getState().onNodesChange(persistedPositionChanges);
-      }
 
       const syncedPreviewNodeIds = new Set(
-        previewPositionChanges.map((change) => change.previewNodeId),
+        previewPositionChanges,
       );
       const remainingPreviewPositions = Object.fromEntries(
         Object.entries(previewPositionOverrides).filter(
@@ -404,6 +516,7 @@ export default function DslCodeEditorPanel({
         text: dslText,
         baselineRevision: nextBaselineRevision,
         previewPositions: remainingPreviewPositions,
+        isIntentionalBlank: dslText.trim().length === 0,
       });
     }, [
       buildCurrentPersistedRevisionHash,
@@ -417,13 +530,6 @@ export default function DslCodeEditorPanel({
       ydoc,
     ]),
   });
-
-  /** 에디터 인스턴스 ref (커서 가드용으로 sync 훅보다 앞에 선언) */
-  const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
-  /** Monaco 인스턴스 ref */
-  const monacoRef = useRef<typeof Monaco | null>(null);
-  /** Monaco mount 완료 여부 */
-  const [monacoReady, setMonacoReady] = useState(false);
 
   // ERD→Code 동기화 시 커서/스크롤 보존 가드
   const { syncCodeChange, isSyncing, shouldIgnoreChange } = useEditorCursorGuard(
@@ -440,8 +546,9 @@ export default function DslCodeEditorPanel({
       parsing,
       hasBlockingErrors: errorCount > 0,
       hasContent: dslText.trim().length > 0,
+      allowPersistedFallback: !draftHydrated || dslText.trim().length > 0,
     }),
-    [dslText, errorCount, parsing, previewGraph],
+    [draftHydrated, dslText, errorCount, parsing, previewGraph],
   );
 
   const { handleUserCodeChange, handleGeneratedCodeChange, clearQueueTimeoutHold, syncStatus } =
@@ -571,9 +678,13 @@ export default function DslCodeEditorPanel({
 
   useEffect(() => {
     setDraftHydrated(!persistDraft);
+    setDraftFallbackHydrationReady(!persistDraft || !delayDraftHydration);
     draftBaselineRevisionRef.current = null;
     pendingDraftRecordRef.current = null;
     lastPersistedDraftRecordRef.current = null;
+    setSharedDraftBootstrapIntentionalBlank(false);
+    generatedFallbackTextRef.current = null;
+    draftHydrationSourceRef.current = null;
     onPreviewPositionOverridesChange?.({});
     previewGraphBuildSeqRef.current += 1;
     if (pendingDraftPersistTimerRef.current) {
@@ -588,10 +699,43 @@ export default function DslCodeEditorPanel({
       clearTimeout(sharedDraftTextSyncTimerRef.current);
       sharedDraftTextSyncTimerRef.current = null;
     }
-  }, [diagramId, onPreviewPositionOverridesChange, persistDraft, projectId, teamId]);
+  }, [
+    delayDraftHydration,
+    diagramId,
+    onPreviewPositionOverridesChange,
+    persistDraft,
+    projectId,
+    teamId,
+  ]);
+
+  useEffect(() => {
+    if (!persistDraft || draftHydrated || !delayDraftHydration) {
+      setDraftFallbackHydrationReady(true);
+      return;
+    }
+
+    setDraftFallbackHydrationReady(false);
+    const timer = setTimeout(() => {
+      setDraftFallbackHydrationReady(true);
+    }, CODE_SHARED_DRAFT_BOOTSTRAP_WAIT_MS);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [delayDraftHydration, draftHydrated, persistDraft]);
+
+  useEffect(() => {
+    if (pendingHydratedTextRef.current != null && dslText === pendingHydratedTextRef.current) {
+      pendingHydratedTextRef.current = null;
+    }
+  }, [dslText]);
 
   useEffect(() => {
     if (!persistDraft || !draftHydrated) {
+      return;
+    }
+
+    if (pendingHydratedTextRef.current != null && dslText !== pendingHydratedTextRef.current) {
       return;
     }
 
@@ -599,6 +743,7 @@ export default function DslCodeEditorPanel({
       text: dslText,
       baselineRevision: draftBaselineRevisionRef.current,
       previewPositions: previewPositionOverrides,
+      isIntentionalBlank: dslText.trim().length === 0,
     };
 
     if (pendingDraftPersistTimerRef.current) {
@@ -624,49 +769,155 @@ export default function DslCodeEditorPanel({
   ]);
 
   useEffect(() => {
-    if (!persistDraft || draftHydrated || !hasDictionary) {
+    if (!persistDraft || draftHydrated) {
       return;
     }
 
-    const storedDraft = loadDiagramDslDraftRecord(draftScope);
+    const hasSharedDraftBootstrapState =
+      sharedDraftBootstrapIntentionalBlank || sharedDraftBootstrapText.trim().length > 0;
+    const storedDraft = sanitizeHydrationDraftRecord(
+      loadDiagramDslDraftRecord(draftScope),
+      persistedDiagramHasContent,
+    );
+    const canHydrateFromFallbackSources =
+      hasSharedDraftBootstrapState ||
+      storedDraft != null ||
+      hasNodes ||
+      !persistedDiagramHasContent;
+    if (!canHydrateFromFallbackSources) {
+      return;
+    }
+
+    if (!hasSharedDraftBootstrapState && delayDraftHydration && !draftFallbackHydrationReady) {
+      return;
+    }
+
     const currentBaselineRevision = buildCurrentPersistedRevisionHash();
-    const sharedDraftText = ydoc ? readCodeModeSharedDraftText(ydoc) : '';
     const sharedDraftBaselineRevision = ydoc
       ? readCodeModeSharedDraftBaselineRevision(ydoc)
       : null;
 
-    if (sharedDraftText.trim().length > 0) {
+    if (hasSharedDraftBootstrapState) {
       draftBaselineRevisionRef.current = sharedDraftBaselineRevision ?? currentBaselineRevision;
+      pendingHydratedTextRef.current = sharedDraftBootstrapText;
+      generatedFallbackTextRef.current = null;
+      draftHydrationSourceRef.current = 'shared';
       lastPersistedDraftRecordRef.current = JSON.stringify({
-        text: sharedDraftText,
+        text: sharedDraftBootstrapText,
         baselineRevision: draftBaselineRevisionRef.current,
         previewPositions: {},
+        isIntentionalBlank: sharedDraftBootstrapIntentionalBlank,
       });
       onPreviewPositionOverridesChange?.({});
-      syncCodeChange(sharedDraftText);
+      syncCodeChange(sharedDraftBootstrapText);
     } else if (storedDraft != null) {
       draftBaselineRevisionRef.current = storedDraft.baselineRevision ?? currentBaselineRevision;
+      pendingHydratedTextRef.current = storedDraft.text;
+      generatedFallbackTextRef.current = null;
+      draftHydrationSourceRef.current = 'local';
       lastPersistedDraftRecordRef.current = JSON.stringify({
         text: storedDraft.text,
         baselineRevision: draftBaselineRevisionRef.current,
         previewPositions: storedDraft.previewPositions,
+        isIntentionalBlank: storedDraft.isIntentionalBlank,
       });
       onPreviewPositionOverridesChange?.(storedDraft.previewPositions);
       syncCodeChange(storedDraft.text);
     } else {
+      if (persistedDiagramHasContent && !hasNodes) {
+        return;
+      }
+      const generatedDsl = generateFromErd();
       draftBaselineRevisionRef.current = currentBaselineRevision;
+      pendingHydratedTextRef.current = generatedDsl;
+      generatedFallbackTextRef.current = generatedDsl;
+      draftHydrationSourceRef.current = 'generated';
       onPreviewPositionOverridesChange?.({});
-      executeRefresh();
+      syncCodeChange(generatedDsl);
     }
     setDraftHydrated(true);
   }, [
     buildCurrentPersistedRevisionHash,
     draftHydrated,
     draftScope,
-    executeRefresh,
+    draftFallbackHydrationReady,
+    generateFromErd,
+    hasNodes,
     hasDictionary,
     onPreviewPositionOverridesChange,
+    persistedDiagramHasContent,
     persistDraft,
+    sharedDraftBootstrapIntentionalBlank,
+    sharedDraftBootstrapText,
+    syncCodeChange,
+    ydoc,
+    delayDraftHydration,
+  ]);
+
+  useEffect(() => {
+    if (!persistDraft || !ydoc) {
+      setSharedDraftBootstrapText('');
+      setSharedDraftBootstrapIntentionalBlank(false);
+      return;
+    }
+
+    const yText = getCodeModeSharedDraftText(ydoc);
+    const draftMap = ydoc.getMap('codeModeSharedDraft');
+    const syncBootstrapText = () => {
+      setSharedDraftBootstrapText(yText.toString());
+      setSharedDraftBootstrapIntentionalBlank(readCodeModeSharedDraftIntentionalBlank(ydoc));
+    };
+
+    syncBootstrapText();
+    yText.observe(syncBootstrapText);
+    draftMap.observe(syncBootstrapText);
+    return () => {
+      yText.unobserve(syncBootstrapText);
+      draftMap.unobserve(syncBootstrapText);
+    };
+  }, [persistDraft, ydoc]);
+
+  useEffect(() => {
+    if (
+      !persistDraft ||
+      !draftHydrated ||
+      !ydoc ||
+      (!sharedDraftBootstrapIntentionalBlank && sharedDraftBootstrapText.trim().length === 0) ||
+      draftHydrationSourceRef.current !== 'generated'
+    ) {
+      return;
+    }
+
+    const currentText = readCurrentDslText();
+    const generatedFallbackText = generatedFallbackTextRef.current;
+    if (
+      !generatedFallbackText ||
+      currentText !== generatedFallbackText ||
+      currentText === sharedDraftBootstrapText
+    ) {
+      return;
+    }
+
+    draftBaselineRevisionRef.current =
+      readCodeModeSharedDraftBaselineRevision(ydoc) ?? draftBaselineRevisionRef.current;
+    pendingHydratedTextRef.current = sharedDraftBootstrapText;
+    generatedFallbackTextRef.current = null;
+    draftHydrationSourceRef.current = 'shared';
+    lastPersistedDraftRecordRef.current = JSON.stringify({
+      text: sharedDraftBootstrapText,
+      baselineRevision: draftBaselineRevisionRef.current,
+      previewPositions: {},
+      isIntentionalBlank: sharedDraftBootstrapIntentionalBlank,
+    });
+    onPreviewPositionOverridesChange?.({});
+    syncCodeChange(sharedDraftBootstrapText);
+  }, [
+    draftHydrated,
+    onPreviewPositionOverridesChange,
+    persistDraft,
+    readCurrentDslText,
+    sharedDraftBootstrapIntentionalBlank,
+    sharedDraftBootstrapText,
     syncCodeChange,
     ydoc,
   ]);
@@ -703,20 +954,52 @@ export default function DslCodeEditorPanel({
     }
 
     const flushPendingDraft = () => {
+      const currentText = readCurrentDslText();
+      if (
+        pendingHydratedTextRef.current != null &&
+        currentText !== pendingHydratedTextRef.current
+      ) {
+        return;
+      }
+
+      pendingDraftRecordRef.current = {
+        text: currentText,
+        baselineRevision: draftBaselineRevisionRef.current,
+        previewPositions: previewPositionOverrides,
+        isIntentionalBlank: currentText.trim().length === 0,
+      };
       persistDraftRecordImmediately(pendingDraftRecordRef.current);
+      flushSharedDraftTextImmediately();
     };
 
     if (typeof globalThis.addEventListener === 'function') {
       globalThis.addEventListener('pagehide', flushPendingDraft);
+    }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushPendingDraft();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
     }
 
     return () => {
       if (typeof globalThis.removeEventListener === 'function') {
         globalThis.removeEventListener('pagehide', flushPendingDraft);
       }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
       flushPendingDraft();
     };
-  }, [persistDraft, persistDraftRecordImmediately]);
+  }, [
+    flushSharedDraftTextImmediately,
+    persistDraft,
+    persistDraftRecordImmediately,
+    previewPositionOverrides,
+    readCurrentDslText,
+  ]);
 
   useEffect(() => {
     if (!persistDraft || !draftHydrated || !ydoc) {
@@ -728,14 +1011,8 @@ export default function DslCodeEditorPanel({
     }
 
     sharedDraftTextSyncTimerRef.current = setTimeout(() => {
-      writeCodeModeSharedDraftTextSnapshot(
-        ydoc,
-        dslText,
-        draftBaselineRevisionRef.current,
-        CODE_MODE_SHARED_DRAFT_TEXT_ORIGIN,
-      );
-      sharedDraftTextSyncTimerRef.current = null;
-    }, CODE_DRAFT_PERSIST_IDLE_MS);
+      flushSharedDraftTextImmediately();
+    }, CODE_SHARED_DRAFT_SYNC_IDLE_MS);
 
     return () => {
       if (sharedDraftTextSyncTimerRef.current) {
@@ -743,7 +1020,7 @@ export default function DslCodeEditorPanel({
         sharedDraftTextSyncTimerRef.current = null;
       }
     };
-  }, [draftHydrated, dslText, persistDraft, ydoc]);
+  }, [draftHydrated, dslText, flushSharedDraftTextImmediately, persistDraft, ydoc]);
 
   useEffect(() => {
     if (!onPreviewStateChange) {
@@ -939,7 +1216,8 @@ export default function DslCodeEditorPanel({
         requestId: Date.now(),
       });
     },
-  });
+    });
+
   useCodeEditorTableReveal({
     enabled: !!tableRevealRequest,
     editorReady: monacoReady,

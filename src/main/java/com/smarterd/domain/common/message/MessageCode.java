@@ -35,6 +35,7 @@ public enum MessageCode {
         "error.business.diagram-dictionary-set-change-while-editing"
     ),
     ERROR_BUSINESS_DIAGRAM_CONTENT_INVALID_JSON("error.business.diagram-content-invalid-json"),
+    ERROR_BUSINESS_DIAGRAM_SNAPSHOT_STALE("error.business.diagram-snapshot-stale"),
     ERROR_BUSINESS_DIAGRAM_SAVE_WHILE_EDITING("error.business.diagram-save-while-editing"),
     ERROR_BUSINESS_DICTIONARY_SET_DEFAULT_DELETE_FORBIDDEN("error.business.dictionary-set-default-delete-forbidden"),
     ERROR_BUSINESS_PROJECT_TEAM_MISMATCH("error.business.project-team-mismatch"),

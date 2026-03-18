@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.smarterd.api.diagram.dto.CreateDiagramRequest;
 import com.smarterd.api.diagram.dto.DiagramDetailResponse;
 import com.smarterd.api.diagram.dto.DiagramResponse;
+import com.smarterd.api.diagram.dto.PersistYdocSnapshotRequest;
 import com.smarterd.api.diagram.dto.RenameDiagramRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
@@ -160,6 +161,35 @@ public class DiagramService {
         diagram.updateContent(request.content());
         // content 저장 직후 stale snapshot 우선 로딩을 피하기 위해 기존 스냅샷을 무효화한다.
         diagram.updateYdocSnapshot(null);
+        diagramSnapshotService.evictCachedSnapshot(diagramId);
+    }
+
+    /**
+     * 클라이언트가 보낸 현재 Y.Doc 전체 상태를 persisted snapshot으로 저장한다.
+     *
+     * <p>코드 모드 shared draft를 세션 간 복원할 수 있도록 keepalive/idle 경로에서 사용한다.</p>
+     *
+     * @param loginId   요청 사용자 로그인 ID
+     * @param teamId    팀 ID
+     * @param projectId 프로젝트 ID
+     * @param diagramId 다이어그램 ID
+     * @param request   Y.Doc 스냅샷 저장 요청
+     */
+    @Transactional
+    public void persistYdocSnapshot(
+        String loginId,
+        Long teamId,
+        Long projectId,
+        Long diagramId,
+        PersistYdocSnapshotRequest request
+    ) {
+        final var project = verifyWriteAccess(loginId, teamId, projectId);
+        findDiagramByProjectAndId(project, diagramId);
+        diagramSnapshotService.replaceSnapshotWithClientState(
+            diagramId,
+            request.expectedContentRevision(),
+            request.ydocSnapshot()
+        );
     }
 
     /**
@@ -217,6 +247,7 @@ public class DiagramService {
         final var invalidationCounts = invalidateDictionaryBindings(diagram, dictionarySet);
         diagram.changeDictionarySet(dictionarySet);
         diagram.updateYdocSnapshot(null);
+        diagramSnapshotService.evictCachedSnapshot(diagramId);
         return new UpdateDiagramDictionarySetResponse(
             dictionarySet.getId(),
             invalidationCounts.invalidatedTermBindingCount(),
@@ -239,6 +270,7 @@ public class DiagramService {
         final var resolvedDiagramId = Objects.requireNonNull(diagram.getId());
         diagram.softDelete(loginId);
         diagram.nullifySnapshot();
+        diagramSnapshotService.evictCachedSnapshot(resolvedDiagramId);
         roomManager.discardRoom(resolvedDiagramId);
         diagramSnapshotService.clearCompactionCoolDown(resolvedDiagramId);
     }

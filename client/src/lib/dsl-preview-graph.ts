@@ -61,6 +61,8 @@ export interface DslPreviewCanvasState {
   hasBlockingErrors: boolean;
   /** 코드 입력 내용 존재 여부 */
   hasContent: boolean;
+  /** published ERD fallback 표시 허용 여부 */
+  allowPersistedFallback: boolean;
 }
 
 /** persisted preview 배치 source */

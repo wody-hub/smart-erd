@@ -3,6 +3,7 @@ package com.smarterd.api.diagram;
 import com.smarterd.api.diagram.dto.CreateDiagramRequest;
 import com.smarterd.api.diagram.dto.DiagramDetailResponse;
 import com.smarterd.api.diagram.dto.DiagramResponse;
+import com.smarterd.api.diagram.dto.PersistYdocSnapshotRequest;
 import com.smarterd.api.diagram.dto.RenameDiagramRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
@@ -138,6 +139,31 @@ public class DiagramController {
         @Valid @RequestBody SaveDiagramRequest request
     ) {
         diagramService.saveDiagram(jwt.getSubject(), teamId, projectId, diagramId, request);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 현재 Y.Doc 스냅샷을 즉시 영속화한다.
+     *
+     * @param jwt        인증된 JWT 토큰
+     * @param teamId     팀 ID
+     * @param projectId  프로젝트 ID
+     * @param diagramId  다이어그램 ID
+     * @param request    Y.Doc 스냅샷 저장 요청
+     * @return 204 No Content
+     */
+    @Operation(summary = "Y.Doc 스냅샷 즉시 저장", description = "클라이언트가 보낸 현재 Y.Doc 스냅샷을 즉시 저장한다.")
+    @ApiResponse(responseCode = "204", description = "저장 성공")
+    @ApiResponse(responseCode = "400", description = "다이어그램 미존재 또는 접근 권한 없음")
+    @PostMapping("/{diagramId}/ydoc-snapshot")
+    public ResponseEntity<Void> persistYdocSnapshot(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Parameter(description = "다이어그램 ID") @PathVariable Long diagramId,
+        @Valid @RequestBody PersistYdocSnapshotRequest request
+    ) {
+        diagramService.persistYdocSnapshot(jwt.getSubject(), teamId, projectId, diagramId, request);
         return ResponseEntity.noContent().build();
     }
 

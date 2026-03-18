@@ -27,6 +27,8 @@ export interface DiagramDslDraftRecord {
   baselineRevision: string | null;
   /** code 모드 preview 캔버스의 로컬 위치 override */
   previewPositions: DiagramPreviewPositionRecord;
+  /** 사용자가 의도적으로 빈 코드를 저장했는지 여부 */
+  isIntentionalBlank: boolean;
 }
 
 /**
@@ -85,6 +87,7 @@ function parseDiagramDslDraftRecord(raw: string | null): DiagramDslDraftRecord |
         text: parsed,
         baselineRevision: null,
         previewPositions: {},
+        isIntentionalBlank: parsed.trim().length === 0,
       };
     }
     if (typeof parsed?.text === 'string') {
@@ -93,6 +96,7 @@ function parseDiagramDslDraftRecord(raw: string | null): DiagramDslDraftRecord |
         baselineRevision:
           typeof parsed.baselineRevision === 'string' ? parsed.baselineRevision : null,
         previewPositions: normalizePreviewPositions(parsed.previewPositions),
+        isIntentionalBlank: parsed.isIntentionalBlank === true,
       };
     }
   } catch {
@@ -100,6 +104,7 @@ function parseDiagramDslDraftRecord(raw: string | null): DiagramDslDraftRecord |
       text: raw,
       baselineRevision: null,
       previewPositions: {},
+      isIntentionalBlank: raw.trim().length === 0,
     };
   }
 
@@ -161,6 +166,7 @@ export function saveDiagramDslDraft(scope: DiagramCodeDraftScope, draft: string)
     text: draft,
     baselineRevision: null,
     previewPositions: {},
+    isIntentionalBlank: draft.trim().length === 0,
   });
 }
 

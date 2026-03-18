@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   applyNodeChanges,
   Background,
@@ -28,7 +28,6 @@ import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import type { CodeEditorTableFocusRequest } from '@/lib/code-editor-table-navigation';
 import { findPreviewTableNodeForFocus } from '@/lib/diagram-table-focus';
 import { buildPreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
-import { buildPersistedPreviewPositionChanges } from '@/lib/preview-position-sync';
 import {
   CODE_MODE_SHARED_DRAFT_GRAPH_ORIGIN,
   writeCodeModeSharedDraftGraph,
@@ -86,6 +85,26 @@ function resolvePreviewMessage(
     return translatePreviewMessage(t, 'diagram.workMode.codePreviewEmpty');
   }
   return null;
+}
+
+/**
+ * persisted fallback 사용 중임을 알리는 배너 문구를 계산한다.
+ *
+ * @param t i18n 번역 함수
+ * @param previewState preview 상태
+ * @param isUsingPersistedFallback 현재 persisted fallback 사용 여부
+ * @returns 안내 문구 또는 null
+ */
+function resolveFallbackBannerMessage(
+  t: TFunction,
+  previewState: DslPreviewCanvasState | null,
+  isUsingPersistedFallback: boolean,
+): string | null {
+  if (!isUsingPersistedFallback || previewState?.allowPersistedFallback === false) {
+    return null;
+  }
+
+  return translatePreviewMessage(t, 'diagram.workMode.codePreviewFallback');
 }
 
 interface PreviewCanvasProps {
@@ -226,6 +245,24 @@ function mergePreviewNodesWithLocalOverrides(
 }
 
 /**
+ * persisted ERD 테이블 노드를 preview 전용 노드로 변환한다.
+ *
+ * code 모드 preview가 아직 준비되지 않았거나 일시적으로 비어 있을 때도
+ * 사용자가 기존 published 다이어그램을 계속 볼 수 있도록 한다.
+ *
+ * @param nodes persisted ERD 노드 목록
+ * @returns preview 렌더용 노드 목록
+ */
+function buildPreviewFallbackNodes(nodes: readonly TableNode[]): DslPreviewNode[] {
+  return nodes
+    .filter((node) => node.type === 'table')
+    .map((node) => ({
+      ...node,
+      type: 'previewTable',
+    }));
+}
+
+/**
  * code 모드에서 DSL parse 결과를 읽기 전용 그래프로 보여주는 preview 캔버스.
  *
  * @param props.previewState 현재 DSL preview 상태
@@ -253,13 +290,29 @@ export default function PreviewCanvas({
       persistedEdges: state.edges as ERDEdge[],
     })),
   );
-  const message = resolvePreviewMessage(t, previewState);
   const graph = previewState?.graph;
-  const hasGraph = !!graph && graph.nodes.length > 0;
+  const canUsePersistedFallback = previewState?.allowPersistedFallback ?? true;
+  const fallbackGraph = useMemo(
+    () => ({
+      nodes: buildPreviewFallbackNodes(persistedNodes),
+      edges: persistedEdges,
+    }),
+    [persistedEdges, persistedNodes],
+  );
+  const effectiveGraph =
+    graph ?? (canUsePersistedFallback && fallbackGraph.nodes.length > 0 ? fallbackGraph : null);
+  const hasGraph = !!effectiveGraph && effectiveGraph.nodes.length > 0;
+  const isUsingPersistedFallback = graph == null && effectiveGraph === fallbackGraph && hasGraph;
+  const message = hasGraph ? null : resolvePreviewMessage(t, previewState);
   const blockingBannerMessage =
     hasGraph && previewState?.hasBlockingErrors
       ? translatePreviewMessage(t, 'diagram.workMode.codePreviewBlocked')
       : null;
+  const fallbackBannerMessage = resolveFallbackBannerMessage(
+    t,
+    previewState,
+    isUsingPersistedFallback,
+  );
   const [displayNodes, setDisplayNodes] = useState<DslPreviewNode[]>([]);
   const positionOverridesRef = useRef<DiagramPreviewPositionRecord>(positionOverrides);
   const lastSharedPreviewGraphRef = useRef<string | null>(null);
@@ -271,12 +324,13 @@ export default function PreviewCanvas({
   }, [positionOverrides]);
 
   useEffect(() => {
-    if (!graph) {
+    const sourceGraph = graph ?? (fallbackGraph.nodes.length > 0 ? fallbackGraph : null);
+    if (!sourceGraph) {
       setDisplayNodes([]);
       return;
     }
 
-    const nextNodeIds = new Set(graph.nodes.map((node) => node.id));
+    const nextNodeIds = new Set(sourceGraph.nodes.map((node) => node.id));
     const nextOverrides: DiagramPreviewPositionRecord = {};
     let changed = false;
 
@@ -294,9 +348,12 @@ export default function PreviewCanvas({
     }
 
     setDisplayNodes(
-      mergePreviewNodesWithLocalOverrides(graph.nodes, changed ? nextOverrides : positionOverridesRef.current),
+      mergePreviewNodesWithLocalOverrides(
+        sourceGraph.nodes,
+        changed ? nextOverrides : positionOverridesRef.current,
+      ),
     );
-  }, [graph, onPositionOverridesChange, positionOverrides]);
+  }, [fallbackGraph, graph, onPositionOverridesChange, positionOverrides]);
 
   useEffect(() => {
     if (!ydoc) {
@@ -356,30 +413,18 @@ export default function PreviewCanvas({
    */
   const handleNodeDragStop = useCallback((_event: unknown, node: DslPreviewNode) => {
     const canvasState = useCanvasStore.getState();
-    const persistedPositionChanges = buildPersistedPreviewPositionChanges(
+    const nextOverrides = { ...positionOverridesRef.current };
+    const syncedPreviewNodeIds = canvasState.applyPreviewPositionChangesToPersisted(
       [node],
-      canvasState.nodes as TableNode[],
       { [node.id]: node.position },
     );
-    const nextOverrides = { ...positionOverridesRef.current };
-    if (persistedPositionChanges.length > 0) {
+    if (syncedPreviewNodeIds.length > 0) {
       delete nextOverrides[node.id];
     } else {
       nextOverrides[node.id] = node.position;
     }
     positionOverridesRef.current = nextOverrides;
     onPositionOverridesChange(nextOverrides);
-    if (persistedPositionChanges.length === 0) {
-      return;
-    }
-
-    const reactFlowPositionChanges: NodeChange[] = persistedPositionChanges.map((change) => ({
-      id: change.nodeId,
-      type: 'position',
-      position: change.position,
-      dragging: false,
-    }));
-    canvasState.onNodesChange(reactFlowPositionChanges);
   }, [onPositionOverridesChange]);
 
   /**
@@ -390,8 +435,8 @@ export default function PreviewCanvas({
   const handleResetLayout = useCallback(() => {
     positionOverridesRef.current = {};
     onPositionOverridesChange({});
-    setDisplayNodes(graph?.nodes ?? []);
-  }, [graph?.nodes, onPositionOverridesChange]);
+    setDisplayNodes(effectiveGraph?.nodes ?? []);
+  }, [effectiveGraph?.nodes, onPositionOverridesChange]);
 
   useEffect(() => {
     if (!tableFocusRequest || displayNodes.length === 0) {
@@ -433,7 +478,7 @@ export default function PreviewCanvas({
       {hasGraph ? (
         <ReactFlow
           nodes={displayNodes}
-          edges={graph!.edges}
+          edges={effectiveGraph!.edges}
           onInit={(instance) => {
             reactFlowInstanceRef.current = instance;
           }}
@@ -472,10 +517,10 @@ export default function PreviewCanvas({
         <div className="h-full w-full bg-background" />
       )}
 
-      {blockingBannerMessage && (
+      {(blockingBannerMessage || fallbackBannerMessage) && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 max-w-[calc(100%-2rem)] -translate-x-1/2 px-4">
           <div className="rounded-md border border-amber-500/30 bg-background/92 px-3 py-2 text-xs text-amber-700 shadow-sm backdrop-blur dark:text-amber-300">
-            {blockingBannerMessage}
+            {blockingBannerMessage ?? fallbackBannerMessage}
           </div>
         </div>
       )}

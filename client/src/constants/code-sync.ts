@@ -7,6 +7,15 @@ export const CODE_AUTO_APPLY_IDLE_MS = 1800;
 /** code 모드 DSL draft localStorage 저장 대기 시간 (ms) */
 export const CODE_DRAFT_PERSIST_IDLE_MS = 500;
 
+/** code 모드 shared draft Y.Doc 동기화 대기 시간 (ms) */
+export const CODE_SHARED_DRAFT_SYNC_IDLE_MS = 200;
+
+/** code 모드 shared draft Y.Doc snapshot 서버 영속화 대기 시간 (ms) */
+export const CODE_SHARED_DRAFT_SERVER_PERSIST_IDLE_MS = 100;
+
+/** code 모드 remote shared draft bootstrap 대기 시간 (ms) */
+export const CODE_SHARED_DRAFT_BOOTSTRAP_WAIT_MS = 1200;
+
 /** code 모드 preview graph 생성 대기 시간 (ms) */
 export const CODE_PREVIEW_GRAPH_IDLE_MS = 300;
 

@@ -199,6 +199,7 @@
       "codeDslOnly": "Phase 1 supports the DSL tab only",
       "codePreviewParsing": "Building the DSL preview ERD.",
       "codePreviewBlocked": "Fix the DSL errors to show the preview ERD.",
+      "codePreviewFallback": "Showing the saved diagram for now.",
       "codePreviewEmpty": "Add DSL tables to show the preview ERD.",
       "codeDraftConflict": "The persisted ERD changed since this code draft started. Refresh the code before applying."
     },

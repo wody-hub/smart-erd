@@ -14,7 +14,9 @@ import {
 } from '@/constants/canvas-history';
 import { djb2 } from '@/lib/hash';
 import { extractColId } from '@/lib/handle-id';
-import type { ERDEdgeData, TableGroup, TableNodeData } from '@/types/erd';
+import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
+import type { ERDEdgeData, TableGroup, TableNode, TableNodeData } from '@/types/erd';
+import type { DslPreviewNode } from '@/lib/dsl-preview-graph';
 import {
   deleteColumnFromYArray,
   createWaypointsYArray,
@@ -27,6 +29,7 @@ import {
   yTablesMapToNodes,
 } from '@/collaboration/yjsBridge';
 import type { EdgeRoutingType, Waypoint } from '@/types/erd';
+import { buildPersistedPreviewPositionChanges } from '@/lib/preview-position-sync';
 import {
   parseEdgeHandleSelectionValue,
   resolveEdgeHandlesFromPreference,
@@ -62,6 +65,7 @@ type CanvasSyncActionKeys =
   | 'resetEdgeWaypoints'
   | 'normalizeEdgeHandles'
   | 'applyLayout'
+  | 'applyPreviewPositionChangesToPersisted'
   | 'serialize';
 
 /**
@@ -657,6 +661,49 @@ export function createCanvasSyncActions(
           }
         }
       }, CANVAS_HISTORY_ORIGIN.USER_LAYOUT);
+    },
+
+    applyPreviewPositionChangesToPersisted: (
+      previewNodes: readonly DslPreviewNode[],
+      positionOverrides: DiagramPreviewPositionRecord,
+    ) => {
+      const { ydoc, nodes } = get();
+      const persistedPositionChanges = buildPersistedPreviewPositionChanges(
+        previewNodes,
+        nodes as TableNode[],
+        positionOverrides,
+      );
+      if (persistedPositionChanges.length === 0) {
+        return [];
+      }
+
+      if (!ydoc) {
+        const reactFlowPositionChanges: NodeChange[] = persistedPositionChanges.map((change) => ({
+          id: change.nodeId,
+          type: 'position',
+          position: change.position,
+          dragging: false,
+        }));
+        get().onNodesChange(reactFlowPositionChanges);
+        return persistedPositionChanges.map((change) => change.previewNodeId);
+      }
+
+      ydoc.transact(() => {
+        const tablesMap = getTablesMap(ydoc);
+        for (const change of persistedPositionChanges) {
+          const tableYMap = tablesMap.get(change.nodeId);
+          if (!tableYMap) {
+            continue;
+          }
+          const positionYMap = tableYMap.get('position');
+          if (positionYMap instanceof Y.Map) {
+            positionYMap.set('x', change.position.x);
+            positionYMap.set('y', change.position.y);
+          }
+        }
+      }, DRAG_TRANSACTION_ORIGIN);
+      set({ nodes: yTablesMapToNodes(getTablesMap(ydoc)) });
+      return persistedPositionChanges.map((change) => change.previewNodeId);
     },
 
     serialize: () => {

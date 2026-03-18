@@ -1,6 +1,8 @@
 package com.smarterd.domain.diagram.service;
 
 import com.smarterd.config.websocket.WebSocketProperties;
+import com.smarterd.domain.common.exception.ConflictException;
+import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.diagram.repository.SnapshotWithRevision;
 import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
@@ -138,6 +140,69 @@ public class DiagramSnapshotService implements SmartLifecycle {
      */
     public Optional<SnapshotWithRevision> loadSnapshotWithRevision(Long diagramId) {
         return diagramRepository.findYdocSnapshotWithRevisionById(diagramId);
+    }
+
+    /**
+     * 캐시된 persisted snapshot을 제거한다.
+     *
+     * REST 저장 등으로 snapshot을 무효화한 직후 stale cache가 handoff에 재사용되지 않게 한다.
+     *
+     * @param diagramId 다이어그램 ID
+     */
+    public void evictCachedSnapshot(Long diagramId) {
+        snapshotCache.remove(diagramId);
+    }
+
+    /**
+     * 클라이언트가 보낸 현재 Y.Doc 전체 상태로 persisted snapshot을 즉시 교체한다.
+     *
+     * <p>코드 모드의 shared draft가 페이지 이탈 직전에도 세션 간 복원될 수 있도록
+     * keepalive 요청에서 사용한다.</p>
+     *
+     * @param diagramId               다이어그램 ID
+     * @param expectedContentRevision 클라이언트가 기준으로 삼은 contentRevision
+     * @param fullStateUpdate         클라이언트가 보낸 현재 Y.Doc 전체 상태 update
+     * @return 저장 성공 여부
+     */
+    @Transactional
+    public boolean replaceSnapshotWithClientState(
+        Long diagramId,
+        String expectedContentRevision,
+        byte[] fullStateUpdate
+    ) {
+        if (fullStateUpdate == null || fullStateUpdate.length == 0) {
+            return false;
+        }
+
+        final var contentRevision = diagramRepository.findContentRevisionForUpdate(diagramId);
+        if (contentRevision == null) {
+            log.warn("클라이언트 snapshot 저장 실패: 다이어그램 미존재 (id={})", diagramId);
+            return false;
+        }
+        if (!String.valueOf(contentRevision).equals(expectedContentRevision)) {
+            throw new ConflictException(MessageCode.ERROR_BUSINESS_DIAGRAM_SNAPSHOT_STALE.code());
+        }
+
+        final var snapshot = YjsUpdateFormat.encode(List.of(fullStateUpdate));
+        final var updated = diagramRepository.updateYdocSnapshotAndRevisionById(
+            diagramId,
+            snapshot,
+            contentRevision
+        );
+        if (updated == 0) {
+            log.warn("클라이언트 snapshot 저장 실패: UPDATE 실패 (id={})", diagramId);
+            return false;
+        }
+
+        snapshotCache.put(diagramId, snapshot);
+        roomManager.replaceUpdates(diagramId, fullStateUpdate);
+        log.info(
+            "클라이언트 Y.Doc 스냅샷 저장 완료: diagramId={}, size={}bytes, snapshotRevision={}",
+            diagramId,
+            snapshot.length,
+            contentRevision
+        );
+        return true;
     }
 
     /**

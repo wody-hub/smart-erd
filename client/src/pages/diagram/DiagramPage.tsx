@@ -1,10 +1,11 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import * as Y from 'yjs';
+import { isAxiosError } from 'axios';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useHotkeys } from 'react-hotkeys-hook';
-import type * as Y from 'yjs';
 import { useShallow } from 'zustand/react/shallow';
 import DiagramCollaboratorsBar from '@/components/erd/DiagramCollaboratorsBar';
 import { DiagramCodeNavigationProvider } from '@/components/erd/DiagramCodeNavigationContext';
@@ -23,8 +24,14 @@ import { DiagramWorkModeProvider } from '@/components/erd/DiagramWorkModeContext
 import Spinner from '@/components/ui/spinner';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useCollaborationStore from '@/stores/erd/useCollaborationStore';
-import { fetchDiagram, saveDiagram } from '@/api/diagramApi';
-import { isTextInputLikeTarget } from '@/constants/canvas-history';
+import {
+  fetchDiagram,
+  persistDiagramYdocSnapshot,
+  persistDiagramYdocSnapshotKeepalive,
+  saveDiagram,
+} from '@/api/diagramApi';
+import { CANVAS_HISTORY_ORIGIN, isTextInputLikeTarget } from '@/constants/canvas-history';
+import { CODE_SHARED_DRAFT_SERVER_PERSIST_IDLE_MS } from '@/constants/code-sync';
 import { queryKeys } from '@/constants/query-keys';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { getErrorMessage } from '@/lib/api-error';
@@ -49,6 +56,7 @@ import type { DslPreviewCanvasState } from '@/lib/dsl-preview-graph';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import {
   readCodeModeSharedDraftGraph,
+  CODE_MODE_SHARED_DRAFT_TEXT_ORIGIN,
   getCodeModeSharedDraftMap,
 } from '@/lib/code-mode-shared-draft';
 import type { PreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
@@ -119,6 +127,12 @@ export default function DiagramPage() {
   const prevPreviewSyncStatusRef = useRef<'inactive' | 'syncing' | 'live' | 'degraded'>('inactive');
   /** 다이어그램 전환 직후 1회 평가 스킵 가드 */
   const skipLatchEvalRef = useRef(false);
+  /** code 모드 shared draft snapshot 서버 저장 debounce 타이머 */
+  const codeModeSnapshotPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** code 모드 shared draft snapshot 서버 저장 진행 중 여부 */
+  const codeModeSnapshotPersistInFlightRef = useRef(false);
+  /** code 모드 shared draft snapshot 서버 저장 필요 여부 */
+  const codeModeSnapshotPersistDirtyRef = useRef(false);
 
   const { canEdit } = useTeamRole(teamId);
   const workModeCapabilities = useMemo(
@@ -284,6 +298,7 @@ export default function DiagramPage() {
 
   // Y.Doc + YjsProvider 라이프사이클 관리
   const { providerRef, isPreviewMode, previewSyncStatus } = useYjsCollaboration(diagram, diagramId);
+
   useEffect(() => {
     if (!ydoc) {
       setSharedCodeModeDraftGraph(null);
@@ -352,6 +367,112 @@ export default function DiagramPage() {
     setWorkMode(nextMode);
   }, []);
 
+  /**
+   * 현재 Y.Doc 전체 상태를 서버 persisted snapshot으로 저장한다.
+   *
+   * code 모드 shared draft를 세션 종료/재접속 후에도 복원할 수 있도록
+   * 로컬 update를 주기적으로 snapshot에 반영한다.
+   *
+   * @param useKeepalive keepalive fetch 사용 여부
+   * @returns 없음
+   */
+  const persistCodeModeSnapshotNow = useCallback(
+    async (useKeepalive = false) => {
+      if (!teamId || !projectId || !diagramId || !ydoc) {
+        return;
+      }
+      if (!diagram?.contentRevision) {
+        return;
+      }
+
+      const nextSnapshot = Y.encodeStateAsUpdate(ydoc);
+      if (nextSnapshot.length === 0) {
+        codeModeSnapshotPersistDirtyRef.current = false;
+        return;
+      }
+
+      if (useKeepalive) {
+        codeModeSnapshotPersistDirtyRef.current = false;
+        persistDiagramYdocSnapshotKeepalive(
+          teamId,
+          projectId,
+          diagramId,
+          diagram.contentRevision,
+          nextSnapshot,
+        );
+        return;
+      }
+
+      if (codeModeSnapshotPersistInFlightRef.current) {
+        codeModeSnapshotPersistDirtyRef.current = true;
+        return;
+      }
+
+      codeModeSnapshotPersistInFlightRef.current = true;
+      codeModeSnapshotPersistDirtyRef.current = false;
+      try {
+        await persistDiagramYdocSnapshot(
+          teamId,
+          projectId,
+          diagramId,
+          diagram.contentRevision,
+          nextSnapshot,
+        );
+      } catch (error) {
+        if (isAxiosError(error) && error.response?.status === 409) {
+          codeModeSnapshotPersistDirtyRef.current = false;
+          console.warn('[DiagramPage] code mode snapshot persist skipped due to stale content revision');
+          return;
+        }
+        codeModeSnapshotPersistDirtyRef.current = true;
+        console.warn('[DiagramPage] code mode snapshot persist failed:', error);
+      } finally {
+        codeModeSnapshotPersistInFlightRef.current = false;
+        if (codeModeSnapshotPersistDirtyRef.current) {
+          if (codeModeSnapshotPersistTimerRef.current) {
+            clearTimeout(codeModeSnapshotPersistTimerRef.current);
+          }
+          codeModeSnapshotPersistTimerRef.current = setTimeout(() => {
+            void persistCodeModeSnapshotNow();
+          }, CODE_SHARED_DRAFT_SERVER_PERSIST_IDLE_MS);
+        }
+      }
+    },
+    [diagram?.contentRevision, diagramId, projectId, teamId, ydoc],
+  );
+
+  /**
+   * code 모드 snapshot 서버 저장을 debounce 예약한다.
+   *
+   * @returns 없음
+   */
+  const scheduleCodeModeSnapshotPersist = useCallback(() => {
+    codeModeSnapshotPersistDirtyRef.current = true;
+    if (codeModeSnapshotPersistTimerRef.current) {
+      clearTimeout(codeModeSnapshotPersistTimerRef.current);
+    }
+    codeModeSnapshotPersistTimerRef.current = setTimeout(() => {
+      void persistCodeModeSnapshotNow();
+    }, CODE_SHARED_DRAFT_SERVER_PERSIST_IDLE_MS);
+  }, [persistCodeModeSnapshotNow]);
+
+  /**
+   * code 모드 shared draft text flush 직후 snapshot 저장을 즉시 시작한다.
+   *
+   * 일반 입력 경로에서는 keepalive 대신 즉시 서버 저장을 시작해
+   * 재접속 직후에도 draft가 복원될 가능성을 높인다.
+   *
+   * @returns 없음
+   */
+  const requestImmediateCodeModeSnapshotPersist = useCallback(() => {
+    if (codeModeSnapshotPersistTimerRef.current) {
+      clearTimeout(codeModeSnapshotPersistTimerRef.current);
+      codeModeSnapshotPersistTimerRef.current = null;
+    }
+    codeModeSnapshotPersistDirtyRef.current = false;
+    void persistCodeModeSnapshotNow();
+  }, [persistCodeModeSnapshotNow]);
+
   useHotkeys(
     KEYBINDINGS.UNDO,
     (event) => {
@@ -395,6 +516,68 @@ export default function DiagramPage() {
       setDslPreviewState(null);
     }
   }, [workModeCapabilities.canvasSource]);
+
+  useEffect(() => {
+    if (!workModeCapabilities.persistCodeDraft || !ydoc || !teamId || !projectId || !diagramId) {
+      if (codeModeSnapshotPersistTimerRef.current) {
+        clearTimeout(codeModeSnapshotPersistTimerRef.current);
+        codeModeSnapshotPersistTimerRef.current = null;
+      }
+      codeModeSnapshotPersistDirtyRef.current = false;
+      return;
+    }
+
+    const handleDocUpdate = (_update: Uint8Array, origin: unknown) => {
+      if (
+        origin === 'remote' ||
+        origin === CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE ||
+        origin === CODE_MODE_SHARED_DRAFT_TEXT_ORIGIN
+      ) {
+        return;
+      }
+      scheduleCodeModeSnapshotPersist();
+    };
+
+    const flushKeepalive = () => {
+      if (!codeModeSnapshotPersistDirtyRef.current) {
+        return;
+      }
+      if (codeModeSnapshotPersistTimerRef.current) {
+        clearTimeout(codeModeSnapshotPersistTimerRef.current);
+        codeModeSnapshotPersistTimerRef.current = null;
+      }
+      void persistCodeModeSnapshotNow(true);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushKeepalive();
+      }
+    };
+
+    ydoc.on('update', handleDocUpdate);
+    globalThis.addEventListener('pagehide', flushKeepalive);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      ydoc.off('update', handleDocUpdate);
+      globalThis.removeEventListener('pagehide', flushKeepalive);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      flushKeepalive();
+      if (codeModeSnapshotPersistTimerRef.current) {
+        clearTimeout(codeModeSnapshotPersistTimerRef.current);
+        codeModeSnapshotPersistTimerRef.current = null;
+      }
+    };
+  }, [
+    diagramId,
+    persistCodeModeSnapshotNow,
+    projectId,
+    scheduleCodeModeSnapshotPersist,
+    teamId,
+    workModeCapabilities.persistCodeDraft,
+    ydoc,
+  ]);
 
   useEffect(() => {
     if (prevLatchKeyRef.current !== latchKey) {
@@ -554,6 +737,17 @@ export default function DiagramPage() {
                           onPreviewPositionOverridesChange={setDslPreviewPositionOverrides}
                           onNavigateToTable={handleNavigateToTableFromEditor}
                           tableRevealRequest={tableCodeRevealRequest}
+                          delayDraftHydration={
+                            workModeCapabilities.persistCodeDraft &&
+                            !!diagram?.hasYdocSnapshot &&
+                            isPreviewMode
+                          }
+                          persistedDiagramHasContent={!!diagram?.content}
+                          onPersistCodeModeSnapshot={
+                            workModeCapabilities.persistCodeDraft
+                              ? requestImmediateCodeModeSnapshotPersist
+                              : undefined
+                          }
                           onDslPreviewStateChange={
                             workModeCapabilities.canvasSource === 'preview'
                               ? setDslPreviewState

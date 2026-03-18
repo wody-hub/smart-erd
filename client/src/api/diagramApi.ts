@@ -1,4 +1,6 @@
 import axiosInstance from './axiosInstance';
+import { STORAGE_KEYS } from '@/constants/storage';
+import { getApiBaseUrl } from '@/lib/platform';
 import type {
   DiagramSummary,
   DiagramDetail,
@@ -7,6 +9,26 @@ import type {
 import type { WsTicketIssueResponse } from '@/types/collaboration';
 
 export type { DiagramSummary, DiagramDetail };
+
+/**
+ * Uint8Array를 base64 문자열로 인코딩한다.
+ *
+ * @param bytes 인코딩할 바이트 배열
+ * @returns base64 문자열
+ */
+function encodeBytesToBase64(bytes: Uint8Array): string {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(bytes).toString('base64');
+  }
+
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, Math.min(index + chunkSize, bytes.length));
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
 
 /**
  * 프로젝트의 다이어그램 목록을 조회한다.
@@ -77,6 +99,68 @@ export async function saveDiagram(
   await axiosInstance.put(`/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`, {
     content,
   });
+}
+
+/**
+ * 현재 Y.Doc 스냅샷을 서버에 즉시 저장한다.
+ *
+ * @param teamId 팀 ID
+ * @param projectId 프로젝트 ID
+ * @param diagramId 다이어그램 ID
+ * @param ydocSnapshot 현재 Y.Doc 전체 상태 update
+ * @returns 없음
+ */
+export async function persistDiagramYdocSnapshot(
+  teamId: string,
+  projectId: string,
+  diagramId: string,
+  expectedContentRevision: string,
+  ydocSnapshot: Uint8Array,
+): Promise<void> {
+  await axiosInstance.post(`/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/ydoc-snapshot`, {
+    expectedContentRevision,
+    ydocSnapshot: encodeBytesToBase64(ydocSnapshot),
+  });
+}
+
+/**
+ * 현재 Y.Doc 스냅샷을 keepalive fetch로 서버에 저장한다.
+ *
+ * 페이지 이탈 직전에도 draft가 남을 수 있도록 `pagehide` 경로에서 사용한다.
+ *
+ * @param teamId 팀 ID
+ * @param projectId 프로젝트 ID
+ * @param diagramId 다이어그램 ID
+ * @param ydocSnapshot 현재 Y.Doc 전체 상태 update
+ * @returns 요청 시작 여부
+ */
+export function persistDiagramYdocSnapshotKeepalive(
+  teamId: string,
+  projectId: string,
+  diagramId: string,
+  expectedContentRevision: string,
+  ydocSnapshot: Uint8Array,
+): boolean {
+  const accessToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+  const language = localStorage.getItem(STORAGE_KEYS.LANGUAGE) || navigator.language || 'en';
+  const requestUrl = `${getApiBaseUrl()}/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/ydoc-snapshot`;
+  const requestBody = JSON.stringify({
+    expectedContentRevision,
+    ydocSnapshot: encodeBytesToBase64(ydocSnapshot),
+  });
+
+  void fetch(requestUrl, {
+    method: 'POST',
+    keepalive: true,
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept-Language': language,
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: requestBody,
+  }).catch(() => undefined);
+
+  return true;
 }
 
 /**

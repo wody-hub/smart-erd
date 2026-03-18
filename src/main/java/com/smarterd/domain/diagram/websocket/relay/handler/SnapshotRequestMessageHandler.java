@@ -55,10 +55,7 @@ public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
             final var roomSessionCount = roomManager.getSessionCount(context.diagramId());
             final var pendingUpdates =
                 roomSessionCount > 1 ? roomManager.peekMergedUpdates(context.diagramId()) : new byte[0];
-            final var cachedSnapshot =
-                roomSessionCount > 1
-                    ? snapshotService.getCachedSnapshot(context.diagramId())
-                    : java.util.Optional.<byte[]>empty();
+            final var cachedSnapshot = snapshotService.getCachedSnapshot(context.diagramId());
 
             final byte[] snapshot;
             if (pendingUpdates.length > 0) {
