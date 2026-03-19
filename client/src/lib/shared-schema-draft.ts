@@ -191,6 +191,36 @@ export function hasSharedSchemaDraftContent(snapshot: SharedSchemaDraftSnapshot 
 }
 
 /**
+ * persisted 반영 이후 shared schema draft를 완전히 비워도 되는지 판정한다.
+ *
+ * `ERD 적용`/`최종 저장` 직후에는 shared schema draft가 구조를 더 이상 담지 않으면서
+ * positions만 남는 경우가 있다. 이 상태는 code 모드 footer에서 다시 dirty로
+ * 판정되는 원인이 되므로, post-apply reconcile 시에는 clean 상태로 정리한다.
+ *
+ * @param snapshot 현재 shared schema draft snapshot
+ * @param appliedSchemaHash 방금 persisted에 반영한 schema hash
+ * @returns shared schema draft를 clear해도 되면 true
+ */
+export function shouldClearSharedSchemaDraftAfterPersistedApply(
+  snapshot: SharedSchemaDraftSnapshot | null,
+  appliedSchemaHash: string | null,
+): boolean {
+  if (!snapshot) {
+    return false;
+  }
+
+  if (!hasSharedSchemaDraftContent(snapshot)) {
+    return Object.keys(snapshot.positions).length > 0;
+  }
+
+  return (
+    snapshot.schemaHash != null &&
+    appliedSchemaHash != null &&
+    snapshot.schemaHash === appliedSchemaHash
+  );
+}
+
+/**
  * shared schema draft snapshot 전체를 저장한다.
  *
  * @param doc 대상 Y.Doc

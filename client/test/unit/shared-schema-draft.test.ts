@@ -8,6 +8,7 @@ import {
   clearSharedSchemaDraft,
   hasSharedSchemaDraftContent,
   readSharedSchemaDraftSnapshot,
+  shouldClearSharedSchemaDraftAfterPersistedApply,
   writeSharedSchemaDraftPositions,
   writeSharedSchemaDraftSnapshot,
 } from '../../src/lib/shared-schema-draft.js';
@@ -138,6 +139,70 @@ test('writeSharedSchemaDraftPositions 는 위치 정보만 갱신한다', () => 
   assert.deepEqual(snapshot.positions, {
     'preview-table:dept': { x: 10, y: 20 },
   });
+});
+
+test('shouldClearSharedSchemaDraftAfterPersistedApply 는 schema hash 가 일치하면 clear 대상으로 본다', () => {
+  assert.equal(
+    shouldClearSharedSchemaDraftAfterPersistedApply(
+      {
+        mode: 'dsl',
+        baselineRevision: 'rev-apply',
+        schemaHash: 'schema-hash-apply',
+        tables: [{ name: 'dept', columns: [] }],
+        relations: [],
+        positions: {
+          'preview-table:dept': { x: 10, y: 20 },
+        },
+        isIntentionalBlank: false,
+        isConfirmedBlank: false,
+        updatedAt: null,
+      },
+      'schema-hash-apply',
+    ),
+    true,
+  );
+});
+
+test('shouldClearSharedSchemaDraftAfterPersistedApply 는 positions-only draft 도 clear 대상으로 본다', () => {
+  assert.equal(
+    shouldClearSharedSchemaDraftAfterPersistedApply(
+      {
+        mode: 'dsl',
+        baselineRevision: 'rev-position-only',
+        schemaHash: null,
+        tables: [],
+        relations: [],
+        positions: {
+          'preview-table:dept': { x: 10, y: 20 },
+        },
+        isIntentionalBlank: false,
+        isConfirmedBlank: false,
+        updatedAt: null,
+      },
+      null,
+    ),
+    true,
+  );
+});
+
+test('shouldClearSharedSchemaDraftAfterPersistedApply 는 완전히 빈 draft 는 clear 대상으로 보지 않는다', () => {
+  assert.equal(
+    shouldClearSharedSchemaDraftAfterPersistedApply(
+      {
+        mode: 'dsl',
+        baselineRevision: null,
+        schemaHash: null,
+        tables: [],
+        relations: [],
+        positions: {},
+        isIntentionalBlank: false,
+        isConfirmedBlank: false,
+        updatedAt: null,
+      },
+      null,
+    ),
+    false,
+  );
 });
 
 test('clearSharedSchemaDraft 는 snapshot 전체를 제거한다', () => {

@@ -40,6 +40,7 @@ import {
   hasSharedSchemaDraftContent,
   readSharedSchemaDraftSnapshot,
   SHARED_SCHEMA_DRAFT_ORIGIN,
+  shouldClearSharedSchemaDraftAfterPersistedApply,
   writeSharedSchemaDraftSnapshot,
   type SharedSchemaDraftSnapshot,
 } from '@/lib/shared-schema-draft';
@@ -697,20 +698,22 @@ export default function DslCodeEditorPanel({
     }
 
     const currentSharedSchemaDraft = readSharedSchemaDraftSnapshot(ydoc);
-    const shouldClearSharedSchemaDraft =
-      hasSharedSchemaDraftContent(currentSharedSchemaDraft) &&
-      currentSharedSchemaDraft.schemaHash != null &&
-      appliedSchemaHash != null &&
-      currentSharedSchemaDraft.schemaHash === appliedSchemaHash;
+    const shouldClearSharedSchemaDraft = shouldClearSharedSchemaDraftAfterPersistedApply(
+      currentSharedSchemaDraft,
+      appliedSchemaHash,
+    );
 
     if (shouldClearSharedSchemaDraft) {
       clearSharedSchemaDraft(ydoc, SHARED_SCHEMA_DRAFT_ORIGIN);
       clearCodeModeSharedDraft(ydoc, SHARED_SCHEMA_DRAFT_ORIGIN);
+      onPreviewPositionOverridesChange?.({});
       return;
     }
 
     if (!hasSharedSchemaDraftContent(currentSharedSchemaDraft)) {
+      clearSharedSchemaDraft(ydoc, SHARED_SCHEMA_DRAFT_ORIGIN);
       clearCodeModeSharedDraft(ydoc, SHARED_SCHEMA_DRAFT_ORIGIN);
+      onPreviewPositionOverridesChange?.({});
       return;
     }
 
