@@ -22,6 +22,7 @@ import {
   createWaypointsYArray,
   getEdgesMap,
   getGroupsMap,
+  setTableYMapPosition,
   getTablesMap,
   yDocToJson,
   yEdgesMapToEdges,
@@ -65,6 +66,7 @@ type CanvasSyncActionKeys =
   | 'resetEdgeWaypoints'
   | 'normalizeEdgeHandles'
   | 'applyLayout'
+  | 'finalizeNodeDrag'
   | 'applyPreviewPositionChangesToPersisted'
   | 'serialize';
 
@@ -81,6 +83,12 @@ export function createCanvasSyncActions(
   set: CanvasSetState,
   get: CanvasGetState,
 ): Pick<CanvasState, CanvasSyncActionKeys> {
+  function isFinitePosition(
+    position: { x: number; y: number } | null | undefined,
+  ): position is { x: number; y: number } {
+    return !!position && Number.isFinite(position.x) && Number.isFinite(position.y);
+  }
+
   /**
    * 노드 position 변경을 대기 큐에 적재한다.
    *
@@ -96,7 +104,11 @@ export function createCanvasSyncActions(
       return;
     }
     for (const change of posChanges) {
-      if (change.type === 'position' && 'position' in change && change.position) {
+      if (
+        change.type === 'position' &&
+        'position' in change &&
+        isFinitePosition(change.position)
+      ) {
         ctx.pending.set(change.id, change.position);
       }
     }
@@ -120,15 +132,14 @@ export function createCanvasSyncActions(
     ydoc.transact(() => {
       const yMap = getYMap(ydoc);
       for (const [nodeId, pos] of ctx.pending) {
+        if (!isFinitePosition(pos)) {
+          continue;
+        }
         const nodeYMap = yMap.get(nodeId);
         if (!nodeYMap) {
           continue;
         }
-        const posYMap = nodeYMap.get('position') as Y.Map<number> | undefined;
-        if (posYMap) {
-          posYMap.set('x', pos.x);
-          posYMap.set('y', pos.y);
-        }
+        setTableYMapPosition(nodeYMap, pos);
       }
     }, DRAG_TRANSACTION_ORIGIN);
     ctx.pending.clear();
@@ -254,7 +265,8 @@ export function createCanvasSyncActions(
           get().internal.hasDeferredTableSync = true;
           return;
         }
-        set({ nodes: yTablesMapToNodes(tablesMap) });
+        const nextNodes = yTablesMapToNodes(tablesMap);
+        set({ nodes: nextNodes });
       };
       internal.edgesObserver = () => {
         set({ edges: yEdgesMapToEdges(edgesMap) });
@@ -329,6 +341,7 @@ export function createCanvasSyncActions(
 
     onNodesChange: (changes) => {
       const internal = get().internal;
+      const hasPositionChanges = changes.some((change) => change.type === 'position');
 
       let shouldSyncDeferredTables = false;
       for (const change of changes) {
@@ -351,6 +364,10 @@ export function createCanvasSyncActions(
         set({
           nodes: fastNodes ?? (applyNodeChanges(changes, currentNodes) as CanvasState['nodes']),
         });
+      }
+
+      if (hasPositionChanges) {
+        return;
       }
 
       queuePositionToYDoc(changes, internal.tablePositionQueue);
@@ -654,13 +671,28 @@ export function createCanvasSyncActions(
           if (!tableYMap) {
             continue;
           }
-          const posYMap = tableYMap.get('position') as Y.Map<number> | undefined;
-          if (posYMap) {
-            posYMap.set('x', node.position.x);
-            posYMap.set('y', node.position.y);
-          }
+          setTableYMapPosition(tableYMap, node.position);
         }
       }, CANVAS_HISTORY_ORIGIN.USER_LAYOUT);
+    },
+
+    finalizeNodeDrag: (nodePositions) => {
+      const internal = get().internal;
+      for (const entry of nodePositions ?? []) {
+        if (!isFinitePosition(entry.position)) {
+          continue;
+        }
+        internal.tablePositionQueue.pending.set(entry.nodeId, entry.position);
+      }
+      internal.isNodeDragging = false;
+      flushQueuedPositionsToYDoc(internal.tablePositionQueue, getTablesMap);
+      if (internal.hasDeferredTableSync) {
+        internal.hasDeferredTableSync = false;
+        const doc = get().ydoc;
+        if (doc) {
+          set({ nodes: yTablesMapToNodes(getTablesMap(doc)) });
+        }
+      }
     },
 
     applyPreviewPositionChangesToPersisted: (
@@ -691,15 +723,14 @@ export function createCanvasSyncActions(
       ydoc.transact(() => {
         const tablesMap = getTablesMap(ydoc);
         for (const change of persistedPositionChanges) {
+          if (!isFinitePosition(change.position)) {
+            continue;
+          }
           const tableYMap = tablesMap.get(change.nodeId);
           if (!tableYMap) {
             continue;
           }
-          const positionYMap = tableYMap.get('position');
-          if (positionYMap instanceof Y.Map) {
-            positionYMap.set('x', change.position.x);
-            positionYMap.set('y', change.position.y);
-          }
+          setTableYMapPosition(tableYMap, change.position);
         }
       }, DRAG_TRANSACTION_ORIGIN);
       set({ nodes: yTablesMapToNodes(getTablesMap(ydoc)) });

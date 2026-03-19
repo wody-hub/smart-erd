@@ -11,6 +11,7 @@ import type {
 } from '../types/erd.js';
 import type { Column } from '../types/erd.js';
 import type { TableNode } from '../types/erd.js';
+import type { DiagramPreviewPositionRecord } from './diagram-code-draft.js';
 import { resolvePreservedWaypoints } from './edge-presentation-restore.js';
 import {
   buildRelationKey,
@@ -445,12 +446,14 @@ function buildPreviewNodes(
 
   return tables.map((table) => {
     const layoutSource = resolvePreviewLayoutSource(table, sourceMaps);
+    const nodeHeight = calculatePreviewNodeHeight(table.columns.length);
 
     return {
       id: buildPreviewTableNodeId(table.name),
       type: 'previewTable',
       position: layoutSource?.position ?? { x: 0, y: 0 },
       width: PREVIEW_NODE_WIDTH,
+      height: nodeHeight,
       data: {
         label: table.name,
         logicalTableName: table.logicalTableName || table.comment,
@@ -572,6 +575,27 @@ function applyPreviewPersistedLayout(
 }
 
 /**
+ * draft 위치 override를 preview 노드 위치에 반영한다.
+ *
+ * @param nodes preview 노드 목록
+ * @param positions preview 위치 레코드
+ * @returns 위치 override가 반영된 preview 노드 목록
+ */
+function applyPreviewDraftPositions(
+  nodes: DslPreviewNode[],
+  positions: DiagramPreviewPositionRecord,
+): DslPreviewNode[] {
+  if (Object.keys(positions).length === 0) {
+    return nodes;
+  }
+
+  return nodes.map((node) => ({
+    ...node,
+    position: positions[node.id] ?? node.position,
+  }));
+}
+
+/**
  * layout 완료된 preview 노드와 parsed relation으로 preview 엣지를 만든다.
  *
  * @param nodes layout 완료된 preview 노드 목록
@@ -670,6 +694,7 @@ export function buildPreviewGraphFromDslParsedSchema(
   parsedSchema: DdlParseResult,
   previewLayoutSourceEntries: readonly string[] = [],
   previewEdgePresentationEntries: readonly string[] = [],
+  draftPositions: DiagramPreviewPositionRecord = {},
 ): DslPreviewGraph {
   const sourceMaps = resolvePreviewLayoutSourceMaps(previewLayoutSourceEntries);
   const edgePresentationByRelationKey =
@@ -684,9 +709,14 @@ export function buildPreviewGraphFromDslParsedSchema(
     persistedNodeIds.size > 0
       ? applyPreviewPersistedLayout(baseNodes, persistedNodeIds)
       : applyPreviewDagreLayout(baseNodes, parsedSchema.relations);
-  const edges = buildPreviewEdges(nodes, parsedSchema.relations, edgePresentationByRelationKey);
+  const positionedNodes = applyPreviewDraftPositions(nodes, draftPositions);
+  const edges = buildPreviewEdges(
+    positionedNodes,
+    parsedSchema.relations,
+    edgePresentationByRelationKey,
+  );
 
-  return { nodes, edges };
+  return { nodes: positionedNodes, edges };
 }
 
 /**

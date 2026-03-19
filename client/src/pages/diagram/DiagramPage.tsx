@@ -31,11 +31,12 @@ import {
   saveDiagram,
 } from '@/api/diagramApi';
 import type { DiagramDetail, SaveDiagramResult } from '@/types/diagram';
-import { CANVAS_HISTORY_ORIGIN, isTextInputLikeTarget } from '@/constants/canvas-history';
+import { isTextInputLikeTarget } from '@/constants/canvas-history';
 import { CODE_SHARED_DRAFT_SERVER_PERSIST_IDLE_MS } from '@/constants/code-sync';
 import { queryKeys } from '@/constants/query-keys';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { getErrorMessage } from '@/lib/api-error';
+import { shouldScheduleCodeModeSnapshotPersist } from '@/lib/code-mode-snapshot-persist';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { useSidebarResize, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH } from '@/hooks/useSidebarResize';
 import { toast } from 'sonner';
@@ -54,13 +55,23 @@ import type {
   CodeEditorTableRevealRequest,
 } from '@/lib/code-editor-table-navigation';
 import type { DslPreviewCanvasState } from '@/lib/dsl-preview-graph';
+import {
+  buildPreviewEdgePresentationEntries,
+  buildPreviewGraphFromDslParsedSchema,
+  buildPreviewLayoutSourceEntries,
+} from '@/lib/dsl-preview-graph';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import {
-  readCodeModeSharedDraftGraph,
-  CODE_MODE_SHARED_DRAFT_TEXT_ORIGIN,
-  getCodeModeSharedDraftMap,
-} from '@/lib/code-mode-shared-draft';
-import type { PreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
+  buildParseResultFromSharedSchemaDraft,
+  getSharedSchemaDraftMap,
+  readSharedSchemaDraftSnapshot,
+  SHARED_SCHEMA_DRAFT_ORIGIN,
+  writeSharedSchemaDraftPositions,
+  type SharedSchemaDraftSnapshot,
+  hasSharedSchemaDraftContent,
+} from '@/lib/shared-schema-draft';
+import { buildPreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
+import type { ERDEdge, TableNode } from '@/types/erd';
 
 type CodeModeDraftPersistStatus = 'inactive' | 'dirty' | 'saving' | 'saved' | 'error' | 'stale';
 
@@ -107,12 +118,11 @@ export default function DiagramPage() {
   const [workModeHydrated, setWorkModeHydrated] = useState(false);
   /** code 모드의 DSL preview 상태 */
   const [dslPreviewState, setDslPreviewState] = useState<DslPreviewCanvasState | null>(null);
-  /** code 모드의 로컬 preview 위치 override */
+  /** code 모드의 shared schema draft 위치 정보 */
   const [dslPreviewPositionOverrides, setDslPreviewPositionOverrides] =
     useState<DiagramPreviewPositionRecord>({});
-  /** shared code mode preview draft overlay graph */
-  const [sharedCodeModeDraftGraph, setSharedCodeModeDraftGraph] =
-    useState<PreviewDraftOverlayGraph | null>(null);
+  /** shared schema draft snapshot */
+  const [sharedSchemaDraft, setSharedSchemaDraft] = useState<SharedSchemaDraftSnapshot | null>(null);
   /** 코드 에디터에서 요청한 테이블 포커스 대상 */
   const [tableFocusRequest, setTableFocusRequest] = useState<CodeEditorTableFocusRequest | null>(null);
   /** ERD에서 요청한 코드 reveal 대상 */
@@ -130,20 +140,20 @@ export default function DiagramPage() {
   const prevPreviewSyncStatusRef = useRef<'inactive' | 'syncing' | 'live' | 'degraded'>('inactive');
   /** 다이어그램 전환 직후 1회 평가 스킵 가드 */
   const skipLatchEvalRef = useRef(false);
-  /** code 모드 shared draft snapshot 서버 저장 debounce 타이머 */
+  /** code 모드 shared schema draft snapshot 서버 저장 debounce 타이머 */
   const codeModeSnapshotPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** code 모드 shared draft snapshot 서버 저장 진행 중 여부 */
+  /** code 모드 shared schema draft snapshot 서버 저장 진행 중 여부 */
   const codeModeSnapshotPersistInFlightRef = useRef(false);
-  /** code 모드 shared draft snapshot 서버 저장 필요 여부 */
+  /** code 모드 shared schema draft snapshot 서버 저장 필요 여부 */
   const codeModeSnapshotPersistDirtyRef = useRef(false);
-  /** code 모드 shared draft snapshot 저장 세대 (최종 저장 후 이전 요청 결과 무시용) */
+  /** code 모드 shared schema draft snapshot 저장 세대 (최종 저장 후 이전 요청 결과 무시용) */
   const codeModeSnapshotPersistEpochRef = useRef(0);
   /** keepalive snapshot 중복 전송 방지용 마지막 발사 시각 */
   const codeModeSnapshotLastKeepaliveAtRef = useRef(0);
-  /** code 모드 draft 서버 저장 상태 */
+  /** code 모드 shared schema draft 서버 저장 상태 */
   const [codeModeDraftPersistStatus, setCodeModeDraftPersistStatus] =
     useState<CodeModeDraftPersistStatus>('inactive');
-  /** code 모드 draft 서버 저장 완료 시각 */
+  /** code 모드 shared schema draft 서버 저장 완료 시각 */
   const [codeModeDraftPersistedAt, setCodeModeDraftPersistedAt] = useState<number | null>(null);
 
   const { canEdit } = useTeamRole(teamId);
@@ -174,6 +184,12 @@ export default function DiagramPage() {
   const { ydoc } = useCanvasStore(
     useShallow((state) => ({
       ydoc: state.ydoc,
+    })),
+  );
+  const { persistedNodes, persistedEdges } = useCanvasStore(
+    useShallow((state) => ({
+      persistedNodes: state.nodes as TableNode[],
+      persistedEdges: state.edges as ERDEdge[],
     })),
   );
 
@@ -402,19 +418,21 @@ export default function DiagramPage() {
 
   useEffect(() => {
     if (!ydoc) {
-      setSharedCodeModeDraftGraph(null);
+      setSharedSchemaDraft(null);
       return;
     }
 
-    const draftMap = getCodeModeSharedDraftMap(ydoc);
-    const syncDraftGraph = (_event?: Y.YMapEvent<unknown>) => {
-      setSharedCodeModeDraftGraph(readCodeModeSharedDraftGraph(ydoc));
+    const draftMap = getSharedSchemaDraftMap(ydoc);
+    const syncSharedSchemaDraft = (_event?: Y.YMapEvent<unknown>) => {
+      const nextSnapshot = readSharedSchemaDraftSnapshot(ydoc);
+      setSharedSchemaDraft(hasSharedSchemaDraftContent(nextSnapshot) ? nextSnapshot : null);
+      setDslPreviewPositionOverrides(nextSnapshot.positions);
     };
 
-    syncDraftGraph();
-    draftMap.observe(syncDraftGraph);
+    syncSharedSchemaDraft();
+    draftMap.observe(syncSharedSchemaDraft);
     return () => {
-      draftMap.unobserve(syncDraftGraph);
+      draftMap.unobserve(syncSharedSchemaDraft);
     };
   }, [ydoc]);
 
@@ -422,8 +440,24 @@ export default function DiagramPage() {
     if (workModeCapabilities.canvasSource === 'preview' || activeGroupId) {
       return null;
     }
-    return sharedCodeModeDraftGraph;
-  }, [activeGroupId, sharedCodeModeDraftGraph, workModeCapabilities.canvasSource]);
+    if (!sharedSchemaDraft) {
+      return null;
+    }
+
+    const previewGraph = buildPreviewGraphFromDslParsedSchema(
+      buildParseResultFromSharedSchemaDraft(sharedSchemaDraft),
+      buildPreviewLayoutSourceEntries(persistedNodes),
+      buildPreviewEdgePresentationEntries(persistedNodes, persistedEdges),
+      sharedSchemaDraft.positions,
+    );
+    return buildPreviewDraftOverlayGraph(previewGraph, persistedNodes, persistedEdges);
+  }, [
+    activeGroupId,
+    persistedEdges,
+    persistedNodes,
+    sharedSchemaDraft,
+    workModeCapabilities.canvasSource,
+  ]);
   const workModeRuntimeState = useMemo(
     () =>
       resolveDiagramWorkModeRuntimeState({
@@ -467,6 +501,29 @@ export default function DiagramPage() {
   const handleWorkModeChange = useCallback((nextMode: DiagramWorkMode) => {
     setWorkMode(nextMode);
   }, []);
+
+  /**
+   * code 모드 shared schema draft 위치 정보를 갱신한다.
+   *
+   * 신규 draft 테이블 위치는 shared schema draft에 저장하고,
+   * 기존 persisted 테이블 위치는 PreviewCanvas 내부에서 persisted Y.Doc에 즉시 반영한다.
+   *
+   * @param nextPositions 다음 preview 위치 레코드
+   * @returns 없음
+   */
+  const handleSharedSchemaDraftPositionsChange = useCallback(
+    (nextPositions: DiagramPreviewPositionRecord) => {
+      setDslPreviewPositionOverrides(nextPositions);
+      if (!ydoc && Object.keys(nextPositions).length === 0) {
+        return;
+      }
+      if (!ydoc) {
+        return;
+      }
+      writeSharedSchemaDraftPositions(ydoc, nextPositions, SHARED_SCHEMA_DRAFT_ORIGIN);
+    },
+    [ydoc],
+  );
 
   /**
    * 현재 Y.Doc 전체 상태를 서버 persisted snapshot으로 저장한다.
@@ -682,11 +739,7 @@ export default function DiagramPage() {
     }
 
     const handleDocUpdate = (_update: Uint8Array, origin: unknown) => {
-      if (
-        origin === 'remote' ||
-        origin === CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE ||
-        origin === CODE_MODE_SHARED_DRAFT_TEXT_ORIGIN
-      ) {
+      if (!shouldScheduleCodeModeSnapshotPersist(origin)) {
         return;
       }
       scheduleCodeModeSnapshotPersist();
@@ -887,7 +940,7 @@ export default function DiagramPage() {
                           dslOnly={workModeCapabilities.dslOnlyCodeEditor}
                           workMode={workMode}
                           previewPositionOverrides={dslPreviewPositionOverrides}
-                          onPreviewPositionOverridesChange={setDslPreviewPositionOverrides}
+                          onPreviewPositionOverridesChange={handleSharedSchemaDraftPositionsChange}
                           onNavigateToTable={handleNavigateToTableFromEditor}
                           tableRevealRequest={tableCodeRevealRequest}
                           delayDraftHydration={
@@ -946,7 +999,7 @@ export default function DiagramPage() {
                         diagramName={diagramName || 'diagram'}
                         tableFocusRequest={tableFocusRequest}
                         positionOverrides={dslPreviewPositionOverrides}
-                        onPositionOverridesChange={setDslPreviewPositionOverrides}
+                        onPositionOverridesChange={handleSharedSchemaDraftPositionsChange}
                         canOpenDictionary={
                           !!dictionaryContextSetId && workModeRuntimeState.canOpenDictionaryManagement
                         }

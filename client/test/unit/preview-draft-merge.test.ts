@@ -60,7 +60,7 @@ test('buildPreviewDraftOverlayGraph 는 기존 persisted 테이블의 draft 변�
 
   assert.ok(overlayGraph);
   assert.equal(overlayGraph.nodes.length, 1);
-  assert.equal(overlayGraph.nodes[0]?.id, 'preview-table:users');
+  assert.equal(overlayGraph.nodes[0]?.id, 'draft-overlay:preview-table:users');
   assert.equal(overlayGraph.nodes[0]?.type, 'previewTable');
   assert.deepEqual(overlayGraph.nodes[0]?.position, { x: 120, y: 180 });
 });

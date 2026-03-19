@@ -10,7 +10,11 @@ import type {
   Waypoint,
 } from '@/types/erd';
 import type { DdlParseResult, ParsedColumn, ParsedRelation, ParsedTable } from '@/lib/ddl-parser';
-import { createEdgeYMap, createTableYMap } from '@/collaboration/yjsBridge';
+import {
+  createEdgeYMap,
+  createTableYMap,
+  syncLegacyWaypointsInEdgeYMap,
+} from '@/collaboration/yjsBridge';
 import { extractColId } from '@/lib/handle-id';
 import { extractHandleSide } from '@/lib/handle-id';
 import {
@@ -339,6 +343,18 @@ export function populateFromDdl(
       nextTargetSide: targetSide,
       waypoints: restoredEdgePresentation?.waypoints,
     });
+    const edgeYMap = createEdgeYMap(
+      parent.nodeId,
+      child.nodeId,
+      sourceHandle,
+      targetHandle,
+      'non-identifying',
+      routingType,
+      preservedWaypoints,
+      handleMode,
+      sourceSide,
+      targetSide,
+    );
     edgesMap.set(
       buildStableEdgeId({
         parentTable: relation.parentTable,
@@ -346,19 +362,9 @@ export function populateFromDdl(
         childTable: relation.childTable,
         childColumn: relation.childColumn,
       }),
-      createEdgeYMap(
-        parent.nodeId,
-        child.nodeId,
-        sourceHandle,
-        targetHandle,
-        'non-identifying',
-        routingType,
-        preservedWaypoints,
-        handleMode,
-        sourceSide,
-        targetSide,
-      ),
+      edgeYMap,
     );
+    syncLegacyWaypointsInEdgeYMap(edgeYMap);
   });
 }
 

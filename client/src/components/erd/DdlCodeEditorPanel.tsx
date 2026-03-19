@@ -94,7 +94,7 @@ interface DdlCodeEditorPanelProps {
   workMode?: DiagramWorkMode;
   /** DSL preview 상태 변경 핸들러 */
   onDslPreviewStateChange?: (previewState: DslPreviewCanvasState | null) => void;
-  /** 코드 draft 저장 활성 여부 */
+  /** shared schema draft 저장 활성 여부 */
   persistDraft?: boolean;
   /** code 모드 preview 위치 override */
   previewPositionOverrides?: DiagramPreviewPositionRecord;
@@ -108,13 +108,13 @@ interface DdlCodeEditorPanelProps {
   delayDraftHydration?: boolean;
   /** 현재 persisted 다이어그램에 저장된 내용 존재 여부 */
   persistedDiagramHasContent?: boolean;
-  /** code 모드 shared draft snapshot 서버 저장 예약 요청 */
+  /** code 모드 shared schema draft snapshot 서버 저장 예약 요청 */
   onScheduleCodeModeSnapshotPersist?: () => void;
-  /** code 모드 shared draft snapshot 저장 상태 즉시 정리 */
+  /** code 모드 shared schema draft snapshot 저장 상태 즉시 정리 */
   onResetCodeModeSnapshotPersistState?: () => void;
-  /** code 모드 draft 서버 저장 상태 */
+  /** code 모드 shared schema draft 서버 저장 상태 */
   codeModeDraftPersistStatus?: CodeModeDraftPersistStatus;
-  /** code 모드 draft 서버 저장 완료 시각 */
+  /** code 모드 shared schema draft 서버 저장 완료 시각 */
   codeModeDraftPersistedAt?: number | null;
   /** code 모드 published 다이어그램 최종 저장 요청 */
   onPersistPublishedDiagram?: () => Promise<boolean>;

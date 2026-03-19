@@ -127,6 +127,9 @@ export interface CanvasState {
     origin?: unknown,
   ) => void;
   applyLayout: (nodes: Node<TableNodeData>[]) => void;
+  finalizeNodeDrag: (
+    nodePositions?: Array<{ nodeId: string; position: { x: number; y: number } }>,
+  ) => void;
   applyPreviewPositionChangesToPersisted: (
     previewNodes: readonly DslPreviewNode[],
     positionOverrides: DiagramPreviewPositionRecord,

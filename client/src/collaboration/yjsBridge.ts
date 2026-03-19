@@ -44,6 +44,61 @@ export function getGroupsMap(doc: Y.Doc): Y.Map<Y.Map<unknown>> {
   return doc.getMap('groups') as Y.Map<Y.Map<unknown>>;
 }
 
+const TABLE_POSITION_X_KEY = 'positionX';
+const TABLE_POSITION_Y_KEY = 'positionY';
+
+function readNodePosition(
+  rawPosition: unknown,
+): { x: number; y: number } | null {
+  if (rawPosition instanceof Y.Map) {
+    if (!rawPosition.doc) {
+      return null;
+    }
+    const x = rawPosition.get('x');
+    const y = rawPosition.get('y');
+    if (typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)) {
+      return { x, y };
+    }
+    return null;
+  }
+
+  if (!rawPosition || typeof rawPosition !== 'object') {
+    return null;
+  }
+
+  const x = (rawPosition as { x?: unknown }).x;
+  const y = (rawPosition as { y?: unknown }).y;
+  if (typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)) {
+    return { x, y };
+  }
+
+  return null;
+}
+
+function readTablePosition(tableYMap: Y.Map<unknown>): { x: number; y: number } | null {
+  const x = tableYMap.get(TABLE_POSITION_X_KEY);
+  const y = tableYMap.get(TABLE_POSITION_Y_KEY);
+  if (typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)) {
+    return { x, y };
+  }
+  return readNodePosition(tableYMap.get('position'));
+}
+
+function ensureLegacyPositionYMap(tableYMap: Y.Map<unknown>): Y.Map<unknown> | null {
+  if (!tableYMap.doc) {
+    return null;
+  }
+
+  const rawPosition = tableYMap.get('position');
+  if (rawPosition instanceof Y.Map && rawPosition.doc) {
+    return rawPosition;
+  }
+
+  const positionYMap = new Y.Map<unknown>();
+  tableYMap.set('position', positionYMap);
+  return positionYMap;
+}
+
 /**
  * Y.Map으로 표현된 테이블들을 React Flow Node 배열로 변환한다.
  *
@@ -54,7 +109,7 @@ export function yTablesMapToNodes(tablesMap: Y.Map<Y.Map<unknown>>): Node<TableN
   const nodes: Node<TableNodeData>[] = [];
 
   tablesMap.forEach((tableYMap, tableId) => {
-    const positionYMap = tableYMap.get('position') as Y.Map<number> | undefined;
+    const position = readTablePosition(tableYMap);
     const columnsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
 
     const columns: Column[] = [];
@@ -78,10 +133,7 @@ export function yTablesMapToNodes(tablesMap: Y.Map<Y.Map<unknown>>): Node<TableN
     nodes.push({
       id: tableId,
       type: 'table',
-      position: {
-        x: positionYMap?.get('x') ?? 100,
-        y: positionYMap?.get('y') ?? 100,
-      },
+      position: position ?? { x: 100, y: 100 },
       data: {
         label: (tableYMap.get('label') as string) ?? 'Untitled',
         logicalTableName: (tableYMap.get('logicalTableName') as string) ?? undefined,
@@ -204,21 +256,20 @@ export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
 
       for (const edge of edgesArray) {
         const edgeData = edge.data;
-        edgesMap.set(
-          edge.id,
-          createEdgeYMap(
-            edge.source,
-            edge.target,
-            edge.sourceHandle ?? undefined,
-            edge.targetHandle ?? undefined,
-            edgeData?.relationType,
-            edgeData?.routingType,
-            edgeData?.waypoints,
-            edgeData?.handleMode,
-            edgeData?.sourceSide,
-            edgeData?.targetSide,
-          ),
+        const edgeYMap = createEdgeYMap(
+          edge.source,
+          edge.target,
+          edge.sourceHandle ?? undefined,
+          edge.targetHandle ?? undefined,
+          edgeData?.relationType,
+          edgeData?.routingType,
+          edgeData?.waypoints,
+          edgeData?.handleMode,
+          edgeData?.sourceSide,
+          edgeData?.targetSide,
         );
+        edgesMap.set(edge.id, edgeYMap);
+        syncLegacyWaypointsInEdgeYMap(edgeYMap);
       }
 
       for (const rawGroup of groupsArray) {
@@ -407,20 +458,73 @@ export function createWaypointsYArray(waypoints: Waypoint[]): Y.Array<Y.Map<unkn
  * @returns waypoint 배열
  */
 export function readWaypointsFromEdgeYMap(edgeYMap: Y.Map<unknown>): Waypoint[] {
-  const waypointsYArray = edgeYMap.get('waypoints') as Y.Array<Y.Map<unknown>> | undefined;
-  if (!waypointsYArray || waypointsYArray.length === 0) {
+  const rawWaypoints = edgeYMap.get('waypoints');
+  if (rawWaypoints instanceof Y.Array) {
+    if (!rawWaypoints.doc || rawWaypoints.length === 0) {
+      return [];
+    }
+
+    const waypoints: Waypoint[] = [];
+    rawWaypoints.forEach((waypointYMap) => {
+      if (!(waypointYMap instanceof Y.Map) || !waypointYMap.doc) {
+        return;
+      }
+      const x = waypointYMap.get('x');
+      const y = waypointYMap.get('y');
+      if (typeof x === 'number' && typeof y === 'number') {
+        waypoints.push({ x, y });
+      }
+    });
+    return waypoints;
+  }
+
+  if (!Array.isArray(rawWaypoints) || rawWaypoints.length === 0) {
     return [];
   }
 
   const waypoints: Waypoint[] = [];
-  waypointsYArray.forEach((waypointYMap) => {
-    const x = waypointYMap.get('x');
-    const y = waypointYMap.get('y');
+  for (const rawWaypoint of rawWaypoints) {
+    if (!rawWaypoint || typeof rawWaypoint !== 'object') {
+      continue;
+    }
+    const x = (rawWaypoint as { x?: unknown }).x;
+    const y = (rawWaypoint as { y?: unknown }).y;
     if (typeof x === 'number' && typeof y === 'number') {
       waypoints.push({ x, y });
     }
-  });
+  }
   return waypoints;
+}
+
+/**
+ * attached edge Y.Map에 legacy waypoint Y.Array 표현을 함께 유지한다.
+ *
+ * 최신 클라이언트는 plain array도 읽지만, 혼합 버전 환경에서는 legacy Y.Array가 더 안전하다.
+ * detached 생성 단계에서는 plain array를 유지하고, doc에 붙은 뒤에만 승격한다.
+ *
+ * @param edgeYMap 대상 edge Y.Map
+ * @returns 없음
+ */
+export function syncLegacyWaypointsInEdgeYMap(edgeYMap: Y.Map<unknown>): void {
+  if (!edgeYMap.doc) {
+    return;
+  }
+
+  const rawWaypoints = edgeYMap.get('waypoints');
+  if (rawWaypoints instanceof Y.Array) {
+    return;
+  }
+
+  if (!Array.isArray(rawWaypoints) || rawWaypoints.length === 0) {
+    return;
+  }
+
+  const waypoints = readWaypointsFromEdgeYMap(edgeYMap);
+  if (waypoints.length === 0) {
+    return;
+  }
+
+  edgeYMap.set('waypoints', createWaypointsYArray(waypoints));
 }
 
 /**
@@ -458,7 +562,10 @@ export function createEdgeYMap(
     edgeYMap.set('targetSide', targetSide);
   }
   if (Array.isArray(waypoints) && waypoints.length > 0) {
-    edgeYMap.set('waypoints', createWaypointsYArray(waypoints));
+    edgeYMap.set(
+      'waypoints',
+      waypoints.map((waypoint) => ({ x: waypoint.x, y: waypoint.y })),
+    );
   }
   return edgeYMap;
 }
@@ -492,11 +599,7 @@ export function createTableYMap(
 ): Y.Map<unknown> {
   const tableYMap = new Y.Map<unknown>();
   tableYMap.set('label', label);
-
-  const posYMap = new Y.Map<number>();
-  posYMap.set('x', position.x);
-  posYMap.set('y', position.y);
-  tableYMap.set('position', posYMap);
+  setTableYMapPosition(tableYMap, position);
 
   const colsYArray = new Y.Array<Y.Map<unknown>>();
   for (const col of columns) {
@@ -514,6 +617,33 @@ export function createTableYMap(
   }
 
   return tableYMap;
+}
+
+/**
+ * 테이블 Y.Map의 position 필드를 nested Y.Map 형태로 안전하게 갱신한다.
+ *
+ * 기존 값이 plain object여도 nested Y.Map으로 승격한 뒤 x/y를 쓴다.
+ * nested Y.Map은 먼저 attach한 다음 x/y를 기록해서 원격 observe 시점에도
+ * 좌표가 비지 않도록 한다.
+ *
+ * @param tableYMap 대상 테이블 Y.Map
+ * @param position 저장할 좌표
+ * @returns 없음
+ */
+export function setTableYMapPosition(
+  tableYMap: Y.Map<unknown>,
+  position: { x: number; y: number },
+): void {
+  tableYMap.set(TABLE_POSITION_X_KEY, position.x);
+  tableYMap.set(TABLE_POSITION_Y_KEY, position.y);
+
+  const legacyPositionYMap = ensureLegacyPositionYMap(tableYMap);
+  if (!legacyPositionYMap) {
+    return;
+  }
+
+  legacyPositionYMap.set('x', position.x);
+  legacyPositionYMap.set('y', position.y);
 }
 
 /**

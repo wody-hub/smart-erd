@@ -201,7 +201,7 @@
       "codePreviewBlocked": "Fix the DSL errors to show the preview ERD.",
       "codePreviewFallback": "Showing the saved diagram for now.",
       "codePreviewEmpty": "Add DSL tables to show the preview ERD.",
-      "codeDraftConflict": "The persisted ERD changed since this code draft started. Refresh the code before applying."
+      "sharedDraftConflict": "The persisted ERD changed since this shared draft started. Refresh before applying it again."
     },
     "toast": {
       "created": "Diagram created",
@@ -296,11 +296,11 @@
       "failed": "Failed to apply DDL",
       "finalizeSaveButton": "Finalize save",
       "finalizeSavingButton": "Saving...",
-      "draftStatusDirty": "Draft save pending",
-      "draftStatusSaving": "Saving draft",
-      "draftStatusSaved": "Draft saved",
-      "draftStatusError": "Draft save failed",
-      "draftStatusStale": "Draft save paused. Refresh and try again.",
+      "draftStatusDirty": "Shared draft save pending",
+      "draftStatusSaving": "Saving shared draft",
+      "draftStatusSaved": "Shared draft saved",
+      "draftStatusError": "Shared draft save failed",
+      "draftStatusStale": "Shared draft save paused. Refresh and try again.",
       "finalizeApplyRequired": "Apply to ERD before final save",
       "finalizePending": "Final save required",
       "finalizeSaved": "Final save complete",

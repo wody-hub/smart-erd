@@ -1,5 +1,5 @@
 import * as Y from 'yjs';
-import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
+import { CANVAS_HISTORY_ORIGIN, DRAG_TRANSACTION_ORIGIN } from '@/constants/canvas-history';
 import { getWsBaseUrl } from '@/lib/platform';
 import { WS_MSG_TYPE, WS_PRESENCE, WS_RECONNECT } from '@/constants/ws';
 import type {
@@ -116,7 +116,9 @@ export class YjsProvider {
       if (origin === 'remote' || origin === CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE) {
         return;
       }
-      this.sendMessage(WS_MSG_TYPE.YJS_UPDATE, update);
+      const outboundUpdate =
+        origin === DRAG_TRANSACTION_ORIGIN ? Y.encodeStateAsUpdate(this.doc) : update;
+      this.sendMessage(WS_MSG_TYPE.YJS_UPDATE, outboundUpdate);
     };
 
     this.doc.on('update', this.updateHandler);

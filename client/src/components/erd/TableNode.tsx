@@ -419,6 +419,9 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   return (
     <TooltipProvider delayDuration={300}>
       <div
+        data-table-node-kind="persisted"
+        data-table-name={label}
+        data-table-logical-name={logicalTableName ?? ''}
         className={cn(
           'bg-card border border-border rounded shadow-md w-max min-w-[420px]',
           isHighlighted && 'ring-2 ring-primary shadow-lg',

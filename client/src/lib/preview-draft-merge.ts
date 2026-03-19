@@ -3,6 +3,9 @@ import type { TableNodeData, ERDEdge, TableNode } from '../types/erd.js';
 import type { DslPreviewGraph, DslPreviewNode } from './dsl-preview-graph.js';
 import { matchPreviewNodesToPersistedNodes } from './preview-position-sync.js';
 
+/** persisted 캔버스에서 draft overlay 노드에 부여할 고유 ID prefix */
+const PREVIEW_DRAFT_OVERLAY_NODE_ID_PREFIX = 'draft-overlay:';
+
 /** sync/erd 모드에서 표시할 shared draft overlay 그래프 */
 export interface PreviewDraftOverlayGraph {
   /** overlay 노드 목록 */
@@ -66,6 +69,19 @@ function isPreviewNodeEquivalentToPersistedNode(
 }
 
 /**
+ * preview 노드를 persisted overlay 전용 고유 노드 ID로 변환한다.
+ *
+ * persisted 노드와 draft overlay 노드가 같은 React Flow id를 공유하면
+ * 노드 상태가 섞여 협업 렌더가 불안정해질 수 있으므로, overlay는 항상 별도 id를 사용한다.
+ *
+ * @param previewNodeId 원본 preview 노드 ID
+ * @returns overlay 전용 노드 ID
+ */
+function buildPreviewDraftOverlayNodeId(previewNodeId: string): string {
+  return `${PREVIEW_DRAFT_OVERLAY_NODE_ID_PREFIX}${previewNodeId}`;
+}
+
+/**
  * shared preview draft graph를 persisted 캔버스용 overlay 그래프로 변환한다.
  *
  * persisted와 중복되는 테이블/관계는 제외하고, draft 전용 객체와
@@ -87,16 +103,11 @@ export function buildPreviewDraftOverlayGraph(
 
   const matchedNodes = matchPreviewNodesToPersistedNodes(previewGraph.nodes, persistedNodes);
   const persistedEdgeIds = new Set(persistedEdges.map((edge) => edge.id));
-  const overlayEdges = previewGraph.edges
-    .filter((edge) => !persistedEdgeIds.has(edge.id))
-    .map((edge) => ({
-      ...edge,
-      selectable: false,
-      focusable: false,
-    }));
+  const previewNodeIdToOverlayNodeId = new Map<string, string>();
 
+  const draftOnlyEdges = previewGraph.edges.filter((edge) => !persistedEdgeIds.has(edge.id));
   const referencedNodeIds = new Set<string>();
-  for (const edge of overlayEdges) {
+  for (const edge of draftOnlyEdges) {
     referencedNodeIds.add(edge.source);
     referencedNodeIds.add(edge.target);
   }
@@ -108,9 +119,12 @@ export function buildPreviewDraftOverlayGraph(
       if (!shouldRenderVisibleOverlay && !referencedNodeIds.has(node.id)) {
         return [];
       }
+      const overlayNodeId = buildPreviewDraftOverlayNodeId(node.id);
+      previewNodeIdToOverlayNodeId.set(node.id, overlayNodeId);
       return [
         {
           ...node,
+          id: overlayNodeId,
           type: shouldRenderVisibleOverlay ? 'previewTable' : 'previewGhostTable',
           draggable: false,
           selectable: false,
@@ -121,9 +135,12 @@ export function buildPreviewDraftOverlayGraph(
       ];
     }
 
+    const overlayNodeId = buildPreviewDraftOverlayNodeId(node.id);
+    previewNodeIdToOverlayNodeId.set(node.id, overlayNodeId);
     return [
       {
         ...node,
+        id: overlayNodeId,
         type: 'previewTable',
         draggable: false,
         selectable: false,
@@ -132,6 +149,22 @@ export function buildPreviewDraftOverlayGraph(
       } satisfies DslPreviewNode,
     ];
   });
+
+  const overlayEdges: ERDEdge[] = [];
+  for (const edge of draftOnlyEdges) {
+    const source = previewNodeIdToOverlayNodeId.get(edge.source);
+    const target = previewNodeIdToOverlayNodeId.get(edge.target);
+    if (!source || !target) {
+      continue;
+    }
+    overlayEdges.push({
+      ...edge,
+      source,
+      target,
+      selectable: false,
+      focusable: false,
+    });
+  }
 
   if (overlayNodes.length === 0 && overlayEdges.length === 0) {
     return null;

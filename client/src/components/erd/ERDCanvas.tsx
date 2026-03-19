@@ -84,6 +84,13 @@ const edgeTypes: EdgeTypes = {
 const MINIMAP_NODE_LIMIT = 80;
 const EMPTY_EDGE_LOCKS = new Map();
 const EMPTY_EDGE_PREVIEWS = new Map();
+
+function isFiniteCanvasPosition(
+  position: { x: number; y: number } | null | undefined,
+): position is { x: number; y: number } {
+  return !!position && Number.isFinite(position.x) && Number.isFinite(position.y);
+}
+
 function areRoutePointsEqual(left: Waypoint[], right: Waypoint[]): boolean {
   if (left.length !== right.length) {
     return false;
@@ -203,6 +210,7 @@ function ERDCanvas({
   const resetEdgeWaypoints = useCanvasStore((s) => s.resetEdgeWaypoints);
   const normalizeEdgeHandles = useCanvasStore((s) => s.normalizeEdgeHandles);
   const applyLayout = useCanvasStore((s) => s.applyLayout);
+  const finalizeNodeDrag = useCanvasStore((s) => s.finalizeNodeDrag);
   const undo = useCanvasStore((s) => s.undo);
   const redo = useCanvasStore((s) => s.redo);
   const canUndo = useCanvasStore((s) => s.canUndo);
@@ -778,7 +786,33 @@ function ERDCanvas({
                       const latestNode =
                         (reactFlowInstance.getNode(node.id) as Node<TableNodeData> | undefined) ??
                         node;
-                      normalizeEdgeHandles([node.id], [latestNode], DRAG_TRANSACTION_ORIGIN);
+                      const storeNode = useCanvasStore
+                        .getState()
+                        .nodes.find((candidate) => candidate.id === node.id) as
+                        | Node<TableNodeData>
+                        | undefined;
+                      const resolvedPosition = isFiniteCanvasPosition(latestNode.position)
+                        ? latestNode.position
+                        : isFiniteCanvasPosition(node.position)
+                          ? node.position
+                          : isFiniteCanvasPosition(storeNode?.position)
+                            ? storeNode.position
+                            : null;
+                      if (!resolvedPosition) {
+                        return;
+                      }
+                      const normalizedNode =
+                        latestNode.position.x === resolvedPosition.x &&
+                        latestNode.position.y === resolvedPosition.y
+                          ? latestNode
+                          : { ...latestNode, position: resolvedPosition };
+                      finalizeNodeDrag([
+                        {
+                          nodeId: latestNode.id,
+                          position: resolvedPosition,
+                        },
+                      ]);
+                      normalizeEdgeHandles([node.id], [normalizedNode], DRAG_TRANSACTION_ORIGIN);
                       stopHistoryCapture();
                     });
                   }

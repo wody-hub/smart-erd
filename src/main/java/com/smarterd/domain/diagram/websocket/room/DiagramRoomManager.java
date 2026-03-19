@@ -4,6 +4,8 @@ import com.smarterd.config.websocket.WebSocketProperties;
 import com.smarterd.domain.diagram.websocket.model.JoinResult;
 import com.smarterd.domain.diagram.websocket.model.LeaveResult;
 import com.smarterd.domain.diagram.websocket.model.PresenceSnapshot;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -231,6 +233,8 @@ public class DiagramRoomManager {
         final var nonNullDiagramId = Objects.requireNonNull(diagramId, "diagramId must not be null");
         final var nonNullSender = Objects.requireNonNull(sender, "sender must not be null");
         final var nonNullMessage = Objects.requireNonNull(message, "message must not be null");
+        final var payload = copyPayload(nonNullMessage);
+        final var isLast = nonNullMessage.isLast();
 
         final var sessions = sessionRegistry.getSessionsOrEmpty(nonNullDiagramId);
         for (final var session : sessions) {
@@ -240,7 +244,7 @@ public class DiagramRoomManager {
             try {
                 final var lock = getSessionLock(session);
                 synchronized (lock) {
-                    session.sendMessage(nonNullMessage);
+                    session.sendMessage(new BinaryMessage(Arrays.copyOf(payload, payload.length), isLast));
                 }
             } catch (Exception e) {
                 log.warn("메시지 전송 실패 (세션 {})", session.getId(), e);
@@ -526,5 +530,18 @@ public class DiagramRoomManager {
             }
         }
         log.info("다이어그램 {} 방 폐기 완료 ({}개 세션)", nonNullDiagramId, sessions.size());
+    }
+
+    /**
+     * BinaryMessage payload를 세션별 재전송에 안전한 byte 배열로 복사한다.
+     *
+     * @param message 원본 바이너리 메시지
+     * @return 복사된 payload
+     */
+    private byte[] copyPayload(BinaryMessage message) {
+        final ByteBuffer buffer = message.getPayload().asReadOnlyBuffer();
+        final var payload = new byte[buffer.remaining()];
+        buffer.get(payload);
+        return payload;
     }
 }

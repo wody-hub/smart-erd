@@ -7,6 +7,7 @@ import { getColumnWarning } from '@/hooks/useColumnValidation';
 import TableNodeHeader from './TableNodeHeader';
 import StaticColumnRow from './StaticColumnRow';
 import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
+import type { TableNode as PersistedTableNode } from '@/types/erd';
 
 /**
  * preview 테이블 노드에서 연결된 핸들을 수집한다.
@@ -81,6 +82,9 @@ function PreviewTableNodeFrame({
   return (
     <TooltipProvider delayDuration={300}>
       <div
+        data-table-node-kind={ghost ? 'ghost' : 'preview'}
+        data-table-name={node.data.label}
+        data-table-logical-name={node.data.logicalTableName ?? ''}
         className="w-max min-w-[420px] rounded border border-border bg-card shadow-md"
         style={ghost ? { opacity: 0, pointerEvents: 'none' } : undefined}
       >
@@ -240,8 +244,49 @@ function PreviewGhostTableNode(props: NodeProps<DslPreviewNode>) {
   );
 }
 
+/**
+ * persisted table 노드가 preview canvas에 잠깐 섞일 때 사용할 read-only fallback 노드.
+ *
+ * preview 전용 프레임과 컬럼 렌더러를 그대로 재사용해서, 경고는 없애되 persisted 편집 동작은
+ * preview canvas로 새지 않게 유지한다.
+ *
+ * @param props persisted table React Flow 노드 props
+ * @returns preview-safe fallback 노드
+ */
+function PreviewPersistedTableFallbackNode(props: NodeProps<PersistedTableNode>) {
+  const connectedHandles = useConnectedHandles(props.id);
+  const node: DslPreviewNode = {
+    id: props.id,
+    type: 'previewTable',
+    position: { x: props.positionAbsoluteX, y: props.positionAbsoluteY },
+    data: {
+      label: props.data.label,
+      logicalTableName: props.data.logicalTableName,
+      tableTermId: props.data.tableTermId,
+      headerColor: props.data.headerColor,
+      handleLayout: props.data.handleLayout,
+      columns: props.data.columns,
+    },
+  };
+
+  return (
+    <PreviewTableNodeFrame node={node}>
+      <PreviewTableRows
+        node={node}
+        connectedHandles={connectedHandles}
+      />
+    </PreviewTableNodeFrame>
+  );
+}
+
 /** persisted/preview canvas 공통 preview node types */
 export const previewNodeTypes: NodeTypes = {
   previewTable: memo(PreviewTableNode),
   previewGhostTable: memo(PreviewGhostTableNode),
+};
+
+/** preview canvas 전용 superset node types */
+export const previewCanvasNodeTypes: NodeTypes = {
+  table: memo(PreviewPersistedTableFallbackNode),
+  ...previewNodeTypes,
 };

@@ -22,6 +22,7 @@ import {
   getTablesMap,
   moveColumnInYArray,
   removeTableIdFromYArray,
+  syncLegacyWaypointsInEdgeYMap,
 } from '@/collaboration/yjsBridge';
 import type { CanvasGetState, CanvasSetState, CanvasState } from './canvasStoreTypes';
 
@@ -390,6 +391,13 @@ export function createCanvasTableActions(
             sourceColId: pkCol.id,
             targetColId: fkColId,
           });
+          const edgeYMap = createEdgeYMap(
+            parentNodeId,
+            childNodeId,
+            sourceHandle,
+            targetHandle,
+            relationType,
+          );
           getEdgesMap(ydoc).set(
             buildStableEdgeId({
               parentTable: parentNode.data.label,
@@ -397,8 +405,9 @@ export function createCanvasTableActions(
               childTable: childNode.data.label,
               childColumn: fkName,
             }),
-            createEdgeYMap(parentNodeId, childNodeId, sourceHandle, targetHandle, relationType),
+            edgeYMap,
           );
+          syncLegacyWaypointsInEdgeYMap(edgeYMap);
           count += 1;
         }
       }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
@@ -451,16 +460,18 @@ export function createCanvasTableActions(
               targetHandle,
             };
       ydoc.transact(() => {
+        const edgeYMap = createEdgeYMap(
+          source,
+          target,
+          resolvedHandles.sourceHandle,
+          resolvedHandles.targetHandle,
+          relationType,
+        );
         getEdgesMap(ydoc).set(
           edgeId,
-          createEdgeYMap(
-            source,
-            target,
-            resolvedHandles.sourceHandle,
-            resolvedHandles.targetHandle,
-            relationType,
-          ),
+          edgeYMap,
         );
+        syncLegacyWaypointsInEdgeYMap(edgeYMap);
         const colId = extractColId(targetHandle, target);
         const tableYMap = getTablesMap(ydoc).get(target);
         if (tableYMap) {

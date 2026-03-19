@@ -27,16 +27,11 @@ import type { DslPreviewCanvasState, DslPreviewNode } from '@/lib/dsl-preview-gr
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import type { CodeEditorTableFocusRequest } from '@/lib/code-editor-table-navigation';
 import { findPreviewTableNodeForFocus } from '@/lib/diagram-table-focus';
-import { buildPreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
-import {
-  CODE_MODE_SHARED_DRAFT_GRAPH_ORIGIN,
-  writeCodeModeSharedDraftGraph,
-} from '@/lib/code-mode-shared-draft';
 import { useExportDiagram } from '@/hooks/useExportDiagram';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { ERDEdge, TableNode } from '@/types/erd';
 import ErdRelationEdge from './ErdRelationEdge';
-import { previewNodeTypes } from './PreviewTableNodes';
+import { previewCanvasNodeTypes } from './PreviewTableNodes';
 import {
   applyHeaderZoomCssVariables,
   TABLE_HEADER_ZOOM_CHANGE_EPSILON,
@@ -264,6 +259,7 @@ function buildPreviewFallbackNodes(nodes: readonly TableNode[]): DslPreviewNode[
     .map((node) => ({
       ...node,
       type: 'previewTable',
+      height: node.height ?? (52 + node.data.columns.length * 30),
     }));
 }
 
@@ -288,7 +284,6 @@ export default function PreviewCanvas({
   onOpenDictionary,
 }: PreviewCanvasProps) {
   const { t } = useTranslation();
-  const ydoc = useCanvasStore((state) => state.ydoc);
   const { persistedNodes, persistedEdges } = useCanvasStore(
     useShallow((state) => ({
       persistedNodes: state.nodes as TableNode[],
@@ -320,7 +315,6 @@ export default function PreviewCanvas({
   );
   const [displayNodes, setDisplayNodes] = useState<DslPreviewNode[]>([]);
   const positionOverridesRef = useRef<DiagramPreviewPositionRecord>(positionOverrides);
-  const lastSharedPreviewGraphRef = useRef<string | null>(null);
   const reactFlowInstanceRef = useRef<ReactFlowInstance<DslPreviewNode, ERDEdge> | null>(null);
   const lastHandledFocusRequestIdRef = useRef<number | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -410,45 +404,6 @@ export default function PreviewCanvas({
       ),
     );
   }, [fallbackGraph, graph, onPositionOverridesChange, positionOverrides]);
-
-  useEffect(() => {
-    if (!ydoc) {
-      return;
-    }
-
-    if (!previewState?.hasContent) {
-      lastSharedPreviewGraphRef.current = null;
-      writeCodeModeSharedDraftGraph(ydoc, null, CODE_MODE_SHARED_DRAFT_GRAPH_ORIGIN);
-      return;
-    }
-
-    if (!graph || displayNodes.length === 0) {
-      return;
-    }
-
-    const nextGraph = {
-      nodes: displayNodes,
-      edges: graph.edges,
-    };
-    const nextOverlayGraph = buildPreviewDraftOverlayGraph(
-      nextGraph,
-      persistedNodes,
-      persistedEdges,
-    );
-    if (!nextOverlayGraph) {
-      lastSharedPreviewGraphRef.current = null;
-      writeCodeModeSharedDraftGraph(ydoc, null, CODE_MODE_SHARED_DRAFT_GRAPH_ORIGIN);
-      return;
-    }
-
-    const serializedOverlayGraph = JSON.stringify(nextOverlayGraph);
-    if (serializedOverlayGraph === lastSharedPreviewGraphRef.current) {
-      return;
-    }
-
-    lastSharedPreviewGraphRef.current = serializedOverlayGraph;
-    writeCodeModeSharedDraftGraph(ydoc, nextOverlayGraph, CODE_MODE_SHARED_DRAFT_GRAPH_ORIGIN);
-  }, [displayNodes, graph, persistedEdges, persistedNodes, previewState?.hasContent, ydoc]);
 
   /**
    * preview 노드 위치 변경을 화면 상태에 반영한다.
@@ -551,7 +506,7 @@ export default function PreviewCanvas({
           }}
           onNodesChange={handleNodesChange}
           onNodeDragStop={handleNodeDragStop}
-          nodeTypes={previewNodeTypes}
+          nodeTypes={previewCanvasNodeTypes}
           edgeTypes={previewEdgeTypes}
           deleteKeyCode={null}
           panActivationKeyCode={null}
