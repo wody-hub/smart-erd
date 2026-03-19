@@ -14,6 +14,7 @@ export interface DiagramCodeDraftScope {
 interface StorageLike {
   getItem: (key: string) => string | null;
   setItem: (key: string, value: string) => void;
+  removeItem?: (key: string) => void;
 }
 
 /** code 모드 preview 캔버스 로컬 위치 저장 포맷 */
@@ -29,6 +30,8 @@ export interface DiagramDslDraftRecord {
   previewPositions: DiagramPreviewPositionRecord;
   /** 사용자가 의도적으로 빈 코드를 저장했는지 여부 */
   isIntentionalBlank: boolean;
+  /** intentional blank가 실제 사용자 입력으로 확인된 상태인지 여부 */
+  isConfirmedBlank: boolean;
 }
 
 /**
@@ -88,6 +91,7 @@ function parseDiagramDslDraftRecord(raw: string | null): DiagramDslDraftRecord |
         baselineRevision: null,
         previewPositions: {},
         isIntentionalBlank: parsed.trim().length === 0,
+        isConfirmedBlank: false,
       };
     }
     if (typeof parsed?.text === 'string') {
@@ -97,6 +101,7 @@ function parseDiagramDslDraftRecord(raw: string | null): DiagramDslDraftRecord |
           typeof parsed.baselineRevision === 'string' ? parsed.baselineRevision : null,
         previewPositions: normalizePreviewPositions(parsed.previewPositions),
         isIntentionalBlank: parsed.isIntentionalBlank === true,
+        isConfirmedBlank: parsed.isConfirmedBlank === true,
       };
     }
   } catch {
@@ -105,6 +110,7 @@ function parseDiagramDslDraftRecord(raw: string | null): DiagramDslDraftRecord |
       baselineRevision: null,
       previewPositions: {},
       isIntentionalBlank: raw.trim().length === 0,
+      isConfirmedBlank: false,
     };
   }
 
@@ -167,6 +173,7 @@ export function saveDiagramDslDraft(scope: DiagramCodeDraftScope, draft: string)
     baselineRevision: null,
     previewPositions: {},
     isIntentionalBlank: draft.trim().length === 0,
+    isConfirmedBlank: false,
   });
 }
 
@@ -190,5 +197,24 @@ export function saveDiagramDslDraftRecord(
     storage.setItem(key, JSON.stringify(draft));
   } catch {
     // draft 저장 실패는 코드 편집 자체를 막지 않는다.
+  }
+}
+
+/**
+ * 다이어그램 단위 DSL draft 레코드를 제거한다.
+ *
+ * @param scope 팀/프로젝트/다이어그램 식별자
+ * @returns 없음
+ */
+export function clearDiagramDslDraftRecord(scope: DiagramCodeDraftScope): void {
+  const key = buildDiagramDslDraftStorageKey(scope);
+  const storage = getLocalStorage();
+  if (!key || !storage?.removeItem) {
+    return;
+  }
+  try {
+    storage.removeItem(key);
+  } catch {
+    // draft 제거 실패는 코드 편집 자체를 막지 않는다.
   }
 }

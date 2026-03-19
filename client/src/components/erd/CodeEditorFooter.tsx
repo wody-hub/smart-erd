@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Play, RefreshCw, WandSparkles } from 'lucide-react';
+import { Play, RefreshCw, Save, WandSparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 
@@ -36,6 +36,12 @@ interface CodeEditorFooterProps {
   refreshConfirmOpen: boolean;
   /** Refresh 확인 다이얼로그 열림 상태 세터 */
   setRefreshConfirmOpen: (open: boolean) => void;
+  /** code 모드 최종 저장 버튼 클릭 핸들러 */
+  onFinalize?: () => void;
+  /** code 모드 최종 저장 버튼 활성화 여부 */
+  canFinalize?: boolean;
+  /** code 모드 최종 저장 진행 여부 */
+  finalizing?: boolean;
   /** 파싱 상태 표시 영역 (에디터별 커스텀 렌더링) */
   children: ReactNode;
 }
@@ -65,6 +71,9 @@ export default function CodeEditorFooter({
   hasNodes,
   refreshConfirmOpen,
   setRefreshConfirmOpen,
+  onFinalize,
+  canFinalize = false,
+  finalizing = false,
   children,
 }: CodeEditorFooterProps) {
   const { t } = useTranslation();
@@ -81,6 +90,20 @@ export default function CodeEditorFooter({
             <Play className="h-3.5 w-3.5" />
             {t('erd.codeEditor.applyButton')}
           </Button>
+          {onFinalize && (
+            <Button
+              variant="outline"
+              className="gap-1.5"
+              size="sm"
+              onClick={onFinalize}
+              disabled={!canFinalize || finalizing}
+            >
+              <Save className="h-3.5 w-3.5" />
+              {finalizing
+                ? t('erd.codeEditor.finalizeSavingButton')
+                : t('erd.codeEditor.finalizeSaveButton')}
+            </Button>
+          )}
           {onFormat && (
             <Button
               variant="outline"

@@ -10,7 +10,14 @@ export const CODE_DRAFT_PERSIST_IDLE_MS = 500;
 /** code 모드 shared draft Y.Doc 동기화 대기 시간 (ms) */
 export const CODE_SHARED_DRAFT_SYNC_IDLE_MS = 200;
 
-/** code 모드 shared draft Y.Doc snapshot 서버 영속화 대기 시간 (ms) */
+/**
+ * code 모드 shared draft Y.Doc snapshot 서버 영속화 대기 시간 (ms)
+ *
+ * TODO: 현재는 debounce 저장이라, 이 윈도우 안에 서버 재기동/장애가 나면
+ * code 모드의 최신 draft가 세션 간 복원되지 못할 수 있다.
+ * "최대한 빠른 서버 영속"이 필요해지면 구조 변경 감지 즉시 저장 또는 더 짧은
+ * 저장 정책으로 재설계해야 한다.
+ */
 export const CODE_SHARED_DRAFT_SERVER_PERSIST_IDLE_MS = 1500;
 
 /** code 모드 remote shared draft bootstrap 대기 시간 (ms) */

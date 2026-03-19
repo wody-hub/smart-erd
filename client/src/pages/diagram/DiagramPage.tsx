@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import * as Y from 'yjs';
 import { isAxiosError } from 'axios';
 import { ReactFlowProvider } from '@xyflow/react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useShallow } from 'zustand/react/shallow';
@@ -30,6 +30,7 @@ import {
   persistDiagramYdocSnapshotKeepalive,
   saveDiagram,
 } from '@/api/diagramApi';
+import type { DiagramDetail, SaveDiagramResult } from '@/types/diagram';
 import { CANVAS_HISTORY_ORIGIN, isTextInputLikeTarget } from '@/constants/canvas-history';
 import { CODE_SHARED_DRAFT_SERVER_PERSIST_IDLE_MS } from '@/constants/code-sync';
 import { queryKeys } from '@/constants/query-keys';
@@ -60,6 +61,8 @@ import {
   getCodeModeSharedDraftMap,
 } from '@/lib/code-mode-shared-draft';
 import type { PreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
+
+type CodeModeDraftPersistStatus = 'inactive' | 'dirty' | 'saving' | 'saved' | 'error' | 'stale';
 
 const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPanel'));
 
@@ -133,8 +136,18 @@ export default function DiagramPage() {
   const codeModeSnapshotPersistInFlightRef = useRef(false);
   /** code 모드 shared draft snapshot 서버 저장 필요 여부 */
   const codeModeSnapshotPersistDirtyRef = useRef(false);
+  /** code 모드 shared draft snapshot 저장 세대 (최종 저장 후 이전 요청 결과 무시용) */
+  const codeModeSnapshotPersistEpochRef = useRef(0);
+  /** keepalive snapshot 중복 전송 방지용 마지막 발사 시각 */
+  const codeModeSnapshotLastKeepaliveAtRef = useRef(0);
+  /** code 모드 draft 서버 저장 상태 */
+  const [codeModeDraftPersistStatus, setCodeModeDraftPersistStatus] =
+    useState<CodeModeDraftPersistStatus>('inactive');
+  /** code 모드 draft 서버 저장 완료 시각 */
+  const [codeModeDraftPersistedAt, setCodeModeDraftPersistedAt] = useState<number | null>(null);
 
   const { canEdit } = useTeamRole(teamId);
+  const queryClient = useQueryClient();
   const workModeCapabilities = useMemo(
     () => createDiagramWorkModeCapabilities(workMode),
     [workMode],
@@ -183,6 +196,10 @@ export default function DiagramPage() {
     queryFn: () => fetchDiagram(teamId!, projectId!, diagramId!),
     enabled: !!teamId && !!projectId && !!diagramId,
   });
+  const diagramDetailQueryKey = useMemo(
+    () => queryKeys.diagrams.detail(teamId!, projectId!, diagramId!),
+    [diagramId, projectId, teamId],
+  );
 
   // --- 파생값 (useQuery 결과 `diagram`에 의존하므로 그룹7 이후 배치) ---
   /** 빈 다이어그램 여부 */
@@ -194,8 +211,38 @@ export default function DiagramPage() {
   /** 오버레이 표시 조건 */
   const showOverlay = !isPersistedEmptyDiagram && !hasRenderableGraph && !initialLoadComplete;
 
+  /**
+   * 저장 성공 응답을 즉시 detail cache에 반영한다.
+   *
+   * @param savedDiagram 서버가 반환한 최신 저장 메타데이터
+   * @param content 저장한 content JSON
+   * @returns 없음
+   */
+  const applySavedDiagramDetailToCache = useCallback(
+    (savedDiagram: SaveDiagramResult, content: string) => {
+      queryClient.setQueryData(diagramDetailQueryKey, (prev: DiagramDetail | undefined) => {
+        if (!prev) {
+          return prev;
+        }
+        return {
+          ...prev,
+          content,
+          hasYdocSnapshot: savedDiagram.hasYdocSnapshot,
+          contentRevision: savedDiagram.contentRevision,
+          snapshotRevision: savedDiagram.snapshotRevision,
+          snapshotUpdatedAt: savedDiagram.snapshotUpdatedAt,
+          updatedAt: savedDiagram.updatedAt,
+        };
+      });
+    },
+    [diagramDetailQueryKey, queryClient],
+  );
+
   const saveMutation = useMutation({
     mutationFn: (content: string) => saveDiagram(teamId!, projectId!, diagramId!, content),
+    onSuccess: (savedDiagram, content) => {
+      applySavedDiagramDetailToCache(savedDiagram, content);
+    },
   });
 
   /**
@@ -222,6 +269,60 @@ export default function DiagramPage() {
       onError: (err) => toast.error(getErrorMessage(err, t('diagram.toast.backupFailed'))),
     });
   };
+
+  /**
+   * 현재 캔버스 상태를 즉시 persisted 다이어그램으로 저장한다.
+   *
+   * code 모드에서는 `최종 저장` 액션에서 사용하며, draft 저장과 달리
+   * published ERD를 서버에 확정 반영한다.
+   *
+   * @returns 저장 성공 여부
+   */
+  const persistPublishedDiagramNow = useCallback(async (): Promise<boolean> => {
+    if (saveMutation.isPending) {
+      return false;
+    }
+
+    const result = prepareBackup();
+    if (!result) {
+      return true;
+    }
+
+    try {
+      await saveMutation.mutateAsync(result.content);
+      markBackedUp(result.hash);
+      void queryClient.invalidateQueries({ queryKey: diagramDetailQueryKey, exact: true });
+      toast.success(t('diagram.toast.backupSynced'));
+      return true;
+    } catch (error) {
+      toast.error(getErrorMessage(error, t('diagram.toast.backupFailed')));
+      return false;
+    }
+  }, [diagramDetailQueryKey, markBackedUp, prepareBackup, queryClient, saveMutation, t]);
+
+  /**
+   * code 모드 draft snapshot 저장 상태를 즉시 정리한다.
+   *
+   * 최종 저장 뒤에는 stale snapshot 저장 타이머/결과가 UI를 다시 흔들지 않도록
+   * 세대를 증가시켜 이전 in-flight 결과를 무시한다.
+   *
+   * @param nextStatus 정리 후 표시할 상태
+   * @returns 없음
+   */
+  const resetCodeModeSnapshotPersistState = useCallback(
+    (nextStatus: CodeModeDraftPersistStatus = 'saved') => {
+      codeModeSnapshotPersistEpochRef.current += 1;
+      if (codeModeSnapshotPersistTimerRef.current) {
+        clearTimeout(codeModeSnapshotPersistTimerRef.current);
+        codeModeSnapshotPersistTimerRef.current = null;
+      }
+      codeModeSnapshotPersistDirtyRef.current = false;
+      codeModeSnapshotPersistInFlightRef.current = false;
+      setCodeModeDraftPersistStatus(nextStatus);
+      setCodeModeDraftPersistedAt(nextStatus === 'saved' ? Date.now() : null);
+    },
+    [],
+  );
 
   /** 유효성 검사 패널 토글 핸들러 */
   const handleToggleValidation = useCallback(() => setValidationOpen((prev) => !prev), []);
@@ -373,6 +474,10 @@ export default function DiagramPage() {
    * code 모드 shared draft를 세션 종료/재접속 후에도 복원할 수 있도록
    * 로컬 update를 주기적으로 snapshot에 반영한다.
    *
+   * TODO: 이 경로는 debounce/keepalive 기반이라, 마지막 입력 직후 서버가 내려가면
+   * 최신 draft가 snapshot에 반영되기 전에 유실될 수 있다. 기능은 유지하되
+   * durability를 더 높여야 할 시점에는 즉시 저장 조건을 더 공격적으로 가져가야 한다.
+   *
    * @param useKeepalive keepalive fetch 사용 여부
    * @returns 없음
    */
@@ -381,54 +486,111 @@ export default function DiagramPage() {
       if (!teamId || !projectId || !diagramId || !ydoc) {
         return;
       }
-      if (!diagram?.contentRevision) {
+      const cachedDiagramDetail = queryClient.getQueryData<DiagramDetail>(diagramDetailQueryKey);
+      const expectedContentRevision = cachedDiagramDetail?.contentRevision ?? diagram?.contentRevision;
+      if (!expectedContentRevision) {
         return;
       }
+      const requestEpoch = codeModeSnapshotPersistEpochRef.current;
 
       const nextSnapshot = Y.encodeStateAsUpdate(ydoc);
       if (nextSnapshot.length === 0) {
         codeModeSnapshotPersistDirtyRef.current = false;
+        if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
+          setCodeModeDraftPersistStatus('saved');
+        }
         return;
       }
 
       if (useKeepalive) {
+        const now = Date.now();
+        if (now - codeModeSnapshotLastKeepaliveAtRef.current < 1000) {
+          return;
+        }
+        codeModeSnapshotLastKeepaliveAtRef.current = now;
         codeModeSnapshotPersistDirtyRef.current = false;
         persistDiagramYdocSnapshotKeepalive(
           teamId,
           projectId,
           diagramId,
-          diagram.contentRevision,
+          expectedContentRevision,
           nextSnapshot,
         );
+        if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
+          setCodeModeDraftPersistStatus('saved');
+          setCodeModeDraftPersistedAt(now);
+        }
         return;
       }
 
       if (codeModeSnapshotPersistInFlightRef.current) {
         codeModeSnapshotPersistDirtyRef.current = true;
+        setCodeModeDraftPersistStatus('dirty');
         return;
       }
 
       codeModeSnapshotPersistInFlightRef.current = true;
       codeModeSnapshotPersistDirtyRef.current = false;
+      if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
+        setCodeModeDraftPersistStatus('saving');
+      }
       try {
         await persistDiagramYdocSnapshot(
           teamId,
           projectId,
           diagramId,
-          diagram.contentRevision,
+          expectedContentRevision,
           nextSnapshot,
         );
+        if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
+          setCodeModeDraftPersistStatus('saved');
+          setCodeModeDraftPersistedAt(Date.now());
+        }
       } catch (error) {
-        if (isAxiosError(error) && error.response?.status === 409) {
-          codeModeSnapshotPersistDirtyRef.current = false;
-          console.warn('[DiagramPage] code mode snapshot persist skipped due to stale content revision');
+        if (requestEpoch !== codeModeSnapshotPersistEpochRef.current) {
           return;
         }
+        if (isAxiosError(error) && error.response?.status === 409) {
+          try {
+            const latestDiagram = await fetchDiagram(teamId, projectId, diagramId);
+            queryClient.setQueryData(diagramDetailQueryKey, latestDiagram);
+            await persistDiagramYdocSnapshot(
+              teamId,
+              projectId,
+              diagramId,
+              latestDiagram.contentRevision,
+              nextSnapshot,
+            );
+            if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
+              setCodeModeDraftPersistStatus('saved');
+              setCodeModeDraftPersistedAt(Date.now());
+            }
+            return;
+          } catch (retryError) {
+            if (requestEpoch !== codeModeSnapshotPersistEpochRef.current) {
+              return;
+            }
+            if (isAxiosError(retryError) && retryError.response?.status === 409) {
+              codeModeSnapshotPersistDirtyRef.current = true;
+              setCodeModeDraftPersistStatus('dirty');
+              console.warn('[DiagramPage] code mode snapshot persist retried with latest revision but remained stale');
+              return;
+            }
+            codeModeSnapshotPersistDirtyRef.current = true;
+            setCodeModeDraftPersistStatus('error');
+            console.warn('[DiagramPage] code mode snapshot persist retry failed:', retryError);
+            return;
+          }
+        }
         codeModeSnapshotPersistDirtyRef.current = true;
+        setCodeModeDraftPersistStatus('error');
         console.warn('[DiagramPage] code mode snapshot persist failed:', error);
       } finally {
-        codeModeSnapshotPersistInFlightRef.current = false;
+        if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
+          codeModeSnapshotPersistInFlightRef.current = false;
+        }
         if (codeModeSnapshotPersistDirtyRef.current) {
+          setCodeModeDraftPersistStatus('dirty');
           if (codeModeSnapshotPersistTimerRef.current) {
             clearTimeout(codeModeSnapshotPersistTimerRef.current);
           }
@@ -438,7 +600,7 @@ export default function DiagramPage() {
         }
       }
     },
-    [diagram?.contentRevision, diagramId, projectId, teamId, ydoc],
+    [diagram?.contentRevision, diagramDetailQueryKey, diagramId, projectId, queryClient, teamId, ydoc],
   );
 
   /**
@@ -448,6 +610,7 @@ export default function DiagramPage() {
    */
   const scheduleCodeModeSnapshotPersist = useCallback(() => {
     codeModeSnapshotPersistDirtyRef.current = true;
+    setCodeModeDraftPersistStatus('dirty');
     if (codeModeSnapshotPersistTimerRef.current) {
       clearTimeout(codeModeSnapshotPersistTimerRef.current);
     }
@@ -501,6 +664,14 @@ export default function DiagramPage() {
   }, [workModeCapabilities.canvasSource]);
 
   useEffect(() => {
+    if (!workModeCapabilities.persistCodeDraft) {
+      setCodeModeDraftPersistStatus('inactive');
+      setCodeModeDraftPersistedAt(null);
+      return;
+    }
+  }, [workModeCapabilities.persistCodeDraft]);
+
+  useEffect(() => {
     if (!workModeCapabilities.persistCodeDraft || !ydoc || !teamId || !projectId || !diagramId) {
       if (codeModeSnapshotPersistTimerRef.current) {
         clearTimeout(codeModeSnapshotPersistTimerRef.current);
@@ -546,7 +717,6 @@ export default function DiagramPage() {
       ydoc.off('update', handleDocUpdate);
       globalThis.removeEventListener('pagehide', flushKeepalive);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      flushKeepalive();
       if (codeModeSnapshotPersistTimerRef.current) {
         clearTimeout(codeModeSnapshotPersistTimerRef.current);
         codeModeSnapshotPersistTimerRef.current = null;
@@ -729,6 +899,18 @@ export default function DiagramPage() {
                           onScheduleCodeModeSnapshotPersist={
                             workModeCapabilities.persistCodeDraft
                               ? scheduleCodeModeSnapshotPersist
+                              : undefined
+                          }
+                          onResetCodeModeSnapshotPersistState={
+                            workModeCapabilities.persistCodeDraft
+                              ? resetCodeModeSnapshotPersistState
+                              : undefined
+                          }
+                          codeModeDraftPersistStatus={codeModeDraftPersistStatus}
+                          codeModeDraftPersistedAt={codeModeDraftPersistedAt}
+                          onPersistPublishedDiagram={
+                            workModeCapabilities.persistCodeDraft
+                              ? persistPublishedDiagramNow
                               : undefined
                           }
                           onDslPreviewStateChange={

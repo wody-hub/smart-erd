@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildDiagramDslDraftStorageKey,
+  clearDiagramDslDraftRecord,
   loadDiagramDslDraft,
   loadDiagramDslDraftRecord,
   saveDiagramDslDraftRecord,
@@ -29,6 +30,9 @@ test('loadDiagramDslDraft 와 saveDiagramDslDraftRecord 는 localStorage 를 rou
       setItem: (key: string, value: string) => {
         storage.set(key, value);
       },
+      removeItem: (key: string) => {
+        storage.delete(key);
+      },
     },
   });
 
@@ -42,6 +46,7 @@ test('loadDiagramDslDraft 와 saveDiagramDslDraftRecord 는 localStorage 를 rou
           'preview-table:user': { x: 120, y: 240 },
         },
         isIntentionalBlank: false,
+        isConfirmedBlank: false,
       },
     );
     assert.equal(
@@ -57,6 +62,7 @@ test('loadDiagramDslDraft 와 saveDiagramDslDraftRecord 는 localStorage 를 rou
           'preview-table:user': { x: 120, y: 240 },
         },
         isIntentionalBlank: false,
+        isConfirmedBlank: false,
       },
     );
   } finally {
@@ -78,6 +84,9 @@ test('loadDiagramDslDraftRecord 는 legacy plain string 저장값도 호환한�
       setItem: (key: string, value: string) => {
         storage.set(key, value);
       },
+      removeItem: (key: string) => {
+        storage.delete(key);
+      },
     },
   });
 
@@ -90,6 +99,7 @@ test('loadDiagramDslDraftRecord 는 legacy plain string 저장값도 호환한�
         baselineRevision: null,
         previewPositions: {},
         isIntentionalBlank: false,
+        isConfirmedBlank: false,
       },
     );
   } finally {
@@ -110,6 +120,9 @@ test('loadDiagramDslDraftRecord 는 잘못된 previewPositions 값을 무시한�
       getItem: (key: string) => storage.get(key) ?? null,
       setItem: (key: string, value: string) => {
         storage.set(key, value);
+      },
+      removeItem: (key: string) => {
+        storage.delete(key);
       },
     },
   });
@@ -137,6 +150,7 @@ test('loadDiagramDslDraftRecord 는 잘못된 previewPositions 값을 무시한�
           valid: { x: 10, y: 20 },
         },
         isIntentionalBlank: false,
+        isConfirmedBlank: false,
       },
     );
   } finally {
@@ -158,6 +172,9 @@ test('loadDiagramDslDraftRecord 는 intentional blank draft 를 복원한다', (
       setItem: (key: string, value: string) => {
         storage.set(key, value);
       },
+      removeItem: (key: string) => {
+        storage.delete(key);
+      },
     },
   });
 
@@ -169,6 +186,7 @@ test('loadDiagramDslDraftRecord 는 intentional blank draft 를 복원한다', (
         baselineRevision: 'rev-3',
         previewPositions: {},
         isIntentionalBlank: true,
+        isConfirmedBlank: true,
       }),
     );
 
@@ -179,7 +197,97 @@ test('loadDiagramDslDraftRecord 는 intentional blank draft 를 복원한다', (
         baselineRevision: 'rev-3',
         previewPositions: {},
         isIntentionalBlank: true,
+        isConfirmedBlank: true,
       },
+    );
+  } finally {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: original,
+    });
+  }
+});
+
+test('loadDiagramDslDraftRecord 는 구버전 blank draft 를 미확정 상태로 읽는다', () => {
+  const storage = new Map<string, string>();
+  const original = globalThis.localStorage;
+
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        storage.set(key, value);
+      },
+      removeItem: (key: string) => {
+        storage.delete(key);
+      },
+    },
+  });
+
+  try {
+    storage.set(
+      'smart-erd-dsl-draft:team:project:diagram',
+      JSON.stringify({
+        text: '',
+        baselineRevision: 'rev-old',
+        previewPositions: {},
+        isIntentionalBlank: true,
+      }),
+    );
+
+    assert.deepEqual(
+      loadDiagramDslDraftRecord({ teamId: 'team', projectId: 'project', diagramId: 'diagram' }),
+      {
+        text: '',
+        baselineRevision: 'rev-old',
+        previewPositions: {},
+        isIntentionalBlank: true,
+        isConfirmedBlank: false,
+      },
+    );
+  } finally {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: original,
+    });
+  }
+});
+
+test('clearDiagramDslDraftRecord 는 저장된 draft 레코드를 제거한다', () => {
+  const storage = new Map<string, string>();
+  const original = globalThis.localStorage;
+
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        storage.set(key, value);
+      },
+      removeItem: (key: string) => {
+        storage.delete(key);
+      },
+    },
+  });
+
+  try {
+    saveDiagramDslDraftRecord(
+      { teamId: 'team', projectId: 'project', diagramId: 'diagram' },
+      {
+        text: "Table '임시' {}",
+        baselineRevision: 'rev-clear',
+        previewPositions: {},
+        isIntentionalBlank: false,
+        isConfirmedBlank: false,
+      },
+    );
+
+    clearDiagramDslDraftRecord({ teamId: 'team', projectId: 'project', diagramId: 'diagram' });
+
+    assert.equal(
+      loadDiagramDslDraftRecord({ teamId: 'team', projectId: 'project', diagramId: 'diagram' }),
+      null,
     );
   } finally {
     Object.defineProperty(globalThis, 'localStorage', {

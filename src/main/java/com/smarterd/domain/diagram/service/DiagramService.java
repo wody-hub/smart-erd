@@ -11,6 +11,7 @@ import com.smarterd.api.diagram.dto.DiagramResponse;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotRequest;
 import com.smarterd.api.diagram.dto.RenameDiagramRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
+import com.smarterd.api.diagram.dto.SaveDiagramResponse;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetResponse;
 import com.smarterd.domain.common.exception.BusinessException;
@@ -137,8 +138,6 @@ public class DiagramService {
     public DiagramDetailResponse getDiagram(String loginId, Long teamId, Long projectId, Long diagramId) {
         final var project = verifyReadAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
-        // 새로고침 직후에도 최신 상태를 반환하도록 조회 직전에 누적 update를 즉시 flush한다.
-        diagramSnapshotService.flushDiagramSnapshotNow(diagram.getId());
         final var hasSnapshot = diagramRepository.existsYdocSnapshotById(diagramId);
 
         return DiagramDetailResponse.from(diagram, project.getId(), hasSnapshot);
@@ -152,16 +151,22 @@ public class DiagramService {
      * @param projectId  프로젝트 ID
      * @param diagramId  다이어그램 ID
      * @param request    저장 요청 (content)
+     * @return 최신 저장 상태 응답
      */
     @Transactional
-    public void saveDiagram(String loginId, Long teamId, Long projectId, Long diagramId, SaveDiagramRequest request) {
+    public SaveDiagramResponse saveDiagram(
+        String loginId,
+        Long teamId,
+        Long projectId,
+        Long diagramId,
+        SaveDiagramRequest request
+    ) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
 
         diagram.updateContent(request.content());
-        // content 저장 직후 stale snapshot 우선 로딩을 피하기 위해 기존 스냅샷을 무효화한다.
-        diagram.updateYdocSnapshot(null);
         diagramSnapshotService.evictCachedSnapshot(diagramId);
+        return SaveDiagramResponse.from(diagram);
     }
 
     /**

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
 import type { UseMutationResult } from '@tanstack/react-query';
+import type { SaveDiagramResult } from '@/types/diagram';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 
 /** 자동 백업 주기 (밀리초) — 60초 */
@@ -115,7 +116,7 @@ function logAutosaveMetrics(
  * @param diagramId    다이어그램 ID
  */
 export function useAutoBackup(
-  saveMutation: UseMutationResult<void, Error, string>,
+  saveMutation: UseMutationResult<SaveDiagramResult, Error, string>,
   teamId: string,
   projectId: string,
   diagramId: string,

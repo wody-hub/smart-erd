@@ -76,6 +76,7 @@ const DslCodeEditorPanel = lazy(() => import('./DslCodeEditorPanel'));
 /** 코드 에디터 모드 */
 type EditorMode = 'sql' | 'dsl';
 const [OPT_PK, OPT_AI, OPT_NN] = DSL_COLUMN_OPTIONS;
+type CodeModeDraftPersistStatus = 'inactive' | 'dirty' | 'saving' | 'saved' | 'error' | 'stale';
 
 /** DdlCodeEditorPanel 컴포넌트의 props */
 interface DdlCodeEditorPanelProps {
@@ -109,6 +110,14 @@ interface DdlCodeEditorPanelProps {
   persistedDiagramHasContent?: boolean;
   /** code 모드 shared draft snapshot 서버 저장 예약 요청 */
   onScheduleCodeModeSnapshotPersist?: () => void;
+  /** code 모드 shared draft snapshot 저장 상태 즉시 정리 */
+  onResetCodeModeSnapshotPersistState?: () => void;
+  /** code 모드 draft 서버 저장 상태 */
+  codeModeDraftPersistStatus?: CodeModeDraftPersistStatus;
+  /** code 모드 draft 서버 저장 완료 시각 */
+  codeModeDraftPersistedAt?: number | null;
+  /** code 모드 published 다이어그램 최종 저장 요청 */
+  onPersistPublishedDiagram?: () => Promise<boolean>;
 }
 
 /**
@@ -136,6 +145,10 @@ export default function DdlCodeEditorPanel({
   delayDraftHydration = false,
   persistedDiagramHasContent = false,
   onScheduleCodeModeSnapshotPersist,
+  onResetCodeModeSnapshotPersistState,
+  codeModeDraftPersistStatus = 'inactive',
+  codeModeDraftPersistedAt = null,
+  onPersistPublishedDiagram,
 }: DdlCodeEditorPanelProps) {
   const { t } = useTranslation();
 
@@ -227,6 +240,10 @@ export default function DdlCodeEditorPanel({
               delayDraftHydration={delayDraftHydration}
               persistedDiagramHasContent={persistedDiagramHasContent}
               onScheduleCodeModeSnapshotPersist={onScheduleCodeModeSnapshotPersist}
+              onResetCodeModeSnapshotPersistState={onResetCodeModeSnapshotPersistState}
+              codeModeDraftPersistStatus={codeModeDraftPersistStatus}
+              codeModeDraftPersistedAt={codeModeDraftPersistedAt}
+              onPersistPublishedDiagram={onPersistPublishedDiagram}
             />
           </Suspense>
         )}

@@ -6,6 +6,7 @@ import com.smarterd.api.diagram.dto.DiagramResponse;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotRequest;
 import com.smarterd.api.diagram.dto.RenameDiagramRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
+import com.smarterd.api.diagram.dto.SaveDiagramResponse;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetResponse;
 import com.smarterd.domain.diagram.service.DiagramService;
@@ -125,21 +126,26 @@ public class DiagramController {
      * @param projectId  프로젝트 ID
      * @param diagramId  다이어그램 ID
      * @param request    저장 요청 (content)
-     * @return 204 No Content
+     * @return 200 OK + SaveDiagramResponse
      */
     @Operation(summary = "다이어그램 저장", description = "다이어그램의 콘텐츠(노드·엣지 JSON)를 저장한다.")
-    @ApiResponse(responseCode = "204", description = "저장 성공")
+    @ApiResponse(
+        responseCode = "200",
+        description = "저장 성공",
+        content = @Content(schema = @Schema(implementation = SaveDiagramResponse.class))
+    )
     @ApiResponse(responseCode = "400", description = "다이어그램 미존재 또는 접근 권한 없음")
     @PutMapping("/{diagramId}")
-    public ResponseEntity<Void> saveDiagram(
+    public ResponseEntity<SaveDiagramResponse> saveDiagram(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
         @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
         @Parameter(description = "다이어그램 ID") @PathVariable Long diagramId,
         @Valid @RequestBody SaveDiagramRequest request
     ) {
-        diagramService.saveDiagram(jwt.getSubject(), teamId, projectId, diagramId, request);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(
+            diagramService.saveDiagram(jwt.getSubject(), teamId, projectId, diagramId, request)
+        );
     }
 
     /**

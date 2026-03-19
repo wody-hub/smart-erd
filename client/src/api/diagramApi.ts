@@ -4,6 +4,7 @@ import { getApiBaseUrl } from '@/lib/platform';
 import type {
   DiagramSummary,
   DiagramDetail,
+  SaveDiagramResult,
   UpdateDiagramDictionaryContextResult,
 } from '@/types/diagram';
 import type { WsTicketIssueResponse } from '@/types/collaboration';
@@ -89,16 +90,18 @@ export async function createDiagram(
  * @param projectId 프로젝트 ID
  * @param diagramId 다이어그램 ID
  * @param content   직렬화된 React Flow JSON
+ * @returns 최신 저장 상태
  */
 export async function saveDiagram(
   teamId: string,
   projectId: string,
   diagramId: string,
   content: string,
-): Promise<void> {
-  await axiosInstance.put(`/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`, {
+): Promise<SaveDiagramResult> {
+  const res = await axiosInstance.put(`/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`, {
     content,
   });
+  return res.data;
 }
 
 /**
