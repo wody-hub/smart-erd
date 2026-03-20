@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Copy, Play, RefreshCw, Save, WandSparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -60,7 +60,7 @@ interface CodeEditorFooterProps {
  * @param props 컴포넌트 props
  * @returns 코드 에디터 하단 푸터 JSX
  */
-export default function CodeEditorFooter({
+const CodeEditorFooter = memo(function CodeEditorFooter({
   onApply,
   canApply,
   executeApply,
@@ -164,4 +164,6 @@ export default function CodeEditorFooter({
       />
     </>
   );
-}
+});
+
+export default CodeEditorFooter;

@@ -1,7 +1,7 @@
-import { startTransition, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { memo, startTransition, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Loader2, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertTriangle, XCircle, type LucideIcon } from 'lucide-react';
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { toast } from 'sonner';
@@ -28,7 +28,7 @@ import DslAssistPopup from './DslAssistPopup';
 import QuickTermDialog from './QuickTermDialog';
 import QuickDomainDialog from './QuickDomainDialog';
 import { DSL_LANGUAGE_ID, registerDslLanguage } from '@/lib/monaco-dsl-language';
-import type { DslDictionary } from '@/lib/dsl-parser';
+import type { DslDictionary, DslParseResult } from '@/lib/dsl-parser';
 import { generateDsl } from '@/lib/dsl-generator';
 import { buildParsedSchemaHash } from '@/lib/code-sync-schema-hash';
 import { buildRevisionHash } from '@/lib/code-sync-revision';
@@ -81,7 +81,7 @@ import {
   buildErdPhysicalNameSourceEntries,
 } from '@/lib/dsl-physical-name-hints';
 import { buildDslCopyTextWithPhysicalNames } from '@/lib/dsl-copy-with-physical-names';
-import { getSyncStatusMeta } from '@/lib/sync-status-meta';
+import { getSyncStatusMeta, type SyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { TableNode, ERDEdge } from '@/types/erd';
@@ -1845,81 +1845,16 @@ export default function DslCodeEditorPanel({
           parseResult?.result && errorCount === 0 && dslText.trim().length > 0,
         )}
       >
-        <div className="flex items-center gap-2 text-xs min-h-[20px] flex-wrap">
-          {parsing && (
-            <span className="flex items-center gap-1 text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              {t('erd.ddlImport.parsing')}
-            </span>
-          )}
-
-          {!parsing && parseResult && (
-            <>
-              {parseResult.result.tables.length > 0 && (
-                <span className="flex items-center gap-1 text-success">
-                  <CheckCircle2 className="h-3 w-3" />
-                  {t('erd.ddlImport.preview', {
-                    tables: parseResult.result.tables.length,
-                    relations: parseResult.result.relations.length,
-                  })}
-                </span>
-              )}
-
-              {errorCount > 0 && (
-                <span className="flex items-center gap-1 text-destructive">
-                  <XCircle className="h-3 w-3" />
-                  {t('erd.dsl.errorCount', { count: errorCount })}
-                </span>
-              )}
-
-              {warningCount > 0 && (
-                <span className="flex items-center gap-1 text-erd-warning">
-                  <AlertTriangle className="h-3 w-3" />
-                  {t('erd.dsl.warningCount', { count: warningCount })}
-                </span>
-              )}
-
-              {parseResult.result.tables.length === 0 && errorCount === 0 && dslText.trim() && (
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  {t('erd.dsl.noTables')}
-                </span>
-              )}
-            </>
-          )}
-
-          {syncStatusMeta && (
-            <span
-              className={cn('flex items-center gap-1', syncStatusMeta.className)}
-              aria-label={t('erd.sync.statusAria')}
-            >
-              <syncStatusMeta.Icon
-                className={cn('h-3 w-3', syncStatusMeta.spin && 'animate-spin')}
-              />
-              {syncStatusMeta.label}
-            </span>
-          )}
-
-          {draftPersistStatusMeta && (
-            <span
-              className={cn('flex items-center gap-1', draftPersistStatusMeta.className)}
-              title={draftPersistStatusMeta.title}
-            >
-              <draftPersistStatusMeta.Icon
-                className={cn('h-3 w-3', draftPersistStatusMeta.spin && 'animate-spin')}
-              />
-              {draftPersistStatusMeta.label}
-            </span>
-          )}
-
-          {finalizeStatusMeta && (
-            <span className={cn('flex items-center gap-1', finalizeStatusMeta.className)}>
-              <finalizeStatusMeta.Icon
-                className={cn('h-3 w-3', finalizeStatusMeta.spin && 'animate-spin')}
-              />
-              {finalizeStatusMeta.label}
-            </span>
-          )}
-        </div>
+        <DslFooterStatus
+          parsing={parsing}
+          parseResult={parseResult}
+          errorCount={errorCount}
+          warningCount={warningCount}
+          hasDslText={dslText.trim().length > 0}
+          syncStatusMeta={syncStatusMeta}
+          draftPersistStatusMeta={draftPersistStatusMeta}
+          finalizeStatusMeta={finalizeStatusMeta}
+        />
       </CodeEditorFooter>
 
       <QuickTermDialog
@@ -1976,3 +1911,117 @@ export default function DslCodeEditorPanel({
     </div>
   );
 }
+
+/** draftPersistStatusMeta / finalizeStatusMeta 공통 형태 */
+interface StatusIndicatorMeta {
+  className: string;
+  label: string;
+  Icon: LucideIcon;
+  spin: boolean;
+  title?: string;
+}
+
+/**
+ * DSL 코드 에디터 하단 파싱·동기화 상태 표시 영역.
+ *
+ * `React.memo`로 감싸 불필요한 리렌더링을 방지한다.
+ */
+const DslFooterStatus = memo(function DslFooterStatus({
+  parsing,
+  parseResult,
+  errorCount,
+  warningCount,
+  hasDslText,
+  syncStatusMeta,
+  draftPersistStatusMeta,
+  finalizeStatusMeta,
+}: {
+  parsing: boolean;
+  parseResult: DslParseResult | null;
+  errorCount: number;
+  warningCount: number;
+  hasDslText: boolean;
+  syncStatusMeta: SyncStatusMeta | null;
+  draftPersistStatusMeta: StatusIndicatorMeta | null;
+  finalizeStatusMeta: StatusIndicatorMeta | null;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex items-center gap-2 text-xs min-h-[20px] flex-wrap">
+      {parsing && (
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {t('erd.ddlImport.parsing')}
+        </span>
+      )}
+
+      {!parsing && parseResult && (
+        <>
+          {parseResult.result.tables.length > 0 && (
+            <span className="flex items-center gap-1 text-success">
+              <CheckCircle2 className="h-3 w-3" />
+              {t('erd.ddlImport.preview', {
+                tables: parseResult.result.tables.length,
+                relations: parseResult.result.relations.length,
+              })}
+            </span>
+          )}
+
+          {errorCount > 0 && (
+            <span className="flex items-center gap-1 text-destructive">
+              <XCircle className="h-3 w-3" />
+              {t('erd.dsl.errorCount', { count: errorCount })}
+            </span>
+          )}
+
+          {warningCount > 0 && (
+            <span className="flex items-center gap-1 text-erd-warning">
+              <AlertTriangle className="h-3 w-3" />
+              {t('erd.dsl.warningCount', { count: warningCount })}
+            </span>
+          )}
+
+          {parseResult.result.tables.length === 0 && errorCount === 0 && hasDslText && (
+            <span className="flex items-center gap-1 text-muted-foreground">
+              {t('erd.dsl.noTables')}
+            </span>
+          )}
+        </>
+      )}
+
+      {syncStatusMeta && (
+        <span
+          className={cn('flex items-center gap-1', syncStatusMeta.className)}
+          aria-label={t('erd.sync.statusAria')}
+        >
+          <syncStatusMeta.Icon
+            className={cn('h-3 w-3', syncStatusMeta.spin && 'animate-spin')}
+          />
+          {syncStatusMeta.label}
+        </span>
+      )}
+
+      {draftPersistStatusMeta && (
+        <span
+          className={cn('flex items-center gap-1', draftPersistStatusMeta.className)}
+          title={draftPersistStatusMeta.title}
+        >
+          <draftPersistStatusMeta.Icon
+            className={cn('h-3 w-3', draftPersistStatusMeta.spin && 'animate-spin')}
+          />
+          {draftPersistStatusMeta.label}
+        </span>
+      )}
+
+      {finalizeStatusMeta && (
+        <span className={cn('flex items-center gap-1', finalizeStatusMeta.className)}>
+          <finalizeStatusMeta.Icon
+            className={cn('h-3 w-3', finalizeStatusMeta.spin && 'animate-spin')}
+          />
+          {finalizeStatusMeta.label}
+        </span>
+      )}
+    </div>
+  );
+});

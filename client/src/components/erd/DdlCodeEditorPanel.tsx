@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { lazy, memo, Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle, CircleHelp } from 'lucide-react';
@@ -43,7 +43,8 @@ import { buildCodeEditorNavigableTables } from '@/lib/code-editor-table-navigati
 import type { DiagramWorkMode } from '@/lib/diagram-work-mode';
 import type { DslPreviewCanvasState } from '@/lib/dsl-preview-graph';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
-import { getSyncStatusMeta } from '@/lib/sync-status-meta';
+import type { DdlParseResult } from '@/lib/ddl-parser';
+import { getSyncStatusMeta, type SyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import { generateDdl } from '@/lib/ddl-generator';
 import CodeEditorFooter from './CodeEditorFooter';
@@ -659,55 +660,81 @@ function SqlDdlEditor({
         refreshConfirmOpen={refreshConfirmOpen}
         setRefreshConfirmOpen={setRefreshConfirmOpen}
       >
-        <div className="flex items-center gap-2 text-xs min-h-[20px]">
-          {parsing && (
-            <span className="flex items-center gap-1 text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              {t('erd.ddlImport.parsing')}
-            </span>
-          )}
-
-          {!parsing && parseResult && (
-            <>
-              {parseResult.tables.length > 0 && (
-                <span className="flex items-center gap-1 text-success">
-                  <CheckCircle2 className="h-3 w-3" />
-                  {t('erd.ddlImport.preview', {
-                    tables: parseResult.tables.length,
-                    relations: parseResult.relations.length,
-                  })}
-                </span>
-              )}
-
-              {parseResult.errors.length > 0 && parseResult.tables.length > 0 && (
-                <span className="flex items-center gap-1 text-erd-warning">
-                  <AlertTriangle className="h-3 w-3" />
-                  {t('erd.ddlImport.warnings', { count: parseResult.errors.length })}
-                </span>
-              )}
-
-              {parseResult.tables.length === 0 && parseResult.errors.length > 0 && (
-                <span className="flex items-center gap-1 text-destructive">
-                  <XCircle className="h-3 w-3" />
-                  {t('erd.ddlImport.parseError')}
-                </span>
-              )}
-            </>
-          )}
-
-          {syncStatusMeta && (
-            <span
-              className={cn('flex items-center gap-1', syncStatusMeta.className)}
-              aria-label={t('erd.sync.statusAria')}
-            >
-              <syncStatusMeta.Icon
-                className={cn('h-3 w-3', syncStatusMeta.spin && 'animate-spin')}
-              />
-              {syncStatusMeta.label}
-            </span>
-          )}
-        </div>
+        <SqlFooterStatus
+          parsing={parsing}
+          parseResult={parseResult}
+          syncStatusMeta={syncStatusMeta}
+        />
       </CodeEditorFooter>
     </div>
   );
 }
+
+/**
+ * SQL DDL 에디터 하단 파싱 상태 표시.
+ *
+ * React.memo로 감싸 parsing/parseResult/syncStatusMeta가 변하지 않으면 리렌더링을 스킵한다.
+ * CodeEditorFooter의 memo와 함께 작동하여 불필요한 깜빡임을 방지한다.
+ */
+const SqlFooterStatus = memo(function SqlFooterStatus({
+  parsing,
+  parseResult,
+  syncStatusMeta,
+}: {
+  parsing: boolean;
+  parseResult: DdlParseResult | null;
+  syncStatusMeta: SyncStatusMeta | null;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex items-center gap-2 text-xs min-h-[20px]">
+      {parsing && (
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {t('erd.ddlImport.parsing')}
+        </span>
+      )}
+
+      {!parsing && parseResult && (
+        <>
+          {parseResult.tables.length > 0 && (
+            <span className="flex items-center gap-1 text-success">
+              <CheckCircle2 className="h-3 w-3" />
+              {t('erd.ddlImport.preview', {
+                tables: parseResult.tables.length,
+                relations: parseResult.relations.length,
+              })}
+            </span>
+          )}
+
+          {parseResult.errors.length > 0 && parseResult.tables.length > 0 && (
+            <span className="flex items-center gap-1 text-erd-warning">
+              <AlertTriangle className="h-3 w-3" />
+              {t('erd.ddlImport.warnings', { count: parseResult.errors.length })}
+            </span>
+          )}
+
+          {parseResult.tables.length === 0 && parseResult.errors.length > 0 && (
+            <span className="flex items-center gap-1 text-destructive">
+              <XCircle className="h-3 w-3" />
+              {t('erd.ddlImport.parseError')}
+            </span>
+          )}
+        </>
+      )}
+
+      {syncStatusMeta && (
+        <span
+          className={cn('flex items-center gap-1', syncStatusMeta.className)}
+          aria-label={t('erd.sync.statusAria')}
+        >
+          <syncStatusMeta.Icon
+            className={cn('h-3 w-3', syncStatusMeta.spin && 'animate-spin')}
+          />
+          {syncStatusMeta.label}
+        </span>
+      )}
+    </div>
+  );
+});

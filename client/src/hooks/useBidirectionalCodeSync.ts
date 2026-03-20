@@ -105,6 +105,8 @@ export function useBidirectionalCodeSync({
 
   const originRef = useRef<SyncOrigin>(null);
   const lastUserEditAtRef = useRef(0);
+  /** 사용자가 코드 편집 중인 "활성 세션" 여부 — Code→ERD 자동적용 완료까지 유지 */
+  const userEditingSessionRef = useRef(false);
   const codeToErdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const erdToCodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lockBlockedSinceRef = useRef<number | null>(null);
@@ -226,6 +228,7 @@ export function useBidirectionalCodeSync({
       clearErdToCodeTimer();
       pendingErdSyncRevisionRef.current = null;
       originRef.current = 'user-code';
+      userEditingSessionRef.current = true;
       lastUserEditAtRef.current = Date.now();
       parseBaseRevisionHashRef.current = currentRevisionHash;
       setStatus('idle-wait');
@@ -325,6 +328,7 @@ export function useBidirectionalCodeSync({
             return;
           }
           lastAppliedSchemaHashRef.current = parsedSchemaHash;
+          userEditingSessionRef.current = false;
           setStatus(resolveCodeAutoApplyStatus(true));
         } finally {
           inFlightApplyRef.current = false;
@@ -383,10 +387,17 @@ export function useBidirectionalCodeSync({
         return;
       }
 
-      // Code 편집 흐름이 우선이므로 최소 codeIdle 기간이 지나기 전에는 역방향 동기화를 보류한다.
+      // Code 편집 흐름이 우선이므로 활성 편집 세션이거나 최소 codeIdle 기간 내에는 역방향 동기화를 보류한다.
       const minQuietMs = Math.max(erdIdleMs, codeIdleMs);
-      const hasRecentUserCodeEdit = Date.now() - lastUserEditAtRef.current < minQuietMs;
-      if (hasRecentUserCodeEdit) {
+      const elapsedSinceEdit = Date.now() - lastUserEditAtRef.current;
+      const hasRecentUserCodeEdit = elapsedSinceEdit < minQuietMs;
+
+      // 자동적용이 일어나지 않아 세션이 풀리지 못한 경우, autoApplyIdleMs 이상 유휴하면 세션을 자동 해제한다.
+      if (userEditingSessionRef.current && elapsedSinceEdit >= autoApplyIdleMs) {
+        userEditingSessionRef.current = false;
+      }
+
+      if (userEditingSessionRef.current || hasRecentUserCodeEdit) {
         setStatus('idle-wait');
         erdToCodeTimerRef.current = setTimeout(runErdToCode, erdIdleMs);
         return;
@@ -422,6 +433,7 @@ export function useBidirectionalCodeSync({
 
     return clearErdToCodeTimer;
   }, [
+    autoApplyIdleMs,
     codeIdleMs,
     enableErdToCodeSync,
     erdIdleMs,
@@ -444,6 +456,7 @@ export function useBidirectionalCodeSync({
       pendingErdSyncRevisionRef.current = null;
       suppressNextErdSyncRef.current = false;
       parseBaseRevisionHashRef.current = null;
+      userEditingSessionRef.current = false;
       syncStatusRef.current = null;
     };
   }, [clearCodeToErdTimer, clearErdToCodeTimer]);

@@ -47,10 +47,8 @@ export function useEditorCursorGuard(
         return;
       }
 
-      // 1) 커서 · 스크롤 스냅샷
-      const position = editor.getPosition();
-      const scrollTop = editor.getScrollTop();
-      const scrollLeft = editor.getScrollLeft();
+      // 1) 전체 뷰 상태 스냅샷 (커서 + 스크롤 + 선택 영역 + 접힌 영역)
+      const viewState = editor.saveViewState();
 
       // 2) onChange 억제 후 모델 직접 갱신
       isSyncingRef.current = true;
@@ -67,17 +65,26 @@ export function useEditorCursorGuard(
         releaseFrameRef.current = null;
       });
 
-      // 3) 커서 복원 (문서 범위 내로 클램프)
-      if (position) {
+      // 3) 뷰 상태 복원 — 커서 위치를 새 문서 범위 내로 클램프한 뒤 전체 복원
+      if (viewState) {
         const lineCount = model.getLineCount();
-        const line = Math.min(position.lineNumber, lineCount);
-        const maxCol = model.getLineMaxColumn(line);
-        editor.setPosition({
-          lineNumber: line,
-          column: Math.min(position.column, maxCol),
-        });
+        const cursorState = viewState.cursorState;
+        if (cursorState?.length) {
+          const clampPos = (pos: Monaco.IPosition) => {
+            const line = Math.min(pos.lineNumber, lineCount);
+            return { lineNumber: line, column: Math.min(pos.column, model.getLineMaxColumn(line)) };
+          };
+          for (let i = 0; i < cursorState.length; i++) {
+            const cs = cursorState[i];
+            cursorState[i] = {
+              ...cs,
+              position: clampPos(cs.position),
+              selectionStart: clampPos(cs.selectionStart),
+            };
+          }
+        }
+        editor.restoreViewState(viewState);
       }
-      editor.setScrollPosition({ scrollTop, scrollLeft });
 
       // 4) React 상태 동기화
       onCodeTextChange(value);
