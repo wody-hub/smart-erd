@@ -26,6 +26,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -154,6 +156,45 @@ public class DiagramSnapshotService implements SmartLifecycle {
     }
 
     /**
+     * authoritative persisted 저장 이후 realtime 상태를 after-commit 시점에 정렬한다.
+     *
+     * <p>DB 커밋이 확정되기 전에 room/cache를 바꾸면 잠깐 동안 persisted와 handoff가 엇갈릴 수 있으므로
+     * 정렬 자체는 커밋 이후에만 수행한다.</p>
+     *
+     * @param diagramId       다이어그램 ID
+     * @param fullStateUpdate 저장 시점의 전체 Y.Doc 상태 update (없으면 null)
+     */
+    public void reconcileRealtimeStateWithPersistedContentAfterCommit(Long diagramId, byte[] fullStateUpdate) {
+        final var snapshotCopy = fullStateUpdate == null ? null : fullStateUpdate.clone();
+        runAfterCommit(() -> reconcileRealtimeStateWithPersistedContent(diagramId, snapshotCopy, true));
+    }
+
+    /**
+     * authoritative persisted 변경 후 stale realtime 상태를 after-commit 시점에 폐기한다.
+     *
+     * <p>사전 세트 변경/삭제처럼 기존 room 상태를 그대로 둘 수 없는 경로에서 사용한다.</p>
+     *
+     * @param diagramId 다이어그램 ID
+     */
+    public void discardRealtimeStateAfterCommit(Long diagramId) {
+        runAfterCommit(() -> reconcileRealtimeStateWithPersistedContent(diagramId, null, false));
+    }
+
+    /**
+     * REST 저장 이후 실시간 협업 상태를 최신 persisted 기준으로 정렬한다.
+     *
+     * <p>저장 시점의 전체 Y.Doc 상태가 있으면 cache/room 버퍼를 같은 기준으로 교체하고,
+     * 없으면 stale snapshot/update가 다시 살아나지 않도록 비운다.</p>
+     *
+     * @param diagramId        다이어그램 ID
+     * @param fullStateUpdate  저장 시점의 전체 Y.Doc 상태 update (없으면 null)
+     * @returns 없음
+     */
+    public void reconcileRealtimeStateWithPersistedContent(Long diagramId, byte[] fullStateUpdate) {
+        reconcileRealtimeStateWithPersistedContent(diagramId, fullStateUpdate, false);
+    }
+
+    /**
      * 클라이언트가 보낸 현재 Y.Doc 전체 상태로 persisted snapshot을 즉시 교체한다.
      *
      * <p>코드 모드의 shared draft가 페이지 이탈 직전에도 세션 간 복원될 수 있도록
@@ -203,6 +244,60 @@ public class DiagramSnapshotService implements SmartLifecycle {
             contentRevision
         );
         return true;
+    }
+
+    /**
+     * persisted 기준으로 realtime 상태를 실제로 정렬한다.
+     *
+     * @param diagramId                          다이어그램 ID
+     * @param fullStateUpdate                    저장 시점의 전체 Y.Doc 상태 update (없으면 null)
+     * @param preserveActiveRoomWhenSnapshotMissing snapshot이 없을 때 active room 보존 여부
+     */
+    private void reconcileRealtimeStateWithPersistedContent(
+        Long diagramId,
+        byte[] fullStateUpdate,
+        boolean preserveActiveRoomWhenSnapshotMissing
+    ) {
+        if (fullStateUpdate == null || fullStateUpdate.length == 0) {
+            snapshotCache.remove(diagramId);
+            clearCompactionCoolDown(diagramId);
+            if (preserveActiveRoomWhenSnapshotMissing && roomManager.getSessionCount(diagramId) > 0) {
+                log.info(
+                    "authoritative content 저장 후 realtime room 보존: diagramId={}, activeSessions={}",
+                    diagramId,
+                    roomManager.getSessionCount(diagramId)
+                );
+                return;
+            }
+            roomManager.discardRoom(diagramId);
+            return;
+        }
+
+        snapshotCache.put(diagramId, YjsUpdateFormat.encode(List.of(fullStateUpdate)));
+        roomManager.replaceUpdates(diagramId, fullStateUpdate);
+    }
+
+    /**
+     * 현재 트랜잭션이 있으면 after-commit으로, 없으면 즉시 실행한다.
+     *
+     * @param task 실행할 작업
+     */
+    private void runAfterCommit(Runnable task) {
+        if (
+            TransactionSynchronizationManager.isSynchronizationActive()
+                && TransactionSynchronizationManager.isActualTransactionActive()
+        ) {
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        task.run();
+                    }
+                }
+            );
+            return;
+        }
+        task.run();
     }
 
     /**

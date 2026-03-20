@@ -97,9 +97,11 @@ export async function saveDiagram(
   projectId: string,
   diagramId: string,
   content: string,
+  ydocSnapshot?: Uint8Array | null,
 ): Promise<SaveDiagramResult> {
   const res = await axiosInstance.put(`/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`, {
     content,
+    ydocSnapshot: ydocSnapshot && ydocSnapshot.length > 0 ? encodeBytesToBase64(ydocSnapshot) : undefined,
   });
   return res.data;
 }

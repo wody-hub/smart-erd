@@ -6,6 +6,7 @@ import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.diagram.service.DiagramDictionaryBindingService.InvalidationCounts;
+import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.dictionary.service.DictionarySetService;
 import com.smarterd.domain.project.entity.Project;
@@ -130,6 +131,7 @@ public class DiagramService {
      * @param projectId  프로젝트 ID
      * @param diagramId  다이어그램 ID
      * @param content    저장할 직렬화된 React Flow JSON
+     * @param ydocSnapshot 저장 시점의 현재 Y.Doc 전체 상태 update
      * @return 최신 저장 상태 결과
      */
     @Transactional
@@ -138,13 +140,18 @@ public class DiagramService {
         Long teamId,
         Long projectId,
         Long diagramId,
-        String content
+        String content,
+        byte[] ydocSnapshot
     ) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
 
         diagram.updateContent(content);
-        diagramSnapshotService.evictCachedSnapshot(diagramId);
+        if (ydocSnapshot != null && ydocSnapshot.length > 0) {
+            diagram.updateYdocSnapshot(YjsUpdateFormat.encode(List.of(ydocSnapshot)));
+            diagram.syncSnapshotRevision(diagram.getContentRevision());
+        }
+        diagramSnapshotService.reconcileRealtimeStateWithPersistedContentAfterCommit(diagramId, ydocSnapshot);
         return toSaveDiagramResult(diagram);
     }
 
@@ -232,8 +239,8 @@ public class DiagramService {
         final var dictionarySet = dictionarySetService.findByTeamAndId(project.getTeam(), dictionarySetId);
         final var invalidationCounts = diagramDictionaryBindingService.invalidateBindings(diagram, dictionarySet);
         diagram.changeDictionarySet(dictionarySet);
-        diagram.updateYdocSnapshot(null);
-        diagramSnapshotService.evictCachedSnapshot(diagramId);
+        diagram.nullifySnapshot();
+        diagramSnapshotService.discardRealtimeStateAfterCommit(diagramId);
         return new DictionarySetChangeResult(
             dictionarySet.getId(),
             invalidationCounts.invalidatedTermBindingCount(),
@@ -256,9 +263,7 @@ public class DiagramService {
         final var resolvedDiagramId = Objects.requireNonNull(diagram.getId());
         diagram.softDelete(loginId);
         diagram.nullifySnapshot();
-        diagramSnapshotService.evictCachedSnapshot(resolvedDiagramId);
-        roomManager.discardRoom(resolvedDiagramId);
-        diagramSnapshotService.clearCompactionCoolDown(resolvedDiagramId);
+        diagramSnapshotService.discardRealtimeStateAfterCommit(resolvedDiagramId);
     }
 
     /**

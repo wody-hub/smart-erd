@@ -155,7 +155,14 @@ public class DiagramController {
         @Valid @RequestBody SaveDiagramRequest request
     ) {
         return ResponseEntity.ok(toSaveDiagramResponse(
-            diagramService.saveDiagram(jwt.getSubject(), teamId, projectId, diagramId, request.content())
+            diagramService.saveDiagram(
+                jwt.getSubject(),
+                teamId,
+                projectId,
+                diagramId,
+                request.content(),
+                request.ydocSnapshot()
+            )
         ));
     }
 

@@ -75,6 +75,8 @@ import type { ERDEdge, TableNode } from '@/types/erd';
 
 type CodeModeDraftPersistStatus = 'inactive' | 'dirty' | 'saving' | 'saved' | 'error' | 'stale';
 
+const PERSISTED_SAVE_SNAPSHOT_CACHE_IDLE_MS = 350;
+
 const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPanel'));
 
 /** 빈 핸들러 (오버레이 retry prop용, 현재 syncStage 고정이므로 미사용). @returns 없음 */
@@ -150,6 +152,16 @@ export default function DiagramPage() {
   const codeModeSnapshotPersistEpochRef = useRef(0);
   /** keepalive snapshot 중복 전송 방지용 마지막 발사 시각 */
   const codeModeSnapshotLastKeepaliveAtRef = useRef(0);
+  /** persisted 저장용 Y.Doc 변경 버전 */
+  const persistedSaveSnapshotDocVersionRef = useRef(0);
+  /** 마지막으로 캐시한 persisted 저장용 snapshot 버전 */
+  const persistedSaveSnapshotBuiltVersionRef = useRef(0);
+  /** persisted 저장용 최근 snapshot 캐시 */
+  const persistedSaveSnapshotCacheRef = useRef<Uint8Array | null>(null);
+  /** persisted 저장용 snapshot 캐시 debounce 타이머 */
+  const persistedSaveSnapshotBuildTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** persisted 저장용 snapshot 캐시 idle handle */
+  const persistedSaveSnapshotIdleHandleRef = useRef<number | null>(null);
   /** code 모드 shared schema draft 서버 저장 상태 */
   const [codeModeDraftPersistStatus, setCodeModeDraftPersistStatus] =
     useState<CodeModeDraftPersistStatus>('inactive');
@@ -254,8 +266,93 @@ export default function DiagramPage() {
     [diagramDetailQueryKey, queryClient],
   );
 
+  /**
+   * persisted 저장용 snapshot 캐시 예약 작업을 취소한다.
+   *
+   * @returns 없음
+   */
+  const clearPersistedSaveSnapshotBuildSchedule = useCallback(() => {
+    if (persistedSaveSnapshotBuildTimerRef.current) {
+      clearTimeout(persistedSaveSnapshotBuildTimerRef.current);
+      persistedSaveSnapshotBuildTimerRef.current = null;
+    }
+    if (
+      persistedSaveSnapshotIdleHandleRef.current != null &&
+      typeof window !== 'undefined' &&
+      typeof window.cancelIdleCallback === 'function'
+    ) {
+      window.cancelIdleCallback(persistedSaveSnapshotIdleHandleRef.current);
+      persistedSaveSnapshotIdleHandleRef.current = null;
+    }
+  }, []);
+
+  /**
+   * 현재 Y.Doc 상태를 persisted 저장용 snapshot 캐시에 반영한다.
+   *
+   * @returns 없음
+   */
+  const buildPersistedSaveSnapshotCache = useCallback(() => {
+    if (!ydoc) {
+      persistedSaveSnapshotCacheRef.current = null;
+      persistedSaveSnapshotBuiltVersionRef.current = 0;
+      return;
+    }
+    persistedSaveSnapshotCacheRef.current = Y.encodeStateAsUpdate(ydoc);
+    persistedSaveSnapshotBuiltVersionRef.current = persistedSaveSnapshotDocVersionRef.current;
+  }, [ydoc]);
+
+  /**
+   * persisted 저장용 snapshot 캐시를 debounce + idle 시점에 다시 만든다.
+   *
+   * @returns 없음
+   */
+  const schedulePersistedSaveSnapshotCacheBuild = useCallback(() => {
+    clearPersistedSaveSnapshotBuildSchedule();
+    persistedSaveSnapshotBuildTimerRef.current = setTimeout(() => {
+      persistedSaveSnapshotBuildTimerRef.current = null;
+      if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+        persistedSaveSnapshotIdleHandleRef.current = window.requestIdleCallback(() => {
+          persistedSaveSnapshotIdleHandleRef.current = null;
+          buildPersistedSaveSnapshotCache();
+        });
+        return;
+      }
+      buildPersistedSaveSnapshotCache();
+    }, PERSISTED_SAVE_SNAPSHOT_CACHE_IDLE_MS);
+  }, [buildPersistedSaveSnapshotCache, clearPersistedSaveSnapshotBuildSchedule]);
+
+  /**
+   * 저장 시 사용할 최신 Y.Doc snapshot을 반환한다.
+   *
+   * 캐시가 현재 문서 버전과 일치하면 재사용하고, 아니면 즉시 다시 인코딩한다.
+   *
+   * @returns 저장에 사용할 최신 snapshot
+   */
+  const getLatestPersistedSaveSnapshot = useCallback((): Uint8Array | undefined => {
+    if (!ydoc) {
+      return undefined;
+    }
+    if (
+      persistedSaveSnapshotCacheRef.current &&
+      persistedSaveSnapshotBuiltVersionRef.current === persistedSaveSnapshotDocVersionRef.current
+    ) {
+      return persistedSaveSnapshotCacheRef.current;
+    }
+    const snapshot = Y.encodeStateAsUpdate(ydoc);
+    persistedSaveSnapshotCacheRef.current = snapshot;
+    persistedSaveSnapshotBuiltVersionRef.current = persistedSaveSnapshotDocVersionRef.current;
+    return snapshot;
+  }, [ydoc]);
+
   const saveMutation = useMutation({
-    mutationFn: (content: string) => saveDiagram(teamId!, projectId!, diagramId!, content),
+    mutationFn: (content: string) =>
+      saveDiagram(
+        teamId!,
+        projectId!,
+        diagramId!,
+        content,
+        getLatestPersistedSaveSnapshot(),
+      ),
     onSuccess: (savedDiagram, content) => {
       applySavedDiagramDetailToCache(savedDiagram, content);
     },
@@ -550,7 +647,10 @@ export default function DiagramPage() {
       }
       const requestEpoch = codeModeSnapshotPersistEpochRef.current;
 
-      const nextSnapshot = Y.encodeStateAsUpdate(ydoc);
+      const nextSnapshot = getLatestPersistedSaveSnapshot();
+      if (!nextSnapshot) {
+        return;
+      }
       if (nextSnapshot.length === 0) {
         codeModeSnapshotPersistDirtyRef.current = false;
         if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
@@ -657,7 +757,16 @@ export default function DiagramPage() {
         }
       }
     },
-    [diagram?.contentRevision, diagramDetailQueryKey, diagramId, projectId, queryClient, teamId, ydoc],
+    [
+      diagram?.contentRevision,
+      diagramDetailQueryKey,
+      diagramId,
+      getLatestPersistedSaveSnapshot,
+      projectId,
+      queryClient,
+      teamId,
+      ydoc,
+    ],
   );
 
   /**
@@ -727,6 +836,32 @@ export default function DiagramPage() {
       return;
     }
   }, [workModeCapabilities.persistCodeDraft]);
+
+  useEffect(() => {
+    persistedSaveSnapshotDocVersionRef.current = ydoc ? 1 : 0;
+    persistedSaveSnapshotBuiltVersionRef.current = 0;
+    persistedSaveSnapshotCacheRef.current = null;
+    clearPersistedSaveSnapshotBuildSchedule();
+    if (!ydoc) {
+      return;
+    }
+
+    const handleYdocSnapshotSourceUpdate = () => {
+      persistedSaveSnapshotDocVersionRef.current += 1;
+      schedulePersistedSaveSnapshotCacheBuild();
+    };
+
+    ydoc.on('update', handleYdocSnapshotSourceUpdate);
+    schedulePersistedSaveSnapshotCacheBuild();
+
+    return () => {
+      ydoc.off('update', handleYdocSnapshotSourceUpdate);
+      clearPersistedSaveSnapshotBuildSchedule();
+      persistedSaveSnapshotCacheRef.current = null;
+      persistedSaveSnapshotBuiltVersionRef.current = 0;
+      persistedSaveSnapshotDocVersionRef.current = 0;
+    };
+  }, [clearPersistedSaveSnapshotBuildSchedule, schedulePersistedSaveSnapshotCacheBuild, ydoc]);
 
   useEffect(() => {
     if (!workModeCapabilities.persistCodeDraft || !ydoc || !teamId || !projectId || !diagramId) {

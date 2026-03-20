@@ -2,6 +2,7 @@ package com.smarterd.domain.diagram.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -44,18 +45,21 @@ class DiagramSnapshotServiceTest {
         // given
         final var diagramId = 1L;
         final var compactedUpdate = new byte[50];
+        final var contentRevision = 7L;
 
         // 기존 스냅샷: YLPF 포맷으로 인코딩된 200바이트짜리 update
         final var existingSnapshot = YjsUpdateFormat.encode(List.of(new byte[200]));
         when(diagramRepository.findYdocSnapshotById(diagramId)).thenReturn(Optional.of(existingSnapshot));
-        when(diagramRepository.updateYdocSnapshotById(eq(diagramId), any(byte[].class))).thenReturn(1L);
+        when(diagramRepository.findContentRevisionForUpdate(diagramId)).thenReturn(contentRevision);
+        when(diagramRepository.updateYdocSnapshotAndRevisionById(eq(diagramId), any(byte[].class), eq(contentRevision)))
+            .thenReturn(1L);
 
         // when
         final var result = diagramSnapshotService.replaceSnapshot(diagramId, compactedUpdate);
 
         // then
         assertThat(result).isTrue();
-        verify(diagramRepository).updateYdocSnapshotById(eq(diagramId), any(byte[].class));
+        verify(diagramRepository).updateYdocSnapshotAndRevisionById(eq(diagramId), any(byte[].class), eq(contentRevision));
     }
 
     @Test
@@ -75,7 +79,7 @@ class DiagramSnapshotServiceTest {
 
         // then
         assertThat(result).isFalse();
-        verify(diagramRepository, never()).updateYdocSnapshotById(any(), any());
+        verify(diagramRepository, never()).updateYdocSnapshotAndRevisionById(any(), any(), anyLong());
     }
 
     @Test
@@ -85,10 +89,7 @@ class DiagramSnapshotServiceTest {
         final var diagramId = 999L;
         final var compactedUpdate = new byte[50];
 
-        // 기존 스냅샷은 존재하지만 update 시 다이어그램 미존재 (0행 갱신)
-        final var existingSnapshot = YjsUpdateFormat.encode(List.of(new byte[200]));
-        when(diagramRepository.findYdocSnapshotById(diagramId)).thenReturn(Optional.of(existingSnapshot));
-        when(diagramRepository.updateYdocSnapshotById(eq(diagramId), any(byte[].class))).thenReturn(0L);
+        when(diagramRepository.findContentRevisionForUpdate(diagramId)).thenReturn(null);
 
         // when
         final var result = diagramSnapshotService.replaceSnapshot(diagramId, compactedUpdate);
@@ -103,16 +104,19 @@ class DiagramSnapshotServiceTest {
         // given
         final var diagramId = 1L;
         final var compactedUpdate = new byte[100];
+        final var contentRevision = 9L;
 
         when(diagramRepository.findYdocSnapshotById(diagramId)).thenReturn(Optional.empty());
-        when(diagramRepository.updateYdocSnapshotById(eq(diagramId), any(byte[].class))).thenReturn(1L);
+        when(diagramRepository.findContentRevisionForUpdate(diagramId)).thenReturn(contentRevision);
+        when(diagramRepository.updateYdocSnapshotAndRevisionById(eq(diagramId), any(byte[].class), eq(contentRevision)))
+            .thenReturn(1L);
 
         // when
         final var result = diagramSnapshotService.replaceSnapshot(diagramId, compactedUpdate);
 
         // then
         assertThat(result).isTrue();
-        verify(diagramRepository).updateYdocSnapshotById(eq(diagramId), any(byte[].class));
+        verify(diagramRepository).updateYdocSnapshotAndRevisionById(eq(diagramId), any(byte[].class), eq(contentRevision));
     }
 
     @Test
@@ -121,8 +125,11 @@ class DiagramSnapshotServiceTest {
         // given
         final var diagramId = 1L;
         final var compactedUpdate = new byte[50];
+        final var contentRevision = 11L;
         when(diagramRepository.findYdocSnapshotById(diagramId)).thenReturn(Optional.of(new byte[0]));
-        when(diagramRepository.updateYdocSnapshotById(eq(diagramId), any(byte[].class))).thenReturn(1L);
+        when(diagramRepository.findContentRevisionForUpdate(diagramId)).thenReturn(contentRevision);
+        when(diagramRepository.updateYdocSnapshotAndRevisionById(eq(diagramId), any(byte[].class), eq(contentRevision)))
+            .thenReturn(1L);
 
         // when
         diagramSnapshotService.replaceSnapshot(diagramId, compactedUpdate);
@@ -157,5 +164,64 @@ class DiagramSnapshotServiceTest {
 
         // then
         assertThat(diagramSnapshotService.isCompactionInCoolDown(diagramId)).isFalse();
+    }
+
+    @Test
+    @DisplayName("reconcileRealtimeStateWithPersistedContent - null snapshot이면 stale cache/room을 함께 비운다")
+    void reconcileRealtimeStateWithPersistedContent_whenSnapshotIsNull_discardsStaleRealtimeState() {
+        // given
+        final var diagramId = 10L;
+        final var persistedSnapshot = new byte[] { 1, 2, 3 };
+        when(diagramRepository.findYdocSnapshotById(diagramId)).thenReturn(Optional.of(persistedSnapshot));
+
+        // warm cache
+        assertThat(diagramSnapshotService.loadSnapshot(diagramId)).isEqualTo(persistedSnapshot);
+        assertThat(diagramSnapshotService.getCachedSnapshot(diagramId)).contains(persistedSnapshot);
+
+        // when
+        diagramSnapshotService.reconcileRealtimeStateWithPersistedContent(diagramId, null);
+
+        // then
+        assertThat(diagramSnapshotService.getCachedSnapshot(diagramId)).isEmpty();
+        verify(roomManager).discardRoom(diagramId);
+        verify(roomManager, never()).replaceUpdates(eq(diagramId), any(byte[].class));
+    }
+
+    @Test
+    @DisplayName("reconcileRealtimeStateWithPersistedContentAfterCommit - snapshot 없이 저장한 구버전 클라이언트는 active room을 강제로 버리지 않는다")
+    void reconcileRealtimeStateWithPersistedContentAfterCommit_whenSnapshotIsNullAndRoomActive_preservesRoom() {
+        // given
+        final var diagramId = 12L;
+        final var persistedSnapshot = new byte[] { 4, 5, 6 };
+        when(diagramRepository.findYdocSnapshotById(diagramId)).thenReturn(Optional.of(persistedSnapshot));
+        when(roomManager.getSessionCount(diagramId)).thenReturn(2);
+
+        assertThat(diagramSnapshotService.loadSnapshot(diagramId)).isEqualTo(persistedSnapshot);
+        assertThat(diagramSnapshotService.getCachedSnapshot(diagramId)).contains(persistedSnapshot);
+
+        // when
+        diagramSnapshotService.reconcileRealtimeStateWithPersistedContentAfterCommit(diagramId, null);
+
+        // then
+        assertThat(diagramSnapshotService.getCachedSnapshot(diagramId)).isEmpty();
+        verify(roomManager, never()).discardRoom(diagramId);
+        verify(roomManager, never()).replaceUpdates(eq(diagramId), any(byte[].class));
+    }
+
+    @Test
+    @DisplayName("reconcileRealtimeStateWithPersistedContent - full state update면 cache와 room update를 최신 상태로 교체한다")
+    void reconcileRealtimeStateWithPersistedContent_whenSnapshotProvided_replacesCacheAndRoomState() {
+        // given
+        final var diagramId = 11L;
+        final var fullStateUpdate = new byte[] { 9, 8, 7 };
+
+        // when
+        diagramSnapshotService.reconcileRealtimeStateWithPersistedContent(diagramId, fullStateUpdate);
+
+        // then
+        assertThat(diagramSnapshotService.getCachedSnapshot(diagramId))
+            .contains(YjsUpdateFormat.encode(List.of(fullStateUpdate)));
+        verify(roomManager).replaceUpdates(diagramId, fullStateUpdate);
+        verify(roomManager, never()).discardRoom(diagramId);
     }
 }

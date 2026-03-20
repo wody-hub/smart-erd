@@ -79,7 +79,8 @@ class DictionarySetServiceTest {
         final var response = dictionarySetService.createDictionarySet(
             loginId,
             teamId,
-            new com.smarterd.api.dictionary.dto.CreateDictionarySetRequest("Set-A", "desc")
+            "Set-A",
+            "desc"
         );
 
         // then
@@ -113,7 +114,8 @@ class DictionarySetServiceTest {
         final var response = dictionarySetService.createDictionarySet(
             loginId,
             teamId,
-            new com.smarterd.api.dictionary.dto.CreateDictionarySetRequest("Set-B", "desc")
+            "Set-B",
+            "desc"
         );
 
         // then
