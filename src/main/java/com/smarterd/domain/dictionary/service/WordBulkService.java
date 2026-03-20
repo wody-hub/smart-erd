@@ -1,16 +1,14 @@
 package com.smarterd.domain.dictionary.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smarterd.api.dictionary.dto.BulkSaveResponse;
-import com.smarterd.api.dictionary.dto.BulkValidationResponse;
-import com.smarterd.api.dictionary.dto.BulkValidationRow;
-import com.smarterd.api.dictionary.dto.BulkWordRow;
-import com.smarterd.api.dictionary.dto.BulkWordSaveRequest;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.dictionary.entity.Word;
-import com.smarterd.domain.dictionary.service.session.BulkValidationSessionStore;
 import com.smarterd.domain.dictionary.repository.WordRepository;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkSaveResult;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationResult;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationRowResult;
+import com.smarterd.domain.dictionary.service.session.BulkValidationSessionStore;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import com.smarterd.utils.AppStringUtils;
@@ -42,9 +40,20 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
     private static final int PREVIEW_ROW_LIMIT = 2_000;
     private static final String ERROR_REPORT_ACCESSOR_ERROR = "Failed to resolve word error report methods";
 
+    /** 단어 레포지토리 */
     private final WordRepository wordRepository;
+    /** 사전 세트 서비스 */
     private final DictionarySetService dictionarySetService;
 
+    /**
+     * @param wordRepository 단어 레포지토리
+     * @param dictionarySetService 사전 세트 서비스
+     * @param validationSessionStore 벌크 검증 세션 저장소
+     * @param objectMapper JSON 직렬화/역직렬화
+     * @param authService 인증 서비스
+     * @param teamService 팀 서비스
+     * @param messageSource 메시지 소스
+     */
     public WordBulkService(
         WordRepository wordRepository,
         DictionarySetService dictionarySetService,
@@ -59,11 +68,13 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         this.dictionarySetService = dictionarySetService;
     }
 
+    /** {@inheritDoc} */
     @Override
     protected Class<WordUploadRow> uploadRowClass() {
         return WordUploadRow.class;
     }
 
+    /** {@inheritDoc} */
     @Override
     protected Map<String, String> mapUploadRow(WordUploadRow row) {
         final var map = new HashMap<String, String>();
@@ -73,6 +84,7 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         return map;
     }
 
+    /** {@inheritDoc} */
     @Override
     protected Map<String, String> mapCsvFields(String[] fields) {
         final var map = new HashMap<String, String>();
@@ -82,17 +94,29 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         return map;
     }
 
+    /** {@inheritDoc} */
     @Override
     protected List<String> excelColumnKeys() {
         return List.of("logicalName", "physicalName", "description");
     }
 
+    /** {@inheritDoc} */
     @Override
     protected String validationSessionKeyPrefix() {
         return "dict:bulk:validation:word:";
     }
 
-    public BulkValidationResponse validateUpload(String loginId, Long teamId, Long setId, MultipartFile file, Locale locale) {
+    /**
+     * 업로드 파일에서 단어 데이터를 파싱하고 검증한다.
+     *
+     * @param loginId 요청 사용자 로그인 ID
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @param file 업로드 파일
+     * @param locale 요청 로케일
+     * @return 검증 결과 응답
+     */
+    public BulkValidationResult validateUpload(String loginId, Long teamId, Long setId, MultipartFile file, Locale locale) {
         final var team = verifyTeamAccess(loginId, teamId);
         final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
         final var rawRows = parseFile(file, file.getOriginalFilename());
@@ -108,20 +132,35 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         return createValidationResponse(loginId, teamId, dictionarySet.getId(), rawRows.size(), validationResult);
     }
 
+    /**
+     * 검증을 통과한 단어를 일괄 저장한다.
+     *
+     * @param loginId 요청 사용자 로그인 ID
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @param request 일괄 저장 요청
+     * @return 저장 결과 응답
+     */
     @Transactional
-    public BulkSaveResponse bulkSave(String loginId, Long teamId, Long setId, BulkWordSaveRequest request) {
+    public BulkSaveResult bulkSave(
+        String loginId,
+        Long teamId,
+        Long setId,
+        String validationToken,
+        List<Integer> excludedRowNumbers
+    ) {
         final var team = verifyTeamAccess(loginId, teamId);
         final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
-        final var session = consumeValidationSession(loginId, teamId, setId, request.validationToken(), ValidationSession.class);
-        final var excludedRowNumbers = new HashSet<>(request.excludedRowNumbers());
+        final var session = consumeValidationSession(loginId, teamId, setId, validationToken, ValidationSession.class);
+        final var excludedRows = new HashSet<>(excludedRowNumbers);
         final var candidateRows = session.validRows()
             .stream()
-            .filter((row) -> !excludedRowNumbers.contains(row.rowNumber()))
+            .filter((row) -> !excludedRows.contains(row.rowNumber()))
             .map(ValidatedWordRow::row)
             .toList();
 
         final var existingNames = findExistingLogicalNames(
-            candidateRows.stream().map(BulkWordRow::logicalName).toList(),
+            candidateRows.stream().map(WordBulkRow::logicalName).toList(),
             LOGICAL_NAME_QUERY_BATCH_SIZE,
             (names) -> wordRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, names),
             Word::getLogicalName
@@ -150,9 +189,19 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         } catch (DataIntegrityViolationException e) {
             throw new DuplicateException(MessageCode.ERROR_BULK_CONCURRENT_DUPLICATE.code());
         }
-        return new BulkSaveResponse(wordsToSave.size(), failedCount);
+        return new BulkSaveResult(wordsToSave.size(), failedCount);
     }
 
+    /**
+     * 검증 실패 행을 엑셀 오류 리포트로 생성한다.
+     *
+     * @param loginId 요청 사용자 로그인 ID
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @param validationToken 검증 세션 토큰
+     * @param locale 요청 로케일
+     * @return 오류 리포트 엑셀 데이터
+     */
     public ExcelData generateErrorReport(String loginId, Long teamId, Long setId, String validationToken, Locale locale) {
         final var team = verifyTeamAccess(loginId, teamId);
         dictionarySetService.findByTeamAndId(team, setId);
@@ -175,6 +224,15 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         );
     }
 
+    /**
+     * 단어 업로드용 템플릿 엑셀을 생성한다.
+     *
+     * @param loginId 요청 사용자 로그인 ID
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @param locale 요청 로케일
+     * @return 템플릿 엑셀 데이터
+     */
     public ExcelData generateTemplate(String loginId, Long teamId, Long setId, @NonNull Locale locale) {
         final var team = verifyTeamAccess(loginId, teamId);
         dictionarySetService.findByTeamAndId(team, setId);
@@ -198,6 +256,14 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         );
     }
 
+    /**
+     * 모든 행을 순회하며 단어 검증 결과를 누적한다.
+     *
+     * @param rawRows 파싱된 행 목록
+     * @param existingNames DB에 이미 존재하는 논리명 집합
+     * @param locale 요청 로케일
+     * @return 검증 결과 누적 객체
+     */
     private RowValidationResult validateRows(List<Map<String, String>> rawRows, Set<String> existingNames, Locale locale) {
         final var seenNames = new HashSet<String>();
         final var result = new RowValidationResult(rawRows.size());
@@ -216,17 +282,34 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
 
             final var rowNumber = i + 2;
             final var valid = errors.isEmpty();
-            final var previewRow = new BulkValidationRow(rowNumber, valid, errors, data);
+            final var previewRow = new BulkValidationRowResult(rowNumber, valid, errors, data);
             if (valid) {
-                result.addValid(previewRow, new ValidatedWordRow(rowNumber, new BulkWordRow(logicalName, physicalName, description)));
+                result.addValid(
+                    previewRow,
+                    new ValidatedWordRow(rowNumber, new WordBulkRow(logicalName, physicalName, description))
+                );
             } else {
-                result.addError(previewRow, new WordErrorReportRow(rowNumber, logicalName, physicalName, description, String.join("\n", errors)));
+                result.addError(
+                    previewRow,
+                    new WordErrorReportRow(rowNumber, logicalName, physicalName, description, String.join("\n", errors))
+                );
             }
         }
 
         return result;
     }
 
+    /**
+     * 단일 단어 행의 필드 검증과 중복 검사를 수행한다.
+     *
+     * @param logicalName 논리명
+     * @param physicalName 물리명
+     * @param description 설명
+     * @param seenNames 파일 내 이미 등장한 논리명 집합
+     * @param existingNames DB에 이미 존재하는 논리명 집합
+     * @param locale 요청 로케일
+     * @return 에러 메시지 목록
+     */
     private List<String> validateSingleRow(
         String logicalName,
         String physicalName,
@@ -258,7 +341,17 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         return errors;
     }
 
-    private BulkValidationResponse createValidationResponse(
+    /**
+     * 검증 결과와 세션 토큰을 포함한 응답을 생성한다.
+     *
+     * @param loginId 요청 사용자 로그인 ID
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @param totalRows 전체 행 수
+     * @param validationResult 검증 결과 누적 객체
+     * @return 검증 결과 응답
+     */
+    private BulkValidationResult createValidationResponse(
         String loginId,
         Long teamId,
         Long setId,
@@ -276,7 +369,7 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
             false
         );
         final var validationToken = issueValidationToken(session);
-        return new BulkValidationResponse(
+        return new BulkValidationResult(
             validationToken,
             totalRows,
             validationResult.validCount,
@@ -286,9 +379,12 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         );
     }
 
+    /**
+     * 검증 과정 중 누적되는 유효/오류 행 상태를 보관한다.
+     */
     private static class RowValidationResult {
-        final ArrayList<BulkValidationRow> errorPreviewRows;
-        final ArrayList<BulkValidationRow> validPreviewRows;
+        final ArrayList<BulkValidationRowResult> errorPreviewRows;
+        final ArrayList<BulkValidationRowResult> validPreviewRows;
         final ArrayList<ValidatedWordRow> validRows = new ArrayList<>();
         final ArrayList<WordErrorReportRow> errorRows = new ArrayList<>();
         int validCount = 0;
@@ -299,7 +395,13 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
             this.validPreviewRows = new ArrayList<>(Math.min(estimatedSize, PREVIEW_ROW_LIMIT));
         }
 
-        void addValid(BulkValidationRow previewRow, ValidatedWordRow validatedRow) {
+        /**
+         * 유효 행을 누적한다.
+         *
+         * @param previewRow 프리뷰 행
+         * @param validatedRow 저장 후보 행
+         */
+        void addValid(BulkValidationRowResult previewRow, ValidatedWordRow validatedRow) {
             validCount++;
             validRows.add(validatedRow);
             if (validPreviewRows.size() < PREVIEW_ROW_LIMIT) {
@@ -307,7 +409,13 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
             }
         }
 
-        void addError(BulkValidationRow previewRow, WordErrorReportRow errorReportRow) {
+        /**
+         * 오류 행을 누적한다.
+         *
+         * @param previewRow 프리뷰 행
+         * @param errorReportRow 오류 리포트 행
+         */
+        void addError(BulkValidationRowResult previewRow, WordErrorReportRow errorReportRow) {
             errorCount++;
             errorRows.add(errorReportRow);
             if (errorPreviewRows.size() < PREVIEW_ROW_LIMIT) {
@@ -316,8 +424,32 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         }
     }
 
-    private record ValidatedWordRow(int rowNumber, BulkWordRow row) {}
+    /**
+     * 검증을 통과한 업로드 행 정보.
+     *
+     * @param rowNumber 원본 엑셀/CSV 행 번호
+     * @param row 저장 후보 단어 행
+     */
+    private record ValidatedWordRow(int rowNumber, WordBulkRow row) {}
 
+    /**
+     * 벌크 저장 단계에서 사용하는 단어 행 모델.
+     *
+     * @param logicalName 논리명
+     * @param physicalName 물리명
+     * @param description 설명
+     */
+    private record WordBulkRow(String logicalName, String physicalName, String description) {}
+
+    /**
+     * 오류 리포트 엑셀 행 모델.
+     *
+     * @param rowNumber 행 번호
+     * @param logicalName 논리명
+     * @param physicalName 물리명
+     * @param description 설명
+     * @param errors 오류 메시지 묶음
+     */
     public record WordErrorReportRow(
         int rowNumber,
         String logicalName,
@@ -326,6 +458,17 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         String errors
     ) {}
 
+    /**
+     * Redis/메모리 검증 세션 payload 모델.
+     *
+     * @param loginId 요청 사용자 로그인 ID
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @param expiresAt 만료 시각
+     * @param validRows 유효 행 목록
+     * @param errorRows 오류 행 목록
+     * @param saveConsumed 저장 토큰 사용 여부
+     */
     private record ValidationSession(
         String loginId,
         Long teamId,
@@ -336,8 +479,18 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         boolean saveConsumed
     ) implements SessionExpirable, SessionOwnership {}
 
+    /**
+     * 템플릿 엑셀 예시 행 모델.
+     *
+     * @param logicalName 논리명
+     * @param physicalName 물리명
+     * @param description 설명
+     */
     public record TemplateRow(String logicalName, String physicalName, String description) {}
 
+    /**
+     * 엑셀 업로드용 단어 행 매핑 POJO.
+     */
     @Getter
     @Setter
     public static class WordUploadRow {

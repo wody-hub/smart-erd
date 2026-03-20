@@ -167,11 +167,18 @@ src/main/java/com/smarterd/
 │   │   └── dto/                     #   CreateTeamRequest, TeamResponse, AddMemberRequest 등
 │   ├── project/
 │   │   ├── ProjectController.java   #   프로젝트 CRUD (4 엔드포인트)
-│   │   └── dto/                     #   CreateProjectRequest, ProjectResponse
+│   │   └── dto/                     #   Create/Update request, ProjectResponse
 │   ├── dictionary/
-│   │   ├── DomainController.java    #   도메인 사전 CRUD (5 엔드포인트)
-│   │   ├── TermController.java      #   용어 사전 CRUD (5 엔드포인트)
-│   │   └── dto/                     #   Create/Update/Response record (Domain, Term)
+│   │   ├── DictionarySetController.java # 사전 세트 CRUD + 기본 세트 지정
+│   │   ├── DomainController.java    #   도메인 CRUD + bulk 업로드/오류 리포트/템플릿
+│   │   ├── TermController.java      #   용어 CRUD + bulk 업로드/오류 리포트/템플릿
+│   │   ├── WordController.java      #   단어 CRUD + bulk 업로드/오류 리포트/템플릿
+│   │   ├── DictionarySuggestController.java # 용어/도메인 조합 기반 물리명 추천
+│   │   └── dto/                     #   Create/Update/Response + Bulk + Suggest record
+│   ├── diagram/
+│   │   ├── DiagramController.java   #   다이어그램 CRUD + 저장 + Y.Doc snapshot + 사전 세트 변경
+│   │   ├── WsTicketController.java  #   WebSocket 접속용 일회용 ticket 발급
+│   │   └── dto/                     #   Create/Save/Rename/Detail/Response, Snapshot, WsTicket record
 │   └── common/
 │       └── GlobalExceptionHandler.java  # 전역 예외 처리 (404/403/409/400 매핑)
 ├── config/                          # 설정
@@ -187,13 +194,17 @@ src/main/java/com/smarterd/
 │   └── PrettySqlFormat.java         #   p6spy SQL 포맷터 (Hibernate FormatStyle.BASIC 기반 들여쓰기)
 └── domain/                          # 도메인 계층 (Service도 여기에 위치)
     ├── common/
-    │   ├── entity/                   #   BaseTimeEntity (createdAt, updatedAt UTC Instant 자동 감사)
-    │   └── exception/               #   커스텀 예외 계층 (5종, 모두 LocalizedException 상속)
-    │       ├── LocalizedException.java          # 추상 베이스 — messageCode + messageArgs
-    │       ├── EntityNotFoundException.java     # → 404
-    │       ├── DomainAccessDeniedException.java # → 403
-    │       ├── DuplicateException.java          # → 409
-    │       └── BusinessException.java           # → 400
+    │   ├── entity/                  #   BaseTimeEntity, BaseAuditEntity (시각/작성자 감사 공통 베이스)
+    │   ├── exception/               #   커스텀 예외 계층 (7종, 모두 LocalizedException 상속)
+    │   │   ├── LocalizedException.java          # 추상 베이스 — messageCode + messageArgs
+    │   │   ├── EntityNotFoundException.java     # → 404
+    │   │   ├── DomainAccessDeniedException.java # → 403
+    │   │   ├── DuplicateException.java          # → 409
+    │   │   ├── ConflictException.java           # → 409
+    │   │   ├── TooManyRequestsException.java    # → 429
+    │   │   └── BusinessException.java           # → 400
+    │   └── message/
+    │       └── MessageCode.java     #   공통 다국어 메시지 코드 enum
     ├── user/
     │   ├── entity/                   #   User, RefreshToken (loginId unique, BCrypt password)
     │   ├── repository/              #   UserRepository, RefreshTokenRepository (+Custom — QueryDSL bulk delete)
@@ -207,12 +218,14 @@ src/main/java/com/smarterd/
     │   ├── repository/             #   ProjectRepository (findByTeam)
     │   └── service/                #   ProjectService (프로젝트 CRUD, 팀 소속 확인)
     ├── diagram/
-    │   ├── entity/                  #   Diagram (TEXT content — React Flow JSON 직렬화)
-    │   └── repository/             #   DiagramRepository
+    │   ├── entity/                  #   Diagram (TEXT content + Y.Doc snapshot + revision 메타), SaveSource
+    │   ├── repository/             #   DiagramRepository + Custom + snapshot/projection 조회 타입
+    │   ├── service/                #   DiagramService, DiagramSnapshotService, DiagramDictionaryBindingService
+    │   └── websocket/              #   diagram 협업 전용 ticket / transport / room / relay / protocol / session / model
     └── dictionary/
-        ├── entity/                  #   Domain (논리명→물리타입), Term (논리명→물리명)
-        ├── repository/             #   DomainRepository, TermRepository (+Custom — QueryDSL fetch join)
-        └── service/                #   DomainService, TermService (CRUD + 팀 소속/중복 검증)
+        ├── entity/                  #   DictionarySet, Domain, Term, Word
+        ├── repository/             #   DictionarySet/Domain/Term/Word repository (+Custom — QueryDSL fetch join)
+        └── service/                #   CRUD 서비스 + *BulkService + Suggest/Migration + bulk session store
 ```
 
 ### 프론트엔드
@@ -396,9 +409,11 @@ import jakarta.persistence.Id;
 | `EntityNotFoundException`     | 404 Not Found   | 엔티티 조회 실패                           |
 | `DomainAccessDeniedException` | 403 Forbidden   | 권한 부족 (팀 미소속, ADMIN 아님)          |
 | `DuplicateException`          | 409 Conflict    | 중복 리소스 (팀 멤버 중복, 로그인 ID 중복) |
+| `ConflictException`           | 409 Conflict    | 동시 수정/버전 충돌, 상태 경합             |
 | `BusinessException`           | 400 Bad Request | 비즈니스 규칙 위반 (소유자 제거 시도 등)   |
+| `TooManyRequestsException`    | 429 Too Many Requests | 요청 횟수 제한 초과                   |
 
-모든 예외는 `LocalizedException(messageCode, messageArgs...)` 을 상속하며, `domain/common/exception/` 패키지에 위치한다. `GlobalExceptionHandler`가 `MessageSource`를 통해 요청 로케일에 맞는 다국어 메시지로 변환하여 HTTP 응답으로 반환한다.
+모든 예외는 `LocalizedException(messageCode, messageArgs...)` 을 상속하며, `domain/common/exception/` 패키지에 위치한다. 메시지 키는 `domain/common/message/MessageCode` 에서 공통 관리하고, `GlobalExceptionHandler`가 `MessageSource`를 통해 요청 로케일에 맞는 다국어 메시지로 변환하여 HTTP 응답으로 반환한다.
 
 ```java
 // Good — 메시지 코드 + 인자 (MessageSource가 로케일에 맞게 번역)
@@ -654,7 +669,7 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 | ---------------- | -------------------- | ----------------------------------------------------------------- |
 | `api/`           | HTTP 인터페이스 계층 | Controller, DTO (record)                                          |
 | `domain/`        | 비즈니스 도메인 계층 | Entity, Repository, Service                                       |
-| `domain/common/` | 공통 코드            | BaseTimeEntity, 커스텀 예외                                       |
+| `domain/common/` | 공통 코드            | BaseTimeEntity, BaseAuditEntity, MessageCode, 커스텀 예외         |
 | `config/`        | 설정                 | Security, JWT, CORS, Locale, Validation, OpenAPI, QueryDSL, Blaze |
 
 - DTO는 Java `record`로 작성, `@Valid` 검증 포함
@@ -708,11 +723,11 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 - **Team** : 프로젝트와 데이터 사전을 소유하는 조직 단위
 - **TeamMember** : 팀-사용자 다대다 조인 (`@IdClass(TeamMemberId)` record 복합키, 역할: ADMIN, MEMBER, VIEWER)
 - **Project** : ERD 프로젝트 그룹 (Team 소속)
-- **Diagram** : React Flow JSON을 TEXT로 저장하는 ERD 다이어그램 (Project 소속)
+- **Diagram** : React Flow JSON `content`와 Y.Doc snapshot, content/snapshot revision 메타를 함께 관리하는 ERD 다이어그램 (Project 소속)
 - **Domain** : 논리명→물리 데이터타입 매핑 사전 (예: "금액" → `DECIMAL(15,2)`)
 - **Term** : 논리명→물리명 매핑 사전 (예: "사용자명" → `user_name`), Domain 참조 가능
 
-모든 엔티티는 `BaseTimeEntity`를 상속하여 `createdAt`, `updatedAt`을 UTC 기준 `Instant`로 자동 기록한다.
+모든 엔티티는 `BaseTimeEntity` 계층을 통해 `createdAt`, `updatedAt`을 UTC 기준 `Instant`로 자동 기록한다. 감사 주체(`createdBy`, `updatedBy`)가 필요한 엔티티는 `BaseAuditEntity`를 상속한다.
 
 ## API 엔드포인트
 
@@ -745,6 +760,25 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 | GET    | `/api/teams/{teamId}/projects`      | 프로젝트 목록 | —            |
 | GET    | `/api/teams/{teamId}/projects/{id}` | 프로젝트 상세 | —            |
 | DELETE | `/api/teams/{teamId}/projects/{id}` | 프로젝트 삭제 | —            |
+
+### 다이어그램 (`/api/teams/{teamId}/projects/{projectId}/diagrams/**` — 인증 필요)
+
+| Method | Path                                                                    | 설명                    | Request Body                                             |
+| ------ | ----------------------------------------------------------------------- | ----------------------- | -------------------------------------------------------- |
+| POST   | `/api/teams/{teamId}/projects/{projectId}/diagrams`                     | 다이어그램 생성         | `{ name, dictionarySetId }`                              |
+| GET    | `/api/teams/{teamId}/projects/{projectId}/diagrams`                     | 다이어그램 목록         | —                                                        |
+| GET    | `/api/teams/{teamId}/projects/{projectId}/diagrams/{diagramId}`         | 다이어그램 상세         | —                                                        |
+| PUT    | `/api/teams/{teamId}/projects/{projectId}/diagrams/{diagramId}`         | 다이어그램 content 저장 | `{ content }`                                            |
+| POST   | `/api/teams/{teamId}/projects/{projectId}/diagrams/{diagramId}/ydoc-snapshot` | Y.Doc snapshot 즉시 저장 | `{ expectedContentRevision, ydocSnapshot(base64) }`      |
+| PATCH  | `/api/teams/{teamId}/projects/{projectId}/diagrams/{diagramId}`         | 다이어그램 이름 변경    | `{ name }`                                               |
+| PATCH  | `/api/teams/{teamId}/projects/{projectId}/diagrams/{diagramId}/dictionary-set` | 다이어그램 사전 세트 변경 | `{ dictionarySetId }`                                    |
+| DELETE | `/api/teams/{teamId}/projects/{projectId}/diagrams/{diagramId}`         | 다이어그램 삭제         | —                                                        |
+
+### WebSocket Ticket (`/api/ws-ticket` — 인증 필요)
+
+| Method | Path             | 설명                               | Request Body     | Response                                      |
+| ------ | ---------------- | ---------------------------------- | ---------------- | --------------------------------------------- |
+| POST   | `/api/ws-ticket` | 다이어그램 협업 접속용 ticket 발급 | `{ diagramId }`  | `{ ticket, userId, presenceProtocolVersion }` |
 
 ### 도메인 사전 (`/api/teams/{teamId}/domains/**` — 인증 필요)
 

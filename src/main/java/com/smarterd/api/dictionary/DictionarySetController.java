@@ -4,6 +4,7 @@ import com.smarterd.api.dictionary.dto.CreateDictionarySetRequest;
 import com.smarterd.api.dictionary.dto.DictionarySetResponse;
 import com.smarterd.api.dictionary.dto.UpdateDictionarySetRequest;
 import com.smarterd.domain.dictionary.service.DictionarySetService;
+import com.smarterd.domain.dictionary.service.DictionarySetService.DictionarySetResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -59,9 +60,13 @@ public class DictionarySetController {
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
         @Valid @RequestBody CreateDictionarySetRequest request
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-            dictionarySetService.createDictionarySet(jwt.getSubject(), teamId, request)
+        final var result = dictionarySetService.createDictionarySet(
+            jwt.getSubject(),
+            teamId,
+            request.name(),
+            request.description()
         );
+        return ResponseEntity.status(HttpStatus.CREATED).body(toDictionarySetResponse(result));
     }
 
     /**
@@ -77,7 +82,9 @@ public class DictionarySetController {
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId
     ) {
-        return ResponseEntity.ok(dictionarySetService.getDictionarySets(jwt.getSubject(), teamId));
+        return ResponseEntity.ok(
+            dictionarySetService.getDictionarySets(jwt.getSubject(), teamId).stream().map(this::toDictionarySetResponse).toList()
+        );
     }
 
     /**
@@ -95,7 +102,7 @@ public class DictionarySetController {
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
         @Parameter(description = "세트 ID") @PathVariable Long setId
     ) {
-        return ResponseEntity.ok(dictionarySetService.getDictionarySet(jwt.getSubject(), teamId, setId));
+        return ResponseEntity.ok(toDictionarySetResponse(dictionarySetService.getDictionarySet(jwt.getSubject(), teamId, setId)));
     }
 
     /**
@@ -115,7 +122,17 @@ public class DictionarySetController {
         @Parameter(description = "세트 ID") @PathVariable Long setId,
         @Valid @RequestBody UpdateDictionarySetRequest request
     ) {
-        return ResponseEntity.ok(dictionarySetService.updateDictionarySet(jwt.getSubject(), teamId, setId, request));
+        return ResponseEntity.ok(
+            toDictionarySetResponse(
+                dictionarySetService.updateDictionarySet(
+                    jwt.getSubject(),
+                    teamId,
+                    setId,
+                    request.name(),
+                    request.description()
+                )
+            )
+        );
     }
 
     /**
@@ -152,6 +169,26 @@ public class DictionarySetController {
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
         @Parameter(description = "세트 ID") @PathVariable Long setId
     ) {
-        return ResponseEntity.ok(dictionarySetService.setDefaultDictionarySet(jwt.getSubject(), teamId, setId));
+        return ResponseEntity.ok(
+            toDictionarySetResponse(dictionarySetService.setDefaultDictionarySet(jwt.getSubject(), teamId, setId))
+        );
+    }
+
+    /**
+     * 서비스 계층 사전 세트 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private DictionarySetResponse toDictionarySetResponse(DictionarySetResult result) {
+        return new DictionarySetResponse(
+            result.id(),
+            result.name(),
+            result.description(),
+            result.teamId(),
+            result.isDefault(),
+            result.createdAt(),
+            result.updatedAt()
+        );
     }
 }

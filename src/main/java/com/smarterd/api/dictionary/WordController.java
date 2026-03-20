@@ -1,15 +1,19 @@
 package com.smarterd.api.dictionary;
 
 import com.smarterd.api.common.dto.PageResponse;
-import com.smarterd.api.common.dto.PageSearchRequest;
 import com.smarterd.api.dictionary.dto.BulkSaveResponse;
 import com.smarterd.api.dictionary.dto.BulkValidationResponse;
+import com.smarterd.api.dictionary.dto.BulkValidationRow;
 import com.smarterd.api.dictionary.dto.BulkWordSaveRequest;
 import com.smarterd.api.dictionary.dto.CreateWordRequest;
 import com.smarterd.api.dictionary.dto.UpdateWordRequest;
 import com.smarterd.api.dictionary.dto.WordResponse;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkSaveResult;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationResult;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationRowResult;
 import com.smarterd.domain.dictionary.service.WordBulkService;
 import com.smarterd.domain.dictionary.service.WordService;
+import com.smarterd.domain.dictionary.service.WordService.WordResult;
 import com.smarterd.utils.ExcelUtils;
 import jakarta.servlet.http.HttpServletResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -63,9 +67,15 @@ public class WordController {
         @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Valid @RequestBody CreateWordRequest request
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-            wordService.createWord(jwt.getSubject(), teamId, setId, request)
+        final var result = wordService.createWord(
+            jwt.getSubject(),
+            teamId,
+            setId,
+            request.logicalName(),
+            request.physicalName(),
+            request.description()
         );
+        return ResponseEntity.status(HttpStatus.CREATED).body(toWordResponse(result));
     }
 
     @Operation(summary = "단어 목록 조회")
@@ -78,8 +88,9 @@ public class WordController {
         @Parameter(description = "페이지 크기 (최대 200)") @RequestParam(defaultValue = "20") int size,
         @Parameter(description = "복합 검색어 (논리명/물리명/설명)") @RequestParam(required = false, name = "q") String keyword
     ) {
-        final var searchRequest = new PageSearchRequest(page, size, keyword);
-        return ResponseEntity.ok(wordService.getWords(jwt.getSubject(), teamId, setId, searchRequest));
+        final var resultPage = wordService.getWords(jwt.getSubject(), teamId, setId, page, size, keyword)
+            .map(this::toWordResponse);
+        return ResponseEntity.ok(PageResponse.from(resultPage));
     }
 
     @Operation(summary = "단어 업로드 검증", description = "엑셀/CSV 파일의 단어 데이터를 검증한다.")
@@ -91,7 +102,9 @@ public class WordController {
         @RequestParam("file") MultipartFile file,
         Locale locale
     ) {
-        return ResponseEntity.ok(wordBulkService.validateUpload(jwt.getSubject(), teamId, setId, file, locale));
+        return ResponseEntity.ok(
+            toBulkValidationResponse(wordBulkService.validateUpload(jwt.getSubject(), teamId, setId, file, locale))
+        );
     }
 
     @Operation(summary = "단어 일괄 저장", description = "검증 통과한 단어를 일괄 저장한다.")
@@ -102,7 +115,17 @@ public class WordController {
         @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Valid @RequestBody BulkWordSaveRequest request
     ) {
-        return ResponseEntity.ok(wordBulkService.bulkSave(jwt.getSubject(), teamId, setId, request));
+        return ResponseEntity.ok(
+            toBulkSaveResponse(
+                wordBulkService.bulkSave(
+                    jwt.getSubject(),
+                    teamId,
+                    setId,
+                    request.validationToken(),
+                    request.excludedRowNumbers()
+                )
+            )
+        );
     }
 
     @Operation(summary = "단어 업로드 오류 엑셀 다운로드", description = "단어 업로드 검증 오류 행을 엑셀로 다운로드한다.")
@@ -151,7 +174,7 @@ public class WordController {
         @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Parameter(description = "단어 ID") @PathVariable Long wordId
     ) {
-        return ResponseEntity.ok(wordService.getWord(jwt.getSubject(), teamId, setId, wordId));
+        return ResponseEntity.ok(toWordResponse(wordService.getWord(jwt.getSubject(), teamId, setId, wordId)));
     }
 
     @Operation(summary = "단어 수정")
@@ -163,7 +186,19 @@ public class WordController {
         @Parameter(description = "단어 ID") @PathVariable Long wordId,
         @Valid @RequestBody UpdateWordRequest request
     ) {
-        return ResponseEntity.ok(wordService.updateWord(jwt.getSubject(), teamId, setId, wordId, request));
+        return ResponseEntity.ok(
+            toWordResponse(
+                wordService.updateWord(
+                    jwt.getSubject(),
+                    teamId,
+                    setId,
+                    wordId,
+                    request.logicalName(),
+                    request.physicalName(),
+                    request.description()
+                )
+            )
+        );
     }
 
     @Operation(summary = "단어 삭제")
@@ -176,5 +211,61 @@ public class WordController {
     ) {
         wordService.deleteWord(jwt.getSubject(), teamId, setId, wordId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 서비스 계층 단어 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private WordResponse toWordResponse(WordResult result) {
+        return new WordResponse(
+            result.id(),
+            result.logicalName(),
+            result.physicalName(),
+            result.description(),
+            result.teamId(),
+            result.dictionarySetId(),
+            result.createdAt(),
+            result.updatedAt()
+        );
+    }
+
+    /**
+     * 서비스 계층 벌크 검증 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private BulkValidationResponse toBulkValidationResponse(BulkValidationResult result) {
+        return new BulkValidationResponse(
+            result.validationToken(),
+            result.totalCount(),
+            result.validCount(),
+            result.errorCount(),
+            result.previewTruncated(),
+            result.rows().stream().map(this::toBulkValidationRow).toList()
+        );
+    }
+
+    /**
+     * 서비스 계층 벌크 검증 행을 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과 행
+     * @return HTTP 응답 DTO
+     */
+    private BulkValidationRow toBulkValidationRow(BulkValidationRowResult result) {
+        return new BulkValidationRow(result.rowNumber(), result.valid(), result.errors(), result.data());
+    }
+
+    /**
+     * 서비스 계층 벌크 저장 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private BulkSaveResponse toBulkSaveResponse(BulkSaveResult result) {
+        return new BulkSaveResponse(result.savedCount(), result.failedCount());
     }
 }

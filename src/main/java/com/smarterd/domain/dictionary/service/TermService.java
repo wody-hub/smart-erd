@@ -1,10 +1,5 @@
 package com.smarterd.domain.dictionary.service;
 
-import com.smarterd.api.common.dto.PageResponse;
-import com.smarterd.api.common.dto.PageSearchRequest;
-import com.smarterd.api.dictionary.dto.CreateTermRequest;
-import com.smarterd.api.dictionary.dto.TermResponse;
-import com.smarterd.api.dictionary.dto.UpdateTermRequest;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
@@ -17,7 +12,11 @@ import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.service.AuthService;
+import com.smarterd.utils.AppStringUtils;
+import java.time.Instant;
 import java.util.Objects;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.lang.Nullable;
@@ -57,30 +56,41 @@ public class TermService {
      * @param loginId 요청 사용자의 로그인 ID
      * @param teamId  팀 ID
      * @param setId   사전 세트 ID
-     * @param request 용어 생성 요청
-     * @return 생성된 용어 응답
+     * @param logicalName 생성할 논리명
+     * @param physicalName 생성할 물리명
+     * @param domainId 연결할 도메인 ID
+     * @param description 생성할 설명
+     * @return 생성된 용어 결과
      */
     @Transactional
-    public TermResponse createTerm(String loginId, Long teamId, Long setId, CreateTermRequest request) {
+    public TermResult createTerm(
+        String loginId,
+        Long teamId,
+        Long setId,
+        String logicalName,
+        String physicalName,
+        Long domainId,
+        String description
+    ) {
         final var context = verifyWriteAccess(loginId, teamId, setId);
 
-        if (termRepository.existsByDictionarySetAndLogicalName(context.dictionarySet(), request.logicalName())) {
-            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_TERM_LOGICAL_NAME.code(), request.logicalName());
+        if (termRepository.existsByDictionarySetAndLogicalName(context.dictionarySet(), logicalName)) {
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_TERM_LOGICAL_NAME.code(), logicalName);
         }
 
-        final var domain = resolveDomain(request.domainId(), context.team(), context.dictionarySet());
+        final var domain = resolveDomain(domainId, context.team(), context.dictionarySet());
 
         final var term = Term.builder()
-            .logicalName(request.logicalName())
-            .physicalName(request.physicalName())
-            .description(request.description())
+            .logicalName(logicalName)
+            .physicalName(physicalName)
+            .description(description)
             .team(context.team())
             .dictionarySet(context.dictionarySet())
             .domain(domain)
             .build();
         termRepository.save(Objects.requireNonNull(term));
 
-        return TermResponse.from(term);
+        return toTermResult(term);
     }
 
     /**
@@ -89,28 +99,33 @@ public class TermService {
      * @param loginId       요청 사용자의 로그인 ID
      * @param teamId        팀 ID
      * @param setId         사전 세트 ID
-     * @param searchRequest 페이지네이션 + 검색 요청
-     * @return 용어 응답 목록
+     * @param page          페이지 번호
+     * @param size          페이지 크기
+     * @param keyword       복합 검색어
+     * @return 용어 결과 페이지
      */
-    public PageResponse<TermResponse> getTerms(
+    public Page<TermResult> getTerms(
         String loginId,
         Long teamId,
         Long setId,
-        PageSearchRequest searchRequest
+        int page,
+        int size,
+        String keyword
     ) {
         final var context = verifyReadAccess(loginId, teamId, setId);
 
-        final var pageable = searchRequest.toPageRequest(
-            MAX_PAGE_SIZE,
+        final var pageable = PageRequest.of(
+            Math.max(page, 0),
+            Math.min(Math.max(size, 1), MAX_PAGE_SIZE),
             Sort.by(Sort.Order.asc("logicalName"), Sort.Order.asc("id"))
         );
-        final var normalizedKeyword = searchRequest.normalizedKeyword();
+        final var normalizedKeyword = AppStringUtils.trimToNull(keyword);
         final var resultPage = (
             normalizedKeyword == null
                 ? termRepository.findByDictionarySet(context.dictionarySet(), pageable)
                 : termRepository.searchByDictionarySet(context.dictionarySet(), normalizedKeyword, pageable)
-        ).map(TermResponse::from);
-        return PageResponse.from(resultPage);
+        ).map(this::toTermResult);
+        return resultPage;
     }
 
     /**
@@ -120,16 +135,16 @@ public class TermService {
      * @param teamId  팀 ID
      * @param setId   사전 세트 ID
      * @param termId  용어 ID
-     * @return 용어 응답
+     * @return 용어 결과
      */
-    public TermResponse getTerm(String loginId, Long teamId, Long setId, Long termId) {
+    public TermResult getTerm(String loginId, Long teamId, Long setId, Long termId) {
         verifyReadAccess(loginId, teamId, setId);
 
         final var term = findTermById(termId);
         verifyTermBelongsToTeam(term, teamId);
         verifyTermBelongsToSet(term, setId);
 
-        return TermResponse.from(term);
+        return toTermResult(term);
     }
 
     /**
@@ -139,11 +154,23 @@ public class TermService {
      * @param teamId  팀 ID
      * @param setId   사전 세트 ID
      * @param termId  용어 ID
-     * @param request 용어 수정 요청
-     * @return 수정된 용어 응답
+     * @param logicalName 변경할 논리명
+     * @param physicalName 변경할 물리명
+     * @param domainId 변경할 도메인 ID
+     * @param description 변경할 설명
+     * @return 수정된 용어 결과
      */
     @Transactional
-    public TermResponse updateTerm(String loginId, Long teamId, Long setId, Long termId, UpdateTermRequest request) {
+    public TermResult updateTerm(
+        String loginId,
+        Long teamId,
+        Long setId,
+        Long termId,
+        String logicalName,
+        String physicalName,
+        Long domainId,
+        String description
+    ) {
         final var context = verifyWriteAccess(loginId, teamId, setId);
 
         final var term = findTermById(termId);
@@ -153,17 +180,17 @@ public class TermService {
         if (
             termRepository.existsByDictionarySetAndLogicalNameAndIdNot(
                 context.dictionarySet(),
-                request.logicalName(),
+                logicalName,
                 termId
             )
         ) {
-            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_TERM_LOGICAL_NAME.code(), request.logicalName());
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_TERM_LOGICAL_NAME.code(), logicalName);
         }
 
-        final var domain = resolveDomain(request.domainId(), context.team(), context.dictionarySet());
-        term.update(request.logicalName(), request.physicalName(), domain, request.description());
+        final var domain = resolveDomain(domainId, context.team(), context.dictionarySet());
+        term.update(logicalName, physicalName, domain, description);
 
-        return TermResponse.from(term);
+        return toTermResult(term);
     }
 
     /**
@@ -287,6 +314,28 @@ public class TermService {
     }
 
     /**
+     * 용어 엔티티를 서비스 결과로 변환한다.
+     *
+     * @param term 용어 엔티티
+     * @return 서비스 계층 용어 결과
+     */
+    private TermResult toTermResult(Term term) {
+        final var domain = term.getDomain();
+        return new TermResult(
+            term.getId(),
+            term.getLogicalName(),
+            term.getPhysicalName(),
+            term.getDescription(),
+            term.getTeam().getId(),
+            term.getDictionarySet() != null ? term.getDictionarySet().getId() : null,
+            domain != null ? domain.getId() : null,
+            domain != null ? domain.getLogicalName() : null,
+            term.getCreatedAt(),
+            term.getUpdatedAt()
+        );
+    }
+
+    /**
      * 접근 검증 결과를 담는 내부 컨텍스트.
      *
      * @param user          인증된 사용자
@@ -294,4 +343,31 @@ public class TermService {
      * @param dictionarySet 대상 사전 세트
      */
     private record AccessContext(User user, Team team, DictionarySet dictionarySet) {}
+
+    /**
+     * 용어 응답용 서비스 결과.
+     *
+     * @param id 용어 ID
+     * @param logicalName 논리명
+     * @param physicalName 물리명
+     * @param description 설명
+     * @param teamId 소속 팀 ID
+     * @param dictionarySetId 소속 사전 세트 ID
+     * @param domainId 연결 도메인 ID
+     * @param domainLogicalName 연결 도메인 논리명
+     * @param createdAt 생성 시각
+     * @param updatedAt 수정 시각
+     */
+    public record TermResult(
+        Long id,
+        String logicalName,
+        String physicalName,
+        String description,
+        Long teamId,
+        Long dictionarySetId,
+        Long domainId,
+        String domainLogicalName,
+        Instant createdAt,
+        Instant updatedAt
+    ) {}
 }

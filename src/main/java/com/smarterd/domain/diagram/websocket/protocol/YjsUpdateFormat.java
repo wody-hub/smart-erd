@@ -23,6 +23,9 @@ public final class YjsUpdateFormat {
     /** 포맷 식별 매직 바이트 ("YLPF" = Yjs Length Prefixed Format) */
     static final byte[] FORMAT_MAGIC = { 0x59, 0x4C, 0x50, 0x46 };
 
+    /**
+     * 유틸리티 클래스 인스턴스화를 방지한다.
+     */
     private YjsUpdateFormat() {}
 
     /**

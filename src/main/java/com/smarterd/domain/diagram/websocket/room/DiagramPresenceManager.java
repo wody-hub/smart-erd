@@ -28,6 +28,13 @@ final class DiagramPresenceManager {
         private final long joinSeq;
         private int sessionCount;
 
+        /**
+         * room 내부 presence 엔트리를 생성한다.
+         *
+         * @param userId 사용자 ID
+         * @param displayName 사용자 표시 이름
+         * @param joinSeq room 입장 순번
+         */
         private PresenceEntry(String userId, String displayName, long joinSeq) {
             this.userId = userId;
             this.displayName = displayName;
@@ -153,12 +160,23 @@ final class DiagramPresenceManager {
         presenceRooms.remove(diagramId);
     }
 
+    /**
+     * 호출자가 room 락을 보유한 상태인지 검증한다.
+     *
+     * @param roomLock room 세션 락 객체
+     */
     private void requireRoomLock(Object roomLock) {
         if (!Thread.holdsLock(roomLock)) {
             throw new IllegalStateException("presence 접근은 room lock 보유 상태에서만 호출해야 합니다.");
         }
     }
 
+    /**
+     * 현재 room 상태를 presence snapshot payload로 변환한다.
+     *
+     * @param roomState room presence 상태
+     * @return 정렬된 참여자 목록을 포함한 snapshot
+     */
     private PresenceSnapshot buildPresenceSnapshot(PresenceRoomState roomState) {
         final var participants = roomState.entries
             .values()

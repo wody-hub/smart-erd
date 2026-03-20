@@ -144,6 +144,12 @@ public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
         }
     }
 
+    /**
+     * 나노초 단위를 밀리초로 변환한다.
+     *
+     * @param nanos 변환할 나노초 값
+     * @return 밀리초 값
+     */
     private static long nanosToMillis(long nanos) {
         return nanos / 1_000_000L;
     }

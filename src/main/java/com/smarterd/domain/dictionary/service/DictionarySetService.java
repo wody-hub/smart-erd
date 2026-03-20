@@ -1,8 +1,5 @@
 package com.smarterd.domain.dictionary.service;
 
-import com.smarterd.api.dictionary.dto.CreateDictionarySetRequest;
-import com.smarterd.api.dictionary.dto.DictionarySetResponse;
-import com.smarterd.api.dictionary.dto.UpdateDictionarySetRequest;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
@@ -16,6 +13,7 @@ import com.smarterd.domain.dictionary.repository.WordRepository;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -50,9 +48,9 @@ public class DictionarySetService {
      *
      * @param loginId 요청 사용자 로그인 ID
      * @param teamId  팀 ID
-     * @return 사전 세트 응답 목록
+     * @return 사전 세트 결과 목록
      */
-    public List<DictionarySetResponse> getDictionarySets(String loginId, Long teamId) {
+    public List<DictionarySetResult> getDictionarySets(String loginId, Long teamId) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyMembership(team, user);
@@ -60,7 +58,7 @@ public class DictionarySetService {
         return dictionarySetRepository
             .findByTeamOrderByCreatedAtAsc(team)
             .stream()
-            .map(DictionarySetResponse::from)
+            .map(this::toDictionarySetResult)
             .toList();
     }
 
@@ -70,14 +68,14 @@ public class DictionarySetService {
      * @param loginId 요청 사용자 로그인 ID
      * @param teamId  팀 ID
      * @param setId   사전 세트 ID
-     * @return 사전 세트 응답
+     * @return 사전 세트 결과
      */
-    public DictionarySetResponse getDictionarySet(String loginId, Long teamId, Long setId) {
+    public DictionarySetResult getDictionarySet(String loginId, Long teamId, Long setId) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyMembership(team, user);
 
-        return DictionarySetResponse.from(findByTeamAndId(team, setId));
+        return toDictionarySetResult(findByTeamAndId(team, setId));
     }
 
     /**
@@ -88,32 +86,33 @@ public class DictionarySetService {
      *
      * @param loginId 요청 사용자 로그인 ID
      * @param teamId  팀 ID
-     * @param request 생성 요청
-     * @return 생성된 사전 세트 응답
+     * @param name 생성할 세트 이름
+     * @param description 생성할 세트 설명
+     * @return 생성된 사전 세트 결과
      */
     @Transactional
-    public DictionarySetResponse createDictionarySet(String loginId, Long teamId, CreateDictionarySetRequest request) {
+    public DictionarySetResult createDictionarySet(String loginId, Long teamId, String name, String description) {
         final var user = authService.findUserByLoginId(loginId);
         // 팀 row를 락으로 잡아 동일 팀 내 동시 생성 경쟁을 직렬화한다.
         final var team = teamService.findTeamByIdForUpdate(teamId);
         teamService.verifyEditable(team, user);
 
-        if (dictionarySetRepository.existsByTeamAndName(team, request.name())) {
-            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DICTIONARY_SET_NAME.code(), request.name());
+        if (dictionarySetRepository.existsByTeamAndName(team, name)) {
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DICTIONARY_SET_NAME.code(), name);
         }
 
         final var isDefault = dictionarySetRepository.findFirstByTeamAndIsDefaultTrue(team).isEmpty();
         final var dictionarySet = Objects.requireNonNull(
             DictionarySet.builder()
                 .team(team)
-                .name(request.name())
-                .description(request.description())
+                .name(name)
+                .description(description)
                 .isDefault(isDefault)
                 .build()
         );
 
         dictionarySetRepository.save(dictionarySet);
-        return DictionarySetResponse.from(dictionarySet);
+        return toDictionarySetResult(dictionarySet);
     }
 
     /**
@@ -122,26 +121,28 @@ public class DictionarySetService {
      * @param loginId 요청 사용자 로그인 ID
      * @param teamId  팀 ID
      * @param setId   사전 세트 ID
-     * @param request 수정 요청
-     * @return 수정된 사전 세트 응답
+     * @param name 변경할 세트 이름
+     * @param description 변경할 세트 설명
+     * @return 수정된 사전 세트 결과
      */
     @Transactional
-    public DictionarySetResponse updateDictionarySet(
+    public DictionarySetResult updateDictionarySet(
         String loginId,
         Long teamId,
         Long setId,
-        UpdateDictionarySetRequest request
+        String name,
+        String description
     ) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyEditable(team, user);
 
         final var dictionarySet = findByTeamAndId(team, setId);
-        if (dictionarySetRepository.existsByTeamAndNameAndIdNot(team, request.name(), setId)) {
-            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DICTIONARY_SET_NAME.code(), request.name());
+        if (dictionarySetRepository.existsByTeamAndNameAndIdNot(team, name, setId)) {
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DICTIONARY_SET_NAME.code(), name);
         }
-        dictionarySet.update(request.name(), request.description());
-        return DictionarySetResponse.from(dictionarySet);
+        dictionarySet.update(name, description);
+        return toDictionarySetResult(dictionarySet);
     }
 
     /**
@@ -179,10 +180,10 @@ public class DictionarySetService {
      * @param loginId 요청 사용자 로그인 ID
      * @param teamId  팀 ID
      * @param setId   기본으로 지정할 사전 세트 ID
-     * @return 기본으로 지정된 사전 세트 응답
+     * @return 기본으로 지정된 사전 세트 결과
      */
     @Transactional
-    public DictionarySetResponse setDefaultDictionarySet(String loginId, Long teamId, Long setId) {
+    public DictionarySetResult setDefaultDictionarySet(String loginId, Long teamId, Long setId) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyEditable(team, user);
@@ -192,7 +193,7 @@ public class DictionarySetService {
         for (final var set : sets) {
             set.setDefault(set.getId().equals(target.getId()));
         }
-        return DictionarySetResponse.from(target);
+        return toDictionarySetResult(target);
     }
 
     /**
@@ -229,4 +230,43 @@ public class DictionarySetService {
             .findFirstByTeamAndIsDefaultTrue(team)
             .orElseGet(() -> dictionarySetRepository.save(dictionarySet));
     }
+
+    /**
+     * 사전 세트 엔티티를 서비스 결과로 변환한다.
+     *
+     * @param dictionarySet 사전 세트 엔티티
+     * @return 서비스 계층 사전 세트 결과
+     */
+    private DictionarySetResult toDictionarySetResult(DictionarySet dictionarySet) {
+        return new DictionarySetResult(
+            dictionarySet.getId(),
+            dictionarySet.getName(),
+            dictionarySet.getDescription(),
+            dictionarySet.getTeam().getId(),
+            dictionarySet.isDefault(),
+            dictionarySet.getCreatedAt(),
+            dictionarySet.getUpdatedAt()
+        );
+    }
+
+    /**
+     * 사전 세트 응답용 서비스 결과.
+     *
+     * @param id 세트 ID
+     * @param name 세트 이름
+     * @param description 세트 설명
+     * @param teamId 소속 팀 ID
+     * @param isDefault 기본 세트 여부
+     * @param createdAt 생성 시각
+     * @param updatedAt 수정 시각
+     */
+    public record DictionarySetResult(
+        Long id,
+        String name,
+        String description,
+        Long teamId,
+        boolean isDefault,
+        Instant createdAt,
+        Instant updatedAt
+    ) {}
 }

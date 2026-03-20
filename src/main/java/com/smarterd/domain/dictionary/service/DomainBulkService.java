@@ -1,15 +1,13 @@
 package com.smarterd.domain.dictionary.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smarterd.api.dictionary.dto.BulkDomainRow;
-import com.smarterd.api.dictionary.dto.BulkDomainSaveRequest;
-import com.smarterd.api.dictionary.dto.BulkSaveResponse;
-import com.smarterd.api.dictionary.dto.BulkValidationResponse;
-import com.smarterd.api.dictionary.dto.BulkValidationRow;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkSaveResult;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationResult;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationRowResult;
 import com.smarterd.domain.dictionary.service.session.BulkValidationSessionStore;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
@@ -119,7 +117,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
      * @param locale  요청 로케일
      * @return 검증 결과 응답
      */
-    public BulkValidationResponse validateUpload(
+    public BulkValidationResult validateUpload(
         String loginId,
         Long teamId,
         Long setId,
@@ -186,12 +184,12 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
 
             final var rowNumber = i + 2;
             final var valid = errors.isEmpty();
-            final var previewRow = new BulkValidationRow(rowNumber, valid, errors, data);
+            final var previewRow = new BulkValidationRowResult(rowNumber, valid, errors, data);
 
             if (valid) {
                 result.addValid(
                     previewRow,
-                    new ValidatedDomainRow(rowNumber, new BulkDomainRow(logicalName, physicalType, description))
+                    new ValidatedDomainRow(rowNumber, new DomainBulkRow(logicalName, physicalType, description))
                 );
             } else {
                 result.addError(
@@ -269,7 +267,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
      * @param validationResult 검증 결과 누적 객체
      * @return 검증 결과 응답
      */
-    private BulkValidationResponse createValidationResponse(
+    private BulkValidationResult createValidationResponse(
         String loginId,
         Long teamId,
         Long setId,
@@ -292,7 +290,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
             false
         );
         final var validationToken = issueValidationToken(session);
-        return new BulkValidationResponse(
+        return new BulkValidationResult(
             validationToken,
             totalRows,
             validationResult.validCount,
@@ -307,8 +305,8 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
      */
     private static class RowValidationResult {
 
-        final ArrayList<BulkValidationRow> errorPreviewRows;
-        final ArrayList<BulkValidationRow> validPreviewRows;
+        final ArrayList<BulkValidationRowResult> errorPreviewRows;
+        final ArrayList<BulkValidationRowResult> validPreviewRows;
         final ArrayList<ValidatedDomainRow> validRows = new ArrayList<>();
         final ArrayList<DomainErrorReportRow> errorRows = new ArrayList<>();
         int validCount = 0;
@@ -319,7 +317,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
             this.validPreviewRows = new ArrayList<>(Math.min(estimatedSize, PREVIEW_ROW_LIMIT));
         }
 
-        void addValid(BulkValidationRow previewRow, ValidatedDomainRow validatedRow) {
+        void addValid(BulkValidationRowResult previewRow, ValidatedDomainRow validatedRow) {
             validCount++;
             validRows.add(validatedRow);
             if (validPreviewRows.size() < PREVIEW_ROW_LIMIT) {
@@ -327,7 +325,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
             }
         }
 
-        void addError(BulkValidationRow previewRow, DomainErrorReportRow errorReportRow) {
+        void addError(BulkValidationRowResult previewRow, DomainErrorReportRow errorReportRow) {
             errorCount++;
             errorRows.add(errorReportRow);
             if (errorPreviewRows.size() < PREVIEW_ROW_LIMIT) {
@@ -345,27 +343,33 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
      * @return 저장 결과 응답
      */
     @Transactional
-    public BulkSaveResponse bulkSave(String loginId, Long teamId, Long setId, BulkDomainSaveRequest request) {
+    public BulkSaveResult bulkSave(
+        String loginId,
+        Long teamId,
+        Long setId,
+        String validationToken,
+        List<Integer> excludedRowNumbers
+    ) {
         final var team = verifyTeamAccess(loginId, teamId);
         final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
         final var session = consumeValidationSession(
             loginId,
             teamId,
             setId,
-            request.validationToken(),
+            validationToken,
             ValidationSession.class
         );
-        final var excludedRowNumbers = new HashSet<>(request.excludedRowNumbers());
+        final var excludedRows = new HashSet<>(excludedRowNumbers);
         final var candidateRows = session
             .validRows()
             .stream()
-            .filter((row) -> !excludedRowNumbers.contains(row.rowNumber()))
+            .filter((row) -> !excludedRows.contains(row.rowNumber()))
             .map(ValidatedDomainRow::row)
             .toList();
 
         // 기존 논리명 일괄 조회 (N+1 방지)
         final var existingNames = findExistingLogicalNames(
-            candidateRows.stream().map(BulkDomainRow::logicalName).toList(),
+            candidateRows.stream().map(DomainBulkRow::logicalName).toList(),
             LOGICAL_NAME_QUERY_BATCH_SIZE,
             (names) -> domainRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, names),
             Domain::getLogicalName
@@ -374,7 +378,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
         final var domainsToSave = new ArrayList<Domain>();
         var failedCount = 0;
 
-        for (BulkDomainRow row : candidateRows) {
+        for (DomainBulkRow row : candidateRows) {
             if (existingNames.contains(row.logicalName())) {
                 failedCount++;
                 continue;
@@ -395,7 +399,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
         } catch (DataIntegrityViolationException e) {
             throw new DuplicateException(MessageCode.ERROR_BULK_CONCURRENT_DUPLICATE.code());
         }
-        return new BulkSaveResponse(domainsToSave.size(), failedCount);
+        return new BulkSaveResult(domainsToSave.size(), failedCount);
     }
 
     /**
@@ -483,8 +487,22 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
         private String description;
     }
 
-    /** 검증 후 저장 가능한 도메인 행. */
-    private record ValidatedDomainRow(int rowNumber, BulkDomainRow row) {}
+    /**
+     * 검증 통과 후 저장 후보로 유지하는 도메인 행.
+     *
+     * @param rowNumber 원본 행 번호
+     * @param row 저장 후보 도메인 행
+     */
+    private record ValidatedDomainRow(int rowNumber, DomainBulkRow row) {}
+
+    /**
+     * 벌크 저장 단계에서 사용하는 도메인 행 모델.
+     *
+     * @param logicalName 논리명
+     * @param physicalType 물리 타입
+     * @param description 설명
+     */
+    private record DomainBulkRow(String logicalName, String physicalType, String description) {}
 
     /** 오류 보고서 엑셀 행. */
     public record DomainErrorReportRow(

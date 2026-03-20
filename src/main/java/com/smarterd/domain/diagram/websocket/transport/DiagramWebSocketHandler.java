@@ -122,6 +122,12 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
         messageHandlerMap = Map.copyOf(map);
     }
 
+    /**
+     * 메시지 타입 집합을 사람이 읽기 쉬운 16진수 문자열로 변환한다.
+     *
+     * @param types 변환할 메시지 타입 집합
+     * @return 정렬된 16진수 타입 문자열
+     */
     private String formatMessageTypes(Set<Byte> types) {
         return types
             .stream()

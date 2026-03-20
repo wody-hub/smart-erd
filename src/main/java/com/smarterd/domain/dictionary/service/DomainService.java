@@ -1,10 +1,5 @@
 package com.smarterd.domain.dictionary.service;
 
-import com.smarterd.api.common.dto.PageResponse;
-import com.smarterd.api.common.dto.PageSearchRequest;
-import com.smarterd.api.dictionary.dto.CreateDomainRequest;
-import com.smarterd.api.dictionary.dto.DomainResponse;
-import com.smarterd.api.dictionary.dto.UpdateDomainRequest;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
@@ -17,7 +12,11 @@ import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.service.AuthService;
+import com.smarterd.utils.AppStringUtils;
+import java.time.Instant;
 import java.util.Objects;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -56,27 +55,36 @@ public class DomainService {
      * @param loginId 요청 사용자의 로그인 ID
      * @param teamId  팀 ID
      * @param setId   사전 세트 ID
-     * @param request 도메인 생성 요청
-     * @return 생성된 도메인 응답
+     * @param logicalName 생성할 논리명
+     * @param physicalType 생성할 물리 타입
+     * @param description 생성할 설명
+     * @return 생성된 도메인 결과
      */
     @Transactional
-    public DomainResponse createDomain(String loginId, Long teamId, Long setId, CreateDomainRequest request) {
+    public DomainResult createDomain(
+        String loginId,
+        Long teamId,
+        Long setId,
+        String logicalName,
+        String physicalType,
+        String description
+    ) {
         final var context = verifyWriteAccess(loginId, teamId, setId);
 
-        if (domainRepository.existsByDictionarySetAndLogicalName(context.dictionarySet(), request.logicalName())) {
-            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), request.logicalName());
+        if (domainRepository.existsByDictionarySetAndLogicalName(context.dictionarySet(), logicalName)) {
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), logicalName);
         }
 
         final var domain = Domain.builder()
-            .logicalName(request.logicalName())
-            .physicalType(request.physicalType())
-            .description(request.description())
+            .logicalName(logicalName)
+            .physicalType(physicalType)
+            .description(description)
             .team(context.team())
             .dictionarySet(context.dictionarySet())
             .build();
         domainRepository.save(Objects.requireNonNull(domain));
 
-        return DomainResponse.from(domain);
+        return toDomainResult(domain);
     }
 
     /**
@@ -85,28 +93,33 @@ public class DomainService {
      * @param loginId       요청 사용자의 로그인 ID
      * @param teamId        팀 ID
      * @param setId         사전 세트 ID
-     * @param searchRequest 페이지네이션 + 검색 요청
-     * @return 도메인 응답 목록
+     * @param page          페이지 번호
+     * @param size          페이지 크기
+     * @param keyword       복합 검색어
+     * @return 도메인 결과 페이지
      */
-    public PageResponse<DomainResponse> getDomains(
+    public Page<DomainResult> getDomains(
         String loginId,
         Long teamId,
         Long setId,
-        PageSearchRequest searchRequest
+        int page,
+        int size,
+        String keyword
     ) {
         final var context = verifyReadAccess(loginId, teamId, setId);
 
-        final var pageable = searchRequest.toPageRequest(
-            MAX_PAGE_SIZE,
+        final var pageable = PageRequest.of(
+            Math.max(page, 0),
+            Math.min(Math.max(size, 1), MAX_PAGE_SIZE),
             Sort.by(Sort.Order.asc("logicalName"), Sort.Order.asc("id"))
         );
-        final var normalizedKeyword = searchRequest.normalizedKeyword();
+        final var normalizedKeyword = AppStringUtils.trimToNull(keyword);
         final var resultPage = (
             normalizedKeyword == null
                 ? domainRepository.findByDictionarySet(context.dictionarySet(), pageable)
                 : domainRepository.searchByDictionarySet(context.dictionarySet(), normalizedKeyword, pageable)
-        ).map(DomainResponse::from);
-        return PageResponse.from(resultPage);
+        ).map(this::toDomainResult);
+        return resultPage;
     }
 
     /**
@@ -116,16 +129,16 @@ public class DomainService {
      * @param teamId   팀 ID
      * @param setId    사전 세트 ID
      * @param domainId 도메인 ID
-     * @return 도메인 응답
+     * @return 도메인 결과
      */
-    public DomainResponse getDomain(String loginId, Long teamId, Long setId, Long domainId) {
+    public DomainResult getDomain(String loginId, Long teamId, Long setId, Long domainId) {
         verifyReadAccess(loginId, teamId, setId);
 
         final var domain = findDomainById(domainId);
         verifyDomainBelongsToTeam(domain, teamId);
         verifyDomainBelongsToSet(domain, setId);
 
-        return DomainResponse.from(domain);
+        return toDomainResult(domain);
     }
 
     /**
@@ -135,16 +148,20 @@ public class DomainService {
      * @param teamId   팀 ID
      * @param setId    사전 세트 ID
      * @param domainId 도메인 ID
-     * @param request  도메인 수정 요청
-     * @return 수정된 도메인 응답
+     * @param logicalName 변경할 논리명
+     * @param physicalType 변경할 물리 타입
+     * @param description 변경할 설명
+     * @return 수정된 도메인 결과
      */
     @Transactional
-    public DomainResponse updateDomain(
+    public DomainResult updateDomain(
         String loginId,
         Long teamId,
         Long setId,
         Long domainId,
-        UpdateDomainRequest request
+        String logicalName,
+        String physicalType,
+        String description
     ) {
         final var context = verifyWriteAccess(loginId, teamId, setId);
 
@@ -155,16 +172,16 @@ public class DomainService {
         if (
             domainRepository.existsByDictionarySetAndLogicalNameAndIdNot(
                 context.dictionarySet(),
-                request.logicalName(),
+                logicalName,
                 domainId
             )
         ) {
-            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), request.logicalName());
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), logicalName);
         }
 
-        domain.update(request.logicalName(), request.physicalType(), request.description());
+        domain.update(logicalName, physicalType, description);
 
-        return DomainResponse.from(domain);
+        return toDomainResult(domain);
     }
 
     /**
@@ -268,6 +285,25 @@ public class DomainService {
     }
 
     /**
+     * 도메인 엔티티를 서비스 결과로 변환한다.
+     *
+     * @param domain 도메인 엔티티
+     * @return 서비스 계층 도메인 결과
+     */
+    private DomainResult toDomainResult(Domain domain) {
+        return new DomainResult(
+            domain.getId(),
+            domain.getLogicalName(),
+            domain.getPhysicalType(),
+            domain.getDescription(),
+            domain.getTeam().getId(),
+            domain.getDictionarySet() != null ? domain.getDictionarySet().getId() : null,
+            domain.getCreatedAt(),
+            domain.getUpdatedAt()
+        );
+    }
+
+    /**
      * 접근 검증 결과를 담는 내부 컨텍스트.
      *
      * @param user          인증된 사용자
@@ -275,4 +311,27 @@ public class DomainService {
      * @param dictionarySet 대상 사전 세트
      */
     private record AccessContext(User user, Team team, DictionarySet dictionarySet) {}
+
+    /**
+     * 도메인 응답용 서비스 결과.
+     *
+     * @param id 도메인 ID
+     * @param logicalName 논리명
+     * @param physicalType 물리 데이터 타입
+     * @param description 설명
+     * @param teamId 소속 팀 ID
+     * @param dictionarySetId 소속 사전 세트 ID
+     * @param createdAt 생성 시각
+     * @param updatedAt 수정 시각
+     */
+    public record DomainResult(
+        Long id,
+        String logicalName,
+        String physicalType,
+        String description,
+        Long teamId,
+        Long dictionarySetId,
+        Instant createdAt,
+        Instant updatedAt
+    ) {}
 }

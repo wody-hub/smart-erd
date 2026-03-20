@@ -10,6 +10,10 @@ import com.smarterd.api.diagram.dto.SaveDiagramResponse;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetResponse;
 import com.smarterd.domain.diagram.service.DiagramService;
+import com.smarterd.domain.diagram.service.DiagramService.DictionarySetChangeResult;
+import com.smarterd.domain.diagram.service.DiagramService.DiagramDetailResult;
+import com.smarterd.domain.diagram.service.DiagramService.DiagramSummaryResult;
+import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -71,9 +75,14 @@ public class DiagramController {
         @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
         @Valid @RequestBody CreateDiagramRequest request
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-            diagramService.createDiagram(jwt.getSubject(), teamId, projectId, request)
+        final var result = diagramService.createDiagram(
+            jwt.getSubject(),
+            teamId,
+            projectId,
+            request.name(),
+            request.dictionarySetId()
         );
+        return ResponseEntity.status(HttpStatus.CREATED).body(toDiagramResponse(result));
     }
 
     /**
@@ -93,7 +102,9 @@ public class DiagramController {
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
         @Parameter(description = "프로젝트 ID") @PathVariable Long projectId
     ) {
-        return ResponseEntity.ok(diagramService.getDiagrams(jwt.getSubject(), teamId, projectId));
+        return ResponseEntity.ok(
+            diagramService.getDiagrams(jwt.getSubject(), teamId, projectId).stream().map(this::toDiagramResponse).toList()
+        );
     }
 
     /**
@@ -115,7 +126,7 @@ public class DiagramController {
         @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
         @Parameter(description = "다이어그램 ID") @PathVariable Long diagramId
     ) {
-        return ResponseEntity.ok(diagramService.getDiagram(jwt.getSubject(), teamId, projectId, diagramId));
+        return ResponseEntity.ok(toDiagramDetailResponse(diagramService.getDiagram(jwt.getSubject(), teamId, projectId, diagramId)));
     }
 
     /**
@@ -143,9 +154,9 @@ public class DiagramController {
         @Parameter(description = "다이어그램 ID") @PathVariable Long diagramId,
         @Valid @RequestBody SaveDiagramRequest request
     ) {
-        return ResponseEntity.ok(
-            diagramService.saveDiagram(jwt.getSubject(), teamId, projectId, diagramId, request)
-        );
+        return ResponseEntity.ok(toSaveDiagramResponse(
+            diagramService.saveDiagram(jwt.getSubject(), teamId, projectId, diagramId, request.content())
+        ));
     }
 
     /**
@@ -169,7 +180,14 @@ public class DiagramController {
         @Parameter(description = "다이어그램 ID") @PathVariable Long diagramId,
         @Valid @RequestBody PersistYdocSnapshotRequest request
     ) {
-        diagramService.persistYdocSnapshot(jwt.getSubject(), teamId, projectId, diagramId, request);
+        diagramService.persistYdocSnapshot(
+            jwt.getSubject(),
+            teamId,
+            projectId,
+            diagramId,
+            request.expectedContentRevision(),
+            request.ydocSnapshot()
+        );
         return ResponseEntity.noContent().build();
     }
 
@@ -194,7 +212,9 @@ public class DiagramController {
         @Parameter(description = "다이어그램 ID") @PathVariable Long diagramId,
         @Valid @RequestBody RenameDiagramRequest request
     ) {
-        return ResponseEntity.ok(diagramService.renameDiagram(jwt.getSubject(), teamId, projectId, diagramId, request));
+        return ResponseEntity.ok(
+            toDiagramResponse(diagramService.renameDiagram(jwt.getSubject(), teamId, projectId, diagramId, request.name()))
+        );
     }
 
     /**
@@ -221,9 +241,15 @@ public class DiagramController {
         @Parameter(description = "다이어그램 ID") @PathVariable Long diagramId,
         @Valid @RequestBody UpdateDiagramDictionarySetRequest request
     ) {
-        return ResponseEntity.ok(
-            diagramService.updateDiagramDictionarySet(jwt.getSubject(), teamId, projectId, diagramId, request)
-        );
+        return ResponseEntity.ok(toUpdateDiagramDictionarySetResponse(
+            diagramService.updateDiagramDictionarySet(
+                jwt.getSubject(),
+                teamId,
+                projectId,
+                diagramId,
+                request.dictionarySetId()
+            )
+        ));
     }
 
     /**
@@ -247,5 +273,78 @@ public class DiagramController {
     ) {
         diagramService.deleteDiagram(jwt.getSubject(), teamId, projectId, diagramId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 서비스 계층 목록 결과를 API 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 목록 결과
+     * @return API 목록 응답 DTO
+     */
+    private DiagramResponse toDiagramResponse(DiagramSummaryResult result) {
+        return new DiagramResponse(
+            result.id(),
+            result.name(),
+            result.projectId(),
+            result.dictionarySetId(),
+            result.dictionarySetName(),
+            result.createdAt(),
+            result.updatedAt()
+        );
+    }
+
+    /**
+     * 서비스 계층 상세 결과를 API 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 상세 결과
+     * @return API 상세 응답 DTO
+     */
+    private DiagramDetailResponse toDiagramDetailResponse(DiagramDetailResult result) {
+        return new DiagramDetailResponse(
+            result.id(),
+            result.name(),
+            result.projectId(),
+            result.dictionarySetId(),
+            result.dictionarySetName(),
+            result.content(),
+            result.hasYdocSnapshot(),
+            String.valueOf(result.contentRevision()),
+            result.snapshotRevision() != null ? String.valueOf(result.snapshotRevision()) : null,
+            result.snapshotUpdatedAt(),
+            result.createdAt(),
+            result.updatedAt()
+        );
+    }
+
+    /**
+     * 서비스 계층 저장 결과를 API 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 저장 결과
+     * @return API 저장 응답 DTO
+     */
+    private SaveDiagramResponse toSaveDiagramResponse(SaveDiagramResult result) {
+        return new SaveDiagramResponse(
+            String.valueOf(result.contentRevision()),
+            result.hasYdocSnapshot(),
+            result.snapshotRevision() != null ? String.valueOf(result.snapshotRevision()) : null,
+            result.snapshotUpdatedAt(),
+            result.updatedAt()
+        );
+    }
+
+    /**
+     * 서비스 계층 사전 세트 변경 결과를 API 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 사전 세트 변경 결과
+     * @return API 사전 세트 변경 응답 DTO
+     */
+    private UpdateDiagramDictionarySetResponse toUpdateDiagramDictionarySetResponse(
+        DictionarySetChangeResult result
+    ) {
+        return new UpdateDiagramDictionarySetResponse(
+            result.dictionarySetId(),
+            result.invalidatedTermBindingCount(),
+            result.invalidatedDomainBindingCount()
+        );
     }
 }
