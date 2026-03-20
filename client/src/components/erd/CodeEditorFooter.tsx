@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Play, RefreshCw, Save, WandSparkles } from 'lucide-react';
+import { Copy, Play, RefreshCw, Save, WandSparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 
@@ -42,6 +42,10 @@ interface CodeEditorFooterProps {
   canFinalize?: boolean;
   /** code 모드 최종 저장 진행 여부 */
   finalizing?: boolean;
+  /** 물리명 포함 복사 버튼 클릭 핸들러 */
+  onCopyWithPhysicalNames?: () => void;
+  /** 물리명 포함 복사 버튼 활성화 여부 */
+  canCopyWithPhysicalNames?: boolean;
   /** 파싱 상태 표시 영역 (에디터별 커스텀 렌더링) */
   children: ReactNode;
 }
@@ -74,6 +78,8 @@ export default function CodeEditorFooter({
   onFinalize,
   canFinalize = false,
   finalizing = false,
+  onCopyWithPhysicalNames,
+  canCopyWithPhysicalNames = false,
   children,
 }: CodeEditorFooterProps) {
   const { t } = useTranslation();
@@ -113,6 +119,18 @@ export default function CodeEditorFooter({
               aria-label={t('erd.codeEditor.formatButton')}
             >
               <WandSparkles className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          {onCopyWithPhysicalNames && (
+            <Button
+              variant="outline"
+              className="gap-1.5"
+              size="sm"
+              onClick={onCopyWithPhysicalNames}
+              disabled={!canCopyWithPhysicalNames}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              {t('erd.codeEditor.copyWithPhysicalNamesButton')}
             </Button>
           )}
           <Button

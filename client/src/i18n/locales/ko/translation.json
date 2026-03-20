@@ -304,6 +304,9 @@
       "finalizePending": "최종 저장 필요",
       "finalizeSaved": "최종 저장 완료",
       "formatButton": "코드 정렬",
+      "copyWithPhysicalNamesButton": "물리명 포함 복사",
+      "copyWithPhysicalNamesCopied": "물리명 포함 코드가 클립보드에 복사되었습니다",
+      "copyWithPhysicalNamesFailed": "물리명 포함 코드 복사에 실패했습니다",
       "refreshButton": "ERD에서 새로고침",
       "refreshConfirmTitle": "코드 새로고침",
       "refreshConfirmDescription": "현재 편집 내용을 버리고 ERD에서 코드를 다시 생성합니다. 계속하시겠습니까?"

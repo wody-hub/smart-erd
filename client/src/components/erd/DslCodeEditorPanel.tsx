@@ -80,6 +80,7 @@ import {
   buildDslPhysicalNameHints,
   buildErdPhysicalNameSourceEntries,
 } from '@/lib/dsl-physical-name-hints';
+import { buildDslCopyTextWithPhysicalNames } from '@/lib/dsl-copy-with-physical-names';
 import { getSyncStatusMeta } from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
@@ -1033,6 +1034,40 @@ export default function DslCodeEditorPanel({
     syncCodeChange(nextDsl);
   }, [dslText, getFormattedDslTextForApply, markFinalizationDirty, syncCodeChange]);
 
+  /**
+   * 현재 DSL 선택 영역을 물리명 포함 문자열로 복사한다.
+   *
+   * 기본 Monaco 복사는 injected text를 포함하지 않으므로, 현재 화면에 표시 중인
+   * 물리명 힌트를 복사용 문자열에 다시 삽입한 뒤 클립보드에 쓴다.
+   *
+   * @returns 없음
+   */
+  const handleCopyWithPhysicalNames = useCallback(async () => {
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    const currentDslText = model?.getValue() ?? dslTextValueRef.current;
+    const selections = editor
+      ?.getSelections()
+      ?.map((selection) => ({
+        startLineNumber: selection.startLineNumber,
+        startColumn: selection.startColumn,
+        endLineNumber: selection.endLineNumber,
+        endColumn: selection.endColumn,
+      }));
+
+    try {
+      const copiedText = buildDslCopyTextWithPhysicalNames(
+        currentDslText,
+        physicalNameHints,
+        selections,
+      );
+      await navigator.clipboard.writeText(copiedText);
+      toast.success(t('erd.codeEditor.copyWithPhysicalNamesCopied'));
+    } catch {
+      toast.error(t('erd.codeEditor.copyWithPhysicalNamesFailed'));
+    }
+  }, [physicalNameHints, t]);
+
   // --- Quick Register Dialogs ---
   /** DSL 오류 가이드에서 사용하는 빠른 용어 등록 다이얼로그 상태 */
   const [quickTermOpen, setQuickTermOpen] = useState(false);
@@ -1805,6 +1840,10 @@ export default function DslCodeEditorPanel({
         onFinalize={persistDraft ? handleFinalize : undefined}
         canFinalize={canFinalize}
         finalizing={finalizing}
+        onCopyWithPhysicalNames={handleCopyWithPhysicalNames}
+        canCopyWithPhysicalNames={Boolean(
+          parseResult?.result && errorCount === 0 && dslText.trim().length > 0,
+        )}
       >
         <div className="flex items-center gap-2 text-xs min-h-[20px] flex-wrap">
           {parsing && (

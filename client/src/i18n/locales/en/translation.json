@@ -305,6 +305,9 @@
       "finalizePending": "Final save required",
       "finalizeSaved": "Final save complete",
       "formatButton": "Format code",
+      "copyWithPhysicalNamesButton": "Copy with physical names",
+      "copyWithPhysicalNamesCopied": "Code with physical names copied to clipboard",
+      "copyWithPhysicalNamesFailed": "Failed to copy code with physical names",
       "refreshButton": "Refresh from ERD",
       "refreshConfirmTitle": "Refresh Code",
       "refreshConfirmDescription": "Current edits will be replaced with code generated from the ERD. Continue?"
