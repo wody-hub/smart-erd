@@ -5,7 +5,7 @@
   "type": "module",
   "main": "./out/main/index.js",
   "scripts": {
-    "dev": "vite --port 3000",
+    "dev": "vite",
     "dev:electron": "electron-vite dev",
     "build": "tsc -b && vite build",
     "build:electron": "electron-vite build",

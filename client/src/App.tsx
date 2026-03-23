@@ -23,9 +23,6 @@ const Router = isElectron() ? HashRouter : BrowserRouter;
 /** Electron 환경 여부 (렌더링 분기용 캐시) */
 const isElectronEnv = isElectron();
 
-/** Electron에서 서버 URL 미설정 여부 (초기 렌더링 시점 캐시) */
-const needsServerSetup = isElectronEnv && !getServerUrl();
-
 /**
  * 애플리케이션 루트 컴포넌트.
  *
@@ -34,6 +31,9 @@ const needsServerSetup = isElectronEnv && !getServerUrl();
  * Electron에서 서버 URL 미설정 시 Settings 페이지만 표시한다.
  */
 export default function App() {
+  /** Electron에서 서버 URL 미설정 여부 (렌더링마다 재평가) */
+  const needsServerSetup = isElectronEnv && !getServerUrl();
+
   return (
     <QueryClientProvider client={queryClient}>
       <Toaster />

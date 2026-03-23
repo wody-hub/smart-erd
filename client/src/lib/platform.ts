@@ -54,11 +54,19 @@ export async function updateServerUrl(
   const api = window.electronAPI;
   if (api) {
     await api.setServerUrl(url);
+  } else {
+    localStorage.setItem('smart-erd-server-url', url);
   }
   cachedServerUrl = url;
   deps.clearCache();
   deps.clearAuth();
-  redirectToLogin();
+  // App 컴포넌트의 needsServerSetup 재평가를 위해 전체 리로드.
+  // bootstrap()이 electron-store / localStorage에서 URL을 다시 로드한다.
+  // HashRouter 사용 시 hash를 루트로 변경해야 Settings 라우트에 재진입하지 않는다.
+  if (isElectron()) {
+    window.location.hash = '#/';
+  }
+  window.location.reload();
 }
 
 /**
