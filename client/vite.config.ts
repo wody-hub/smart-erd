@@ -94,14 +94,14 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: 4500,
     proxy: {
       '/api': {
-        target: 'http://localhost:8190',
+        target: 'http://localhost:9500',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:8190',
+        target: 'ws://localhost:9500',
         ws: true,
       },
     },

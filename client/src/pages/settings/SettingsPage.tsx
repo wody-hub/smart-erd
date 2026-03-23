@@ -42,10 +42,8 @@ export default function SettingsPage() {
   useEffect(() => {
     const loadUrl = async () => {
       const api = window.electronAPI;
-      if (api) {
-        const url = await api.getServerUrl();
-        setServerUrl(url);
-      }
+      const saved = api ? await api.getServerUrl() : '';
+      setServerUrl(saved || 'http://localhost:9500');
     };
     loadUrl();
   }, []);
@@ -62,13 +60,12 @@ export default function SettingsPage() {
     setTestError('');
 
     try {
-      const res = await axios.get(`${trimmedUrl}/api/health`, { timeout: 5000 });
-      if (res.status >= 200 && res.status < 300) {
-        setTestResult(true);
-      } else {
-        setTestResult(false);
-        setTestError(t('settings.testServerError', { status: res.status }));
-      }
+      await axios.get(`${trimmedUrl}/api/auth/health`, {
+        timeout: 5000,
+        validateStatus: () => true,
+      });
+      // 어떤 HTTP 응답이든 (401 포함) 서버에 도달했으면 성공
+      setTestResult(true);
     } catch {
       setTestResult(false);
       setTestError(t('settings.testFailedDetail'));

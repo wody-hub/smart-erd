@@ -45,7 +45,7 @@ function toWsUrl(baseUrl) {
 }
 
 export function loadConfig() {
-    const baseHttpUrl = __ENV.BASE_HTTP_URL || 'http://localhost:8190';
+    const baseHttpUrl = __ENV.BASE_HTTP_URL || 'http://localhost:9500';
     const baseWsUrl = __ENV.BASE_WS_URL || toWsUrl(baseHttpUrl);
     const ticketPath = __ENV.TICKET_PATH || '/api/ws-ticket';
 
@@ -160,7 +160,7 @@ export function runWebSocketSession() {
     let openedAt = 0;
     let intervalId = null;
 
-    const res = ws.connect(wsUrl, { headers: { Origin: 'http://localhost:3000' } }, (socket) => {
+    const res = ws.connect(wsUrl, { headers: { Origin: 'http://localhost:4500' } }, (socket) => {
         socket.on('open', () => {
             openedAt = Date.now();
             intervalId = socket.setInterval(() => {

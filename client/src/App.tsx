@@ -28,8 +28,12 @@ const isElectronEnv = isElectron();
  *
  * Electron에서는 HashRouter, 웹에서는 BrowserRouter로 SPA 라우팅을 구성하고,
  * 인증이 필요한 경로에 ProtectedRoute 가드를 적용한다.
+ * Electron에서 서버 URL 미설정 시 Settings 페이지만 표시한다.
  */
 export default function App() {
+  /** Electron에서 서버 URL 미설정 여부 (렌더링마다 재평가) */
+  const needsServerSetup = isElectronEnv && !getServerUrl();
+
   return (
     <QueryClientProvider client={queryClient}>
       <Toaster />
@@ -41,61 +45,65 @@ export default function App() {
             </div>
           }
         >
-          <Routes>
-            {/* ── Electron 전용 (ProtectedRoute 이전에 배치) ── */}
-            {isElectronEnv && <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />}
-            {isElectronEnv && !getServerUrl() && (
+          {needsServerSetup ? (
+            <Routes>
+              <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
               <Route path="*" element={<Navigate to={ROUTES.SETTINGS} replace />} />
-            )}
+            </Routes>
+          ) : (
+            <Routes>
+              {/* ── Electron 전용 ── */}
+              {isElectronEnv && <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />}
 
-            {/* ── 공개 라우트 ── */}
-            <Route path={ROUTES.LOGIN} element={<LoginPage />} />
-            <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
+              {/* ── 공개 라우트 ── */}
+              <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+              <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
 
-            {/* ── 인증 필요 라우트 ── */}
-            <Route
-              path={ROUTES.TEAMS}
-              element={
-                <ProtectedRoute>
-                  <TeamsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path={ROUTES.PROJECTS_PATTERN}
-              element={
-                <ProtectedRoute>
-                  <ProjectsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path={ROUTES.DICTIONARY_PATTERN}
-              element={
-                <ProtectedRoute>
-                  <DictionaryPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path={ROUTES.DIAGRAMS_PATTERN}
-              element={
-                <ProtectedRoute>
-                  <DiagramsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path={ROUTES.DIAGRAM_PATTERN}
-              element={
-                <ProtectedRoute>
-                  <DiagramPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/" element={<Navigate to={ROUTES.TEAMS} replace />} />
-            <Route path="*" element={<Navigate to={ROUTES.TEAMS} replace />} />
-          </Routes>
+              {/* ── 인증 필요 라우트 ── */}
+              <Route
+                path={ROUTES.TEAMS}
+                element={
+                  <ProtectedRoute>
+                    <TeamsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path={ROUTES.PROJECTS_PATTERN}
+                element={
+                  <ProtectedRoute>
+                    <ProjectsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path={ROUTES.DICTIONARY_PATTERN}
+                element={
+                  <ProtectedRoute>
+                    <DictionaryPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path={ROUTES.DIAGRAMS_PATTERN}
+                element={
+                  <ProtectedRoute>
+                    <DiagramsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path={ROUTES.DIAGRAM_PATTERN}
+                element={
+                  <ProtectedRoute>
+                    <DiagramPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/" element={<Navigate to={ROUTES.TEAMS} replace />} />
+              <Route path="*" element={<Navigate to={ROUTES.TEAMS} replace />} />
+            </Routes>
+          )}
         </Suspense>
       </Router>
     </QueryClientProvider>

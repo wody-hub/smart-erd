@@ -5,7 +5,7 @@
 - Exercise real flow: `POST /api/ws-ticket` -> `GET /ws/diagram/{diagramId}?ticket=...`.
 
 ## Prerequisites
-- Server is running (example: `http://localhost:8190`).
+- Server is running (example: `http://localhost:9500`).
 - `k6` is installed.
 - Test users exist and each user has a valid JWT access token.
 - `BEARER_TOKENS` must include enough unique users for your target concurrency.
@@ -23,7 +23,7 @@
 ```bash
 export BEARER_TOKENS='token_user1,token_user2,token_user3,token_user4,token_user5,token_user6'
 export DIAGRAM_ID=1
-export BASE_HTTP_URL='http://localhost:8190'
+export BASE_HTTP_URL='http://localhost:9500'
 export SESSION_DURATION_MS=30000
 export ITERATION_PAUSE_MS=200
 
@@ -34,7 +34,7 @@ Soak:
 ```bash
 export BEARER_TOKENS='token_user1,token_user2,token_user3,token_user4,token_user5,token_user6'
 export DIAGRAM_ID=1
-export BASE_HTTP_URL='http://localhost:8190'
+export BASE_HTTP_URL='http://localhost:9500'
 export SOAK_VUS=30
 export SOAK_DURATION='25m'
 export SESSION_DURATION_MS=30000
@@ -44,7 +44,7 @@ k6 run scripts/perf/k6/websocket-soak.js
 ```
 
 ## Important Environment Variables
-- `BASE_HTTP_URL` (default: `http://localhost:8190`)
+- `BASE_HTTP_URL` (default: `http://localhost:9500`)
 - `BASE_WS_URL` (optional; auto-derived from `BASE_HTTP_URL` if omitted)
 - `TICKET_PATH` (default: `/api/ws-ticket`)
 - `DIAGRAM_ID` (default: `1`)

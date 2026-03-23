@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -6,16 +6,35 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { login as loginApi } from '@/api/authApi';
 import useAuthStore from '@/stores/useAuthStore';
 import { getErrorMessage } from '@/lib/api-error';
+import { isElectron, initServerUrl } from '@/lib/platform';
+import { STORAGE_KEYS } from '@/constants/storage';
 import { ROUTES } from '@/constants/routes';
 import { toast } from 'sonner';
+
+/** Electron 환경에서 선택 가능한 서버 URL 목록. */
+const SERVER_URL_OPTIONS = [
+  { label: 'Local (localhost:9500)', value: 'http://localhost:9500' },
+  { label: 'Local (127.0.0.1:9500)', value: 'http://127.0.0.1:9500' },
+];
+
+/** Electron 서버 URL을 localStorage에 저장하는 키. */
+const ELECTRON_SERVER_URL_KEY = 'smart-erd-server-url';
 
 /**
  * 로그인 페이지 컴포넌트.
  *
  * 로그인 ID와 비밀번호 입력 폼을 중앙에 배치한 인증 화면이다.
+ * Electron 환경에서는 서버 URL 선택 셀렉트박스를 추가로 표시한다.
  * 인증 성공 시 JWT 토큰을 저장하고 /teams 페이지로 이동한다.
  */
 export default function LoginPage() {
@@ -25,7 +44,47 @@ export default function LoginPage() {
   const [loginId, setLoginId] = useState('');
   /** 비밀번호 입력값 */
   const [password, setPassword] = useState('');
+  /** 선택된 서버 URL (Electron 전용) */
+  const [serverUrl, setServerUrl] = useState('');
   const login = useAuthStore((s) => s.login);
+
+  /** Electron 환경 여부 */
+  const isDesktop = isElectron();
+
+  // Electron: 저장된 서버 URL 로드 (electronAPI → localStorage fallback)
+  useEffect(() => {
+    if (!isDesktop) return;
+    const loadUrl = async () => {
+      const api = window.electronAPI;
+      let saved = '';
+      if (api) {
+        saved = await api.getServerUrl();
+      } else {
+        saved = localStorage.getItem(ELECTRON_SERVER_URL_KEY) ?? '';
+      }
+      const url = saved || SERVER_URL_OPTIONS[0].value;
+      setServerUrl(url);
+      initServerUrl(url);
+    };
+    loadUrl();
+  }, [isDesktop]);
+
+  /**
+   * 서버 URL 변경 시 저장하고 API base URL을 갱신한다.
+   * electronAPI가 있으면 electron-store에, 없으면 localStorage에 저장한다.
+   *
+   * @param url 선택된 서버 URL
+   */
+  const handleServerUrlChange = async (url: string) => {
+    setServerUrl(url);
+    initServerUrl(url);
+    const api = window.electronAPI;
+    if (api) {
+      await api.setServerUrl(url);
+    } else {
+      localStorage.setItem(ELECTRON_SERVER_URL_KEY, url);
+    }
+  };
 
   const loginMutation = useMutation({
     mutationFn: () => loginApi(loginId, password),
@@ -40,6 +99,10 @@ export default function LoginPage() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!loginId.trim() || !password) return;
+    // Electron: 서버 URL이 설정되지 않았으면 먼저 저장
+    if (isDesktop && serverUrl) {
+      initServerUrl(serverUrl);
+    }
     loginMutation.mutate();
   };
 
@@ -51,6 +114,25 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
+            {/* Electron 전용: 서버 URL 선택 */}
+            {isDesktop && (
+              <div className="space-y-2">
+                <Label htmlFor="server-url">{t('settings.serverUrlLabel')}</Label>
+                <Select value={serverUrl} onValueChange={handleServerUrlChange}>
+                  <SelectTrigger id="server-url">
+                    <SelectValue placeholder={t('settings.serverUrlPlaceholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SERVER_URL_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="login-id">{t('auth.login.loginId')}</Label>
               <Input

@@ -28,7 +28,7 @@ function createWindow(): void {
     backgroundColor: getBackgroundColor(),
     autoHideMenuBar: process.platform !== 'darwin',
     webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
+      preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -54,18 +54,29 @@ function createWindow(): void {
     return { action: 'deny' };
   });
 
-  // CORS Origin 치환 (file:// → 서버 URL)
+  // CORS Origin 치환 (file:// → 대상 서버 Origin)
   mainWindow.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
     const { requestHeaders } = details;
-    const serverUrl = getServerUrl();
-    if (serverUrl) {
-      try {
-        requestHeaders['Origin'] = new URL(serverUrl).origin;
-      } catch {
-        // URL 파싱 실패 시 Origin 그대로 유지
-      }
+    try {
+      const targetOrigin = new URL(getServerUrl() || details.url).origin;
+      requestHeaders['Origin'] = targetOrigin;
+    } catch {
+      // URL 파싱 실패 시 Origin 그대로 유지
     }
     callback({ requestHeaders });
+  });
+
+  // CORS 응답 헤더 보정 — Electron file:// Origin 대신 서버 Origin을 허용
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = { ...details.responseHeaders };
+    try {
+      const targetOrigin = new URL(getServerUrl() || details.url).origin;
+      responseHeaders['Access-Control-Allow-Origin'] = [targetOrigin];
+      responseHeaders['Access-Control-Allow-Credentials'] = ['true'];
+    } catch {
+      // URL 파싱 실패 시 원본 헤더 유지
+    }
+    callback({ responseHeaders });
   });
 
   // Dev 환경: Vite dev server 로드 / Prod: 빌드된 HTML 로드

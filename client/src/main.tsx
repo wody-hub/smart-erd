@@ -11,18 +11,24 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import './i18n';
-import { initServerUrl } from '@/lib/platform';
+import { isElectron, initServerUrl } from '@/lib/platform';
 import './lib/monaco-setup';
 import App from './App';
 
 /**
  * 앱 부트스트랩. Electron 환경이면 서버 URL을 로드하여 캐시에 초기화한 후 React를 마운트한다.
+ * electronAPI가 없는 경우 localStorage를 fallback으로 사용한다.
  */
 async function bootstrap() {
-  const api = window.electronAPI;
-  if (api) {
-    const url = await api.getServerUrl();
-    initServerUrl(url);
+  if (isElectron()) {
+    const api = window.electronAPI;
+    if (api) {
+      const url = await api.getServerUrl();
+      initServerUrl(url);
+    } else {
+      const url = localStorage.getItem('smart-erd-server-url') ?? '';
+      initServerUrl(url);
+    }
   }
 
   createRoot(document.getElementById('root')!).render(

@@ -30,6 +30,7 @@ replay_pid*
 # Spring Boot
 application-local.yml
 application-local.properties
+bootRun-local.sh
 
 # H2 Database
 *.db

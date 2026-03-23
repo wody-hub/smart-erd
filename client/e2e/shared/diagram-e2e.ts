@@ -172,8 +172,8 @@ function parseRenderableNodeCount(content: string | null | undefined): number {
 }
 
 export function getE2EConfig(): E2EConfig {
-  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:3000';
-  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? 'http://localhost:8190/api';
+  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:4500';
+  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? 'http://localhost:9500/api';
   const repoDir = process.env.SMART_ERD_E2E_REPO_DIR ?? path.resolve(process.cwd(), '..');
 
   return {
@@ -184,8 +184,8 @@ export function getE2EConfig(): E2EConfig {
     pinnedTeamId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_TEAM_ID),
     pinnedProjectId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_PROJECT_ID),
     pinnedDiagramId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_DIAGRAM_ID),
-    backendPort: parsePositiveInt(process.env.SMART_ERD_E2E_BACKEND_PORT, 8190),
-    frontendPort: parsePositiveInt(process.env.SMART_ERD_E2E_FRONTEND_PORT, 3000),
+    backendPort: parsePositiveInt(process.env.SMART_ERD_E2E_BACKEND_PORT, 9500),
+    frontendPort: parsePositiveInt(process.env.SMART_ERD_E2E_FRONTEND_PORT, 4500),
     backendRestartCommand: process.env.SMART_ERD_E2E_BACKEND_RESTART_CMD ?? './gradlew bootRun',
     repoDir,
     bootLogPath:
@@ -194,8 +194,8 @@ export function getE2EConfig(): E2EConfig {
 }
 
 export function getE2EProvisioningConfig(): E2EConfig {
-  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:3000';
-  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? 'http://localhost:8190/api';
+  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:4500';
+  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? 'http://localhost:9500/api';
   const repoDir = process.env.SMART_ERD_E2E_REPO_DIR ?? path.resolve(process.cwd(), '..');
 
   return {
@@ -206,8 +206,8 @@ export function getE2EProvisioningConfig(): E2EConfig {
     pinnedTeamId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_TEAM_ID),
     pinnedProjectId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_PROJECT_ID),
     pinnedDiagramId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_DIAGRAM_ID),
-    backendPort: parsePositiveInt(process.env.SMART_ERD_E2E_BACKEND_PORT, 8190),
-    frontendPort: parsePositiveInt(process.env.SMART_ERD_E2E_FRONTEND_PORT, 3000),
+    backendPort: parsePositiveInt(process.env.SMART_ERD_E2E_BACKEND_PORT, 9500),
+    frontendPort: parsePositiveInt(process.env.SMART_ERD_E2E_FRONTEND_PORT, 4500),
     backendRestartCommand: process.env.SMART_ERD_E2E_BACKEND_RESTART_CMD ?? './gradlew bootRun',
     repoDir,
     bootLogPath:
