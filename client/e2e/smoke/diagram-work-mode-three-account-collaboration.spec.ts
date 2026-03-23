@@ -17,6 +17,8 @@ import {
   provisionCollaborationFixture,
   waitForEditableDiagram,
 } from '../shared/diagram-e2e';
+import * as Y from 'yjs';
+import { migrateJsonToYDoc } from '../../src/collaboration/yjsBridge';
 
 const PROPAGATION_TIMEOUT_MS = 20_000;
 
@@ -36,6 +38,10 @@ interface ProvisionedUser {
 }
 
 type TableNodeKind = 'persisted' | 'preview' | 'ghost';
+
+interface BrowserDiagnostics {
+  collaborationWarnings: string[];
+}
 
 /**
  * 인증된 API 요청을 수행한다.
@@ -211,7 +217,10 @@ function tableNodeWrappers(page: Page, name: string, kinds: readonly TableNodeKi
   });
 }
 
-function attachBrowserDiagnostics(page: Page, label: string): void {
+function attachBrowserDiagnostics(page: Page, label: string): BrowserDiagnostics {
+  const diagnostics: BrowserDiagnostics = {
+    collaborationWarnings: [],
+  };
   page.on('console', (message) => {
     const text = message.text();
     if (
@@ -224,11 +233,32 @@ function attachBrowserDiagnostics(page: Page, label: string): void {
     if (!['warning', 'error'].includes(message.type())) {
       return;
     }
+    if (
+      text.includes('persisted=false') ||
+      text.includes('snapshot seed failed') ||
+      text.includes('snapshot persist returned persisted=false')
+    ) {
+      diagnostics.collaborationWarnings.push(`[browser:${label}:${message.type()}] ${text}`);
+    }
     console.log(`[browser:${label}:${message.type()}] ${text}`);
   });
   page.on('pageerror', (error) => {
     console.log(`[browser:${label}:pageerror] ${error.message}`);
   });
+  return diagnostics;
+}
+
+function encodeContentToYdocSnapshot(content: object): string {
+  const doc = new Y.Doc();
+  migrateJsonToYDoc(doc, JSON.stringify(content));
+  return Buffer.from(Y.encodeStateAsUpdate(doc)).toString('base64');
+}
+
+function assertNoCollaborationWarnings(...diagnostics: BrowserDiagnostics[]): void {
+  const warnings = diagnostics.flatMap((entry) => entry.collaborationWarnings);
+  if (warnings.length > 0) {
+    throw new Error(`Unexpected collaboration warnings:\n${warnings.join('\n')}`);
+  }
 }
 
 /**
@@ -517,7 +547,7 @@ test('three accounts collaborate across code, sync, and erd-only modes @smoke', 
       fixture.target,
     );
     const ownerPage = ownerSession.page;
-    attachBrowserDiagnostics(ownerPage, 'owner');
+    const ownerDiagnostics = attachBrowserDiagnostics(ownerPage, 'owner');
     const ownerToken = ownerSession.token;
 
     const memberOne = await signupUser(request, config.apiBaseUrl, suffix, 'sync');
@@ -610,7 +640,10 @@ test('three accounts collaborate across code, sync, and erd-only modes @smoke', 
       'PUT',
       `${config.apiBaseUrl}/teams/${fixture.target.teamId}/projects/${fixture.target.projectId}/diagrams/${fixture.target.diagramId}`,
       ownerToken,
-      { content: JSON.stringify(initialContent) },
+      {
+        content: JSON.stringify(initialContent),
+        ydocSnapshot: encodeContentToYdocSnapshot(initialContent),
+      },
     );
 
     await ownerPage.reload({ waitUntil: 'domcontentloaded' });
@@ -625,7 +658,7 @@ test('three accounts collaborate across code, sync, and erd-only modes @smoke', 
       fixture.target,
     );
     const syncPage = syncSession.page;
-    attachBrowserDiagnostics(syncPage, 'sync');
+    const syncDiagnostics = attachBrowserDiagnostics(syncPage, 'sync');
     const erdSession = await openDiagramSession(
       erdContext,
       config,
@@ -634,7 +667,7 @@ test('three accounts collaborate across code, sync, and erd-only modes @smoke', 
       fixture.target,
     );
     const erdPage = erdSession.page;
-    attachBrowserDiagnostics(erdPage, 'erd');
+    const erdDiagnostics = attachBrowserDiagnostics(erdPage, 'erd');
 
     await switchWorkMode(ownerPage, /코드 우선|code-first/i);
     await switchWorkMode(erdPage, /ERD 전용|ERD-only/i);
@@ -770,6 +803,8 @@ test('three accounts collaborate across code, sync, and erd-only modes @smoke', 
         ),
       );
     }
+
+    assertNoCollaborationWarnings(ownerDiagnostics, syncDiagnostics, erdDiagnostics);
   } finally {
     await ownerContext.close();
     await syncContext.close();

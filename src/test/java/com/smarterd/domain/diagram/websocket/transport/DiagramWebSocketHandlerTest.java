@@ -9,6 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.smarterd.config.websocket.WebSocketProperties;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeyFactory;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSessionMetadataPolicy;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
 import com.smarterd.domain.diagram.websocket.model.LeaveResult;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
@@ -18,6 +20,7 @@ import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
 import com.smarterd.domain.diagram.websocket.relay.DiagramPresenceNotifier;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
+import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionResolver;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -229,12 +232,17 @@ class DiagramWebSocketHandlerTest {
         final var snapshotService = mock(DiagramSnapshotService.class);
         final var messageSender = mock(DiagramMessageSender.class);
         final var presenceNotifier = mock(DiagramPresenceNotifier.class);
+        final var resourceKeyFactory = new DiagramCollaborationResourceKeyFactory();
+        final var sessionResolver = new DiagramWebSocketSessionResolver(
+            new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory)
+        );
         final var handler = new DiagramWebSocketHandler(
             new WebSocketProperties(),
             roomManager,
             snapshotService,
             messageSender,
             presenceNotifier,
+            sessionResolver,
             new ArrayList<>(handlers)
         );
         return new Fixture(handler, roomManager, messageSender);
@@ -248,6 +256,7 @@ class DiagramWebSocketHandlerTest {
                 new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_YJS_UPDATE)),
                 new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_AWARENESS)),
                 new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_SNAPSHOT_REQUEST)),
+                new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_SNAPSHOT_REQUEST_V2)),
                 new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_COMPACTED_SNAPSHOT)),
                 new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_PRESENCE_SNAPSHOT_REQUEST))
             )

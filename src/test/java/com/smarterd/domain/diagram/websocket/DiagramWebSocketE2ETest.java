@@ -139,7 +139,7 @@ class DiagramWebSocketE2ETest {
     private WebSocketSession connect(Long diagramId, String ticket, @NonNull WebSocketHandler handler)
         throws Exception {
         final var headers = new WebSocketHttpHeaders();
-        headers.setOrigin("http://localhost:4500");
+        headers.setOrigin("http://localhost:4503");
         final var uri = Objects.requireNonNull(
             URI.create("ws://localhost:" + port + "/ws/diagram/" + diagramId + "?ticket=" + ticket)
         );

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:4500';
+const baseURL = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:4502';
 const browserChannel = process.env.SMART_ERD_E2E_BROWSER_CHANNEL;
 
 export default defineConfig({

@@ -13,19 +13,32 @@ import org.springframework.stereotype.Component;
 @Component
 public class DiagramCollaborationSessionMetadataPolicy implements CollaborationAccessPolicy {
 
+    private final DiagramCollaborationResourceKeyFactory resourceKeyFactory;
+
+    /**
+     * 기본 생성자.
+     *
+     * @param resourceKeyFactory 다이어그램 resource key factory
+     */
+    public DiagramCollaborationSessionMetadataPolicy(
+        DiagramCollaborationResourceKeyFactory resourceKeyFactory
+    ) {
+        this.resourceKeyFactory = resourceKeyFactory;
+    }
+
     /**
      * {@inheritDoc}
      */
     @Override
     public void validateAccess(CollaborationAuthenticatedSession session) {
-        if (!DiagramCollaborationChannelPlugin.CHANNEL_TYPE.equals(session.resourceKey().channelType())) {
+        if (!resourceKeyFactory.channelType().equals(session.resourceKey().channelType())) {
             throw new IllegalArgumentException(
                 "다이어그램 채널 접근 정책에 맞지 않는 채널 타입: " + session.resourceKey().channelType()
             );
         }
 
         try {
-            Long.parseLong(session.resourceKey().resourceId());
+            resourceKeyFactory.parseDiagramId(session.resourceKey());
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(
                 "다이어그램 채널 resourceId는 Long으로 해석 가능해야 한다: " + session.resourceKey().resourceId(),

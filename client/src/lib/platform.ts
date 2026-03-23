@@ -21,7 +21,7 @@ export function isElectron(): boolean {
 /**
  * 서버 URL을 캐시에 저장한다. main.tsx의 bootstrap()에서 1회 호출.
  *
- * @param url 서버 URL (예: 'http://localhost:9500')
+ * @param url 서버 URL (예: 'http://localhost:9503')
  */
 export function initServerUrl(url: string): void {
   cachedServerUrl = url;

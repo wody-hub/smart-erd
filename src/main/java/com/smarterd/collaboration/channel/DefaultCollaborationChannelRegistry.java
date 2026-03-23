@@ -21,6 +21,12 @@ public class DefaultCollaborationChannelRegistry implements CollaborationChannel
     public DefaultCollaborationChannelRegistry(List<CollaborationChannelPlugin> plugins) {
         final var resolved = new LinkedHashMap<String, CollaborationChannelPlugin>();
         for (final var plugin : plugins) {
+            if (!plugin.channelType().equals(plugin.resourceKeyFactory().channelType())) {
+                throw new IllegalStateException(
+                    "협업 채널 플러그인과 resource key factory의 채널 타입이 일치하지 않음: "
+                        + plugin.channelType()
+                );
+            }
             final var previous = resolved.putIfAbsent(plugin.channelType(), plugin);
             if (previous != null) {
                 throw new IllegalStateException("중복된 협업 채널 플러그인 타입: " + plugin.channelType());

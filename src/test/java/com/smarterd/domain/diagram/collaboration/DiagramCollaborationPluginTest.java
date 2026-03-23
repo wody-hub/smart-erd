@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.smarterd.collaboration.channel.CollaborationResourceKey;
+import com.smarterd.collaboration.channel.CollaborationResourceKeyFactory;
 import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
 import com.smarterd.collaboration.handoff.CollaborationHandoffResult;
 import com.smarterd.collaboration.snapshot.CollaborationSnapshotSaveCommand;
@@ -24,6 +25,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class DiagramCollaborationPluginTest {
 
+    private final DiagramCollaborationResourceKeyFactory resourceKeyFactory =
+        new DiagramCollaborationResourceKeyFactory();
+
     @Mock
     private DiagramSnapshotService diagramSnapshotService;
 
@@ -35,7 +39,7 @@ class DiagramCollaborationPluginTest {
 
     @Test
     void accessPolicy_shouldAcceptDiagramChannelSession() {
-        final var policy = new DiagramCollaborationSessionMetadataPolicy();
+        final var policy = new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory);
         final var session = new CollaborationAuthenticatedSession(
             "user-1",
             "login-1",
@@ -50,7 +54,7 @@ class DiagramCollaborationPluginTest {
 
     @Test
     void accessPolicy_shouldRejectNonDiagramChannelSession() {
-        final var policy = new DiagramCollaborationSessionMetadataPolicy();
+        final var policy = new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory);
         final var session = new CollaborationAuthenticatedSession(
             "user-1",
             "login-1",
@@ -67,8 +71,8 @@ class DiagramCollaborationPluginTest {
 
     @Test
     void snapshotStore_shouldDelegateLoadAndSaveToDiagramSnapshotService() {
-        final var store = new DiagramCollaborationSnapshotStore(diagramSnapshotService);
-        final var resourceKey = new CollaborationResourceKey("diagram", "42");
+        final var store = new DiagramCollaborationSnapshotStore(diagramSnapshotService, resourceKeyFactory);
+        final var resourceKey = resourceKeyFactory.forDiagramId(42L);
         final var command = new CollaborationSnapshotSaveCommand("17", new byte[] { 0x01, 0x02 });
         final var snapshot = new byte[] { 0x11, 0x22 };
 
@@ -86,8 +90,12 @@ class DiagramCollaborationPluginTest {
 
     @Test
     void handoffPolicy_shouldPreferWarmSnapshotWhenPendingUpdatesExist() {
-        final var policy = new DiagramCollaborationHandoffPolicy(diagramRoomManager, diagramSnapshotService);
-        final var resourceKey = new CollaborationResourceKey("diagram", "42");
+        final var policy = new DiagramCollaborationHandoffPolicy(
+            diagramRoomManager,
+            diagramSnapshotService,
+            resourceKeyFactory
+        );
+        final var resourceKey = resourceKeyFactory.forDiagramId(42L);
         final var pendingUpdates = new byte[] { 0x55 };
         final var warmSnapshot = new byte[] { 0x11, 0x22 };
 
@@ -107,8 +115,12 @@ class DiagramCollaborationPluginTest {
 
     @Test
     void handoffPolicy_shouldFallbackToPersistedSnapshotStoreWhenRoomHasNoPendingUpdates() {
-        final var policy = new DiagramCollaborationHandoffPolicy(diagramRoomManager, diagramSnapshotService);
-        final var resourceKey = new CollaborationResourceKey("diagram", "42");
+        final var policy = new DiagramCollaborationHandoffPolicy(
+            diagramRoomManager,
+            diagramSnapshotService,
+            resourceKeyFactory
+        );
+        final var resourceKey = resourceKeyFactory.forDiagramId(42L);
         final var cachedSnapshot = new byte[] { 0x10, 0x20 };
         when(diagramRoomManager.getSessionCount(42L)).thenReturn(1);
         when(diagramSnapshotService.getCachedSnapshot(42L)).thenReturn(java.util.Optional.of(cachedSnapshot));
@@ -122,8 +134,12 @@ class DiagramCollaborationPluginTest {
 
     @Test
     void handoffPolicy_shouldFallbackToDbSnapshotWhenCacheIsEmpty() {
-        final var policy = new DiagramCollaborationHandoffPolicy(diagramRoomManager, diagramSnapshotService);
-        final var resourceKey = new CollaborationResourceKey("diagram", "42");
+        final var policy = new DiagramCollaborationHandoffPolicy(
+            diagramRoomManager,
+            diagramSnapshotService,
+            resourceKeyFactory
+        );
+        final var resourceKey = resourceKeyFactory.forDiagramId(42L);
         final var snapshot = new byte[] { 0x33, 0x44 };
 
         when(diagramRoomManager.getSessionCount(42L)).thenReturn(1);
@@ -138,5 +154,27 @@ class DiagramCollaborationPluginTest {
         verify(collaborationSnapshotStore).load(resourceKey);
         verify(diagramRoomManager, never()).peekMergedUpdates(42L);
         verify(diagramSnapshotService, never()).buildWarmHandoffSnapshot(anyLong(), any());
+    }
+
+    @Test
+    void channelPlugin_shouldExposeMatchingResourceKeyFactory() {
+        final var accessPolicy = new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory);
+        final var snapshotStore = new DiagramCollaborationSnapshotStore(diagramSnapshotService, resourceKeyFactory);
+        final var handoffPolicy = new DiagramCollaborationHandoffPolicy(
+            diagramRoomManager,
+            diagramSnapshotService,
+            resourceKeyFactory
+        );
+        final var plugin = new DiagramCollaborationChannelPlugin(
+            resourceKeyFactory,
+            accessPolicy,
+            snapshotStore,
+            handoffPolicy
+        );
+
+        final CollaborationResourceKeyFactory pluginResourceKeyFactory = plugin.resourceKeyFactory();
+
+        assertThat(plugin.channelType()).isEqualTo(pluginResourceKeyFactory.channelType());
+        assertThat(pluginResourceKeyFactory.create("42")).isEqualTo(resourceKeyFactory.forDiagramId(42L));
     }
 }

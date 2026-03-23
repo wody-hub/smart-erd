@@ -7,6 +7,9 @@ import com.smarterd.collaboration.channel.CollaborationResourceKey;
  */
 public final class DiagramCollaborationResourceKeys {
 
+    private static final DiagramCollaborationResourceKeyFactory FACTORY =
+        new DiagramCollaborationResourceKeyFactory();
+
     private DiagramCollaborationResourceKeys() {}
 
     /**
@@ -16,10 +19,7 @@ public final class DiagramCollaborationResourceKeys {
      * @return 협업 리소스 key
      */
     public static CollaborationResourceKey forDiagramId(Long diagramId) {
-        return new CollaborationResourceKey(
-            DiagramCollaborationChannelPlugin.CHANNEL_TYPE,
-            String.valueOf(diagramId)
-        );
+        return FACTORY.forDiagramId(diagramId);
     }
 
     /**
@@ -29,11 +29,6 @@ public final class DiagramCollaborationResourceKeys {
      * @return 다이어그램 ID
      */
     public static Long parseDiagramId(CollaborationResourceKey resourceKey) {
-        if (!DiagramCollaborationChannelPlugin.CHANNEL_TYPE.equals(resourceKey.channelType())) {
-            throw new IllegalArgumentException(
-                "다이어그램 채널에 맞지 않는 채널 타입: " + resourceKey.channelType()
-            );
-        }
-        return Long.parseLong(resourceKey.resourceId());
+        return FACTORY.parseDiagramId(resourceKey);
     }
 }

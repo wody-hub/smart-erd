@@ -43,7 +43,7 @@ export default function SettingsPage() {
     const loadUrl = async () => {
       const api = window.electronAPI;
       const saved = api ? await api.getServerUrl() : '';
-      setServerUrl(saved || 'http://localhost:9500');
+      setServerUrl(saved || 'http://localhost:9503');
     };
     loadUrl();
   }, []);

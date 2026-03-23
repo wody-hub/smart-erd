@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import * as Y from 'yjs';
 import { YjsProvider } from '@/collaboration/YjsProvider';
 import { useCollaborationSession } from '@/collaboration/core/use-collaboration-session';
+import {
+  toPreviewSyncStatus,
+  type PreviewSyncStatus,
+} from '@/collaboration/core/collaboration-preview-sync-status';
 import { getTablesMap, migrateJsonToYDoc } from '@/collaboration/yjsBridge';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useCollaborationStore from '@/stores/erd/useCollaborationStore';
@@ -12,7 +16,6 @@ import type { ConnectionStatus } from '@/types/collaboration';
 
 /** WS 스냅샷이 도착하지 않을 때 JSON content로 폴백하기까지의 대기 시간 (ms) */
 const WS_SNAPSHOT_FALLBACK_MS = 5_000;
-type PreviewSyncStatus = 'inactive' | 'syncing' | 'live' | 'degraded';
 
 /**
  * useYjsCollaboration 훅의 반환 타입.
@@ -42,10 +45,11 @@ export function useYjsCollaboration(
   projectId: string | undefined,
 ): UseYjsCollaborationReturn {
   const providerRef = useRef<YjsProvider | null>(null);
-  const { dispatchRuntimeEvent, resetRuntimeState } = useCollaborationSession();
+  const { runtimeState, dispatchRuntimeEvent, resetRuntimeState } = useCollaborationSession();
   /** API JSON 프리뷰 모드 (Y.Doc에 데이터가 도착하면 해제) */
   const [isPreviewMode, setIsPreviewMode] = useState(false);
-  const [previewSyncStatus, setPreviewSyncStatus] = useState<PreviewSyncStatus>('inactive');
+  const previewEnabled = Boolean(diagram?.hasYdocSnapshot && diagram.content);
+  const previewSyncStatus = toPreviewSyncStatus(runtimeState, previewEnabled);
 
   const initYDoc = useCanvasStore((s) => s.initYDoc);
   const destroyYDoc = useCanvasStore((s) => s.destroyYDoc);
@@ -84,9 +88,6 @@ export function useYjsCollaboration(
     const updatePreviewMode = (next: boolean) => {
       setIsPreviewMode(next);
     };
-    const updatePreviewSyncStatus = (next: PreviewSyncStatus) => {
-      setPreviewSyncStatus(next);
-    };
 
     initYDoc(ydoc);
 
@@ -96,7 +97,6 @@ export function useYjsCollaboration(
       // Y.Doc 스냅샷은 WS 연결 후 SNAPSHOT_REQUEST로 서버에서 로드
       if (diagram.content && !diagram.hasYdocSnapshot) {
         migrateJsonToYDoc(ydoc, diagram.content);
-        updatePreviewSyncStatus('inactive');
 
         if (teamId && projectId) {
           try {
@@ -133,7 +133,6 @@ export function useYjsCollaboration(
         loadPreview(diagram.content);
         previewShownAt = performance.now();
         updatePreviewMode(true);
-        updatePreviewSyncStatus('syncing');
         console.info(
           '%s preview-visible totalMs=%d',
           handoffLogPrefix,
@@ -159,20 +158,15 @@ export function useYjsCollaboration(
             );
             if (previewHydrationSource === 'fallback') {
               dispatchRuntimeEvent('fallback-timeout');
-              updatePreviewSyncStatus('degraded');
               return;
             }
             dispatchRuntimeEvent('remote-snapshot-applied');
-            if (currentConnectionStatus === 'connected') {
-              updatePreviewSyncStatus('live');
-              return;
+            if (currentConnectionStatus !== 'connected') {
+              previewRemoteReadyPending = true;
             }
-            previewRemoteReadyPending = true;
           }
         };
         tablesMap.observeDeep(previewExitObserver);
-      } else {
-        updatePreviewSyncStatus('inactive');
       }
 
       // 5. YjsProvider 연결
@@ -213,7 +207,6 @@ export function useYjsCollaboration(
         }
         if (status === 'connected' && previewRemoteReadyPending) {
           previewRemoteReadyPending = false;
-          updatePreviewSyncStatus('live');
           console.info(
             '%s live-ready totalMs=%d afterWsMs=%s',
             handoffLogPrefix,
@@ -283,7 +276,6 @@ export function useYjsCollaboration(
         getTablesMap(ydoc).unobserveDeep(previewExitObserver);
       }
       updatePreviewMode(false);
-      updatePreviewSyncStatus('inactive');
       resetRuntimeState();
       if (snapshotFallbackTimer) {
         clearTimeout(snapshotFallbackTimer);

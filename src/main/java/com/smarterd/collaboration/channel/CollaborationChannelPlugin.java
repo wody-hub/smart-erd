@@ -19,6 +19,13 @@ public interface CollaborationChannelPlugin {
     String channelType();
 
     /**
+     * 채널 리소스 key 생성 규칙을 반환한다.
+     *
+     * @return resource key factory
+     */
+    CollaborationResourceKeyFactory resourceKeyFactory();
+
+    /**
      * 채널 접근 정책을 반환한다.
      *
      * @return 접근 정책

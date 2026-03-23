@@ -12,6 +12,7 @@ import com.smarterd.collaboration.channel.DefaultCollaborationChannelRegistry;
 import com.smarterd.config.websocket.WebSocketProperties;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationChannelPlugin;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationHandoffPolicy;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeyFactory;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSessionMetadataPolicy;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSnapshotStore;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
@@ -28,6 +29,7 @@ import com.smarterd.domain.diagram.websocket.relay.handler.SyncRelayMessageHandl
 import com.smarterd.domain.diagram.websocket.relay.handler.YjsUpdateMessageHandler;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
+import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionResolver;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.List;
@@ -193,13 +195,18 @@ class DiagramWebSocketFlowIntegrationTest {
         final var objectMapper = new ObjectMapper();
         final var messageSender = new DiagramMessageSender(roomManager, objectMapper);
         final var presenceNotifier = new DiagramPresenceNotifier(roomManager, messageSender);
+        final var resourceKeyFactory = new DiagramCollaborationResourceKeyFactory();
         final var diagramChannelPlugin = new DiagramCollaborationChannelPlugin(
-            new DiagramCollaborationSessionMetadataPolicy(),
-            new DiagramCollaborationSnapshotStore(snapshotService),
-            new DiagramCollaborationHandoffPolicy(roomManager, snapshotService)
+            resourceKeyFactory,
+            new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory),
+            new DiagramCollaborationSnapshotStore(snapshotService, resourceKeyFactory),
+            new DiagramCollaborationHandoffPolicy(roomManager, snapshotService, resourceKeyFactory)
         );
         final var channelRegistry = new DefaultCollaborationChannelRegistry(List.of(diagramChannelPlugin));
         final var loadCollaborationHandoffUseCase = new LoadCollaborationHandoffUseCase(channelRegistry);
+        final var sessionResolver = new DiagramWebSocketSessionResolver(
+            new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory)
+        );
 
         final var handlers = List.<DiagramMessageHandler>of(
             new SyncRelayMessageHandler(messageSender),
@@ -216,6 +223,7 @@ class DiagramWebSocketFlowIntegrationTest {
             snapshotService,
             messageSender,
             presenceNotifier,
+            sessionResolver,
             handlers
         );
         handler.initHandlerMap();

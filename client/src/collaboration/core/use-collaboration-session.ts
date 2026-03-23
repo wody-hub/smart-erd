@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useState } from 'react';
 import type {
   CollaborationRuntimeEvent,
   CollaborationRuntimeState,
@@ -13,17 +13,22 @@ import { transitionCollaborationRuntimeState } from './collaboration-session-mac
  * preview/hydrating/live/degraded/reconnecting 상태 전이만 공통 훅으로 고정한다.</p>
  */
 export function useCollaborationSession() {
-  const runtimeStateRef = useRef<CollaborationRuntimeState>(INITIAL_COLLABORATION_RUNTIME_STATE);
+  const [runtimeState, setRuntimeState] = useState<CollaborationRuntimeState>(
+    INITIAL_COLLABORATION_RUNTIME_STATE,
+  );
 
   const dispatchRuntimeEvent = (event: CollaborationRuntimeEvent) => {
-    runtimeStateRef.current = transitionCollaborationRuntimeState(runtimeStateRef.current, event);
+    setRuntimeState((currentState) =>
+      transitionCollaborationRuntimeState(currentState, event),
+    );
   };
 
   const resetRuntimeState = () => {
-    runtimeStateRef.current = INITIAL_COLLABORATION_RUNTIME_STATE;
+    setRuntimeState(INITIAL_COLLABORATION_RUNTIME_STATE);
   };
 
   return {
+    runtimeState,
     dispatchRuntimeEvent,
     resetRuntimeState,
   };

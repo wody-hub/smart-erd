@@ -17,14 +17,17 @@ import { login as loginApi } from '@/api/authApi';
 import useAuthStore from '@/stores/useAuthStore';
 import { getErrorMessage } from '@/lib/api-error';
 import { isElectron, initServerUrl } from '@/lib/platform';
-import { STORAGE_KEYS } from '@/constants/storage';
 import { ROUTES } from '@/constants/routes';
 import { toast } from 'sonner';
 
 /** Electron 환경에서 선택 가능한 서버 URL 목록. */
 const SERVER_URL_OPTIONS = [
-  { label: 'Local (localhost:9500)', value: 'http://localhost:9500' },
-  { label: 'Local (127.0.0.1:9500)', value: 'http://127.0.0.1:9500' },
+  { label: 'Dev (localhost:9503)', value: 'http://localhost:9503' },
+  { label: 'Test (localhost:9502)', value: 'http://localhost:9502' },
+  { label: 'Local (localhost:9501)', value: 'http://localhost:9501' },
+  { label: 'Dev (127.0.0.1:9503)', value: 'http://127.0.0.1:9503' },
+  { label: 'Test (127.0.0.1:9502)', value: 'http://127.0.0.1:9502' },
+  { label: 'Local (127.0.0.1:9501)', value: 'http://127.0.0.1:9501' },
 ];
 
 /** Electron 서버 URL을 localStorage에 저장하는 키. */

@@ -2,6 +2,7 @@ package com.smarterd.domain.diagram.collaboration;
 
 import com.smarterd.collaboration.channel.CollaborationAccessPolicy;
 import com.smarterd.collaboration.channel.CollaborationChannelPlugin;
+import com.smarterd.collaboration.channel.CollaborationResourceKeyFactory;
 import com.smarterd.collaboration.handoff.CollaborationHandoffPolicy;
 import com.smarterd.collaboration.snapshot.CollaborationSnapshotStore;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,7 @@ public class DiagramCollaborationChannelPlugin implements CollaborationChannelPl
     /** 다이어그램 협업 채널 타입 */
     public static final String CHANNEL_TYPE = "diagram";
 
+    private final CollaborationResourceKeyFactory resourceKeyFactory;
     private final CollaborationAccessPolicy accessPolicy;
     private final CollaborationSnapshotStore snapshotStore;
     private final CollaborationHandoffPolicy handoffPolicy;
@@ -25,15 +27,18 @@ public class DiagramCollaborationChannelPlugin implements CollaborationChannelPl
     /**
      * 기본 생성자.
      *
+     * @param resourceKeyFactory 다이어그램 채널 resource key factory
      * @param accessPolicy  다이어그램 채널 세션 메타데이터 정책
      * @param snapshotStore 다이어그램 snapshot 저장소
      * @param handoffPolicy 다이어그램 handoff 정책
      */
     public DiagramCollaborationChannelPlugin(
+        DiagramCollaborationResourceKeyFactory resourceKeyFactory,
         DiagramCollaborationSessionMetadataPolicy accessPolicy,
         DiagramCollaborationSnapshotStore snapshotStore,
         DiagramCollaborationHandoffPolicy handoffPolicy
     ) {
+        this.resourceKeyFactory = resourceKeyFactory;
         this.accessPolicy = accessPolicy;
         this.snapshotStore = snapshotStore;
         this.handoffPolicy = handoffPolicy;
@@ -45,6 +50,14 @@ public class DiagramCollaborationChannelPlugin implements CollaborationChannelPl
     @Override
     public String channelType() {
         return CHANNEL_TYPE;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public CollaborationResourceKeyFactory resourceKeyFactory() {
+        return resourceKeyFactory;
     }
 
     /**

@@ -21,19 +21,23 @@ public class DiagramCollaborationHandoffPolicy implements CollaborationHandoffPo
 
     private final DiagramRoomManager roomManager;
     private final DiagramSnapshotService snapshotService;
+    private final DiagramCollaborationResourceKeyFactory resourceKeyFactory;
 
     /**
      * 기본 생성자.
      *
      * @param roomManager     다이어그램 room 관리자
      * @param snapshotService 다이어그램 스냅샷 서비스
+     * @param resourceKeyFactory 다이어그램 resource key factory
      */
     public DiagramCollaborationHandoffPolicy(
         DiagramRoomManager roomManager,
-        DiagramSnapshotService snapshotService
+        DiagramSnapshotService snapshotService,
+        DiagramCollaborationResourceKeyFactory resourceKeyFactory
     ) {
         this.roomManager = Objects.requireNonNull(roomManager);
         this.snapshotService = Objects.requireNonNull(snapshotService);
+        this.resourceKeyFactory = Objects.requireNonNull(resourceKeyFactory);
     }
 
     /**
@@ -44,7 +48,7 @@ public class DiagramCollaborationHandoffPolicy implements CollaborationHandoffPo
         CollaborationResourceKey resourceKey,
         CollaborationSnapshotStore snapshotStore
     ) {
-        final var diagramId = DiagramCollaborationResourceKeys.parseDiagramId(resourceKey);
+        final var diagramId = resourceKeyFactory.parseDiagramId(resourceKey);
         final var roomSessionCount = roomManager.getSessionCount(diagramId);
         final var pendingUpdates = roomSessionCount > 1 ? roomManager.peekMergedUpdates(diagramId) : new byte[0];
         if (pendingUpdates.length > 0) {

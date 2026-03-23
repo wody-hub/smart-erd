@@ -1019,7 +1019,7 @@
     "title": "Server Settings",
     "description": "Configure the backend server URL for Smart ERD.",
     "serverUrlLabel": "Server URL",
-    "serverUrlPlaceholder": "e.g. http://localhost:9500",
+    "serverUrlPlaceholder": "e.g. http://localhost:9503",
     "testConnection": "Test Connection",
     "testing": "Testing...",
     "testSuccess": "Connection successful",

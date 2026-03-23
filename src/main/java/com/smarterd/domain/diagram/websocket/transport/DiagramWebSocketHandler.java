@@ -1,7 +1,6 @@
 package com.smarterd.domain.diagram.websocket.transport;
 
 import com.smarterd.config.websocket.WebSocketProperties;
-import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
@@ -9,7 +8,7 @@ import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
 import com.smarterd.domain.diagram.websocket.relay.DiagramPresenceNotifier;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
-import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
+import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionResolver;
 import jakarta.annotation.PostConstruct;
 import java.nio.channels.ClosedChannelException;
 import java.util.HashMap;
@@ -21,7 +20,6 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
@@ -60,6 +58,9 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
 
     /** presence 알림 전송 유틸 */
     private final DiagramPresenceNotifier presenceNotifier;
+
+    /** 공통/legacy 세션 메타데이터 resolver */
+    private final DiagramWebSocketSessionResolver sessionResolver;
 
     /** 타입별 메시지 핸들러 */
     private final List<DiagramMessageHandler> messageHandlers;
@@ -147,7 +148,7 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
     public void afterConnectionEstablished(@NonNull WebSocketSession session) {
         session.setBinaryMessageSizeLimit(webSocketProperties.getBinaryMessageSizeLimit());
 
-        final var info = getSessionInfo(session);
+        final var info = sessionResolver.resolve(session);
         if (info == null) {
             log.warn("WebSocket 세션 메타데이터 누락으로 연결 거부 (세션 {})", session.getId());
             try {
@@ -190,7 +191,7 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
      */
     @Override
     protected void handleBinaryMessage(@NonNull WebSocketSession session, @NonNull BinaryMessage message) {
-        final var info = getSessionInfo(session);
+        final var info = sessionResolver.resolve(session);
         if (info == null) {
             log.warn("WebSocket 세션 메타데이터 누락으로 메시지 처리 중단 (세션 {})", session.getId());
             try {
@@ -264,7 +265,7 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
         }
 
         roomManager.cleanupRateLimit(session);
-        final var info = getSessionInfo(session);
+        final var info = sessionResolver.resolve(session);
         final var diagramId = info != null ? info.diagramId() : roomManager.findDiagramIdBySession(session);
         final var userId = info != null ? info.userId() : roomManager.findUserIdBySession(session);
         if (diagramId == null) {
@@ -363,44 +364,4 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
         return false;
     }
 
-    /**
-     * 세션 attributes에서 AuthenticatedSession를 추출한다.
-     *
-     * @param session WebSocket 세션
-     * @return 세션 메타데이터. 없으면 {@code null}
-     */
-    @Nullable
-    private AuthenticatedSession getSessionInfo(WebSocketSession session) {
-        final var legacyValue = session.getAttributes().get(AuthenticatedSession.SESSION_ATTR_KEY);
-        if (legacyValue instanceof AuthenticatedSession info) {
-            return info;
-        }
-        if (legacyValue != null) {
-            log.warn(
-                "WebSocket legacy 세션 메타데이터 타입 오류 (세션 {}, actualType={})",
-                session.getId(),
-                legacyValue.getClass().getName()
-            );
-        }
-
-        final var commonValue = session.getAttributes().get(CollaborationAuthenticatedSession.SESSION_ATTR_KEY);
-        if (commonValue == null) {
-            return null;
-        }
-        if (commonValue instanceof CollaborationAuthenticatedSession info) {
-            try {
-                return AuthenticatedSession.fromCollaborationSession(info);
-            } catch (IllegalArgumentException e) {
-                log.warn("공통 협업 세션 메타데이터를 다이어그램 세션으로 변환 실패 (세션 {})", session.getId(), e);
-                return null;
-            }
-        }
-
-        log.warn(
-            "WebSocket 공통 세션 메타데이터 타입 오류 (세션 {}, actualType={})",
-            session.getId(),
-            commonValue.getClass().getName()
-        );
-        return null;
-    }
 }
