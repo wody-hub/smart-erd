@@ -1,13 +1,13 @@
 package com.smarterd.domain.diagram.websocket.relay.handler;
 
-import com.smarterd.domain.diagram.service.DiagramSnapshotService;
+import com.smarterd.application.collaboration.query.LoadCollaborationHandoffUseCase;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeys;
 import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
-import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +31,7 @@ public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
     );
 
     private final DiagramRoomManager roomManager;
-    private final DiagramSnapshotService snapshotService;
+    private final LoadCollaborationHandoffUseCase loadCollaborationHandoffUseCase;
     private final DiagramMessageSender messageSender;
 
     /**
@@ -52,24 +52,13 @@ public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
         final var startedAt = System.nanoTime();
         try {
             final var loadStartedAt = System.nanoTime();
-            final var roomSessionCount = roomManager.getSessionCount(context.diagramId());
-            final var pendingUpdates =
-                roomSessionCount > 1 ? roomManager.peekMergedUpdates(context.diagramId()) : new byte[0];
-            final var cachedSnapshot = snapshotService.getCachedSnapshot(context.diagramId());
-
-            final byte[] snapshot;
-            if (pendingUpdates.length > 0) {
-                snapshot = Objects.requireNonNull(
-                    snapshotService.buildWarmHandoffSnapshot(context.diagramId(), pendingUpdates)
-                );
-            } else {
-                snapshot = cachedSnapshot.orElseGet(
-                    () -> Objects.requireNonNull(snapshotService.loadSnapshot(context.diagramId()))
-                );
-            }
+            final var handoff = loadCollaborationHandoffUseCase.loadHandoffSnapshot(
+                DiagramCollaborationResourceKeys.forDiagramId(context.diagramId())
+            );
             final var loadEndedAt = System.nanoTime();
             final var messageType = context.messageType();
-            final var snapshotSource = pendingUpdates.length > 0 || !cachedSnapshot.isEmpty() ? "warm" : "db";
+            final var snapshot = handoff.snapshot();
+            final var snapshotSource = handoff.source();
             if (snapshot.length == 0) {
                 log.info(
                     "snapshot-handoff diagramId={} session={} mode={} source={} snapshotBytes=0 loadMs={} decodeMs=0 sendMs=0 totalMs={}",
@@ -118,9 +107,7 @@ public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
                         .session()
                         .sendMessage(
                             new BinaryMessage(
-                                Objects.requireNonNull(
-                                    messageSender.wrapMessage(DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE, update)
-                                )
+                                messageSender.wrapMessage(DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE, update)
                             )
                         );
                 }

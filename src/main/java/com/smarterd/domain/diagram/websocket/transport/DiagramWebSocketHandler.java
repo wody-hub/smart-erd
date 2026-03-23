@@ -1,6 +1,7 @@
 package com.smarterd.domain.diagram.websocket.transport;
 
 import com.smarterd.config.websocket.WebSocketProperties;
+import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
@@ -370,17 +371,35 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
      */
     @Nullable
     private AuthenticatedSession getSessionInfo(WebSocketSession session) {
-        final var value = session.getAttributes().get(AuthenticatedSession.SESSION_ATTR_KEY);
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof AuthenticatedSession info) {
+        final var legacyValue = session.getAttributes().get(AuthenticatedSession.SESSION_ATTR_KEY);
+        if (legacyValue instanceof AuthenticatedSession info) {
             return info;
         }
+        if (legacyValue != null) {
+            log.warn(
+                "WebSocket legacy 세션 메타데이터 타입 오류 (세션 {}, actualType={})",
+                session.getId(),
+                legacyValue.getClass().getName()
+            );
+        }
+
+        final var commonValue = session.getAttributes().get(CollaborationAuthenticatedSession.SESSION_ATTR_KEY);
+        if (commonValue == null) {
+            return null;
+        }
+        if (commonValue instanceof CollaborationAuthenticatedSession info) {
+            try {
+                return AuthenticatedSession.fromCollaborationSession(info);
+            } catch (IllegalArgumentException e) {
+                log.warn("공통 협업 세션 메타데이터를 다이어그램 세션으로 변환 실패 (세션 {})", session.getId(), e);
+                return null;
+            }
+        }
+
         log.warn(
-            "WebSocket 세션 메타데이터 타입 오류 (세션 {}, actualType={})",
+            "WebSocket 공통 세션 메타데이터 타입 오류 (세션 {}, actualType={})",
             session.getId(),
-            value.getClass().getName()
+            commonValue.getClass().getName()
         );
         return null;
     }

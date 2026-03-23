@@ -7,7 +7,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smarterd.application.collaboration.query.LoadCollaborationHandoffUseCase;
+import com.smarterd.collaboration.channel.DefaultCollaborationChannelRegistry;
 import com.smarterd.config.websocket.WebSocketProperties;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationChannelPlugin;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationHandoffPolicy;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSessionMetadataPolicy;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSnapshotStore;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
 import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
@@ -187,12 +193,19 @@ class DiagramWebSocketFlowIntegrationTest {
         final var objectMapper = new ObjectMapper();
         final var messageSender = new DiagramMessageSender(roomManager, objectMapper);
         final var presenceNotifier = new DiagramPresenceNotifier(roomManager, messageSender);
+        final var diagramChannelPlugin = new DiagramCollaborationChannelPlugin(
+            new DiagramCollaborationSessionMetadataPolicy(),
+            new DiagramCollaborationSnapshotStore(snapshotService),
+            new DiagramCollaborationHandoffPolicy(roomManager, snapshotService)
+        );
+        final var channelRegistry = new DefaultCollaborationChannelRegistry(List.of(diagramChannelPlugin));
+        final var loadCollaborationHandoffUseCase = new LoadCollaborationHandoffUseCase(channelRegistry);
 
         final var handlers = List.<DiagramMessageHandler>of(
             new SyncRelayMessageHandler(messageSender),
             new YjsUpdateMessageHandler(roomManager, messageSender),
             new AwarenessMessageHandler(objectMapper, messageSender),
-            new SnapshotRequestMessageHandler(roomManager, snapshotService, messageSender),
+            new SnapshotRequestMessageHandler(roomManager, loadCollaborationHandoffUseCase, messageSender),
             new CompactedSnapshotMessageHandler(roomManager, snapshotService),
             new PresenceSnapshotRequestMessageHandler(roomManager, presenceNotifier)
         );

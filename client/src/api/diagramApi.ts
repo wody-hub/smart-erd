@@ -121,11 +121,12 @@ export async function persistDiagramYdocSnapshot(
   diagramId: string,
   expectedContentRevision: string,
   ydocSnapshot: Uint8Array,
-): Promise<void> {
-  await axiosInstance.post(`/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/ydoc-snapshot`, {
+): Promise<boolean> {
+  const response = await axiosInstance.post(`/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/ydoc-snapshot`, {
     expectedContentRevision,
     ydocSnapshot: encodeBytesToBase64(ydocSnapshot),
   });
+  return Boolean(response.data?.persisted);
 }
 
 /**

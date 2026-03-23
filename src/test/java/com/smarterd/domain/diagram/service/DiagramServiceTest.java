@@ -250,9 +250,8 @@ class DiagramServiceTest {
     }
 
     @Test
-    @DisplayName("saveDiagram - Y.Doc snapshot이 함께 오면 content와 snapshot을 같은 revision으로 저장한다")
-    void saveDiagram_whenYdocSnapshotProvided_keepsContentAndSnapshotInSync() {
-        // given
+    @DisplayName("loadWritableDiagram - 쓰기 가능한 다이어그램 엔티티를 반환한다")
+    void loadWritableDiagram_returnsWritableDiagram() {
         final var loginId = "tester";
         final var teamId = 1L;
         final var projectId = 10L;
@@ -260,11 +259,8 @@ class DiagramServiceTest {
         final var user = createUser(1L, loginId);
         final var team = createTeam(teamId, user);
         final var project = createProject(projectId, team);
-        final var initialContent = "{\"nodes\":[]}";
-        final var savedContent = "{\"nodes\":[{\"id\":\"n1\"}]}";
-        final var ydocSnapshot = new byte[] { 1, 2, 3, 4 };
         final var diagram = Objects.requireNonNull(
-            Diagram.builder().name("D").project(project).content(initialContent).build()
+            Diagram.builder().name("D").project(project).content("{\"nodes\":[]}").build()
         );
         ReflectionTestUtils.setField(diagram, "id", diagramId);
 
@@ -273,64 +269,25 @@ class DiagramServiceTest {
         when(projectService.findProjectById(projectId)).thenReturn(project);
         when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
 
-        // when
-        final var result = diagramService.saveDiagram(
-            loginId,
-            teamId,
-            projectId,
-            diagramId,
-            savedContent,
-            ydocSnapshot
-        );
+        final var loaded = diagramService.loadWritableDiagram(loginId, teamId, projectId, diagramId);
 
-        // then
-        assertThat(diagram.getContent()).isEqualTo(savedContent);
-        assertThat(diagram.getYdocSnapshot()).isNotNull();
-        assertThat(result.contentRevision()).isEqualTo(diagram.getContentRevision());
-        assertThat(result.snapshotRevision()).isEqualTo(diagram.getSnapshotRevision());
-        verify(diagramSnapshotService).reconcileRealtimeStateWithPersistedContentAfterCommit(diagramId, ydocSnapshot);
+        assertThat(loaded).isSameAs(diagram);
     }
 
     @Test
-    @DisplayName("saveDiagram - snapshot 없이 저장하면 stale realtime state를 버린다")
-    void saveDiagram_whenYdocSnapshotMissing_discardsRealtimeState() {
-        // given
-        final var loginId = "tester";
-        final var teamId = 1L;
-        final var projectId = 10L;
-        final var diagramId = 100L;
-        final var user = createUser(1L, loginId);
-        final var team = createTeam(teamId, user);
-        final var project = createProject(projectId, team);
-        final var initialContent = "{\"nodes\":[]}";
-        final var savedContent = "{\"nodes\":[{\"id\":\"n1\"}]}";
+    @DisplayName("buildSaveDiagramResult - 현재 다이어그램 상태를 저장 응답으로 변환한다")
+    void buildSaveDiagramResult_returnsCurrentDiagramState() {
         final var diagram = Objects.requireNonNull(
-            Diagram.builder().name("D").project(project).content(initialContent).build()
+            Diagram.builder().name("D").project(createProject(10L, createTeam(1L, createUser(1L, "tester")))).build()
         );
-        ReflectionTestUtils.setField(diagram, "id", diagramId);
-        diagram.updateYdocSnapshot(new byte[] { 9, 9, 9 });
+        ReflectionTestUtils.setField(diagram, "id", 100L);
+        diagram.updateYdocSnapshot(new byte[] { 1, 2, 3 });
         diagram.syncSnapshotRevision(diagram.getContentRevision());
 
-        when(authService.findUserByLoginId(loginId)).thenReturn(user);
-        when(teamService.findTeamById(teamId)).thenReturn(team);
-        when(projectService.findProjectById(projectId)).thenReturn(project);
-        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
+        final var result = diagramService.buildSaveDiagramResult(diagram);
 
-        // when
-        final var result = diagramService.saveDiagram(
-            loginId,
-            teamId,
-            projectId,
-            diagramId,
-            savedContent,
-            null
-        );
-
-        // then
-        assertThat(diagram.getContent()).isEqualTo(savedContent);
-        assertThat(diagram.getYdocSnapshot()).isNull();
-        assertThat(result.snapshotRevision()).isNull();
-        verify(diagramSnapshotService).reconcileRealtimeStateWithPersistedContentAfterCommit(diagramId, null);
+        assertThat(result.hasYdocSnapshot()).isTrue();
+        assertThat(result.snapshotRevision()).isEqualTo(diagram.getSnapshotRevision());
     }
 
     private User createUser(Long id, String loginId) {

@@ -314,6 +314,7 @@ export default function PreviewCanvas({
     isUsingPersistedFallback,
   );
   const [displayNodes, setDisplayNodes] = useState<DslPreviewNode[]>([]);
+  const displayNodesRef = useRef<DslPreviewNode[]>([]);
   const positionOverridesRef = useRef<DiagramPreviewPositionRecord>(positionOverrides);
   const reactFlowInstanceRef = useRef<ReactFlowInstance<DslPreviewNode, ERDEdge> | null>(null);
   const lastHandledFocusRequestIdRef = useRef<number | null>(null);
@@ -368,6 +369,10 @@ export default function PreviewCanvas({
   }, [positionOverrides]);
 
   useEffect(() => {
+    displayNodesRef.current = displayNodes;
+  }, [displayNodes]);
+
+  useEffect(() => {
     return () => {
       clearZoomCompensationTimer();
     };
@@ -406,23 +411,13 @@ export default function PreviewCanvas({
   }, [fallbackGraph, graph, onPositionOverridesChange, positionOverrides]);
 
   /**
-   * preview 노드 위치 변경을 화면 상태에 반영한다.
-   *
-   * @param changes React Flow 노드 변경 목록
-   * @returns 없음
-   */
-  const handleNodesChange = useCallback((changes: NodeChange<DslPreviewNode>[]) => {
-    setDisplayNodes((currentNodes) => applyNodeChanges(changes, currentNodes));
-  }, []);
-
-  /**
    * 드래그가 끝난 preview 노드의 위치를 로컬 override로 저장한다.
    *
    * @param _event React Flow drag stop 이벤트
    * @param node 드래그가 끝난 preview 노드
    * @returns 없음
    */
-  const handleNodeDragStop = useCallback((_event: unknown, node: DslPreviewNode) => {
+  const commitPreviewNodePosition = useCallback((node: DslPreviewNode) => {
     const canvasState = useCanvasStore.getState();
     const nextOverrides = { ...positionOverridesRef.current };
     const syncedPreviewNodeIds = canvasState.applyPreviewPositionChangesToPersisted(
@@ -437,6 +432,29 @@ export default function PreviewCanvas({
     positionOverridesRef.current = nextOverrides;
     onPositionOverridesChange(nextOverrides);
   }, [onPositionOverridesChange]);
+
+  /**
+   * preview 노드 위치 변경을 화면 상태에 반영한다.
+   *
+   * @param changes React Flow 노드 변경 목록
+   * @returns 없음
+   */
+  const handleNodesChange = useCallback((changes: NodeChange<DslPreviewNode>[]) => {
+    const nextNodes = applyNodeChanges(changes, displayNodesRef.current);
+    displayNodesRef.current = nextNodes;
+    setDisplayNodes(nextNodes);
+
+    for (const change of changes) {
+      if (change.type !== 'position' || change.dragging !== false) {
+        continue;
+      }
+      const committedNode = nextNodes.find((candidate) => candidate.id === change.id);
+      if (!committedNode) {
+        continue;
+      }
+      commitPreviewNodePosition(committedNode);
+    }
+  }, [commitPreviewNodePosition]);
 
   /**
    * 사용자가 조정한 로컬 preview 위치를 기본 배치로 되돌린다.
@@ -505,7 +523,6 @@ export default function PreviewCanvas({
             scheduleZoomTextCompensation(viewport.zoom);
           }}
           onNodesChange={handleNodesChange}
-          onNodeDragStop={handleNodeDragStop}
           nodeTypes={previewCanvasNodeTypes}
           edgeTypes={previewEdgeTypes}
           deleteKeyCode={null}

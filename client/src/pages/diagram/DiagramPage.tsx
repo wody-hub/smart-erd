@@ -36,6 +36,10 @@ import { CODE_SHARED_DRAFT_SERVER_PERSIST_IDLE_MS } from '@/constants/code-sync'
 import { queryKeys } from '@/constants/query-keys';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { getErrorMessage } from '@/lib/api-error';
+import {
+  beginCodeModeSnapshotKeepalive,
+  shouldRetryCodeModeSnapshotAfterKeepalive,
+} from '@/lib/code-mode-snapshot-keepalive';
 import { shouldScheduleCodeModeSnapshotPersist } from '@/lib/code-mode-snapshot-persist';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { useSidebarResize, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH } from '@/hooks/useSidebarResize';
@@ -152,6 +156,8 @@ export default function DiagramPage() {
   const codeModeSnapshotPersistEpochRef = useRef(0);
   /** keepalive snapshot 중복 전송 방지용 마지막 발사 시각 */
   const codeModeSnapshotLastKeepaliveAtRef = useRef(0);
+  /** keepalive snapshot 전송 후 응답 미확정 상태 */
+  const codeModeSnapshotKeepalivePendingRef = useRef(false);
   /** persisted 저장용 Y.Doc 변경 버전 */
   const persistedSaveSnapshotDocVersionRef = useRef(0);
   /** 마지막으로 캐시한 persisted 저장용 snapshot 버전 */
@@ -431,6 +437,7 @@ export default function DiagramPage() {
       }
       codeModeSnapshotPersistDirtyRef.current = false;
       codeModeSnapshotPersistInFlightRef.current = false;
+      codeModeSnapshotKeepalivePendingRef.current = false;
       setCodeModeDraftPersistStatus(nextStatus);
       setCodeModeDraftPersistedAt(nextStatus === 'saved' ? Date.now() : null);
     },
@@ -511,7 +518,12 @@ export default function DiagramPage() {
   );
 
   // Y.Doc + YjsProvider 라이프사이클 관리
-  const { providerRef, isPreviewMode, previewSyncStatus } = useYjsCollaboration(diagram, diagramId);
+  const { providerRef, isPreviewMode, previewSyncStatus } = useYjsCollaboration(
+    diagram,
+    diagramId,
+    teamId,
+    projectId,
+  );
 
   useEffect(() => {
     if (!ydoc) {
@@ -653,6 +665,7 @@ export default function DiagramPage() {
       }
       if (nextSnapshot.length === 0) {
         codeModeSnapshotPersistDirtyRef.current = false;
+        codeModeSnapshotKeepalivePendingRef.current = false;
         if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
           setCodeModeDraftPersistStatus('saved');
         }
@@ -661,11 +674,16 @@ export default function DiagramPage() {
 
       if (useKeepalive) {
         const now = Date.now();
-        if (now - codeModeSnapshotLastKeepaliveAtRef.current < 1000) {
+        const keepaliveDecision = beginCodeModeSnapshotKeepalive(
+          now,
+          codeModeSnapshotLastKeepaliveAtRef.current,
+          1000,
+        );
+        if (!keepaliveDecision.shouldSend) {
           return;
         }
-        codeModeSnapshotLastKeepaliveAtRef.current = now;
-        codeModeSnapshotPersistDirtyRef.current = false;
+        codeModeSnapshotLastKeepaliveAtRef.current = keepaliveDecision.nextLastKeepaliveAt;
+        codeModeSnapshotKeepalivePendingRef.current = keepaliveDecision.keepalivePending;
         persistDiagramYdocSnapshotKeepalive(
           teamId,
           projectId,
@@ -674,8 +692,8 @@ export default function DiagramPage() {
           nextSnapshot,
         );
         if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
-          setCodeModeDraftPersistStatus('saved');
-          setCodeModeDraftPersistedAt(now);
+          setCodeModeDraftPersistStatus('saving');
+          setCodeModeDraftPersistedAt(null);
         }
         return;
       }
@@ -688,17 +706,26 @@ export default function DiagramPage() {
 
       codeModeSnapshotPersistInFlightRef.current = true;
       codeModeSnapshotPersistDirtyRef.current = false;
+      codeModeSnapshotKeepalivePendingRef.current = false;
       if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
         setCodeModeDraftPersistStatus('saving');
       }
       try {
-        await persistDiagramYdocSnapshot(
+        const persisted = await persistDiagramYdocSnapshot(
           teamId,
           projectId,
           diagramId,
           expectedContentRevision,
           nextSnapshot,
         );
+        if (!persisted) {
+          codeModeSnapshotPersistDirtyRef.current = true;
+          if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
+            setCodeModeDraftPersistStatus('dirty');
+          }
+          console.warn('[DiagramPage] code mode snapshot persist returned persisted=false');
+          return;
+        }
         if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
           setCodeModeDraftPersistStatus('saved');
           setCodeModeDraftPersistedAt(Date.now());
@@ -711,13 +738,19 @@ export default function DiagramPage() {
           try {
             const latestDiagram = await fetchDiagram(teamId, projectId, diagramId);
             queryClient.setQueryData(diagramDetailQueryKey, latestDiagram);
-            await persistDiagramYdocSnapshot(
+            const persisted = await persistDiagramYdocSnapshot(
               teamId,
               projectId,
               diagramId,
               latestDiagram.contentRevision,
               nextSnapshot,
             );
+            if (!persisted) {
+              codeModeSnapshotPersistDirtyRef.current = true;
+              setCodeModeDraftPersistStatus('dirty');
+              console.warn('[DiagramPage] code mode snapshot persist retry returned persisted=false');
+              return;
+            }
             if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
               setCodeModeDraftPersistStatus('saved');
               setCodeModeDraftPersistedAt(Date.now());
@@ -870,6 +903,7 @@ export default function DiagramPage() {
         codeModeSnapshotPersistTimerRef.current = null;
       }
       codeModeSnapshotPersistDirtyRef.current = false;
+      codeModeSnapshotKeepalivePendingRef.current = false;
       return;
     }
 
@@ -894,7 +928,20 @@ export default function DiagramPage() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         flushKeepalive();
+        return;
       }
+      if (
+        !shouldRetryCodeModeSnapshotAfterKeepalive(
+          document.visibilityState,
+          codeModeSnapshotKeepalivePendingRef.current,
+        )
+      ) {
+        return;
+      }
+      codeModeSnapshotKeepalivePendingRef.current = false;
+      codeModeSnapshotPersistDirtyRef.current = true;
+      setCodeModeDraftPersistStatus('dirty');
+      void persistCodeModeSnapshotNow();
     };
 
     ydoc.on('update', handleDocUpdate);

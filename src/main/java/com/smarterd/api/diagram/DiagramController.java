@@ -4,11 +4,14 @@ import com.smarterd.api.diagram.dto.CreateDiagramRequest;
 import com.smarterd.api.diagram.dto.DiagramDetailResponse;
 import com.smarterd.api.diagram.dto.DiagramResponse;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotRequest;
+import com.smarterd.api.diagram.dto.PersistYdocSnapshotResponse;
 import com.smarterd.api.diagram.dto.RenameDiagramRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramResponse;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetResponse;
+import com.smarterd.application.diagram.command.PersistDiagramSnapshotUseCase;
+import com.smarterd.application.diagram.command.SaveDiagramUseCase;
 import com.smarterd.domain.diagram.service.DiagramService;
 import com.smarterd.domain.diagram.service.DiagramService.DictionarySetChangeResult;
 import com.smarterd.domain.diagram.service.DiagramService.DiagramDetailResult;
@@ -51,6 +54,12 @@ public class DiagramController {
 
     /** 다이어그램 비즈니스 로직 서비스 */
     private final DiagramService diagramService;
+
+    /** authoritative 다이어그램 저장 유스케이스 */
+    private final SaveDiagramUseCase saveDiagramUseCase;
+
+    /** 협업 snapshot 저장 유스케이스 */
+    private final PersistDiagramSnapshotUseCase persistDiagramSnapshotUseCase;
 
     /**
      * 다이어그램을 생성한다.
@@ -155,7 +164,7 @@ public class DiagramController {
         @Valid @RequestBody SaveDiagramRequest request
     ) {
         return ResponseEntity.ok(toSaveDiagramResponse(
-            diagramService.saveDiagram(
+            saveDiagramUseCase.execute(
                 jwt.getSubject(),
                 teamId,
                 projectId,
@@ -174,28 +183,35 @@ public class DiagramController {
      * @param projectId  프로젝트 ID
      * @param diagramId  다이어그램 ID
      * @param request    Y.Doc 스냅샷 저장 요청
-     * @return 204 No Content
+     * @return 200 OK + PersistYdocSnapshotResponse
      */
     @Operation(summary = "Y.Doc 스냅샷 즉시 저장", description = "클라이언트가 보낸 현재 Y.Doc 스냅샷을 즉시 저장한다.")
-    @ApiResponse(responseCode = "204", description = "저장 성공")
+    @ApiResponse(
+        responseCode = "200",
+        description = "저장 성공",
+        content = @Content(schema = @Schema(implementation = PersistYdocSnapshotResponse.class))
+    )
     @ApiResponse(responseCode = "400", description = "다이어그램 미존재 또는 접근 권한 없음")
     @PostMapping("/{diagramId}/ydoc-snapshot")
-    public ResponseEntity<Void> persistYdocSnapshot(
+    public ResponseEntity<PersistYdocSnapshotResponse> persistYdocSnapshot(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
         @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
         @Parameter(description = "다이어그램 ID") @PathVariable Long diagramId,
         @Valid @RequestBody PersistYdocSnapshotRequest request
     ) {
-        diagramService.persistYdocSnapshot(
-            jwt.getSubject(),
-            teamId,
-            projectId,
-            diagramId,
-            request.expectedContentRevision(),
-            request.ydocSnapshot()
+        return ResponseEntity.ok(
+            new PersistYdocSnapshotResponse(
+                persistDiagramSnapshotUseCase.execute(
+                    jwt.getSubject(),
+                    teamId,
+                    projectId,
+                    diagramId,
+                    request.expectedContentRevision(),
+                    request.ydocSnapshot()
+                )
+            )
         );
-        return ResponseEntity.noContent().build();
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.smarterd.domain.diagram.websocket.transport;
 
+import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
 import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
 import com.smarterd.domain.diagram.websocket.ticket.WsTicketService;
 import com.smarterd.utils.AppStringUtils;
@@ -25,7 +26,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  *   <li>query param {@code ticket}에서 일회용 ticket을 추출</li>
  *   <li>{@link WsTicketService}로 ticket 검증 및 소멸(consume)</li>
  *   <li>ticket의 다이어그램 ID와 URL 경로의 다이어그램 ID 일치 확인</li>
- *   <li>{@link AuthenticatedSession}를 세션 attributes에 저장</li>
+ *   <li>{@link CollaborationAuthenticatedSession}와 {@link AuthenticatedSession}를 세션 attributes에 저장</li>
  * </ol></p>
  */
 @Component
@@ -117,6 +118,7 @@ public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
                 sessionInfo.expiresAt(),
                 protocolVersion
             );
+            attributes.put(CollaborationAuthenticatedSession.SESSION_ATTR_KEY, enrichedSession.toCollaborationSession());
             attributes.put(AuthenticatedSession.SESSION_ATTR_KEY, enrichedSession);
 
             log.info(

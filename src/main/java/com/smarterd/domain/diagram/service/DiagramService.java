@@ -1,12 +1,10 @@
 package com.smarterd.domain.diagram.service;
-
 import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.diagram.service.DiagramDictionaryBindingService.InvalidationCounts;
-import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.dictionary.service.DictionarySetService;
 import com.smarterd.domain.project.entity.Project;
@@ -121,68 +119,6 @@ public class DiagramService {
         final var hasSnapshot = diagramRepository.existsYdocSnapshotById(diagramId);
 
         return toDiagramDetailResult(diagram, project.getId(), hasSnapshot);
-    }
-
-    /**
-     * 다이어그램 콘텐츠를 저장한다.
-     *
-     * @param loginId    요청 사용자의 로그인 ID
-     * @param teamId     팀 ID
-     * @param projectId  프로젝트 ID
-     * @param diagramId  다이어그램 ID
-     * @param content    저장할 직렬화된 React Flow JSON
-     * @param ydocSnapshot 저장 시점의 현재 Y.Doc 전체 상태 update
-     * @return 최신 저장 상태 결과
-     */
-    @Transactional
-    public SaveDiagramResult saveDiagram(
-        String loginId,
-        Long teamId,
-        Long projectId,
-        Long diagramId,
-        String content,
-        byte[] ydocSnapshot
-    ) {
-        final var project = verifyWriteAccess(loginId, teamId, projectId);
-        final var diagram = findDiagramByProjectAndId(project, diagramId);
-
-        diagram.updateContent(content);
-        if (ydocSnapshot != null && ydocSnapshot.length > 0) {
-            diagram.updateYdocSnapshot(YjsUpdateFormat.encode(List.of(ydocSnapshot)));
-            diagram.syncSnapshotRevision(diagram.getContentRevision());
-        }
-        diagramSnapshotService.reconcileRealtimeStateWithPersistedContentAfterCommit(diagramId, ydocSnapshot);
-        return toSaveDiagramResult(diagram);
-    }
-
-    /**
-     * 클라이언트가 보낸 현재 Y.Doc 전체 상태를 persisted snapshot으로 저장한다.
-     *
-     * <p>코드 모드 shared draft를 세션 간 복원할 수 있도록 keepalive/idle 경로에서 사용한다.</p>
-     *
-     * @param loginId   요청 사용자 로그인 ID
-     * @param teamId    팀 ID
-     * @param projectId 프로젝트 ID
-     * @param diagramId 다이어그램 ID
-     * @param expectedContentRevision 클라이언트가 기대하는 content 리비전
-     * @param ydocSnapshot            클라이언트의 현재 Y.Doc 스냅샷
-     */
-    @Transactional
-    public void persistYdocSnapshot(
-        String loginId,
-        Long teamId,
-        Long projectId,
-        Long diagramId,
-        String expectedContentRevision,
-        byte[] ydocSnapshot
-    ) {
-        final var project = verifyWriteAccess(loginId, teamId, projectId);
-        findDiagramByProjectAndId(project, diagramId);
-        diagramSnapshotService.replaceSnapshotWithClientState(
-            diagramId,
-            expectedContentRevision,
-            ydocSnapshot
-        );
     }
 
     /**
@@ -319,6 +255,20 @@ public class DiagramService {
     }
 
     /**
+     * 쓰기 가능한 다이어그램 엔티티를 로드한다.
+     *
+     * @param loginId   요청 사용자의 로그인 ID
+     * @param teamId    팀 ID
+     * @param projectId 프로젝트 ID
+     * @param diagramId 다이어그램 ID
+     * @return 쓰기 가능한 다이어그램 엔티티
+     */
+    public Diagram loadWritableDiagram(String loginId, Long teamId, Long projectId, Long diagramId) {
+        final var project = verifyWriteAccess(loginId, teamId, projectId);
+        return findDiagramByProjectAndId(project, diagramId);
+    }
+
+    /**
      * Diagram 엔티티를 목록/이름변경 응답용 결과로 변환한다.
      *
      * @param diagram    다이어그램 엔티티
@@ -370,7 +320,7 @@ public class DiagramService {
      * @param diagram 저장 직후 다이어그램 엔티티
      * @return 서비스 계층 저장 결과
      */
-    private SaveDiagramResult toSaveDiagramResult(Diagram diagram) {
+    public SaveDiagramResult buildSaveDiagramResult(Diagram diagram) {
         return new SaveDiagramResult(
             diagram.getContentRevision(),
             diagram.getYdocSnapshot() != null,

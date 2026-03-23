@@ -397,19 +397,35 @@ async function expectVisibleTableNearPosition(
   targetPosition: { x: number; y: number },
   kinds: readonly TableNodeKind[] = ['persisted', 'preview'],
 ) {
-  await expect
-    .poll(
-      async () => {
-        const positions = await getTableNodePositions(page, name, kinds);
-        return positions.some(
-          (position) =>
-            Math.abs(position.x - targetPosition.x) <= 8 &&
-            Math.abs(position.y - targetPosition.y) <= 8,
-        );
-      },
-      { timeout: PROPAGATION_TIMEOUT_MS },
-    )
-    .toBe(true);
+  try {
+    await expect
+      .poll(
+        async () => {
+          const positions = await getTableNodePositions(page, name, kinds);
+          return positions.some(
+            (position) =>
+              Math.abs(position.x - targetPosition.x) <= 8 &&
+              Math.abs(position.y - targetPosition.y) <= 8,
+          );
+        },
+        { timeout: PROPAGATION_TIMEOUT_MS },
+      )
+      .toBe(true);
+  } catch (error) {
+    const [breakdown, storeSnapshot] = await Promise.all([
+      getTableNodeBreakdown(page, name),
+      getCanvasUsersStoreSnapshot(page),
+    ]);
+    throw new Error(
+      [
+        `Expected table "${name}" near (${targetPosition.x}, ${targetPosition.y})`,
+        `kinds=${kinds.join(',')}`,
+        `breakdown=${JSON.stringify(breakdown)}`,
+        `store=${JSON.stringify(storeSnapshot)}`,
+        `cause=${error instanceof Error ? error.message : String(error)}`,
+      ].join('\n'),
+    );
+  }
 }
 
 async function waitForTableNearPosition(
