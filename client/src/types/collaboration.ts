@@ -53,6 +53,8 @@ export interface AwarenessState {
 export interface YjsProviderOptions {
   /** 다이어그램 ID */
   diagramId: string;
+  /** WebSocket 경로. 미지정 시 다이어그램 기본 경로를 사용 */
+  websocketPath?: string;
   /** 일회용 WebSocket ticket을 발급받는 콜백 */
   getTicket: () => Promise<WsTicketIssueResponse>;
   /** WS 프로토콜 버전 (1: 레거시, 2: 리비전 포함 바이너리). 기본값 1 */

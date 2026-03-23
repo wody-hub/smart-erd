@@ -1,7 +1,7 @@
 package com.smarterd.application.collaboration.query;
 
 import com.smarterd.collaboration.channel.CollaborationResourceKey;
-import com.smarterd.collaboration.channel.CollaborationChannelRegistry;
+import com.smarterd.collaboration.channel.CollaborationRuntimeSupportRegistry;
 import com.smarterd.collaboration.handoff.CollaborationHandoffResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class LoadCollaborationHandoffUseCase {
 
-    private final CollaborationChannelRegistry collaborationChannelRegistry;
+    private final CollaborationRuntimeSupportRegistry collaborationRuntimeSupportRegistry;
 
     /**
      * 채널 리소스 기준 협업 handoff snapshot을 로드한다.
@@ -27,9 +27,9 @@ public class LoadCollaborationHandoffUseCase {
      * @return handoff에 사용할 전체 update snapshot과 출처
      */
     public CollaborationHandoffResult loadHandoffSnapshot(CollaborationResourceKey resourceKey) {
-        final var channelPlugin = collaborationChannelRegistry.getRequired(resourceKey.channelType());
-        return channelPlugin
+        final var runtimeSupport = collaborationRuntimeSupportRegistry.getRequired(resourceKey);
+        return runtimeSupport
             .handoffPolicy()
-            .buildHandoffSnapshot(resourceKey, channelPlugin.snapshotStore());
+            .buildHandoffSnapshot(resourceKey, runtimeSupport.snapshotStore());
     }
 }

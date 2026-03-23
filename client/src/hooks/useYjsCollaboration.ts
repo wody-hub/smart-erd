@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Y from 'yjs';
 import { YjsProvider } from '@/collaboration/YjsProvider';
 import { useCollaborationSession } from '@/collaboration/core/use-collaboration-session';
@@ -6,13 +6,14 @@ import {
   toPreviewSyncStatus,
   type PreviewSyncStatus,
 } from '@/collaboration/core/collaboration-preview-sync-status';
-import { getTablesMap, migrateJsonToYDoc } from '@/collaboration/yjsBridge';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import { useSnapshotCompaction } from '@/hooks/useSnapshotCompaction';
-import { persistDiagramYdocSnapshot, requestWsTicket } from '@/api/diagramApi';
 import type { DiagramDetail } from '@/types/diagram';
-import type { ConnectionStatus } from '@/types/collaboration';
+import type { DiagramCollaborationBootstrap } from '@/collaboration/channel/diagram/diagram-collaboration-bootstrap';
+import { DiagramCollaborationPreviewPolicy } from '@/collaboration/channel/diagram/diagram-collaboration-preview-policy';
+import { DiagramCollaborationProviderLifecycle } from '@/collaboration/channel/diagram/diagram-collaboration-provider-lifecycle';
+import { DiagramYjsDocumentAdapter } from '@/collaboration/yjs/diagram-yjs-document-adapter';
 
 /** WS 스냅샷이 도착하지 않을 때 JSON content로 폴백하기까지의 대기 시간 (ms) */
 const WS_SNAPSHOT_FALLBACK_MS = 5_000;
@@ -45,11 +46,8 @@ export function useYjsCollaboration(
   projectId: string | undefined,
 ): UseYjsCollaborationReturn {
   const providerRef = useRef<YjsProvider | null>(null);
-  const { runtimeState, dispatchRuntimeEvent, resetRuntimeState } = useCollaborationSession();
   /** API JSON 프리뷰 모드 (Y.Doc에 데이터가 도착하면 해제) */
   const [isPreviewMode, setIsPreviewMode] = useState(false);
-  const previewEnabled = Boolean(diagram?.hasYdocSnapshot && diagram.content);
-  const previewSyncStatus = toPreviewSyncStatus(runtimeState, previewEnabled);
 
   const initYDoc = useCanvasStore((s) => s.initYDoc);
   const destroyYDoc = useCanvasStore((s) => s.destroyYDoc);
@@ -65,237 +63,95 @@ export function useYjsCollaboration(
   const removePeerByLoginId = useCollaborationStore((s) => s.removePeerByLoginId);
   const resetCollaboration = useCollaborationStore((s) => s.reset);
 
+  const previewPolicy = useMemo(
+    () => new DiagramCollaborationPreviewPolicy(),
+    [],
+  );
+  const documentAdapter = useMemo(
+    () => new DiagramYjsDocumentAdapter(),
+    [],
+  );
+  const runtimeTransition = useMemo(
+    () => previewPolicy.transition.bind(previewPolicy),
+    [previewPolicy],
+  );
+  const collaborationBootstrap = useMemo<DiagramCollaborationBootstrap | null>(
+    () => {
+      if (!diagram) {
+        return null;
+      }
+      return {
+        content: diagram.content,
+        hasYdocSnapshot: diagram.hasYdocSnapshot,
+        contentRevision: diagram.contentRevision,
+      };
+    },
+    [diagram?.content, diagram?.contentRevision, diagram?.hasYdocSnapshot],
+  );
+  const { runtimeState, dispatchRuntimeEvent, resetRuntimeState } = useCollaborationSession({
+    transition: runtimeTransition,
+  });
+  const previewEnabled = Boolean(
+    collaborationBootstrap && previewPolicy.shouldStartInPreview(collaborationBootstrap),
+  );
+  const previewSyncStatus = toPreviewSyncStatus(runtimeState, previewEnabled);
+
   // Y.Doc 생성 + YjsProvider 연결 + 라이프사이클 관리
   useEffect(() => {
-    if (!diagram || !diagramId) {
+    if (!collaborationBootstrap || !diagramId) {
       return;
     }
 
     // 1. Y.Doc 생성
     const ydoc = new Y.Doc();
-    let isDisposed = false;
-    let provider: YjsProvider | null = null;
-    let currentConnectionStatus: ConnectionStatus = 'connecting';
-    let previewHydrationSource: 'remote' | 'fallback' | null = null;
-    let previewRemoteReadyPending = false;
+    initYDoc(ydoc);
     const handoffStartedAt = performance.now();
     const handoffLogPrefix = `[useYjsCollaboration][diagramId=${diagramId}]`;
-    let ticketRequestedAt: number | null = null;
-    let wsConnectedAt: number | null = null;
-    let previewShownAt: number | null = null;
-    let previewUnlockedAt: number | null = null;
-
-    const updatePreviewMode = (next: boolean) => {
-      setIsPreviewMode(next);
-    };
-
-    initYDoc(ydoc);
-
-    let previewExitObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null = null;
-    const setupCollaboration = async () => {
-      // 2. 기존 JSON 데이터 마이그레이션 (ydocSnapshot이 없는 레거시 다이어그램용)
-      // Y.Doc 스냅샷은 WS 연결 후 SNAPSHOT_REQUEST로 서버에서 로드
-      if (diagram.content && !diagram.hasYdocSnapshot) {
-        migrateJsonToYDoc(ydoc, diagram.content);
-
-        if (teamId && projectId) {
-          try {
-            const persisted = await persistDiagramYdocSnapshot(
-              teamId,
-              projectId,
-              diagramId,
-              diagram.contentRevision,
-              Y.encodeStateAsUpdate(ydoc),
-            );
-            if (persisted) {
-              console.info(
-                '%s content-only snapshot-seeded totalMs=%d',
-                handoffLogPrefix,
-                Math.round(performance.now() - handoffStartedAt),
-              );
-            } else {
-              console.warn('%s content-only snapshot seed returned persisted=false', handoffLogPrefix);
-            }
-          } catch (error) {
-            console.warn('%s content-only snapshot seed failed', handoffLogPrefix, error);
-          }
-        }
-      }
-
-      if (isDisposed) {
-        return;
-      }
-
-      // 4. hasYdocSnapshot=true → API JSON으로 프리뷰 즉시 표시
-      //    Y.Doc은 건드리지 않고 Zustand에만 주입하여 CRDT 충돌을 방지한다.
-      if (diagram.hasYdocSnapshot && diagram.content) {
-        dispatchRuntimeEvent('bootstrap-loaded');
-        loadPreview(diagram.content);
-        previewShownAt = performance.now();
-        updatePreviewMode(true);
-        console.info(
-          '%s preview-visible totalMs=%d',
-          handoffLogPrefix,
-          Math.round(previewShownAt - handoffStartedAt),
-        );
-
-        // Y.Doc에 데이터가 들어오면 프리뷰 모드 해제
-        const tablesMap = getTablesMap(ydoc);
-        previewExitObserver = () => {
-          if (tablesMap.size > 0) {
-            previewHydrationSource ??= 'remote';
-            tablesMap.unobserveDeep(previewExitObserver!);
-            previewExitObserver = null;
-            updatePreviewMode(false);
-            previewUnlockedAt = performance.now();
-            console.info(
-              '%s preview-unlocked source=%s totalMs=%d afterPreviewMs=%d updatesApplied=%d',
-              handoffLogPrefix,
-              previewHydrationSource,
-              Math.round(previewUnlockedAt - handoffStartedAt),
-              Math.round(previewUnlockedAt - (previewShownAt ?? handoffStartedAt)),
-              tablesMap.size,
-            );
-            if (previewHydrationSource === 'fallback') {
-              dispatchRuntimeEvent('fallback-timeout');
-              return;
-            }
-            dispatchRuntimeEvent('remote-snapshot-applied');
-            if (currentConnectionStatus !== 'connected') {
-              previewRemoteReadyPending = true;
-            }
-          }
-        };
-        tablesMap.observeDeep(previewExitObserver);
-      }
-
-      // 5. YjsProvider 연결
-      provider = new YjsProvider(ydoc, {
-        diagramId,
-        getTicket: async () => {
-          ticketRequestedAt = performance.now();
-          const ticket = await requestWsTicket(diagramId);
-          const ticketResolvedAt = performance.now();
-          console.info(
-            '%s ticket-issued ms=%d totalMs=%d',
-            handoffLogPrefix,
-            Math.round(ticketResolvedAt - ticketRequestedAt),
-            Math.round(ticketResolvedAt - handoffStartedAt),
-          );
-          return ticket;
-        },
-      });
-
-      provider.onConnectionStatusChange = (status: ConnectionStatus) => {
-        currentConnectionStatus = status;
-        setConnectionStatus(status);
-        if (status === 'connecting' && wsConnectedAt !== null) {
-          dispatchRuntimeEvent('reconnect-start');
-        }
-        if (status === 'disconnected') {
-          dispatchRuntimeEvent('disconnect');
-        }
-        if (status === 'connected') {
-          dispatchRuntimeEvent('ws-connected');
-          wsConnectedAt = performance.now();
-          console.info(
-            '%s ws-connected totalMs=%d afterTicketMs=%s',
-            handoffLogPrefix,
-            Math.round(wsConnectedAt - handoffStartedAt),
-            ticketRequestedAt === null ? 'n/a' : Math.round(wsConnectedAt - ticketRequestedAt),
-          );
-        }
-        if (status === 'connected' && previewRemoteReadyPending) {
-          previewRemoteReadyPending = false;
-          console.info(
-            '%s live-ready totalMs=%d afterWsMs=%s',
-            handoffLogPrefix,
-            Math.round(performance.now() - handoffStartedAt),
-            wsConnectedAt === null ? 'n/a' : Math.round(performance.now() - wsConnectedAt),
-          );
-        }
-      };
-
-      provider.onIdentityResolved = (userId) => {
-        setSelfUserId(userId);
-      };
-
-      provider.onPresenceModeChange = (mode) => {
-        setPresenceMode(mode);
-      };
-
-      provider.onPresenceSnapshot = (payload) => {
-        applyPresenceSnapshot(payload);
-      };
-
-      provider.onPresencePeerJoined = (payload) => {
-        applyPeerJoined(payload);
-      };
-
-      provider.onPresencePeerLeft = (payload) => {
-        applyPeerLeft(payload);
-        removePeerByUserId(payload.userId);
-      };
-
-      provider.onAwarenessReceived = (clientId, state) => {
-        updateAwareness(clientId, state);
-      };
-
-      provider.onPeerLeft = (loginId) => {
-        removePeerByLoginId(loginId);
-      };
-
-      provider.connect();
-      providerRef.current = provider;
-
-      // 6. hasYdocSnapshot === true인데 WS 스냅샷이 도착하지 않으면 JSON content로 폴백
-      if (diagram.hasYdocSnapshot && diagram.content) {
-        snapshotFallbackTimer = setTimeout(() => {
-          snapshotFallbackTimer = null;
-          if (getTablesMap(ydoc).size === 0) {
-            console.warn(
-              '%s snapshot-fallback timeoutMs=%d totalMs=%d',
-              handoffLogPrefix,
-              WS_SNAPSHOT_FALLBACK_MS,
-              Math.round(performance.now() - handoffStartedAt),
-            );
-            // 'remote' origin: WS 브로드캐스트 방지 + useAutoBackup 로컬 변경 미인식
-            previewHydrationSource = 'fallback';
-            ydoc.transact(() => migrateJsonToYDoc(ydoc, diagram.content!), 'remote');
-          }
-        }, WS_SNAPSHOT_FALLBACK_MS);
-      }
-    };
-
-    let snapshotFallbackTimer: ReturnType<typeof setTimeout> | null = null;
-    void setupCollaboration();
+    const providerLifecycle = new DiagramCollaborationProviderLifecycle({
+      ydoc,
+      bootstrap: collaborationBootstrap,
+      diagramId,
+      teamId,
+      projectId,
+      previewEnabled,
+      handoffStartedAt,
+      handoffLogPrefix,
+      fallbackTimeoutMs: WS_SNAPSHOT_FALLBACK_MS,
+      documentAdapter,
+      dispatchRuntimeEvent,
+      updatePreviewMode: (next) => {
+        setIsPreviewMode(next);
+      },
+      loadPreview,
+      setConnectionStatus,
+      setPresenceMode,
+      setSelfUserId,
+      applyPresenceSnapshot,
+      applyPeerJoined,
+      applyPeerLeft,
+      updateAwareness,
+      removePeerByUserId,
+      removePeerByLoginId,
+      onProviderReady: (provider) => {
+        providerRef.current = provider;
+      },
+      onProviderDisposed: () => {
+        providerRef.current = null;
+      },
+    });
+    void providerLifecycle.setup();
 
     return () => {
-      isDisposed = true;
-      if (previewExitObserver) {
-        getTablesMap(ydoc).unobserveDeep(previewExitObserver);
-      }
-      updatePreviewMode(false);
       resetRuntimeState();
-      if (snapshotFallbackTimer) {
-        clearTimeout(snapshotFallbackTimer);
-      }
-      try {
-        provider?.destroy();
-      } catch (e) {
-        console.error('[useYjsCollaboration] provider.destroy() 실패:', e);
-      } finally {
-        providerRef.current = null;
-        destroyYDoc();
-        resetCollaboration();
-      }
+      providerLifecycle.dispose();
+      destroyYDoc();
+      resetCollaboration();
     };
     // 의존성 배열 안전성 근거:
-    // - getTicket: useCallback으로 diagramId 캡처, 참조 안정
     // - initYDoc, destroyYDoc: Zustand 셀렉터 — create() 내부 클로저로 참조 안정
-    // - setConnectionStatus, updateAwareness, removePeerByLoginId, resetCollaboration: 동일
+    // - collaboration store action 셀렉터들도 참조 안정
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [diagramId, diagram?.id, projectId, teamId]);
+  }, [applyPeerJoined, applyPeerLeft, applyPresenceSnapshot, collaborationBootstrap, destroyYDoc, diagramId, dispatchRuntimeEvent, documentAdapter, initYDoc, projectId, removePeerByLoginId, removePeerByUserId, resetCollaboration, resetRuntimeState, setConnectionStatus, setPresenceMode, setSelfUserId, teamId, updateAwareness]);
 
   // 스냅샷 크기 임계치 초과 + 단독 접속 시 자동 컴팩션
   useSnapshotCompaction(providerRef, diagramId);

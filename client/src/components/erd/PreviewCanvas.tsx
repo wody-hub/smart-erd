@@ -318,6 +318,9 @@ export default function PreviewCanvas({
   const positionOverridesRef = useRef<DiagramPreviewPositionRecord>(positionOverrides);
   const reactFlowInstanceRef = useRef<ReactFlowInstance<DslPreviewNode, ERDEdge> | null>(null);
   const lastHandledFocusRequestIdRef = useRef<number | null>(null);
+  const lastFittedGraphSignatureRef = useRef<string | null>(null);
+  const manualViewportInteractionRef = useRef(false);
+  const autoFitViewportMovePendingRef = useRef(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const headerZoomCompensationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAppliedHeaderZoomRef = useRef<number | null>(null);
@@ -410,6 +413,36 @@ export default function PreviewCanvas({
     );
   }, [fallbackGraph, graph, onPositionOverridesChange, positionOverrides]);
 
+  useEffect(() => {
+    if (!effectiveGraph || effectiveGraph.nodes.length === 0) {
+      lastFittedGraphSignatureRef.current = null;
+      return;
+    }
+
+    if (Object.keys(positionOverridesRef.current).length > 0) {
+      return;
+    }
+
+    if (manualViewportInteractionRef.current) {
+      return;
+    }
+
+    const graphSignature = JSON.stringify({
+      nodes: effectiveGraph.nodes.map((node) => node.id),
+      edges: effectiveGraph.edges.map((edge) => edge.id),
+    });
+
+    if (lastFittedGraphSignatureRef.current === graphSignature) {
+      return;
+    }
+
+    lastFittedGraphSignatureRef.current = graphSignature;
+    requestAnimationFrame(() => {
+      autoFitViewportMovePendingRef.current = true;
+      reactFlowInstanceRef.current?.fitView({ padding: 0.2, duration: 300 });
+    });
+  }, [effectiveGraph]);
+
   /**
    * 드래그가 끝난 preview 노드의 위치를 로컬 override로 저장한다.
    *
@@ -462,9 +495,15 @@ export default function PreviewCanvas({
    * @returns 없음
    */
   const handleResetLayout = useCallback(() => {
+    manualViewportInteractionRef.current = false;
+    autoFitViewportMovePendingRef.current = true;
+    lastFittedGraphSignatureRef.current = null;
     positionOverridesRef.current = {};
     onPositionOverridesChange({});
     setDisplayNodes(effectiveGraph?.nodes ?? []);
+    requestAnimationFrame(() => {
+      reactFlowInstanceRef.current?.fitView({ padding: 0.2, duration: 300 });
+    });
   }, [effectiveGraph?.nodes, onPositionOverridesChange]);
 
   useEffect(() => {
@@ -484,6 +523,7 @@ export default function PreviewCanvas({
     const reactFlowNode = reactFlowInstanceRef.current?.getNode(targetNode.id);
     const width = reactFlowNode?.width ?? 420;
     const height = reactFlowNode?.height ?? 80;
+    autoFitViewportMovePendingRef.current = true;
     reactFlowInstanceRef.current?.setCenter(
       targetNode.position.x + width / 2,
       targetNode.position.y + height / 2,
@@ -513,6 +553,11 @@ export default function PreviewCanvas({
             applyZoomTextCompensation(instance.getZoom());
           }}
           onMoveEnd={(_event, viewport) => {
+            const autoFitMovePending = autoFitViewportMovePendingRef.current;
+            autoFitViewportMovePendingRef.current = false;
+            if (!autoFitMovePending) {
+              manualViewportInteractionRef.current = true;
+            }
             const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
             if (
               lastAppliedZoom != null &&

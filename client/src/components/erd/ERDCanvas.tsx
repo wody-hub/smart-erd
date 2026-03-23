@@ -271,6 +271,10 @@ function ERDCanvas({
   const [ddlImportOpen, setDdlImportOpen] = useState(false);
   /** 노드 드래그 진행 여부 (드래그 중 성능 우선 렌더링 제어용) */
   const [isDraggingNode, setIsDraggingNode] = useState(false);
+  /** 마지막으로 fitView 적용한 draft overlay 그래프 시그니처 */
+  const lastDraftOverlayFitSignatureRef = useRef<string | null>(null);
+  const manualViewportInteractionRef = useRef(false);
+  const autoFitViewportMovePendingRef = useRef(false);
 
   /** 그룹 뷰 활성 여부 */
   const isGroupView = !!activeGroupId && !!activeGroupTableIds;
@@ -354,12 +358,40 @@ function ERDCanvas({
     };
   }, [clearZoomCompensationTimer]);
 
+  useEffect(() => {
+    const overlayNodes = draftOverlayGraph?.nodes ?? [];
+    if (overlayNodes.length === 0) {
+      lastDraftOverlayFitSignatureRef.current = null;
+      return;
+    }
+
+    const overlaySignature = JSON.stringify({
+      nodes: overlayNodes.map((node) => node.id),
+      edges: (draftOverlayGraph?.edges ?? []).map((edge) => edge.id),
+    });
+
+    if (lastDraftOverlayFitSignatureRef.current === overlaySignature) {
+      return;
+    }
+
+    if (manualViewportInteractionRef.current) {
+      return;
+    }
+
+    lastDraftOverlayFitSignatureRef.current = overlaySignature;
+    requestAnimationFrame(() => {
+      autoFitViewportMovePendingRef.current = true;
+      reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+    });
+  }, [draftOverlayGraph?.edges, draftOverlayGraph?.nodes, reactFlowInstance]);
+
   // 그룹 뷰 전환 시 필터링된 노드에 맞춰 뷰포트를 보정한다.
   useEffect(() => {
     if (!isGroupView || displayNodes.length === 0) {
       return;
     }
     requestAnimationFrame(() => {
+      autoFitViewportMovePendingRef.current = true;
       reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
     });
   }, [activeGroupId, displayNodes.length, isGroupView, reactFlowInstance]);
@@ -659,6 +691,7 @@ function ERDCanvas({
     const height = reactFlowNode?.height ?? 80;
     setHighlightedEdge(null);
     setHighlightedNodes([targetNode.id]);
+    autoFitViewportMovePendingRef.current = true;
     reactFlowInstance.setCenter(targetNode.position.x + width / 2, targetNode.position.y + height / 2, {
       duration: 300,
       zoom: Math.max(reactFlowInstance.getZoom(), 0.8),
@@ -825,6 +858,11 @@ function ERDCanvas({
               applyZoomTextCompensation(instance.getZoom());
             }}
             onMoveEnd={(_event, viewport) => {
+              const autoFitMovePending = autoFitViewportMovePendingRef.current;
+              autoFitViewportMovePendingRef.current = false;
+              if (!autoFitMovePending) {
+                manualViewportInteractionRef.current = true;
+              }
               const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
               if (
                 lastAppliedZoom != null &&

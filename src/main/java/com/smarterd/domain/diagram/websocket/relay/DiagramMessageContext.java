@@ -1,6 +1,7 @@
 package com.smarterd.domain.diagram.websocket.relay;
 
-import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
+import com.smarterd.collaboration.channel.CollaborationResourceKey;
+import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionInfo;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -11,17 +12,33 @@ import org.springframework.web.socket.WebSocketSession;
  *
  * @param session     WebSocket 세션
  * @param sessionInfo 세션 메타데이터
- * @param diagramId   다이어그램 ID
  * @param message     원본 바이너리 메시지
  * @param payload     원본 payload 바이트
  */
 public record DiagramMessageContext(
     WebSocketSession session,
-    AuthenticatedSession sessionInfo,
-    Long diagramId,
+    DiagramWebSocketSessionInfo sessionInfo,
     BinaryMessage message,
     byte[] payload
 ) {
+    /**
+     * 컨텍스트가 가리키는 협업 리소스 key를 반환한다.
+     *
+     * @return 협업 리소스 key
+     */
+    public CollaborationResourceKey resourceKey() {
+        return sessionInfo.resourceKey();
+    }
+
+    /**
+     * 컨텍스트가 가리키는 다이어그램 ID를 반환한다.
+     *
+     * @return 다이어그램 ID
+     */
+    public Long diagramId() {
+        return sessionInfo.diagramId();
+    }
+
     /**
      * payload의 첫 바이트(메시지 타입)를 반환한다.
      *

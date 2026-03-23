@@ -2,7 +2,7 @@ package com.smarterd.application.diagram.command;
 
 import com.smarterd.application.collaboration.command.PersistCollaborationSnapshotUseCase;
 import com.smarterd.collaboration.snapshot.CollaborationSnapshotSaveCommand;
-import com.smarterd.domain.diagram.collaboration.DiagramCollaborationChannelPlugin;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeyFactory;
 import com.smarterd.domain.diagram.service.DiagramService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PersistDiagramSnapshotUseCase {
 
     private final DiagramService diagramService;
-    private final DiagramCollaborationChannelPlugin diagramCollaborationChannelPlugin;
+    private final DiagramCollaborationResourceKeyFactory diagramCollaborationResourceKeyFactory;
     private final PersistCollaborationSnapshotUseCase persistCollaborationSnapshotUseCase;
 
     /**
@@ -41,7 +41,7 @@ public class PersistDiagramSnapshotUseCase {
     ) {
         diagramService.loadWritableDiagram(loginId, teamId, projectId, diagramId);
         return persistCollaborationSnapshotUseCase.persistSnapshot(
-            diagramCollaborationChannelPlugin.resourceKeyFactory().create(String.valueOf(diagramId)),
+            diagramCollaborationResourceKeyFactory.forDiagramId(diagramId),
             new CollaborationSnapshotSaveCommand(expectedContentRevision, ydocSnapshot)
         );
     }

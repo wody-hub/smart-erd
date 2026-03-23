@@ -8,11 +8,11 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.application.collaboration.query.LoadCollaborationHandoffUseCase;
-import com.smarterd.collaboration.channel.DefaultCollaborationChannelRegistry;
+import com.smarterd.collaboration.channel.DefaultCollaborationRuntimeSupportRegistry;
 import com.smarterd.config.websocket.WebSocketProperties;
-import com.smarterd.domain.diagram.collaboration.DiagramCollaborationChannelPlugin;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationHandoffPolicy;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeyFactory;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationRuntimeSupport;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSessionMetadataPolicy;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSnapshotStore;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
@@ -195,16 +195,21 @@ class DiagramWebSocketFlowIntegrationTest {
         final var objectMapper = new ObjectMapper();
         final var messageSender = new DiagramMessageSender(roomManager, objectMapper);
         final var presenceNotifier = new DiagramPresenceNotifier(roomManager, messageSender);
+        final var sessionLifecycle = new DiagramWebSocketSessionLifecycle(
+            roomManager,
+            snapshotService,
+            presenceNotifier
+        );
         final var resourceKeyFactory = new DiagramCollaborationResourceKeyFactory();
-        final var diagramChannelPlugin = new DiagramCollaborationChannelPlugin(
-            resourceKeyFactory,
+        final var diagramRuntimeSupport = new DiagramCollaborationRuntimeSupport(
             new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory),
             new DiagramCollaborationSnapshotStore(snapshotService, resourceKeyFactory),
             new DiagramCollaborationHandoffPolicy(roomManager, snapshotService, resourceKeyFactory)
         );
-        final var channelRegistry = new DefaultCollaborationChannelRegistry(List.of(diagramChannelPlugin));
-        final var loadCollaborationHandoffUseCase = new LoadCollaborationHandoffUseCase(channelRegistry);
+        final var runtimeSupportRegistry = new DefaultCollaborationRuntimeSupportRegistry(List.of(diagramRuntimeSupport));
+        final var loadCollaborationHandoffUseCase = new LoadCollaborationHandoffUseCase(runtimeSupportRegistry);
         final var sessionResolver = new DiagramWebSocketSessionResolver(
+            resourceKeyFactory,
             new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory)
         );
 
@@ -212,21 +217,25 @@ class DiagramWebSocketFlowIntegrationTest {
             new SyncRelayMessageHandler(messageSender),
             new YjsUpdateMessageHandler(roomManager, messageSender),
             new AwarenessMessageHandler(objectMapper, messageSender),
-            new SnapshotRequestMessageHandler(roomManager, loadCollaborationHandoffUseCase, messageSender),
+            new SnapshotRequestMessageHandler(
+                roomManager,
+                loadCollaborationHandoffUseCase,
+                messageSender
+            ),
             new CompactedSnapshotMessageHandler(roomManager, snapshotService),
             new PresenceSnapshotRequestMessageHandler(roomManager, presenceNotifier)
         );
+        final var messageDispatcher = new DiagramWebSocketMessageDispatcher(handlers);
 
         final var handler = new DiagramWebSocketHandler(
             properties,
             roomManager,
-            snapshotService,
             messageSender,
-            presenceNotifier,
             sessionResolver,
-            handlers
+            sessionLifecycle,
+            messageDispatcher
         );
-        handler.initHandlerMap();
+        messageDispatcher.initHandlerMap();
         return new Fixture(handler, roomManager);
     }
 
@@ -234,9 +243,17 @@ class DiagramWebSocketFlowIntegrationTest {
         throws Exception {
         final var session = mock(WebSocketSession.class);
         final Map<String, Object> attributes = new ConcurrentHashMap<>();
+        final var legacySession = new AuthenticatedSession(
+            userId,
+            loginId,
+            userName,
+            diagramId,
+            Instant.now().plusSeconds(60),
+            1
+        );
         attributes.put(
-            AuthenticatedSession.SESSION_ATTR_KEY,
-            new AuthenticatedSession(userId, loginId, userName, diagramId, Instant.now().plusSeconds(60), 1)
+            com.smarterd.collaboration.session.CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
+            legacySession.toCollaborationSession()
         );
 
         final var inbox = new CopyOnWriteArrayList<BinaryMessage>();

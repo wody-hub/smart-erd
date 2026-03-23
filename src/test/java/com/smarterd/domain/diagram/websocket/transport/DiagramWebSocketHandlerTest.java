@@ -44,7 +44,7 @@ class DiagramWebSocketHandlerTest {
         final var fixture = createFixture(List.of(new TestMessageHandler(Set.of(DiagramMessageTypes.MSG_SYNC_STEP1))));
 
         // when & then
-        assertThatThrownBy(fixture.handler()::initHandlerMap)
+        assertThatThrownBy(fixture.messageDispatcher()::initHandlerMap)
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("필수 메시지 핸들러 누락");
     }
@@ -58,7 +58,7 @@ class DiagramWebSocketHandlerTest {
         final var fixture = createFixture(handlers);
 
         // when & then
-        assertThatThrownBy(fixture.handler()::initHandlerMap)
+        assertThatThrownBy(fixture.messageDispatcher()::initHandlerMap)
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("등록 불가 메시지 타입");
     }
@@ -75,13 +75,15 @@ class DiagramWebSocketHandlerTest {
             .orElseThrow();
 
         final var fixture = createFixture(handlers);
-        fixture.handler().initHandlerMap();
+        fixture.messageDispatcher().initHandlerMap();
 
         final var session = mock(WebSocketSession.class);
         final var attributes = new HashMap<String, Object>();
+        final var authenticatedSession =
+            new AuthenticatedSession("user-1", "login-1", "User 1", 100L, Instant.now().plusSeconds(60), 1);
         attributes.put(
-            AuthenticatedSession.SESSION_ATTR_KEY,
-            new AuthenticatedSession("user-1", "login-1", "User 1", 100L, Instant.now().plusSeconds(60), 1)
+            com.smarterd.collaboration.session.CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
+            authenticatedSession.toCollaborationSession()
         );
 
         when(session.getId()).thenReturn("session-1");
@@ -107,13 +109,15 @@ class DiagramWebSocketHandlerTest {
         // given
         final var handlers = createRequiredHandlers();
         final var fixture = createFixture(handlers);
-        fixture.handler().initHandlerMap();
+        fixture.messageDispatcher().initHandlerMap();
 
         final var session = mock(WebSocketSession.class);
         final var attributes = new HashMap<String, Object>();
+        final var authenticatedSession =
+            new AuthenticatedSession("user-1", "login-1", "User 1", 100L, Instant.now().plusSeconds(60), 1);
         attributes.put(
-            AuthenticatedSession.SESSION_ATTR_KEY,
-            new AuthenticatedSession("user-1", "login-1", "User 1", 100L, Instant.now().plusSeconds(60), 1)
+            com.smarterd.collaboration.session.CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
+            authenticatedSession.toCollaborationSession()
         );
         when(session.getId()).thenReturn("session-1");
         when(session.getAttributes()).thenReturn(attributes);
@@ -134,7 +138,7 @@ class DiagramWebSocketHandlerTest {
     void afterConnectionEstablished_withoutSessionInfo_closesSession() throws Exception {
         // given
         final var fixture = createFixture(createRequiredHandlers());
-        fixture.handler().initHandlerMap();
+        fixture.messageDispatcher().initHandlerMap();
         final var session = mock(WebSocketSession.class);
         when(session.getId()).thenReturn("session-1");
         when(session.getAttributes()).thenReturn(new HashMap<>());
@@ -152,7 +156,7 @@ class DiagramWebSocketHandlerTest {
     void handleBinaryMessage_withoutSessionInfo_closesSession() throws Exception {
         // given
         final var fixture = createFixture(createRequiredHandlers());
-        fixture.handler().initHandlerMap();
+        fixture.messageDispatcher().initHandlerMap();
         final var session = mock(WebSocketSession.class);
         when(session.getId()).thenReturn("session-1");
         when(session.getAttributes()).thenReturn(new HashMap<>());
@@ -170,10 +174,13 @@ class DiagramWebSocketHandlerTest {
     void handleBinaryMessage_withInvalidSessionInfoType_closesSessionSafely() throws Exception {
         // given
         final var fixture = createFixture(createRequiredHandlers());
-        fixture.handler().initHandlerMap();
+        fixture.messageDispatcher().initHandlerMap();
         final var session = mock(WebSocketSession.class);
         final var attributes = new HashMap<String, Object>();
-        attributes.put(AuthenticatedSession.SESSION_ATTR_KEY, "invalid-session-info");
+        attributes.put(
+            com.smarterd.collaboration.session.CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
+            "invalid-session-info"
+        );
         when(session.getId()).thenReturn("session-1");
         when(session.getAttributes()).thenReturn(attributes);
 
@@ -190,7 +197,7 @@ class DiagramWebSocketHandlerTest {
     void afterConnectionClosed_withoutSessionInfo_cleansRateLimitOnly() {
         // given
         final var fixture = createFixture(createRequiredHandlers());
-        fixture.handler().initHandlerMap();
+        fixture.messageDispatcher().initHandlerMap();
         final var session = mock(WebSocketSession.class);
         when(session.getId()).thenReturn("session-1");
         when(session.getAttributes()).thenReturn(new HashMap<>());
@@ -209,7 +216,7 @@ class DiagramWebSocketHandlerTest {
     void afterConnectionClosed_withoutSessionInfo_butRoomFound_leavesRoom() {
         // given
         final var fixture = createFixture(createRequiredHandlers());
-        fixture.handler().initHandlerMap();
+        fixture.messageDispatcher().initHandlerMap();
         final var session = mock(WebSocketSession.class);
         when(session.getId()).thenReturn("session-1");
         when(session.getAttributes()).thenReturn(new HashMap<>());
@@ -232,20 +239,22 @@ class DiagramWebSocketHandlerTest {
         final var snapshotService = mock(DiagramSnapshotService.class);
         final var messageSender = mock(DiagramMessageSender.class);
         final var presenceNotifier = mock(DiagramPresenceNotifier.class);
+        final var sessionLifecycle = new DiagramWebSocketSessionLifecycle(roomManager, snapshotService, presenceNotifier);
+        final var messageDispatcher = new DiagramWebSocketMessageDispatcher(new ArrayList<>(handlers));
         final var resourceKeyFactory = new DiagramCollaborationResourceKeyFactory();
         final var sessionResolver = new DiagramWebSocketSessionResolver(
+            resourceKeyFactory,
             new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory)
         );
         final var handler = new DiagramWebSocketHandler(
             new WebSocketProperties(),
             roomManager,
-            snapshotService,
             messageSender,
-            presenceNotifier,
             sessionResolver,
-            new ArrayList<>(handlers)
+            sessionLifecycle,
+            messageDispatcher
         );
-        return new Fixture(handler, roomManager, messageSender);
+        return new Fixture(handler, roomManager, messageSender, messageDispatcher);
     }
 
     private List<TestMessageHandler> createRequiredHandlers() {
@@ -266,7 +275,8 @@ class DiagramWebSocketHandlerTest {
     private record Fixture(
         DiagramWebSocketHandler handler,
         DiagramRoomManager roomManager,
-        DiagramMessageSender messageSender
+        DiagramMessageSender messageSender,
+        DiagramWebSocketMessageDispatcher messageDispatcher
     ) {}
 
     private static final class TestMessageHandler implements DiagramMessageHandler {

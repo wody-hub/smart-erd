@@ -1,7 +1,7 @@
 package com.smarterd.application.collaboration.command;
 
 import com.smarterd.collaboration.channel.CollaborationResourceKey;
-import com.smarterd.collaboration.channel.CollaborationChannelRegistry;
+import com.smarterd.collaboration.channel.CollaborationRuntimeSupportRegistry;
 import com.smarterd.collaboration.snapshot.CollaborationSnapshotSaveCommand;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class PersistCollaborationSnapshotUseCase {
 
-    private final CollaborationChannelRegistry collaborationChannelRegistry;
+    private final CollaborationRuntimeSupportRegistry collaborationRuntimeSupportRegistry;
 
     /**
      * 채널 리소스 기준 협업 snapshot을 저장한다.
@@ -26,7 +26,7 @@ public class PersistCollaborationSnapshotUseCase {
         CollaborationResourceKey resourceKey,
         CollaborationSnapshotSaveCommand command
     ) {
-        final var channelPlugin = collaborationChannelRegistry.getRequired(resourceKey.channelType());
-        return channelPlugin.snapshotStore().save(resourceKey, command);
+        final var runtimeSupport = collaborationRuntimeSupportRegistry.getRequired(resourceKey);
+        return runtimeSupport.snapshotStore().save(resourceKey, command);
     }
 }

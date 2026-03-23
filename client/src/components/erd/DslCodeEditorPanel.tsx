@@ -227,6 +227,7 @@ export default function DslCodeEditorPanel({
   const pendingHydratedTextRef = useRef<string | null>(null);
   const generatedFallbackTextRef = useRef<string | null>(null);
   const draftHydrationSourceRef = useRef<'shared' | 'local' | 'generated' | null>(null);
+  const userStartedLocalEditRef = useRef(false);
   const finalizeRequestedRef = useRef(false);
   const finalizeExecutionArmedRef = useRef(false);
   const previewGraphBuildTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -330,6 +331,18 @@ export default function DslCodeEditorPanel({
   }, []);
 
   /**
+   * 로컬 입력이 시작됐음을 표시한다.
+   *
+   * 늦게 도착한 hydration/bootstrap이 현재 에디터 텍스트를 덮어쓰지 않도록
+   * 최초 입력 시작 신호를 보존한다.
+   *
+   * @returns 없음
+   */
+  const markLocalEditStarted = useCallback(() => {
+    userStartedLocalEditRef.current = true;
+  }, []);
+
+  /**
    * code 모드 draft를 최종 저장 필요 상태로 표시한다.
    *
    * @returns 없음
@@ -384,35 +397,6 @@ export default function DslCodeEditorPanel({
    *
    * @returns 없음
    */
-  const flushSharedSchemaDraftImmediately = useCallback(() => {
-    if (!persistDraft || !draftHydrated || !ydoc) {
-      return;
-    }
-
-    if (shouldSkipGeneratedFallbackSharedDraftWrite()) {
-      return;
-    }
-
-    if (sharedSchemaDraftSyncTimerRef.current) {
-      clearTimeout(sharedSchemaDraftSyncTimerRef.current);
-      sharedSchemaDraftSyncTimerRef.current = null;
-    }
-
-    const nextSnapshot = buildCurrentSharedSchemaDraftSnapshot();
-    if (!nextSnapshot) {
-      return;
-    }
-
-    writeSharedSchemaDraftSnapshot(ydoc, nextSnapshot, SHARED_SCHEMA_DRAFT_ORIGIN);
-    onScheduleCodeModeSnapshotPersist?.();
-  }, [
-    draftHydrated,
-    onScheduleCodeModeSnapshotPersist,
-    persistDraft,
-    shouldSkipGeneratedFallbackSharedDraftWrite,
-    ydoc,
-  ]);
-
   /** 사전 데이터 로딩 완료 여부 */
   const hasDictionary = isDictionaryReady;
 
@@ -502,6 +486,29 @@ export default function DslCodeEditorPanel({
     () => (parseResult?.result ? buildParsedSchemaHash(parseResult.result) : null),
     [parseResult?.result],
   );
+
+  /**
+   * 사용자가 이미 로컬 편집을 시작한 경우 늦게 도착한 hydration/bootstrap 덮어쓰기를 막는다.
+   *
+   * code 모드에서는 사용자의 현재 텍스트가 우선이며, hydrate는 최초 pristine 상태에서만 허용한다.
+   *
+   * @returns 로컬 편집이 시작되어 hydration을 건너뛰어야 하면 true
+   */
+  const shouldSkipLateDraftHydration = useCallback(() => {
+    if (!persistDraft || !userStartedLocalEditRef.current) {
+      return false;
+    }
+
+    if (draftBaselineRevisionRef.current == null) {
+      draftBaselineRevisionRef.current = buildCurrentPersistedRevisionHash();
+    }
+
+    pendingHydratedTextRef.current = null;
+    generatedFallbackTextRef.current = null;
+    draftHydrationSourceRef.current = null;
+    setDraftHydrated(true);
+    return true;
+  }, [buildCurrentPersistedRevisionHash, persistDraft]);
 
   const {
     handleApply,
@@ -618,7 +625,9 @@ export default function DslCodeEditorPanel({
    *
    * @returns 저장할 shared schema draft snapshot. 반영 대상이 없으면 null
    */
-  function buildCurrentSharedSchemaDraftSnapshot(): Omit<SharedSchemaDraftSnapshot, 'updatedAt'> | null {
+  const buildCurrentSharedSchemaDraftSnapshot = useCallback(():
+    | Omit<SharedSchemaDraftSnapshot, 'updatedAt'>
+    | null => {
     const currentText = readCurrentDslText();
     const isIntentionalBlank = currentText.trim().length === 0;
     const isConfirmedBlank = isIntentionalBlank && confirmedBlankDraftRef.current;
@@ -650,7 +659,43 @@ export default function DslCodeEditorPanel({
       isIntentionalBlank: false,
       isConfirmedBlank: false,
     };
-  }
+  }, [
+    errorCount,
+    parseResult?.result,
+    parsedSchemaHash,
+    previewPositionOverrides,
+    readCurrentDslText,
+  ]);
+
+  const flushSharedSchemaDraftImmediately = useCallback(() => {
+    if (!persistDraft || !draftHydrated || !ydoc) {
+      return;
+    }
+
+    if (shouldSkipGeneratedFallbackSharedDraftWrite()) {
+      return;
+    }
+
+    if (sharedSchemaDraftSyncTimerRef.current) {
+      clearTimeout(sharedSchemaDraftSyncTimerRef.current);
+      sharedSchemaDraftSyncTimerRef.current = null;
+    }
+
+    const nextSnapshot = buildCurrentSharedSchemaDraftSnapshot();
+    if (!nextSnapshot) {
+      return;
+    }
+
+    writeSharedSchemaDraftSnapshot(ydoc, nextSnapshot, SHARED_SCHEMA_DRAFT_ORIGIN);
+    onScheduleCodeModeSnapshotPersist?.();
+  }, [
+    buildCurrentSharedSchemaDraftSnapshot,
+    draftHydrated,
+    onScheduleCodeModeSnapshotPersist,
+    persistDraft,
+    shouldSkipGeneratedFallbackSharedDraftWrite,
+    ydoc,
+  ]);
 
   /**
    * shared schema draft snapshot을 로컬 코드 문자열로 재생성한다.
@@ -1128,6 +1173,7 @@ export default function DslCodeEditorPanel({
     lastPersistedDraftRecordRef.current = null;
     generatedFallbackTextRef.current = null;
     draftHydrationSourceRef.current = null;
+    userStartedLocalEditRef.current = false;
     setRequiresApplyBeforeFinalize(false);
     setRequiresPublishedSave(false);
     setFinalizing(false);
@@ -1257,6 +1303,10 @@ export default function DslCodeEditorPanel({
       ? generateDslFromSharedSchemaDraft(sharedSchemaDraftBootstrap)
       : '';
 
+    if (shouldSkipLateDraftHydration()) {
+      return;
+    }
+
     if (hasSharedDraftBootstrapState) {
       draftBaselineRevisionRef.current =
         sharedSchemaDraftBootstrap?.baselineRevision ?? currentBaselineRevision;
@@ -1374,7 +1424,8 @@ export default function DslCodeEditorPanel({
       !persistDraft ||
       !draftHydrated ||
       !sharedSchemaDraftBootstrap ||
-      draftHydrationSourceRef.current !== 'generated'
+      draftHydrationSourceRef.current !== 'generated' ||
+      userStartedLocalEditRef.current
     ) {
       return;
     }
@@ -1500,9 +1551,13 @@ export default function DslCodeEditorPanel({
   }, [
     draftHydrated,
     dslText,
+    errorCount,
     flushSharedSchemaDraftImmediately,
     hasPendingDraftChanges,
+    parseResult?.result,
+    parsedSchemaHash,
     persistDraft,
+    previewPositionOverrides,
     ydoc,
   ]);
 
@@ -1655,11 +1710,12 @@ export default function DslCodeEditorPanel({
       if (shouldIgnoreChange(value)) {
         return;
       }
+      markLocalEditStarted();
       confirmedBlankDraftRef.current = (value ?? '').trim().length === 0;
       markFinalizationDirty();
       handleUserCodeChange(value);
     },
-    [handleUserCodeChange, markFinalizationDirty, shouldIgnoreChange],
+    [handleUserCodeChange, markFinalizationDirty, markLocalEditStarted, shouldIgnoreChange],
   );
 
   /**
@@ -1682,6 +1738,25 @@ export default function DslCodeEditorPanel({
     monacoRef.current = monaco;
     setMonacoReady(true);
   };
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !canEdit) {
+      return;
+    }
+
+    const compositionStartDisposable = editor.onDidCompositionStart(() => {
+      markLocalEditStarted();
+    });
+    const pasteDisposable = editor.onDidPaste(() => {
+      markLocalEditStarted();
+    });
+
+    return () => {
+      compositionStartDisposable.dispose();
+      pasteDisposable.dispose();
+    };
+  }, [canEdit, markLocalEditStarted, monacoReady]);
 
   useCodeEditorTableLock({
     enabled: canEdit && enableTableLock,

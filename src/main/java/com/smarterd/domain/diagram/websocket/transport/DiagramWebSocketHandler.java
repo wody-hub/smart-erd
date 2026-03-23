@@ -1,22 +1,12 @@
 package com.smarterd.domain.diagram.websocket.transport;
 
 import com.smarterd.config.websocket.WebSocketProperties;
-import com.smarterd.domain.diagram.service.DiagramSnapshotService;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
-import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
-import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
-import com.smarterd.domain.diagram.websocket.relay.DiagramPresenceNotifier;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionResolver;
-import jakarta.annotation.PostConstruct;
 import java.nio.channels.ClosedChannelException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
@@ -50,93 +40,17 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
     /** 방 관리자 */
     private final DiagramRoomManager roomManager;
 
-    /** 스냅샷 저장 서비스 */
-    private final DiagramSnapshotService snapshotService;
-
     /** 메시지 전송 유틸 */
     private final DiagramMessageSender messageSender;
-
-    /** presence 알림 전송 유틸 */
-    private final DiagramPresenceNotifier presenceNotifier;
 
     /** 공통/legacy 세션 메타데이터 resolver */
     private final DiagramWebSocketSessionResolver sessionResolver;
 
-    /** 타입별 메시지 핸들러 */
-    private final List<DiagramMessageHandler> messageHandlers;
+    /** 세션 join/leave/flush 수명주기 */
+    private final DiagramWebSocketSessionLifecycle sessionLifecycle;
 
-    /** 메시지 타입 디스패치 맵 */
-    private Map<Byte, DiagramMessageHandler> messageHandlerMap = Map.of();
-
-    /** 클라이언트 -> 서버 inbound 메시지 타입 집합 */
-    private static final Set<Byte> REQUIRED_INBOUND_MESSAGE_TYPES = Set.of(
-        DiagramMessageTypes.MSG_SYNC_STEP1,
-        DiagramMessageTypes.MSG_SYNC_STEP2,
-        DiagramMessageTypes.MSG_YJS_UPDATE,
-        DiagramMessageTypes.MSG_AWARENESS,
-        DiagramMessageTypes.MSG_SNAPSHOT_REQUEST,
-        DiagramMessageTypes.MSG_SNAPSHOT_REQUEST_V2,
-        DiagramMessageTypes.MSG_COMPACTED_SNAPSHOT,
-        DiagramMessageTypes.MSG_PRESENCE_SNAPSHOT_REQUEST
-    );
-
-    /**
-     * 등록된 타입별 핸들러 목록으로 디스패치 맵을 초기화한다.
-     *
-     * <p>동일 타입이 두 번 이상 등록되면 서버 시작 시점에 예외를 던져 설정 오류를 조기에 탐지한다.</p>
-     *
-     * @throws IllegalStateException 동일 메시지 타입이 중복 등록된 경우
-     */
-    @PostConstruct
-    void initHandlerMap() {
-        final var map = new HashMap<Byte, DiagramMessageHandler>();
-        for (final var handler : messageHandlers) {
-            for (final var type : handler.supportedTypes()) {
-                if (!REQUIRED_INBOUND_MESSAGE_TYPES.contains(type)) {
-                    throw new IllegalStateException(
-                        "등록 불가 메시지 타입 감지: " +
-                            formatMessageTypes(Set.of(type)) +
-                            ", handler=" +
-                            handler.getClass().getSimpleName()
-                    );
-                }
-                final var previous = map.putIfAbsent(type, handler);
-                if (previous != null) {
-                    throw new IllegalStateException(
-                        "중복 메시지 핸들러 등록: type=0x" +
-                            String.format("%02x", Byte.toUnsignedInt(type)) +
-                            ", first=" +
-                            previous.getClass().getSimpleName() +
-                            ", second=" +
-                            handler.getClass().getSimpleName()
-                    );
-                }
-            }
-        }
-
-        if (!map.keySet().containsAll(REQUIRED_INBOUND_MESSAGE_TYPES)) {
-            final var missingTypes = REQUIRED_INBOUND_MESSAGE_TYPES.stream()
-                .filter((type) -> !map.containsKey(type))
-                .collect(Collectors.toSet());
-            throw new IllegalStateException("필수 메시지 핸들러 누락: " + formatMessageTypes(missingTypes));
-        }
-
-        messageHandlerMap = Map.copyOf(map);
-    }
-
-    /**
-     * 메시지 타입 집합을 사람이 읽기 쉬운 16진수 문자열로 변환한다.
-     *
-     * @param types 변환할 메시지 타입 집합
-     * @return 정렬된 16진수 타입 문자열
-     */
-    private String formatMessageTypes(Set<Byte> types) {
-        return types
-            .stream()
-            .map((type) -> String.format("0x%02x", Byte.toUnsignedInt(type)))
-            .sorted()
-            .collect(Collectors.joining(", "));
-    }
+    /** inbound 메시지 디스패처 */
+    private final DiagramWebSocketMessageDispatcher messageDispatcher;
 
     /**
      * WebSocket 연결 수립 후 호출된다.
@@ -159,27 +73,7 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
             return;
         }
 
-        final var joinResult = roomManager.join(info.diagramId(), session, info.userId(), info.userName());
-        if (!joinResult.accepted()) {
-            try {
-                session.close(Objects.requireNonNull(CloseStatus.POLICY_VIOLATION));
-            } catch (Exception e) {
-                log.warn("방 입장 거부 후 세션 종료 실패", e);
-            }
-            return;
-        }
-
-        presenceNotifier.sendPresenceSnapshotToSession(session, info.diagramId(), joinResult.snapshot());
-
-        if (joinResult.joinedParticipant() != null && joinResult.snapshot() != null) {
-            presenceNotifier.broadcastPeerJoined(
-                Objects.requireNonNull(info.diagramId()),
-                session,
-                joinResult.snapshot().roomEpoch(),
-                joinResult.joinedPresenceVersion(),
-                joinResult.joinedParticipant()
-            );
-        }
+        sessionLifecycle.establish(session, info);
     }
 
     /**
@@ -225,29 +119,8 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
             return;
         }
 
-        final var diagramId = Objects.requireNonNull(info.diagramId());
-        final var context = new DiagramMessageContext(session, info, diagramId, message, payload);
-        final var messageType = context.messageType();
-        final var messageHandler = messageHandlerMap.get(messageType);
-
-        if (messageHandler == null) {
-            if (log.isDebugEnabled()) {
-                log.debug("알 수 없는 메시지 타입: 0x{}", String.format("%02x", Byte.toUnsignedInt(messageType)));
-            }
-            return;
-        }
-
-        try {
-            messageHandler.handle(context);
-        } catch (Exception e) {
-            log.error(
-                "메시지 처리 실패 (type=0x{}, diagramId={}, session={})",
-                String.format("%02x", Byte.toUnsignedInt(messageType)),
-                diagramId,
-                session.getId(),
-                e
-            );
-        }
+        final var context = new DiagramMessageContext(session, info, message, payload);
+        messageDispatcher.dispatch(context);
     }
 
     /**
@@ -264,58 +137,8 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
             return;
         }
 
-        roomManager.cleanupRateLimit(session);
         final var info = sessionResolver.resolve(session);
-        final var diagramId = info != null ? info.diagramId() : roomManager.findDiagramIdBySession(session);
-        final var userId = info != null ? info.userId() : roomManager.findUserIdBySession(session);
-        if (diagramId == null) {
-            log.warn("WebSocket 세션 메타데이터/room 조회 실패로 종료 정리 생략 (세션 {})", session.getId());
-            return;
-        }
-
-        // leave: 방이 비면 원자적으로 누적 update를 drain + 인메모리 리소스 정리
-        final var result = roomManager.leave(diagramId, session, userId);
-
-        // 사용자 완전 퇴장(1 -> 0)일 때만 presence peer-left 브로드캐스트
-        if (result.leftUserId() != null && result.roomEpoch() != null) {
-            presenceNotifier.broadcastPeerLeft(
-                Objects.requireNonNull(diagramId),
-                session,
-                result.roomEpoch(),
-                result.leftPresenceVersion(),
-                result.leftUserId()
-            );
-            // 구버전 클라이언트의 원격 커서 정리를 위해 loginId 기반 peer-left도 함께 전송
-            if (info != null) {
-                presenceNotifier.broadcastPeerLeftLegacy(Objects.requireNonNull(diagramId), session, info.loginId());
-            }
-        }
-
-        if (result.roomEmpty()) {
-            // room 생명주기 종료 시 컴팩션 쿨다운 상태 정리
-            snapshotService.clearCompactionCoolDown(diagramId);
-
-            try {
-                // 마지막 사용자 퇴장 → drain된 update를 DB에 저장
-                if (result.drainedUpdates().length > 0) {
-                    synchronized (roomManager.getFlushLock(diagramId)) {
-                        try {
-                            snapshotService.saveSnapshotWithUpdates(diagramId, result.drainedUpdates());
-                        } catch (Exception e) {
-                            // 저장 실패 시 drain 데이터를 복원하여 주기 flush 재시도를 가능하게 한다.
-                            final var restored = roomManager.restoreUpdates(diagramId, result.drainedUpdates());
-                            if (!restored) {
-                                log.error("연결 종료 flush 실패 후 update 복원 실패 (diagramId={})", diagramId);
-                            }
-                            log.error("연결 종료 flush 실패, drain된 update 복원 (diagramId={})", diagramId, e);
-                        }
-                    }
-                }
-            } finally {
-                // flush 완료/실패 여부와 무관하게 flush 락 제거
-                roomManager.removeFlushLock(diagramId);
-            }
-        }
+        sessionLifecycle.close(session, info);
     }
 
     /**

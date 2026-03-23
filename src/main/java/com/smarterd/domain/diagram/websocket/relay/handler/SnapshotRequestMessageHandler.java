@@ -1,7 +1,6 @@
 package com.smarterd.domain.diagram.websocket.relay.handler;
 
 import com.smarterd.application.collaboration.query.LoadCollaborationHandoffUseCase;
-import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeys;
 import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
@@ -52,9 +51,7 @@ public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
         final var startedAt = System.nanoTime();
         try {
             final var loadStartedAt = System.nanoTime();
-            final var handoff = loadCollaborationHandoffUseCase.loadHandoffSnapshot(
-                DiagramCollaborationResourceKeys.forDiagramId(context.diagramId())
-            );
+            final var handoff = loadCollaborationHandoffUseCase.loadHandoffSnapshot(context.resourceKey());
             final var loadEndedAt = System.nanoTime();
             final var messageType = context.messageType();
             final var snapshot = handoff.snapshot();

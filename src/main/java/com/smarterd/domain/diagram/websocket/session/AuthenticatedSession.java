@@ -2,7 +2,7 @@ package com.smarterd.domain.diagram.websocket.session;
 
 import com.smarterd.collaboration.channel.CollaborationResourceKey;
 import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
-import com.smarterd.domain.diagram.collaboration.DiagramCollaborationChannelPlugin;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeyFactory;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeys;
 import java.time.Instant;
 
@@ -72,7 +72,7 @@ public record AuthenticatedSession(
      * @throws IllegalArgumentException diagram 채널이 아니거나 resourceId를 Long으로 해석할 수 없으면 예외
      */
     public static AuthenticatedSession fromCollaborationSession(CollaborationAuthenticatedSession session) {
-        if (!DiagramCollaborationChannelPlugin.CHANNEL_TYPE.equals(session.resourceKey().channelType())) {
+        if (!DiagramCollaborationResourceKeyFactory.CHANNEL_TYPE.equals(session.resourceKey().channelType())) {
             throw new IllegalArgumentException(
                 "다이어그램 세션으로 변환할 수 없는 채널 타입: " + session.resourceKey().channelType()
             );

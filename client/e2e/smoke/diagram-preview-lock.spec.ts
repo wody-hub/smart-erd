@@ -32,9 +32,10 @@ test('diagram preview renders before ws sync and unlocks editing afterwards @smo
   await expect(backupButton).toHaveCount(0);
   await expect(page.getByText(/실시간 동기화 연결 중|real-time sync in progress/i)).toBeVisible();
   await expect(
-    page.getByText(
-      /미리보기를 먼저 표시했습니다|preview is already visible|편집 잠금|editing locked until sync completes/i,
-    ),
+    page.getByText(/미리보기를 먼저 표시했습니다|preview is already visible/i),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/연결 완료 전까지 편집 잠금|editing locked until sync completes/i),
   ).toBeVisible();
 
   const editableBackupButton = await waitForEditableDiagram(page, 30_000);

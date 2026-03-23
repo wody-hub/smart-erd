@@ -37,6 +37,12 @@ class DiagramCollaborationPluginTest {
     @Mock
     private CollaborationSnapshotStore collaborationSnapshotStore;
 
+    @Mock
+    private DiagramCollaborationTicketIssuer collaborationTicketIssuer;
+
+    @Mock
+    private DiagramCollaborationTicketAuthenticator collaborationTicketAuthenticator;
+
     @Test
     void accessPolicy_shouldAcceptDiagramChannelSession() {
         final var policy = new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory);
@@ -158,6 +164,16 @@ class DiagramCollaborationPluginTest {
 
     @Test
     void channelPlugin_shouldExposeMatchingResourceKeyFactory() {
+        final var plugin = new DiagramCollaborationChannelPlugin(resourceKeyFactory);
+
+        final CollaborationResourceKeyFactory pluginResourceKeyFactory = plugin.resourceKeyFactory();
+
+        assertThat(plugin.channelType()).isEqualTo(pluginResourceKeyFactory.channelType());
+        assertThat(pluginResourceKeyFactory.create("42")).isEqualTo(resourceKeyFactory.forDiagramId(42L));
+    }
+
+    @Test
+    void runtimeSupport_shouldExposeAccessSnapshotAndHandoffPolicies() {
         final var accessPolicy = new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory);
         final var snapshotStore = new DiagramCollaborationSnapshotStore(diagramSnapshotService, resourceKeyFactory);
         final var handoffPolicy = new DiagramCollaborationHandoffPolicy(
@@ -165,16 +181,27 @@ class DiagramCollaborationPluginTest {
             diagramSnapshotService,
             resourceKeyFactory
         );
-        final var plugin = new DiagramCollaborationChannelPlugin(
-            resourceKeyFactory,
+        final var support = new DiagramCollaborationRuntimeSupport(
             accessPolicy,
             snapshotStore,
             handoffPolicy
         );
 
-        final CollaborationResourceKeyFactory pluginResourceKeyFactory = plugin.resourceKeyFactory();
+        assertThat(support.channelType()).isEqualTo(resourceKeyFactory.channelType());
+        assertThat(support.accessPolicy()).isSameAs(accessPolicy);
+        assertThat(support.snapshotStore()).isSameAs(snapshotStore);
+        assertThat(support.handoffPolicy()).isSameAs(handoffPolicy);
+    }
 
-        assertThat(plugin.channelType()).isEqualTo(pluginResourceKeyFactory.channelType());
-        assertThat(pluginResourceKeyFactory.create("42")).isEqualTo(resourceKeyFactory.forDiagramId(42L));
+    @Test
+    void ticketSupport_shouldExposeTicketPolicies() {
+        final var support = new DiagramCollaborationTicketSupport(
+            collaborationTicketIssuer,
+            collaborationTicketAuthenticator
+        );
+
+        assertThat(support.channelType()).isEqualTo(resourceKeyFactory.channelType());
+        assertThat(support.ticketIssuer()).isSameAs(collaborationTicketIssuer);
+        assertThat(support.ticketAuthenticator()).isSameAs(collaborationTicketAuthenticator);
     }
 }

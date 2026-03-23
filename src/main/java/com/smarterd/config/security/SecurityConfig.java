@@ -1,5 +1,6 @@
 package com.smarterd.config.security;
 
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeyFactory;
 import com.smarterd.utils.AppStringUtils;
 import java.util.LinkedHashSet;
 import lombok.RequiredArgsConstructor;
@@ -76,7 +77,7 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/swagger-ui/**", "/v3/api-docs/**")
                     .permitAll()
-                    .requestMatchers("/ws/diagram/**")
+                    .requestMatchers(DiagramCollaborationResourceKeyFactory.WEBSOCKET_SECURITY_PATTERN)
                     .permitAll()
                     .anyRequest()
                     .authenticated()

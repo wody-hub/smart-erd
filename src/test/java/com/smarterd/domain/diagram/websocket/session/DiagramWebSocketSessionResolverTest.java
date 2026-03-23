@@ -21,6 +21,7 @@ class DiagramWebSocketSessionResolverTest {
     @Test
     void resolve_shouldPreferCommonCollaborationSessionWhenAvailable() {
         final var resolver = new DiagramWebSocketSessionResolver(
+            resourceKeyFactory,
             new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory)
         );
         final var session = mock(WebSocketSession.class);
@@ -32,50 +33,43 @@ class DiagramWebSocketSessionResolverTest {
             Instant.parse("2026-03-23T00:00:00Z"),
             2
         );
-        final var legacy = new AuthenticatedSession(
-            "legacy-user",
-            "legacy-login",
-            "Legacy",
-            99L,
-            Instant.parse("2026-03-23T00:00:00Z"),
-            1
-        );
 
         when(session.getAttributes()).thenReturn(
             Map.of(
                 CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
-                common,
-                AuthenticatedSession.SESSION_ATTR_KEY,
-                legacy
+                common
             )
         );
 
-        assertThat(resolver.resolve(session)).isEqualTo(AuthenticatedSession.fromCollaborationSession(common));
+        assertThat(resolver.resolve(session)).isEqualTo(
+            new DiagramWebSocketSessionInfo(
+                common.userId(),
+                common.loginId(),
+                common.userName(),
+                common.resourceKey(),
+                42L,
+                common.expiresAt(),
+                common.protocolVersion()
+            )
+        );
     }
 
     @Test
-    void resolve_shouldFallbackToLegacySessionWhenCommonSessionIsMissing() {
+    void resolve_shouldReturnNullWhenCommonSessionIsMissing() {
         final var resolver = new DiagramWebSocketSessionResolver(
+            resourceKeyFactory,
             new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory)
         );
         final var session = mock(WebSocketSession.class);
-        final var legacy = new AuthenticatedSession(
-            "user-1",
-            "login-1",
-            "Tester",
-            42L,
-            Instant.parse("2026-03-23T00:00:00Z"),
-            1
-        );
+        when(session.getAttributes()).thenReturn(Map.of());
 
-        when(session.getAttributes()).thenReturn(Map.of(AuthenticatedSession.SESSION_ATTR_KEY, legacy));
-
-        assertThat(resolver.resolve(session)).isEqualTo(legacy);
+        assertThat(resolver.resolve(session)).isNull();
     }
 
     @Test
-    void resolve_shouldFallbackToLegacySessionWhenCommonSessionFailsValidation() {
+    void resolve_shouldReturnNullWhenCommonSessionFailsValidation() {
         final var resolver = new DiagramWebSocketSessionResolver(
+            resourceKeyFactory,
             new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory)
         );
         final var session = mock(WebSocketSession.class);
@@ -87,24 +81,13 @@ class DiagramWebSocketSessionResolverTest {
             Instant.parse("2026-03-23T00:00:00Z"),
             2
         );
-        final var legacy = new AuthenticatedSession(
-            "user-1",
-            "login-1",
-            "Tester",
-            42L,
-            Instant.parse("2026-03-23T00:00:00Z"),
-            1
-        );
-
         when(session.getAttributes()).thenReturn(
             Map.of(
                 CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
-                invalidCommon,
-                AuthenticatedSession.SESSION_ATTR_KEY,
-                legacy
+                invalidCommon
             )
         );
 
-        assertThat(resolver.resolve(session)).isEqualTo(legacy);
+        assertThat(resolver.resolve(session)).isNull();
     }
 }

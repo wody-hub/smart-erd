@@ -7,9 +7,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.smarterd.collaboration.channel.CollaborationResourceKey;
 import com.smarterd.collaboration.snapshot.CollaborationSnapshotSaveCommand;
 import com.smarterd.application.collaboration.command.PersistCollaborationSnapshotUseCase;
-import com.smarterd.collaboration.channel.CollaborationResourceKeyFactory;
 import com.smarterd.domain.diagram.entity.Diagram;
-import com.smarterd.domain.diagram.collaboration.DiagramCollaborationChannelPlugin;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeyFactory;
 import com.smarterd.domain.diagram.service.DiagramService;
 import com.smarterd.domain.project.entity.Project;
 import org.junit.jupiter.api.Test;
@@ -24,10 +23,7 @@ class PersistDiagramSnapshotUseCaseTest {
     private DiagramService diagramService;
 
     @Mock
-    private DiagramCollaborationChannelPlugin diagramCollaborationChannelPlugin;
-
-    @Mock
-    private CollaborationResourceKeyFactory collaborationResourceKeyFactory;
+    private DiagramCollaborationResourceKeyFactory diagramCollaborationResourceKeyFactory;
 
     @Mock
     private PersistCollaborationSnapshotUseCase persistCollaborationSnapshotUseCase;
@@ -36,7 +32,7 @@ class PersistDiagramSnapshotUseCaseTest {
     void execute_validatesWritableDiagramThenDelegatesPersist() {
         final var useCase = new PersistDiagramSnapshotUseCase(
             diagramService,
-            diagramCollaborationChannelPlugin,
+            diagramCollaborationResourceKeyFactory,
             persistCollaborationSnapshotUseCase
         );
         final var diagram = Diagram.builder()
@@ -45,19 +41,21 @@ class PersistDiagramSnapshotUseCaseTest {
             .content("{\"nodes\":[]}")
             .build();
         final var snapshot = new byte[] { 1, 2, 3 };
-        final var expectedResourceKey = new CollaborationResourceKey(DiagramCollaborationChannelPlugin.CHANNEL_TYPE, "100");
+        final var expectedResourceKey = new CollaborationResourceKey(
+            DiagramCollaborationResourceKeyFactory.CHANNEL_TYPE,
+            "100"
+        );
         final var expectedCommand = new CollaborationSnapshotSaveCommand("17", snapshot);
 
         when(diagramService.loadWritableDiagram("tester", 1L, 10L, 100L)).thenReturn(diagram);
-        when(diagramCollaborationChannelPlugin.resourceKeyFactory()).thenReturn(collaborationResourceKeyFactory);
-        when(collaborationResourceKeyFactory.create("100")).thenReturn(expectedResourceKey);
+        when(diagramCollaborationResourceKeyFactory.forDiagramId(100L)).thenReturn(expectedResourceKey);
         when(persistCollaborationSnapshotUseCase.persistSnapshot(expectedResourceKey, expectedCommand)).thenReturn(true);
 
         final var persisted = useCase.execute("tester", 1L, 10L, 100L, "17", snapshot);
 
         assertThat(persisted).isTrue();
         verify(diagramService).loadWritableDiagram("tester", 1L, 10L, 100L);
-        verify(collaborationResourceKeyFactory).create("100");
+        verify(diagramCollaborationResourceKeyFactory).forDiagramId(100L);
         verify(persistCollaborationSnapshotUseCase).persistSnapshot(expectedResourceKey, expectedCommand);
     }
 }

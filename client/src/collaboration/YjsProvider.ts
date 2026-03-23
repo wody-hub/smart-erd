@@ -660,7 +660,8 @@ export class YjsProvider {
    * @returns WebSocket URL
    */
   private buildWsUrl(ticket: string): string {
-    return `${getWsBaseUrl()}/ws/diagram/${this.options.diagramId}?ticket=${encodeURIComponent(ticket)}`;
+    const websocketPath = this.options.websocketPath ?? `/ws/diagram/${this.options.diagramId}`;
+    return `${getWsBaseUrl()}${websocketPath}?ticket=${encodeURIComponent(ticket)}`;
   }
 
   /**

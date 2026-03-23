@@ -1,6 +1,7 @@
 package com.smarterd.config.websocket;
 
 import com.smarterd.config.security.CorsConfig;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeyFactory;
 import com.smarterd.domain.diagram.websocket.transport.DiagramWebSocketHandler;
 import com.smarterd.domain.diagram.websocket.transport.WsTicketHandshakeInterceptor;
 import java.util.Objects;
@@ -51,7 +52,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
         );
 
         nonNullRegistry
-            .addHandler(nonNullDiagramWebSocketHandler, "/ws/diagram/*")
+            .addHandler(nonNullDiagramWebSocketHandler, DiagramCollaborationResourceKeyFactory.WEBSOCKET_HANDLER_PATTERN)
             .addInterceptors(wsTicketHandshakeInterceptor)
             .setAllowedOrigins(nonNullAllowedOrigins);
     }
