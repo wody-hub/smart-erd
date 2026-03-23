@@ -2,7 +2,7 @@ services:
   postgres:
     image: 'postgres:17'
     ports:
-      - '15432:5432'
+      - '25433:5432'
     environment:
       POSTGRES_DB: smarterd
       POSTGRES_USER: smarterd

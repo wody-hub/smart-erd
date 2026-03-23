@@ -68,6 +68,22 @@ function createWindow(): void {
     callback({ requestHeaders });
   });
 
+  // CORS 응답 헤더 보정 — 서버가 반환한 Access-Control-Allow-Origin을 Electron Origin과 일치시킨다
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = { ...details.responseHeaders };
+    const serverUrl = getServerUrl();
+    if (serverUrl) {
+      try {
+        const origin = new URL(serverUrl).origin;
+        responseHeaders['Access-Control-Allow-Origin'] = [origin];
+        responseHeaders['Access-Control-Allow-Credentials'] = ['true'];
+      } catch {
+        // URL 파싱 실패 시 원본 헤더 유지
+      }
+    }
+    callback({ responseHeaders });
+  });
+
   // Dev 환경: Vite dev server 로드 / Prod: 빌드된 HTML 로드
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);

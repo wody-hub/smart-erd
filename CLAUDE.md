@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Backend (Spring Boot)
 
 ```bash
-./gradlew bootRun                    # Start backend on :8190 (Docker PostgreSQL auto-start)
+./gradlew bootRun                    # Start backend on :9500 (Docker PostgreSQL auto-start)
 ./gradlew build                      # Full build (compile + test)
 ./gradlew test                       # Run all tests
 ./gradlew test --tests "com.smarterd.SomeTest.methodName"  # Single test
@@ -23,7 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 cd client
-npm run dev                          # Dev server on :3000, proxies /api → :8190
+npm run dev                          # Dev server on :4500, proxies /api → :9500
 npm run build                        # Production build (tsc + vite)
 npm run lint                         # ESLint
 ```
@@ -119,7 +119,7 @@ client/
 ├── index.html                       # SPA entry point
 ├── package.json                     # "type": "module" (ESM)
 ├── tailwind.config.js               # CSS variable colors, darkMode: ["class"]
-├── vite.config.ts                   # @/ alias → ./src, proxy /api → :8190
+├── vite.config.ts                   # @/ alias → ./src, proxy /api → :9500
 ├── tsconfig.app.json                # paths: { "@/*": ["./src/*"] }
 └── src/
     ├── main.tsx                     # createRoot + StrictMode
@@ -186,7 +186,7 @@ client/
 ### Axios Instance
 
 ```text
-baseURL: /api  →  Vite 프록시  →  localhost:8190
+baseURL: /api  →  Vite 프록시  →  localhost:9500
 요청 인터셉터: Accept-Language (i18n.language) + localStorage Access Token → Authorization: Bearer <token>
 응답 인터셉터: 401 → Refresh Token으로 갱신 시도 (큐 패턴) → 실패 시 로그인 리다이렉트
 ```
@@ -265,7 +265,7 @@ Body: `{ logicalName, physicalType, description? }`
 CRUD (5 endpoints): POST 생성, GET 목록, GET `/{termId}` 상세, PUT `/{termId}` 수정, DELETE `/{termId}` 삭제
 Body: `{ logicalName, physicalName, domainId?, description? }`
 
-Swagger UI: `http://localhost:8190/swagger-ui/index.html`
+Swagger UI: `http://localhost:9500/swagger-ui/index.html`
 
 ### Authentication Flow
 

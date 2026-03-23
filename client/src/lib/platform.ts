@@ -6,16 +6,22 @@ let cachedServerUrl = '';
 /**
  * Electron 데스크톱 환경인지 확인한다.
  *
+ * preload의 contextBridge(window.electronAPI)를 우선 확인하고,
+ * fallback으로 User-Agent에 "Electron" 포함 여부를 검사한다.
+ *
  * @returns Electron 환경이면 true, 웹 환경이면 false
  */
 export function isElectron(): boolean {
-  return window.electronAPI?.isElectron === true;
+  return (
+    window.electronAPI?.isElectron === true ||
+    navigator.userAgent.toLowerCase().includes('electron')
+  );
 }
 
 /**
  * 서버 URL을 캐시에 저장한다. main.tsx의 bootstrap()에서 1회 호출.
  *
- * @param url 서버 URL (예: 'http://localhost:8190')
+ * @param url 서버 URL (예: 'http://localhost:9500')
  */
 export function initServerUrl(url: string): void {
   cachedServerUrl = url;

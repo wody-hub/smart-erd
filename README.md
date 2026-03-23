@@ -38,7 +38,7 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 ### 백엔드
 
 ```bash
-./gradlew bootRun          # http://localhost:8190 (Docker PostgreSQL 자동 시작)
+./gradlew bootRun          # http://localhost:9500 (Docker PostgreSQL 자동 시작)
 ```
 
 ### 프론트엔드
@@ -46,7 +46,7 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 ```bash
 cd client
 npm install
-npm run dev                # http://localhost:3000 (프록시 /api → :8190)
+npm run dev                # http://localhost:4500 (프록시 /api → :9500)
 npm run perf:erd:apply     # S50/S200/S500 parse/apply/layout/total p50/p95 리포트 생성 (/tmp/smart-erd/perf)
 npm run perf:erd:apply:sample  # 저장소 샘플 리포트 갱신 (client/perf-reports/erd-apply-report.json)
 npm run test:e2e:smoke:collaboration  # 협업 생성/undo 전파 스모크
@@ -68,12 +68,12 @@ npm run test:e2e:smoke:collaboration  # 협업 생성/undo 전파 스모크
 | `VITE_ERD_DIFF_APPLY_INTERNAL_IDS`                  | internal 모드 허용 loginId 목록(csv)                  | 빈 값                                     |
 | `SMART_ERD_E2E_LOGIN`                               | Playwright E2E 로그인 ID                              | 없음                                      |
 | `SMART_ERD_E2E_PASSWORD`                            | Playwright E2E 비밀번호                               | 없음                                      |
-| `SMART_ERD_E2E_BASE_URL`                            | Playwright 대상 프런트 주소                           | `http://localhost:3000`                   |
-| `SMART_ERD_E2E_API_URL`                             | Playwright 대상 API 주소                              | `http://localhost:8190/api`               |
+| `SMART_ERD_E2E_BASE_URL`                            | Playwright 대상 프런트 주소                           | `http://localhost:4500`                   |
+| `SMART_ERD_E2E_API_URL`                             | Playwright 대상 API 주소                              | `http://localhost:9500/api`               |
 | `SMART_ERD_E2E_TEAM_ID`                             | 고정 smoke/recovery 대상 팀 ID                        | 자동 탐색                                 |
 | `SMART_ERD_E2E_PROJECT_ID`                          | 고정 smoke/recovery 대상 프로젝트 ID                  | 자동 탐색                                 |
 | `SMART_ERD_E2E_DIAGRAM_ID`                          | 고정 smoke/recovery 대상 다이어그램 ID                | 자동 탐색                                 |
-| `SMART_ERD_E2E_BACKEND_PORT`                        | recovery 테스트가 재기동할 백엔드 포트                | `8190`                                    |
+| `SMART_ERD_E2E_BACKEND_PORT`                        | recovery 테스트가 재기동할 백엔드 포트                | `9500`                                    |
 | `SMART_ERD_E2E_BACKEND_RESTART_CMD`                 | recovery 테스트 백엔드 재기동 명령                    | `./gradlew bootRun`                       |
 | `SMART_ERD_E2E_BOOT_LOG_PATH`                       | recovery 재기동 로그 파일 경로                        | `/tmp/smart-erd-e2e-recovery-backend.log` |
 | `SMART_ERD_E2E_BROWSER_CHANNEL`                     | Playwright 브라우저 채널 강제값 (`chrome` 등)         | Playwright 기본 Chromium                  |
@@ -236,7 +236,7 @@ client/
 ├── package.json                     # "type": "module" (ESM)
 ├── tailwind.config.js               # CSS 변수 기반 색상, darkMode: ["class"], tailwindcss-animate
 ├── postcss.config.js                # tailwindcss + autoprefixer
-├── vite.config.ts                   # @/ alias → ./src, 프록시 /api → :8190
+├── vite.config.ts                   # @/ alias → ./src, 프록시 /api → :9500
 ├── tsconfig.app.json                # paths: { "@/*": ["./src/*"] }
 ├── .prettierrc.json                 # Prettier 설정
 ├── .prettierignore                  # Prettier 무시 파일
@@ -802,7 +802,7 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 
 ### Swagger UI
 
-`http://localhost:8190/swagger-ui/index.html`
+`http://localhost:9500/swagger-ui/index.html`
 
 모든 컨트롤러에 `@Operation`, `@ApiResponse`, `@Parameter`, `@Schema` 어노테이션 적용됨. JWT Bearer 인증이 필요한 엔드포인트는 Swagger UI에서 Authorize 버튼으로 토큰 설정 후 테스트 가능.
 
@@ -1014,7 +1014,7 @@ ERD 편집기 영역(Header, Sidebar, TableNode, ERDCanvas)에서 사용하는 �
 ### Axios 인스턴스
 
 ```text
-baseURL: /api  →  Vite 프록시  →  localhost:8190
+baseURL: /api  →  Vite 프록시  →  localhost:9500
 요청 인터셉터: Accept-Language (i18n.language) + localStorage Access Token → Authorization: Bearer <token>
 응답 인터셉터: 401 → Refresh Token으로 갱신 시도 (큐 패턴) → 실패 시 로그인 리다이렉트
 ```
@@ -1055,7 +1055,7 @@ decorator:
 
 smart-erd:
     cors:
-        allowed-origins: http://localhost:3000
+        allowed-origins: http://localhost:4500
     jwt:
         secret: ${SMART_ERD_JWT_SECRET:기본값}
         access-expiration: 1800000 # 30분 (ms)
@@ -1088,14 +1088,14 @@ annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
 
 ```bash
 # 백엔드
-./gradlew bootRun            # 개발 서버 기동 (:8190, Docker PostgreSQL 자동 시작)
+./gradlew bootRun            # 개발 서버 기동 (:9500, Docker PostgreSQL 자동 시작)
 ./gradlew build              # 전체 빌드 (컴파일 + 테스트)
 ./gradlew test               # 테스트 실행
 ./gradlew compileJava        # 컴파일만 (QueryDSL/Lombok AP 트리거)
 
 # 프론트엔드
 cd client
-npm run dev                  # 개발 서버 기동 (:3000, 프록시 /api → :8190)
+npm run dev                  # 개발 서버 기동 (:4500, 프록시 /api → :9500)
 npm run build                # 프로덕션 빌드 (tsc + vite)
 npm run lint                 # ESLint
 
