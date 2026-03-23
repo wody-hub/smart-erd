@@ -1,0 +1,16 @@
+server:
+  port: 9501
+
+smart-erd:
+  cors:
+    allowed-origins:
+      - http://localhost:4051
+      - http://127.0.0.1:4051
+      - http://localhost:4500
+      - http://127.0.0.1:4500
+      - http://localhost:4501
+      - http://127.0.0.1:4501
+      - http://localhost:9500
+      - http://127.0.0.1:9500
+      - http://localhost:9501
+      - http://127.0.0.1:9501
