@@ -1,0 +1,11 @@
+server:
+  port: ${SERVER_PORT:9501}
+
+spring:
+  docker:
+    compose:
+      enabled: false
+  datasource:
+    url: jdbc:postgresql://localhost:15432/smarterd
+    username: smarterd
+    password: smarterd

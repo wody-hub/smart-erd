@@ -2,7 +2,6 @@
 .gradle/
 build/
 bin/
-!gradle/wrapper/gradle-wrapper.jar
 
 # IDE
 .idea/
@@ -26,6 +25,7 @@ bin/
 .mtj.tmp/
 hs_err_pid*
 replay_pid*
+!gradle/wrapper/gradle-wrapper.jar
 
 # Spring Boot
 application-local.yml

@@ -33,12 +33,23 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 
 - Java 25+
 - Node.js 20+
-- Docker Desktop (PostgreSQL 컨테이너 자동 기동)
+- Docker Desktop
 
 ### 백엔드
 
 ```bash
-./gradlew bootRun          # http://localhost:9500 (Docker PostgreSQL 자동 시작)
+./gradlew bootRun          # http://localhost:9500 (현재 프로젝트 compose 기준 Docker PostgreSQL 자동 시작)
+```
+
+### 백엔드 local 프로파일
+
+`local` 프로파일은 Docker Compose 자동 기동을 끄고, 이미 실행 중인 PostgreSQL(`localhost:15432`)에 붙는다.
+
+```bash
+docker compose -f ../smart-erd/compose.yaml -p smart-erd up -d postgres  # 최초 1회 또는 DB가 내려가 있을 때만
+
+SERVER_PORT=9501 ./bootRun-local.sh   # http://localhost:9501
+SERVER_PORT=9502 ./bootRun-local.sh   # http://localhost:9502
 ```
 
 ### 프론트엔드
@@ -47,6 +58,10 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 cd client
 npm install
 npm run dev                # http://localhost:4500 (프록시 /api → :9500)
+npm run local              # http://localhost:4051 (프록시 /api → :9501)
+VITE_API_PROXY_TARGET=http://localhost:9502 \
+VITE_WS_PROXY_TARGET=ws://localhost:9502 \
+npm run local              # http://localhost:4051 (프록시 /api → :9502)
 npm run perf:erd:apply     # S50/S200/S500 parse/apply/layout/total p50/p95 리포트 생성 (/tmp/smart-erd/perf)
 npm run perf:erd:apply:sample  # 저장소 샘플 리포트 갱신 (client/perf-reports/erd-apply-report.json)
 npm run test:e2e:smoke:collaboration  # 협업 생성/undo 전파 스모크
@@ -77,6 +92,10 @@ npm run test:e2e:smoke:collaboration  # 협업 생성/undo 전파 스모크
 | `SMART_ERD_E2E_BACKEND_RESTART_CMD`                 | recovery 테스트 백엔드 재기동 명령                    | `./gradlew bootRun`                       |
 | `SMART_ERD_E2E_BOOT_LOG_PATH`                       | recovery 재기동 로그 파일 경로                        | `/tmp/smart-erd-e2e-recovery-backend.log` |
 | `SMART_ERD_E2E_BROWSER_CHANNEL`                     | Playwright 브라우저 채널 강제값 (`chrome` 등)         | Playwright 기본 Chromium                  |
+| `SERVER_PORT`                                       | `bootRun-local.sh`가 사용할 local 백엔드 포트         | `9501`                                    |
+| `VITE_DEV_SERVER_PORT`                              | Vite 개발 서버 포트                                   | `4500` (`frontend-local`은 `4051`)        |
+| `VITE_API_PROXY_TARGET`                             | Vite `/api` 프록시 대상                               | `http://localhost:9500`                   |
+| `VITE_WS_PROXY_TARGET`                              | Vite `/ws` 프록시 대상                                | `ws://localhost:9500`                     |
 
 ## Playwright E2E 운영
 

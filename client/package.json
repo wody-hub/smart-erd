@@ -6,6 +6,7 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "vite",
+    "local": "vite --mode frontend-local",
     "dev:electron": "electron-vite dev",
     "build": "tsc -b && vite build",
     "build:electron": "electron-vite build",
