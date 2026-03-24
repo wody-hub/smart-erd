@@ -6,12 +6,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import com.smarterd.config.websocket.WebSocketProperties;
 import com.smarterd.application.diagram.command.CompleteDiagramSessionJoinUseCase;
 import com.smarterd.application.diagram.command.CompleteDiagramSessionLeaveUseCase;
 import com.smarterd.application.diagram.command.FlushDiagramDrainedUpdatesUseCase;
+import com.smarterd.config.websocket.WebSocketProperties;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeyFactory;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSessionMetadataPolicy;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
@@ -91,7 +92,7 @@ class DiagramWebSocketHandlerTest {
 
         when(session.getId()).thenReturn("session-1");
         when(session.getAttributes()).thenReturn(attributes);
-        when(fixture.roomManager().checkRateLimit(session)).thenReturn(true);
+        when(fixture.diagramSessionTransportUseCase().allowMessage(session)).thenReturn(true);
         when(fixture.messageSender().extractPayload(any(BinaryMessage.class))).thenReturn(
             new byte[] { DiagramMessageTypes.MSG_YJS_UPDATE, 0x01 }
         );
@@ -124,7 +125,7 @@ class DiagramWebSocketHandlerTest {
         );
         when(session.getId()).thenReturn("session-1");
         when(session.getAttributes()).thenReturn(attributes);
-        when(fixture.roomManager().checkRateLimit(session)).thenReturn(true);
+        when(fixture.diagramSessionTransportUseCase().allowMessage(session)).thenReturn(true);
         when(fixture.messageSender().extractPayload(any(BinaryMessage.class))).thenReturn(
             new byte[] { (byte) 0x7F, 0x01 }
         );
@@ -151,7 +152,7 @@ class DiagramWebSocketHandlerTest {
 
         // then
         verify(session).close(CloseStatus.POLICY_VIOLATION);
-        verify(fixture.roomManager(), never()).join(any(), any(), any(), any());
+        verifyNoMoreInteractions(fixture.diagramSessionTransportUseCase());
     }
 
     @Test
@@ -169,7 +170,7 @@ class DiagramWebSocketHandlerTest {
 
         // then
         verify(session).close(CloseStatus.POLICY_VIOLATION);
-        verify(fixture.roomManager(), never()).checkRateLimit(session);
+        verify(fixture.diagramSessionTransportUseCase(), never()).allowMessage(session);
     }
 
     @Test
@@ -192,7 +193,7 @@ class DiagramWebSocketHandlerTest {
 
         // then
         verify(session).close(CloseStatus.POLICY_VIOLATION);
-        verify(fixture.roomManager(), never()).checkRateLimit(session);
+        verify(fixture.diagramSessionTransportUseCase(), never()).allowMessage(session);
     }
 
     @Test
@@ -204,14 +205,13 @@ class DiagramWebSocketHandlerTest {
         final var session = mock(WebSocketSession.class);
         when(session.getId()).thenReturn("session-1");
         when(session.getAttributes()).thenReturn(new HashMap<>());
-        when(fixture.roomManager().findDiagramIdBySession(session)).thenReturn(null);
+        when(fixture.diagramSessionTransportUseCase().close(session, null, null)).thenReturn(null);
 
         // when
         fixture.handler().afterConnectionClosed(session, CloseStatus.NORMAL);
 
         // then
-        verify(fixture.roomManager()).cleanupRateLimit(session);
-        verify(fixture.roomManager(), never()).leave(any(), any(), any());
+        verify(fixture.diagramSessionTransportUseCase()).close(session, null, null);
     }
 
     @Test
@@ -223,32 +223,30 @@ class DiagramWebSocketHandlerTest {
         final var session = mock(WebSocketSession.class);
         when(session.getId()).thenReturn("session-1");
         when(session.getAttributes()).thenReturn(new HashMap<>());
-        when(fixture.roomManager().findDiagramIdBySession(session)).thenReturn(100L);
-        when(fixture.roomManager().findUserIdBySession(session)).thenReturn("user-1");
-        when(fixture.roomManager().leave(100L, session, "user-1")).thenReturn(
-            new LeaveResult(false, new byte[0], null, null, 0)
+        when(fixture.diagramSessionTransportUseCase().close(session, null, null)).thenReturn(
+            new DiagramSessionCloseResult(100L, new LeaveResult(false, new byte[0], null, null, 0))
         );
 
         // when
         fixture.handler().afterConnectionClosed(session, CloseStatus.NORMAL);
 
         // then
-        verify(fixture.roomManager()).cleanupRateLimit(session);
-        verify(fixture.roomManager()).leave(100L, session, "user-1");
+        verify(fixture.diagramSessionTransportUseCase()).close(session, null, null);
     }
 
     private Fixture createFixture(List<TestMessageHandler> handlers) {
-        final var roomManager = mock(DiagramRoomManager.class);
+        final var diagramSessionTransportUseCase = mock(DiagramSessionTransportUseCase.class);
         final var snapshotService = mock(DiagramSnapshotService.class);
         final var messageSender = mock(DiagramMessageSender.class);
         final var presenceNotifier = mock(DiagramPresenceNotifier.class);
         final var sessionLifecycle = new DiagramWebSocketSessionLifecycle(
-            roomManager,
+            diagramSessionTransportUseCase,
             new CompleteDiagramSessionJoinUseCase(presenceNotifier),
             new CompleteDiagramSessionLeaveUseCase(
                 presenceNotifier,
-                new FlushDiagramDrainedUpdatesUseCase(roomManager, snapshotService)
-            )
+                new FlushDiagramDrainedUpdatesUseCase(mock(DiagramRoomManager.class), snapshotService)
+            ),
+            presenceNotifier
         );
         final var messageDispatcher = new DiagramWebSocketMessageDispatcher(new ArrayList<>(handlers));
         final var resourceKeyFactory = new DiagramCollaborationResourceKeyFactory();
@@ -258,13 +256,13 @@ class DiagramWebSocketHandlerTest {
         );
         final var handler = new DiagramWebSocketHandler(
             new WebSocketProperties(),
-            roomManager,
+            diagramSessionTransportUseCase,
             messageSender,
             sessionResolver,
             sessionLifecycle,
             messageDispatcher
         );
-        return new Fixture(handler, roomManager, messageSender, messageDispatcher);
+        return new Fixture(handler, diagramSessionTransportUseCase, messageSender, messageDispatcher);
     }
 
     private List<TestMessageHandler> createRequiredHandlers() {
@@ -284,7 +282,7 @@ class DiagramWebSocketHandlerTest {
 
     private record Fixture(
         DiagramWebSocketHandler handler,
-        DiagramRoomManager roomManager,
+        DiagramSessionTransportUseCase diagramSessionTransportUseCase,
         DiagramMessageSender messageSender,
         DiagramWebSocketMessageDispatcher messageDispatcher
     ) {}

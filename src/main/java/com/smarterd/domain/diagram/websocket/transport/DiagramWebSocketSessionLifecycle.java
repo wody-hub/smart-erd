@@ -2,7 +2,9 @@ package com.smarterd.domain.diagram.websocket.transport;
 
 import com.smarterd.application.diagram.command.CompleteDiagramSessionJoinUseCase;
 import com.smarterd.application.diagram.command.CompleteDiagramSessionLeaveUseCase;
-import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
+import com.smarterd.application.diagram.port.DiagramSessionRef;
+import com.smarterd.domain.diagram.websocket.mapper.DiagramApplicationPayloadMapper;
+import com.smarterd.domain.diagram.websocket.model.JoinResult;
 import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionInfo;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -20,9 +22,10 @@ import org.springframework.web.socket.WebSocketSession;
 @Slf4j
 public class DiagramWebSocketSessionLifecycle {
 
-    private final DiagramRoomManager roomManager;
+    private final DiagramSessionTransportUseCase diagramSessionTransportUseCase;
     private final CompleteDiagramSessionJoinUseCase completeDiagramSessionJoinUseCase;
     private final CompleteDiagramSessionLeaveUseCase completeDiagramSessionLeaveUseCase;
+    private final DiagramLegacyPresencePort diagramLegacyPresencePort;
 
     /**
      * 세션을 방에 입장시키고 presence 초기 메시지를 전송한다.
@@ -31,7 +34,7 @@ public class DiagramWebSocketSessionLifecycle {
      * @param info 정규화된 세션 메타데이터
      */
     public void establish(WebSocketSession session, DiagramWebSocketSessionInfo info) {
-        final var joinResult = roomManager.join(info.diagramId(), session, info.userId(), info.userName());
+        final var joinResult = diagramSessionTransportUseCase.join(session, info.diagramId(), info.userId(), info.userName());
         if (!joinResult.accepted()) {
             try {
                 session.close(Objects.requireNonNull(CloseStatus.POLICY_VIOLATION));
@@ -40,7 +43,11 @@ public class DiagramWebSocketSessionLifecycle {
             }
             return;
         }
-        completeDiagramSessionJoinUseCase.complete(session, info, joinResult);
+        completeDiagramSessionJoinUseCase.complete(
+            new DiagramSessionRef(session.getId()),
+            info.diagramId(),
+            DiagramApplicationPayloadMapper.toJoinCompletion(joinResult)
+        );
     }
 
     /**
@@ -50,15 +57,32 @@ public class DiagramWebSocketSessionLifecycle {
      * @param info 세션 메타데이터. 없으면 roomManager 조회 결과로 보완한다.
      */
     public void close(WebSocketSession session, @Nullable DiagramWebSocketSessionInfo info) {
-        roomManager.cleanupRateLimit(session);
-        final var diagramId = info != null ? info.diagramId() : roomManager.findDiagramIdBySession(session);
-        final var userId = info != null ? info.userId() : roomManager.findUserIdBySession(session);
-        if (diagramId == null) {
+        final var closeResult = diagramSessionTransportUseCase.close(
+            session,
+            info != null ? info.diagramId() : null,
+            info != null ? info.userId() : null
+        );
+        if (closeResult == null) {
             log.warn("WebSocket 세션 메타데이터/room 조회 실패로 종료 정리 생략 (세션 {})", session.getId());
             return;
         }
-
-        final var result = roomManager.leave(diagramId, session, userId);
-        completeDiagramSessionLeaveUseCase.complete(session, info, Objects.requireNonNull(diagramId), result);
+        completeDiagramSessionLeaveUseCase.complete(
+            new DiagramSessionRef(session.getId()),
+            Objects.requireNonNull(closeResult.diagramId()),
+            DiagramApplicationPayloadMapper.toLeaveCompletion(closeResult.leaveResult())
+        );
+        if (
+            info != null &&
+            info.loginId() != null &&
+            closeResult.leaveResult().leftUserId() != null &&
+            closeResult.leaveResult().roomEpoch() != null
+        ) {
+            diagramLegacyPresencePort.broadcastPeerLeftLegacy(
+                Objects.requireNonNull(closeResult.diagramId()),
+                new DiagramSessionRef(session.getId()),
+                info.loginId()
+            );
+        }
     }
+
 }

@@ -33,6 +33,7 @@ import com.smarterd.domain.diagram.websocket.relay.handler.SnapshotRequestMessag
 import com.smarterd.domain.diagram.websocket.relay.handler.SyncRelayMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.handler.YjsUpdateMessageHandler;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
+import com.smarterd.domain.diagram.websocket.room.DiagramRealtimeSessionPortAdapter;
 import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
 import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionResolver;
 import java.nio.ByteBuffer;
@@ -200,14 +201,19 @@ class DiagramWebSocketFlowIntegrationTest {
         final var objectMapper = new ObjectMapper();
         final var messageSender = new DiagramMessageSender(roomManager, objectMapper);
         final var presenceNotifier = new DiagramPresenceNotifier(roomManager, messageSender);
-        final var diagramRealtimeSessionUseCase = new DiagramRealtimeSessionUseCase(roomManager, presenceNotifier);
+        final var diagramRealtimeSessionUseCase = new DiagramRealtimeSessionUseCase(
+            new DiagramRealtimeSessionPortAdapter(roomManager),
+            presenceNotifier
+        );
+        final var diagramSessionTransportUseCase = new DiagramSessionTransportUseCase(roomManager);
         final var sessionLifecycle = new DiagramWebSocketSessionLifecycle(
-            roomManager,
+            diagramSessionTransportUseCase,
             new CompleteDiagramSessionJoinUseCase(presenceNotifier),
             new CompleteDiagramSessionLeaveUseCase(
                 presenceNotifier,
                 new FlushDiagramDrainedUpdatesUseCase(roomManager, snapshotService)
-            )
+            ),
+            presenceNotifier
         );
         final var resourceKeyFactory = new DiagramCollaborationResourceKeyFactory();
         final var diagramRuntimeSupport = new DiagramCollaborationRuntimeSupport(
@@ -237,7 +243,7 @@ class DiagramWebSocketFlowIntegrationTest {
 
         final var handler = new DiagramWebSocketHandler(
             properties,
-            roomManager,
+            diagramSessionTransportUseCase,
             messageSender,
             sessionResolver,
             sessionLifecycle,

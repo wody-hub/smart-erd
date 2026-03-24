@@ -41,13 +41,13 @@ public class DiagramMessageSender {
      * 같은 room의 다른 세션들로 메시지를 브로드캐스트한다.
      *
      * @param diagramId 대상 다이어그램 ID
-     * @param sender    발신 세션(자기 자신 제외)
-     * @param message   브로드캐스트할 메시지
+     * @param senderSessionId 발신 세션 ID(자기 자신 제외)
+     * @param message 브로드캐스트할 메시지
      */
-    public void broadcastToRoom(Long diagramId, WebSocketSession sender, BinaryMessage message) {
+    public void broadcastToRoom(Long diagramId, String senderSessionId, BinaryMessage message) {
         roomManager.broadcast(
             Objects.requireNonNull(diagramId),
-            Objects.requireNonNull(sender),
+            Objects.requireNonNull(senderSessionId),
             Objects.requireNonNull(message)
         );
     }
@@ -56,20 +56,21 @@ public class DiagramMessageSender {
      * JSON을 타입 payload로 감싸 room에 브로드캐스트한다.
      *
      * @param diagramId   대상 다이어그램 ID
-     * @param sender      발신 세션(자기 자신 제외)
+     * @param diagramId 대상 다이어그램 ID
+     * @param senderSessionId 발신 세션 ID(자기 자신 제외)
      * @param messageType 메시지 타입 바이트
-     * @param payloadMap  JSON 직렬화할 payload 객체
+     * @param payloadMap JSON 직렬화할 payload 객체
      * @throws Exception JSON 직렬화 또는 전송 중 오류가 발생한 경우
      */
     public void broadcastJsonToRoom(
         Long diagramId,
-        WebSocketSession sender,
+        String senderSessionId,
         byte messageType,
         Map<String, ?> payloadMap
     ) throws Exception {
         final var payloadBytes = objectMapper.writeValueAsBytes(payloadMap);
         final var payload = wrapMessage(messageType, payloadBytes);
-        broadcastToRoom(diagramId, sender, new BinaryMessage(Objects.requireNonNull(payload)));
+        broadcastToRoom(diagramId, senderSessionId, new BinaryMessage(Objects.requireNonNull(payload)));
     }
 
     /**

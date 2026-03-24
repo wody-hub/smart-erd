@@ -1,6 +1,7 @@
 package com.smarterd.domain.diagram.websocket.relay.handler;
 
 import com.smarterd.application.diagram.command.DiagramRealtimeSessionUseCase;
+import com.smarterd.application.diagram.port.DiagramSessionRef;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
@@ -38,7 +39,7 @@ public class PresenceSnapshotRequestMessageHandler implements DiagramMessageHand
      */
     @Override
     public void handle(DiagramMessageContext context) {
-        if (!diagramRealtimeSessionUseCase.requestPresenceSnapshot(context.session(), context.diagramId())) {
+        if (!diagramRealtimeSessionUseCase.requestPresenceSnapshot(new DiagramSessionRef(context.sessionId()), context.diagramId())) {
             log.warn("Presence snapshot request rate limit 초과 (세션 {})", context.sessionId());
             return;
         }

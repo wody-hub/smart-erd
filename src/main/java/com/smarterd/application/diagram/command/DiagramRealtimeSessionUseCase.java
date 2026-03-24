@@ -1,10 +1,10 @@
 package com.smarterd.application.diagram.command;
 
-import com.smarterd.domain.diagram.websocket.relay.DiagramPresenceNotifier;
-import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
+import com.smarterd.application.diagram.port.DiagramPresencePort;
+import com.smarterd.application.diagram.port.DiagramRealtimeSessionPort;
+import com.smarterd.application.diagram.port.DiagramSessionRef;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.WebSocketSession;
 
 /**
  * 다이어그램 실시간 세션에서 발생하는 경량 room/presence 명령을 조정한다.
@@ -13,8 +13,8 @@ import org.springframework.web.socket.WebSocketSession;
 @RequiredArgsConstructor
 public class DiagramRealtimeSessionUseCase {
 
-    private final DiagramRoomManager roomManager;
-    private final DiagramPresenceNotifier presenceNotifier;
+    private final DiagramRealtimeSessionPort diagramRealtimeSessionPort;
+    private final DiagramPresencePort diagramPresencePort;
 
     /**
      * 순수 Yjs update를 room 누적 버퍼에 추가한다.
@@ -24,21 +24,21 @@ public class DiagramRealtimeSessionUseCase {
      * @return 누적 성공 여부
      */
     public boolean appendRealtimeUpdate(Long diagramId, byte[] update) {
-        return roomManager.appendUpdate(diagramId, update);
+        return diagramRealtimeSessionPort.appendRealtimeUpdate(diagramId, update);
     }
 
     /**
      * rate limit을 검사한 뒤 최신 presence snapshot을 전송한다.
      *
-     * @param session 대상 세션
+     * @param sessionRef 대상 세션 식별자
      * @param diagramId 다이어그램 ID
      * @return rate limit 통과 여부
      */
-    public boolean requestPresenceSnapshot(WebSocketSession session, Long diagramId) {
-        if (!roomManager.allowPresenceSnapshotRequest(session)) {
+    public boolean requestPresenceSnapshot(DiagramSessionRef sessionRef, Long diagramId) {
+        if (!diagramRealtimeSessionPort.allowPresenceSnapshotRequest(sessionRef)) {
             return false;
         }
-        presenceNotifier.sendPresenceSnapshotToSession(session, diagramId, null);
+        diagramPresencePort.sendPresenceSnapshotToSession(sessionRef, diagramId, null);
         return true;
     }
 }

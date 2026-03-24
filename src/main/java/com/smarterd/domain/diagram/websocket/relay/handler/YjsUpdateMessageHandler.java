@@ -41,7 +41,7 @@ public class YjsUpdateMessageHandler implements DiagramMessageHandler {
      */
     @Override
     public void handle(DiagramMessageContext context) {
-        messageSender.broadcastToRoom(context.diagramId(), context.session(), context.message());
+        messageSender.broadcastToRoom(context.diagramId(), context.sessionId(), context.message());
 
         // 타입 바이트(0x03) 제외한 순수 Yjs update만 누적
         final var payload = context.payload();
