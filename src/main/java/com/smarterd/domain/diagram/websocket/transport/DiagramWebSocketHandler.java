@@ -1,10 +1,6 @@
 package com.smarterd.domain.diagram.websocket.transport;
 
 import com.smarterd.config.websocket.WebSocketProperties;
-import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
-import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
-import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionInfo;
-import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionResolver;
 import java.nio.channels.ClosedChannelException;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -37,14 +33,8 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
     /** WebSocket 설정 프로퍼티 */
     private final WebSocketProperties webSocketProperties;
 
-    /** WebSocket transport용 room/session 유스케이스 */
-    private final DiagramSessionTransportUseCase diagramSessionTransportUseCase;
-
-    /** 메시지 전송 유틸 */
-    private final DiagramMessageSender messageSender;
-
-    /** 공통/legacy 세션 메타데이터 resolver */
-    private final DiagramWebSocketSessionResolver sessionResolver;
+    /** inbound 세션/context 해석과 공통 guard */
+    private final DiagramInboundMessageContextFactory inboundMessageContextFactory;
 
     /** 세션 join/leave/flush 수명주기 */
     private final DiagramWebSocketSessionLifecycle sessionLifecycle;
@@ -62,7 +52,7 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
     public void afterConnectionEstablished(@NonNull WebSocketSession session) {
         session.setBinaryMessageSizeLimit(webSocketProperties.getBinaryMessageSizeLimit());
 
-        final var info = resolveSessionOrClose(session, "WebSocket 세션 메타데이터 누락으로 연결 거부");
+        final var info = inboundMessageContextFactory.resolveEstablishedSession(session);
         if (info == null) {
             return;
         }
@@ -79,39 +69,10 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
      */
     @Override
     protected void handleBinaryMessage(@NonNull WebSocketSession session, @NonNull BinaryMessage message) {
-        final var info = resolveSessionOrClose(session, "WebSocket 세션 메타데이터 누락으로 메시지 처리 중단");
-        if (info == null) {
+        final var context = inboundMessageContextFactory.createInboundContext(session, message);
+        if (context == null) {
             return;
         }
-
-        // 세션 만료 체크
-        if (info.isExpired()) {
-            log.info("WebSocket 세션 만료 (세션 {}, loginId={})", session.getId(), info.loginId());
-            closePolicyViolation(session, "만료 세션 종료 실패");
-            return;
-        }
-
-        // Rate limit 검사
-        if (!diagramSessionTransportUseCase.allowMessage(session)) {
-            log.warn("Rate limit 초과 (세션 {})", session.getId());
-            return;
-        }
-
-        final var payload = messageSender.extractPayload(message);
-
-        if (payload.length == 0) {
-            return;
-        }
-
-        final var context = new DiagramMessageContext(
-            session,
-            info.resourceKey(),
-            info.diagramId(),
-            info.loginId(),
-            info.userId(),
-            message,
-            payload
-        );
         messageDispatcher.dispatch(context);
     }
 
@@ -129,7 +90,7 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
             return;
         }
 
-        final var info = sessionResolver.resolve(session);
+        final var info = inboundMessageContextFactory.resolveSession(session);
         sessionLifecycle.close(session, info);
     }
 
@@ -177,26 +138,6 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
             current = current.getCause();
         }
         return false;
-    }
-
-    private DiagramWebSocketSessionInfo resolveSessionOrClose(
-        WebSocketSession session,
-        String missingSessionMessage
-    ) {
-        final var info = sessionResolver.resolve(session);
-        if (info == null) {
-            log.warn("{} (세션 {})", missingSessionMessage, session.getId());
-            closePolicyViolation(session, "메타데이터 누락 세션 종료 실패");
-        }
-        return info;
-    }
-
-    private void closePolicyViolation(WebSocketSession session, String failureMessage) {
-        try {
-            session.close(Objects.requireNonNull(CloseStatus.POLICY_VIOLATION));
-        } catch (Exception e) {
-            log.warn("{} (세션 {})", failureMessage, session.getId(), e);
-        }
     }
 
 }

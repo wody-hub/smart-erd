@@ -254,11 +254,14 @@ class DiagramWebSocketHandlerTest {
             resourceKeyFactory,
             new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory)
         );
-        final var handler = new DiagramWebSocketHandler(
-            new WebSocketProperties(),
+        final var inboundMessageContextFactory = new DiagramInboundMessageContextFactory(
             diagramSessionTransportUseCase,
             messageSender,
-            sessionResolver,
+            sessionResolver
+        );
+        final var handler = new DiagramWebSocketHandler(
+            new WebSocketProperties(),
+            inboundMessageContextFactory,
             sessionLifecycle,
             messageDispatcher
         );

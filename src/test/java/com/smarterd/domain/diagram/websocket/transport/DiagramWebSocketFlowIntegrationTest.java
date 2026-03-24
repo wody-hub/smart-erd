@@ -240,12 +240,15 @@ class DiagramWebSocketFlowIntegrationTest {
             new PresenceSnapshotRequestMessageHandler(diagramRealtimeSessionUseCase)
         );
         final var messageDispatcher = new DiagramWebSocketMessageDispatcher(handlers);
+        final var inboundMessageContextFactory = new DiagramInboundMessageContextFactory(
+            diagramSessionTransportUseCase,
+            messageSender,
+            sessionResolver
+        );
 
         final var handler = new DiagramWebSocketHandler(
             properties,
-            diagramSessionTransportUseCase,
-            messageSender,
-            sessionResolver,
+            inboundMessageContextFactory,
             sessionLifecycle,
             messageDispatcher
         );
