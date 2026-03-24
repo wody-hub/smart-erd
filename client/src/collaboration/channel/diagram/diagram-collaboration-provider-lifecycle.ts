@@ -7,7 +7,7 @@ import { DiagramContentOnlySnapshotSeeder } from './diagram-content-only-snapsho
 import { DiagramCollaborationProviderEvents } from './diagram-collaboration-provider-events.js';
 import type { DiagramCollaborationBootstrap } from './diagram-collaboration-bootstrap.js';
 
-interface DiagramCollaborationProviderLifecycleOptions {
+export interface DiagramCollaborationProviderLifecycleOptions {
   ydoc: Y.Doc;
   bootstrap: DiagramCollaborationBootstrap;
   diagramId: string;

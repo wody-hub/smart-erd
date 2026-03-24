@@ -10,14 +10,12 @@ import type { DiagramDetail } from '@/types/diagram';
 import type { DiagramCollaborationBootstrap } from './diagram-collaboration-bootstrap.js';
 import { DiagramCollaborationPreviewPolicy } from './diagram-collaboration-preview-policy.js';
 import { DiagramCollaborationProviderLifecycle } from './diagram-collaboration-provider-lifecycle.js';
-import { DiagramCollaborationProviderBinding } from './diagram-collaboration-provider-binding.js';
-import { DiagramPreviewHydrationController } from './diagram-preview-hydration-controller.js';
 import { DiagramCollaborationTransport } from './diagram-collaboration-transport.js';
 import { DiagramContentOnlySnapshotSeeder } from './diagram-content-only-snapshot-seeder.js';
-import { DiagramCollaborationProviderEvents } from './diagram-collaboration-provider-events.js';
 import { useDiagramCollaborationStoreBridge } from './use-diagram-collaboration-store-bridge.js';
 import type { DiagramCollaborationStoreBridge } from './diagram-collaboration-store-bridge.js';
 import { DiagramYjsDocumentAdapter } from '@/collaboration/yjs/diagram-yjs-document-adapter';
+import { createDiagramCollaborationProviderLifecycle } from './create-diagram-collaboration-provider-lifecycle.js';
 
 /** WS 스냅샷이 도착하지 않을 때 JSON content로 폴백하기까지의 대기 시간 (ms) */
 const WS_SNAPSHOT_FALLBACK_MS = 5_000;
@@ -113,13 +111,7 @@ export function useDiagramCollaborationRuntime(
     }: CreateDiagramCollaborationProviderLifecycleArgs) => {
       const handoffStartedAt = performance.now();
       const handoffLogPrefix = `[useYjsCollaboration][diagramId=${diagramId}]`;
-      const providerEvents = new DiagramCollaborationProviderEvents({
-        storeBridge,
-        dispatchRuntimeEvent,
-        handoffLogPrefix,
-        handoffStartedAt,
-      });
-      const previewHydrationController = new DiagramPreviewHydrationController({
+      return createDiagramCollaborationProviderLifecycle({
         ydoc,
         bootstrap: collaborationBootstrap!,
         previewEnabled,
@@ -129,30 +121,15 @@ export function useDiagramCollaborationRuntime(
         documentAdapter,
         dispatchRuntimeEvent,
         updatePreviewMode,
-        loadPreview: storeBridge.loadPreview,
-        getConnectionStatus: providerEvents.getConnectionStatus,
-      });
-      const providerBinding = new DiagramCollaborationProviderBinding(
-        providerEvents.createBindingCallbacks((wsConnectedAt) => {
-          previewHydrationController.onConnected(wsConnectedAt);
-        }),
-      );
-      return new DiagramCollaborationProviderLifecycle({
-        ydoc,
-        bootstrap: collaborationBootstrap!,
         diagramId,
         teamId,
         projectId,
-        handoffStartedAt,
-        handoffLogPrefix,
+        storeBridge,
         onProviderReady,
         onProviderDisposed,
       }, {
         transport,
         contentOnlySnapshotSeeder,
-        previewHydrationController,
-        providerBinding,
-        providerEvents,
       });
     },
     [
