@@ -23,6 +23,7 @@ import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSnapshotSto
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
 import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
+import com.smarterd.domain.diagram.websocket.relay.DiagramHandoffSnapshotResponder;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
 import com.smarterd.domain.diagram.websocket.relay.DiagramPresenceNotifier;
@@ -233,8 +234,7 @@ class DiagramWebSocketFlowIntegrationTest {
             new YjsUpdateMessageHandler(diagramRealtimeSessionUseCase, messageSender),
             new AwarenessMessageHandler(objectMapper, messageSender),
             new SnapshotRequestMessageHandler(
-                loadCollaborationHandoffUseCase,
-                messageSender
+                new DiagramHandoffSnapshotResponder(loadCollaborationHandoffUseCase, messageSender)
             ),
             new CompactedSnapshotMessageHandler(new ApplyDiagramCompactedSnapshotUseCase(roomManager, snapshotService)),
             new PresenceSnapshotRequestMessageHandler(diagramRealtimeSessionUseCase)

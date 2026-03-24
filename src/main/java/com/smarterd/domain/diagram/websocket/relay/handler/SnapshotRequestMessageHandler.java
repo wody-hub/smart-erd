@@ -1,14 +1,11 @@
 package com.smarterd.domain.diagram.websocket.relay.handler;
 
-import com.smarterd.application.collaboration.query.LoadCollaborationHandoffUseCase;
-import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
+import com.smarterd.domain.diagram.websocket.relay.DiagramHandoffSnapshotResponder;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
-import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
@@ -19,7 +16,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
 
     private static final Set<Byte> SUPPORTED_TYPES = Set.of(
@@ -27,8 +23,7 @@ public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
         DiagramMessageTypes.MSG_SNAPSHOT_REQUEST_V2
     );
 
-    private final LoadCollaborationHandoffUseCase loadCollaborationHandoffUseCase;
-    private final DiagramMessageSender messageSender;
+    private final DiagramHandoffSnapshotResponder handoffSnapshotResponder;
 
     /**
      * {@inheritDoc}
@@ -45,84 +40,6 @@ public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
      */
     @Override
     public void handle(DiagramMessageContext context) {
-        final var startedAt = System.nanoTime();
-        try {
-            final var loadStartedAt = System.nanoTime();
-            final var handoff = loadCollaborationHandoffUseCase.loadHandoffSnapshot(context.resourceKey());
-            final var loadEndedAt = System.nanoTime();
-            final var messageType = context.messageType();
-            final var snapshot = handoff.snapshot();
-            final var snapshotSource = handoff.source();
-            if (snapshot.length == 0) {
-                log.info(
-                    "snapshot-handoff diagramId={} session={} mode={} source={} snapshotBytes=0 loadMs={} decodeMs=0 sendMs=0 totalMs={}",
-                    context.diagramId(),
-                    context.sessionId(),
-                    messageType == DiagramMessageTypes.MSG_SNAPSHOT_REQUEST_V2 ? "v2" : "v1",
-                    snapshotSource,
-                    nanosToMillis(loadEndedAt - loadStartedAt),
-                    nanosToMillis(System.nanoTime() - startedAt)
-                );
-                return;
-            }
-
-            if (messageType == DiagramMessageTypes.MSG_SNAPSHOT_REQUEST_V2) {
-                final var sendStartedAt = System.nanoTime();
-                messageSender.sendBinaryToSession(
-                    context.session(),
-                    messageSender.wrapMessage(DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE_V2, snapshot)
-                );
-                final var sendEndedAt = System.nanoTime();
-                log.info(
-                    "snapshot-handoff diagramId={} session={} mode=v2 source={} snapshotBytes={} updateCount=-1 sentUpdateBytes={} loadMs={} decodeMs=0 sendMs={} totalMs={}",
-                    context.diagramId(),
-                    context.sessionId(),
-                    snapshotSource,
-                    snapshot.length,
-                    snapshot.length,
-                    nanosToMillis(loadEndedAt - loadStartedAt),
-                    nanosToMillis(sendEndedAt - sendStartedAt),
-                    nanosToMillis(sendEndedAt - startedAt)
-                );
-                return;
-            }
-
-            // length-prefixed 포맷을 디코딩하여 개별 Yjs update를 각각 전송
-            final var decodeStartedAt = System.nanoTime();
-            final var updates = YjsUpdateFormat.decode(snapshot);
-            final var decodeEndedAt = System.nanoTime();
-            final var sendStartedAt = System.nanoTime();
-            final var sentBytes = messageSender.sendWrappedMessagesToSession(
-                context.session(),
-                DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE,
-                updates
-            );
-            final var sendEndedAt = System.nanoTime();
-            log.info(
-                "snapshot-handoff diagramId={} session={} mode=v1 source={} snapshotBytes={} updateCount={} sentUpdateBytes={} loadMs={} decodeMs={} sendMs={} totalMs={}",
-                context.diagramId(),
-                context.sessionId(),
-                snapshotSource,
-                snapshot.length,
-                updates.size(),
-                sentBytes,
-                nanosToMillis(loadEndedAt - loadStartedAt),
-                nanosToMillis(decodeEndedAt - decodeStartedAt),
-                nanosToMillis(sendEndedAt - sendStartedAt),
-                nanosToMillis(sendEndedAt - startedAt)
-            );
-        } catch (Exception e) {
-            log.error("스냅샷 전송 실패 (다이어그램 {})", context.diagramId(), e);
-        }
-    }
-
-    /**
-     * 나노초 단위를 밀리초로 변환한다.
-     *
-     * @param nanos 변환할 나노초 값
-     * @return 밀리초 값
-     */
-    private static long nanosToMillis(long nanos) {
-        return nanos / 1_000_000L;
+        handoffSnapshotResponder.respond(context);
     }
 }
