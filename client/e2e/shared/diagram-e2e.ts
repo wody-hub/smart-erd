@@ -146,6 +146,16 @@ function parseScale(transform: string): number {
   return Number.isFinite(values[0]) && values[0] > 0 ? values[0] : 1;
 }
 
+function resolveDefaultBackendRestartCommand(port: number): string {
+  if (port === 9501) {
+    return './bootRun-local.sh';
+  }
+  if (port === 9502) {
+    return './bootRun-test.sh';
+  }
+  return port === 9503 ? './bootRun-dev.sh' : `SERVER_PORT=${port} ./gradlew bootRun`;
+}
+
 async function waitForPortState(
   port: number,
   open: boolean,
@@ -250,7 +260,7 @@ export function getE2EConfig(): E2EConfig {
     frontendPort: frontendEndpoint.port,
     backendRestartCommand:
       process.env.SMART_ERD_E2E_BACKEND_RESTART_CMD ??
-      './gradlew bootRun --args="--spring.profiles.active=test"',
+      resolveDefaultBackendRestartCommand(backendEndpoint.port),
     repoDir,
     bootLogPath:
       process.env.SMART_ERD_E2E_BOOT_LOG_PATH ?? '/tmp/smart-erd-e2e-recovery-backend.log',
@@ -290,7 +300,7 @@ export function getE2EProvisioningConfig(): E2EConfig {
     frontendPort: frontendEndpoint.port,
     backendRestartCommand:
       process.env.SMART_ERD_E2E_BACKEND_RESTART_CMD ??
-      './gradlew bootRun --args="--spring.profiles.active=test"',
+      resolveDefaultBackendRestartCommand(backendEndpoint.port),
     repoDir,
     bootLogPath:
       process.env.SMART_ERD_E2E_BOOT_LOG_PATH ?? '/tmp/smart-erd-e2e-recovery-backend.log',
@@ -575,6 +585,26 @@ export async function clickBackup(page: Page): Promise<void> {
   const backupButton = await waitForEditableDiagram(page, 30_000);
   await backupButton.click();
   await delay(1_000);
+}
+
+export async function clickBackupAndWaitForPersistedDiagramSave(
+  page: Page,
+  target: DiagramTarget,
+  timeoutMs = 30_000,
+): Promise<void> {
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'PUT' &&
+      response.url().includes(
+        `/teams/${target.teamId}/projects/${target.projectId}/diagrams/${target.diagramId}`,
+      ) &&
+      response.status() >= 200 &&
+      response.status() < 300,
+    { timeout: timeoutMs },
+  );
+
+  await clickBackup(page);
+  await responsePromise;
 }
 
 export async function restartBackend(config: E2EConfig): Promise<number> {

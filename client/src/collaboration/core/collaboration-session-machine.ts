@@ -28,6 +28,7 @@ export function transitionCollaborationRuntimeState(
     case 'remote-snapshot-applied':
       return 'live';
     case 'fallback-timeout':
+    case 'setup-failed':
       return 'degraded';
     case 'disconnect':
       return 'degraded';

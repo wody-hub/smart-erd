@@ -9,34 +9,21 @@ import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { DiagramDetail } from '@/types/diagram';
 import type { DiagramCollaborationBootstrap } from './diagram-collaboration-bootstrap.js';
 import { DiagramCollaborationPreviewPolicy } from './diagram-collaboration-preview-policy.js';
-import { DiagramCollaborationProviderLifecycle } from './diagram-collaboration-provider-lifecycle.js';
 import { DiagramCollaborationTransport } from './diagram-collaboration-transport.js';
 import { DiagramContentOnlySnapshotSeeder } from './diagram-content-only-snapshot-seeder.js';
 import { useDiagramCollaborationStoreBridge } from './use-diagram-collaboration-store-bridge.js';
 import type { DiagramCollaborationStoreBridge } from './diagram-collaboration-store-bridge.js';
 import { DiagramYjsDocumentAdapter } from '@/collaboration/yjs/diagram-yjs-document-adapter';
 import { createDiagramCollaborationProviderLifecycle } from './create-diagram-collaboration-provider-lifecycle.js';
+import type {
+  CreateDiagramCollaborationProviderLifecycle,
+  DiagramCollaborationProviderLifecycleFactoryArgs as CreateDiagramCollaborationProviderLifecycleArgs,
+} from './diagram-collaboration-provider-factory.js';
 
 /** WS 스냅샷이 도착하지 않을 때 JSON content로 폴백하기까지의 대기 시간 (ms) */
 const WS_SNAPSHOT_FALLBACK_MS = 5_000;
 
-export interface CreateDiagramCollaborationProviderLifecycleArgs {
-  ydoc: Y.Doc;
-  diagramId: string;
-  teamId: string | undefined;
-  projectId: string | undefined;
-  updatePreviewMode: (next: boolean) => void;
-  onProviderReady: Parameters<
-    ConstructorParameters<typeof DiagramCollaborationProviderLifecycle>[0]['onProviderReady']
-  >[0] extends never
-    ? never
-    : ConstructorParameters<typeof DiagramCollaborationProviderLifecycle>[0]['onProviderReady'];
-  onProviderDisposed: () => void;
-}
-
-export type CreateDiagramCollaborationProviderLifecycle = (
-  args: CreateDiagramCollaborationProviderLifecycleArgs,
-) => DiagramCollaborationProviderLifecycle;
+export type { CreateDiagramCollaborationProviderLifecycle };
 
 interface UseDiagramCollaborationRuntimeReturn {
   collaborationBootstrap: DiagramCollaborationBootstrap | null;
@@ -46,6 +33,7 @@ interface UseDiagramCollaborationRuntimeReturn {
   storeBridge: DiagramCollaborationStoreBridge;
   resetRuntimeState: () => void;
   createProviderLifecycle: CreateDiagramCollaborationProviderLifecycle;
+  handleProviderSetupFailed: (error: unknown) => void;
 }
 
 /**
@@ -143,6 +131,11 @@ export function useDiagramCollaborationRuntime(
     ],
   );
 
+  const handleProviderSetupFailed = useCallback((_error: unknown) => {
+    storeBridge.setConnectionStatus('disconnected');
+    dispatchRuntimeEvent('setup-failed');
+  }, [dispatchRuntimeEvent, storeBridge]);
+
   return {
     collaborationBootstrap,
     previewSyncStatus,
@@ -151,5 +144,6 @@ export function useDiagramCollaborationRuntime(
     storeBridge,
     resetRuntimeState,
     createProviderLifecycle,
+    handleProviderSetupFailed,
   };
 }

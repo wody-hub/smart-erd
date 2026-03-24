@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 import { YjsProvider } from '@/collaboration/YjsProvider';
 import type { DiagramCollaborationBootstrap } from './diagram-collaboration-bootstrap.js';
-import type { CreateDiagramCollaborationProviderLifecycle } from './use-diagram-collaboration-runtime.js';
+import type { CreateDiagramCollaborationProviderLifecycle } from './diagram-collaboration-provider-factory.js';
 import { DiagramCollaborationProviderSession } from './diagram-collaboration-provider-session.js';
 
 interface UseDiagramCollaborationProviderOptions {
@@ -15,6 +15,7 @@ interface UseDiagramCollaborationProviderOptions {
   resetCollaboration: () => void;
   resetRuntimeState: () => void;
   createProviderLifecycle: CreateDiagramCollaborationProviderLifecycle;
+  onSetupFailed: (error: unknown) => void;
 }
 
 interface UseDiagramCollaborationProviderReturn {
@@ -35,6 +36,7 @@ export function useDiagramCollaborationProvider({
   resetCollaboration,
   resetRuntimeState,
   createProviderLifecycle,
+  onSetupFailed,
 }: UseDiagramCollaborationProviderOptions): UseDiagramCollaborationProviderReturn {
   const providerRef = useRef<YjsProvider | null>(null);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
@@ -44,6 +46,7 @@ export function useDiagramCollaborationProvider({
       return;
     }
 
+    let cancelled = false;
     const providerSession = new DiagramCollaborationProviderSession({
       collaborationBootstrap,
       diagramId,
@@ -56,15 +59,22 @@ export function useDiagramCollaborationProvider({
       createProviderLifecycle,
       updatePreviewMode: setIsPreviewMode,
       onProviderReady: (provider) => {
-        providerRef.current = provider;
+        providerRef.current = provider as YjsProvider;
       },
       onProviderDisposed: () => {
         providerRef.current = null;
       },
     });
-    void providerSession.setup();
+    void providerSession.setup().catch((error) => {
+      if (cancelled) {
+        return;
+      }
+      console.error('[useYjsCollaboration] provider session setup failed', error);
+      onSetupFailed(error);
+    });
 
     return () => {
+      cancelled = true;
       providerSession.dispose();
     };
   }, [
@@ -76,6 +86,7 @@ export function useDiagramCollaborationProvider({
     projectId,
     resetCollaboration,
     resetRuntimeState,
+    onSetupFailed,
     teamId,
   ]);
 

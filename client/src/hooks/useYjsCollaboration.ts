@@ -42,6 +42,7 @@ export function useYjsCollaboration(
     storeBridge,
     resetRuntimeState,
     createProviderLifecycle,
+    handleProviderSetupFailed,
   } = useDiagramCollaborationRuntime(diagram);
   const { providerRef, isPreviewMode } = useDiagramCollaborationProvider({
     collaborationBootstrap,
@@ -53,6 +54,7 @@ export function useYjsCollaboration(
     resetCollaboration: storeBridge.resetCollaboration,
     resetRuntimeState,
     createProviderLifecycle,
+    onSetupFailed: handleProviderSetupFailed,
   });
 
   // 스냅샷 크기 임계치 초과 + 단독 접속 시 자동 컴팩션

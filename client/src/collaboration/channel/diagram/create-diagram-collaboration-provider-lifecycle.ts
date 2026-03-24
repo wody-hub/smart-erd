@@ -1,14 +1,18 @@
 import { DiagramCollaborationProviderBinding } from './diagram-collaboration-provider-binding.js';
 import { DiagramPreviewHydrationController } from './diagram-preview-hydration-controller.js';
 import { DiagramCollaborationProviderEvents } from './diagram-collaboration-provider-events.js';
+import { DiagramCollaborationProviderConnection } from './diagram-collaboration-provider-connection.js';
+import { YjsProvider } from '@/collaboration/YjsProvider';
+import type { WsTicketIssueResponse, YjsProviderOptions } from '@/types/collaboration';
 import {
   DiagramCollaborationProviderLifecycle,
-  type DiagramCollaborationProviderLifecycleDependencies,
   type DiagramCollaborationProviderLifecycleOptions,
 } from './diagram-collaboration-provider-lifecycle.js';
 import type { CollaborationRuntimeEvent } from '../../core/collaboration-runtime-types.js';
 import type { DiagramCollaborationStoreBridge } from './diagram-collaboration-store-bridge.js';
 import type { DiagramYjsDocumentAdapter } from '@/collaboration/yjs/diagram-yjs-document-adapter';
+import type { DiagramCollaborationTransport } from './diagram-collaboration-transport.js';
+import type { DiagramContentOnlySnapshotSeeder } from './diagram-content-only-snapshot-seeder.js';
 
 export interface CreateDiagramCollaborationProviderLifecycleOptions
   extends DiagramCollaborationProviderLifecycleOptions {
@@ -18,6 +22,13 @@ export interface CreateDiagramCollaborationProviderLifecycleOptions
   dispatchRuntimeEvent: (event: CollaborationRuntimeEvent) => void;
   updatePreviewMode: (next: boolean) => void;
   storeBridge: DiagramCollaborationStoreBridge;
+  onProviderReady: (provider: YjsProvider) => void;
+  onProviderDisposed: () => void;
+}
+
+interface CreateDiagramCollaborationProviderLifecycleDependencies {
+  transport: DiagramCollaborationTransport;
+  contentOnlySnapshotSeeder: DiagramContentOnlySnapshotSeeder;
 }
 
 /**
@@ -25,10 +36,7 @@ export interface CreateDiagramCollaborationProviderLifecycleOptions
  */
 export function createDiagramCollaborationProviderLifecycle(
   options: CreateDiagramCollaborationProviderLifecycleOptions,
-  dependencies: Omit<
-    DiagramCollaborationProviderLifecycleDependencies,
-    'previewHydrationController' | 'providerBinding' | 'providerEvents'
-  >,
+  dependencies: CreateDiagramCollaborationProviderLifecycleDependencies,
 ): DiagramCollaborationProviderLifecycle {
   const providerEvents = new DiagramCollaborationProviderEvents({
     storeBridge: options.storeBridge,
@@ -54,11 +62,24 @@ export function createDiagramCollaborationProviderLifecycle(
       previewHydrationController.onConnected(wsConnectedAt);
     }),
   );
+  const providerConnection = new DiagramCollaborationProviderConnection<YjsProvider, WsTicketIssueResponse>(
+    {
+      ydoc: options.ydoc,
+      diagramId: options.diagramId,
+      onProviderReady: options.onProviderReady,
+      onProviderDisposed: options.onProviderDisposed,
+    },
+    {
+      transport: dependencies.transport,
+      providerBinding,
+      providerEvents,
+      createProvider: (doc, providerOptions) => new YjsProvider(doc, providerOptions as YjsProviderOptions),
+    },
+  );
 
   return new DiagramCollaborationProviderLifecycle(options, {
     ...dependencies,
     previewHydrationController,
-    providerBinding,
-    providerEvents,
+    providerConnection,
   });
 }

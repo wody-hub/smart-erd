@@ -1,11 +1,12 @@
 import * as Y from 'yjs';
-import { YjsProvider } from '@/collaboration/YjsProvider';
-import { DiagramCollaborationProviderBinding } from './diagram-collaboration-provider-binding.js';
 import { DiagramPreviewHydrationController } from './diagram-preview-hydration-controller.js';
-import { DiagramCollaborationTransport } from './diagram-collaboration-transport.js';
 import { DiagramContentOnlySnapshotSeeder } from './diagram-content-only-snapshot-seeder.js';
-import { DiagramCollaborationProviderEvents } from './diagram-collaboration-provider-events.js';
 import type { DiagramCollaborationBootstrap } from './diagram-collaboration-bootstrap.js';
+
+interface DiagramCollaborationProviderConnectionLike {
+  connect(): void;
+  dispose(): void;
+}
 
 export interface DiagramCollaborationProviderLifecycleOptions {
   ydoc: Y.Doc;
@@ -15,24 +16,18 @@ export interface DiagramCollaborationProviderLifecycleOptions {
   projectId: string | undefined;
   handoffStartedAt: number;
   handoffLogPrefix: string;
-  onProviderReady: (provider: YjsProvider) => void;
-  onProviderDisposed: () => void;
 }
 
 export interface DiagramCollaborationProviderLifecycleDependencies {
-  transport: DiagramCollaborationTransport;
   contentOnlySnapshotSeeder: DiagramContentOnlySnapshotSeeder;
   previewHydrationController: DiagramPreviewHydrationController;
-  providerBinding: DiagramCollaborationProviderBinding;
-  providerEvents: DiagramCollaborationProviderEvents;
+  providerConnection: DiagramCollaborationProviderConnectionLike;
 }
 
 /**
  * 다이어그램 채널의 YjsProvider 생성/연결/정리 수명주기를 캡슐화한다.
  */
 export class DiagramCollaborationProviderLifecycle {
-  private provider: YjsProvider | null = null;
-
   private isDisposed = false;
 
   constructor(
@@ -44,7 +39,7 @@ export class DiagramCollaborationProviderLifecycle {
    * content-only seed, preview hydration, provider 연결을 순서대로 수행한다.
    */
   async setup(): Promise<void> {
-    const { contentOnlySnapshotSeeder, previewHydrationController, transport, providerBinding, providerEvents } =
+    const { contentOnlySnapshotSeeder, previewHydrationController, providerConnection } =
       this.dependencies;
     try {
       const seedResult = await contentOnlySnapshotSeeder.seed({
@@ -74,21 +69,7 @@ export class DiagramCollaborationProviderLifecycle {
     }
 
     previewHydrationController.start();
-
-    this.provider = new YjsProvider(this.options.ydoc, {
-      diagramId: this.options.diagramId,
-      websocketPath: transport.websocketPath(this.options.diagramId),
-      getTicket: async () => {
-        providerEvents.markTicketRequested();
-        const ticket = await transport.issueTicket(this.options.diagramId);
-        providerEvents.logTicketIssued();
-        return ticket;
-      },
-    });
-
-    providerBinding.bind(this.provider);
-    this.provider.connect();
-    this.options.onProviderReady(this.provider);
+    providerConnection.connect();
   }
 
   /**
@@ -97,14 +78,6 @@ export class DiagramCollaborationProviderLifecycle {
   dispose(): void {
     this.isDisposed = true;
     this.dependencies.previewHydrationController.dispose();
-    try {
-      this.provider?.destroy();
-    } catch (error) {
-      console.error('[useYjsCollaboration] provider.destroy() 실패:', error);
-    } finally {
-      this.dependencies.providerBinding.dispose(this.provider);
-      this.provider = null;
-      this.options.onProviderDisposed();
-    }
+    this.dependencies.providerConnection.dispose();
   }
 }

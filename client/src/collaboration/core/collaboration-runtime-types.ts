@@ -17,6 +17,7 @@ export type CollaborationRuntimeEvent =
   | 'ws-connected'
   | 'remote-snapshot-applied'
   | 'fallback-timeout'
+  | 'setup-failed'
   | 'disconnect'
   | 'reconnect-start'
   | 'destroy';

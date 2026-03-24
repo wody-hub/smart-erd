@@ -38,10 +38,10 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 ### 백엔드
 
 ```bash
-./gradlew bootRun          # http://localhost:9503 (dev 기본, 현재 프로젝트 compose 기준 Docker PostgreSQL 자동 시작)
+./bootRun-dev.sh          # http://localhost:9503 (dev 기본, 현재 프로젝트 compose 기준 Docker PostgreSQL 자동 시작)
 ```
 
-### 백엔드 local / test 프로파일
+### 백엔드 프로파일별 기동
 
 `local` 프로파일은 Docker Compose 자동 기동을 끄고, 이미 실행 중인 PostgreSQL(`localhost:15432`)에 붙는다.
 `test` 프로파일은 테스트 지원 설정을 유지하면서 `9502` 포트로 기동한다.
@@ -49,8 +49,9 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 ```bash
 docker compose -f ../smart-erd/compose.yaml -p smart-erd up -d postgres  # 최초 1회 또는 DB가 내려가 있을 때만
 
-SERVER_PORT=9501 ./bootRun-local.sh   # http://localhost:9501
-./gradlew bootRun --args="--spring.profiles.active=test"   # http://localhost:9502
+./bootRun-local.sh   # http://localhost:9501
+./bootRun-test.sh    # http://localhost:9502
+./bootRun-dev.sh     # http://localhost:9503
 ```
 
 ### 프론트엔드
@@ -59,7 +60,7 @@ SERVER_PORT=9501 ./bootRun-local.sh   # http://localhost:9501
 cd client
 npm install
 npm run dev                # http://localhost:4503 (프록시 /api → :9503)
-npm run local              # http://localhost:4051 (프록시 /api → :9501)
+npm run local              # http://localhost:4501 (프록시 /api → :9501)
 npm run test:frontend      # http://localhost:4502 (프록시 /api → :9502)
 npm run perf:erd:apply     # S50/S200/S500 parse/apply/layout/total p50/p95 리포트 생성 (/tmp/smart-erd/perf)
 npm run perf:erd:apply:sample  # 저장소 샘플 리포트 갱신 (client/perf-reports/erd-apply-report.json)
@@ -88,11 +89,11 @@ npm run test:e2e:smoke:collaboration  # 협업 생성/undo 전파 스모크
 | `SMART_ERD_E2E_PROJECT_ID`                          | 고정 smoke/recovery 대상 프로젝트 ID                  | 자동 탐색                                 |
 | `SMART_ERD_E2E_DIAGRAM_ID`                          | 고정 smoke/recovery 대상 다이어그램 ID                | 자동 탐색                                 |
 | `SMART_ERD_E2E_BACKEND_PORT`                        | recovery 테스트가 재기동할 백엔드 포트                | `9502`                                    |
-| `SMART_ERD_E2E_BACKEND_RESTART_CMD`                 | recovery 테스트 백엔드 재기동 명령                    | `./gradlew bootRun --args="--spring.profiles.active=test"` |
+| `SMART_ERD_E2E_BACKEND_RESTART_CMD`                 | recovery 테스트 백엔드 재기동 명령                    | 포트 기준 기본값 사용 (`9501`=`./bootRun-local.sh`, `9502`=`./bootRun-test.sh`, `9503`=`./bootRun-dev.sh`) |
 | `SMART_ERD_E2E_BOOT_LOG_PATH`                       | recovery 재기동 로그 파일 경로                        | `/tmp/smart-erd-e2e-recovery-backend.log` |
 | `SMART_ERD_E2E_BROWSER_CHANNEL`                     | Playwright 브라우저 채널 강제값 (`chrome` 등)         | Playwright 기본 Chromium                  |
-| `SERVER_PORT`                                       | `bootRun-local.sh`가 사용할 local 백엔드 포트         | `9501`                                    |
-| `VITE_DEV_SERVER_PORT`                              | Vite 개발 서버 포트                                   | `4503` (`frontend-local`은 `4051`, `frontend-test`는 `4502`) |
+| `SERVER_PORT`                                       | `bootRun-*.sh`가 사용할 백엔드 포트                   | 프로파일별 기본값 사용                    |
+| `VITE_DEV_SERVER_PORT`                              | Vite 개발 서버 포트                                   | `4503` (`frontend-local`은 `4501`, `frontend-test`는 `4502`) |
 | `VITE_API_PROXY_TARGET`                             | Vite `/api` 프록시 대상                               | `http://localhost:9503`                   |
 | `VITE_WS_PROXY_TARGET`                              | Vite `/ws` 프록시 대상                                | `ws://localhost:9503`                     |
 
@@ -118,10 +119,10 @@ npm run test:e2e:smoke
 - 목적: 서로 다른 브라우저 컨텍스트 간 생성/undo 전파가 유지되는지 확인
 - 범위: 로그인, 동일 다이어그램 동시 접속, 테이블 생성 전파, undo 전파
 - 권장 시점: Yjs, websocket, history/undo, collaboration 관련 수정 후
-- 주의: `test` 프로파일에서 로그인 비밀번호 검증을 우회하려면 백엔드를 `SPRING_PROFILES_ACTIVE=test`로 띄운다.
+- 주의: `test` 프로파일에서 로그인 비밀번호 검증을 우회하려면 백엔드를 `./bootRun-test.sh`로 띄운다.
 
 ```bash
-SPRING_PROFILES_ACTIVE=test ./gradlew bootRun
+./bootRun-test.sh
 
 cd client
 SMART_ERD_E2E_LOGIN='your-login-id' \
@@ -1073,7 +1074,7 @@ decorator:
 
 smart-erd:
     cors:
-        allowed-origins: http://localhost:4051, http://localhost:4502, http://localhost:4503
+        allowed-origins: http://localhost:4501, http://localhost:4502, http://localhost:4503
     jwt:
         secret: ${SMART_ERD_JWT_SECRET:기본값}
         access-expiration: 1800000 # 30분 (ms)
@@ -1106,7 +1107,7 @@ annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
 
 ```bash
 # 백엔드
-./gradlew bootRun            # 개발 서버 기동 (:9503, Docker PostgreSQL 자동 시작)
+./bootRun-dev.sh            # 개발 서버 기동 (:9503, Docker PostgreSQL 자동 시작)
 ./gradlew build              # 전체 빌드 (컴파일 + 테스트)
 ./gradlew test               # 테스트 실행
 ./gradlew compileJava        # 컴파일만 (QueryDSL/Lombok AP 트리거)
