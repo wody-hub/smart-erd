@@ -9,6 +9,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.smarterd.config.websocket.WebSocketProperties;
+import com.smarterd.application.diagram.command.CompleteDiagramSessionJoinUseCase;
+import com.smarterd.application.diagram.command.CompleteDiagramSessionLeaveUseCase;
+import com.smarterd.application.diagram.command.FlushDiagramDrainedUpdatesUseCase;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeyFactory;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSessionMetadataPolicy;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
@@ -239,7 +242,14 @@ class DiagramWebSocketHandlerTest {
         final var snapshotService = mock(DiagramSnapshotService.class);
         final var messageSender = mock(DiagramMessageSender.class);
         final var presenceNotifier = mock(DiagramPresenceNotifier.class);
-        final var sessionLifecycle = new DiagramWebSocketSessionLifecycle(roomManager, snapshotService, presenceNotifier);
+        final var sessionLifecycle = new DiagramWebSocketSessionLifecycle(
+            roomManager,
+            new CompleteDiagramSessionJoinUseCase(presenceNotifier),
+            new CompleteDiagramSessionLeaveUseCase(
+                presenceNotifier,
+                new FlushDiagramDrainedUpdatesUseCase(roomManager, snapshotService)
+            )
+        );
         final var messageDispatcher = new DiagramWebSocketMessageDispatcher(new ArrayList<>(handlers));
         final var resourceKeyFactory = new DiagramCollaborationResourceKeyFactory();
         final var sessionResolver = new DiagramWebSocketSessionResolver(

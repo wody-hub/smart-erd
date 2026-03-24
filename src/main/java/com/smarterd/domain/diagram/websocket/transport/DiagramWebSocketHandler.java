@@ -119,7 +119,15 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
             return;
         }
 
-        final var context = new DiagramMessageContext(session, info, message, payload);
+        final var context = new DiagramMessageContext(
+            session,
+            info.resourceKey(),
+            info.diagramId(),
+            info.loginId(),
+            info.userId(),
+            message,
+            payload
+        );
         messageDispatcher.dispatch(context);
     }
 

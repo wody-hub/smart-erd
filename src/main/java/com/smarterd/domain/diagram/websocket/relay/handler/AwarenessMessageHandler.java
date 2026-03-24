@@ -41,8 +41,7 @@ public class AwarenessMessageHandler implements DiagramMessageHandler {
      */
     @Override
     public void handle(DiagramMessageContext context) {
-        final var sessionInfo = context.sessionInfo();
-        if (isAwarenessValid(context.payload(), sessionInfo.loginId(), sessionInfo.userId())) {
+        if (isAwarenessValid(context.payload(), context.loginId(), context.userId())) {
             messageSender.broadcastToRoom(context.diagramId(), context.session(), context.message());
         }
     }

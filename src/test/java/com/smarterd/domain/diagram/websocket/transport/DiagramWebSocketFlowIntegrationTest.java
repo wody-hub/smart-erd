@@ -8,6 +8,11 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.application.collaboration.query.LoadCollaborationHandoffUseCase;
+import com.smarterd.application.diagram.command.ApplyDiagramCompactedSnapshotUseCase;
+import com.smarterd.application.diagram.command.CompleteDiagramSessionJoinUseCase;
+import com.smarterd.application.diagram.command.CompleteDiagramSessionLeaveUseCase;
+import com.smarterd.application.diagram.command.DiagramRealtimeSessionUseCase;
+import com.smarterd.application.diagram.command.FlushDiagramDrainedUpdatesUseCase;
 import com.smarterd.collaboration.channel.DefaultCollaborationRuntimeSupportRegistry;
 import com.smarterd.config.websocket.WebSocketProperties;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationHandoffPolicy;
@@ -195,10 +200,14 @@ class DiagramWebSocketFlowIntegrationTest {
         final var objectMapper = new ObjectMapper();
         final var messageSender = new DiagramMessageSender(roomManager, objectMapper);
         final var presenceNotifier = new DiagramPresenceNotifier(roomManager, messageSender);
+        final var diagramRealtimeSessionUseCase = new DiagramRealtimeSessionUseCase(roomManager, presenceNotifier);
         final var sessionLifecycle = new DiagramWebSocketSessionLifecycle(
             roomManager,
-            snapshotService,
-            presenceNotifier
+            new CompleteDiagramSessionJoinUseCase(presenceNotifier),
+            new CompleteDiagramSessionLeaveUseCase(
+                presenceNotifier,
+                new FlushDiagramDrainedUpdatesUseCase(roomManager, snapshotService)
+            )
         );
         final var resourceKeyFactory = new DiagramCollaborationResourceKeyFactory();
         final var diagramRuntimeSupport = new DiagramCollaborationRuntimeSupport(
@@ -215,15 +224,14 @@ class DiagramWebSocketFlowIntegrationTest {
 
         final var handlers = List.<DiagramMessageHandler>of(
             new SyncRelayMessageHandler(messageSender),
-            new YjsUpdateMessageHandler(roomManager, messageSender),
+            new YjsUpdateMessageHandler(diagramRealtimeSessionUseCase, messageSender),
             new AwarenessMessageHandler(objectMapper, messageSender),
             new SnapshotRequestMessageHandler(
-                roomManager,
                 loadCollaborationHandoffUseCase,
                 messageSender
             ),
-            new CompactedSnapshotMessageHandler(roomManager, snapshotService),
-            new PresenceSnapshotRequestMessageHandler(roomManager, presenceNotifier)
+            new CompactedSnapshotMessageHandler(new ApplyDiagramCompactedSnapshotUseCase(roomManager, snapshotService)),
+            new PresenceSnapshotRequestMessageHandler(diagramRealtimeSessionUseCase)
         );
         final var messageDispatcher = new DiagramWebSocketMessageDispatcher(handlers);
 

@@ -1,7 +1,7 @@
 package com.smarterd.domain.diagram.websocket.transport;
 
-import com.smarterd.domain.diagram.service.DiagramSnapshotService;
-import com.smarterd.domain.diagram.websocket.relay.DiagramPresenceNotifier;
+import com.smarterd.application.diagram.command.CompleteDiagramSessionJoinUseCase;
+import com.smarterd.application.diagram.command.CompleteDiagramSessionLeaveUseCase;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionInfo;
 import java.util.Objects;
@@ -21,8 +21,8 @@ import org.springframework.web.socket.WebSocketSession;
 public class DiagramWebSocketSessionLifecycle {
 
     private final DiagramRoomManager roomManager;
-    private final DiagramSnapshotService snapshotService;
-    private final DiagramPresenceNotifier presenceNotifier;
+    private final CompleteDiagramSessionJoinUseCase completeDiagramSessionJoinUseCase;
+    private final CompleteDiagramSessionLeaveUseCase completeDiagramSessionLeaveUseCase;
 
     /**
      * 세션을 방에 입장시키고 presence 초기 메시지를 전송한다.
@@ -40,18 +40,7 @@ public class DiagramWebSocketSessionLifecycle {
             }
             return;
         }
-
-        presenceNotifier.sendPresenceSnapshotToSession(session, info.diagramId(), joinResult.snapshot());
-
-        if (joinResult.joinedParticipant() != null && joinResult.snapshot() != null) {
-            presenceNotifier.broadcastPeerJoined(
-                Objects.requireNonNull(info.diagramId()),
-                session,
-                joinResult.snapshot().roomEpoch(),
-                joinResult.joinedPresenceVersion(),
-                joinResult.joinedParticipant()
-            );
-        }
+        completeDiagramSessionJoinUseCase.complete(session, info, joinResult);
     }
 
     /**
@@ -70,41 +59,6 @@ public class DiagramWebSocketSessionLifecycle {
         }
 
         final var result = roomManager.leave(diagramId, session, userId);
-
-        if (result.leftUserId() != null && result.roomEpoch() != null) {
-            presenceNotifier.broadcastPeerLeft(
-                Objects.requireNonNull(diagramId),
-                session,
-                result.roomEpoch(),
-                result.leftPresenceVersion(),
-                result.leftUserId()
-            );
-            if (info != null) {
-                presenceNotifier.broadcastPeerLeftLegacy(Objects.requireNonNull(diagramId), session, info.loginId());
-            }
-        }
-
-        if (!result.roomEmpty()) {
-            return;
-        }
-
-        snapshotService.clearCompactionCoolDown(diagramId);
-        try {
-            if (result.drainedUpdates().length > 0) {
-                synchronized (roomManager.getFlushLock(diagramId)) {
-                    try {
-                        snapshotService.saveSnapshotWithUpdates(diagramId, result.drainedUpdates());
-                    } catch (Exception e) {
-                        final var restored = roomManager.restoreUpdates(diagramId, result.drainedUpdates());
-                        if (!restored) {
-                            log.error("연결 종료 flush 실패 후 update 복원 실패 (diagramId={})", diagramId);
-                        }
-                        log.error("연결 종료 flush 실패, drain된 update 복원 (diagramId={})", diagramId, e);
-                    }
-                }
-            }
-        } finally {
-            roomManager.removeFlushLock(diagramId);
-        }
+        completeDiagramSessionLeaveUseCase.complete(session, info, Objects.requireNonNull(diagramId), result);
     }
 }

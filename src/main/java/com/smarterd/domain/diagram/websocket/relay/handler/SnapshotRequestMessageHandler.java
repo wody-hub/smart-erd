@@ -6,12 +6,10 @@ import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
-import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.BinaryMessage;
 
 /**
  * 스냅샷 재전송 요청 처리기.
@@ -29,7 +27,6 @@ public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
         DiagramMessageTypes.MSG_SNAPSHOT_REQUEST_V2
     );
 
-    private final DiagramRoomManager roomManager;
     private final LoadCollaborationHandoffUseCase loadCollaborationHandoffUseCase;
     private final DiagramMessageSender messageSender;
 
@@ -60,7 +57,7 @@ public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
                 log.info(
                     "snapshot-handoff diagramId={} session={} mode={} source={} snapshotBytes=0 loadMs={} decodeMs=0 sendMs=0 totalMs={}",
                     context.diagramId(),
-                    context.session().getId(),
+                    context.sessionId(),
                     messageType == DiagramMessageTypes.MSG_SNAPSHOT_REQUEST_V2 ? "v2" : "v1",
                     snapshotSource,
                     nanosToMillis(loadEndedAt - loadStartedAt),
@@ -79,7 +76,7 @@ public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
                 log.info(
                     "snapshot-handoff diagramId={} session={} mode=v2 source={} snapshotBytes={} updateCount=-1 sentUpdateBytes={} loadMs={} decodeMs=0 sendMs={} totalMs={}",
                     context.diagramId(),
-                    context.session().getId(),
+                    context.sessionId(),
                     snapshotSource,
                     snapshot.length,
                     snapshot.length,
@@ -94,26 +91,17 @@ public class SnapshotRequestMessageHandler implements DiagramMessageHandler {
             final var decodeStartedAt = System.nanoTime();
             final var updates = YjsUpdateFormat.decode(snapshot);
             final var decodeEndedAt = System.nanoTime();
-            var sentBytes = 0;
             final var sendStartedAt = System.nanoTime();
-            final var lock = roomManager.getSessionLock(context.session());
-            synchronized (lock) {
-                for (final var update : updates) {
-                    sentBytes += update.length;
-                    context
-                        .session()
-                        .sendMessage(
-                            new BinaryMessage(
-                                messageSender.wrapMessage(DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE, update)
-                            )
-                        );
-                }
-            }
+            final var sentBytes = messageSender.sendWrappedMessagesToSession(
+                context.session(),
+                DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE,
+                updates
+            );
             final var sendEndedAt = System.nanoTime();
             log.info(
                 "snapshot-handoff diagramId={} session={} mode=v1 source={} snapshotBytes={} updateCount={} sentUpdateBytes={} loadMs={} decodeMs={} sendMs={} totalMs={}",
                 context.diagramId(),
-                context.session().getId(),
+                context.sessionId(),
                 snapshotSource,
                 snapshot.length,
                 updates.size(),

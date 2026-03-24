@@ -1,10 +1,9 @@
 package com.smarterd.domain.diagram.websocket.relay.handler;
 
+import com.smarterd.application.diagram.command.DiagramRealtimeSessionUseCase;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
-import com.smarterd.domain.diagram.websocket.relay.DiagramPresenceNotifier;
-import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,8 +21,7 @@ public class PresenceSnapshotRequestMessageHandler implements DiagramMessageHand
 
     private static final Set<Byte> SUPPORTED_TYPES = Set.of(DiagramMessageTypes.MSG_PRESENCE_SNAPSHOT_REQUEST);
 
-    private final DiagramRoomManager roomManager;
-    private final DiagramPresenceNotifier presenceNotifier;
+    private final DiagramRealtimeSessionUseCase diagramRealtimeSessionUseCase;
 
     /**
      * {@inheritDoc}
@@ -40,10 +38,9 @@ public class PresenceSnapshotRequestMessageHandler implements DiagramMessageHand
      */
     @Override
     public void handle(DiagramMessageContext context) {
-        if (!roomManager.allowPresenceSnapshotRequest(context.session())) {
-            log.warn("Presence snapshot request rate limit 초과 (세션 {})", context.session().getId());
+        if (!diagramRealtimeSessionUseCase.requestPresenceSnapshot(context.session(), context.diagramId())) {
+            log.warn("Presence snapshot request rate limit 초과 (세션 {})", context.sessionId());
             return;
         }
-        presenceNotifier.sendPresenceSnapshotToSession(context.session(), context.diagramId(), null);
     }
 }

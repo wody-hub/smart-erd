@@ -1,7 +1,6 @@
 package com.smarterd.domain.diagram.websocket.relay;
 
 import com.smarterd.collaboration.channel.CollaborationResourceKey;
-import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionInfo;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -10,33 +9,48 @@ import org.springframework.web.socket.WebSocketSession;
  *
  * <p>핸들러는 이 컨텍스트만으로 인증 사용자, room 식별자, 원본 메시지 바이트에 접근할 수 있다.</p>
  *
- * @param session     WebSocket 세션
- * @param sessionInfo 세션 메타데이터
- * @param message     원본 바이너리 메시지
- * @param payload     원본 payload 바이트
+ * @param session WebSocket 세션
+ * @param resourceKey 협업 리소스 key
+ * @param diagramId 다이어그램 ID
+ * @param loginId 인증 loginId
+ * @param userId 인증 userId
+ * @param message 원본 바이너리 메시지
+ * @param payload 원본 payload 바이트
  */
 public record DiagramMessageContext(
     WebSocketSession session,
-    DiagramWebSocketSessionInfo sessionInfo,
+    CollaborationResourceKey resourceKey,
+    Long diagramId,
+    String loginId,
+    String userId,
     BinaryMessage message,
     byte[] payload
 ) {
     /**
-     * 컨텍스트가 가리키는 협업 리소스 key를 반환한다.
+     * 컨텍스트의 세션 ID를 반환한다.
      *
-     * @return 협업 리소스 key
+     * @return 세션 ID
      */
-    public CollaborationResourceKey resourceKey() {
-        return sessionInfo.resourceKey();
+    public String sessionId() {
+        return session.getId();
     }
 
     /**
-     * 컨텍스트가 가리키는 다이어그램 ID를 반환한다.
+     * 컨텍스트의 인증 loginId를 반환한다.
      *
-     * @return 다이어그램 ID
+     * @return loginId
      */
-    public Long diagramId() {
-        return sessionInfo.diagramId();
+    public String loginId() {
+        return loginId;
+    }
+
+    /**
+     * 컨텍스트의 인증 userId를 반환한다.
+     *
+     * @return userId
+     */
+    public String userId() {
+        return userId;
     }
 
     /**
