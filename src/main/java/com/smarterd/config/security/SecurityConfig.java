@@ -1,7 +1,8 @@
 package com.smarterd.config.security;
 
-import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeyFactory;
+import com.smarterd.collaboration.channel.CollaborationEndpointSupport;
 import com.smarterd.utils.AppStringUtils;
+import java.util.List;
 import java.util.LinkedHashSet;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -29,7 +30,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
  * <ul>
  *   <li>{@code /api/auth/**} — 로그인·회원가입·토큰 갱신·로그아웃</li>
  *   <li>{@code /swagger-ui/**, /v3/api-docs/**} — Swagger UI 및 OpenAPI 스펙</li>
- *   <li>{@code /ws/diagram/**} — WebSocket 엔드포인트 (JWT 인증은 핸드셰이크 인터셉터에서 처리)</li>
+ *   <li>등록된 협업 WebSocket 엔드포인트 — JWT 인증은 핸드셰이크 인터셉터에서 처리</li>
  * </ul></p>
  */
 @Configuration
@@ -42,6 +43,8 @@ public class SecurityConfig {
     private final CorsConfigurationSource corsConfigurationSource;
     /** 인증 보안 프로퍼티 */
     private final AuthSecurityProperties authSecurityProperties;
+    /** 등록된 채널 endpoint support */
+    private final List<CollaborationEndpointSupport> endpointSupports;
 
     /**
      * HTTP 보안 필터 체인을 구성한다.
@@ -71,17 +74,17 @@ public class SecurityConfig {
                     // [ZAP] HSTS — HTTPS 연결에서만 헤더가 적용된다.
                     .httpStrictTransportSecurity((hsts) -> hsts.maxAgeInSeconds(31536000).includeSubDomains(true))
             )
-            .authorizeHttpRequests((auth) ->
+            .authorizeHttpRequests((auth) -> {
                 auth
                     .requestMatchers("/api/auth/**")
                     .permitAll()
                     .requestMatchers("/swagger-ui/**", "/v3/api-docs/**")
-                    .permitAll()
-                    .requestMatchers(DiagramCollaborationResourceKeyFactory.WEBSOCKET_SECURITY_PATTERN)
-                    .permitAll()
-                    .anyRequest()
-                    .authenticated()
-            )
+                    .permitAll();
+                for (final var endpointSupport : endpointSupports) {
+                    auth.requestMatchers(endpointSupport.websocketSecurityPattern()).permitAll();
+                }
+                auth.anyRequest().authenticated();
+            })
             .oauth2ResourceServer((oauth2) -> oauth2.jwt(Customizer.withDefaults()));
 
         return http.build();

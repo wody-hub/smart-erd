@@ -19,12 +19,6 @@ public class DiagramCollaborationResourceKeyFactory implements CollaborationReso
     /** 다이어그램 WebSocket 경로 패턴 */
     public static final String WEBSOCKET_PATH_PATTERN = "/ws/diagram/{diagramId}";
 
-    /** 다이어그램 WebSocket 핸들러 등록 패턴 */
-    public static final String WEBSOCKET_HANDLER_PATTERN = "/ws/diagram/*";
-
-    /** 다이어그램 WebSocket 보안 허용 패턴 */
-    public static final String WEBSOCKET_SECURITY_PATTERN = "/ws/diagram/**";
-
     /**
      * {@inheritDoc}
      */
