@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import * as Y from 'yjs';
+import type * as Y from 'yjs';
 import { YjsProvider } from '@/collaboration/YjsProvider';
 import type { DiagramCollaborationBootstrap } from './diagram-collaboration-bootstrap.js';
 import type { CreateDiagramCollaborationProviderLifecycle } from './use-diagram-collaboration-runtime.js';
+import { DiagramCollaborationProviderSession } from './diagram-collaboration-provider-session.js';
 
 interface UseDiagramCollaborationProviderOptions {
   collaborationBootstrap: DiagramCollaborationBootstrap | null;
@@ -43,13 +44,16 @@ export function useDiagramCollaborationProvider({
       return;
     }
 
-    const ydoc = new Y.Doc();
-    initYDoc(ydoc);
-    const providerLifecycle = createProviderLifecycle({
-      ydoc,
+    const providerSession = new DiagramCollaborationProviderSession({
+      collaborationBootstrap,
       diagramId,
       teamId,
       projectId,
+      initYDoc,
+      destroyYDoc,
+      resetCollaboration,
+      resetRuntimeState,
+      createProviderLifecycle,
       updatePreviewMode: setIsPreviewMode,
       onProviderReady: (provider) => {
         providerRef.current = provider;
@@ -58,13 +62,10 @@ export function useDiagramCollaborationProvider({
         providerRef.current = null;
       },
     });
-    void providerLifecycle.setup();
+    void providerSession.setup();
 
     return () => {
-      resetRuntimeState();
-      providerLifecycle.dispose();
-      destroyYDoc();
-      resetCollaboration();
+      providerSession.dispose();
     };
   }, [
     collaborationBootstrap,
