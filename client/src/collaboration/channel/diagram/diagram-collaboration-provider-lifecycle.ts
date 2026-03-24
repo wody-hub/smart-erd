@@ -1,20 +1,14 @@
 import * as Y from 'yjs';
 import { YjsProvider } from '@/collaboration/YjsProvider';
 import type { CollaborationRuntimeEvent } from '@/collaboration/core/collaboration-runtime-types';
-import type {
-  AwarenessState,
-  ConnectionStatus,
-  PresenceMode,
-  PresencePeerJoinedPayload,
-  PresencePeerLeftPayload,
-  PresenceSnapshotPayload,
-} from '@/types/collaboration';
-import { DiagramCollaborationProviderBinding } from '@/collaboration/channel/diagram/diagram-collaboration-provider-binding';
-import { DiagramPreviewHydrationController } from '@/collaboration/channel/diagram/diagram-preview-hydration-controller';
-import { DiagramCollaborationTransport } from '@/collaboration/channel/diagram/diagram-collaboration-transport';
-import { DiagramContentOnlySnapshotSeeder } from '@/collaboration/channel/diagram/diagram-content-only-snapshot-seeder';
+import { DiagramCollaborationProviderBinding } from './diagram-collaboration-provider-binding.js';
+import { DiagramPreviewHydrationController } from './diagram-preview-hydration-controller.js';
+import { DiagramCollaborationTransport } from './diagram-collaboration-transport.js';
+import { DiagramContentOnlySnapshotSeeder } from './diagram-content-only-snapshot-seeder.js';
+import { DiagramCollaborationProviderEvents } from './diagram-collaboration-provider-events.js';
+import type { DiagramCollaborationStoreBridge } from './diagram-collaboration-store-bridge.js';
 import type { DiagramYjsDocumentAdapter } from '@/collaboration/yjs/diagram-yjs-document-adapter';
-import type { DiagramCollaborationBootstrap } from '@/collaboration/channel/diagram/diagram-collaboration-bootstrap';
+import type { DiagramCollaborationBootstrap } from './diagram-collaboration-bootstrap.js';
 
 interface DiagramCollaborationProviderLifecycleOptions {
   ydoc: Y.Doc;
@@ -29,16 +23,7 @@ interface DiagramCollaborationProviderLifecycleOptions {
   documentAdapter: DiagramYjsDocumentAdapter;
   dispatchRuntimeEvent: (event: CollaborationRuntimeEvent) => void;
   updatePreviewMode: (next: boolean) => void;
-  loadPreview: (content: string) => void;
-  setConnectionStatus: (status: ConnectionStatus) => void;
-  setPresenceMode: (mode: PresenceMode) => void;
-  setSelfUserId: (userId: string) => void;
-  applyPresenceSnapshot: (payload: PresenceSnapshotPayload) => void;
-  applyPeerJoined: (payload: PresencePeerJoinedPayload) => void;
-  applyPeerLeft: (payload: PresencePeerLeftPayload) => void;
-  updateAwareness: (clientId: number, state: AwarenessState | null) => void;
-  removePeerByUserId: (userId: string) => void;
-  removePeerByLoginId: (loginId: string) => void;
+  storeBridge: DiagramCollaborationStoreBridge;
   onProviderReady: (provider: YjsProvider) => void;
   onProviderDisposed: () => void;
 }
@@ -55,20 +40,22 @@ export class DiagramCollaborationProviderLifecycle {
 
   private readonly providerBinding: DiagramCollaborationProviderBinding;
 
+  private readonly providerEvents: DiagramCollaborationProviderEvents;
+
   private provider: YjsProvider | null = null;
 
   private isDisposed = false;
-
-  private currentConnectionStatus: ConnectionStatus = 'connecting';
-
-  private ticketRequestedAt: number | null = null;
-
-  private wsConnectedAt: number | null = null;
 
   constructor(
     private readonly options: DiagramCollaborationProviderLifecycleOptions,
   ) {
     this.contentOnlySnapshotSeeder = new DiagramContentOnlySnapshotSeeder(options.documentAdapter);
+    this.providerEvents = new DiagramCollaborationProviderEvents({
+      storeBridge: options.storeBridge,
+      dispatchRuntimeEvent: options.dispatchRuntimeEvent,
+      handoffLogPrefix: options.handoffLogPrefix,
+      handoffStartedAt: options.handoffStartedAt,
+    });
     this.previewHydrationController = new DiagramPreviewHydrationController({
       ydoc: options.ydoc,
       bootstrap: options.bootstrap,
@@ -79,54 +66,14 @@ export class DiagramCollaborationProviderLifecycle {
       documentAdapter: options.documentAdapter,
       dispatchRuntimeEvent: options.dispatchRuntimeEvent,
       updatePreviewMode: options.updatePreviewMode,
-      loadPreview: options.loadPreview,
-      getConnectionStatus: () => this.currentConnectionStatus,
+      loadPreview: options.storeBridge.loadPreview,
+      getConnectionStatus: this.providerEvents.getConnectionStatus,
     });
-    this.providerBinding = new DiagramCollaborationProviderBinding({
-      onConnectionStatusChange: (status) => {
-        this.currentConnectionStatus = status;
-        this.options.setConnectionStatus(status);
-        if (status === 'connecting' && this.wsConnectedAt !== null) {
-          this.options.dispatchRuntimeEvent('reconnect-start');
-        }
-        if (status === 'disconnected') {
-          this.options.dispatchRuntimeEvent('disconnect');
-        }
-        if (status === 'connected') {
-          this.options.dispatchRuntimeEvent('ws-connected');
-          this.wsConnectedAt = performance.now();
-          console.info(
-            '%s ws-connected totalMs=%d afterTicketMs=%s',
-            this.options.handoffLogPrefix,
-            Math.round(this.wsConnectedAt - this.options.handoffStartedAt),
-            this.ticketRequestedAt === null ? 'n/a' : Math.round(this.wsConnectedAt - this.ticketRequestedAt),
-          );
-          this.previewHydrationController.onConnected(this.wsConnectedAt);
-        }
-      },
-      onIdentityResolved: (userId) => {
-        this.options.setSelfUserId(userId);
-      },
-      onPresenceModeChange: (mode) => {
-        this.options.setPresenceMode(mode);
-      },
-      onPresenceSnapshot: (payload) => {
-        this.options.applyPresenceSnapshot(payload);
-      },
-      onPresencePeerJoined: (payload) => {
-        this.options.applyPeerJoined(payload);
-      },
-      onPresencePeerLeft: (payload) => {
-        this.options.applyPeerLeft(payload);
-        this.options.removePeerByUserId(payload.userId);
-      },
-      onAwarenessReceived: (clientId, state) => {
-        this.options.updateAwareness(clientId, state);
-      },
-      onPeerLeft: (loginId) => {
-        this.options.removePeerByLoginId(loginId);
-      },
-    });
+    this.providerBinding = new DiagramCollaborationProviderBinding(
+      this.providerEvents.createBindingCallbacks((wsConnectedAt) => {
+        this.previewHydrationController.onConnected(wsConnectedAt);
+      }),
+    );
   }
 
   /**
@@ -166,15 +113,9 @@ export class DiagramCollaborationProviderLifecycle {
       diagramId: this.options.diagramId,
       websocketPath: this.transport.websocketPath(this.options.diagramId),
       getTicket: async () => {
-        this.ticketRequestedAt = performance.now();
+        this.providerEvents.markTicketRequested();
         const ticket = await this.transport.issueTicket(this.options.diagramId);
-        const ticketResolvedAt = performance.now();
-        console.info(
-          '%s ticket-issued ms=%d totalMs=%d',
-          this.options.handoffLogPrefix,
-          Math.round(ticketResolvedAt - this.ticketRequestedAt),
-          Math.round(ticketResolvedAt - this.options.handoffStartedAt),
-        );
+        this.providerEvents.logTicketIssued();
         return ticket;
       },
     });

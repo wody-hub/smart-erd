@@ -1,23 +1,5 @@
-import type {
-  ConnectionStatus,
-  PresenceMode,
-  PresencePeerJoinedPayload,
-  PresencePeerLeftPayload,
-  PresenceSnapshotPayload,
-  AwarenessState,
-} from '@/types/collaboration';
+import type { DiagramCollaborationProviderBindingCallbacks } from './diagram-collaboration-provider-callbacks.js';
 import { YjsProvider } from '@/collaboration/YjsProvider';
-
-export interface DiagramCollaborationProviderBindingCallbacks {
-  onConnectionStatusChange: (status: ConnectionStatus) => void;
-  onIdentityResolved: (userId: string) => void;
-  onPresenceModeChange: (mode: PresenceMode) => void;
-  onPresenceSnapshot: (payload: PresenceSnapshotPayload) => void;
-  onPresencePeerJoined: (payload: PresencePeerJoinedPayload) => void;
-  onPresencePeerLeft: (payload: PresencePeerLeftPayload) => void;
-  onAwarenessReceived: (clientId: number, state: AwarenessState | null) => void;
-  onPeerLeft: (loginId: string) => void;
-}
 
 /**
  * 다이어그램 채널의 provider -> store 이벤트 배선을 캡슐화한다.

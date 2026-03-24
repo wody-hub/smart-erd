@@ -41,6 +41,7 @@
     "src/collaboration/channel/collaboration-binding.ts",
     "src/collaboration/channel/collaboration-channel-plugin.ts",
     "src/collaboration/channel/collaboration-preview-policy.ts",
+    "src/collaboration/channel/diagram/diagram-collaboration-testable.ts",
     "src/collaboration/yjs/yjs-document-adapter.ts",
     "src/collaboration/yjsBridge.ts",
     "src/lib/edge-presentation-restore.ts",
