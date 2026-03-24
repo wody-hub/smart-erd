@@ -61,7 +61,7 @@ smart-erd:
     shutdown-flush-timeout-millis: ${SMART_ERD_WEBSOCKET_SHUTDOWN_FLUSH_TIMEOUT_MILLIS:15000}
     ticket-store: in-memory # in-memory | redis (redis 사용 시: docker compose --profile redis up -d)
   cors:
-    allowed-origins: ${SMART_ERD_CORS_ORIGINS:http://localhost:4051,http://127.0.0.1:4051,http://localhost:4502,http://127.0.0.1:4502,http://localhost:4503,http://127.0.0.1:4503,http://localhost:9501,http://127.0.0.1:9501,http://localhost:9502,http://127.0.0.1:9502,http://localhost:9503,http://127.0.0.1:9503}
+    allowed-origins: ${SMART_ERD_CORS_ORIGINS:http://localhost:4501,http://127.0.0.1:4501,http://localhost:4502,http://127.0.0.1:4502,http://localhost:4503,http://127.0.0.1:4503,http://localhost:9501,http://127.0.0.1:9501,http://localhost:9502,http://127.0.0.1:9502,http://localhost:9503,http://127.0.0.1:9503}
     allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
     allowed-headers: '*'
     allow-credentials: true
