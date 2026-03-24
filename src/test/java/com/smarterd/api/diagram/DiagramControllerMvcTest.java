@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.application.diagram.command.PersistDiagramSnapshotUseCase;
 import com.smarterd.application.diagram.command.SaveDiagramUseCase;
+import com.smarterd.domain.diagram.service.DiagramColumnDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService;
 import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
@@ -55,6 +56,9 @@ class DiagramControllerMvcTest {
     @Mock
     private DiagramTableDefinitionExportService diagramTableDefinitionExportService;
 
+    @Mock
+    private DiagramColumnDefinitionExportService diagramColumnDefinitionExportService;
+
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
@@ -64,7 +68,8 @@ class DiagramControllerMvcTest {
             diagramService,
             saveDiagramUseCase,
             persistDiagramSnapshotUseCase,
-            diagramTableDefinitionExportService
+            diagramTableDefinitionExportService,
+            diagramColumnDefinitionExportService
         );
         this.mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .setCustomArgumentResolvers(new TestJwtArgumentResolver())
@@ -160,6 +165,29 @@ class DiagramControllerMvcTest {
 
         verify(diagramTableDefinitionExportService)
             .generateTableDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}"));
+    }
+
+    @Test
+    void downloadColumnDefinition_returnsExcelAttachment() throws Exception {
+        final var workbook = new XSSFWorkbook();
+        workbook.createSheet("컬럼 정의서").createRow(0).createCell(0).setCellValue("컬럼 정의서");
+        when(diagramColumnDefinitionExportService.generateColumnDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}")))
+            .thenReturn(new ExcelData(workbook, "diagram-column-definition"));
+
+        mockMvc.perform(
+                post("/api/teams/1/projects/10/diagrams/100/column-definition")
+                    .with(request -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(java.util.Map.of("content", "{\"nodes\":[]}")))
+            )
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("diagram-column-definition.xlsx")));
+
+        verify(diagramColumnDefinitionExportService)
+            .generateColumnDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}"));
     }
 
     private Jwt jwt(String subject) {

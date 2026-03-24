@@ -258,6 +258,7 @@
       "export": "Export",
       "exporting": "Exporting...",
       "tableDefinitionExport": "Table Definition",
+      "columnDefinitionExport": "Column Definition",
       "validate": "Validate",
       "validateActive": "Validate (active)",
       "ddlExport": "SQL DDL",
@@ -287,6 +288,10 @@
     "tableDefinitionExport": {
       "downloaded": "Table definition downloaded",
       "failed": "Failed to download table definition"
+    },
+    "columnDefinitionExport": {
+      "downloaded": "Column definition downloaded",
+      "failed": "Failed to download column definition"
     },
     "codeEditor": {
       "placeholder": "-- Enter SQL DDL here...\n-- Example:\n-- CREATE TABLE users (\n--   id SERIAL PRIMARY KEY,\n--   name VARCHAR(100) NOT NULL\n-- );",

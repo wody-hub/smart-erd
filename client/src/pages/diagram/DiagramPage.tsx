@@ -25,6 +25,7 @@ import Spinner from '@/components/ui/spinner';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import {
+  downloadDiagramColumnDefinition,
   downloadDiagramTableDefinition,
   fetchDiagram,
   persistDiagramYdocSnapshot,
@@ -176,6 +177,7 @@ export default function DiagramPage() {
   const [codeModeDraftPersistedAt, setCodeModeDraftPersistedAt] = useState<number | null>(null);
   /** 테이블 정의서 엑셀 다운로드 진행 여부 */
   const [tableDefinitionExporting, setTableDefinitionExporting] = useState(false);
+  const [columnDefinitionExporting, setColumnDefinitionExporting] = useState(false);
 
   const { canEdit } = useTeamRole(teamId);
   const queryClient = useQueryClient();
@@ -243,7 +245,7 @@ export default function DiagramPage() {
       if (!teamId || !projectId || !diagramId) {
         return;
       }
-      if (tableDefinitionExporting) {
+      if (tableDefinitionExporting || columnDefinitionExporting) {
         return;
       }
 
@@ -257,7 +259,29 @@ export default function DiagramPage() {
         setTableDefinitionExporting(false);
       }
     },
-    [diagramId, projectId, t, tableDefinitionExporting, teamId],
+    [columnDefinitionExporting, diagramId, projectId, t, tableDefinitionExporting, teamId],
+  );
+
+  const handleExportColumnDefinition = useCallback(
+    async (content: string) => {
+      if (!teamId || !projectId || !diagramId) {
+        return;
+      }
+      if (columnDefinitionExporting || tableDefinitionExporting) {
+        return;
+      }
+
+      setColumnDefinitionExporting(true);
+      try {
+        await downloadDiagramColumnDefinition(teamId, projectId, diagramId, content);
+        toast.success(t('erd.columnDefinitionExport.downloaded'));
+      } catch {
+        toast.error(t('erd.columnDefinitionExport.failed'));
+      } finally {
+        setColumnDefinitionExporting(false);
+      }
+    },
+    [columnDefinitionExporting, diagramId, projectId, t, tableDefinitionExporting, teamId],
   );
 
   // --- 파생값 (useQuery 결과 `diagram`에 의존하므로 그룹7 이후 배치) ---
@@ -1216,7 +1240,9 @@ export default function DiagramPage() {
                             : undefined
                         }
                         onExportTableDefinition={handleExportTableDefinition}
+                        onExportColumnDefinition={handleExportColumnDefinition}
                         tableDefinitionExporting={tableDefinitionExporting}
+                        columnDefinitionExporting={columnDefinitionExporting}
                       />
                     ) : (
                       <>
@@ -1243,7 +1269,9 @@ export default function DiagramPage() {
                           }
                           isSidebarResizing={isSidebarResizing}
                           onExportTableDefinition={handleExportTableDefinition}
+                          onExportColumnDefinition={handleExportColumnDefinition}
                           tableDefinitionExporting={tableDefinitionExporting}
+                          columnDefinitionExporting={columnDefinitionExporting}
                         />
                         {showOverlay && (
                           <CanvasLoadingOverlay

@@ -4,9 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.smarterd.api.diagram.dto.ExportDiagramTableDefinitionRequest;
+import com.smarterd.api.diagram.dto.ExportDiagramWorkbookRequest;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
+import com.smarterd.domain.diagram.service.DiagramColumnDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService;
 import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
@@ -37,13 +38,17 @@ class DiagramControllerTest {
     @Mock
     private DiagramTableDefinitionExportService diagramTableDefinitionExportService;
 
+    @Mock
+    private DiagramColumnDefinitionExportService diagramColumnDefinitionExportService;
+
     @Test
     void saveDiagram_returnsOkResponseWithLatestSaveState() {
         final var controller = new DiagramController(
             diagramService,
             saveDiagramUseCase,
             persistDiagramSnapshotUseCase,
-            diagramTableDefinitionExportService
+            diagramTableDefinitionExportService,
+            diagramColumnDefinitionExportService
         );
         final var jwt = jwt("tester");
         final var request = new SaveDiagramRequest("{\"nodes\":[]}", new byte[] { 0x01, 0x02 });
@@ -67,7 +72,8 @@ class DiagramControllerTest {
             diagramService,
             saveDiagramUseCase,
             persistDiagramSnapshotUseCase,
-            diagramTableDefinitionExportService
+            diagramTableDefinitionExportService,
+            diagramColumnDefinitionExportService
         );
         final var jwt = jwt("tester");
         final var request = new PersistYdocSnapshotRequest("17", new byte[] { 0x11 });
@@ -89,13 +95,14 @@ class DiagramControllerTest {
             diagramService,
             saveDiagramUseCase,
             persistDiagramSnapshotUseCase,
-            diagramTableDefinitionExportService
+            diagramTableDefinitionExportService,
+            diagramColumnDefinitionExportService
         );
         final var jwt = jwt("tester");
         final var workbook = new XSSFWorkbook();
         workbook.createSheet("테이블 정의서").createRow(0).createCell(0).setCellValue("데이터베이스 정의");
         final var response = new MockHttpServletResponse();
-        final var request = new ExportDiagramTableDefinitionRequest("{\"nodes\":[]}");
+        final var request = new ExportDiagramWorkbookRequest("{\"nodes\":[]}");
 
         when(diagramTableDefinitionExportService.generateTableDefinition("tester", 1L, 10L, 100L, request.content()))
             .thenReturn(new ExcelData(workbook, "diagram-table-definition"));
@@ -108,6 +115,34 @@ class DiagramControllerTest {
         assertThat(response.getHeader("Content-Disposition")).contains("diagram-table-definition.xlsx");
         verify(diagramTableDefinitionExportService)
             .generateTableDefinition("tester", 1L, 10L, 100L, request.content());
+    }
+
+    @Test
+    void downloadColumnDefinition_streamsExcelResponse() throws Exception {
+        final var controller = new DiagramController(
+            diagramService,
+            saveDiagramUseCase,
+            persistDiagramSnapshotUseCase,
+            diagramTableDefinitionExportService,
+            diagramColumnDefinitionExportService
+        );
+        final var jwt = jwt("tester");
+        final var workbook = new XSSFWorkbook();
+        workbook.createSheet("컬럼 정의서").createRow(0).createCell(0).setCellValue("컬럼 정의서");
+        final var response = new MockHttpServletResponse();
+        final var request = new ExportDiagramWorkbookRequest("{\"nodes\":[]}");
+
+        when(diagramColumnDefinitionExportService.generateColumnDefinition("tester", 1L, 10L, 100L, request.content()))
+            .thenReturn(new ExcelData(workbook, "diagram-column-definition"));
+
+        controller.downloadColumnDefinition(jwt, 1L, 10L, 100L, request, response);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getContentType())
+            .isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        assertThat(response.getHeader("Content-Disposition")).contains("diagram-column-definition.xlsx");
+        verify(diagramColumnDefinitionExportService)
+            .generateColumnDefinition("tester", 1L, 10L, 100L, request.content());
     }
 
     private Jwt jwt(String subject) {

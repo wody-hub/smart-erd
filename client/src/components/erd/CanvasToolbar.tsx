@@ -42,6 +42,8 @@ interface CanvasToolbarProps {
   onExportDdl?: () => void;
   /** 테이블 정의서 내보내기 핸들러 */
   onExportTableDefinition?: () => void;
+  /** 컬럼 정의서 내보내기 핸들러 */
+  onExportColumnDefinition?: () => void;
   /** SQL DDL 가져오기 핸들러 */
   onImportDdl?: () => void;
   /** 코드 에디터 활성 여부 */
@@ -104,6 +106,7 @@ export default function CanvasToolbar({
   onExportPdf,
   onExportDdl,
   onExportTableDefinition,
+  onExportColumnDefinition,
   onImportDdl,
   codeEditorActive,
   onToggleCodeEditor,
@@ -213,12 +216,19 @@ export default function CanvasToolbar({
             <DropdownMenuItem onClick={onExportPdf} disabled={isExporting}>
               PDF
             </DropdownMenuItem>
-            {onExportTableDefinition && (
+            {(onExportTableDefinition || onExportColumnDefinition) && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onExportTableDefinition} disabled={isExporting}>
-                  {t('erd.toolbar.tableDefinitionExport')}
-                </DropdownMenuItem>
+                {onExportTableDefinition && (
+                  <DropdownMenuItem onClick={onExportTableDefinition} disabled={isExporting}>
+                    {t('erd.toolbar.tableDefinitionExport')}
+                  </DropdownMenuItem>
+                )}
+                {onExportColumnDefinition && (
+                  <DropdownMenuItem onClick={onExportColumnDefinition} disabled={isExporting}>
+                    {t('erd.toolbar.columnDefinitionExport')}
+                  </DropdownMenuItem>
+                )}
               </>
             )}
           </DropdownMenuContent>

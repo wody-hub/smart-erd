@@ -11,15 +11,6 @@ import com.smarterd.utils.excel.ExcelData;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.apache.poi.ss.usermodel.BorderStyle;
-import org.apache.poi.ss.usermodel.FillPatternType;
-import org.apache.poi.ss.usermodel.HorizontalAlignment;
-import org.apache.poi.ss.usermodel.IndexedColors;
-import org.apache.poi.ss.usermodel.VerticalAlignment;
-import org.apache.poi.ss.util.CellRangeAddress;
-import org.apache.poi.xssf.usermodel.XSSFCellStyle;
-import org.apache.poi.xssf.usermodel.XSSFFont;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +27,8 @@ public class DiagramTableDefinitionExportService {
     private static final String TITLE = "데이터베이스 정의";
     private static final String DEFAULT_TABLE_TYPE = "일반 테이블";
     private static final String DEFAULT_OCCURRENCE_CYCLE = "수시";
+    private static final float TITLE_ROW_HEIGHT = 28F;
+    private static final float HEADER_ROW_HEIGHT = 22F;
     private static final List<String> HEADERS = List.of(
         "NO",
         "영문 DB명",
@@ -166,153 +159,39 @@ public class DiagramTableDefinitionExportService {
      * @return 엑셀 데이터
      */
     private ExcelData buildWorkbook(String diagramName, List<TableDefinitionRow> rows) {
-        final var workbook = new XSSFWorkbook();
-        final var sheet = workbook.createSheet(SHEET_NAME);
-
-        final var titleStyle = createTitleStyle(workbook);
-        final var headerStyle = createHeaderStyle(workbook);
-        final var bodyStyle = createBodyStyle(workbook, HorizontalAlignment.LEFT);
-        final var centeredBodyStyle = createBodyStyle(workbook, HorizontalAlignment.CENTER);
-
-        final var titleRow = sheet.createRow(0);
-        titleRow.setHeightInPoints(28);
-        final var titleCell = titleRow.createCell(0);
-        titleCell.setCellValue(TITLE);
-        titleCell.setCellStyle(titleStyle);
-        for (var columnIndex = 1; columnIndex < HEADERS.size(); columnIndex++) {
-            titleRow.createCell(columnIndex).setCellStyle(titleStyle);
-        }
-        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, HEADERS.size() - 1));
-
-        final var headerRow = sheet.createRow(1);
-        headerRow.setHeightInPoints(22);
-        for (var columnIndex = 0; columnIndex < HEADERS.size(); columnIndex++) {
-            final var cell = headerRow.createCell(columnIndex);
-            cell.setCellValue(HEADERS.get(columnIndex));
-            cell.setCellStyle(headerStyle);
-        }
+        final var template = DiagramDefinitionWorkbookSupport.createTemplate(
+            SHEET_NAME,
+            TITLE,
+            HEADERS,
+            COLUMN_WIDTHS,
+            TITLE_ROW_HEIGHT,
+            HEADER_ROW_HEIGHT
+        );
+        final var workbook = template.workbook();
+        final var sheet = template.sheet();
+        final var bodyStyle = template.bodyStyle();
+        final var centeredBodyStyle = template.centeredBodyStyle();
 
         for (var rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
             final var row = sheet.createRow(rowIndex + 2);
             final var definitionRow = rows.get(rowIndex);
-            writeCell(row, 0, definitionRow.no(), centeredBodyStyle);
-            writeCell(row, 1, definitionRow.databaseName(), bodyStyle);
-            writeCell(row, 2, definitionRow.tableOwner(), bodyStyle);
-            writeCell(row, 3, definitionRow.logicalTableName(), bodyStyle);
-            writeCell(row, 4, definitionRow.physicalTableName(), bodyStyle);
-            writeCell(row, 5, definitionRow.tableType(), centeredBodyStyle);
-            writeCell(row, 6, definitionRow.relatedEntityName(), bodyStyle);
-            writeCell(row, 7, definitionRow.tableDescription(), bodyStyle);
-            writeCell(row, 8, definitionRow.occurrenceCycle(), centeredBodyStyle);
-            writeCell(row, 9, definitionRow.remark(), bodyStyle);
-            writeCell(row, 10, definitionRow.dataCount(), centeredBodyStyle);
+            DiagramDefinitionWorkbookSupport.writeCell(row, 0, definitionRow.no(), centeredBodyStyle);
+            DiagramDefinitionWorkbookSupport.writeCell(row, 1, definitionRow.databaseName(), bodyStyle);
+            DiagramDefinitionWorkbookSupport.writeCell(row, 2, definitionRow.tableOwner(), bodyStyle);
+            DiagramDefinitionWorkbookSupport.writeCell(row, 3, definitionRow.logicalTableName(), bodyStyle);
+            DiagramDefinitionWorkbookSupport.writeCell(row, 4, definitionRow.physicalTableName(), bodyStyle);
+            DiagramDefinitionWorkbookSupport.writeCell(row, 5, definitionRow.tableType(), centeredBodyStyle);
+            DiagramDefinitionWorkbookSupport.writeCell(row, 6, definitionRow.relatedEntityName(), bodyStyle);
+            DiagramDefinitionWorkbookSupport.writeCell(row, 7, definitionRow.tableDescription(), bodyStyle);
+            DiagramDefinitionWorkbookSupport.writeCell(row, 8, definitionRow.occurrenceCycle(), centeredBodyStyle);
+            DiagramDefinitionWorkbookSupport.writeCell(row, 9, definitionRow.remark(), bodyStyle);
+            DiagramDefinitionWorkbookSupport.writeCell(row, 10, definitionRow.dataCount(), centeredBodyStyle);
         }
-
-        for (var columnIndex = 0; columnIndex < COLUMN_WIDTHS.length; columnIndex++) {
-            sheet.setColumnWidth(columnIndex, COLUMN_WIDTHS[columnIndex]);
-        }
-        sheet.createFreezePane(0, 2);
-        sheet.setAutoFilter(new CellRangeAddress(1, 1, 0, HEADERS.size() - 1));
 
         return new ExcelData(
             workbook,
             AppStringUtils.defaultIfBlank(diagramName, "diagram") + "-table-definition"
         );
-    }
-
-    /**
-     * 제목 셀 스타일을 생성한다.
-     *
-     * @param workbook 워크북
-     * @return 제목 셀 스타일
-     */
-    private XSSFCellStyle createTitleStyle(XSSFWorkbook workbook) {
-        final var style = workbook.createCellStyle();
-        style.setAlignment(HorizontalAlignment.CENTER);
-        style.setVerticalAlignment(VerticalAlignment.CENTER);
-        style.setBorderTop(BorderStyle.THIN);
-        style.setBorderBottom(BorderStyle.THIN);
-        style.setBorderLeft(BorderStyle.THIN);
-        style.setBorderRight(BorderStyle.THIN);
-
-        final XSSFFont font = workbook.createFont();
-        font.setBold(true);
-        font.setFontHeightInPoints((short) 14);
-        style.setFont(font);
-        return style;
-    }
-
-    /**
-     * 헤더 셀 스타일을 생성한다.
-     *
-     * @param workbook 워크북
-     * @return 헤더 셀 스타일
-     */
-    private XSSFCellStyle createHeaderStyle(XSSFWorkbook workbook) {
-        final var style = workbook.createCellStyle();
-        style.setAlignment(HorizontalAlignment.CENTER);
-        style.setVerticalAlignment(VerticalAlignment.CENTER);
-        style.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        style.setBorderTop(BorderStyle.THIN);
-        style.setBorderBottom(BorderStyle.THIN);
-        style.setBorderLeft(BorderStyle.THIN);
-        style.setBorderRight(BorderStyle.THIN);
-        style.setWrapText(true);
-
-        final XSSFFont font = workbook.createFont();
-        font.setBold(true);
-        style.setFont(font);
-        return style;
-    }
-
-    /**
-     * 데이터 셀 스타일을 생성한다.
-     *
-     * @param workbook 워크북
-     * @param alignment 수평 정렬
-     * @return 데이터 셀 스타일
-     */
-    private XSSFCellStyle createBodyStyle(XSSFWorkbook workbook, HorizontalAlignment alignment) {
-        final var style = workbook.createCellStyle();
-        style.setAlignment(alignment);
-        style.setVerticalAlignment(VerticalAlignment.CENTER);
-        style.setBorderTop(BorderStyle.THIN);
-        style.setBorderBottom(BorderStyle.THIN);
-        style.setBorderLeft(BorderStyle.THIN);
-        style.setBorderRight(BorderStyle.THIN);
-        style.setWrapText(true);
-        return style;
-    }
-
-    /**
-     * 문자열 값을 셀에 기록한다.
-     *
-     * @param row 대상 행
-     * @param columnIndex 열 인덱스
-     * @param value 기록 값
-     * @param style 셀 스타일
-     * @returns 없음
-     */
-    private void writeCell(org.apache.poi.ss.usermodel.Row row, int columnIndex, String value, XSSFCellStyle style) {
-        final var cell = row.createCell(columnIndex);
-        cell.setCellValue(value);
-        cell.setCellStyle(style);
-    }
-
-    /**
-     * 숫자 값을 셀에 기록한다.
-     *
-     * @param row 대상 행
-     * @param columnIndex 열 인덱스
-     * @param value 기록 값
-     * @param style 셀 스타일
-     * @returns 없음
-     */
-    private void writeCell(org.apache.poi.ss.usermodel.Row row, int columnIndex, int value, XSSFCellStyle style) {
-        final var cell = row.createCell(columnIndex);
-        cell.setCellValue(value);
-        cell.setCellStyle(style);
     }
 
     /**

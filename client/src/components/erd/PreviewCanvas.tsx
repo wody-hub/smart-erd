@@ -27,6 +27,7 @@ import ExportProgressDialog from './ExportProgressDialog';
 import type { DslPreviewCanvasState, DslPreviewNode } from '@/lib/dsl-preview-graph';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import type { CodeEditorTableFocusRequest } from '@/lib/code-editor-table-navigation';
+import { serializeDiagramDefinitionExportContent } from '@/lib/diagram-definition-export';
 import { findPreviewTableNodeForFocus } from '@/lib/diagram-table-focus';
 import { useExportDiagram } from '@/hooks/useExportDiagram';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
@@ -125,8 +126,12 @@ interface PreviewCanvasProps {
   onOpenDictionary?: () => void;
   /** 테이블 정의서 엑셀 다운로드 핸들러 */
   onExportTableDefinition?: (content: string) => Promise<void> | void;
+  /** 컬럼 정의서 엑셀 다운로드 핸들러 */
+  onExportColumnDefinition?: (content: string) => Promise<void> | void;
   /** 테이블 정의서 엑셀 다운로드 진행 여부 */
   tableDefinitionExporting?: boolean;
+  /** 컬럼 정의서 엑셀 다운로드 진행 여부 */
+  columnDefinitionExporting?: boolean;
 }
 
 interface PreviewCanvasToolbarProps {
@@ -142,8 +147,12 @@ interface PreviewCanvasToolbarProps {
   onOpenDictionary?: () => void;
   /** 테이블 정의서 엑셀 다운로드 핸들러 */
   onExportTableDefinition?: () => void;
+  /** 컬럼 정의서 엑셀 다운로드 핸들러 */
+  onExportColumnDefinition?: () => void;
   /** 테이블 정의서 엑셀 다운로드 진행 여부 */
   tableDefinitionExporting?: boolean;
+  /** 컬럼 정의서 엑셀 다운로드 진행 여부 */
+  columnDefinitionExporting?: boolean;
 }
 
 /**
@@ -166,11 +175,14 @@ function PreviewCanvasToolbar({
   canOpenDictionary,
   onOpenDictionary,
   onExportTableDefinition,
+  onExportColumnDefinition,
   tableDefinitionExporting = false,
+  columnDefinitionExporting = false,
 }: PreviewCanvasToolbarProps) {
   const { t } = useTranslation();
   const { exportPng, exportJpg, exportSvg, exportPdf, exportProgress } = useExportDiagram(diagramName);
-  const isExportBusy = exportProgress.isExporting || tableDefinitionExporting;
+  const isExportBusy =
+    exportProgress.isExporting || tableDefinitionExporting || columnDefinitionExporting;
 
   return (
     <>
@@ -193,11 +205,7 @@ function PreviewCanvasToolbar({
                 variant="ghost"
                 size="sm"
                 className="gap-1.5"
-                aria-label={
-                  exportProgress.isExporting
-                    ? t('erd.toolbar.exporting')
-                    : t('erd.toolbar.export')
-                }
+                aria-label={isExportBusy ? t('erd.toolbar.exporting') : t('erd.toolbar.export')}
                 disabled={isExportBusy}
               >
                 <Download className="h-4 w-4" />
@@ -217,12 +225,19 @@ function PreviewCanvasToolbar({
               <DropdownMenuItem onClick={exportPdf} disabled={isExportBusy}>
                 PDF
               </DropdownMenuItem>
-              {onExportTableDefinition && (
+              {(onExportTableDefinition || onExportColumnDefinition) && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={onExportTableDefinition} disabled={isExportBusy || !hasGraph}>
-                    {t('erd.toolbar.tableDefinitionExport')}
-                  </DropdownMenuItem>
+                  {onExportTableDefinition && (
+                    <DropdownMenuItem onClick={onExportTableDefinition} disabled={isExportBusy || !hasGraph}>
+                      {t('erd.toolbar.tableDefinitionExport')}
+                    </DropdownMenuItem>
+                  )}
+                  {onExportColumnDefinition && (
+                    <DropdownMenuItem onClick={onExportColumnDefinition} disabled={isExportBusy || !hasGraph}>
+                      {t('erd.toolbar.columnDefinitionExport')}
+                    </DropdownMenuItem>
+                  )}
                 </>
               )}
             </DropdownMenuContent>
@@ -303,7 +318,9 @@ export default function PreviewCanvas({
   canOpenDictionary,
   onOpenDictionary,
   onExportTableDefinition,
+  onExportColumnDefinition,
   tableDefinitionExporting = false,
+  columnDefinitionExporting = false,
 }: PreviewCanvasProps) {
   const { t } = useTranslation();
   const { persistedNodes, persistedEdges } = useCanvasStore(
@@ -533,13 +550,17 @@ export default function PreviewCanvas({
       return;
     }
     void onExportTableDefinition(
-      JSON.stringify({
-        nodes: effectiveGraph.nodes,
-        edges: effectiveGraph.edges,
-        groups: [],
-      }),
+      serializeDiagramDefinitionExportContent(effectiveGraph.nodes, effectiveGraph.edges),
     );
   }, [effectiveGraph, onExportTableDefinition]);
+  const handleExportColumnDefinition = useCallback(() => {
+    if (!onExportColumnDefinition || !effectiveGraph || effectiveGraph.nodes.length === 0) {
+      return;
+    }
+    void onExportColumnDefinition(
+      serializeDiagramDefinitionExportContent(effectiveGraph.nodes, effectiveGraph.edges),
+    );
+  }, [effectiveGraph, onExportColumnDefinition]);
 
   useEffect(() => {
     if (!tableFocusRequest || displayNodes.length === 0) {
@@ -578,7 +599,9 @@ export default function PreviewCanvas({
           canOpenDictionary={canOpenDictionary}
           onOpenDictionary={onOpenDictionary}
           onExportTableDefinition={handleExportTableDefinition}
+          onExportColumnDefinition={handleExportColumnDefinition}
           tableDefinitionExporting={tableDefinitionExporting}
+          columnDefinitionExporting={columnDefinitionExporting}
         />
 
       {hasGraph ? (

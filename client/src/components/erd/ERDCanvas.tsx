@@ -23,7 +23,7 @@ import {
   getCurrentEdgeHandleSelectionValue,
 } from '@/lib/edge-handles';
 import { extractColId } from '@/lib/handle-id';
-import type { EdgeRoutingType, TableNode as ERDTableNode, TableNodeData, Waypoint } from '@/types/erd';
+import type { ERDEdge, EdgeRoutingType, TableNode as ERDTableNode, TableNodeData, Waypoint } from '@/types/erd';
 import type { YjsProvider } from '@/collaboration/YjsProvider';
 import {
   CANVAS_HISTORY_ORIGIN,
@@ -32,6 +32,7 @@ import {
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { applyDagreLayout } from '@/lib/auto-layout';
 import type { CodeEditorTableFocusRequest } from '@/lib/code-editor-table-navigation';
+import { serializeDiagramDefinitionExportContent } from '@/lib/diagram-definition-export';
 import { findPersistedTableNodeForFocus } from '@/lib/diagram-table-focus';
 import type { PreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
 import { cn } from '@/lib/utils';
@@ -140,8 +141,12 @@ interface ERDCanvasProps {
   tableFocusRequest?: CodeEditorTableFocusRequest | null;
   /** 테이블 정의서 엑셀 다운로드 핸들러 */
   onExportTableDefinition?: (content: string) => Promise<void> | void;
+  /** 컬럼 정의서 엑셀 다운로드 핸들러 */
+  onExportColumnDefinition?: (content: string) => Promise<void> | void;
   /** 테이블 정의서 엑셀 다운로드 진행 여부 */
   tableDefinitionExporting?: boolean;
+  /** 컬럼 정의서 엑셀 다운로드 진행 여부 */
+  columnDefinitionExporting?: boolean;
 }
 
 /** 삭제 다이얼로그 상태 */
@@ -186,6 +191,8 @@ function ERDCanvas({
   tableFocusRequest,
   onExportTableDefinition,
   tableDefinitionExporting = false,
+  onExportColumnDefinition,
+  columnDefinitionExporting = false,
 }: ERDCanvasProps) {
   const { t } = useTranslation();
   const reactFlowInstance = useReactFlow();
@@ -221,7 +228,6 @@ function ERDCanvas({
   const redo = useCanvasStore((s) => s.redo);
   const canUndo = useCanvasStore((s) => s.canUndo);
   const canRedo = useCanvasStore((s) => s.canRedo);
-  const serialize = useCanvasStore((s) => s.serialize);
   const stopHistoryCapture = useCanvasStore((s) => s.stopHistoryCapture);
   const setActiveEditNodeId = useCanvasStore((s) => s.setActiveEditNodeId);
   const localEdgeDrag = useCollaborationStore((s) => s.localEdgeDrag);
@@ -270,8 +276,18 @@ function ERDCanvas({
     if (!onExportTableDefinition) {
       return;
     }
-    void onExportTableDefinition(serialize());
-  }, [onExportTableDefinition, serialize]);
+    void onExportTableDefinition(
+      serializeDiagramDefinitionExportContent(nodes as ERDTableNode[], edges as ERDEdge[]),
+    );
+  }, [edges, nodes, onExportTableDefinition]);
+  const handleExportColumnDefinition = useCallback(() => {
+    if (!onExportColumnDefinition) {
+      return;
+    }
+    void onExportColumnDefinition(
+      serializeDiagramDefinitionExportContent(nodes as ERDTableNode[], edges as ERDEdge[]),
+    );
+  }, [edges, nodes, onExportColumnDefinition]);
   const { exportPng, exportJpg, exportSvg, exportPdf, exportProgress } =
     useExportDiagram(diagramName);
 
@@ -921,6 +937,7 @@ function ERDCanvas({
               onExportSvg={exportSvg}
               onExportPdf={exportPdf}
               onExportTableDefinition={handleExportTableDefinition}
+              onExportColumnDefinition={handleExportColumnDefinition}
               onExportDdl={() => setDdlDialogOpen(true)}
               onImportDdl={() => setDdlImportOpen(true)}
               codeEditorActive={codeEditorActive}
@@ -934,7 +951,9 @@ function ERDCanvas({
               onUndo={undo}
               onRedo={redo}
               canEdit={effectiveCanEdit}
-              isExporting={exportProgress.isExporting || tableDefinitionExporting}
+              isExporting={
+                exportProgress.isExporting || tableDefinitionExporting || columnDefinitionExporting
+              }
             />
             </ReactFlow>
           </EdgeEditingProvider>

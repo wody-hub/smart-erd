@@ -257,6 +257,7 @@
       "export": "내보내기",
       "exporting": "내보내는 중...",
       "tableDefinitionExport": "테이블 정의서",
+      "columnDefinitionExport": "컬럼 정의서",
       "validate": "유효성 검사",
       "validateActive": "유효성 검사 (활성)",
       "ddlExport": "SQL DDL",
@@ -286,6 +287,10 @@
     "tableDefinitionExport": {
       "downloaded": "테이블 정의서를 내려받았습니다",
       "failed": "테이블 정의서 내려받기에 실패했습니다"
+    },
+    "columnDefinitionExport": {
+      "downloaded": "컬럼 정의서를 내려받았습니다",
+      "failed": "컬럼 정의서 내려받기에 실패했습니다"
     },
     "codeEditor": {
       "placeholder": "-- SQL DDL을 입력하세요...\n-- 예시:\n-- CREATE TABLE users (\n--   id SERIAL PRIMARY KEY,\n--   name VARCHAR(100) NOT NULL\n-- );",
