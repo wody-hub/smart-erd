@@ -269,6 +269,20 @@ public class DiagramService {
     }
 
     /**
+     * 읽기 가능한 다이어그램 엔티티를 로드한다.
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId 팀 ID
+     * @param projectId 프로젝트 ID
+     * @param diagramId 다이어그램 ID
+     * @return 읽기 가능한 다이어그램 엔티티
+     */
+    public Diagram loadReadableDiagram(String loginId, Long teamId, Long projectId, Long diagramId) {
+        final var project = verifyReadAccess(loginId, teamId, projectId);
+        return findDiagramByProjectAndId(project, diagramId);
+    }
+
+    /**
      * Diagram 엔티티를 목록/이름변경 응답용 결과로 변환한다.
      *
      * @param diagram    다이어그램 엔티티

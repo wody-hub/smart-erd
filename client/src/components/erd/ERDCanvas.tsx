@@ -138,6 +138,10 @@ interface ERDCanvasProps {
   draftOverlayGraph?: PreviewDraftOverlayGraph | null;
   /** 코드 에디터 테이블 포커스 요청 */
   tableFocusRequest?: CodeEditorTableFocusRequest | null;
+  /** 테이블 정의서 엑셀 다운로드 핸들러 */
+  onExportTableDefinition?: (content: string) => Promise<void> | void;
+  /** 테이블 정의서 엑셀 다운로드 진행 여부 */
+  tableDefinitionExporting?: boolean;
 }
 
 /** 삭제 다이얼로그 상태 */
@@ -180,6 +184,8 @@ function ERDCanvas({
   activeGroupTableIds,
   draftOverlayGraph,
   tableFocusRequest,
+  onExportTableDefinition,
+  tableDefinitionExporting = false,
 }: ERDCanvasProps) {
   const { t } = useTranslation();
   const reactFlowInstance = useReactFlow();
@@ -215,6 +221,7 @@ function ERDCanvas({
   const redo = useCanvasStore((s) => s.redo);
   const canUndo = useCanvasStore((s) => s.canUndo);
   const canRedo = useCanvasStore((s) => s.canRedo);
+  const serialize = useCanvasStore((s) => s.serialize);
   const stopHistoryCapture = useCanvasStore((s) => s.stopHistoryCapture);
   const setActiveEditNodeId = useCanvasStore((s) => s.setActiveEditNodeId);
   const localEdgeDrag = useCollaborationStore((s) => s.localEdgeDrag);
@@ -258,6 +265,13 @@ function ERDCanvas({
     handleFkTypeSelect,
     handleFkTypeDialogClose,
   } = useFkConnectMode();
+
+  const handleExportTableDefinition = useCallback(() => {
+    if (!onExportTableDefinition) {
+      return;
+    }
+    void onExportTableDefinition(serialize());
+  }, [onExportTableDefinition, serialize]);
   const { exportPng, exportJpg, exportSvg, exportPdf, exportProgress } =
     useExportDiagram(diagramName);
 
@@ -906,6 +920,7 @@ function ERDCanvas({
               onExportJpg={exportJpg}
               onExportSvg={exportSvg}
               onExportPdf={exportPdf}
+              onExportTableDefinition={handleExportTableDefinition}
               onExportDdl={() => setDdlDialogOpen(true)}
               onImportDdl={() => setDdlImportOpen(true)}
               codeEditorActive={codeEditorActive}
@@ -919,7 +934,7 @@ function ERDCanvas({
               onUndo={undo}
               onRedo={redo}
               canEdit={effectiveCanEdit}
-              isExporting={exportProgress.isExporting}
+              isExporting={exportProgress.isExporting || tableDefinitionExporting}
             />
             </ReactFlow>
           </EdgeEditingProvider>

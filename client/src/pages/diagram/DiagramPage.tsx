@@ -25,6 +25,7 @@ import Spinner from '@/components/ui/spinner';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import {
+  downloadDiagramTableDefinition,
   fetchDiagram,
   persistDiagramYdocSnapshot,
   persistDiagramYdocSnapshotKeepalive,
@@ -173,6 +174,8 @@ export default function DiagramPage() {
     useState<CodeModeDraftPersistStatus>('inactive');
   /** code 모드 shared schema draft 서버 저장 완료 시각 */
   const [codeModeDraftPersistedAt, setCodeModeDraftPersistedAt] = useState<number | null>(null);
+  /** 테이블 정의서 엑셀 다운로드 진행 여부 */
+  const [tableDefinitionExporting, setTableDefinitionExporting] = useState(false);
 
   const { canEdit } = useTeamRole(teamId);
   const queryClient = useQueryClient();
@@ -233,6 +236,28 @@ export default function DiagramPage() {
   const diagramDetailQueryKey = useMemo(
     () => queryKeys.diagrams.detail(teamId!, projectId!, diagramId!),
     [diagramId, projectId, teamId],
+  );
+
+  const handleExportTableDefinition = useCallback(
+    async (content: string) => {
+      if (!teamId || !projectId || !diagramId) {
+        return;
+      }
+      if (tableDefinitionExporting) {
+        return;
+      }
+
+      setTableDefinitionExporting(true);
+      try {
+        await downloadDiagramTableDefinition(teamId, projectId, diagramId, content);
+        toast.success(t('erd.tableDefinitionExport.downloaded'));
+      } catch {
+        toast.error(t('erd.tableDefinitionExport.failed'));
+      } finally {
+        setTableDefinitionExporting(false);
+      }
+    },
+    [diagramId, projectId, t, tableDefinitionExporting, teamId],
   );
 
   // --- 파생값 (useQuery 결과 `diagram`에 의존하므로 그룹7 이후 배치) ---
@@ -1190,6 +1215,8 @@ export default function DiagramPage() {
                             ? () => setDictionaryDialogOpen(true)
                             : undefined
                         }
+                        onExportTableDefinition={handleExportTableDefinition}
+                        tableDefinitionExporting={tableDefinitionExporting}
                       />
                     ) : (
                       <>
@@ -1215,6 +1242,8 @@ export default function DiagramPage() {
                             workModeRuntimeState.canToggleCodeEditor ? handleToggleCodeEditor : undefined
                           }
                           isSidebarResizing={isSidebarResizing}
+                          onExportTableDefinition={handleExportTableDefinition}
+                          tableDefinitionExporting={tableDefinitionExporting}
                         />
                         {showOverlay && (
                           <CanvasLoadingOverlay

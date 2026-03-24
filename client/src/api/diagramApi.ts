@@ -1,5 +1,6 @@
 import axiosInstance from './axiosInstance';
 import { STORAGE_KEYS } from '@/constants/storage';
+import { downloadBlob } from '@/lib/download';
 import { getApiBaseUrl } from '@/lib/platform';
 import type {
   DiagramSummary,
@@ -243,4 +244,27 @@ export async function deleteDiagram(
   diagramId: string,
 ): Promise<void> {
   await axiosInstance.delete(`/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`);
+}
+
+/**
+ * 현재 다이어그램 기준 테이블 정의서 엑셀을 다운로드한다.
+ *
+ * @param teamId 팀 ID
+ * @param projectId 프로젝트 ID
+ * @param diagramId 다이어그램 ID
+ * @param content 현재 캔버스 기준 직렬화된 다이어그램 JSON
+ * @returns 없음
+ */
+export async function downloadDiagramTableDefinition(
+  teamId: string,
+  projectId: string,
+  diagramId: string,
+  content: string,
+): Promise<void> {
+  const response = await axiosInstance.post(
+    `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/table-definition`,
+    { content },
+    { responseType: 'blob' },
+  );
+  downloadBlob(response, 'table-definition.xlsx');
 }

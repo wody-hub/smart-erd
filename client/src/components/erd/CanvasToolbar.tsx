@@ -17,6 +17,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,8 @@ interface CanvasToolbarProps {
   onExportPdf: () => void;
   /** SQL DDL 내보내기 핸들러 */
   onExportDdl?: () => void;
+  /** 테이블 정의서 내보내기 핸들러 */
+  onExportTableDefinition?: () => void;
   /** SQL DDL 가져오기 핸들러 */
   onImportDdl?: () => void;
   /** 코드 에디터 활성 여부 */
@@ -80,6 +83,7 @@ interface CanvasToolbarProps {
  * @param props.onExportSvg         SVG 내보내기 핸들러
  * @param props.onExportPdf         PDF 내보내기 핸들러
  * @param props.onExportDdl         SQL DDL 내보내기 핸들러
+ * @param props.onExportTableDefinition 테이블 정의서 내보내기 핸들러
  * @param props.onImportDdl         SQL DDL 가져오기 핸들러
  * @param props.codeEditorActive    코드 에디터 활성 여부
  * @param props.onToggleCodeEditor  코드 에디터 토글 핸들러
@@ -99,6 +103,7 @@ export default function CanvasToolbar({
   onExportSvg,
   onExportPdf,
   onExportDdl,
+  onExportTableDefinition,
   onImportDdl,
   codeEditorActive,
   onToggleCodeEditor,
@@ -208,6 +213,14 @@ export default function CanvasToolbar({
             <DropdownMenuItem onClick={onExportPdf} disabled={isExporting}>
               PDF
             </DropdownMenuItem>
+            {onExportTableDefinition && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onExportTableDefinition} disabled={isExporting}>
+                  {t('erd.toolbar.tableDefinitionExport')}
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
         {onExportDdl && (

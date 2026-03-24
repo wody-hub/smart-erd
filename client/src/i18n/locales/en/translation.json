@@ -257,6 +257,7 @@
       "autoLayout": "Auto Layout",
       "export": "Export",
       "exporting": "Exporting...",
+      "tableDefinitionExport": "Table Definition",
       "validate": "Validate",
       "validateActive": "Validate (active)",
       "ddlExport": "SQL DDL",
@@ -282,6 +283,10 @@
       "copied": "Copied to clipboard",
       "copyFailed": "Failed to copy to clipboard",
       "noTables": "No tables to export"
+    },
+    "tableDefinitionExport": {
+      "downloaded": "Table definition downloaded",
+      "failed": "Failed to download table definition"
     },
     "codeEditor": {
       "placeholder": "-- Enter SQL DDL here...\n-- Example:\n-- CREATE TABLE users (\n--   id SERIAL PRIMARY KEY,\n--   name VARCHAR(100) NOT NULL\n-- );",

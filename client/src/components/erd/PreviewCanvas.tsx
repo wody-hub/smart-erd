@@ -20,6 +20,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import ExportProgressDialog from './ExportProgressDialog';
@@ -122,6 +123,10 @@ interface PreviewCanvasProps {
   canOpenDictionary: boolean;
   /** 사전 관리 열기 핸들러 */
   onOpenDictionary?: () => void;
+  /** 테이블 정의서 엑셀 다운로드 핸들러 */
+  onExportTableDefinition?: (content: string) => Promise<void> | void;
+  /** 테이블 정의서 엑셀 다운로드 진행 여부 */
+  tableDefinitionExporting?: boolean;
 }
 
 interface PreviewCanvasToolbarProps {
@@ -135,6 +140,10 @@ interface PreviewCanvasToolbarProps {
   canOpenDictionary: boolean;
   /** 사전 관리 열기 핸들러 */
   onOpenDictionary?: () => void;
+  /** 테이블 정의서 엑셀 다운로드 핸들러 */
+  onExportTableDefinition?: () => void;
+  /** 테이블 정의서 엑셀 다운로드 진행 여부 */
+  tableDefinitionExporting?: boolean;
 }
 
 /**
@@ -156,9 +165,12 @@ function PreviewCanvasToolbar({
   hasGraph,
   canOpenDictionary,
   onOpenDictionary,
+  onExportTableDefinition,
+  tableDefinitionExporting = false,
 }: PreviewCanvasToolbarProps) {
   const { t } = useTranslation();
   const { exportPng, exportJpg, exportSvg, exportPdf, exportProgress } = useExportDiagram(diagramName);
+  const isExportBusy = exportProgress.isExporting || tableDefinitionExporting;
 
   return (
     <>
@@ -186,25 +198,33 @@ function PreviewCanvasToolbar({
                     ? t('erd.toolbar.exporting')
                     : t('erd.toolbar.export')
                 }
-                disabled={exportProgress.isExporting}
+                disabled={isExportBusy}
               >
                 <Download className="h-4 w-4" />
-                {exportProgress.isExporting ? t('erd.toolbar.exporting') : t('erd.toolbar.export')}
+                {isExportBusy ? t('erd.toolbar.exporting') : t('erd.toolbar.export')}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={exportPng} disabled={exportProgress.isExporting}>
+              <DropdownMenuItem onClick={exportPng} disabled={isExportBusy}>
                 PNG
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportJpg} disabled={exportProgress.isExporting}>
+              <DropdownMenuItem onClick={exportJpg} disabled={isExportBusy}>
                 JPG
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportSvg} disabled={exportProgress.isExporting}>
+              <DropdownMenuItem onClick={exportSvg} disabled={isExportBusy}>
                 SVG
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportPdf} disabled={exportProgress.isExporting}>
+              <DropdownMenuItem onClick={exportPdf} disabled={isExportBusy}>
                 PDF
               </DropdownMenuItem>
+              {onExportTableDefinition && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onExportTableDefinition} disabled={isExportBusy || !hasGraph}>
+                    {t('erd.toolbar.tableDefinitionExport')}
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
@@ -282,6 +302,8 @@ export default function PreviewCanvas({
   onPositionOverridesChange,
   canOpenDictionary,
   onOpenDictionary,
+  onExportTableDefinition,
+  tableDefinitionExporting = false,
 }: PreviewCanvasProps) {
   const { t } = useTranslation();
   const { persistedNodes, persistedEdges } = useCanvasStore(
@@ -506,6 +528,19 @@ export default function PreviewCanvas({
     });
   }, [effectiveGraph?.nodes, onPositionOverridesChange]);
 
+  const handleExportTableDefinition = useCallback(() => {
+    if (!onExportTableDefinition || !effectiveGraph || effectiveGraph.nodes.length === 0) {
+      return;
+    }
+    void onExportTableDefinition(
+      JSON.stringify({
+        nodes: effectiveGraph.nodes,
+        edges: effectiveGraph.edges,
+        groups: [],
+      }),
+    );
+  }, [effectiveGraph, onExportTableDefinition]);
+
   useEffect(() => {
     if (!tableFocusRequest || displayNodes.length === 0) {
       return;
@@ -536,13 +571,15 @@ export default function PreviewCanvas({
 
   return (
     <div ref={canvasRef} className="h-full w-full bg-background relative">
-      <PreviewCanvasToolbar
-        diagramName={diagramName}
-        onResetLayout={handleResetLayout}
-        hasGraph={hasGraph}
-        canOpenDictionary={canOpenDictionary}
-        onOpenDictionary={onOpenDictionary}
-      />
+        <PreviewCanvasToolbar
+          diagramName={diagramName}
+          onResetLayout={handleResetLayout}
+          hasGraph={hasGraph}
+          canOpenDictionary={canOpenDictionary}
+          onOpenDictionary={onOpenDictionary}
+          onExportTableDefinition={handleExportTableDefinition}
+          tableDefinitionExporting={tableDefinitionExporting}
+        />
 
       {hasGraph ? (
         <ReactFlow

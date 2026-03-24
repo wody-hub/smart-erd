@@ -8,6 +8,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,9 +16,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.application.diagram.command.PersistDiagramSnapshotUseCase;
 import com.smarterd.application.diagram.command.SaveDiagramUseCase;
 import com.smarterd.domain.diagram.service.DiagramService;
+import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
+import com.smarterd.utils.excel.ExcelData;
 import java.time.Instant;
 import java.util.Base64;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,12 +52,20 @@ class DiagramControllerMvcTest {
     @Mock
     private PersistDiagramSnapshotUseCase persistDiagramSnapshotUseCase;
 
+    @Mock
+    private DiagramTableDefinitionExportService diagramTableDefinitionExportService;
+
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
-        final var controller = new DiagramController(diagramService, saveDiagramUseCase, persistDiagramSnapshotUseCase);
+        final var controller = new DiagramController(
+            diagramService,
+            saveDiagramUseCase,
+            persistDiagramSnapshotUseCase,
+            diagramTableDefinitionExportService
+        );
         this.mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .setCustomArgumentResolvers(new TestJwtArgumentResolver())
             .build();
@@ -125,6 +137,29 @@ class DiagramControllerMvcTest {
         final var snapshotCaptor = ArgumentCaptor.forClass(byte[].class);
         verify(persistDiagramSnapshotUseCase).execute(eq("tester"), eq(1L), eq(10L), eq(100L), eq("17"), snapshotCaptor.capture());
         org.assertj.core.api.Assertions.assertThat(snapshotCaptor.getValue()).isEqualTo(snapshot);
+    }
+
+    @Test
+    void downloadTableDefinition_returnsExcelAttachment() throws Exception {
+        final var workbook = new XSSFWorkbook();
+        workbook.createSheet("테이블 정의서").createRow(0).createCell(0).setCellValue("데이터베이스 정의");
+        when(diagramTableDefinitionExportService.generateTableDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}")))
+            .thenReturn(new ExcelData(workbook, "diagram-table-definition"));
+
+        mockMvc.perform(
+                post("/api/teams/1/projects/10/diagrams/100/table-definition")
+                    .with(request -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(java.util.Map.of("content", "{\"nodes\":[]}")))
+            )
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("diagram-table-definition.xlsx")));
+
+        verify(diagramTableDefinitionExportService)
+            .generateTableDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}"));
     }
 
     private Jwt jwt(String subject) {
