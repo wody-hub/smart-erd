@@ -10,6 +10,11 @@ import type { DiagramDetail } from '@/types/diagram';
 import type { DiagramCollaborationBootstrap } from './diagram-collaboration-bootstrap.js';
 import { DiagramCollaborationPreviewPolicy } from './diagram-collaboration-preview-policy.js';
 import { DiagramCollaborationProviderLifecycle } from './diagram-collaboration-provider-lifecycle.js';
+import { DiagramCollaborationProviderBinding } from './diagram-collaboration-provider-binding.js';
+import { DiagramPreviewHydrationController } from './diagram-preview-hydration-controller.js';
+import { DiagramCollaborationTransport } from './diagram-collaboration-transport.js';
+import { DiagramContentOnlySnapshotSeeder } from './diagram-content-only-snapshot-seeder.js';
+import { DiagramCollaborationProviderEvents } from './diagram-collaboration-provider-events.js';
 import { useDiagramCollaborationStoreBridge } from './use-diagram-collaboration-store-bridge.js';
 import type { DiagramCollaborationStoreBridge } from './diagram-collaboration-store-bridge.js';
 import { DiagramYjsDocumentAdapter } from '@/collaboration/yjs/diagram-yjs-document-adapter';
@@ -63,6 +68,14 @@ export function useDiagramCollaborationRuntime(
     () => new DiagramYjsDocumentAdapter(),
     [],
   );
+  const transport = useMemo(
+    () => new DiagramCollaborationTransport(),
+    [],
+  );
+  const contentOnlySnapshotSeeder = useMemo(
+    () => new DiagramContentOnlySnapshotSeeder(documentAdapter),
+    [documentAdapter],
+  );
   const runtimeTransition = useMemo(
     () => previewPolicy.transition.bind(previewPolicy),
     [previewPolicy],
@@ -100,12 +113,15 @@ export function useDiagramCollaborationRuntime(
     }: CreateDiagramCollaborationProviderLifecycleArgs) => {
       const handoffStartedAt = performance.now();
       const handoffLogPrefix = `[useYjsCollaboration][diagramId=${diagramId}]`;
-      return new DiagramCollaborationProviderLifecycle({
+      const providerEvents = new DiagramCollaborationProviderEvents({
+        storeBridge,
+        dispatchRuntimeEvent,
+        handoffLogPrefix,
+        handoffStartedAt,
+      });
+      const previewHydrationController = new DiagramPreviewHydrationController({
         ydoc,
         bootstrap: collaborationBootstrap!,
-        diagramId,
-        teamId,
-        projectId,
         previewEnabled,
         fallbackTimeoutMs: WS_SNAPSHOT_FALLBACK_MS,
         handoffStartedAt,
@@ -113,17 +129,40 @@ export function useDiagramCollaborationRuntime(
         documentAdapter,
         dispatchRuntimeEvent,
         updatePreviewMode,
-        storeBridge,
+        loadPreview: storeBridge.loadPreview,
+        getConnectionStatus: providerEvents.getConnectionStatus,
+      });
+      const providerBinding = new DiagramCollaborationProviderBinding(
+        providerEvents.createBindingCallbacks((wsConnectedAt) => {
+          previewHydrationController.onConnected(wsConnectedAt);
+        }),
+      );
+      return new DiagramCollaborationProviderLifecycle({
+        ydoc,
+        bootstrap: collaborationBootstrap!,
+        diagramId,
+        teamId,
+        projectId,
+        handoffStartedAt,
+        handoffLogPrefix,
         onProviderReady,
         onProviderDisposed,
+      }, {
+        transport,
+        contentOnlySnapshotSeeder,
+        previewHydrationController,
+        providerBinding,
+        providerEvents,
       });
     },
     [
       collaborationBootstrap,
+      contentOnlySnapshotSeeder,
       dispatchRuntimeEvent,
       documentAdapter,
       previewEnabled,
       storeBridge,
+      transport,
     ],
   );
 
