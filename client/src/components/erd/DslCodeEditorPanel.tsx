@@ -209,6 +209,15 @@ export default function DslCodeEditorPanel({
     () => ({ teamId, projectId, diagramId }),
     [diagramId, projectId, teamId],
   );
+  const editorScopeKey = useMemo(
+    () => `${teamId ?? 'unknown'}:${projectId ?? 'unknown'}:${diagramId ?? 'unknown'}`,
+    [diagramId, projectId, teamId],
+  );
+  const editorModelPath = useMemo(
+    () =>
+      `smart-erd://dsl/${teamId ?? 'unknown'}/${projectId ?? 'unknown'}/${diagramId ?? 'unknown'}`,
+    [diagramId, projectId, teamId],
+  );
   const remoteEditLocks = useRemoteEditLocks();
   const hasRemoteEditLocks = remoteEditLocks.hasTableLocks;
   const ydoc = useCanvasStore((state) => state.ydoc);
@@ -233,6 +242,8 @@ export default function DslCodeEditorPanel({
   const previewGraphBuildTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewGraphBuildSeqRef = useRef(0);
   const sharedSchemaDraftSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousEditorScopeKeyRef = useRef(editorScopeKey);
+  const dslTextScopeKeyRef = useRef(editorScopeKey);
   const dslTextValueRef = useRef('');
   /** 에디터 인스턴스 ref */
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -317,6 +328,14 @@ export default function DslCodeEditorPanel({
     dictionary,
   });
   dslTextValueRef.current = dslText;
+  const handleScopedDslChange = useCallback(
+    (value: string | undefined) => {
+      dslTextScopeKeyRef.current = editorScopeKey;
+      handleDslChange(value);
+    },
+    [editorScopeKey, handleDslChange],
+  );
+  const editorInitialText = dslTextScopeKeyRef.current === editorScopeKey ? dslText : '';
 
   /**
    * 에디터 모델 기준 현재 DSL 문자열을 읽는다.
@@ -569,9 +588,9 @@ export default function DslCodeEditorPanel({
       }
       const formattedDsl = getFormattedDslTextForApply();
       if (formattedDsl && formattedDsl !== dslText) {
-        handleDslChange(formattedDsl);
+        handleScopedDslChange(formattedDsl);
       }
-    }, [dslText, getFormattedDslTextForApply, handleDslChange]),
+    }, [dslText, getFormattedDslTextForApply, handleScopedDslChange]),
     onManualApplySuccess: useCallback(() => {
       const previewPositionChanges = previewGraph
         ? useCanvasStore
@@ -627,7 +646,7 @@ export default function DslCodeEditorPanel({
   // ERD→Code 동기화 시 커서/스크롤 보존 가드
   const { syncCodeChange, isSyncing, shouldIgnoreChange } = useEditorCursorGuard(
     editorRef,
-    handleDslChange,
+    handleScopedDslChange,
   );
   const previewState = useMemo<DslPreviewCanvasState>(
     () => ({
@@ -813,7 +832,7 @@ export default function DslCodeEditorPanel({
       hasParsedTables: parseResult != null && errorCount === 0,
       hasRemoteEditLocks,
       parsedSchemaHash,
-      onCodeTextChange: handleDslChange,
+      onCodeTextChange: handleScopedDslChange,
       onSyncCodeTextChange: syncCodeChange,
       generateCodeFromErd: generateFromErd,
       applyParsedToErd,
@@ -1184,6 +1203,14 @@ export default function DslCodeEditorPanel({
   const requestDictionaryReparse = useCallback(() => {
     pendingDictionaryReparseRef.current = true;
   }, []);
+
+  useEffect(() => {
+    if (previousEditorScopeKeyRef.current === editorScopeKey) {
+      return;
+    }
+    previousEditorScopeKeyRef.current = editorScopeKey;
+    handleScopedDslChange('');
+  }, [editorScopeKey, handleScopedDslChange]);
 
   useEffect(() => {
     setDraftHydrated(!persistDraft);
@@ -1760,6 +1787,11 @@ export default function DslCodeEditorPanel({
     editorRef.current = editor;
     monacoRef.current = monaco;
     setMonacoReady(true);
+
+    const currentText = dslTextScopeKeyRef.current === editorScopeKey ? dslTextValueRef.current : '';
+    if (editor.getModel()?.getValue() !== currentText) {
+      syncCodeChange(currentText);
+    }
   };
 
   useEffect(() => {
@@ -1884,9 +1916,11 @@ export default function DslCodeEditorPanel({
       {/* Monaco Editor */}
       <div className="flex-1 min-h-0 relative">
         <Editor
+          key={editorModelPath}
           height="100%"
           language={DSL_LANGUAGE_ID}
-          value={dslText}
+          defaultValue={editorInitialText}
+          path={editorModelPath}
           onChange={guardedOnChange}
           beforeMount={handleBeforeMount}
           onMount={handleOnMount}
