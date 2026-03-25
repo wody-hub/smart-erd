@@ -30,7 +30,7 @@ import QuickDomainDialog from './QuickDomainDialog';
 import { DSL_LANGUAGE_ID, registerDslLanguage } from '@/lib/monaco-dsl-language';
 import type { DslDictionary, DslParseResult } from '@/lib/dsl-parser';
 import { generateDsl } from '@/lib/dsl-generator';
-import { buildParsedSchemaHash } from '@/lib/code-sync-schema-hash';
+import { buildParsedSchemaHash, buildPersistedDiagramSchemaHash } from '@/lib/code-sync-schema-hash';
 import { buildRevisionHash } from '@/lib/code-sync-revision';
 import {
   buildSharedSchemaDraftSnapshotFromLegacyCodeModeDraft,
@@ -482,6 +482,18 @@ export default function DslCodeEditorPanel({
       })),
     );
   }, []);
+  /**
+   * 현재 persisted ERD가 표현하는 semantic schema hash를 계산한다.
+   *
+   * 노드/엣지 ID, handle side, 위치 정보는 제외하고
+   * parse 결과와 직접 비교 가능한 table/column/relation 의미 정보만 사용한다.
+   *
+   * @returns persisted semantic schema hash
+   */
+  const buildCurrentPersistedSchemaHash = useCallback(() => {
+    const { nodes, edges } = useCanvasStore.getState();
+    return buildPersistedDiagramSchemaHash(nodes as TableNode[], edges as ERDEdge[]);
+  }, []);
   const parsedSchemaHash = useMemo(
     () => (parseResult?.result ? buildParsedSchemaHash(parseResult.result) : null),
     [parseResult?.result],
@@ -534,12 +546,23 @@ export default function DslCodeEditorPanel({
       draftBaselineRevisionRef.current = baselineRevision;
 
       if (currentRevision !== baselineRevision) {
+        const persistedSchemaHash = buildCurrentPersistedSchemaHash();
+        if (parsedSchemaHash && persistedSchemaHash === parsedSchemaHash) {
+          draftBaselineRevisionRef.current = currentRevision;
+          return true;
+        }
         toast.error(t('diagram.workMode.sharedDraftConflict'));
         return false;
       }
 
       return true;
-    }, [buildCurrentPersistedRevisionHash, persistDraft, t]),
+    }, [
+      buildCurrentPersistedRevisionHash,
+      buildCurrentPersistedSchemaHash,
+      parsedSchemaHash,
+      persistDraft,
+      t,
+    ]),
     beforeExecuteManualApply: useCallback(() => {
       if (finalizeRequestedRef.current) {
         finalizeExecutionArmedRef.current = true;

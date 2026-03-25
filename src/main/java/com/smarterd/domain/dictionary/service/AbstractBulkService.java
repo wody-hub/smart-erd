@@ -2,9 +2,9 @@ package com.smarterd.domain.dictionary.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationRowResult;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationRowResult;
 import com.smarterd.domain.dictionary.service.session.BulkValidationSessionStore;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
@@ -389,7 +389,11 @@ public abstract class AbstractBulkService<R> {
      * @return accessor 메서드 목록
      * @param <T>           오류 리포트 행 타입
      */
-    protected <T> List<Method> resolveAccessorMethods(Class<T> rowClass, List<String> methodNames, String errorMessage) {
+    protected <T> List<Method> resolveAccessorMethods(
+        Class<T> rowClass,
+        List<String> methodNames,
+        String errorMessage
+    ) {
         try {
             final var methods = new ArrayList<Method>(methodNames.size());
             for (final var methodName : methodNames) {
@@ -425,7 +429,12 @@ public abstract class AbstractBulkService<R> {
     ) {
         final var sheet = new ExcelSheet<T>();
         sheet.setSheetName(msg("bulk.error-report.sheet-name", locale));
-        sheet.setTitles(titleCodes.stream().map((code) -> msg(code, locale)).toList());
+        sheet.setTitles(
+            titleCodes
+                .stream()
+                .map((code) -> msg(code, locale))
+                .toList()
+        );
         sheet.setReqMethods(resolveAccessorMethods(rowClass, accessorNames, accessorError));
         sheet.setDataList(rows);
         return new ExcelUtils<T>().toExcel(List.of(sheet), null, filePrefix);
@@ -449,7 +458,10 @@ public abstract class AbstractBulkService<R> {
         List<String> titleCodes,
         List<T> sampleRows
     ) {
-        final var titles = titleCodes.stream().map((code) -> msg(code, locale)).toList();
+        final var titles = titleCodes
+            .stream()
+            .map((code) -> msg(code, locale))
+            .toList();
         try (final var utils = new ExcelUtils<>(sampleRows, titles)) {
             utils.sheetName(msg(sheetNameCode, locale));
             final var excelData = utils.toExcel();
@@ -712,7 +724,14 @@ public abstract class AbstractBulkService<R> {
         final var summaryTitleRow = guideSheet.createRow(rowIdx++);
         summaryTitleRow.createCell(0).setCellValue(msg("template.guide.summary.title", locale));
         summaryTitleRow.getCell(0).setCellStyle(sectionStyle);
-        applyMergedRegionStyle(guideSheet, summaryTitleRow.getRowNum(), summaryTitleRow.getRowNum(), 0, 3, sectionStyle);
+        applyMergedRegionStyle(
+            guideSheet,
+            summaryTitleRow.getRowNum(),
+            summaryTitleRow.getRowNum(),
+            0,
+            3,
+            sectionStyle
+        );
         guideSheet.addMergedRegion(
             new CellRangeAddress(summaryTitleRow.getRowNum(), summaryTitleRow.getRowNum(), 0, 3)
         );
@@ -747,7 +766,14 @@ public abstract class AbstractBulkService<R> {
         final var instructionTitleRow = guideSheet.createRow(rowIdx++);
         instructionTitleRow.createCell(0).setCellValue(msg("template.guide.instructions.title", locale));
         instructionTitleRow.getCell(0).setCellStyle(sectionStyle);
-        applyMergedRegionStyle(guideSheet, instructionTitleRow.getRowNum(), instructionTitleRow.getRowNum(), 0, 3, sectionStyle);
+        applyMergedRegionStyle(
+            guideSheet,
+            instructionTitleRow.getRowNum(),
+            instructionTitleRow.getRowNum(),
+            0,
+            3,
+            sectionStyle
+        );
         guideSheet.addMergedRegion(
             new CellRangeAddress(instructionTitleRow.getRowNum(), instructionTitleRow.getRowNum(), 0, 3)
         );
@@ -905,7 +931,12 @@ public abstract class AbstractBulkService<R> {
      * @param lastColumn 종료 열
      * @param style 적용할 셀 스타일
      */
-    private void applyMergedRegionStyle(Row row, int firstColumn, int lastColumn, org.apache.poi.ss.usermodel.CellStyle style) {
+    private void applyMergedRegionStyle(
+        Row row,
+        int firstColumn,
+        int lastColumn,
+        org.apache.poi.ss.usermodel.CellStyle style
+    ) {
         for (var columnIndex = firstColumn; columnIndex <= lastColumn; columnIndex++) {
             final var cell = row.getCell(columnIndex) == null ? row.createCell(columnIndex) : row.getCell(columnIndex);
             cell.setCellStyle(style);
@@ -937,7 +968,9 @@ public abstract class AbstractBulkService<R> {
     private org.apache.poi.ss.usermodel.CellStyle createTemplateHeaderStyle(Workbook workbook, boolean required) {
         final var style = workbook.createCellStyle();
         style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        style.setFillForegroundColor(required ? IndexedColors.DARK_BLUE.getIndex() : IndexedColors.BLUE_GREY.getIndex());
+        style.setFillForegroundColor(
+            required ? IndexedColors.DARK_BLUE.getIndex() : IndexedColors.BLUE_GREY.getIndex()
+        );
         style.setAlignment(HorizontalAlignment.CENTER);
         style.setVerticalAlignment(VerticalAlignment.CENTER);
         style.setBorderBottom(BorderStyle.MEDIUM);

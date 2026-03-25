@@ -1,10 +1,10 @@
 package com.smarterd.domain.diagram.service;
+
 import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
-import com.smarterd.domain.diagram.service.DiagramDictionaryBindingService.InvalidationCounts;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.dictionary.service.DictionarySetService;
 import com.smarterd.domain.project.entity.Project;
@@ -75,11 +75,7 @@ public class DiagramService {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var dictionarySet = dictionarySetService.findByTeamAndId(project.getTeam(), dictionarySetId);
 
-        final var diagram = Diagram.builder()
-            .name(name)
-            .project(project)
-            .dictionarySet(dictionarySet)
-            .build();
+        final var diagram = Diagram.builder().name(name).project(project).dictionarySet(dictionarySet).build();
         diagramRepository.save(Objects.requireNonNull(diagram));
 
         return toDiagramSummaryResult(diagram, project.getId());
