@@ -8,6 +8,7 @@ import com.smarterd.api.diagram.dto.ExportDiagramWorkbookRequest;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
 import com.smarterd.domain.diagram.service.DiagramColumnDefinitionExportService;
+import com.smarterd.domain.diagram.service.DiagramIndexDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService;
 import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
@@ -41,6 +42,9 @@ class DiagramControllerTest {
     @Mock
     private DiagramColumnDefinitionExportService diagramColumnDefinitionExportService;
 
+    @Mock
+    private DiagramIndexDefinitionExportService diagramIndexDefinitionExportService;
+
     @Test
     void saveDiagram_returnsOkResponseWithLatestSaveState() {
         final var controller = new DiagramController(
@@ -48,7 +52,8 @@ class DiagramControllerTest {
             saveDiagramUseCase,
             persistDiagramSnapshotUseCase,
             diagramTableDefinitionExportService,
-            diagramColumnDefinitionExportService
+            diagramColumnDefinitionExportService,
+            diagramIndexDefinitionExportService
         );
         final var jwt = jwt("tester");
         final var request = new SaveDiagramRequest("{\"nodes\":[]}", new byte[] { 0x01, 0x02 });
@@ -73,7 +78,8 @@ class DiagramControllerTest {
             saveDiagramUseCase,
             persistDiagramSnapshotUseCase,
             diagramTableDefinitionExportService,
-            diagramColumnDefinitionExportService
+            diagramColumnDefinitionExportService,
+            diagramIndexDefinitionExportService
         );
         final var jwt = jwt("tester");
         final var request = new PersistYdocSnapshotRequest("17", new byte[] { 0x11 });
@@ -96,7 +102,8 @@ class DiagramControllerTest {
             saveDiagramUseCase,
             persistDiagramSnapshotUseCase,
             diagramTableDefinitionExportService,
-            diagramColumnDefinitionExportService
+            diagramColumnDefinitionExportService,
+            diagramIndexDefinitionExportService
         );
         final var jwt = jwt("tester");
         final var workbook = new XSSFWorkbook();
@@ -124,7 +131,8 @@ class DiagramControllerTest {
             saveDiagramUseCase,
             persistDiagramSnapshotUseCase,
             diagramTableDefinitionExportService,
-            diagramColumnDefinitionExportService
+            diagramColumnDefinitionExportService,
+            diagramIndexDefinitionExportService
         );
         final var jwt = jwt("tester");
         final var workbook = new XSSFWorkbook();
@@ -143,6 +151,35 @@ class DiagramControllerTest {
         assertThat(response.getHeader("Content-Disposition")).contains("diagram-column-definition.xlsx");
         verify(diagramColumnDefinitionExportService)
             .generateColumnDefinition("tester", 1L, 10L, 100L, request.content());
+    }
+
+    @Test
+    void downloadIndexDefinition_streamsExcelResponse() throws Exception {
+        final var controller = new DiagramController(
+            diagramService,
+            saveDiagramUseCase,
+            persistDiagramSnapshotUseCase,
+            diagramTableDefinitionExportService,
+            diagramColumnDefinitionExportService,
+            diagramIndexDefinitionExportService
+        );
+        final var jwt = jwt("tester");
+        final var workbook = new XSSFWorkbook();
+        workbook.createSheet("인덱스 정의서").createRow(0).createCell(0).setCellValue("인덱스 정의서");
+        final var response = new MockHttpServletResponse();
+        final var request = new ExportDiagramWorkbookRequest("{\"nodes\":[]}");
+
+        when(diagramIndexDefinitionExportService.generateIndexDefinition("tester", 1L, 10L, 100L, request.content()))
+            .thenReturn(new ExcelData(workbook, "diagram-index-definition"));
+
+        controller.downloadIndexDefinition(jwt, 1L, 10L, 100L, request, response);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getContentType())
+            .isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        assertThat(response.getHeader("Content-Disposition")).contains("diagram-index-definition.xlsx");
+        verify(diagramIndexDefinitionExportService)
+            .generateIndexDefinition("tester", 1L, 10L, 100L, request.content());
     }
 
     private Jwt jwt(String subject) {

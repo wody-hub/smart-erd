@@ -26,6 +26,7 @@ import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import {
   downloadDiagramColumnDefinition,
+  downloadDiagramIndexDefinition,
   downloadDiagramTableDefinition,
   fetchDiagram,
   persistDiagramYdocSnapshot,
@@ -177,7 +178,10 @@ export default function DiagramPage() {
   const [codeModeDraftPersistedAt, setCodeModeDraftPersistedAt] = useState<number | null>(null);
   /** 테이블 정의서 엑셀 다운로드 진행 여부 */
   const [tableDefinitionExporting, setTableDefinitionExporting] = useState(false);
+  /** 컬럼 정의서 엑셀 다운로드 진행 여부 */
   const [columnDefinitionExporting, setColumnDefinitionExporting] = useState(false);
+  /** 인덱스 정의서 엑셀 다운로드 진행 여부 */
+  const [indexDefinitionExporting, setIndexDefinitionExporting] = useState(false);
 
   const { canEdit } = useTeamRole(teamId);
   const queryClient = useQueryClient();
@@ -245,7 +249,7 @@ export default function DiagramPage() {
       if (!teamId || !projectId || !diagramId) {
         return;
       }
-      if (tableDefinitionExporting || columnDefinitionExporting) {
+      if (tableDefinitionExporting || columnDefinitionExporting || indexDefinitionExporting) {
         return;
       }
 
@@ -259,7 +263,15 @@ export default function DiagramPage() {
         setTableDefinitionExporting(false);
       }
     },
-    [columnDefinitionExporting, diagramId, projectId, t, tableDefinitionExporting, teamId],
+    [
+      columnDefinitionExporting,
+      diagramId,
+      indexDefinitionExporting,
+      projectId,
+      t,
+      tableDefinitionExporting,
+      teamId,
+    ],
   );
 
   const handleExportColumnDefinition = useCallback(
@@ -267,7 +279,7 @@ export default function DiagramPage() {
       if (!teamId || !projectId || !diagramId) {
         return;
       }
-      if (columnDefinitionExporting || tableDefinitionExporting) {
+      if (columnDefinitionExporting || tableDefinitionExporting || indexDefinitionExporting) {
         return;
       }
 
@@ -281,7 +293,45 @@ export default function DiagramPage() {
         setColumnDefinitionExporting(false);
       }
     },
-    [columnDefinitionExporting, diagramId, projectId, t, tableDefinitionExporting, teamId],
+    [
+      columnDefinitionExporting,
+      diagramId,
+      indexDefinitionExporting,
+      projectId,
+      t,
+      tableDefinitionExporting,
+      teamId,
+    ],
+  );
+
+  const handleExportIndexDefinition = useCallback(
+    async (content: string) => {
+      if (!teamId || !projectId || !diagramId) {
+        return;
+      }
+      if (indexDefinitionExporting || tableDefinitionExporting || columnDefinitionExporting) {
+        return;
+      }
+
+      setIndexDefinitionExporting(true);
+      try {
+        await downloadDiagramIndexDefinition(teamId, projectId, diagramId, content);
+        toast.success(t('erd.indexDefinitionExport.downloaded'));
+      } catch {
+        toast.error(t('erd.indexDefinitionExport.failed'));
+      } finally {
+        setIndexDefinitionExporting(false);
+      }
+    },
+    [
+      columnDefinitionExporting,
+      diagramId,
+      indexDefinitionExporting,
+      projectId,
+      t,
+      tableDefinitionExporting,
+      teamId,
+    ],
   );
 
   // --- 파생값 (useQuery 결과 `diagram`에 의존하므로 그룹7 이후 배치) ---
@@ -1241,8 +1291,10 @@ export default function DiagramPage() {
                         }
                         onExportTableDefinition={handleExportTableDefinition}
                         onExportColumnDefinition={handleExportColumnDefinition}
+                        onExportIndexDefinition={handleExportIndexDefinition}
                         tableDefinitionExporting={tableDefinitionExporting}
                         columnDefinitionExporting={columnDefinitionExporting}
+                        indexDefinitionExporting={indexDefinitionExporting}
                       />
                     ) : (
                       <>
@@ -1270,8 +1322,10 @@ export default function DiagramPage() {
                           isSidebarResizing={isSidebarResizing}
                           onExportTableDefinition={handleExportTableDefinition}
                           onExportColumnDefinition={handleExportColumnDefinition}
+                          onExportIndexDefinition={handleExportIndexDefinition}
                           tableDefinitionExporting={tableDefinitionExporting}
                           columnDefinitionExporting={columnDefinitionExporting}
+                          indexDefinitionExporting={indexDefinitionExporting}
                         />
                         {showOverlay && (
                           <CanvasLoadingOverlay

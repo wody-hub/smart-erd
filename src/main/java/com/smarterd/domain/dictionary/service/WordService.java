@@ -13,6 +13,7 @@ import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.service.AuthService;
 import com.smarterd.utils.AppStringUtils;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -98,6 +99,24 @@ public class WordService {
                 : wordRepository.searchByDictionarySet(context.dictionarySet(), normalizedKeyword, pageable)
         ).map(this::toWordResult);
         return resultPage;
+    }
+
+    /**
+     * 엑셀 내보내기용 전체 단어 목록을 조회한다.
+     *
+     * @param loginId 요청 사용자 로그인 ID
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @return 사전 세트명과 정렬된 단어 목록
+     */
+    public WordExportResult getWordsForExport(String loginId, Long teamId, Long setId) {
+        final var context = verifyReadAccess(loginId, teamId, setId);
+        final var words = wordRepository
+            .findByDictionarySetOrderByLogicalNameAscIdAsc(context.dictionarySet())
+            .stream()
+            .map(this::toWordResult)
+            .toList();
+        return new WordExportResult(context.dictionarySet().getName(), words);
     }
 
     /**
@@ -289,4 +308,12 @@ public class WordService {
         Instant createdAt,
         Instant updatedAt
     ) {}
+
+    /**
+     * 단어 사전 엑셀 내보내기 결과.
+     *
+     * @param dictionarySetName 사전 세트명
+     * @param words 정렬된 단어 목록
+     */
+    public record WordExportResult(String dictionarySetName, List<WordResult> words) {}
 }

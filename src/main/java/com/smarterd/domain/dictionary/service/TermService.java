@@ -14,6 +14,7 @@ import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.service.AuthService;
 import com.smarterd.utils.AppStringUtils;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -126,6 +127,24 @@ public class TermService {
                 : termRepository.searchByDictionarySet(context.dictionarySet(), normalizedKeyword, pageable)
         ).map(this::toTermResult);
         return resultPage;
+    }
+
+    /**
+     * 엑셀 내보내기용 전체 용어 목록을 조회한다.
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @return 사전 세트명과 정렬된 용어 목록
+     */
+    public TermExportResult getTermsForExport(String loginId, Long teamId, Long setId) {
+        final var context = verifyReadAccess(loginId, teamId, setId);
+        final var terms = termRepository
+            .findByDictionarySetOrderByLogicalNameAscIdAsc(context.dictionarySet())
+            .stream()
+            .map(this::toTermResult)
+            .toList();
+        return new TermExportResult(context.dictionarySet().getName(), terms);
     }
 
     /**
@@ -370,4 +389,12 @@ public class TermService {
         Instant createdAt,
         Instant updatedAt
     ) {}
+
+    /**
+     * 용어 사전 엑셀 내보내기 결과.
+     *
+     * @param dictionarySetName 사전 세트명
+     * @param terms 정렬된 용어 목록
+     */
+    public record TermExportResult(String dictionarySetName, List<TermResult> terms) {}
 }

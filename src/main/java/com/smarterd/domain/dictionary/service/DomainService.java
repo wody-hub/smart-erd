@@ -14,18 +14,20 @@ import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.service.AuthService;
 import com.smarterd.utils.AppStringUtils;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 도메인(데이터 타입 사전) 관련 비즈니스 로직 서비스.
  *
- * <p>도메인 CRUD를 처리하며, 팀 소속 여부 및 논리명 중복을 검증한다.</p>
+ * <p>도메인 CRUD를 처리하며, 팀 소속 여부 및 표준 도메인명 중복을 검증한다.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -55,8 +57,13 @@ public class DomainService {
      * @param loginId 요청 사용자의 로그인 ID
      * @param teamId  팀 ID
      * @param setId   사전 세트 ID
-     * @param logicalName 생성할 논리명
-     * @param physicalType 생성할 물리 타입
+     * @param domainGroup 생성할 도메인 그룹
+     * @param domainClassification 생성할 도메인명
+     * @param logicalName 생성할 표준 도메인명
+     * @param physicalType 생성할 호환용 물리 타입
+     * @param dataType 생성할 데이터 타입
+     * @param dataLength 생성할 데이터 길이
+     * @param dataScale 생성할 데이터 소수점 길이
      * @param description 생성할 설명
      * @return 생성된 도메인 결과
      */
@@ -65,19 +72,38 @@ public class DomainService {
         String loginId,
         Long teamId,
         Long setId,
+        String domainGroup,
+        String domainClassification,
         String logicalName,
         String physicalType,
+        String dataType,
+        Integer dataLength,
+        Integer dataScale,
         String description
     ) {
         final var context = verifyWriteAccess(loginId, teamId, setId);
+        final var typeComponents = DomainPhysicalTypeSupport.resolve(physicalType, dataType, dataLength, dataScale);
+        validateStructuredTypeRules(typeComponents.dataType(), typeComponents.dataLength(), typeComponents.dataScale());
+        final var standardLogicalName = DomainLogicalNameSupport.resolve(
+            logicalName,
+            domainClassification,
+            typeComponents.dataType(),
+            typeComponents.dataLength(),
+            typeComponents.dataScale()
+        );
 
-        if (domainRepository.existsByDictionarySetAndLogicalName(context.dictionarySet(), logicalName)) {
-            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), logicalName);
+        if (domainRepository.existsByDictionarySetAndLogicalName(context.dictionarySet(), standardLogicalName)) {
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), standardLogicalName);
         }
 
         final var domain = Domain.builder()
-            .logicalName(logicalName)
-            .physicalType(physicalType)
+            .logicalName(standardLogicalName)
+            .domainGroup(AppStringUtils.trimToNull(domainGroup))
+            .domainClassification(AppStringUtils.trimToNull(domainClassification))
+            .dataType(typeComponents.dataType())
+            .dataLength(typeComponents.dataLength())
+            .dataScale(typeComponents.dataScale())
+            .physicalType(typeComponents.physicalType())
             .description(description)
             .team(context.team())
             .dictionarySet(context.dictionarySet())
@@ -123,6 +149,24 @@ public class DomainService {
     }
 
     /**
+     * 엑셀 내보내기용 전체 도메인 목록을 조회한다.
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @return 사전 세트명과 정렬된 도메인 목록
+     */
+    public DomainExportResult getDomainsForExport(String loginId, Long teamId, Long setId) {
+        final var context = verifyReadAccess(loginId, teamId, setId);
+        final var domains = domainRepository
+            .findByDictionarySetOrderByLogicalNameAscIdAsc(context.dictionarySet())
+            .stream()
+            .map(this::toDomainResult)
+            .toList();
+        return new DomainExportResult(context.dictionarySet().getName(), domains);
+    }
+
+    /**
      * 도메인 상세를 조회한다.
      *
      * @param loginId  요청 사용자의 로그인 ID
@@ -148,8 +192,13 @@ public class DomainService {
      * @param teamId   팀 ID
      * @param setId    사전 세트 ID
      * @param domainId 도메인 ID
-     * @param logicalName 변경할 논리명
-     * @param physicalType 변경할 물리 타입
+     * @param domainGroup 변경할 도메인 그룹
+     * @param domainClassification 변경할 도메인명
+     * @param logicalName 변경할 표준 도메인명
+     * @param physicalType 변경할 호환용 물리 타입
+     * @param dataType 변경할 데이터 타입
+     * @param dataLength 변경할 데이터 길이
+     * @param dataScale 변경할 데이터 소수점 길이
      * @param description 변경할 설명
      * @return 수정된 도메인 결과
      */
@@ -159,11 +208,25 @@ public class DomainService {
         Long teamId,
         Long setId,
         Long domainId,
+        String domainGroup,
+        String domainClassification,
         String logicalName,
         String physicalType,
+        String dataType,
+        Integer dataLength,
+        Integer dataScale,
         String description
     ) {
         final var context = verifyWriteAccess(loginId, teamId, setId);
+        final var typeComponents = DomainPhysicalTypeSupport.resolve(physicalType, dataType, dataLength, dataScale);
+        validateStructuredTypeRules(typeComponents.dataType(), typeComponents.dataLength(), typeComponents.dataScale());
+        final var standardLogicalName = DomainLogicalNameSupport.resolve(
+            logicalName,
+            domainClassification,
+            typeComponents.dataType(),
+            typeComponents.dataLength(),
+            typeComponents.dataScale()
+        );
 
         final var domain = findDomainById(domainId);
         verifyDomainBelongsToTeam(domain, teamId);
@@ -172,14 +235,23 @@ public class DomainService {
         if (
             domainRepository.existsByDictionarySetAndLogicalNameAndIdNot(
                 context.dictionarySet(),
-                logicalName,
+                standardLogicalName,
                 domainId
             )
         ) {
-            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), logicalName);
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_DOMAIN_LOGICAL_NAME.code(), standardLogicalName);
         }
 
-        domain.update(logicalName, physicalType, description);
+        domain.update(
+            standardLogicalName,
+            AppStringUtils.trimToNull(domainGroup),
+            AppStringUtils.trimToNull(domainClassification),
+            typeComponents.dataType(),
+            typeComponents.dataLength(),
+            typeComponents.dataScale(),
+            typeComponents.physicalType(),
+            description
+        );
 
         return toDomainResult(domain);
     }
@@ -291,16 +363,43 @@ public class DomainService {
      * @return 서비스 계층 도메인 결과
      */
     private DomainResult toDomainResult(Domain domain) {
+        final var typeComponents = DomainPhysicalTypeSupport.resolve(
+            domain.getPhysicalType(),
+            domain.getDataType(),
+            domain.getDataLength(),
+            domain.getDataScale()
+        );
         return new DomainResult(
             domain.getId(),
             domain.getLogicalName(),
-            domain.getPhysicalType(),
+            domain.getDomainGroup(),
+            domain.getDomainClassification(),
+            typeComponents.dataType(),
+            typeComponents.dataLength(),
+            typeComponents.dataScale(),
+            typeComponents.physicalType(),
             domain.getDescription(),
             domain.getTeam().getId(),
             domain.getDictionarySet() != null ? domain.getDictionarySet().getId() : null,
             domain.getCreatedAt(),
             domain.getUpdatedAt()
         );
+    }
+
+    private void validateStructuredTypeRules(
+        @Nullable String dataType,
+        @Nullable Integer dataLength,
+        @Nullable Integer dataScale
+    ) {
+        if (DomainPhysicalTypeSupport.requiresLength(dataType) && dataLength == null) {
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_DOMAIN_DATA_LENGTH_REQUIRED.code());
+        }
+        if (dataScale != null && dataLength == null) {
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_DOMAIN_DATA_SCALE_REQUIRES_LENGTH.code());
+        }
+        if (DomainPhysicalTypeSupport.isScaleExceedsLength(dataLength, dataScale)) {
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_DOMAIN_DATA_SCALE_INVALID.code());
+        }
     }
 
     /**
@@ -316,8 +415,13 @@ public class DomainService {
      * 도메인 응답용 서비스 결과.
      *
      * @param id 도메인 ID
-     * @param logicalName 논리명
-     * @param physicalType 물리 데이터 타입
+     * @param logicalName 공통 표준 도메인명
+     * @param domainGroup 도메인 그룹
+     * @param domainClassification 도메인명
+     * @param dataType 데이터 타입
+     * @param dataLength 데이터 길이
+     * @param dataScale 데이터 소수점 길이
+     * @param physicalType 표시 물리 데이터 타입
      * @param description 설명
      * @param teamId 소속 팀 ID
      * @param dictionarySetId 소속 사전 세트 ID
@@ -327,6 +431,11 @@ public class DomainService {
     public record DomainResult(
         Long id,
         String logicalName,
+        String domainGroup,
+        String domainClassification,
+        String dataType,
+        Integer dataLength,
+        Integer dataScale,
         String physicalType,
         String description,
         Long teamId,
@@ -334,4 +443,12 @@ public class DomainService {
         Instant createdAt,
         Instant updatedAt
     ) {}
+
+    /**
+     * 도메인 사전 엑셀 내보내기 결과.
+     *
+     * @param dictionarySetName 사전 세트명
+     * @param domains 정렬된 도메인 목록
+     */
+    public record DomainExportResult(String dictionarySetName, List<DomainResult> domains) {}
 }

@@ -12,6 +12,7 @@ import com.smarterd.domain.dictionary.service.BulkModels.BulkSaveResult;
 import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationResult;
 import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationRowResult;
 import com.smarterd.domain.dictionary.service.WordBulkService;
+import com.smarterd.domain.dictionary.service.WordDictionaryExportService;
 import com.smarterd.domain.dictionary.service.WordService;
 import com.smarterd.domain.dictionary.service.WordService.WordResult;
 import com.smarterd.utils.ExcelUtils;
@@ -53,6 +54,7 @@ public class WordController {
 
     private final WordService wordService;
     private final WordBulkService wordBulkService;
+    private final WordDictionaryExportService wordDictionaryExportService;
 
     @Operation(summary = "단어 생성")
     @ApiResponse(
@@ -164,6 +166,18 @@ public class WordController {
             Objects.requireNonNull(locale)
         );
         ExcelUtils.download(excelData, response, "word-template");
+    }
+
+    @Operation(summary = "단어 사전 엑셀 다운로드", description = "현재 사전 세트의 단어 사전을 엑셀로 다운로드한다.")
+    @GetMapping("/download/excel")
+    public void downloadWordDictionary(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
+        HttpServletResponse response
+    ) throws IOException {
+        final var excelData = wordDictionaryExportService.generateWordDictionary(jwt.getSubject(), teamId, setId);
+        ExcelUtils.download(excelData, response);
     }
 
     @Operation(summary = "단어 상세 조회")

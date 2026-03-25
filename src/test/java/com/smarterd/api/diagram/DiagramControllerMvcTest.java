@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.application.diagram.command.PersistDiagramSnapshotUseCase;
 import com.smarterd.application.diagram.command.SaveDiagramUseCase;
 import com.smarterd.domain.diagram.service.DiagramColumnDefinitionExportService;
+import com.smarterd.domain.diagram.service.DiagramIndexDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService;
 import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
@@ -59,6 +60,9 @@ class DiagramControllerMvcTest {
     @Mock
     private DiagramColumnDefinitionExportService diagramColumnDefinitionExportService;
 
+    @Mock
+    private DiagramIndexDefinitionExportService diagramIndexDefinitionExportService;
+
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
@@ -69,7 +73,8 @@ class DiagramControllerMvcTest {
             saveDiagramUseCase,
             persistDiagramSnapshotUseCase,
             diagramTableDefinitionExportService,
-            diagramColumnDefinitionExportService
+            diagramColumnDefinitionExportService,
+            diagramIndexDefinitionExportService
         );
         this.mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .setCustomArgumentResolvers(new TestJwtArgumentResolver())
@@ -188,6 +193,29 @@ class DiagramControllerMvcTest {
 
         verify(diagramColumnDefinitionExportService)
             .generateColumnDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}"));
+    }
+
+    @Test
+    void downloadIndexDefinition_returnsExcelAttachment() throws Exception {
+        final var workbook = new XSSFWorkbook();
+        workbook.createSheet("인덱스 정의서").createRow(0).createCell(0).setCellValue("인덱스 정의서");
+        when(diagramIndexDefinitionExportService.generateIndexDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}")))
+            .thenReturn(new ExcelData(workbook, "diagram-index-definition"));
+
+        mockMvc.perform(
+                post("/api/teams/1/projects/10/diagrams/100/index-definition")
+                    .with(request -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(java.util.Map.of("content", "{\"nodes\":[]}")))
+            )
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("diagram-index-definition.xlsx")));
+
+        verify(diagramIndexDefinitionExportService)
+            .generateIndexDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}"));
     }
 
     private Jwt jwt(String subject) {

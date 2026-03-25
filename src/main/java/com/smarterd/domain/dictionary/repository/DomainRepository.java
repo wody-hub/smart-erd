@@ -19,6 +19,10 @@ import org.springframework.data.repository.query.Param;
 public interface DomainRepository extends JpaRepository<Domain, Long> {
     List<Domain> findByDictionarySet(DictionarySet dictionarySet);
 
+    List<Domain> findByDictionarySetOrderByIdAsc(DictionarySet dictionarySet);
+
+    List<Domain> findByDictionarySetOrderByLogicalNameAscIdAsc(DictionarySet dictionarySet);
+
     Page<Domain> findByDictionarySet(DictionarySet dictionarySet, Pageable pageable);
 
     @Query(
@@ -28,6 +32,9 @@ public interface DomainRepository extends JpaRepository<Domain, Long> {
         where d.dictionarySet = :dictionarySet
           and (
             lower(d.logicalName) like lower(concat('%', :keyword, '%'))
+            or lower(coalesce(d.domainGroup, '')) like lower(concat('%', :keyword, '%'))
+            or lower(coalesce(d.domainClassification, '')) like lower(concat('%', :keyword, '%'))
+            or lower(coalesce(d.dataType, '')) like lower(concat('%', :keyword, '%'))
             or lower(d.physicalType) like lower(concat('%', :keyword, '%'))
             or lower(coalesce(d.description, '')) like lower(concat('%', :keyword, '%'))
           )

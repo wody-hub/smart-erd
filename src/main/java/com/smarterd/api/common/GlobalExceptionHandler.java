@@ -69,11 +69,19 @@ public class GlobalExceptionHandler {
             .findFirst()
             .map((e) -> e.getField() + ": " + messageSource.getMessage(e, locale))
             .orElseGet(() ->
-                messageSource.getMessage(
-                    Objects.requireNonNull(MessageCode.ERROR_VALIDATION_FAILED.code()),
-                    null,
-                    locale
-                )
+                ex
+                    .getBindingResult()
+                    .getGlobalErrors()
+                    .stream()
+                    .findFirst()
+                    .map((error) -> messageSource.getMessage(error, locale))
+                    .orElseGet(() ->
+                        messageSource.getMessage(
+                            Objects.requireNonNull(MessageCode.ERROR_VALIDATION_FAILED.code()),
+                            null,
+                            locale
+                        )
+                    )
             );
         return ResponseEntity.badRequest().body(Map.of("error", message));
     }

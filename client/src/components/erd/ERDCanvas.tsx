@@ -143,10 +143,14 @@ interface ERDCanvasProps {
   onExportTableDefinition?: (content: string) => Promise<void> | void;
   /** 컬럼 정의서 엑셀 다운로드 핸들러 */
   onExportColumnDefinition?: (content: string) => Promise<void> | void;
+  /** 인덱스 정의서 엑셀 다운로드 핸들러 */
+  onExportIndexDefinition?: (content: string) => Promise<void> | void;
   /** 테이블 정의서 엑셀 다운로드 진행 여부 */
   tableDefinitionExporting?: boolean;
   /** 컬럼 정의서 엑셀 다운로드 진행 여부 */
   columnDefinitionExporting?: boolean;
+  /** 인덱스 정의서 엑셀 다운로드 진행 여부 */
+  indexDefinitionExporting?: boolean;
 }
 
 /** 삭제 다이얼로그 상태 */
@@ -193,6 +197,8 @@ function ERDCanvas({
   tableDefinitionExporting = false,
   onExportColumnDefinition,
   columnDefinitionExporting = false,
+  onExportIndexDefinition,
+  indexDefinitionExporting = false,
 }: ERDCanvasProps) {
   const { t } = useTranslation();
   const reactFlowInstance = useReactFlow();
@@ -288,6 +294,14 @@ function ERDCanvas({
       serializeDiagramDefinitionExportContent(nodes as ERDTableNode[], edges as ERDEdge[]),
     );
   }, [edges, nodes, onExportColumnDefinition]);
+  const handleExportIndexDefinition = useCallback(() => {
+    if (!onExportIndexDefinition) {
+      return;
+    }
+    void onExportIndexDefinition(
+      serializeDiagramDefinitionExportContent(nodes as ERDTableNode[], edges as ERDEdge[]),
+    );
+  }, [edges, nodes, onExportIndexDefinition]);
   const { exportPng, exportJpg, exportSvg, exportPdf, exportProgress } =
     useExportDiagram(diagramName);
 
@@ -938,6 +952,7 @@ function ERDCanvas({
               onExportPdf={exportPdf}
               onExportTableDefinition={handleExportTableDefinition}
               onExportColumnDefinition={handleExportColumnDefinition}
+              onExportIndexDefinition={handleExportIndexDefinition}
               onExportDdl={() => setDdlDialogOpen(true)}
               onImportDdl={() => setDdlImportOpen(true)}
               codeEditorActive={codeEditorActive}
@@ -952,7 +967,10 @@ function ERDCanvas({
               onRedo={redo}
               canEdit={effectiveCanEdit}
               isExporting={
-                exportProgress.isExporting || tableDefinitionExporting || columnDefinitionExporting
+                exportProgress.isExporting ||
+                tableDefinitionExporting ||
+                columnDefinitionExporting ||
+                indexDefinitionExporting
               }
             />
             </ReactFlow>

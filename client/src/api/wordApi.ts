@@ -197,3 +197,19 @@ export async function downloadWordUploadErrors(
   );
   downloadBlob(res, 'word-upload-errors.xlsx');
 }
+
+/**
+ * 단어 사전 엑셀 파일을 다운로드한다.
+ *
+ * @param teamId 팀 ID
+ * @param setId 사전 세트 ID
+ */
+export async function downloadWordDictionary(teamId: string, setId: string): Promise<void> {
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/dictionary-sets/${setId}/words/download/excel`,
+    {
+      responseType: 'blob',
+    },
+  );
+  downloadBlob(res, 'word-dictionary.xlsx');
+}

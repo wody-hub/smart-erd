@@ -43,7 +43,9 @@ import org.springframework.web.multipart.MultipartFile;
 @Transactional(readOnly = true)
 public class DomainBulkService extends AbstractBulkService<DomainBulkService.DomainUploadRow> {
 
-    private static final int PHYSICAL_TYPE_MAX = 50;
+    private static final int DOMAIN_GROUP_MAX = 100;
+    private static final int DOMAIN_CLASSIFICATION_MAX = 100;
+    private static final int DATA_TYPE_MAX = 50;
     private static final int LOGICAL_NAME_QUERY_BATCH_SIZE = 5_000;
     private static final int PREVIEW_ROW_LIMIT = 2_000;
     private static final String ERROR_REPORT_ACCESSOR_ERROR = "Failed to resolve domain error report methods";
@@ -82,8 +84,12 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     @Override
     protected Map<String, String> mapUploadRow(DomainUploadRow row) {
         final var map = new HashMap<String, String>();
+        map.put("domainGroup", nullToEmpty(row.getDomainGroup()));
+        map.put("domainClassification", nullToEmpty(row.getDomainClassification()));
         map.put("logicalName", nullToEmpty(row.getLogicalName()));
-        map.put("physicalType", nullToEmpty(row.getPhysicalType()));
+        map.put("dataType", nullToEmpty(row.getDataType()));
+        map.put("dataLength", nullToEmpty(row.getDataLength()));
+        map.put("dataScale", nullToEmpty(row.getDataScale()));
         map.put("description", nullToEmpty(row.getDescription()));
         return map;
     }
@@ -91,15 +97,19 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     @Override
     protected Map<String, String> mapCsvFields(String[] fields) {
         final var map = new HashMap<String, String>();
-        map.put("logicalName", fields.length > 0 ? fields[0] : "");
-        map.put("physicalType", fields.length > 1 ? fields[1] : "");
-        map.put("description", fields.length > 2 ? fields[2] : "");
+        map.put("domainGroup", fields.length > 0 ? fields[0] : "");
+        map.put("domainClassification", fields.length > 1 ? fields[1] : "");
+        map.put("logicalName", fields.length > 2 ? fields[2] : "");
+        map.put("dataType", fields.length > 3 ? fields[3] : "");
+        map.put("dataLength", fields.length > 4 ? fields[4] : "");
+        map.put("dataScale", fields.length > 5 ? fields[5] : "");
+        map.put("description", fields.length > 6 ? fields[6] : "");
         return map;
     }
 
     @Override
     protected List<String> excelColumnKeys() {
-        return List.of("logicalName", "physicalType", "description");
+        return List.of("domainGroup", "domainClassification", "logicalName", "dataType", "dataLength", "dataScale", "description");
     }
 
     @Override
@@ -131,9 +141,9 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
         final var rawRows = parseFile(file, fileName);
         validateRowCount(rawRows);
 
-        // DB 기존 논리명 일괄 조회
+        // DB 기존 표준 도메인명 일괄 조회
         final var existingNames = findExistingLogicalNames(
-            rawRows.stream().map((row) -> AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", ""))).toList(),
+            rawRows.stream().map(this::resolveRowLogicalName).toList(),
             LOGICAL_NAME_QUERY_BATCH_SIZE,
             (names) -> domainRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, names),
             Domain::getLogicalName
@@ -150,7 +160,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
      * 모든 행을 순회하며 필드 검증, 중복 검사를 수행하고 결과를 수집한다.
      *
      * @param rawRows       파싱된 행 목록
-     * @param existingNames DB에 이미 존재하는 논리명 집합
+     * @param existingNames DB에 이미 존재하는 표준 도메인명 집합
      * @param locale        요청 로케일
      * @return 검증 결과 누적 객체
      */
@@ -164,22 +174,55 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
 
         for (var i = 0; i < rawRows.size(); i++) {
             final var row = rawRows.get(i);
+            final var domainGroup = AppStringUtils.trimToEmpty(row.getOrDefault("domainGroup", ""));
+            final var domainClassification = AppStringUtils.trimToEmpty(row.getOrDefault("domainClassification", ""));
             final var logicalName = AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", ""));
-            final var physicalType = AppStringUtils.trimToEmpty(row.getOrDefault("physicalType", ""));
+            final var dataType = AppStringUtils.trimToEmpty(row.getOrDefault("dataType", ""));
+            final var dataLengthRaw = AppStringUtils.trimToEmpty(row.getOrDefault("dataLength", ""));
+            final var dataScaleRaw = AppStringUtils.trimToEmpty(row.getOrDefault("dataScale", ""));
             final var description = AppStringUtils.trimToEmpty(row.getOrDefault("description", ""));
 
-            final var errors = validateSingleRow(
-                logicalName,
-                physicalType,
-                description,
-                seenNames,
-                existingNames,
-                locale
+            final var errors = new ArrayList<String>();
+            final var dataLength = parsePositiveInteger(
+                dataLengthRaw,
+                errors,
+                locale,
+                MessageCode.ERROR_BULK_VALIDATION_DATA_LENGTH_INVALID.code()
+            );
+            final var dataScale = parseNonNegativeInteger(
+                dataScaleRaw,
+                errors,
+                locale,
+                MessageCode.ERROR_BULK_VALIDATION_DATA_SCALE_INVALID.code()
+            );
+            final var generatedLogicalName = AppStringUtils.trimToEmpty(
+                DomainLogicalNameSupport.resolve(logicalName, domainClassification, dataType, dataLength, dataScale)
+            );
+
+            errors.addAll(
+                validateSingleRow(
+                    domainGroup,
+                    domainClassification,
+                    generatedLogicalName,
+                    dataType,
+                    dataLengthRaw,
+                    dataScaleRaw,
+                    description,
+                    dataLength,
+                    dataScale,
+                    seenNames,
+                    existingNames,
+                    locale
+                )
             );
 
             final var data = new LinkedHashMap<String, String>();
-            data.put("logicalName", logicalName);
-            data.put("physicalType", physicalType);
+            data.put("domainGroup", domainGroup);
+            data.put("domainClassification", domainClassification);
+            data.put("logicalName", generatedLogicalName);
+            data.put("dataType", dataType);
+            data.put("dataLength", dataLengthRaw);
+            data.put("dataScale", dataScaleRaw);
             data.put("description", description);
 
             final var rowNumber = i + 2;
@@ -189,15 +232,30 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
             if (valid) {
                 result.addValid(
                     previewRow,
-                    new ValidatedDomainRow(rowNumber, new DomainBulkRow(logicalName, physicalType, description))
+                    new ValidatedDomainRow(
+                        rowNumber,
+                        new DomainBulkRow(
+                            domainGroup,
+                            domainClassification,
+                            generatedLogicalName,
+                            dataType,
+                            dataLength,
+                            dataScale,
+                            description
+                        )
+                    )
                 );
             } else {
                 result.addError(
                     previewRow,
                     new DomainErrorReportRow(
                         rowNumber,
-                        logicalName,
-                        physicalType,
+                        domainGroup,
+                        domainClassification,
+                        generatedLogicalName,
+                        dataType,
+                        dataLengthRaw,
+                        dataScaleRaw,
                         description,
                         String.join("\n", errors)
                     )
@@ -210,23 +268,49 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     /**
      * 단일 도메인 행의 필드 검증과 중복 검사를 수행한다.
      *
-     * @param logicalName   논리명
-     * @param physicalType  물리 타입
+     * @param domainGroup 도메인 그룹
+     * @param domainClassification 도메인명
+     * @param logicalName   표준 도메인명
+     * @param dataType 데이터 타입
+     * @param dataLengthRaw 데이터 길이 원본 문자열
+     * @param dataScaleRaw 데이터 소수점 길이 원본 문자열
      * @param description   설명
-     * @param seenNames     파일 내 이미 등장한 논리명 집합 (변경됨)
-     * @param existingNames DB에 존재하는 논리명 집합
+     * @param dataLength 파싱된 데이터 길이
+     * @param dataScale 파싱된 데이터 소수점 길이
+     * @param seenNames     파일 내 이미 등장한 표준 도메인명 집합 (변경됨)
+     * @param existingNames DB에 존재하는 표준 도메인명 집합
      * @param locale        요청 로케일
      * @return 에러 메시지 목록 (비어있으면 유효)
      */
     private List<String> validateSingleRow(
+        String domainGroup,
+        String domainClassification,
         String logicalName,
-        String physicalType,
+        String dataType,
+        String dataLengthRaw,
+        String dataScaleRaw,
         String description,
+        Integer dataLength,
+        Integer dataScale,
         Set<String> seenNames,
         Set<String> existingNames,
         Locale locale
     ) {
         final var errors = new ArrayList<String>();
+
+        if (domainGroup.length() > DOMAIN_GROUP_MAX) {
+            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DOMAIN_GROUP_MAX_LENGTH.code(), locale, DOMAIN_GROUP_MAX));
+        }
+
+        if (domainClassification.length() > DOMAIN_CLASSIFICATION_MAX) {
+            errors.add(
+                msg(
+                    MessageCode.ERROR_BULK_VALIDATION_DOMAIN_CLASSIFICATION_MAX_LENGTH.code(),
+                    locale,
+                    DOMAIN_CLASSIFICATION_MAX
+                )
+            );
+        }
 
         if (AppStringUtils.isBlank(logicalName)) {
             errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_LOGICAL_NAME_REQUIRED.code(), locale));
@@ -234,12 +318,22 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
             errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_LOGICAL_NAME_MAX_LENGTH.code(), locale, LOGICAL_NAME_MAX));
         }
 
-        if (AppStringUtils.isBlank(physicalType)) {
-            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_PHYSICAL_TYPE_REQUIRED.code(), locale));
-        } else if (physicalType.length() > PHYSICAL_TYPE_MAX) {
-            errors.add(
-                msg(MessageCode.ERROR_BULK_VALIDATION_PHYSICAL_TYPE_MAX_LENGTH.code(), locale, PHYSICAL_TYPE_MAX)
-            );
+        if (AppStringUtils.isBlank(dataType)) {
+            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DATA_TYPE_REQUIRED.code(), locale));
+        } else if (dataType.length() > DATA_TYPE_MAX) {
+            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DATA_TYPE_MAX_LENGTH.code(), locale, DATA_TYPE_MAX));
+        }
+
+        if (DomainPhysicalTypeSupport.requiresLength(dataType) && dataLength == null) {
+            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DATA_LENGTH_REQUIRED_FOR_TYPE.code(), locale));
+        }
+
+        if (AppStringUtils.isNotBlank(dataScaleRaw) && AppStringUtils.isBlank(dataLengthRaw)) {
+            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DATA_SCALE_REQUIRES_LENGTH.code(), locale));
+        }
+
+        if (DomainPhysicalTypeSupport.isScaleExceedsLength(dataLength, dataScale)) {
+            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DATA_SCALE_INVALID.code(), locale));
         }
 
         if (description.length() > DESCRIPTION_MAX) {
@@ -255,6 +349,66 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
         }
 
         return errors;
+    }
+
+    private Integer parsePositiveInteger(String value, List<String> errors, Locale locale, String errorCode) {
+        final var normalized = AppStringUtils.trimToNull(value);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            final var parsed = Integer.parseInt(normalized);
+            if (parsed <= 0) {
+                errors.add(msg(errorCode, locale));
+                return null;
+            }
+            return parsed;
+        } catch (NumberFormatException e) {
+            errors.add(msg(errorCode, locale));
+            return null;
+        }
+    }
+
+    private Integer parseNonNegativeInteger(String value, List<String> errors, Locale locale, String errorCode) {
+        final var normalized = AppStringUtils.trimToNull(value);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            final var parsed = Integer.parseInt(normalized);
+            if (parsed < 0) {
+                errors.add(msg(errorCode, locale));
+                return null;
+            }
+            return parsed;
+        } catch (NumberFormatException e) {
+            errors.add(msg(errorCode, locale));
+            return null;
+        }
+    }
+
+    private String resolveRowLogicalName(Map<String, String> row) {
+        final var domainClassification = AppStringUtils.trimToNull(row.getOrDefault("domainClassification", ""));
+        final var logicalName = AppStringUtils.trimToNull(row.getOrDefault("logicalName", ""));
+        final var dataType = AppStringUtils.trimToNull(row.getOrDefault("dataType", ""));
+        final var dataLength = parseIntegerQuietly(row.getOrDefault("dataLength", ""));
+        final var dataScale = parseIntegerQuietly(row.getOrDefault("dataScale", ""));
+        return AppStringUtils.defaultIfBlank(
+            DomainLogicalNameSupport.resolve(logicalName, domainClassification, dataType, dataLength, dataScale),
+            ""
+        );
+    }
+
+    private Integer parseIntegerQuietly(String value) {
+        final var normalized = AppStringUtils.trimToNull(value);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(normalized);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**
@@ -367,7 +521,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
             .map(ValidatedDomainRow::row)
             .toList();
 
-        // 기존 논리명 일괄 조회 (N+1 방지)
+        // 기존 표준 도메인명 일괄 조회 (N+1 방지)
         final var existingNames = findExistingLogicalNames(
             candidateRows.stream().map(DomainBulkRow::logicalName).toList(),
             LOGICAL_NAME_QUERY_BATCH_SIZE,
@@ -383,10 +537,20 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
                 failedCount++;
                 continue;
             }
+            final var typeComponents = DomainPhysicalTypeSupport.fromStructured(
+                row.dataType(),
+                row.dataLength(),
+                row.dataScale()
+            );
             domainsToSave.add(
                 Domain.builder()
                     .logicalName(row.logicalName())
-                    .physicalType(row.physicalType())
+                    .domainGroup(AppStringUtils.trimToNull(row.domainGroup()))
+                    .domainClassification(AppStringUtils.trimToNull(row.domainClassification()))
+                    .dataType(typeComponents.dataType())
+                    .dataLength(typeComponents.dataLength())
+                    .dataScale(typeComponents.dataScale())
+                    .physicalType(typeComponents.physicalType())
                     .description(row.description())
                     .team(team)
                     .dictionarySet(dictionarySet)
@@ -430,12 +594,26 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
             locale,
             List.of(
                 "bulk.error-report.col.row",
+                "bulk.error-report.col.domain-group",
+                "bulk.error-report.col.domain-classification",
                 "bulk.error-report.col.logical-name",
-                "bulk.error-report.col.physical-type",
+                "bulk.error-report.col.data-type",
+                "bulk.error-report.col.data-length",
+                "bulk.error-report.col.data-scale",
                 "bulk.error-report.col.description",
                 "bulk.error-report.col.errors"
             ),
-            List.of("rowNumber", "logicalName", "physicalType", "description", "errors"),
+            List.of(
+                "rowNumber",
+                "domainGroup",
+                "domainClassification",
+                "logicalName",
+                "dataType",
+                "dataLength",
+                "dataScale",
+                "description",
+                "errors"
+            ),
             ERROR_REPORT_ACCESSOR_ERROR
         );
     }
@@ -459,14 +637,22 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
             TemplateType.DOMAIN,
             "template.domain.sheet-name",
             List.of(
+                "template.domain.col.domain-group",
+                "template.domain.col.domain-classification",
                 "template.domain.col.logical-name",
-                "template.domain.col.physical-type",
+                "template.domain.col.data-type",
+                "template.domain.col.data-length",
+                "template.domain.col.data-scale",
                 "template.domain.col.description"
             ),
             List.of(
                 new TemplateRow(
+                    msg("template.domain.sample.domain-group", locale),
+                    msg("template.domain.sample.domain-classification", locale),
                     msg("template.domain.sample.logical-name", locale),
-                    msg("template.domain.sample.physical-type", locale),
+                    msg("template.domain.sample.data-type", locale),
+                    msg("template.domain.sample.data-length", locale),
+                    msg("template.domain.sample.data-scale", locale),
                     msg("template.domain.sample.description", locale)
                 )
             )
@@ -482,8 +668,12 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     @Setter
     public static class DomainUploadRow {
 
+        private String domainGroup;
+        private String domainClassification;
         private String logicalName;
-        private String physicalType;
+        private String dataType;
+        private String dataLength;
+        private String dataScale;
         private String description;
     }
 
@@ -498,17 +688,33 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     /**
      * 벌크 저장 단계에서 사용하는 도메인 행 모델.
      *
-     * @param logicalName 논리명
-     * @param physicalType 물리 타입
+     * @param logicalName 표준 도메인명
+     * @param domainGroup 도메인 그룹
+     * @param domainClassification 도메인명
+     * @param dataType 데이터 타입
+     * @param dataLength 데이터 길이
+     * @param dataScale 데이터 소수점 길이
      * @param description 설명
      */
-    private record DomainBulkRow(String logicalName, String physicalType, String description) {}
+    private record DomainBulkRow(
+        String domainGroup,
+        String domainClassification,
+        String logicalName,
+        String dataType,
+        Integer dataLength,
+        Integer dataScale,
+        String description
+    ) {}
 
     /** 오류 보고서 엑셀 행. */
     public record DomainErrorReportRow(
         int rowNumber,
+        String domainGroup,
+        String domainClassification,
         String logicalName,
-        String physicalType,
+        String dataType,
+        String dataLength,
+        String dataScale,
         String description,
         String errors
     ) {}
@@ -525,5 +731,13 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     ) implements SessionExpirable, SessionOwnership {}
 
     /** 템플릿 엑셀 생성용 행 데이터. */
-    public record TemplateRow(String logicalName, String physicalType, String description) {}
+    public record TemplateRow(
+        String domainGroup,
+        String domainClassification,
+        String logicalName,
+        String dataType,
+        String dataLength,
+        String dataScale,
+        String description
+    ) {}
 }

@@ -22,6 +22,7 @@ import WordFormDialog from '@/components/dictionary/WordFormDialog';
 import {
   createWord,
   deleteWord,
+  downloadWordDictionary,
   downloadWordTemplate,
   fetchWordsPage,
   updateWord,
@@ -109,6 +110,12 @@ export default function WordTab({ canEdit = true, setId }: WordTabProps) {
       toast.error(getErrorMessage(err, t('dictionary.upload.toast.templateFailed'))),
   });
 
+  const downloadDictionaryMutation = useMutation({
+    mutationFn: () => downloadWordDictionary(teamId!, setId),
+    onSuccess: () => toast.success(t('dictionary.export.wordDownloaded')),
+    onError: (err) => toast.error(getErrorMessage(err, t('dictionary.export.wordFailed'))),
+  });
+
   useEffect(() => {
     if (!wordPageData) return;
     adjustToTotalPages(wordPageData.totalPages);
@@ -137,31 +144,41 @@ export default function WordTab({ canEdit = true, setId }: WordTabProps) {
             aria-label={t('dictionary.search.wordPlaceholder')}
           />
         </div>
-        {canEdit && (
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => downloadTemplateMutation.mutate()}
-              disabled={downloadTemplateMutation.isPending}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              {t('dictionary.upload.template')}
-            </Button>
-            <Button variant="outline" onClick={() => setUploadOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" />
-              {t('dictionary.upload.button')}
-            </Button>
-            <Button
-              onClick={() => {
-                setEditTarget(null);
-                setFormOpen(true);
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              {t('dictionary.word.form.createTitle')}
-            </Button>
-          </div>
-        )}
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => downloadDictionaryMutation.mutate()}
+            disabled={downloadDictionaryMutation.isPending}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {t('dictionary.export.button')}
+          </Button>
+          {canEdit && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => downloadTemplateMutation.mutate()}
+                disabled={downloadTemplateMutation.isPending}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {t('dictionary.upload.template')}
+              </Button>
+              <Button variant="outline" onClick={() => setUploadOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                {t('dictionary.upload.button')}
+              </Button>
+              <Button
+                onClick={() => {
+                  setEditTarget(null);
+                  setFormOpen(true);
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                {t('dictionary.word.form.createTitle')}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {totalElements === 0 ? (
@@ -169,31 +186,41 @@ export default function WordTab({ canEdit = true, setId }: WordTabProps) {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <BookText className="mb-4 h-12 w-12 text-muted-foreground" />
             <p className="mb-4 text-muted-foreground">{t('dictionary.word.table.empty')}</p>
-            {canEdit && (
-              <div className="flex flex-wrap justify-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => downloadTemplateMutation.mutate()}
-                  disabled={downloadTemplateMutation.isPending}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  {t('dictionary.upload.template')}
-                </Button>
-                <Button variant="outline" onClick={() => setUploadOpen(true)}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  {t('dictionary.upload.button')}
-                </Button>
-                <Button
-                  onClick={() => {
-                    setEditTarget(null);
-                    setFormOpen(true);
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t('dictionary.word.form.createTitle')}
-                </Button>
-              </div>
-            )}
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => downloadDictionaryMutation.mutate()}
+                disabled={downloadDictionaryMutation.isPending}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {t('dictionary.export.button')}
+              </Button>
+              {canEdit && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => downloadTemplateMutation.mutate()}
+                    disabled={downloadTemplateMutation.isPending}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    {t('dictionary.upload.template')}
+                  </Button>
+                  <Button variant="outline" onClick={() => setUploadOpen(true)}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    {t('dictionary.upload.button')}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setEditTarget(null);
+                      setFormOpen(true);
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('dictionary.word.form.createTitle')}
+                  </Button>
+                </>
+              )}
+            </div>
           </CardContent>
         </Card>
       ) : (

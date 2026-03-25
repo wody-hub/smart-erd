@@ -17,6 +17,8 @@ import org.springframework.data.repository.query.Param;
 public interface WordRepository extends JpaRepository<Word, Long> {
     List<Word> findByDictionarySet(DictionarySet dictionarySet);
 
+    List<Word> findByDictionarySetOrderByLogicalNameAscIdAsc(DictionarySet dictionarySet);
+
     Page<Word> findByDictionarySet(DictionarySet dictionarySet, Pageable pageable);
 
     @Query(

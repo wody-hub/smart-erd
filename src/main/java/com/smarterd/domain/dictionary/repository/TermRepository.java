@@ -22,6 +22,9 @@ public interface TermRepository extends JpaRepository<Term, Long>, TermRepositor
     List<Term> findByDictionarySet(DictionarySet dictionarySet);
 
     @EntityGraph(attributePaths = "domain")
+    List<Term> findByDictionarySetOrderByLogicalNameAscIdAsc(DictionarySet dictionarySet);
+
+    @EntityGraph(attributePaths = "domain")
     Page<Term> findByDictionarySet(DictionarySet dictionarySet, Pageable pageable);
 
     @EntityGraph(attributePaths = "domain")

@@ -44,8 +44,8 @@ class DiagramTableDefinitionExportServiceTest {
         assertThat(sheet.getSheetName()).isEqualTo("테이블 정의서");
         assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("데이터베이스 정의");
         assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("NO");
-        assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("common");
-        assertThat(sheet.getRow(2).getCell(2).getStringCellValue()).isEqualTo("riskzero");
+        assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEmpty();
+        assertThat(sheet.getRow(2).getCell(2).getStringCellValue()).isEmpty();
         assertThat(sheet.getRow(2).getCell(3).getStringCellValue()).isEqualTo("이메일 발송 히스토리");
         assertThat(sheet.getRow(2).getCell(4).getStringCellValue()).isEqualTo("send_email_history");
         assertThat(sheet.getRow(2).getCell(5).getStringCellValue()).isEqualTo("일반 테이블");
@@ -80,6 +80,28 @@ class DiagramTableDefinitionExportServiceTest {
         final var sheet = excelData.excelBook().getSheetAt(0);
         assertThat(sheet.getRow(2).getCell(3).getStringCellValue()).isEqualTo("현재 테이블");
         assertThat(sheet.getRow(2).getCell(4).getStringCellValue()).isEqualTo("override_table");
+    }
+
+    @Test
+    void generateTableDefinition_usesExplicitExportMetadataWhenProvided() {
+        final var service = new DiagramTableDefinitionExportService(diagramService, new ObjectMapper());
+        when(diagramService.loadReadableDiagram("tester", 1L, 10L, 100L)).thenReturn(buildDiagram("{\"nodes\":[]}"));
+
+        final var excelData = service.generateTableDefinition(
+            "tester",
+            1L,
+            10L,
+            100L,
+            """
+                {"metadata":{"databaseName":"common","tableOwner":"riskzero"},"nodes":[
+                  {"id":"table-1","data":{"label":"override_table","logicalTableName":"현재 테이블","columns":[]}}
+                ],"edges":[],"groups":[]}
+                """
+        );
+
+        final var sheet = excelData.excelBook().getSheetAt(0);
+        assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("common");
+        assertThat(sheet.getRow(2).getCell(2).getStringCellValue()).isEqualTo("riskzero");
     }
 
     @Test
