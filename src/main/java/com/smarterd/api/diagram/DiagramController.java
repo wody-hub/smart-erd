@@ -14,6 +14,7 @@ import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetResponse;
 import com.smarterd.application.diagram.command.PersistDiagramSnapshotUseCase;
 import com.smarterd.application.diagram.command.SaveDiagramUseCase;
 import com.smarterd.domain.diagram.service.DiagramColumnDefinitionExportService;
+import com.smarterd.domain.diagram.service.DiagramIndexDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService;
 import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService.DictionarySetChangeResult;
@@ -71,6 +72,9 @@ public class DiagramController {
 
     /** 다이어그램 컬럼 정의서 엑셀 export 서비스 */
     private final DiagramColumnDefinitionExportService diagramColumnDefinitionExportService;
+
+    /** 다이어그램 인덱스 정의서 엑셀 export 서비스 */
+    private final DiagramIndexDefinitionExportService diagramIndexDefinitionExportService;
 
     /**
      * 다이어그램을 생성한다.
@@ -280,6 +284,38 @@ public class DiagramController {
         HttpServletResponse response
     ) throws java.io.IOException {
         final var excelData = diagramColumnDefinitionExportService.generateColumnDefinition(
+            jwt.getSubject(),
+            teamId,
+            projectId,
+            diagramId,
+            request != null ? request.content() : null
+        );
+        ExcelUtils.download(excelData, response);
+    }
+
+    /**
+     * 다이어그램의 인덱스 정의서 엑셀을 다운로드한다.
+     *
+     * @param jwt 인증된 JWT 토큰
+     * @param teamId 팀 ID
+     * @param projectId 프로젝트 ID
+     * @param diagramId 다이어그램 ID
+     * @param request 현재 캔버스 기준 직렬화 JSON
+     * @param response HTTP 응답
+     * @throws java.io.IOException 다운로드 오류 발생 시
+     */
+    @Operation(summary = "인덱스 정의서 엑셀 다운로드", description = "현재 다이어그램 기준 인덱스 정의서 엑셀을 다운로드한다.")
+    @ApiResponse(responseCode = "200", description = "다운로드 성공")
+    @PostMapping("/{diagramId}/index-definition")
+    public void downloadIndexDefinition(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Parameter(description = "다이어그램 ID") @PathVariable Long diagramId,
+        @RequestBody(required = false) ExportDiagramWorkbookRequest request,
+        HttpServletResponse response
+    ) throws java.io.IOException {
+        final var excelData = diagramIndexDefinitionExportService.generateIndexDefinition(
             jwt.getSubject(),
             teamId,
             projectId,

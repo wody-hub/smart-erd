@@ -20,11 +20,12 @@ import Spinner from '@/components/ui/spinner';
 import TermFormDialog from '@/components/dictionary/TermFormDialog';
 import BulkUploadDialog from '@/components/dictionary/BulkUploadDialog';
 import {
-  fetchTermsPage,
   createTerm,
-  updateTerm,
   deleteTerm,
+  downloadTermDictionary,
   downloadTermTemplate,
+  fetchTermsPage,
+  updateTerm,
 } from '@/api/termApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
@@ -126,6 +127,12 @@ export default function TermTab({ canEdit = true, setId }: TermTabProps) {
       toast.error(getErrorMessage(err, t('dictionary.upload.toast.templateFailed'))),
   });
 
+  const downloadDictionaryMutation = useMutation({
+    mutationFn: () => downloadTermDictionary(teamId!, setId),
+    onSuccess: () => toast.success(t('dictionary.export.termDownloaded')),
+    onError: (err) => toast.error(getErrorMessage(err, t('dictionary.export.termFailed'))),
+  });
+
   /**
    * 생성 버튼 클릭 핸들러.
    *
@@ -191,26 +198,36 @@ export default function TermTab({ canEdit = true, setId }: TermTabProps) {
             aria-label={t('dictionary.search.termPlaceholder')}
           />
         </div>
-        {canEdit && (
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={handleTemplateDownload}
-              disabled={downloadTemplateMutation.isPending}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {t('dictionary.upload.template')}
-            </Button>
-            <Button variant="outline" onClick={() => setUploadOpen(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              {t('dictionary.upload.button')}
-            </Button>
-            <Button onClick={handleCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              {t('dictionary.term.form.createTitle')}
-            </Button>
-          </div>
-        )}
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => downloadDictionaryMutation.mutate()}
+            disabled={downloadDictionaryMutation.isPending}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {t('dictionary.export.button')}
+          </Button>
+          {canEdit && (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleTemplateDownload}
+                disabled={downloadTemplateMutation.isPending}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {t('dictionary.upload.template')}
+              </Button>
+              <Button variant="outline" onClick={() => setUploadOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                {t('dictionary.upload.button')}
+              </Button>
+              <Button onClick={handleCreate}>
+                <Plus className="h-4 w-4 mr-2" />
+                {t('dictionary.term.form.createTitle')}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {totalElements === 0 ? (
@@ -218,12 +235,22 @@ export default function TermTab({ canEdit = true, setId }: TermTabProps) {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground mb-4">{t('dictionary.term.table.empty')}</p>
-            {canEdit && (
-              <Button onClick={handleCreate}>
-                <Plus className="h-4 w-4 mr-2" />
-                {t('dictionary.term.form.createTitle')}
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => downloadDictionaryMutation.mutate()}
+                disabled={downloadDictionaryMutation.isPending}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {t('dictionary.export.button')}
               </Button>
-            )}
+              {canEdit && (
+                <Button onClick={handleCreate}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t('dictionary.term.form.createTitle')}
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       ) : (

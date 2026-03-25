@@ -259,6 +259,7 @@
       "exporting": "Exporting...",
       "tableDefinitionExport": "Table Definition",
       "columnDefinitionExport": "Column Definition",
+      "indexDefinitionExport": "Index Definition",
       "validate": "Validate",
       "validateActive": "Validate (active)",
       "ddlExport": "SQL DDL",
@@ -292,6 +293,10 @@
     "columnDefinitionExport": {
       "downloaded": "Column definition downloaded",
       "failed": "Failed to download column definition"
+    },
+    "indexDefinitionExport": {
+      "downloaded": "Index definition downloaded",
+      "failed": "Failed to download index definition"
     },
     "codeEditor": {
       "placeholder": "-- Enter SQL DDL here...\n-- Example:\n-- CREATE TABLE users (\n--   id SERIAL PRIMARY KEY,\n--   name VARCHAR(100) NOT NULL\n-- );",
@@ -780,7 +785,7 @@
     },
     "search": {
       "wordPlaceholder": "Search words (logical/physical/description)",
-      "domainPlaceholder": "Search domains (logical/physical type/description)",
+      "domainPlaceholder": "Search domains (group/domain name/standard name/type/description)",
       "termPlaceholder": "Search terms (logical/physical/description)"
     },
     "word": {
@@ -847,8 +852,13 @@
     },
     "domain": {
       "table": {
-        "logicalName": "Logical Name",
-        "physicalType": "Physical Type",
+        "domainGroup": "Domain Group",
+        "domainClassification": "Domain Name",
+        "logicalName": "Standard Domain Name",
+        "dataType": "Data Type",
+        "dataLength": "Data Length",
+        "dataScale": "Data Scale",
+        "physicalType": "Display Type",
         "description": "Description",
         "actions": "Actions",
         "empty": "No domains yet. Add your first domain."
@@ -857,11 +867,23 @@
         "createTitle": "Add Domain",
         "editTitle": "Edit Domain",
         "createDescription": "Register a new domain in the dictionary set.",
-        "editDescription": "Update the selected domain's logical name, physical type, and description.",
-        "logicalName": "Logical Name",
-        "logicalNamePlaceholder": "e.g. Amount",
+        "editDescription": "Update the selected domain name, type rule, and description.",
+        "domainGroup": "Domain Group",
+        "domainGroupPlaceholder": "e.g. Naming",
+        "domainClassification": "Domain Name",
+        "domainClassificationPlaceholder": "e.g. Name",
+        "logicalName": "Standard Domain Name",
+        "logicalNamePlaceholder": "e.g. Name_V300",
+        "dataType": "Data Type",
+        "dataTypePlaceholder": "e.g. VARCHAR",
+        "dataLength": "Data Length",
+        "dataLengthPlaceholder": "e.g. 300",
+        "dataScale": "Data Scale",
+        "dataScalePlaceholder": "e.g. 2",
         "physicalType": "Physical Type",
         "physicalTypePlaceholder": "e.g. DECIMAL(15,2)",
+        "physicalTypePreview": "Display Type Preview",
+        "physicalTypePreviewPlaceholder": "Generated automatically from type and length",
         "description": "Description",
         "descriptionPlaceholder": "Optional description"
       },
@@ -1002,6 +1024,15 @@
         "dropzone": "File upload area",
         "selectRow": "Select row {{row}}"
       }
+    },
+    "export": {
+      "button": "Download Excel",
+      "wordDownloaded": "Word dictionary downloaded",
+      "wordFailed": "Failed to download word dictionary",
+      "termDownloaded": "Term dictionary downloaded",
+      "termFailed": "Failed to download term dictionary",
+      "domainDownloaded": "Domain dictionary downloaded",
+      "domainFailed": "Failed to download domain dictionary"
     },
     "suggest": {
       "hint": "Suggestion: {{details}}",

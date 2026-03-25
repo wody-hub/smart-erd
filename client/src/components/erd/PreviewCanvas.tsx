@@ -128,10 +128,14 @@ interface PreviewCanvasProps {
   onExportTableDefinition?: (content: string) => Promise<void> | void;
   /** 컬럼 정의서 엑셀 다운로드 핸들러 */
   onExportColumnDefinition?: (content: string) => Promise<void> | void;
+  /** 인덱스 정의서 엑셀 다운로드 핸들러 */
+  onExportIndexDefinition?: (content: string) => Promise<void> | void;
   /** 테이블 정의서 엑셀 다운로드 진행 여부 */
   tableDefinitionExporting?: boolean;
   /** 컬럼 정의서 엑셀 다운로드 진행 여부 */
   columnDefinitionExporting?: boolean;
+  /** 인덱스 정의서 엑셀 다운로드 진행 여부 */
+  indexDefinitionExporting?: boolean;
 }
 
 interface PreviewCanvasToolbarProps {
@@ -149,10 +153,14 @@ interface PreviewCanvasToolbarProps {
   onExportTableDefinition?: () => void;
   /** 컬럼 정의서 엑셀 다운로드 핸들러 */
   onExportColumnDefinition?: () => void;
+  /** 인덱스 정의서 엑셀 다운로드 핸들러 */
+  onExportIndexDefinition?: () => void;
   /** 테이블 정의서 엑셀 다운로드 진행 여부 */
   tableDefinitionExporting?: boolean;
   /** 컬럼 정의서 엑셀 다운로드 진행 여부 */
   columnDefinitionExporting?: boolean;
+  /** 인덱스 정의서 엑셀 다운로드 진행 여부 */
+  indexDefinitionExporting?: boolean;
 }
 
 /**
@@ -176,13 +184,18 @@ function PreviewCanvasToolbar({
   onOpenDictionary,
   onExportTableDefinition,
   onExportColumnDefinition,
+  onExportIndexDefinition,
   tableDefinitionExporting = false,
   columnDefinitionExporting = false,
+  indexDefinitionExporting = false,
 }: PreviewCanvasToolbarProps) {
   const { t } = useTranslation();
   const { exportPng, exportJpg, exportSvg, exportPdf, exportProgress } = useExportDiagram(diagramName);
   const isExportBusy =
-    exportProgress.isExporting || tableDefinitionExporting || columnDefinitionExporting;
+    exportProgress.isExporting ||
+    tableDefinitionExporting ||
+    columnDefinitionExporting ||
+    indexDefinitionExporting;
 
   return (
     <>
@@ -225,7 +238,7 @@ function PreviewCanvasToolbar({
               <DropdownMenuItem onClick={exportPdf} disabled={isExportBusy}>
                 PDF
               </DropdownMenuItem>
-              {(onExportTableDefinition || onExportColumnDefinition) && (
+              {(onExportTableDefinition || onExportColumnDefinition || onExportIndexDefinition) && (
                 <>
                   <DropdownMenuSeparator />
                   {onExportTableDefinition && (
@@ -236,6 +249,11 @@ function PreviewCanvasToolbar({
                   {onExportColumnDefinition && (
                     <DropdownMenuItem onClick={onExportColumnDefinition} disabled={isExportBusy || !hasGraph}>
                       {t('erd.toolbar.columnDefinitionExport')}
+                    </DropdownMenuItem>
+                  )}
+                  {onExportIndexDefinition && (
+                    <DropdownMenuItem onClick={onExportIndexDefinition} disabled={isExportBusy || !hasGraph}>
+                      {t('erd.toolbar.indexDefinitionExport')}
                     </DropdownMenuItem>
                   )}
                 </>
@@ -319,8 +337,10 @@ export default function PreviewCanvas({
   onOpenDictionary,
   onExportTableDefinition,
   onExportColumnDefinition,
+  onExportIndexDefinition,
   tableDefinitionExporting = false,
   columnDefinitionExporting = false,
+  indexDefinitionExporting = false,
 }: PreviewCanvasProps) {
   const { t } = useTranslation();
   const { persistedNodes, persistedEdges } = useCanvasStore(
@@ -561,6 +581,14 @@ export default function PreviewCanvas({
       serializeDiagramDefinitionExportContent(effectiveGraph.nodes, effectiveGraph.edges),
     );
   }, [effectiveGraph, onExportColumnDefinition]);
+  const handleExportIndexDefinition = useCallback(() => {
+    if (!onExportIndexDefinition || !effectiveGraph || effectiveGraph.nodes.length === 0) {
+      return;
+    }
+    void onExportIndexDefinition(
+      serializeDiagramDefinitionExportContent(effectiveGraph.nodes, effectiveGraph.edges),
+    );
+  }, [effectiveGraph, onExportIndexDefinition]);
 
   useEffect(() => {
     if (!tableFocusRequest || displayNodes.length === 0) {
@@ -600,8 +628,10 @@ export default function PreviewCanvas({
           onOpenDictionary={onOpenDictionary}
           onExportTableDefinition={handleExportTableDefinition}
           onExportColumnDefinition={handleExportColumnDefinition}
+          onExportIndexDefinition={handleExportIndexDefinition}
           tableDefinitionExporting={tableDefinitionExporting}
           columnDefinitionExporting={columnDefinitionExporting}
+          indexDefinitionExporting={indexDefinitionExporting}
         />
 
       {hasGraph ? (

@@ -12,6 +12,7 @@ import com.smarterd.domain.dictionary.service.BulkModels.BulkSaveResult;
 import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationResult;
 import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationRowResult;
 import com.smarterd.domain.dictionary.service.DomainBulkService;
+import com.smarterd.domain.dictionary.service.DomainDictionaryExportService;
 import com.smarterd.domain.dictionary.service.DomainService;
 import com.smarterd.domain.dictionary.service.DomainService.DomainResult;
 import com.smarterd.utils.ExcelUtils;
@@ -60,6 +61,9 @@ public class DomainController {
     /** 도메인 일괄 업로드 서비스 */
     private final DomainBulkService domainBulkService;
 
+    /** 도메인 사전 엑셀 다운로드 서비스 */
+    private final DomainDictionaryExportService domainDictionaryExportService;
+
     /**
      * 도메인을 생성한다.
      *
@@ -87,8 +91,13 @@ public class DomainController {
             jwt.getSubject(),
             teamId,
             setId,
+            request.domainGroup(),
+            request.domainClassification(),
             request.logicalName(),
             request.physicalType(),
+            request.dataType(),
+            request.dataLength(),
+            request.dataScale(),
             request.description()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(toDomainResponse(result));
@@ -170,8 +179,13 @@ public class DomainController {
                     teamId,
                     setId,
                     domainId,
+                    request.domainGroup(),
+                    request.domainClassification(),
                     request.logicalName(),
                     request.physicalType(),
+                    request.dataType(),
+                    request.dataLength(),
+                    request.dataScale(),
                     request.description()
                 )
             )
@@ -298,6 +312,28 @@ public class DomainController {
     }
 
     /**
+     * 도메인 사전 엑셀을 다운로드한다.
+     *
+     * @param jwt 인증된 JWT 토큰
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @param response HTTP 응답
+     * @throws IOException 엑셀 생성 실패 시
+     */
+    @Operation(summary = "도메인 사전 엑셀 다운로드", description = "현재 사전 세트의 도메인 사전을 엑셀로 다운로드한다.")
+    @ApiResponse(responseCode = "200", description = "도메인 사전 다운로드 성공")
+    @GetMapping("/download/excel")
+    public void downloadDomainDictionary(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
+        HttpServletResponse response
+    ) throws IOException {
+        final var excelData = domainDictionaryExportService.generateDomainDictionary(jwt.getSubject(), teamId, setId);
+        ExcelUtils.download(excelData, response);
+    }
+
+    /**
      * 도메인을 삭제한다.
      *
      * @param jwt      인증된 JWT 토큰
@@ -329,6 +365,11 @@ public class DomainController {
         return new DomainResponse(
             result.id(),
             result.logicalName(),
+            result.domainGroup(),
+            result.domainClassification(),
+            result.dataType(),
+            result.dataLength(),
+            result.dataScale(),
             result.physicalType(),
             result.description(),
             result.teamId(),

@@ -104,11 +104,7 @@ public class DiagramTableDefinitionExportService {
                 return List.of();
             }
 
-            final var databaseName = AppStringUtils.defaultIfBlank(diagram.getProject().getName(), "");
-            final var ownerLoginId = AppStringUtils.defaultIfBlank(
-                diagram.getProject().getTeam().getOwner().getLoginId(),
-                ""
-            );
+            final var exportMetadata = resolveExportMetadata(rootNode);
 
             final List<TableDefinitionRow> rows = new ArrayList<>();
             var index = 1;
@@ -131,8 +127,8 @@ public class DiagramTableDefinitionExportService {
                 rows.add(
                     new TableDefinitionRow(
                         index++,
-                        databaseName,
-                        ownerLoginId,
+                        exportMetadata.databaseName(),
+                        exportMetadata.tableOwner(),
                         logicalTableName,
                         physicalTableName,
                         DEFAULT_TABLE_TYPE,
@@ -207,6 +203,17 @@ public class DiagramTableDefinitionExportService {
         return AppStringUtils.defaultIfBlank(node.asText(null), "").trim();
     }
 
+    private DiagramExportMetadata resolveExportMetadata(JsonNode rootNode) {
+        final var metadataNode = rootNode.path("metadata");
+        if (!metadataNode.isObject()) {
+            return new DiagramExportMetadata("", "");
+        }
+        return new DiagramExportMetadata(
+            trimToEmpty(metadataNode.path("databaseName")),
+            trimToEmpty(metadataNode.path("tableOwner"))
+        );
+    }
+
     /**
      * 테이블 정의서 데이터 행.
      *
@@ -235,4 +242,6 @@ public class DiagramTableDefinitionExportService {
         String remark,
         String dataCount
     ) {}
+
+    private record DiagramExportMetadata(String databaseName, String tableOwner) {}
 }

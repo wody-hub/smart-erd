@@ -12,6 +12,7 @@ import com.smarterd.domain.dictionary.service.BulkModels.BulkSaveResult;
 import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationResult;
 import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationRowResult;
 import com.smarterd.domain.dictionary.service.TermBulkService;
+import com.smarterd.domain.dictionary.service.TermDictionaryExportService;
 import com.smarterd.domain.dictionary.service.TermService;
 import com.smarterd.domain.dictionary.service.TermService.TermResult;
 import com.smarterd.utils.ExcelUtils;
@@ -59,6 +60,9 @@ public class TermController {
 
     /** 용어 일괄 업로드 서비스 */
     private final TermBulkService termBulkService;
+
+    /** 용어 사전 엑셀 다운로드 서비스 */
+    private final TermDictionaryExportService termDictionaryExportService;
 
     /**
      * 용어를 생성한다.
@@ -292,6 +296,28 @@ public class TermController {
     ) throws IOException {
         final var excelData = termBulkService.generateTemplate(jwt.getSubject(), teamId, setId, locale);
         ExcelUtils.download(excelData, response, "term-template");
+    }
+
+    /**
+     * 용어 사전 엑셀을 다운로드한다.
+     *
+     * @param jwt 인증된 JWT 토큰
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @param response HTTP 응답
+     * @throws IOException 엑셀 생성 실패 시
+     */
+    @Operation(summary = "용어 사전 엑셀 다운로드", description = "현재 사전 세트의 용어 사전을 엑셀로 다운로드한다.")
+    @ApiResponse(responseCode = "200", description = "용어 사전 다운로드 성공")
+    @GetMapping("/download/excel")
+    public void downloadTermDictionary(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
+        HttpServletResponse response
+    ) throws IOException {
+        final var excelData = termDictionaryExportService.generateTermDictionary(jwt.getSubject(), teamId, setId);
+        ExcelUtils.download(excelData, response);
     }
 
     /**

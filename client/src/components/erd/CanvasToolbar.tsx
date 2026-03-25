@@ -44,6 +44,8 @@ interface CanvasToolbarProps {
   onExportTableDefinition?: () => void;
   /** 컬럼 정의서 내보내기 핸들러 */
   onExportColumnDefinition?: () => void;
+  /** 인덱스 정의서 내보내기 핸들러 */
+  onExportIndexDefinition?: () => void;
   /** SQL DDL 가져오기 핸들러 */
   onImportDdl?: () => void;
   /** 코드 에디터 활성 여부 */
@@ -86,6 +88,8 @@ interface CanvasToolbarProps {
  * @param props.onExportPdf         PDF 내보내기 핸들러
  * @param props.onExportDdl         SQL DDL 내보내기 핸들러
  * @param props.onExportTableDefinition 테이블 정의서 내보내기 핸들러
+ * @param props.onExportColumnDefinition 컬럼 정의서 내보내기 핸들러
+ * @param props.onExportIndexDefinition 인덱스 정의서 내보내기 핸들러
  * @param props.onImportDdl         SQL DDL 가져오기 핸들러
  * @param props.codeEditorActive    코드 에디터 활성 여부
  * @param props.onToggleCodeEditor  코드 에디터 토글 핸들러
@@ -107,6 +111,7 @@ export default function CanvasToolbar({
   onExportDdl,
   onExportTableDefinition,
   onExportColumnDefinition,
+  onExportIndexDefinition,
   onImportDdl,
   codeEditorActive,
   onToggleCodeEditor,
@@ -216,7 +221,7 @@ export default function CanvasToolbar({
             <DropdownMenuItem onClick={onExportPdf} disabled={isExporting}>
               PDF
             </DropdownMenuItem>
-            {(onExportTableDefinition || onExportColumnDefinition) && (
+            {(onExportTableDefinition || onExportColumnDefinition || onExportIndexDefinition) && (
               <>
                 <DropdownMenuSeparator />
                 {onExportTableDefinition && (
@@ -227,6 +232,11 @@ export default function CanvasToolbar({
                 {onExportColumnDefinition && (
                   <DropdownMenuItem onClick={onExportColumnDefinition} disabled={isExporting}>
                     {t('erd.toolbar.columnDefinitionExport')}
+                  </DropdownMenuItem>
+                )}
+                {onExportIndexDefinition && (
+                  <DropdownMenuItem onClick={onExportIndexDefinition} disabled={isExporting}>
+                    {t('erd.toolbar.indexDefinitionExport')}
                   </DropdownMenuItem>
                 )}
               </>

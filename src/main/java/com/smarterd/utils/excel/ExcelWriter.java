@@ -21,9 +21,9 @@ import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.WorkbookUtil;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.lang.Nullable;
+import org.springframework.web.util.UriUtils;
 
 /**
  * 엑셀 생성/다운로드를 담당하는 클래스.
@@ -43,6 +43,7 @@ import org.springframework.lang.Nullable;
 public class ExcelWriter<T> implements AutoCloseable {
 
     private static final int MAX_SHEET_NAME_LENGTH = 31;
+    private static final String DEFAULT_DOWNLOAD_FILE_NAME = "download.xlsx";
 
     private List<T> dataList;
     private List<Method> reqMethods;
@@ -388,10 +389,7 @@ public class ExcelWriter<T> implements AutoCloseable {
         final var fileName = AppStringUtils.defaultIfBlank(baseFileName, "excel") + ".xlsx";
 
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        response.setHeader(
-            HttpHeaders.CONTENT_DISPOSITION,
-            ContentDisposition.attachment().filename(fileName, StandardCharsets.UTF_8).build().toString()
-        );
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, buildAttachmentContentDisposition(fileName));
 
         try (final var stream = response.getOutputStream()) {
             workbook.write(stream);
@@ -404,6 +402,94 @@ public class ExcelWriter<T> implements AutoCloseable {
             workbook.close();
             throw new ExcelException("Error occurred while downloading Excel file.");
         }
+    }
+
+    private static String buildAttachmentContentDisposition(String fileName) {
+        final var normalizedFileName = normalizeDownloadFileName(fileName);
+        if (isAsciiFileName(normalizedFileName)) {
+            return "attachment; filename=\"" + escapeQuotedValue(normalizedFileName) + "\"";
+        }
+
+        final var asciiFallback = buildAsciiFallbackFileName(normalizedFileName);
+        return "attachment; filename=\""
+            + escapeQuotedValue(asciiFallback)
+            + "\"; filename*=UTF-8''"
+            + UriUtils.encode(normalizedFileName, StandardCharsets.UTF_8);
+    }
+
+    private static String normalizeDownloadFileName(String fileName) {
+        final var sanitized = new StringBuilder(fileName.length());
+        for (var index = 0; index < fileName.length(); index++) {
+            final var character = fileName.charAt(index);
+            if (character == '\r' || character == '\n') {
+                continue;
+            }
+            if (character == '/' || character == '\\') {
+                sanitized.append('-');
+                continue;
+            }
+            sanitized.append(character);
+        }
+
+        return AppStringUtils.defaultIfBlank(AppStringUtils.trimToNull(sanitized.toString()), DEFAULT_DOWNLOAD_FILE_NAME);
+    }
+
+    private static boolean isAsciiFileName(String fileName) {
+        for (var index = 0; index < fileName.length(); index++) {
+            if (fileName.charAt(index) > 0x7E) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String buildAsciiFallbackFileName(String fileName) {
+        final var extension = AppStringUtils.endsWithIgnoreCase(fileName, ".xlsx") ? ".xlsx" : "";
+        final var baseName = extension.isEmpty() ? fileName : fileName.substring(0, fileName.length() - extension.length());
+        final var asciiBaseName = sanitizeAsciiBaseName(baseName);
+
+        if (AppStringUtils.isBlank(asciiBaseName)) {
+            return "download" + extension;
+        }
+
+        return asciiBaseName + extension;
+    }
+
+    private static String sanitizeAsciiBaseName(String baseName) {
+        final var sanitized = new StringBuilder(baseName.length());
+        var previousWasSeparator = false;
+
+        for (var index = 0; index < baseName.length(); index++) {
+            final var character = baseName.charAt(index);
+            if (character <= 0x7E && Character.isLetterOrDigit(character)) {
+                sanitized.append(character);
+                previousWasSeparator = false;
+                continue;
+            }
+
+            if (character == '-' || character == '_' || character == ' ' || character == '.') {
+                if (sanitized.length() > 0 && !previousWasSeparator) {
+                    sanitized.append('-');
+                    previousWasSeparator = true;
+                }
+                continue;
+            }
+
+            if (character > 0x7E && sanitized.length() > 0 && !previousWasSeparator) {
+                sanitized.append('-');
+                previousWasSeparator = true;
+            }
+        }
+
+        final var lastIndex = sanitized.length() - 1;
+        if (lastIndex >= 0 && sanitized.charAt(lastIndex) == '-') {
+            sanitized.deleteCharAt(lastIndex);
+        }
+        return sanitized.toString();
+    }
+
+    private static String escapeQuotedValue(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     @Override
