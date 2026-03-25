@@ -324,6 +324,18 @@ Accept-Language: ko → { "error": "사용자를 찾을 수 없습니다: testus
 | i18n          | i18next, react-i18next (FE) + Spring MessageSource (BE)                          |
 | Misc          | p6spy 1.12.1, Sonner, Prettier + prettier-plugin-java, ESLint, SonarQube        |
 
+## SOLID 원칙 (MUST)
+
+아키텍처와 코드는 반드시 SOLID 원칙을 준수해야 하며, 위반해서는 안 된다.
+
+| 원칙 | 설명 | 점검 기준 |
+|------|------|----------|
+| **S — 단일 책임 원칙 (SRP)** | 하나의 클래스/모듈/훅은 하나의 변경 사유만 가진다 | 여러 관심사(렌더링+동기화+직렬화 등)가 하나의 파일에 혼재하면 위반 |
+| **O — 개방-폐쇄 원칙 (OCP)** | 확장에는 열려 있고 수정에는 닫혀 있다 | 새 기능(플러그인, 핸들러, Projector 등) 추가 시 기존 코드 수정이 필요하면 위반 |
+| **L — 리스코프 치환 원칙 (LSP)** | 구현체는 상위 타입의 계약을 준수한다 | 구현체가 예외를 던지거나 부분적으로만 동작하면 위반 |
+| **I — 인터페이스 분리 원칙 (ISP)** | 클라이언트는 사용하지 않는 메서드에 의존하지 않는다 | 거대 인터페이스 대신 역할별 포트(Command/Query/Subscription)로 분리 |
+| **D — 의존성 역전 원칙 (DIP)** | 상위 모듈은 하위 모듈의 구체 타입에 직접 의존하지 않는다 | View가 Y.Doc 등 CRDT 구현체에 직접 의존하면 위반. 추상(인터페이스/포트)에 의존 |
+
 ## Code Standards
 
 ### Modern Java Idioms (MUST follow)

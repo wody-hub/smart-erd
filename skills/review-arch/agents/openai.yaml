@@ -1,4 +1,4 @@
 interface:
   display_name: "Architecture Reviewer"
-  short_description: "Review structural design and security risks"
-  default_prompt: "Use $review-arch to inspect changed files for architecture and OWASP-focused security issues with severity-ranked findings."
+  short_description: "Review structural design defects and dependency risks"
+  default_prompt: "Use $review-arch to inspect changed files for architecture defects in system/package/class/dependency/data-model design. Focus on layered and hexagonal boundaries, DDD alignment, dependency direction, business-logic placement, ERD and entity responsibility, and SOLID/DIP. The goal is not to create good design but to find bad design. Review is not praise — it is the act of finding defects. Return severity-ranked findings with concrete file:line evidence, and for each finding provide problem, cause, improvement direction, and a structural improvement example."
