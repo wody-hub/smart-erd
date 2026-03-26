@@ -125,7 +125,8 @@ public class DomainController {
             name = "q"
         ) String keyword
     ) {
-        final var resultPage = domainService.getDomains(jwt.getSubject(), teamId, setId, page, size, keyword)
+        final var resultPage = domainService
+            .getDomains(jwt.getSubject(), teamId, setId, page, size, keyword)
             .map(this::toDomainResponse);
         return ResponseEntity.ok(PageResponse.from(resultPage));
     }
@@ -320,7 +321,10 @@ public class DomainController {
      * @param response HTTP 응답
      * @throws IOException 엑셀 생성 실패 시
      */
-    @Operation(summary = "도메인 사전 엑셀 다운로드", description = "현재 사전 세트의 도메인 사전을 엑셀로 다운로드한다.")
+    @Operation(
+        summary = "도메인 사전 엑셀 다운로드",
+        description = "현재 사전 세트의 도메인 사전을 엑셀로 다운로드한다."
+    )
     @ApiResponse(responseCode = "200", description = "도메인 사전 다운로드 성공")
     @GetMapping("/download/excel")
     public void downloadDomainDictionary(

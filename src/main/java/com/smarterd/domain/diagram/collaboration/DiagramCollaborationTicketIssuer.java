@@ -35,10 +35,6 @@ public class DiagramCollaborationTicketIssuer implements CollaborationTicketIssu
     @Override
     public CollaborationTicketIssueResult issueVerifiedTicket(String loginId, CollaborationResourceKey resourceKey) {
         final var result = wsTicketService.issueVerifiedTicket(loginId, resourceKeyFactory.parseDiagramId(resourceKey));
-        return new CollaborationTicketIssueResult(
-            result.ticket(),
-            result.userId(),
-            result.presenceProtocolVersion()
-        );
+        return new CollaborationTicketIssueResult(result.ticket(), result.userId(), result.presenceProtocolVersion());
     }
 }

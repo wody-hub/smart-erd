@@ -1,21 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import useCanvasStore from '@/stores/erd/useCanvasStore';
-import type { TableNode, ERDEdge } from '@/types/erd';
-
 /**
  * useCodeEditorRefresh 훅의 옵션.
  */
 interface UseCodeEditorRefreshOptions {
-  /**
-   * ERD 노드/엣지를 코드 텍스트로 변환하는 생성 함수.
-   *
-   * @param nodes 테이블 노드 배열
-   * @param edges 엣지 배열
-   * @returns 생성된 코드 텍스트
-   */
-  generate: (nodes: TableNode[], edges: ERDEdge[]) => string;
+  /** 현재 persisted ERD 기준으로 코드 텍스트를 생성한다 */
+  generateFromErd: () => string;
   /** 생성된 코드를 에디터에 반영하는 핸들러 */
   onGenerated: (text: string) => void;
+  /** 현재 persisted ERD에 노드가 있는지 여부 */
+  hasNodes: boolean;
   /** 현재 에디터 텍스트 (Refresh 시 확인 다이얼로그 표시 판단용) */
   currentText: string;
   /** 초기화 가능 여부 (사전 데이터 로딩 등 선행 조건) */
@@ -52,8 +45,9 @@ interface UseCodeEditorRefreshReturn {
  * @returns Refresh 관련 상태 및 핸들러
  */
 export function useCodeEditorRefresh({
-  generate,
+  generateFromErd,
   onGenerated,
+  hasNodes,
   currentText,
   ready = true,
   skipInitialRefresh = false,
@@ -68,11 +62,8 @@ export function useCodeEditorRefresh({
   /** ERD → 코드 생성을 실행한다 */
   const executeRefresh = useCallback(() => {
     beforeExecuteRefresh?.();
-    const nodes = useCanvasStore.getState().nodes as TableNode[];
-    const edges = useCanvasStore.getState().edges as ERDEdge[];
-    const generated = generate(nodes, edges);
-    onGenerated(generated);
-  }, [beforeExecuteRefresh, generate, onGenerated]);
+    onGenerated(generateFromErd());
+  }, [beforeExecuteRefresh, generateFromErd, onGenerated]);
 
   /** Refresh 버튼 핸들러 (편집 내용이 있으면 확인 다이얼로그) */
   const handleRefresh = useCallback(() => {
@@ -83,9 +74,6 @@ export function useCodeEditorRefresh({
     }
   }, [currentText, executeRefresh]);
 
-  /** ERD에 노드가 있는지 여부 */
-  const hasNodes = useCanvasStore((s) => s.nodes.length > 0);
-
   // 마운트 시 ERD → 코드 초기 채우기 (1회)
   useEffect(() => {
     if (skipInitialRefresh) {
@@ -94,12 +82,11 @@ export function useCodeEditorRefresh({
     }
     if (!initializedRef.current && ready) {
       initializedRef.current = true;
-      const nodes = useCanvasStore.getState().nodes as TableNode[];
-      if (nodes.length > 0) {
+      if (hasNodes) {
         executeRefresh();
       }
     }
-  }, [executeRefresh, ready, skipInitialRefresh]);
+  }, [executeRefresh, hasNodes, ready, skipInitialRefresh]);
 
   return {
     executeRefresh,

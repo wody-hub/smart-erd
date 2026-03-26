@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type {
   AwarenessState,
   ConnectionStatus,
+  DocumentChangeSummary,
   PresenceMode,
   PresenceParticipant,
   PresencePeerJoinedPayload,
@@ -45,6 +46,8 @@ interface CollaborationState {
   remoteEdgeAwareness: Map<number, AwarenessState>;
   /** 로컬 edge waypoint 드래그 세션 */
   localEdgeDrag: LocalEdgeWaypointDrag | null;
+  /** 마지막 문서 변경 요약 */
+  lastDocumentChange: DocumentChangeSummary | null;
 
   /** 연결 상태를 설정한다. */
   setConnectionStatus: (status: ConnectionStatus) => void;
@@ -71,6 +74,8 @@ interface CollaborationState {
   updateLocalEdgeDragPreview: (waypoints: Waypoint[], routePoints?: Waypoint[]) => void;
   /** 로컬 edge drag 세션을 종료한다. */
   clearLocalEdgeDrag: () => void;
+  /** 마지막 문서 변경 요약을 반영한다. */
+  applyDocumentChange: (summary: DocumentChangeSummary) => void;
 
   /** 모든 협업 상태를 초기화한다. */
   reset: () => void;
@@ -88,8 +93,7 @@ function areWaypointsEqual(left?: Waypoint[] | null, right?: Waypoint[] | null):
     return false;
   }
   return left.every(
-    (waypoint, index) =>
-      waypoint.x === right[index]?.x && waypoint.y === right[index]?.y,
+    (waypoint, index) => waypoint.x === right[index]?.x && waypoint.y === right[index]?.y,
   );
 }
 
@@ -128,7 +132,10 @@ function areCursorAwarenessEqual(
   );
 }
 
-function areEdgeAwarenessEqual(left?: AwarenessState | null, right?: AwarenessState | null): boolean {
+function areEdgeAwarenessEqual(
+  left?: AwarenessState | null,
+  right?: AwarenessState | null,
+): boolean {
   if (!left && !right) {
     return true;
   }
@@ -205,6 +212,7 @@ const useCollaborationStore = create<CollaborationState>((set, get) => ({
   remoteCursors: new Map(),
   remoteEdgeAwareness: new Map(),
   localEdgeDrag: null,
+  lastDocumentChange: null,
 
   setConnectionStatus: (status) => set({ connectionStatus: status }),
 
@@ -402,6 +410,8 @@ const useCollaborationStore = create<CollaborationState>((set, get) => ({
 
   clearLocalEdgeDrag: () => set({ localEdgeDrag: null }),
 
+  applyDocumentChange: (summary) => set({ lastDocumentChange: summary }),
+
   reset: () =>
     set({
       connectionStatus: 'disconnected',
@@ -413,6 +423,7 @@ const useCollaborationStore = create<CollaborationState>((set, get) => ({
       remoteCursors: new Map(),
       remoteEdgeAwareness: new Map(),
       localEdgeDrag: null,
+      lastDocumentChange: null,
     }),
 }));
 

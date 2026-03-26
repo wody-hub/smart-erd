@@ -8,7 +8,6 @@ import java.util.Objects;
  * @param sessionId WebSocket 세션 ID
  */
 public record DiagramSessionRef(String sessionId) {
-
     public DiagramSessionRef {
         Objects.requireNonNull(sessionId, "sessionId must not be null");
     }

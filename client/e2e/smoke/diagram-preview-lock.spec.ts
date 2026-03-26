@@ -1,23 +1,90 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '@playwright/test';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
   captureDiagramReady,
+  clickBackupAndWaitForPersistedDiagramSave,
   diagramUrl,
   expectDiagramHeaderVisible,
-  getE2EConfig,
+  getE2EProvisioningConfig,
   loginViaUi,
-  resolveTargetDiagram,
+  provisionCollaborationFixture,
   waitForEditableDiagram,
 } from '../shared/diagram-e2e';
 
 const WS_TICKET_DELAY_MS = 3_000;
 
+async function putDiagramContent(
+  request: APIRequestContext,
+  apiBaseUrl: string,
+  token: string,
+  target: {
+    teamId: number;
+    projectId: number;
+    diagramId: number;
+  },
+  content: string,
+): Promise<void> {
+  const response = await request.put(
+    `${apiBaseUrl}/teams/${target.teamId}/projects/${target.projectId}/diagrams/${target.diagramId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Accept-Language': 'ko',
+        'Content-Type': 'application/json',
+      },
+      data: { content },
+    },
+  );
+
+  if (!response.ok()) {
+    throw new Error(`Failed to seed diagram content: ${response.status()}`);
+  }
+}
+
 test('diagram preview renders before ws sync and unlocks editing afterwards @smoke', async ({
   page,
+  request,
 }) => {
-  const config = getE2EConfig();
-  const token = await loginViaUi(page, config);
-  const target = await resolveTargetDiagram(token, config);
+  const config = getE2EProvisioningConfig();
+  const fixture = await provisionCollaborationFixture(config);
+  const token = await loginViaUi(page, { ...config, ...fixture });
+  const target = fixture.target;
+
+  await putDiagramContent(
+    request,
+    config.apiBaseUrl,
+    token,
+    target,
+    JSON.stringify({
+      nodes: [
+        {
+          id: 'table-preview-lock',
+          type: 'table',
+          position: { x: 480, y: 240 },
+          data: {
+            label: 'preview_lock_users',
+            columns: [
+              {
+                id: 'col-preview-lock-id',
+                logicalName: 'id',
+                name: 'id',
+                type: 'BIGINT',
+                nullable: false,
+                pk: true,
+              },
+            ],
+          },
+        },
+      ],
+      edges: [],
+      groups: [],
+    }),
+  );
+
+  await page.goto(diagramUrl(config, target), { waitUntil: 'domcontentloaded' });
+  await expectDiagramHeaderVisible(page, target);
+  await waitForEditableDiagram(page, 30_000);
+  await clickBackupAndWaitForPersistedDiagramSave(page, target);
 
   await page.route('**/api/ws-ticket', async (route) => {
     await delay(WS_TICKET_DELAY_MS);

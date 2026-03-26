@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { Node, Connection } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
+import { useDiagramErdEdgeActions } from '@/collaboration/channel/diagram/use-diagram-erd-edge-actions';
 import { toast } from 'sonner';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { RelationType, TableNodeData } from '@/types/erd';
@@ -26,10 +27,9 @@ export function useFkConnectMode() {
   const [pendingConnection, setPendingConnection] = useState<Connection | null>(null);
 
   const nodes = useCanvasStore((s) => s.nodes);
-  const addFkRelation = useCanvasStore((s) => s.addFkRelation);
-  const connectWithRelationType = useCanvasStore((s) => s.connectWithRelationType);
   const setHighlightedNodes = useCanvasStore((s) => s.setHighlightedNodes);
   const clearHighlights = useCanvasStore((s) => s.clearHighlights);
+  const edgeActions = useDiagramErdEdgeActions();
 
   /** FK 모드 상태를 초기화하고 하이라이트를 해제한다. */
   const resetFkMode = useCallback(() => {
@@ -105,11 +105,11 @@ export function useFkConnectMode() {
   const handleFkTypeSelect = (relationType: RelationType) => {
     // Handle 드래그 연결
     if (pendingConnection) {
-      connectWithRelationType(
+      edgeActions.connectEdge(
         pendingConnection.source!,
         pendingConnection.target!,
-        pendingConnection.sourceHandle ?? undefined,
-        pendingConnection.targetHandle ?? undefined,
+        pendingConnection.sourceHandle ?? '',
+        pendingConnection.targetHandle ?? '',
         relationType,
       );
       setPendingConnection(null);
@@ -127,7 +127,7 @@ export function useFkConnectMode() {
     const pkColumns = parentNode.data.columns.filter((c) => c.pk);
     const existingNames = childNode.data.columns.map((c) => c.name);
 
-    const createdCount = addFkRelation({
+    const createdCount = edgeActions.addFkRelation({
       parentNodeId: parentNode.id,
       childNodeId: childNode.id,
       pkColumns,

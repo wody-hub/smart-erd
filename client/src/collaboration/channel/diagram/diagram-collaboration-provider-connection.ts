@@ -11,7 +11,9 @@ export interface DiagramCollaborationProviderConnectOptions<TTicket = unknown> {
   getTicket: () => Promise<TTicket>;
 }
 
-interface DiagramCollaborationProviderConnectionOptions<TProvider extends DiagramCollaborationProviderLike> {
+interface DiagramCollaborationProviderConnectionOptions<
+  TProvider extends DiagramCollaborationProviderLike,
+> {
   ydoc: Y.Doc;
   diagramId: string;
   onProviderReady: (provider: TProvider) => void;
@@ -57,12 +59,17 @@ export class DiagramCollaborationProviderConnection<
 
   constructor(
     private readonly options: DiagramCollaborationProviderConnectionOptions<TProvider>,
-    private readonly dependencies: DiagramCollaborationProviderConnectionDependencies<TProvider, TTicket>,
+    private readonly dependencies: DiagramCollaborationProviderConnectionDependencies<
+      TProvider,
+      TTicket
+    >,
   ) {}
 
   connect(): void {
     if (this.provider) {
-      throw new Error('DiagramCollaborationProviderConnection.connect() called twice without dispose()');
+      throw new Error(
+        'DiagramCollaborationProviderConnection.connect() called twice without dispose()',
+      );
     }
 
     const { transport, providerBinding, providerEvents } = this.dependencies;
@@ -89,7 +96,7 @@ export class DiagramCollaborationProviderConnection<
       this.dependencies.providerBinding.dispose(provider);
       provider?.destroy();
     } catch (error) {
-      console.error('[useYjsCollaboration] provider.destroy() 실패:', error);
+      console.error('[useDiagramCollaborationSession] provider.destroy() 실패:', error);
     } finally {
       this.provider = null;
       this.options.onProviderDisposed();

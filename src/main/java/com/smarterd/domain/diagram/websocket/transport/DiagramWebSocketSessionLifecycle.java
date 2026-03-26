@@ -34,7 +34,12 @@ public class DiagramWebSocketSessionLifecycle {
      * @param info 정규화된 세션 메타데이터
      */
     public void establish(WebSocketSession session, DiagramWebSocketSessionInfo info) {
-        final var joinResult = diagramSessionTransportUseCase.join(session, info.diagramId(), info.userId(), info.userName());
+        final var joinResult = diagramSessionTransportUseCase.join(
+            session,
+            info.diagramId(),
+            info.userId(),
+            info.userName()
+        );
         if (!joinResult.accepted()) {
             try {
                 session.close(Objects.requireNonNull(CloseStatus.POLICY_VIOLATION));
@@ -84,5 +89,4 @@ public class DiagramWebSocketSessionLifecycle {
             );
         }
     }
-
 }

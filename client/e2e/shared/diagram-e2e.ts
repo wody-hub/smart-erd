@@ -383,6 +383,30 @@ export async function loginViaUi(page: Page, config: E2EConfig): Promise<string>
   return token;
 }
 
+export async function openCodeEditor(page: Page, timeoutMs = 15_000): Promise<void> {
+  await page.getByRole('button', { name: /^(코드|Code)$/ }).click();
+  await page.waitForFunction(
+    () => Boolean(window.monaco?.editor?.getModels?.().length),
+    undefined,
+    { timeout: timeoutMs },
+  );
+}
+
+export async function waitForMonacoModelValueContains(
+  page: Page,
+  fragment: string,
+  timeoutMs = 15_000,
+): Promise<void> {
+  await page.waitForFunction(
+    (expected) => {
+      const model = window.monaco?.editor?.getModels?.()[0];
+      return model?.getValue().includes(expected) ?? false;
+    },
+    fragment,
+    { timeout: timeoutMs },
+  );
+}
+
 export async function resolveTargetDiagram(
   token: string,
   config: E2EConfig,

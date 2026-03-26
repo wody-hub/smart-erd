@@ -20,9 +20,7 @@ public class DiagramCollaborationSessionMetadataPolicy implements CollaborationA
      *
      * @param resourceKeyFactory 다이어그램 resource key factory
      */
-    public DiagramCollaborationSessionMetadataPolicy(
-        DiagramCollaborationResourceKeyFactory resourceKeyFactory
-    ) {
+    public DiagramCollaborationSessionMetadataPolicy(DiagramCollaborationResourceKeyFactory resourceKeyFactory) {
         this.resourceKeyFactory = resourceKeyFactory;
     }
 

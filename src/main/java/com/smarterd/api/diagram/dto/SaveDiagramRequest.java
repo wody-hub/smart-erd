@@ -1,7 +1,9 @@
 package com.smarterd.api.diagram.dto;
 
+import com.smarterd.collaboration.CollaborationLimits;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 /**
  * 다이어그램 저장(콘텐츠 갱신) 요청 DTO.
@@ -11,6 +13,10 @@ import jakarta.validation.constraints.NotNull;
  */
 @Schema(description = "다이어그램 저장 요청")
 public record SaveDiagramRequest(
-    @NotNull(message = "{validation.not-null.content}") @Schema(description = "직렬화된 React Flow JSON") String content,
-    @Schema(description = "현재 Y.Doc 전체 상태 update (base64 인코딩, 선택)") byte[] ydocSnapshot
+    @NotNull(message = "{validation.not-null.content}")
+    @Schema(description = "직렬화된 React Flow JSON")
+    String content,
+    @Size(max = CollaborationLimits.MAX_SNAPSHOT_BYTES, message = "{validation.size.ydoc-snapshot}")
+    @Schema(description = "현재 Y.Doc 전체 상태 update (base64 인코딩, 선택)")
+    byte[] ydocSnapshot
 ) {}

@@ -18,8 +18,8 @@ import com.smarterd.application.diagram.command.SaveDiagramUseCase;
 import com.smarterd.domain.diagram.service.DiagramColumnDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramIndexDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService;
-import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
+import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
 import com.smarterd.utils.excel.ExcelData;
 import java.time.Instant;
 import java.util.Base64;
@@ -31,14 +31,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @ExtendWith(MockitoExtension.class)
 class DiagramControllerMvcTest {
@@ -85,14 +85,22 @@ class DiagramControllerMvcTest {
     @Test
     void saveDiagram_bindsBase64SnapshotAndReturnsJsonBody() throws Exception {
         final var snapshot = new byte[] { 0x01, 0x02 };
-        final var result = new SaveDiagramResult(17L, true, 17L, Instant.parse("2026-03-23T12:00:00Z"), Instant.parse("2026-03-23T12:00:01Z"));
+        final var result = new SaveDiagramResult(
+            17L,
+            true,
+            17L,
+            Instant.parse("2026-03-23T12:00:00Z"),
+            Instant.parse("2026-03-23T12:00:01Z")
+        );
 
-        when(saveDiagramUseCase.execute(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}"), any(byte[].class)))
-            .thenReturn(result);
+        when(
+            saveDiagramUseCase.execute(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}"), any(byte[].class))
+        ).thenReturn(result);
 
-        mockMvc.perform(
+        mockMvc
+            .perform(
                 put("/api/teams/1/projects/10/diagrams/100")
-                    .with(request -> {
+                    .with((request) -> {
                         request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                         return request;
                     })
@@ -113,19 +121,36 @@ class DiagramControllerMvcTest {
             .andExpect(jsonPath("$.hasYdocSnapshot").value(true));
 
         final var snapshotCaptor = ArgumentCaptor.forClass(byte[].class);
-        verify(saveDiagramUseCase).execute(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}"), snapshotCaptor.capture());
+        verify(saveDiagramUseCase).execute(
+            eq("tester"),
+            eq(1L),
+            eq(10L),
+            eq(100L),
+            eq("{\"nodes\":[]}"),
+            snapshotCaptor.capture()
+        );
         org.assertj.core.api.Assertions.assertThat(snapshotCaptor.getValue()).isEqualTo(snapshot);
     }
 
     @Test
     void persistYdocSnapshot_bindsBase64SnapshotAndReturnsPersistedFlag() throws Exception {
         final var snapshot = new byte[] { 0x11 };
-        when(persistDiagramSnapshotUseCase.execute(eq("tester"), eq(1L), eq(10L), eq(100L), eq("17"), any(byte[].class)))
-            .thenReturn(false);
+        when(
+            persistDiagramSnapshotUseCase.execute(
+                eq("tester"),
+                eq(1L),
+                eq(10L),
+                eq(100L),
+                eq("17"),
+                any(byte[].class),
+                eq(false)
+            )
+        ).thenReturn(false);
 
-        mockMvc.perform(
+        mockMvc
+            .perform(
                 post("/api/teams/1/projects/10/diagrams/100/ydoc-snapshot")
-                    .with(request -> {
+                    .with((request) -> {
                         request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                         return request;
                     })
@@ -145,7 +170,15 @@ class DiagramControllerMvcTest {
             .andExpect(jsonPath("$.persisted").value(false));
 
         final var snapshotCaptor = ArgumentCaptor.forClass(byte[].class);
-        verify(persistDiagramSnapshotUseCase).execute(eq("tester"), eq(1L), eq(10L), eq(100L), eq("17"), snapshotCaptor.capture());
+        verify(persistDiagramSnapshotUseCase).execute(
+            eq("tester"),
+            eq(1L),
+            eq(10L),
+            eq(100L),
+            eq("17"),
+            snapshotCaptor.capture(),
+            eq(false)
+        );
         org.assertj.core.api.Assertions.assertThat(snapshotCaptor.getValue()).isEqualTo(snapshot);
     }
 
@@ -153,12 +186,20 @@ class DiagramControllerMvcTest {
     void downloadTableDefinition_returnsExcelAttachment() throws Exception {
         final var workbook = new XSSFWorkbook();
         workbook.createSheet("테이블 정의서").createRow(0).createCell(0).setCellValue("데이터베이스 정의");
-        when(diagramTableDefinitionExportService.generateTableDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}")))
-            .thenReturn(new ExcelData(workbook, "diagram-table-definition"));
+        when(
+            diagramTableDefinitionExportService.generateTableDefinition(
+                eq("tester"),
+                eq(1L),
+                eq(10L),
+                eq(100L),
+                eq("{\"nodes\":[]}")
+            )
+        ).thenReturn(new ExcelData(workbook, "diagram-table-definition"));
 
-        mockMvc.perform(
+        mockMvc
+            .perform(
                 post("/api/teams/1/projects/10/diagrams/100/table-definition")
-                    .with(request -> {
+                    .with((request) -> {
                         request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                         return request;
                     })
@@ -166,22 +207,40 @@ class DiagramControllerMvcTest {
                     .content(objectMapper.writeValueAsString(java.util.Map.of("content", "{\"nodes\":[]}")))
             )
             .andExpect(status().isOk())
-            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("diagram-table-definition.xlsx")));
+            .andExpect(
+                header().string(
+                    "Content-Disposition",
+                    org.hamcrest.Matchers.containsString("diagram-table-definition.xlsx")
+                )
+            );
 
-        verify(diagramTableDefinitionExportService)
-            .generateTableDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}"));
+        verify(diagramTableDefinitionExportService).generateTableDefinition(
+            eq("tester"),
+            eq(1L),
+            eq(10L),
+            eq(100L),
+            eq("{\"nodes\":[]}")
+        );
     }
 
     @Test
     void downloadColumnDefinition_returnsExcelAttachment() throws Exception {
         final var workbook = new XSSFWorkbook();
         workbook.createSheet("컬럼 정의서").createRow(0).createCell(0).setCellValue("컬럼 정의서");
-        when(diagramColumnDefinitionExportService.generateColumnDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}")))
-            .thenReturn(new ExcelData(workbook, "diagram-column-definition"));
+        when(
+            diagramColumnDefinitionExportService.generateColumnDefinition(
+                eq("tester"),
+                eq(1L),
+                eq(10L),
+                eq(100L),
+                eq("{\"nodes\":[]}")
+            )
+        ).thenReturn(new ExcelData(workbook, "diagram-column-definition"));
 
-        mockMvc.perform(
+        mockMvc
+            .perform(
                 post("/api/teams/1/projects/10/diagrams/100/column-definition")
-                    .with(request -> {
+                    .with((request) -> {
                         request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                         return request;
                     })
@@ -189,22 +248,40 @@ class DiagramControllerMvcTest {
                     .content(objectMapper.writeValueAsString(java.util.Map.of("content", "{\"nodes\":[]}")))
             )
             .andExpect(status().isOk())
-            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("diagram-column-definition.xlsx")));
+            .andExpect(
+                header().string(
+                    "Content-Disposition",
+                    org.hamcrest.Matchers.containsString("diagram-column-definition.xlsx")
+                )
+            );
 
-        verify(diagramColumnDefinitionExportService)
-            .generateColumnDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}"));
+        verify(diagramColumnDefinitionExportService).generateColumnDefinition(
+            eq("tester"),
+            eq(1L),
+            eq(10L),
+            eq(100L),
+            eq("{\"nodes\":[]}")
+        );
     }
 
     @Test
     void downloadIndexDefinition_returnsExcelAttachment() throws Exception {
         final var workbook = new XSSFWorkbook();
         workbook.createSheet("인덱스 정의서").createRow(0).createCell(0).setCellValue("인덱스 정의서");
-        when(diagramIndexDefinitionExportService.generateIndexDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}")))
-            .thenReturn(new ExcelData(workbook, "diagram-index-definition"));
+        when(
+            diagramIndexDefinitionExportService.generateIndexDefinition(
+                eq("tester"),
+                eq(1L),
+                eq(10L),
+                eq(100L),
+                eq("{\"nodes\":[]}")
+            )
+        ).thenReturn(new ExcelData(workbook, "diagram-index-definition"));
 
-        mockMvc.perform(
+        mockMvc
+            .perform(
                 post("/api/teams/1/projects/10/diagrams/100/index-definition")
-                    .with(request -> {
+                    .with((request) -> {
                         request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                         return request;
                     })
@@ -212,17 +289,24 @@ class DiagramControllerMvcTest {
                     .content(objectMapper.writeValueAsString(java.util.Map.of("content", "{\"nodes\":[]}")))
             )
             .andExpect(status().isOk())
-            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("diagram-index-definition.xlsx")));
+            .andExpect(
+                header().string(
+                    "Content-Disposition",
+                    org.hamcrest.Matchers.containsString("diagram-index-definition.xlsx")
+                )
+            );
 
-        verify(diagramIndexDefinitionExportService)
-            .generateIndexDefinition(eq("tester"), eq(1L), eq(10L), eq(100L), eq("{\"nodes\":[]}"));
+        verify(diagramIndexDefinitionExportService).generateIndexDefinition(
+            eq("tester"),
+            eq(1L),
+            eq(10L),
+            eq(100L),
+            eq("{\"nodes\":[]}")
+        );
     }
 
     private Jwt jwt(String subject) {
-        return Jwt.withTokenValue("token")
-            .header("alg", "none")
-            .subject(subject)
-            .build();
+        return Jwt.withTokenValue("token").header("alg", "none").subject(subject).build();
     }
 
     /**
@@ -235,8 +319,10 @@ class DiagramControllerMvcTest {
 
         @Override
         public boolean supportsParameter(MethodParameter parameter) {
-            return parameter.hasParameterAnnotation(AuthenticationPrincipal.class)
-                && Jwt.class.isAssignableFrom(parameter.getParameterType());
+            return (
+                parameter.hasParameterAnnotation(AuthenticationPrincipal.class) &&
+                Jwt.class.isAssignableFrom(parameter.getParameterType())
+            );
         }
 
         @Override
@@ -246,7 +332,8 @@ class DiagramControllerMvcTest {
             NativeWebRequest webRequest,
             WebDataBinderFactory binderFactory
         ) {
-            return webRequest.getNativeRequest(jakarta.servlet.http.HttpServletRequest.class)
+            return webRequest
+                .getNativeRequest(jakarta.servlet.http.HttpServletRequest.class)
                 .getAttribute(TEST_JWT_REQUEST_ATTRIBUTE);
         }
     }

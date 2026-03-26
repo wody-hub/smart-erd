@@ -123,10 +123,7 @@ export function buildPersistedPreviewPositionChanges(
       continue;
     }
 
-    if (
-      persistedNode.position.x === override.x &&
-      persistedNode.position.y === override.y
-    ) {
+    if (persistedNode.position.x === override.x && persistedNode.position.y === override.y) {
       continue;
     }
 

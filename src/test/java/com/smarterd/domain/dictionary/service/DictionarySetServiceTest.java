@@ -76,12 +76,7 @@ class DictionarySetServiceTest {
         );
 
         // when
-        final var response = dictionarySetService.createDictionarySet(
-            loginId,
-            teamId,
-            "Set-A",
-            "desc"
-        );
+        final var response = dictionarySetService.createDictionarySet(loginId, teamId, "Set-A", "desc");
 
         // then
         final var captor = ArgumentCaptor.forClass(DictionarySet.class);
@@ -111,12 +106,7 @@ class DictionarySetServiceTest {
         );
 
         // when
-        final var response = dictionarySetService.createDictionarySet(
-            loginId,
-            teamId,
-            "Set-B",
-            "desc"
-        );
+        final var response = dictionarySetService.createDictionarySet(loginId, teamId, "Set-B", "desc");
 
         // then
         final var captor = ArgumentCaptor.forClass(DictionarySet.class);

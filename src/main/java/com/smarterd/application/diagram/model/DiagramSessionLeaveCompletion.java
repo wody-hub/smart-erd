@@ -56,11 +56,13 @@ public final class DiagramSessionLeaveCompletion {
         if (!(o instanceof DiagramSessionLeaveCompletion that)) {
             return false;
         }
-        return roomEmpty == that.roomEmpty
-            && leftPresenceVersion == that.leftPresenceVersion
-            && Arrays.equals(drainedUpdates, that.drainedUpdates)
-            && Objects.equals(roomEpoch, that.roomEpoch)
-            && Objects.equals(leftUserId, that.leftUserId);
+        return (
+            roomEmpty == that.roomEmpty &&
+            leftPresenceVersion == that.leftPresenceVersion &&
+            Arrays.equals(drainedUpdates, that.drainedUpdates) &&
+            Objects.equals(roomEpoch, that.roomEpoch) &&
+            Objects.equals(leftUserId, that.leftUserId)
+        );
     }
 
     @Override
@@ -72,12 +74,19 @@ public final class DiagramSessionLeaveCompletion {
 
     @Override
     public String toString() {
-        return "DiagramSessionLeaveCompletion[" +
-            "roomEmpty=" + roomEmpty +
-            ", drainedUpdates=" + Arrays.toString(drainedUpdates) +
-            ", roomEpoch=" + roomEpoch +
-            ", leftUserId=" + leftUserId +
-            ", leftPresenceVersion=" + leftPresenceVersion +
-            ']';
+        return (
+            "DiagramSessionLeaveCompletion[" +
+            "roomEmpty=" +
+            roomEmpty +
+            ", drainedUpdates=" +
+            Arrays.toString(drainedUpdates) +
+            ", roomEpoch=" +
+            roomEpoch +
+            ", leftUserId=" +
+            leftUserId +
+            ", leftPresenceVersion=" +
+            leftPresenceVersion +
+            ']'
+        );
     }
 }

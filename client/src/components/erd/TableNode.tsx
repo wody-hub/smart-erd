@@ -20,6 +20,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { TableNode as TableNodeType, Column } from '@/types/erd';
 import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
+import { useDiagramErdCrudActions } from '@/collaboration/channel/diagram/use-diagram-erd-crud-actions';
+import { useDiagramErdEdgeActions } from '@/collaboration/channel/diagram/use-diagram-erd-edge-actions';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
 import { useErdDictionary } from './ErdDictionaryContext';
@@ -118,13 +120,6 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const { t } = useTranslation();
   const { label, columns, logicalTableName, tableTermId, headerColor, handleLayout } = data;
   const updateNodeInternals = useUpdateNodeInternals();
-  const renameTable = useCanvasStore((s) => s.renameTable);
-  const updateTableMeta = useCanvasStore((s) => s.updateTableMeta);
-  const addColumn = useCanvasStore((s) => s.addColumn);
-  const deleteColumn = useCanvasStore((s) => s.deleteColumn);
-  const updateColumn = useCanvasStore((s) => s.updateColumn);
-  const moveColumn = useCanvasStore((s) => s.moveColumn);
-  const normalizeEdgeHandles = useCanvasStore((s) => s.normalizeEdgeHandles);
   const isHighlighted = useCanvasStore((s) => s.highlightedNodeIds.includes(id));
 
   const { findTermById, findDomainById, resolveLogicalName } = useErdDictionary();
@@ -205,9 +200,40 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
       }).length,
     [columns, duplicatedLogicalNames],
   );
+  const crudActions = useDiagramErdCrudActions();
+  const edgeActions = useDiagramErdEdgeActions();
+
+  const applyTableMetaUpdates = (
+    updates: Partial<
+      Pick<
+        TableNodeType['data'],
+        'label' | 'logicalTableName' | 'tableTermId' | 'headerColor' | 'handleLayout'
+      >
+    >,
+  ) => {
+    crudActions.updateTableMeta(id, updates);
+  };
+
+  const applyColumnUpdates = (colId: string, updates: Partial<Column>) => {
+    crudActions.updateColumn(id, colId, updates);
+  };
+
+  const handleAddColumn = () => {
+    crudActions.addColumn(id);
+  };
+
+  const handleDeleteColumn = (colId: string) => {
+    crudActions.deleteColumn(id, colId);
+  };
 
   /** 테이블 물리명 변경 핸들러. @param value 새 테이블 이름 */
-  const handleRename = (value: string) => renameTable(id, value);
+  const handleRename = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return;
+    }
+    crudActions.renameTable(id, trimmed);
+  };
 
   /**
    * 테이블 논리명 변경 핸들러.
@@ -219,7 +245,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   const handleTableLogicalNameChange = (newValue: string) => {
     const trimmed = newValue.trim();
     const resolution = resolveLogicalName(newValue);
-    updateTableMeta(id, {
+    applyTableMetaUpdates({
       logicalTableName: trimmed || undefined,
       label: resolution.isWordCompleteMatch ? resolution.physicalName : label,
       tableTermId: resolution.isRegisteredTerm ? resolution.termId : undefined,
@@ -232,7 +258,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
    * @param result 선택된 Term 결과
    */
   const handleTableSelectTerm = (result: TermSelectResult) => {
-    updateTableMeta(id, {
+    applyTableMetaUpdates({
       logicalTableName: result.logicalName,
       label: result.name,
       tableTermId: result.termId,
@@ -247,7 +273,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
    * @param resolution 논리명 해석 결과
    */
   const handleTableSelectDerived = (resolution: LogicalNameResolution) => {
-    updateTableMeta(id, {
+    applyTableMetaUpdates({
       logicalTableName: resolution.query,
       label: resolution.physicalName,
       tableTermId: resolution.isRegisteredTerm ? resolution.termId : undefined,
@@ -274,7 +300,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
     const fromIndex = columns.findIndex((c) => c.id === active.id);
     const toIndex = columns.findIndex((c) => c.id === over.id);
     if (fromIndex !== -1 && toIndex !== -1) {
-      moveColumn(id, fromIndex, toIndex);
+      crudActions.moveColumn(id, fromIndex, toIndex);
     }
   };
 
@@ -312,7 +338,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
       updates.type = revertDomainTypeIfNeeded(column, findDomainById) ?? updates.type;
     }
 
-    updateColumn(id, colId, updates);
+    applyColumnUpdates(colId, updates);
   };
 
   /**
@@ -334,7 +360,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
     } else {
       updates.type = revertDomainTypeIfNeeded(column, findDomainById) ?? updates.type;
     }
-    updateColumn(id, colId, updates);
+    applyColumnUpdates(colId, updates);
   };
 
   /**
@@ -350,7 +376,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
       const resolvedType = physicalType ?? findDomainById(domainId)?.physicalType;
       if (resolvedType) updates.type = resolvedType;
     }
-    updateColumn(id, colId, updates);
+    applyColumnUpdates(colId, updates);
   };
 
   /**
@@ -372,12 +398,12 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
     } else {
       updates.type = revertDomainTypeIfNeeded(column, findDomainById) ?? updates.type;
     }
-    updateColumn(id, colId, updates);
+    applyColumnUpdates(colId, updates);
   };
 
   const handleQuickTermApply = (updates: Partial<Column>) => {
     if (quickTermTarget) {
-      updateColumn(quickTermTarget.nodeId, quickTermTarget.colId, updates);
+      applyColumnUpdates(quickTermTarget.colId, updates);
       setQuickTermTarget(null);
     }
   };
@@ -388,7 +414,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
    * @param updates 등록된 용어 기반 업데이트 데이터
    */
   const handleTableQuickTermApply = (updates: Partial<Column>) => {
-    updateTableMeta(id, {
+    applyTableMetaUpdates({
       logicalTableName: updates.logicalName || undefined,
       label: updates.name || label,
       tableTermId: updates.termId,
@@ -445,12 +471,14 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
           }}
           onNavigateToCode={canNavigateToCode ? handleNavigateToCode : undefined}
           onRename={handleRename}
-          onColorChange={(color) => updateTableMeta(id, { headerColor: color })}
+          onColorChange={(color) => applyTableMetaUpdates({ headerColor: color })}
           onHandleLayoutChange={(layout) => {
-            updateTableMeta(id, { handleLayout: layout });
-            requestAnimationFrame(() =>
-              normalizeEdgeHandles([id], undefined, CANVAS_HISTORY_ORIGIN.USER_TABLE),
-            );
+            applyTableMetaUpdates({ handleLayout: layout });
+            requestAnimationFrame(() => {
+              edgeActions.normalizeEdgeHandles([id], 'table-meta', {
+                origin: CANVAS_HISTORY_ORIGIN.USER_TABLE,
+              });
+            });
           }}
         />
 
@@ -501,8 +529,8 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                         domain={domain}
                         domainPopoverOpen={domainPopoverColId === col.id}
                         onDomainPopoverOpenChange={(o) => setDomainPopoverColId(o ? col.id : null)}
-                        onUpdateColumn={(colId, updates) => updateColumn(id, colId, updates)}
-                        onDeleteColumn={(colId) => deleteColumn(id, colId)}
+                        onUpdateColumn={applyColumnUpdates}
+                        onDeleteColumn={handleDeleteColumn}
                         onLogicalNameChange={handleLogicalNameChange}
                         onSelectTerm={handleSelectTerm}
                         onSelectDerived={handleDerivedSelect}
@@ -549,7 +577,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
           <div className="border-t border-border">
             <button
               className="nodrag flex w-full items-center justify-center gap-1 px-3 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              onClick={() => addColumn(id)}
+              onClick={handleAddColumn}
             >
               <Plus className="h-3 w-3" />
               {t('erd.tableNode.addColumn')}

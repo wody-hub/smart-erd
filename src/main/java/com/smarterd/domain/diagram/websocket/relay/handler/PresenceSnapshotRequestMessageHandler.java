@@ -39,7 +39,12 @@ public class PresenceSnapshotRequestMessageHandler implements DiagramMessageHand
      */
     @Override
     public void handle(DiagramMessageContext context) {
-        if (!diagramRealtimeSessionUseCase.requestPresenceSnapshot(new DiagramSessionRef(context.sessionId()), context.diagramId())) {
+        if (
+            !diagramRealtimeSessionUseCase.requestPresenceSnapshot(
+                new DiagramSessionRef(context.sessionId()),
+                context.diagramId()
+            )
+        ) {
             log.warn("Presence snapshot request rate limit 초과 (세션 {})", context.sessionId());
             return;
         }

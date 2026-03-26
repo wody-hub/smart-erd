@@ -15,6 +15,18 @@ import type {
 /** snapshot 재요청 rate limit (분당 최대 횟수) */
 const MAX_SNAPSHOT_REQUESTS_PER_MINUTE = 6;
 
+function shouldSendLocalUpdate(origin: unknown): boolean {
+  return !(origin === 'remote' || origin === 'bootstrap');
+}
+
+function shouldQueuePendingLocalStatePush(origin: unknown): boolean {
+  return !(
+    origin === 'remote' ||
+    origin === 'bootstrap' ||
+    origin === CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE
+  );
+}
+
 /**
  * Raw WebSocket 기반 Yjs sync provider.
  *
@@ -97,6 +109,9 @@ export class YjsProvider {
   /** 초기 sync 완료 여부 */
   private synced = false;
 
+  /** WS가 열리기 전에 발생한 로컬 상태 업로드 필요 여부 */
+  private hasPendingLocalStatePush = false;
+
   /** 현재 presence 모드 */
   private presenceMode: PresenceMode = 'active';
 
@@ -113,7 +128,13 @@ export class YjsProvider {
 
     // Y.Doc update 이벤트 -> 'remote' origin이 아닌 경우만 WebSocket 전송
     this.updateHandler = (update: Uint8Array, origin: unknown) => {
-      if (origin === 'remote' || origin === CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE) {
+      if (!shouldSendLocalUpdate(origin)) {
+        return;
+      }
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        if (shouldQueuePendingLocalStatePush(origin)) {
+          this.hasPendingLocalStatePush = true;
+        }
         return;
       }
       const outboundUpdate =
@@ -251,6 +272,7 @@ export class YjsProvider {
 
       this.requestSnapshot();
       this.requestSync();
+      this.flushPendingLocalState();
     };
 
     this.ws.onmessage = (event: MessageEvent) => {
@@ -388,6 +410,20 @@ export class YjsProvider {
     message.set(payload, 1);
 
     this.ws.send(message);
+  }
+
+  /**
+   * 연결 전/재연결 대기 중 누적된 로컬 상태를 전체 state update로 밀어 넣는다.
+   *
+   * Yjs update는 merge 가능하므로, 세부 diff를 보관하기보다 현재 문서 전체 상태를
+   * 한 번 전송하는 편이 초기 연결/재연결 경계에서 더 안전하다.
+   */
+  private flushPendingLocalState(): void {
+    if (!this.hasPendingLocalStatePush) {
+      return;
+    }
+    this.hasPendingLocalStatePush = false;
+    this.sendMessage(WS_MSG_TYPE.YJS_UPDATE, Y.encodeStateAsUpdate(this.doc));
   }
 
   /**

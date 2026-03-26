@@ -10,8 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.smarterd.collaboration.channel.CollaborationResourceKey;
 import com.smarterd.collaboration.channel.CollaborationResourceKeyFactory;
-import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
 import com.smarterd.collaboration.handoff.CollaborationHandoffResult;
+import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
 import com.smarterd.collaboration.snapshot.CollaborationSnapshotSaveCommand;
 import com.smarterd.collaboration.snapshot.CollaborationSnapshotStore;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
@@ -79,19 +79,30 @@ class DiagramCollaborationPluginTest {
     void snapshotStore_shouldDelegateLoadAndSaveToDiagramSnapshotService() {
         final var store = new DiagramCollaborationSnapshotStore(diagramSnapshotService, resourceKeyFactory);
         final var resourceKey = resourceKeyFactory.forDiagramId(42L);
-        final var command = new CollaborationSnapshotSaveCommand("17", new byte[] { 0x01, 0x02 });
+        final var command = new CollaborationSnapshotSaveCommand("17", new byte[] { 0x01, 0x02 }, false);
         final var snapshot = new byte[] { 0x11, 0x22 };
 
         when(diagramSnapshotService.loadSnapshot(42L)).thenReturn(snapshot);
-        when(diagramSnapshotService.replaceSnapshotWithClientState(42L, "17", command.fullStateUpdate()))
-            .thenReturn(true);
+        when(
+            diagramSnapshotService.replaceSnapshotWithClientState(
+                42L,
+                "17",
+                command.fullStateUpdate(),
+                command.persistOnlyIfMissing()
+            )
+        ).thenReturn(true);
 
         assertThat(store.load(resourceKey)).isEqualTo(snapshot);
         final var saved = store.save(resourceKey, command);
 
         assertThat(saved).isTrue();
         verify(diagramSnapshotService).loadSnapshot(42L);
-        verify(diagramSnapshotService).replaceSnapshotWithClientState(42L, "17", command.fullStateUpdate());
+        verify(diagramSnapshotService).replaceSnapshotWithClientState(
+            42L,
+            "17",
+            command.fullStateUpdate(),
+            command.persistOnlyIfMissing()
+        );
     }
 
     @Test
@@ -181,11 +192,7 @@ class DiagramCollaborationPluginTest {
             diagramSnapshotService,
             resourceKeyFactory
         );
-        final var support = new DiagramCollaborationRuntimeSupport(
-            accessPolicy,
-            snapshotStore,
-            handoffPolicy
-        );
+        final var support = new DiagramCollaborationRuntimeSupport(accessPolicy, snapshotStore, handoffPolicy);
 
         assertThat(support.channelType()).isEqualTo(resourceKeyFactory.channelType());
         assertThat(support.accessPolicy()).isSameAs(accessPolicy);

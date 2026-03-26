@@ -27,7 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class DomainStartupBackfillService implements ApplicationRunner {
 
     private static final String GH_CONTRACT_SET_NAME = "GH 도급";
-    private static final Map<String, GhContractDomainMetadata> GH_CONTRACT_DOMAIN_METADATA = createGhContractDomainMetadata();
+    private static final Map<String, GhContractDomainMetadata> GH_CONTRACT_DOMAIN_METADATA =
+        createGhContractDomainMetadata();
 
     private final DomainRepository domainRepository;
     private final DictionarySetRepository dictionarySetRepository;
@@ -114,7 +115,11 @@ public class DomainStartupBackfillService implements ApplicationRunner {
                     domain.getLogicalName()
                 );
                 final var expectedPhysicalType = AppStringUtils.defaultIfBlank(
-                    DomainPhysicalTypeSupport.format(domain.getDataType(), domain.getDataLength(), domain.getDataScale()),
+                    DomainPhysicalTypeSupport.format(
+                        domain.getDataType(),
+                        domain.getDataLength(),
+                        domain.getDataScale()
+                    ),
                     domain.getPhysicalType()
                 );
 

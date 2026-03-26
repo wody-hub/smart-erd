@@ -2,10 +2,10 @@ import { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import type { Edge, Node } from '@xyflow/react';
-import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useAuthStore from '@/stores/useAuthStore';
 import { applyDagreLayout, applyIncrementalLayoutByLabel } from '@/lib/auto-layout';
 import type { DdlParseResult } from '@/lib/ddl-parser';
+import type { ApplyDiffResult } from '@/lib/erd-diff-apply';
 import { buildErdTableDiffPlan } from '@/lib/erd-diff-builder';
 import { buildScopedDiffPlan } from '@/lib/erd-scoped-diff-builder';
 import { buildFallbackGroupAssignments } from '@/lib/erd-fallback-group-remap';
@@ -13,6 +13,7 @@ import { loadDiffApplyLocalOverride, resolveDiffApplyRollout } from '@/lib/diff-
 import {
   createCurrentSnapshots,
   type DiffParsedRelation,
+  type DiffPlan,
   type DiffParsedTable,
   type TableDiff,
 } from '@/lib/erd-diff-plan';
@@ -26,6 +27,8 @@ import {
   type SyncPolicyScope,
 } from '@/lib/sync-policy';
 import { shouldOpenApplyConfirm } from '@/lib/code-sync-apply-gate';
+import { useDiagramErdApplyActions } from '@/collaboration/channel/diagram/use-diagram-erd-apply-actions';
+import { useDiagramErdApplyRuntime } from '@/collaboration/channel/diagram/use-diagram-erd-apply-runtime';
 
 /** useApplyToErd 훅 옵션 */
 interface UseApplyToErdOptions {
@@ -134,9 +137,9 @@ interface ExecuteDiffPhaseParams {
   beforeEdges: ERDEdge[];
   beforeGroups: TableGroup[];
   parseResult: DdlParseResult;
-  replaceFromDdl: (result: DdlParseResult) => void;
-  applyDiffPlan: ReturnType<typeof useCanvasStore.getState>['applyDiffPlan'];
-  updateGroupTables: ReturnType<typeof useCanvasStore.getState>['updateGroupTables'];
+  replaceFromDdl: (result: DdlParseResult) => boolean;
+  applyDiffPlan: (plan: DiffPlan) => ApplyDiffResult | null;
+  updateGroupTables: (groupId: string, toAdd: string[], toRemove: string[]) => void;
   getCurrentNodes: () => TableNode[];
   onFallback: (droppedCount: number, error: unknown) => void;
 }
@@ -149,7 +152,9 @@ interface ExecuteDiffPhaseParams {
  */
 function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
   if (!params.diffApplyEnabled) {
-    params.replaceFromDdl(params.parseResult);
+    if (!params.replaceFromDdl(params.parseResult)) {
+      throw new Error('replaceFromDdl unavailable');
+    }
     return {
       applyPath: 'full-replace',
       diffAppliedOperations: 0,
@@ -190,7 +195,9 @@ function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
       groupDroppedCount: diffResult.groupRemap.droppedCount,
     };
   } catch (error) {
-    params.replaceFromDdl(params.parseResult);
+    if (!params.replaceFromDdl(params.parseResult)) {
+      throw error;
+    }
     const replacedNodes = params.getCurrentNodes();
     const assignments = buildFallbackGroupAssignments(
       params.beforeGroups,
@@ -218,7 +225,7 @@ interface ExecuteLayoutPhaseParams {
   syncPolicy: SyncPolicy;
   applyPath: ApplyPath;
   diffAppliedOperations: number;
-  applyLayout: ReturnType<typeof useCanvasStore.getState>['applyLayout'];
+  applyLayout: (nodes: Node<TableNodeData>[]) => void;
   getCurrentState: () => { nodes: Node<TableNodeData>[]; edges: Edge[] };
 }
 
@@ -235,12 +242,12 @@ function executeLayoutPhase(params: ExecuteLayoutPhaseParams): LayoutPhaseResult
   const effectiveLayoutMode = preserveExistingDiagram
     ? 'none'
     : shouldRunLayout
-    ? resolveLayoutMode(
-        params.syncPolicy.layoutMode,
-        Math.max(params.estimatedNodeCount, freshNodes.length),
-        params.syncPolicy.largeDiagramThreshold,
-      )
-    : 'none';
+      ? resolveLayoutMode(
+          params.syncPolicy.layoutMode,
+          Math.max(params.estimatedNodeCount, freshNodes.length),
+          params.syncPolicy.largeDiagramThreshold,
+        )
+      : 'none';
 
   let layoutDurationMs = 0;
   if (freshNodes.length > 0 && shouldRunLayout) {
@@ -288,11 +295,8 @@ export function useApplyToErd({
   const { teamId, projectId, diagramId } = policyScope;
   const loginId = useAuthStore((s) => s.loginId);
 
-  const replaceFromDdl = useCanvasStore((s) => s.replaceFromDdl);
-  const applyDiffPlan = useCanvasStore((s) => s.applyDiffPlan);
-  const applyLayout = useCanvasStore((s) => s.applyLayout);
-  const updateGroupTables = useCanvasStore((s) => s.updateGroupTables);
-  const nodes = useCanvasStore((s) => s.nodes);
+  const diagramErdApplyActions = useDiagramErdApplyActions();
+  const diagramErdApplyRuntime = useDiagramErdApplyRuntime();
 
   /** 교체 확인 다이얼로그 열림 상태 */
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -317,7 +321,10 @@ export function useApplyToErd({
     [diagramId, loginId, projectId, teamId],
   );
   /** 현재 또는 반영 예정 노드 수 */
-  const projectedNodeCount = Math.max(nodes.length, parseResult?.tables.length ?? 0);
+  const projectedNodeCount = Math.max(
+    diagramErdApplyRuntime.currentNodes.length,
+    parseResult?.tables.length ?? 0,
+  );
   /** 대형 다이어그램 여부 */
   const isLargeDiagram = projectedNodeCount >= syncPolicy.largeDiagramThreshold;
   /** 반영 가능한 파싱 결과인지 여부 (빈 스키마 포함) */
@@ -345,11 +352,11 @@ export function useApplyToErd({
       if (!parseResult || (parseResult.tables.length === 0 && parseResult.errors.length > 0)) {
         return false;
       }
-      const beforeState = useCanvasStore.getState();
-      const beforeNodes = beforeState.nodes as TableNode[];
-      const beforeEdges = beforeState.edges as ERDEdge[];
-      const beforeGroups = beforeState.groups as TableGroup[];
-      const beforeLayoutNodes = beforeState.nodes as Node<TableNodeData>[];
+      const beforeState = diagramErdApplyRuntime.captureBeforeState();
+      const beforeNodes = beforeState.nodes;
+      const beforeEdges = beforeState.edges;
+      const beforeGroups = beforeState.groups;
+      const beforeLayoutNodes = beforeState.layoutNodes;
       const estimatedNodeCount = Math.max(beforeNodes.length, parseResult.tables.length);
 
       if (hasBlockingStructureLocks) {
@@ -371,6 +378,17 @@ export function useApplyToErd({
       }
 
       const totalStart = performance.now();
+      const replaceFromDdlThroughSession = (result: DdlParseResult) =>
+        diagramErdApplyActions.replaceFromDdl(result) === 'applied';
+      const updateGroupTablesThroughSession = (
+        groupId: string,
+        toAdd: string[],
+        toRemove: string[],
+      ) => {
+        diagramErdApplyActions.updateGroupTables(groupId, toAdd, toRemove);
+      };
+      const applyDiffPlanThroughSession = (plan: DiffPlan) =>
+        diagramErdApplyActions.applyDiffPlan(plan);
 
       try {
         const replaceStart = performance.now();
@@ -381,10 +399,10 @@ export function useApplyToErd({
           beforeEdges,
           beforeGroups,
           parseResult,
-          replaceFromDdl,
-          applyDiffPlan,
-          updateGroupTables,
-          getCurrentNodes: () => useCanvasStore.getState().nodes as TableNode[],
+          replaceFromDdl: replaceFromDdlThroughSession,
+          applyDiffPlan: applyDiffPlanThroughSession,
+          updateGroupTables: updateGroupTablesThroughSession,
+          getCurrentNodes: diagramErdApplyRuntime.getCurrentNodes,
           onFallback: (droppedCount, error) => {
             if (source === 'manual') {
               toast.info(t('erd.codeEditor.diffFallbackApplied', { dropped: droppedCount }));
@@ -401,14 +419,8 @@ export function useApplyToErd({
           syncPolicy,
           applyPath: diffPhase.applyPath,
           diffAppliedOperations: diffPhase.diffAppliedOperations,
-          applyLayout,
-          getCurrentState: () => {
-            const state = useCanvasStore.getState();
-            return {
-              nodes: state.nodes as Node<TableNodeData>[],
-              edges: state.edges as Edge[],
-            };
-          },
+          applyLayout: diagramErdApplyRuntime.applyLayout,
+          getCurrentState: diagramErdApplyRuntime.getCurrentState,
         });
 
         const totalDurationMs = performance.now() - totalStart;
@@ -436,17 +448,15 @@ export function useApplyToErd({
       }
     },
     [
-      applyDiffPlan,
-      applyLayout,
+      diagramErdApplyActions,
+      diagramErdApplyRuntime,
       diffApplyRollout,
       parseResult,
-      replaceFromDdl,
       syncPolicy,
       hasBlockingStructureLocks,
       beforeManualApply,
       onManualApplySuccess,
       t,
-      updateGroupTables,
     ],
   );
 
@@ -488,12 +498,20 @@ export function useApplyToErd({
         }),
       );
     }
-    if (shouldOpenApplyConfirm(nodes.length, isLargeDiagram)) {
+    if (shouldOpenApplyConfirm(diagramErdApplyRuntime.currentNodes.length, isLargeDiagram)) {
       setConfirmOpen(true);
     } else {
       executeApply();
     }
-  }, [executeApply, isLargeDiagram, nodes.length, parseResult, projectedNodeCount, syncPolicy, t]);
+  }, [
+    diagramErdApplyRuntime.currentNodes.length,
+    executeApply,
+    isLargeDiagram,
+    parseResult,
+    projectedNodeCount,
+    syncPolicy,
+    t,
+  ]);
 
   return {
     handleApply,

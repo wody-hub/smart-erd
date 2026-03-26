@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useDiagramErdCrudActions } from '@/collaboration/channel/diagram/use-diagram-erd-crud-actions';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 
 /** GroupTableSelectDialog의 props. */
@@ -37,7 +38,7 @@ export default function GroupTableSelectDialog({
 }: GroupTableSelectDialogProps) {
   const { t } = useTranslation();
   const nodes = useCanvasStore((s) => s.nodes);
-  const updateGroupTables = useCanvasStore((s) => s.updateGroupTables);
+  const crudActions = useDiagramErdCrudActions();
 
   /** 로컬 선택 상태 (체크된 테이블 ID Set) */
   const [selected, setSelected] = useState<Set<string>>(() => new Set(existingTableIds));
@@ -82,7 +83,7 @@ export default function GroupTableSelectDialog({
     const toRemove = snapshotIds.filter((tableId) => !selected.has(tableId));
 
     if (groupId && (toAdd.length > 0 || toRemove.length > 0)) {
-      updateGroupTables(groupId, toAdd, toRemove);
+      crudActions.updateGroupTables(groupId, toAdd, toRemove);
     }
     onOpenChange(false);
   };

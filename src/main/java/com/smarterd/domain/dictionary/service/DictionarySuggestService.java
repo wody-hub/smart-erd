@@ -249,10 +249,5 @@ public class DictionarySuggestService {
      * @param physicalName 추천 물리명
      * @param matchType 매칭 유형
      */
-    public record SuggestMatchResult(
-        String token,
-        boolean matched,
-        String physicalName,
-        String matchType
-    ) {}
+    public record SuggestMatchResult(String token, boolean matched, String physicalName, String matchType) {}
 }

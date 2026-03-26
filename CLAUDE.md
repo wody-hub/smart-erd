@@ -6,12 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **항상 한글로 답변한다.**
 
+## gstack
+
+- 이 저장소는 repo-local gstack 스킬을 사용한다. 경로: `.agents/skills/gstack`
+- 브라우저 QA, 배포 확인, 리뷰, 조사 워크플로우가 필요하면 gstack 계열 스킬을 우선 사용한다.
+- 새로 추가한 repo-local 스킬이 보이지 않으면 현재 Codex/Claude 세션을 다시 시작해 `.agents/skills`를 다시 스캔한다.
+
 ## Build & Run Commands
 
 ### Backend (Spring Boot)
 
 ```bash
-./gradlew bootRun                    # Start backend on :9500 (Docker PostgreSQL auto-start)
+./bootRun-dev.sh                    # Start backend on :9503 (Docker PostgreSQL auto-start)
+./bootRun-local.sh                  # Start backend on :9501
+./bootRun-test.sh                   # Start backend on :9502
 ./gradlew build                      # Full build (compile + test)
 ./gradlew test                       # Run all tests
 ./gradlew test --tests "com.smarterd.SomeTest.methodName"  # Single test
@@ -23,7 +31,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 cd client
-npm run dev                          # Dev server on :4500, proxies /api → :9500
+npm run dev                          # Dev server on :4503, proxies /api → :9503
+npm run local                        # Dev server on :4501, proxies /api → :9501
+npm run test:frontend                # Dev server on :4502, proxies /api → :9502
 npm run build                        # Production build (tsc + vite)
 npm run lint                         # ESLint
 ```
@@ -119,7 +129,7 @@ client/
 ├── index.html                       # SPA entry point
 ├── package.json                     # "type": "module" (ESM)
 ├── tailwind.config.js               # CSS variable colors, darkMode: ["class"]
-├── vite.config.ts                   # @/ alias → ./src, proxy /api → :9500
+├── vite.config.ts                   # @/ alias → ./src, proxy /api → :9503 (frontend-test는 :9502)
 ├── tsconfig.app.json                # paths: { "@/*": ["./src/*"] }
 └── src/
     ├── main.tsx                     # createRoot + StrictMode
@@ -186,7 +196,7 @@ client/
 ### Axios Instance
 
 ```text
-baseURL: /api  →  Vite 프록시  →  localhost:9500
+baseURL: /api  →  Vite 프록시  →  localhost:9503
 요청 인터셉터: Accept-Language (i18n.language) + localStorage Access Token → Authorization: Bearer <token>
 응답 인터셉터: 401 → Refresh Token으로 갱신 시도 (큐 패턴) → 실패 시 로그인 리다이렉트
 ```
@@ -265,7 +275,7 @@ Body: `{ logicalName, physicalType, description? }`
 CRUD (5 endpoints): POST 생성, GET 목록, GET `/{termId}` 상세, PUT `/{termId}` 수정, DELETE `/{termId}` 삭제
 Body: `{ logicalName, physicalName, domainId?, description? }`
 
-Swagger UI: `http://localhost:9500/swagger-ui/index.html`
+Swagger UI: `http://localhost:9503/swagger-ui/index.html`
 
 ### Authentication Flow
 
@@ -598,7 +608,7 @@ const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
 PostgreSQL 17 (Docker). `spring-boot-docker-compose`가 `compose.yaml` 자동 감지.
 
-- **개발:** `./gradlew bootRun` → Docker 자동 시작 (`lifecycle-management: start-only`)
+- **개발:** `./bootRun-dev.sh` → Docker 자동 시작 (`lifecycle-management: start-only`)
 - **테스트:** Testcontainers 임시 PostgreSQL 자동 생성/폐기
 - **스키마:** `ddl-auto: update`
 - **시간 컬럼:** `timestamptz` (UTC 기준)

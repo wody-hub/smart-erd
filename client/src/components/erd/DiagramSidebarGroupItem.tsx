@@ -107,9 +107,7 @@ export default function DiagramSidebarGroupItem({
                   <ChevronRight className="h-3 w-3 shrink-0" />
                 )}
                 <span className="truncate">{group.label}</span>
-                <span className="text-xs text-muted-foreground ml-1">
-                  ({tableIds.length})
-                </span>
+                <span className="text-xs text-muted-foreground ml-1">({tableIds.length})</span>
               </button>
             </CollapsibleTrigger>
 

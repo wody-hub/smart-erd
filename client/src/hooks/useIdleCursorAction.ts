@@ -1,9 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type * as Monaco from 'monaco-editor';
-import {
-  AUTO_ASSIST_TRIGGER_DELAY_MS,
-  type AssistPopupTrigger,
-} from '@/lib/dsl-assist';
+import { AUTO_ASSIST_TRIGGER_DELAY_MS, type AssistPopupTrigger } from '@/lib/dsl-assist';
 
 type AutoAssistTrigger = Exclude<AssistPopupTrigger, 'manual'>;
 
@@ -14,7 +11,10 @@ interface UseIdleCursorActionOptions {
   /** 편집 가능 여부 */
   canEdit: boolean;
   /** 보조 팝업 열기 함수 */
-  openAssistPopup: (options?: { position?: Monaco.IPosition; trigger?: AssistPopupTrigger }) => void;
+  openAssistPopup: (options?: {
+    position?: Monaco.IPosition;
+    trigger?: AssistPopupTrigger;
+  }) => void;
   /** 보조 팝업 닫기 함수 */
   closeAssistPopup: () => void;
   /** 내부 동기화 중 여부 판별 함수 */

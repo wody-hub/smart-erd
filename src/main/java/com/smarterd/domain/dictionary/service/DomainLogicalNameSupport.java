@@ -37,7 +37,9 @@ public final class DomainLogicalNameSupport {
         }
 
         final var typeComponents = DomainPhysicalTypeSupport.fromStructured(dataType, dataLength, dataScale);
-        if (DomainPhysicalTypeSupport.requiresLength(typeComponents.dataType()) && typeComponents.dataLength() == null) {
+        if (
+            DomainPhysicalTypeSupport.requiresLength(typeComponents.dataType()) && typeComponents.dataLength() == null
+        ) {
             return null;
         }
         final var suffixText = buildTypeSuffix(

@@ -11,8 +11,9 @@ export interface YjsDocumentAdapter<TBootstrap> {
    *
    * @param doc       대상 Y.Doc
    * @param bootstrap 채널 bootstrap 데이터
+   * @param origin    Yjs transaction origin
    */
-  applyBootstrapToDoc(doc: Y.Doc, bootstrap: TBootstrap): void;
+  applyBootstrapToDoc(doc: Y.Doc, bootstrap: TBootstrap, origin: unknown): void;
 
   /**
    * 현재 Y.Doc을 저장용 전체 update로 추출한다.

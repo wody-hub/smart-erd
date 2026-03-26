@@ -1,9 +1,4 @@
-import type {
-  EdgeHandleMode,
-  EdgeHandleSide,
-  EdgeRoutingType,
-  Waypoint,
-} from '../types/erd.js';
+import type { EdgeHandleMode, EdgeHandleSide, EdgeRoutingType, Waypoint } from '../types/erd.js';
 
 /** DiffPlan 스키마 버전 */
 export type DiffPlanVersion = 'v1';

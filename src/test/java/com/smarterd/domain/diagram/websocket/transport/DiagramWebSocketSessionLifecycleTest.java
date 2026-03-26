@@ -39,14 +39,7 @@ class DiagramWebSocketSessionLifecycleTest {
         final var session = mock(WebSocketSession.class);
         final var info = sessionInfo();
 
-        when(
-            diagramSessionTransportUseCase.join(
-                session,
-                info.diagramId(),
-                info.userId(),
-                info.userName()
-            )
-        ).thenReturn(
+        when(diagramSessionTransportUseCase.join(session, info.diagramId(), info.userId(), info.userName())).thenReturn(
             new JoinResult(false, null, null, 0L)
         );
 
@@ -77,14 +70,9 @@ class DiagramWebSocketSessionLifecycleTest {
         final var joinResult = new JoinResult(true, null, null, 0L);
         when(session.getId()).thenReturn("session-1");
 
-        when(
-            diagramSessionTransportUseCase.join(
-                session,
-                info.diagramId(),
-                info.userId(),
-                info.userName()
-            )
-        ).thenReturn(joinResult);
+        when(diagramSessionTransportUseCase.join(session, info.diagramId(), info.userId(), info.userName())).thenReturn(
+            joinResult
+        );
 
         lifecycle.establish(session, info);
 
@@ -185,7 +173,11 @@ class DiagramWebSocketSessionLifecycleTest {
             info.diagramId(),
             new DiagramSessionLeaveCompletion(false, new byte[0], "epoch-1", "user-1", 3L)
         );
-        verify(legacyPresencePort).broadcastPeerLeftLegacy(info.diagramId(), new DiagramSessionRef("session-1"), info.loginId());
+        verify(legacyPresencePort).broadcastPeerLeftLegacy(
+            info.diagramId(),
+            new DiagramSessionRef("session-1"),
+            info.loginId()
+        );
         verifyNoMoreInteractions(completeJoinUseCase);
     }
 

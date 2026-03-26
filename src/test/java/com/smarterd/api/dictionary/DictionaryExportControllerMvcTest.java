@@ -71,7 +71,11 @@ class DictionaryExportControllerMvcTest {
     void setUp() {
         final var wordController = new WordController(wordService, wordBulkService, wordDictionaryExportService);
         final var termController = new TermController(termService, termBulkService, termDictionaryExportService);
-        final var domainController = new DomainController(domainService, domainBulkService, domainDictionaryExportService);
+        final var domainController = new DomainController(
+            domainService,
+            domainBulkService,
+            domainDictionaryExportService
+        );
 
         this.mockMvc = MockMvcBuilders.standaloneSetup(wordController, termController, domainController)
             .setCustomArgumentResolvers(new TestJwtArgumentResolver())
@@ -82,17 +86,21 @@ class DictionaryExportControllerMvcTest {
     void downloadWordDictionary_returnsExcelAttachment() throws Exception {
         final var workbook = new XSSFWorkbook();
         workbook.createSheet("단어 사전").createRow(0).createCell(0).setCellValue("단어 사전");
-        when(wordDictionaryExportService.generateWordDictionary(eq("tester"), eq(1L), eq(2L)))
-            .thenReturn(new ExcelData(workbook, "words-export"));
+        when(wordDictionaryExportService.generateWordDictionary(eq("tester"), eq(1L), eq(2L))).thenReturn(
+            new ExcelData(workbook, "words-export")
+        );
 
-        mockMvc.perform(
-                get("/api/teams/1/dictionary-sets/2/words/download/excel").with(request -> {
+        mockMvc
+            .perform(
+                get("/api/teams/1/dictionary-sets/2/words/download/excel").with((request) -> {
                     request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                     return request;
                 })
             )
             .andExpect(status().isOk())
-            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("words-export.xlsx")));
+            .andExpect(
+                header().string("Content-Disposition", org.hamcrest.Matchers.containsString("words-export.xlsx"))
+            );
 
         verify(wordDictionaryExportService).generateWordDictionary(eq("tester"), eq(1L), eq(2L));
     }
@@ -101,17 +109,21 @@ class DictionaryExportControllerMvcTest {
     void downloadTermDictionary_returnsExcelAttachment() throws Exception {
         final var workbook = new XSSFWorkbook();
         workbook.createSheet("용어 사전").createRow(0).createCell(0).setCellValue("용어 사전");
-        when(termDictionaryExportService.generateTermDictionary(eq("tester"), eq(1L), eq(2L)))
-            .thenReturn(new ExcelData(workbook, "terms-export"));
+        when(termDictionaryExportService.generateTermDictionary(eq("tester"), eq(1L), eq(2L))).thenReturn(
+            new ExcelData(workbook, "terms-export")
+        );
 
-        mockMvc.perform(
-                get("/api/teams/1/dictionary-sets/2/terms/download/excel").with(request -> {
+        mockMvc
+            .perform(
+                get("/api/teams/1/dictionary-sets/2/terms/download/excel").with((request) -> {
                     request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                     return request;
                 })
             )
             .andExpect(status().isOk())
-            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("terms-export.xlsx")));
+            .andExpect(
+                header().string("Content-Disposition", org.hamcrest.Matchers.containsString("terms-export.xlsx"))
+            );
 
         verify(termDictionaryExportService).generateTermDictionary(eq("tester"), eq(1L), eq(2L));
     }
@@ -120,34 +132,37 @@ class DictionaryExportControllerMvcTest {
     void downloadDomainDictionary_returnsExcelAttachment() throws Exception {
         final var workbook = new XSSFWorkbook();
         workbook.createSheet("도메인 사전").createRow(0).createCell(0).setCellValue("도메인 사전");
-        when(domainDictionaryExportService.generateDomainDictionary(eq("tester"), eq(1L), eq(2L)))
-            .thenReturn(new ExcelData(workbook, "domains-export"));
+        when(domainDictionaryExportService.generateDomainDictionary(eq("tester"), eq(1L), eq(2L))).thenReturn(
+            new ExcelData(workbook, "domains-export")
+        );
 
-        mockMvc.perform(
-                get("/api/teams/1/dictionary-sets/2/domains/download/excel").with(request -> {
+        mockMvc
+            .perform(
+                get("/api/teams/1/dictionary-sets/2/domains/download/excel").with((request) -> {
                     request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                     return request;
                 })
             )
             .andExpect(status().isOk())
-            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("domains-export.xlsx")));
+            .andExpect(
+                header().string("Content-Disposition", org.hamcrest.Matchers.containsString("domains-export.xlsx"))
+            );
 
         verify(domainDictionaryExportService).generateDomainDictionary(eq("tester"), eq(1L), eq(2L));
     }
 
     private Jwt jwt(String subject) {
-        return Jwt.withTokenValue("token")
-            .header("alg", "none")
-            .subject(subject)
-            .build();
+        return Jwt.withTokenValue("token").header("alg", "none").subject(subject).build();
     }
 
     private static final class TestJwtArgumentResolver implements HandlerMethodArgumentResolver {
 
         @Override
         public boolean supportsParameter(MethodParameter parameter) {
-            return parameter.hasParameterAnnotation(AuthenticationPrincipal.class)
-                && Jwt.class.isAssignableFrom(parameter.getParameterType());
+            return (
+                parameter.hasParameterAnnotation(AuthenticationPrincipal.class) &&
+                Jwt.class.isAssignableFrom(parameter.getParameterType())
+            );
         }
 
         @Override
@@ -157,7 +172,8 @@ class DictionaryExportControllerMvcTest {
             NativeWebRequest webRequest,
             WebDataBinderFactory binderFactory
         ) {
-            return webRequest.getNativeRequest(jakarta.servlet.http.HttpServletRequest.class)
+            return webRequest
+                .getNativeRequest(jakarta.servlet.http.HttpServletRequest.class)
                 .getAttribute(TEST_JWT_REQUEST_ATTRIBUTE);
         }
     }

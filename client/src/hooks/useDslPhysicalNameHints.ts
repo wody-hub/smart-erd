@@ -75,7 +75,9 @@ export function useDslPhysicalNameHints({
       decorationsRef.current = editor.createDecorationsCollection();
     }
 
-    decorationsRef.current.set(physicalNameHints.map((hint) => toPhysicalNameDecoration(monaco, hint)));
+    decorationsRef.current.set(
+      physicalNameHints.map((hint) => toPhysicalNameDecoration(monaco, hint)),
+    );
 
     return () => {
       if (decorationsRef.current) {

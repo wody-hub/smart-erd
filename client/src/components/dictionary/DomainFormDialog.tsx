@@ -353,10 +353,7 @@ export default function DomainFormDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {t('common.button.cancel')}
             </Button>
-            <Button
-              type="submit"
-              disabled={!canSubmit}
-            >
+            <Button type="submit" disabled={!canSubmit}>
               {submitting
                 ? t('common.button.processing')
                 : isEdit

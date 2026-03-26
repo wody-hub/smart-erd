@@ -34,12 +34,7 @@ class DiagramWebSocketSessionResolverTest {
             2
         );
 
-        when(session.getAttributes()).thenReturn(
-            Map.of(
-                CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
-                common
-            )
-        );
+        when(session.getAttributes()).thenReturn(Map.of(CollaborationAuthenticatedSession.SESSION_ATTR_KEY, common));
 
         assertThat(resolver.resolve(session)).isEqualTo(
             new DiagramWebSocketSessionInfo(
@@ -82,10 +77,7 @@ class DiagramWebSocketSessionResolverTest {
             2
         );
         when(session.getAttributes()).thenReturn(
-            Map.of(
-                CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
-                invalidCommon
-            )
+            Map.of(CollaborationAuthenticatedSession.SESSION_ATTR_KEY, invalidCommon)
         );
 
         assertThat(resolver.resolve(session)).isNull();

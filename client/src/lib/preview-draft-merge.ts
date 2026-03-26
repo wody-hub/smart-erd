@@ -115,7 +115,10 @@ export function buildPreviewDraftOverlayGraph(
   const overlayNodes = previewGraph.nodes.flatMap((node) => {
     const matchedPersistedNode = matchedNodes.get(node.id);
     if (matchedPersistedNode) {
-      const shouldRenderVisibleOverlay = !isPreviewNodeEquivalentToPersistedNode(node, matchedPersistedNode);
+      const shouldRenderVisibleOverlay = !isPreviewNodeEquivalentToPersistedNode(
+        node,
+        matchedPersistedNode,
+      );
       if (!shouldRenderVisibleOverlay && !referencedNodeIds.has(node.id)) {
         return [];
       }

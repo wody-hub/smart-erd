@@ -9,7 +9,6 @@ import com.smarterd.collaboration.channel.CollaborationResourceKey;
  * warm handoff 조합은 별도 {@code CollaborationHandoffPolicy}가 담당해야 한다.</p>
  */
 public interface CollaborationSnapshotStore {
-
     /**
      * persisted collaboration snapshot을 로드한다.
      *

@@ -5,7 +5,9 @@ import {
   getE2EProvisioningConfig,
   getNodeModelPosition,
   loginViaUi,
+  openCodeEditor,
   provisionCollaborationFixture,
+  waitForMonacoModelValueContains,
   waitForEditableDiagram,
 } from '../shared/diagram-e2e';
 
@@ -155,12 +157,8 @@ test('code auto apply preserves existing layout and appends new table @smoke', a
   await expect(usersNode).toBeVisible();
   const beforePosition = await getNodeModelPosition(usersNode);
 
-  await page.getByRole('button', { name: /코드|code/i }).click();
-  await page.waitForFunction(
-    () => Boolean(window.monaco?.editor?.getModels?.().length),
-    undefined,
-    { timeout: 15_000 },
-  );
+  await openCodeEditor(page);
+  await waitForMonacoModelValueContains(page, 'Table users {');
 
   await page.evaluate(() => {
     const model = window.monaco?.editor?.getModels?.()[0];
@@ -222,12 +220,7 @@ test('quick term domain dropdown focuses search input on open @smoke', async ({
   await expectDiagramHeaderVisible(page, fixture.target);
   await waitForEditableDiagram(page, 30_000);
 
-  await page.getByRole('button', { name: /코드|code/i }).click();
-  await page.waitForFunction(
-    () => Boolean(window.monaco?.editor?.getModels?.().length),
-    undefined,
-    { timeout: 15_000 },
-  );
+  await openCodeEditor(page);
 
   await page.evaluate(() => {
     const model = window.monaco?.editor?.getModels?.()[0];

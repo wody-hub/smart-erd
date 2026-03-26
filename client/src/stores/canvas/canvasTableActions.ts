@@ -467,10 +467,7 @@ export function createCanvasTableActions(
           resolvedHandles.targetHandle,
           relationType,
         );
-        getEdgesMap(ydoc).set(
-          edgeId,
-          edgeYMap,
-        );
+        getEdgesMap(ydoc).set(edgeId, edgeYMap);
         syncLegacyWaypointsInEdgeYMap(edgeYMap);
         const colId = extractColId(targetHandle, target);
         const tableYMap = getTablesMap(ydoc).get(target);

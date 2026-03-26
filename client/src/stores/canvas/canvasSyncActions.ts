@@ -14,6 +14,7 @@ import {
 } from '@/constants/canvas-history';
 import { djb2 } from '@/lib/hash';
 import { extractColId } from '@/lib/handle-id';
+import { normalizeEdgeHandlesInYDoc, syncEdgeHandlePreference } from '@/lib/erd-edge-yjs-utils';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import type { ERDEdgeData, TableGroup, TableNode, TableNodeData } from '@/types/erd';
 import type { DslPreviewNode } from '@/lib/dsl-preview-graph';
@@ -22,6 +23,9 @@ import {
   createWaypointsYArray,
   getEdgesMap,
   getGroupsMap,
+  yEdgeYMapToEdge,
+  yGroupYMapToTableGroup,
+  yTableYMapToNode,
   setTableYMapPosition,
   getTablesMap,
   yDocToJson,
@@ -35,8 +39,11 @@ import {
   parseEdgeHandleSelectionValue,
   resolveEdgeHandlesFromPreference,
 } from '@/lib/edge-handles';
+import { isProjectorManagedDocumentOrigin } from '@/collaboration/core/store/document-change-origin';
 import type {
   CanvasGetState,
+  ProjectionSyncRequest,
+  ProjectionSyncTarget,
   CanvasSetState,
   CanvasState,
   PositionQueueCtx,
@@ -45,6 +52,7 @@ import type {
 type CanvasSyncActionKeys =
   | 'initYDoc'
   | 'destroyYDoc'
+  | 'syncFromYDoc'
   | 'loadPreview'
   | 'onNodesChange'
   | 'onEdgesChange'
@@ -104,11 +112,7 @@ export function createCanvasSyncActions(
       return;
     }
     for (const change of posChanges) {
-      if (
-        change.type === 'position' &&
-        'position' in change &&
-        isFinitePosition(change.position)
-      ) {
+      if (change.type === 'position' && 'position' in change && isFinitePosition(change.position)) {
         ctx.pending.set(change.id, change.position);
       }
     }
@@ -202,23 +206,134 @@ export function createCanvasSyncActions(
     return nodeById;
   }
 
-  function syncEdgeHandlePreference(
-    edgeYMap: Y.Map<unknown>,
-    resolution: {
-      handleMode: 'auto' | 'manual';
-      sourceSide: 'left' | 'right';
-      targetSide: 'left' | 'right';
-    },
-  ) {
-    if (resolution.handleMode === 'manual') {
-      edgeYMap.set('handleMode', 'manual');
-      edgeYMap.set('sourceSide', resolution.sourceSide);
-      edgeYMap.set('targetSide', resolution.targetSide);
+  function syncProjectionFromYDocWithRequest(request?: ProjectionSyncRequest): void {
+    const ydoc = get().ydoc;
+    if (!ydoc) {
       return;
     }
-    edgeYMap.delete('handleMode');
-    edgeYMap.delete('sourceSide');
-    edgeYMap.delete('targetSide');
+
+    const forceFull = request?.forceFull ?? false;
+    const targets = forceFull ? new Set<ProjectionSyncTarget>() : new Set(request?.targets ?? []);
+
+    if (forceFull || targets.size === 0) {
+      const nextNodes = yTablesMapToNodes(getTablesMap(ydoc));
+      const nextEdges = yEdgesMapToEdges(getEdgesMap(ydoc));
+      const nextGroups = yGroupsMapToTableGroups(getGroupsMap(ydoc));
+      set({
+        nodes: nextNodes,
+        edges: nextEdges,
+        groups: nextGroups,
+      });
+      return;
+    }
+
+    const nextState: Partial<CanvasState> = {};
+    const requestedNodeIds = new Set(request?.nodeIds ?? []);
+    const requestedEdgeIds = new Set(request?.edgeIds ?? []);
+    const requestedGroupIds = new Set(request?.groupIds ?? []);
+
+    function mergeEntitiesById<T extends { id: string }>(
+      current: T[],
+      requestedIds: Set<string>,
+      nextEntries: T[],
+    ): T[] {
+      if (requestedIds.size === 0) {
+        return current;
+      }
+      const retained = current.filter((entry) => !requestedIds.has(entry.id));
+      return [...retained, ...nextEntries];
+    }
+
+    if (targets.has('nodes')) {
+      if (requestedNodeIds.size === 0) {
+        nextState.nodes = yTablesMapToNodes(getTablesMap(ydoc));
+      } else {
+        const tablesMap = getTablesMap(ydoc);
+        const nextNodes = [...requestedNodeIds]
+          .map((nodeId) => {
+            const tableYMap = tablesMap.get(nodeId);
+            return tableYMap ? yTableYMapToNode(nodeId, tableYMap) : null;
+          })
+          .filter((node): node is Node<TableNodeData> => node != null);
+        nextState.nodes = mergeEntitiesById(get().nodes as Node<TableNodeData>[], requestedNodeIds, nextNodes);
+      }
+    }
+    if (targets.has('edges')) {
+      if (requestedEdgeIds.size === 0) {
+        nextState.edges = yEdgesMapToEdges(getEdgesMap(ydoc));
+      } else {
+        const edgesMap = getEdgesMap(ydoc);
+        const nextEdges = [...requestedEdgeIds]
+          .map((edgeId) => {
+            const edgeYMap = edgesMap.get(edgeId);
+            return edgeYMap ? yEdgeYMapToEdge(edgeId, edgeYMap) : null;
+          })
+          .filter((edge): edge is Edge<ERDEdgeData> => edge != null);
+        nextState.edges = mergeEntitiesById(get().edges as Edge<ERDEdgeData>[], requestedEdgeIds, nextEdges);
+      }
+    }
+    if (targets.has('groups')) {
+      if (requestedGroupIds.size === 0) {
+        nextState.groups = yGroupsMapToTableGroups(getGroupsMap(ydoc));
+      } else {
+        const groupsMap = getGroupsMap(ydoc);
+        const nextGroups = [...requestedGroupIds]
+          .map((groupId) => {
+            const groupYMap = groupsMap.get(groupId);
+            return groupYMap ? yGroupYMapToTableGroup(groupId, groupYMap) : null;
+          })
+          .filter((group): group is TableGroup => group != null);
+        nextState.groups = mergeEntitiesById(get().groups, requestedGroupIds, nextGroups);
+      }
+    }
+    set(nextState);
+  }
+
+  function queueDeferredProjectionSync(request?: ProjectionSyncRequest): void {
+    const internal = get().internal;
+    if (request?.forceFull) {
+      internal.deferredProjectionForceFull = true;
+      internal.hasDeferredProjectionSync = true;
+      internal.deferredProjectionTargets.clear();
+      return;
+    }
+
+    const targets = request?.targets ?? [];
+    if (targets.length === 0) {
+      internal.deferredProjectionForceFull = true;
+      internal.hasDeferredProjectionSync = true;
+      internal.deferredProjectionTargets.clear();
+      return;
+    }
+
+    internal.hasDeferredProjectionSync = true;
+    for (const target of targets) {
+      internal.deferredProjectionTargets.add(target);
+    }
+  }
+
+  function flushDeferredProjectionSync(): void {
+    const internal = get().internal;
+    if (!internal.hasDeferredProjectionSync) {
+      return;
+    }
+
+    const request: ProjectionSyncRequest = internal.deferredProjectionForceFull
+      ? { forceFull: true }
+      : { targets: [...internal.deferredProjectionTargets] };
+    internal.hasDeferredProjectionSync = false;
+    internal.deferredProjectionForceFull = false;
+    internal.deferredProjectionTargets.clear();
+    syncProjectionFromYDocWithRequest(request);
+  }
+
+  function shouldDeferProjectionToProjector(events: Y.YEvent<Y.AbstractType<unknown>>[]): boolean {
+    return (
+      events.length > 0 &&
+      events.every((event) => {
+        return isProjectorManagedDocumentOrigin(event.transaction.origin);
+      })
+    );
   }
 
   return {
@@ -261,17 +376,26 @@ export function createCanvasSyncActions(
         if (isLocalPositionSync) {
           return;
         }
+        if (shouldDeferProjectionToProjector(events)) {
+          return;
+        }
         if (get().internal.isNodeDragging) {
-          get().internal.hasDeferredTableSync = true;
+          queueDeferredProjectionSync({ targets: ['nodes'] });
           return;
         }
         const nextNodes = yTablesMapToNodes(tablesMap);
         set({ nodes: nextNodes });
       };
-      internal.edgesObserver = () => {
+      internal.edgesObserver = (events) => {
+        if (shouldDeferProjectionToProjector(events)) {
+          return;
+        }
         set({ edges: yEdgesMapToEdges(edgesMap) });
       };
-      internal.groupsObserver = () => {
+      internal.groupsObserver = (events) => {
+        if (shouldDeferProjectionToProjector(events)) {
+          return;
+        }
         set({ groups: yGroupsMapToTableGroups(groupsMap) });
       };
 
@@ -324,7 +448,9 @@ export function createCanvasSyncActions(
       internal.undoManager = null;
       internal.tablePositionQueue.pending.clear();
       internal.isNodeDragging = false;
-      internal.hasDeferredTableSync = false;
+      internal.hasDeferredProjectionSync = false;
+      internal.deferredProjectionForceFull = false;
+      internal.deferredProjectionTargets.clear();
 
       set({
         ydoc: null,
@@ -339,20 +465,27 @@ export function createCanvasSyncActions(
       });
     },
 
+    syncFromYDoc: (request) => {
+      if (get().internal.isNodeDragging) {
+        queueDeferredProjectionSync(request);
+        return;
+      }
+      syncProjectionFromYDocWithRequest(request);
+    },
+
     onNodesChange: (changes) => {
       const internal = get().internal;
       const hasPositionChanges = changes.some((change) => change.type === 'position');
 
-      let shouldSyncDeferredTables = false;
+      let shouldFlushDeferredProjection = false;
       for (const change of changes) {
         if (change.type === 'position' && 'dragging' in change) {
           if (change.dragging === true) {
             internal.isNodeDragging = true;
           } else if (change.dragging === false) {
             internal.isNodeDragging = false;
-            if (internal.hasDeferredTableSync) {
-              internal.hasDeferredTableSync = false;
-              shouldSyncDeferredTables = true;
+            if (internal.hasDeferredProjectionSync) {
+              shouldFlushDeferredProjection = true;
             }
           }
         }
@@ -374,11 +507,8 @@ export function createCanvasSyncActions(
       if (!internal.isNodeDragging) {
         flushQueuedPositionsToYDoc(internal.tablePositionQueue, getTablesMap);
       }
-      if (shouldSyncDeferredTables) {
-        const doc = get().ydoc;
-        if (doc) {
-          set({ nodes: yTablesMapToNodes(getTablesMap(doc)) });
-        }
+      if (shouldFlushDeferredProjection) {
+        flushDeferredProjectionSync();
       }
     },
 
@@ -522,10 +652,11 @@ export function createCanvasSyncActions(
         sourceSide: preference.sourceSide,
         targetSide: preference.targetSide,
       });
-      const routingType =
-        ((edge.data as ERDEdgeData | undefined)?.routingType ?? 'smoothstep') as EdgeRoutingType;
+      const routingType = ((edge.data as ERDEdgeData | undefined)?.routingType ??
+        'smoothstep') as EdgeRoutingType;
       const handlesChanged =
-        edge.sourceHandle !== resolution.sourceHandle || edge.targetHandle !== resolution.targetHandle;
+        edge.sourceHandle !== resolution.sourceHandle ||
+        edge.targetHandle !== resolution.targetHandle;
 
       ydoc.transact(() => {
         const edgeYMap = getEdgesMap(ydoc).get(edgeId);
@@ -578,85 +709,18 @@ export function createCanvasSyncActions(
       internal.undoManager?.stopCapturing();
     },
 
-    normalizeEdgeHandles: (nodeIds, nodeOverrides, origin = CANVAS_HISTORY_ORIGIN.USER_EDGE) => {
+    normalizeEdgeHandles: (nodeIds, _nodeOverrides, origin = CANVAS_HISTORY_ORIGIN.USER_EDGE) => {
       const { ydoc, edges } = get();
       if (!ydoc || edges.length === 0) {
         return;
       }
 
-      const filterIds = nodeIds ? new Set(nodeIds) : null;
-      const nodeById = buildNodeLookup(nodeOverrides);
-      let mutated = false;
-
       ydoc.transact(() => {
-        const edgesMap = getEdgesMap(ydoc);
-        for (const edge of edges) {
-          if (
-            filterIds &&
-            !filterIds.has(edge.source) &&
-            !filterIds.has(edge.target)
-          ) {
-            continue;
-          }
-          if (!edge.sourceHandle || !edge.targetHandle) {
-            continue;
-          }
-
-          const sourceNode = nodeById.get(edge.source);
-          const targetNode = nodeById.get(edge.target);
-          if (!sourceNode || !targetNode) {
-            continue;
-          }
-
-          const sourceColId = extractColId(edge.sourceHandle, edge.source);
-          const targetColId = extractColId(edge.targetHandle, edge.target);
-          const edgeData = (edge.data as ERDEdgeData | undefined) ?? undefined;
-          const resolution = resolveEdgeHandlesFromPreference({
-            sourceNode,
-            targetNode,
-            sourceColId,
-            targetColId,
-            handleMode: edgeData?.handleMode,
-            sourceSide: edgeData?.sourceSide,
-            targetSide: edgeData?.targetSide,
-          });
-          const { sourceHandle, targetHandle } = resolution;
-
-          const handlesChanged =
-            sourceHandle !== edge.sourceHandle || targetHandle !== edge.targetHandle;
-          const manualChanged =
-            resolution.handleMode === 'manual'
-              ? edgeData?.handleMode !== 'manual' ||
-                edgeData?.sourceSide !== resolution.sourceSide ||
-                edgeData?.targetSide !== resolution.targetSide
-              : edgeData?.handleMode === 'manual' ||
-                edgeData?.sourceSide !== undefined ||
-                edgeData?.targetSide !== undefined;
-
-          if (!handlesChanged && !manualChanged) {
-            continue;
-          }
-
-          const edgeYMap = edgesMap.get(edge.id);
-          if (!edgeYMap) {
-            continue;
-          }
-
-          edgeYMap.set('sourceHandle', sourceHandle);
-          edgeYMap.set('targetHandle', targetHandle);
-          syncEdgeHandlePreference(edgeYMap, resolution);
-          const routingType =
-            (edgeYMap.get('routingType') as EdgeRoutingType | undefined) ?? 'smoothstep';
-          if (routingType === 'straight' && handlesChanged) {
-            edgeYMap.delete('waypoints');
-          }
-          mutated = true;
+        const mutated = normalizeEdgeHandlesInYDoc({ doc: ydoc, nodeIds });
+        if (mutated) {
+          get().internal.undoManager?.stopCapturing();
         }
       }, origin);
-
-      if (mutated) {
-        get().internal.undoManager?.stopCapturing();
-      }
     },
 
     applyLayout: (nodes) => {
@@ -686,13 +750,7 @@ export function createCanvasSyncActions(
       }
       internal.isNodeDragging = false;
       flushQueuedPositionsToYDoc(internal.tablePositionQueue, getTablesMap);
-      if (internal.hasDeferredTableSync) {
-        internal.hasDeferredTableSync = false;
-        const doc = get().ydoc;
-        if (doc) {
-          set({ nodes: yTablesMapToNodes(getTablesMap(doc)) });
-        }
-      }
+      flushDeferredProjectionSync();
     },
 
     applyPreviewPositionChangesToPersisted: (

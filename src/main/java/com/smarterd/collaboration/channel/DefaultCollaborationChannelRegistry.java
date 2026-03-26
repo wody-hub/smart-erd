@@ -23,8 +23,7 @@ public class DefaultCollaborationChannelRegistry implements CollaborationChannel
         for (final var plugin : plugins) {
             if (!plugin.channelType().equals(plugin.resourceKeyFactory().channelType())) {
                 throw new IllegalStateException(
-                    "협업 채널 플러그인과 resource key factory의 채널 타입이 일치하지 않음: "
-                        + plugin.channelType()
+                    "협업 채널 플러그인과 resource key factory의 채널 타입이 일치하지 않음: " + plugin.channelType()
                 );
             }
             final var previous = resolved.putIfAbsent(plugin.channelType(), plugin);

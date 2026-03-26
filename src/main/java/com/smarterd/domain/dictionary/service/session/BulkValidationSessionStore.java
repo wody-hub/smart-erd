@@ -10,7 +10,6 @@ import org.springframework.lang.Nullable;
  * 구현체는 in-memory 또는 Redis를 선택할 수 있다.</p>
  */
 public interface BulkValidationSessionStore {
-
     /**
      * 동일 키가 없을 때만 세션 payload를 저장한다.
      *

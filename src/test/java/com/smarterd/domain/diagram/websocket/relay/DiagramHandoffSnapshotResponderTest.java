@@ -2,8 +2,8 @@ package com.smarterd.domain.diagram.websocket.relay;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyByte;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -40,13 +40,15 @@ class DiagramHandoffSnapshotResponderTest {
         );
         final var wrapped = new byte[] { DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE_V2, 0x11 };
 
-        when(loadUseCase.loadHandoffSnapshot(resourceKey))
-            .thenReturn(new CollaborationHandoffResult(new byte[] { 0x11 }, "warm"));
-        when(messageSender.wrapMessage(
-            eq(DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE_V2),
-            argThat(bytes -> java.util.Arrays.equals(bytes, new byte[] { 0x11 }))
-        ))
-            .thenReturn(wrapped);
+        when(loadUseCase.loadHandoffSnapshot(resourceKey)).thenReturn(
+            new CollaborationHandoffResult(new byte[] { 0x11 }, "warm")
+        );
+        when(
+            messageSender.wrapMessage(
+                eq(DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE_V2),
+                argThat((bytes) -> java.util.Arrays.equals(bytes, new byte[] { 0x11 }))
+            )
+        ).thenReturn(wrapped);
 
         responder.respond(context);
 
@@ -73,18 +75,20 @@ class DiagramHandoffSnapshotResponderTest {
             new byte[] { DiagramMessageTypes.MSG_SNAPSHOT_REQUEST }
         );
 
-        when(loadUseCase.loadHandoffSnapshot(resourceKey))
-            .thenReturn(new CollaborationHandoffResult(snapshot, "snapshot-store"));
+        when(loadUseCase.loadHandoffSnapshot(resourceKey)).thenReturn(
+            new CollaborationHandoffResult(snapshot, "snapshot-store")
+        );
 
         responder.respond(context);
 
         verify(messageSender).sendWrappedMessagesToSession(
             eq(session),
             eq(DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE),
-            argThat((List<byte[]> updates) ->
-                updates.size() == 2
-                    && java.util.Arrays.equals(updates.get(0), new byte[] { 0x11 })
-                    && java.util.Arrays.equals(updates.get(1), new byte[] { 0x22, 0x33 })
+            argThat(
+                (List<byte[]> updates) ->
+                    updates.size() == 2 &&
+                    java.util.Arrays.equals(updates.get(0), new byte[] { 0x11 }) &&
+                    java.util.Arrays.equals(updates.get(1), new byte[] { 0x22, 0x33 })
             )
         );
         verify(messageSender, never()).sendBinaryToSession(any(), any());
@@ -108,8 +112,9 @@ class DiagramHandoffSnapshotResponderTest {
             new byte[] { DiagramMessageTypes.MSG_SNAPSHOT_REQUEST }
         );
 
-        when(loadUseCase.loadHandoffSnapshot(resourceKey))
-            .thenReturn(new CollaborationHandoffResult(new byte[0], "snapshot-store"));
+        when(loadUseCase.loadHandoffSnapshot(resourceKey)).thenReturn(
+            new CollaborationHandoffResult(new byte[0], "snapshot-store")
+        );
 
         responder.respond(context);
 

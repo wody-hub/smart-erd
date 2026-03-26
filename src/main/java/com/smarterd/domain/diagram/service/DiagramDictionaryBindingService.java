@@ -233,7 +233,6 @@ public class DiagramDictionaryBindingService {
      * @param invalidatedDomainBindingCount 무효화된 도메인 바인딩 수
      */
     public record InvalidationCounts(int invalidatedTermBindingCount, int invalidatedDomainBindingCount) {
-
         /**
          * 무효화 없음을 나타내는 빈 카운트를 반환한다.
          *

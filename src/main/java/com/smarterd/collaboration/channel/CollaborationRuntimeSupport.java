@@ -7,7 +7,6 @@ import com.smarterd.collaboration.snapshot.CollaborationSnapshotStore;
  * 채널 런타임이 필요로 하는 persisted snapshot / handoff / access 정책 묶음.
  */
 public interface CollaborationRuntimeSupport {
-
     /**
      * 지원하는 채널 타입을 반환한다.
      *

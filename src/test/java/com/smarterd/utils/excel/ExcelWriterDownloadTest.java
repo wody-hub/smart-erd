@@ -17,8 +17,9 @@ class ExcelWriterDownloadTest {
 
         ExcelWriter.download(new ExcelData(workbook, "word-dictionary"), response);
 
-        assertThat(response.getHeader(HttpHeaders.CONTENT_DISPOSITION))
-            .isEqualTo("attachment; filename=\"word-dictionary.xlsx\"");
+        assertThat(response.getHeader(HttpHeaders.CONTENT_DISPOSITION)).isEqualTo(
+            "attachment; filename=\"word-dictionary.xlsx\""
+        );
     }
 
     @Test
@@ -29,9 +30,8 @@ class ExcelWriterDownloadTest {
 
         ExcelWriter.download(new ExcelData(workbook, "기본사전-word-dictionary"), response);
 
-        assertThat(response.getHeader(HttpHeaders.CONTENT_DISPOSITION))
-            .isEqualTo(
-                "attachment; filename=\"word-dictionary.xlsx\"; filename*=UTF-8''%EA%B8%B0%EB%B3%B8%EC%82%AC%EC%A0%84-word-dictionary.xlsx"
-            );
+        assertThat(response.getHeader(HttpHeaders.CONTENT_DISPOSITION)).isEqualTo(
+            "attachment; filename=\"word-dictionary.xlsx\"; filename*=UTF-8''%EA%B8%B0%EB%B3%B8%EC%82%AC%EC%A0%84-word-dictionary.xlsx"
+        );
     }
 }

@@ -7,8 +7,7 @@ import com.smarterd.collaboration.channel.CollaborationResourceKey;
  */
 public final class DiagramCollaborationResourceKeys {
 
-    private static final DiagramCollaborationResourceKeyFactory FACTORY =
-        new DiagramCollaborationResourceKeyFactory();
+    private static final DiagramCollaborationResourceKeyFactory FACTORY = new DiagramCollaborationResourceKeyFactory();
 
     private DiagramCollaborationResourceKeys() {}
 

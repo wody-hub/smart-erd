@@ -49,6 +49,8 @@ export interface DiagramWorkModeRuntimeStateOptions {
   capabilities: DiagramWorkModeCapabilities;
   /** 팀 권한 기준 편집 가능 여부 */
   canEdit: boolean;
+  /** authoritative bootstrap 전이라 diagram 편집을 열면 안 되는 상태인지 여부 */
+  isAuthoritativeBootstrapBlocked: boolean;
   /** persisted ERD가 preview handoff 상태인지 여부 */
   isPersistedPreviewMode: boolean;
   /** 현재 그룹 단위 보기 활성 여부 */
@@ -226,9 +228,10 @@ export function createDiagramWorkModeCapabilities(
 /**
  * 작업 모드 capability와 현재 런타임 상태를 결합해 실제 화면 정책을 계산한다.
  *
- * code 모드는 persisted ERD preview 상태와 무관하게 로컬 코드 작업을 허용하고,
- * persisted 수정 계열(surface save, canvas edit)만 preview 상태에 묶는다.
- * 사전 관리는 별도 관리 surface로 보고 code 모드에서도 허용한다.
+ * code 모드는 persisted ERD preview 상태와 무관하게 로컬 코드 작업을 허용하지만,
+ * authoritative bootstrap 전에는 모든 diagram 편집 surface를 막는다.
+ * persisted 수정 계열(surface save, canvas edit)은 preview 상태에 묶고,
+ * 사전 관리는 별도 관리 surface로 본다.
  *
  * @param options 작업 모드/권한/preview 상태 입력
  * @returns 현재 화면에서 사용할 런타임 정책
@@ -237,32 +240,37 @@ export function resolveDiagramWorkModeRuntimeState({
   mode,
   capabilities,
   canEdit,
+  isAuthoritativeBootstrapBlocked,
   isPersistedPreviewMode,
   hasActiveGroupView,
 }: DiagramWorkModeRuntimeStateOptions): DiagramWorkModeRuntimeState {
-  const persistedEditingAllowed = canEdit && !isPersistedPreviewMode;
+  const collaborationEditingAllowed = canEdit && !isAuthoritativeBootstrapBlocked;
+  const persistedEditingAllowed = collaborationEditingAllowed && !isPersistedPreviewMode;
   const codeEditingRequiresPersistedReady = mode !== 'code';
   const effectiveCodeCanEdit =
-    canEdit &&
+    collaborationEditingAllowed &&
     capabilities.canEditCode &&
     (!codeEditingRequiresPersistedReady || !isPersistedPreviewMode);
 
   return {
     persistedEditingAllowed,
     headerCanEdit:
-      canEdit && (capabilities.showPersistedSave ? !isPersistedPreviewMode : effectiveCodeCanEdit),
+      collaborationEditingAllowed &&
+      (capabilities.showPersistedSave ? !isPersistedPreviewMode : effectiveCodeCanEdit),
     effectiveCanvasCanEdit: persistedEditingAllowed && capabilities.canEditCanvas,
     effectiveCodeCanEdit,
     canPersistDiagramSave: persistedEditingAllowed && capabilities.showPersistedSave,
     showPreviewSyncBanner:
-      capabilities.showPreviewSyncBanner && canEdit && isPersistedPreviewMode,
+      capabilities.showPreviewSyncBanner &&
+      collaborationEditingAllowed &&
+      isPersistedPreviewMode,
     showCodeModeInfoBanner: mode === 'code',
     canToggleCodeEditor:
       persistedEditingAllowed &&
       capabilities.showCodePanel &&
       capabilities.forcedLeftPanel == null &&
       !hasActiveGroupView,
-    canOpenDictionaryManagement: canEdit,
-    canEditDictionaryManagement: canEdit,
+    canOpenDictionaryManagement: collaborationEditingAllowed,
+    canEditDictionaryManagement: collaborationEditingAllowed,
   };
 }

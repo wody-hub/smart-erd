@@ -31,19 +31,19 @@ export class DiagramPreviewHydrationController {
 
   private previewUnlockedAt: number | null = null;
 
-  private previewExitObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null = null;
+  private previewExitObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null =
+    null;
 
   private snapshotFallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(
-    private readonly options: DiagramPreviewHydrationControllerOptions,
-  ) {}
+  constructor(private readonly options: DiagramPreviewHydrationControllerOptions) {}
 
   /**
    * preview가 필요한 다이어그램이면 preview를 표시하고 remote unlock/fallback 감시를 시작한다.
    */
   start(): void {
-    const { bootstrap, previewEnabled, dispatchRuntimeEvent, loadPreview, updatePreviewMode } = this.options;
+    const { bootstrap, previewEnabled, dispatchRuntimeEvent, loadPreview, updatePreviewMode } =
+      this.options;
     if (!previewEnabled || !bootstrap.content) {
       return;
     }
@@ -103,10 +103,7 @@ export class DiagramPreviewHydrationController {
         Math.round(performance.now() - this.options.handoffStartedAt),
       );
       this.previewHydrationSource = 'fallback';
-      this.options.ydoc.transact(
-        () => this.options.documentAdapter.applyBootstrapToDoc(this.options.ydoc, bootstrap),
-        'remote',
-      );
+      this.options.documentAdapter.applyBootstrapToDoc(this.options.ydoc, bootstrap, 'remote');
     }, this.options.fallbackTimeoutMs);
   }
 

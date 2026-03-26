@@ -84,11 +84,7 @@ export function readCodeModeSharedDraftText(doc: Y.Doc): string {
  * @param origin Yjs transaction origin
  * @returns 없음
  */
-export function replaceCodeModeSharedDraftText(
-  doc: Y.Doc,
-  text: string,
-  origin: unknown,
-): void {
+export function replaceCodeModeSharedDraftText(doc: Y.Doc, text: string, origin: unknown): void {
   const yText = getCodeModeSharedDraftText(doc);
   const currentText = yText.toString();
   if (currentText === text) {

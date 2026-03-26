@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import useCanvasStore from '@/stores/erd/useCanvasStore';
+import type { DraftParseStatus, DraftReconcileState, DraftState } from '@/collaboration/core/draft/draft-state';
 import { djb2 } from '@/lib/hash';
-import { buildRevisionHash } from '@/lib/code-sync-revision';
 import { resolveCodeAutoApplyStatus } from '@/lib/code-sync-apply-gate';
 import type { SyncStatus } from '@/constants/sync-status';
 import {
@@ -10,11 +9,6 @@ import {
   CODE_SYNC_MAX_QUEUE_WAIT_MS,
   ERD_SYNC_IDLE_MS,
 } from '@/constants/code-sync';
-
-/** sync 비활성 모드에서 store 구독 churn을 막기 위한 빈 노드 배열 */
-const EMPTY_NODES: never[] = [];
-/** sync 비활성 모드에서 store 구독 churn을 막기 위한 빈 엣지 배열 */
-const EMPTY_EDGES: never[] = [];
 
 /** 동기화 origin */
 type SyncOrigin = 'user-code' | 'code-auto-sync' | 'erd-auto-sync' | null;
@@ -43,6 +37,8 @@ interface UseBidirectionalCodeSyncOptions {
   onSyncCodeTextChange?: (value: string | undefined) => void;
   /** ERD -> 코드 생성 함수 */
   generateCodeFromErd: () => string;
+  /** 현재 authoritative ERD revision hash */
+  currentErdRevisionHash: string;
   /** 코드 -> ERD 반영 함수 */
   applyParsedToErd: () => boolean;
   /** 현재 파싱 결과의 구조 해시 */
@@ -67,6 +63,8 @@ interface UseBidirectionalCodeSyncReturn {
   clearQueueTimeoutHold: () => void;
   /** 동기화 상태 */
   syncStatus: SyncStatus;
+  /** draft reconcile 상태 */
+  draftState: DraftState;
 }
 
 /**
@@ -90,6 +88,7 @@ export function useBidirectionalCodeSync({
   onCodeTextChange,
   onSyncCodeTextChange,
   generateCodeFromErd,
+  currentErdRevisionHash,
   applyParsedToErd,
   parsedSchemaHash,
   codeIdleMs = CODE_SYNC_IDLE_MS,
@@ -99,9 +98,14 @@ export function useBidirectionalCodeSync({
 }: UseBidirectionalCodeSyncOptions): UseBidirectionalCodeSyncReturn {
   /** 프로그래밍적 업데이트 함수 — 커서 보존 콜백이 있으면 그쪽으로 라우팅 */
   const syncUpdate = onSyncCodeTextChange ?? onCodeTextChange;
-  const syncEnabled = enableCodeToErdSync || enableErdToCodeSync;
-  const nodes = useCanvasStore((s) => (syncEnabled ? s.nodes : EMPTY_NODES));
-  const edges = useCanvasStore((s) => (syncEnabled ? s.edges : EMPTY_EDGES));
+  /**
+   * authoritative ERD revision 관찰은 auto-sync 준비 여부와 분리한다.
+   *
+   * code-first / dictionary loading 중에도 원격 authoritative 변경은 draft state에
+   * 반영되어야 하므로, ready=false여도 revision tracking 자체는 계속 켠다.
+   */
+  const draftTrackingEnabled = true;
+  const syncExecutionReady = ready;
 
   const originRef = useRef<SyncOrigin>(null);
   const lastUserEditAtRef = useRef(0);
@@ -120,6 +124,10 @@ export function useBidirectionalCodeSync({
   const prevParsingRef = useRef(parsing);
   const codeTextRef = useRef(codeText);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(null);
+  const [lastAcceptedRevision, setLastAcceptedRevision] = useState<string | undefined>(() =>
+    currentErdRevisionHash || undefined,
+  );
+  const [pendingRemoteRevision, setPendingRemoteRevision] = useState<string | undefined>(undefined);
   const syncStatusRef = useRef<SyncStatus>(null);
 
   const setStatus = useCallback((next: SyncStatus) => {
@@ -130,28 +138,7 @@ export function useBidirectionalCodeSync({
     setSyncStatus(next);
   }, []);
 
-  const currentRevisionHash = useMemo(
-    () =>
-      buildRevisionHash(
-        nodes.map((node) => ({
-          id: node.id,
-          type: node.type ?? 'table',
-          parentId: node.parentId ?? null,
-          position: { x: node.position.x, y: node.position.y },
-          data: node.data,
-        })),
-        edges.map((edge) => ({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          sourceHandle: edge.sourceHandle ?? null,
-          targetHandle: edge.targetHandle ?? null,
-          type: edge.type ?? 'default',
-          data: edge.data,
-        })),
-      ),
-    [edges, nodes],
-  );
+  const currentRevisionHash = currentErdRevisionHash;
 
   const clearCodeToErdTimer = useCallback(() => {
     if (codeToErdTimerRef.current) {
@@ -167,18 +154,33 @@ export function useBidirectionalCodeSync({
     }
   }, []);
 
+  const acceptCurrentRevision = useCallback(
+    (nextStatus: SyncStatus) => {
+      pendingErdSyncRevisionRef.current = null;
+      lastObservedErdRevisionRef.current = currentRevisionHash;
+      setPendingRemoteRevision(undefined);
+      setLastAcceptedRevision(currentRevisionHash || undefined);
+      setStatus(nextStatus);
+    },
+    [currentRevisionHash, setStatus],
+  );
+
   useEffect(() => {
     codeTextRef.current = codeText;
   }, [codeText]);
 
   useEffect(() => {
-    if (!syncEnabled) {
+    if (!draftTrackingEnabled) {
       lastObservedErdRevisionRef.current = null;
       pendingErdSyncRevisionRef.current = null;
+      setPendingRemoteRevision(undefined);
+      setLastAcceptedRevision(currentRevisionHash || undefined);
+      setStatus(null);
       return;
     }
     if (lastObservedErdRevisionRef.current == null) {
       lastObservedErdRevisionRef.current = currentRevisionHash;
+      setLastAcceptedRevision((prev) => prev ?? currentRevisionHash);
       return;
     }
     if (lastObservedErdRevisionRef.current !== currentRevisionHash) {
@@ -186,19 +188,27 @@ export function useBidirectionalCodeSync({
       if (suppressNextErdSyncRef.current && originRef.current === 'code-auto-sync') {
         suppressNextErdSyncRef.current = false;
         originRef.current = null;
+        acceptCurrentRevision('synced');
         return;
       }
       if (suppressNextErdSyncRef.current) {
         suppressNextErdSyncRef.current = false;
       }
       pendingErdSyncRevisionRef.current = currentRevisionHash;
+      setPendingRemoteRevision(currentRevisionHash);
     }
-  }, [currentRevisionHash, syncEnabled]);
+  }, [
+    acceptCurrentRevision,
+    currentRevisionHash,
+    draftTrackingEnabled,
+    syncExecutionReady,
+    setStatus,
+  ]);
 
   const clearQueueTimeoutHold = useCallback(() => {
     autoApplyBlockedRef.current = false;
     lockBlockedSinceRef.current = null;
-    if (!syncEnabled) {
+    if (!draftTrackingEnabled) {
       setStatus(null);
       return;
     }
@@ -208,15 +218,16 @@ export function useBidirectionalCodeSync({
     ) {
       setStatus('idle-wait');
     }
-  }, [setStatus, syncEnabled]);
+  }, [draftTrackingEnabled, setStatus]);
 
   const handleUserCodeChange = useCallback(
     (value: string | undefined) => {
       codeTextRef.current = value ?? '';
-      if (!syncEnabled) {
+      if (!draftTrackingEnabled) {
         autoApplyBlockedRef.current = false;
         clearErdToCodeTimer();
         pendingErdSyncRevisionRef.current = null;
+        setPendingRemoteRevision(undefined);
         originRef.current = null;
         parseBaseRevisionHashRef.current = null;
         setStatus(null);
@@ -234,7 +245,7 @@ export function useBidirectionalCodeSync({
       setStatus('idle-wait');
       onCodeTextChange(value);
     },
-    [clearErdToCodeTimer, currentRevisionHash, onCodeTextChange, setStatus, syncEnabled],
+    [clearErdToCodeTimer, currentRevisionHash, draftTrackingEnabled, onCodeTextChange, setStatus],
   );
 
   const handleGeneratedCodeChange = useCallback(
@@ -243,22 +254,29 @@ export function useBidirectionalCodeSync({
         return;
       }
       codeTextRef.current = text;
-      if (syncEnabled) {
+      if (enableErdToCodeSync) {
         originRef.current = 'erd-auto-sync';
       } else {
         originRef.current = null;
       }
       syncUpdate(text);
-      setStatus(syncEnabled ? 'synced' : null);
+      if (draftTrackingEnabled) {
+        acceptCurrentRevision(enableErdToCodeSync ? 'synced' : null);
+        return;
+      }
+      setStatus(null);
     },
-    [codeText, syncEnabled, syncUpdate, setStatus],
+    [acceptCurrentRevision, codeText, draftTrackingEnabled, enableErdToCodeSync, syncUpdate, setStatus],
   );
 
   // 코드 -> ERD 자동 반영
   useEffect(() => {
     clearCodeToErdTimer();
-    if (!enableCodeToErdSync || !ready) {
+    if (!syncExecutionReady) {
       setStatus(null);
+      return;
+    }
+    if (!enableCodeToErdSync) {
       return;
     }
     if (autoApplyBlockedRef.current) {
@@ -355,7 +373,7 @@ export function useBidirectionalCodeSync({
     maxQueueWaitMs,
     parsing,
     parsedSchemaHash,
-    ready,
+    syncExecutionReady,
     setStatus,
   ]);
 
@@ -370,7 +388,7 @@ export function useBidirectionalCodeSync({
   // ERD -> 코드 자동 반영 (ERD 스냅샷이 실제로 변경된 경우에만 실행)
   useEffect(() => {
     clearErdToCodeTimer();
-    if (!enableErdToCodeSync || !ready) {
+    if (!enableErdToCodeSync || !syncExecutionReady) {
       return;
     }
     if (!pendingErdSyncRevisionRef.current) {
@@ -417,7 +435,10 @@ export function useBidirectionalCodeSync({
 
       const generated = generateCodeFromErd();
       if (djb2(generated) === djb2(codeTextRef.current)) {
+        const acceptedRevision = pendingErdSyncRevisionRef.current ?? currentRevisionHash;
         pendingErdSyncRevisionRef.current = null;
+        setPendingRemoteRevision(undefined);
+        setLastAcceptedRevision(acceptedRevision);
         setStatus('synced');
         return;
       }
@@ -425,7 +446,10 @@ export function useBidirectionalCodeSync({
       originRef.current = 'erd-auto-sync';
       codeTextRef.current = generated;
       syncUpdate(generated);
+      const acceptedRevision = pendingErdSyncRevisionRef.current ?? currentRevisionHash;
       pendingErdSyncRevisionRef.current = null;
+      setPendingRemoteRevision(undefined);
+      setLastAcceptedRevision(acceptedRevision);
       setStatus('synced');
     };
 
@@ -441,7 +465,7 @@ export function useBidirectionalCodeSync({
     hasBlockingErrors,
     syncUpdate,
     parsing,
-    ready,
+    syncExecutionReady,
     setStatus,
     currentRevisionHash,
     clearErdToCodeTimer,
@@ -454,6 +478,7 @@ export function useBidirectionalCodeSync({
       lockBlockedSinceRef.current = null;
       autoApplyBlockedRef.current = false;
       pendingErdSyncRevisionRef.current = null;
+      setPendingRemoteRevision(undefined);
       suppressNextErdSyncRef.current = false;
       parseBaseRevisionHashRef.current = null;
       userEditingSessionRef.current = false;
@@ -461,10 +486,54 @@ export function useBidirectionalCodeSync({
     };
   }, [clearCodeToErdTimer, clearErdToCodeTimer]);
 
+  const draftState = useMemo<DraftState>(() => {
+    const parseStatus: DraftParseStatus = parsing
+      ? 'parsing'
+      : hasBlockingErrors
+        ? 'invalid'
+        : hasParsedTables
+          ? 'valid'
+          : 'idle';
+
+    let reconcileState: DraftReconcileState = 'clean';
+    if (pendingRemoteRevision) {
+      reconcileState = 'remote-pending';
+    } else if (syncStatus === 'hold-parse-error') {
+      reconcileState = 'dirty-invalid';
+    } else if (
+      syncStatus === 'idle-wait' ||
+      syncStatus === 'hold-remote-lock' ||
+      syncStatus === 'hold-queue-timeout' ||
+      syncStatus === 'hold-manual-confirm' ||
+      syncStatus === 'dropped-stale'
+    ) {
+      reconcileState = parseStatus === 'invalid' ? 'dirty-invalid' : 'dirty-valid';
+    }
+
+    return {
+      draftId: parsedSchemaHash ?? currentRevisionHash,
+      dirty: reconcileState !== 'clean',
+      parseStatus,
+      lastAcceptedRevision,
+      pendingRemoteRevision,
+      reconcileState,
+    };
+  }, [
+    currentRevisionHash,
+    hasBlockingErrors,
+    hasParsedTables,
+    lastAcceptedRevision,
+    parsedSchemaHash,
+    parsing,
+    pendingRemoteRevision,
+    syncStatus,
+  ]);
+
   return {
     handleUserCodeChange,
     handleGeneratedCodeChange,
     clearQueueTimeoutHold,
     syncStatus,
+    draftState,
   };
 }

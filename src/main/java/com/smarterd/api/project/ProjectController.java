@@ -83,7 +83,9 @@ public class ProjectController {
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId
     ) {
-        return ResponseEntity.ok(projectService.getProjects(jwt.getSubject(), teamId).stream().map(this::toProjectResponse).toList());
+        return ResponseEntity.ok(
+            projectService.getProjects(jwt.getSubject(), teamId).stream().map(this::toProjectResponse).toList()
+        );
     }
 
     /**

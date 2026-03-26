@@ -139,5 +139,4 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
         }
         return false;
     }
-
 }

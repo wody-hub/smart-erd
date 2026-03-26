@@ -41,12 +41,9 @@ export function buildErdPhysicalNameSourceEntries(nodes: TableNode[]): string[] 
       }
 
       entries.push(
-        [
-          COLUMN_SOURCE_ENTRY,
-          tableLogicalName,
-          columnLogicalName,
-          columnPhysicalName,
-        ].join(SOURCE_ENTRY_SEPARATOR),
+        [COLUMN_SOURCE_ENTRY, tableLogicalName, columnLogicalName, columnPhysicalName].join(
+          SOURCE_ENTRY_SEPARATOR,
+        ),
       );
     }
 
@@ -135,13 +132,16 @@ export function buildDslPhysicalNameHints(
     .map((hint) => {
       const physicalName =
         hint.kind === 'table'
-          ? tableMap.get(hint.logicalName) ?? hint.physicalName
-          : columnMap.get(`${hint.tableLogicalName ?? ''}::${hint.logicalName}`) ?? hint.physicalName;
+          ? (tableMap.get(hint.logicalName) ?? hint.physicalName)
+          : (columnMap.get(`${hint.tableLogicalName ?? ''}::${hint.logicalName}`) ??
+            hint.physicalName);
 
       return {
         ...hint,
         physicalName,
       };
     })
-    .filter((hint) => hint.physicalName.trim().length > 0 && hint.physicalName !== hint.logicalName);
+    .filter(
+      (hint) => hint.physicalName.trim().length > 0 && hint.physicalName !== hint.logicalName,
+    );
 }

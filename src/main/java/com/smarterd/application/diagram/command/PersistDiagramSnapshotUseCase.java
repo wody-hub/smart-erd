@@ -29,6 +29,7 @@ public class PersistDiagramSnapshotUseCase {
      * @param diagramId               다이어그램 ID
      * @param expectedContentRevision 저장 기준 content revision
      * @param ydocSnapshot            전체 Y.Doc 상태
+     * @param persistOnlyIfMissing    true면 기존 persisted snapshot이 없을 때만 저장
      * @return persisted snapshot 저장 성공 여부
      */
     public boolean execute(
@@ -37,12 +38,13 @@ public class PersistDiagramSnapshotUseCase {
         Long projectId,
         Long diagramId,
         String expectedContentRevision,
-        byte[] ydocSnapshot
+        byte[] ydocSnapshot,
+        boolean persistOnlyIfMissing
     ) {
         diagramService.loadWritableDiagram(loginId, teamId, projectId, diagramId);
         return persistCollaborationSnapshotUseCase.persistSnapshot(
             diagramCollaborationResourceKeyFactory.forDiagramId(diagramId),
-            new CollaborationSnapshotSaveCommand(expectedContentRevision, ydocSnapshot)
+            new CollaborationSnapshotSaveCommand(expectedContentRevision, ydocSnapshot, persistOnlyIfMissing)
         );
     }
 }

@@ -5,9 +5,7 @@ import { YjsProvider } from '@/collaboration/YjsProvider';
  * 다이어그램 채널의 provider -> store 이벤트 배선을 캡슐화한다.
  */
 export class DiagramCollaborationProviderBinding {
-  constructor(
-    private readonly callbacks: DiagramCollaborationProviderBindingCallbacks,
-  ) {}
+  constructor(private readonly callbacks: DiagramCollaborationProviderBindingCallbacks) {}
 
   /**
    * provider 이벤트를 store 콜백에 연결한다.

@@ -23,11 +23,7 @@ public class CompleteDiagramSessionLeaveUseCase {
      * @param diagramId 다이어그램 ID
      * @param leaveCompletion room leave 후속 처리 payload
      */
-    public void complete(
-        DiagramSessionRef sessionRef,
-        Long diagramId,
-        DiagramSessionLeaveCompletion leaveCompletion
-    ) {
+    public void complete(DiagramSessionRef sessionRef, Long diagramId, DiagramSessionLeaveCompletion leaveCompletion) {
         if (leaveCompletion.leftUserId() != null && leaveCompletion.roomEpoch() != null) {
             diagramPresencePort.broadcastPeerLeft(
                 diagramId,

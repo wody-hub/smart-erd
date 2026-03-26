@@ -83,8 +83,14 @@ class DiagramWebSocketHandlerTest {
 
         final var session = mock(WebSocketSession.class);
         final var attributes = new HashMap<String, Object>();
-        final var authenticatedSession =
-            new AuthenticatedSession("user-1", "login-1", "User 1", 100L, Instant.now().plusSeconds(60), 1);
+        final var authenticatedSession = new AuthenticatedSession(
+            "user-1",
+            "login-1",
+            "User 1",
+            100L,
+            Instant.now().plusSeconds(60),
+            1
+        );
         attributes.put(
             com.smarterd.collaboration.session.CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
             authenticatedSession.toCollaborationSession()
@@ -117,8 +123,14 @@ class DiagramWebSocketHandlerTest {
 
         final var session = mock(WebSocketSession.class);
         final var attributes = new HashMap<String, Object>();
-        final var authenticatedSession =
-            new AuthenticatedSession("user-1", "login-1", "User 1", 100L, Instant.now().plusSeconds(60), 1);
+        final var authenticatedSession = new AuthenticatedSession(
+            "user-1",
+            "login-1",
+            "User 1",
+            100L,
+            Instant.now().plusSeconds(60),
+            1
+        );
         attributes.put(
             com.smarterd.collaboration.session.CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
             authenticatedSession.toCollaborationSession()

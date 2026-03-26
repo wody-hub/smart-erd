@@ -20,9 +20,7 @@ export class DiagramCollaborationProviderEvents {
 
   private wsConnectedAt: number | null = null;
 
-  constructor(
-    private readonly options: DiagramCollaborationProviderEventsOptions,
-  ) {}
+  constructor(private readonly options: DiagramCollaborationProviderEventsOptions) {}
 
   getConnectionStatus = (): ConnectionStatus => this.currentConnectionStatus;
 
@@ -60,7 +58,9 @@ export class DiagramCollaborationProviderEvents {
             '%s ws-connected totalMs=%d afterTicketMs=%s',
             this.options.handoffLogPrefix,
             Math.round(this.wsConnectedAt - this.options.handoffStartedAt),
-            this.ticketRequestedAt === null ? 'n/a' : Math.round(this.wsConnectedAt - this.ticketRequestedAt),
+            this.ticketRequestedAt === null
+              ? 'n/a'
+              : Math.round(this.wsConnectedAt - this.ticketRequestedAt),
           );
           onConnected(this.wsConnectedAt);
         }

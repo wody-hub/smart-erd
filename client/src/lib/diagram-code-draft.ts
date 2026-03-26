@@ -52,7 +52,12 @@ function normalizePreviewPositions(value: unknown): DiagramPreviewPositionRecord
     }
     const x = (position as { x?: unknown }).x;
     const y = (position as { y?: unknown }).y;
-    if (typeof x !== 'number' || !Number.isFinite(x) || typeof y !== 'number' || !Number.isFinite(y)) {
+    if (
+      typeof x !== 'number' ||
+      !Number.isFinite(x) ||
+      typeof y !== 'number' ||
+      !Number.isFinite(y)
+    ) {
       continue;
     }
     normalized[nodeId] = { x, y };
@@ -147,7 +152,9 @@ export function loadDiagramDslDraft(scope: DiagramCodeDraftScope): string | null
  * @param scope 팀/프로젝트/다이어그램 식별자
  * @returns 저장된 draft 레코드. 없거나 실패하면 null
  */
-export function loadDiagramDslDraftRecord(scope: DiagramCodeDraftScope): DiagramDslDraftRecord | null {
+export function loadDiagramDslDraftRecord(
+  scope: DiagramCodeDraftScope,
+): DiagramDslDraftRecord | null {
   const key = buildDiagramDslDraftStorageKey(scope);
   const storage = getLocalStorage();
   if (!key || !storage) {

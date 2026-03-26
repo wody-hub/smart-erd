@@ -26,14 +26,14 @@ class DiagramTableDefinitionExportServiceTest {
         final var service = new DiagramTableDefinitionExportService(diagramService, new ObjectMapper());
         final var diagram = buildDiagram(
             """
-                {"nodes":[
-                  {"id":"table-1","type":"table","position":{"x":100,"y":100},"data":{
-                    "label":"send_email_history",
-                    "logicalTableName":"이메일 발송 히스토리",
-                    "columns":[{"id":"c1","name":"id","type":"BIGINT"}]
-                  }}
-                ],"edges":[],"groups":[]}
-                """
+            {"nodes":[
+              {"id":"table-1","type":"table","position":{"x":100,"y":100},"data":{
+                "label":"send_email_history",
+                "logicalTableName":"이메일 발송 히스토리",
+                "columns":[{"id":"c1","name":"id","type":"BIGINT"}]
+              }}
+            ],"edges":[],"groups":[]}
+            """
         );
         when(diagramService.loadReadableDiagram("tester", 1L, 10L, 100L)).thenReturn(diagram);
 
@@ -58,10 +58,10 @@ class DiagramTableDefinitionExportServiceTest {
         final var service = new DiagramTableDefinitionExportService(diagramService, new ObjectMapper());
         final var diagram = buildDiagram(
             """
-                {"nodes":[
-                  {"id":"table-1","data":{"label":"saved_table","logicalTableName":"저장 테이블","columns":[]}}
-                ],"edges":[],"groups":[]}
-                """
+            {"nodes":[
+              {"id":"table-1","data":{"label":"saved_table","logicalTableName":"저장 테이블","columns":[]}}
+            ],"edges":[],"groups":[]}
+            """
         );
         when(diagramService.loadReadableDiagram("tester", 1L, 10L, 100L)).thenReturn(diagram);
 
@@ -71,10 +71,10 @@ class DiagramTableDefinitionExportServiceTest {
             10L,
             100L,
             """
-                {"nodes":[
-                  {"id":"table-1","data":{"label":"override_table","logicalTableName":"현재 테이블","columns":[]}}
-                ],"edges":[],"groups":[]}
-                """
+            {"nodes":[
+              {"id":"table-1","data":{"label":"override_table","logicalTableName":"현재 테이블","columns":[]}}
+            ],"edges":[],"groups":[]}
+            """
         );
 
         final var sheet = excelData.excelBook().getSheetAt(0);
@@ -93,10 +93,10 @@ class DiagramTableDefinitionExportServiceTest {
             10L,
             100L,
             """
-                {"metadata":{"databaseName":"common","tableOwner":"riskzero"},"nodes":[
-                  {"id":"table-1","data":{"label":"override_table","logicalTableName":"현재 테이블","columns":[]}}
-                ],"edges":[],"groups":[]}
-                """
+            {"metadata":{"databaseName":"common","tableOwner":"riskzero"},"nodes":[
+              {"id":"table-1","data":{"label":"override_table","logicalTableName":"현재 테이블","columns":[]}}
+            ],"edges":[],"groups":[]}
+            """
         );
 
         final var sheet = excelData.excelBook().getSheetAt(0);
@@ -109,29 +109,15 @@ class DiagramTableDefinitionExportServiceTest {
         final var service = new DiagramTableDefinitionExportService(diagramService, new ObjectMapper());
         when(diagramService.loadReadableDiagram("tester", 1L, 10L, 100L)).thenReturn(buildDiagram("{invalid"));
 
-        assertThatThrownBy(() -> service.generateTableDefinition("tester", 1L, 10L, 100L, null))
-            .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.generateTableDefinition("tester", 1L, 10L, 100L, null)).isInstanceOf(
+            BusinessException.class
+        );
     }
 
     private Diagram buildDiagram(String content) {
-        final var owner = User.builder()
-            .loginId("riskzero")
-            .password("hashed")
-            .name("Risk Zero")
-            .build();
-        final var team = Team.builder()
-            .name("core-team")
-            .owner(owner)
-            .build();
-        final var project = Project.builder()
-            .name("common")
-            .description("Shared database")
-            .team(team)
-            .build();
-        return Diagram.builder()
-            .name("mail-diagram")
-            .project(project)
-            .content(content)
-            .build();
+        final var owner = User.builder().loginId("riskzero").password("hashed").name("Risk Zero").build();
+        final var team = Team.builder().name("core-team").owner(owner).build();
+        final var project = Project.builder().name("common").description("Shared database").team(team).build();
+        return Diagram.builder().name("mail-diagram").project(project).content(content).build();
     }
 }

@@ -216,9 +216,7 @@ export function applyQuickTermToDslLine(
 
   const trailingPart = working.slice(identifierEnd);
   const nextLogicalName = formatDslIdentifier(logicalName);
-  const domainPart = domainLogicalName?.trim()
-    ? ` :${formatDslIdentifier(domainLogicalName)}`
-    : '';
+  const domainPart = domainLogicalName?.trim() ? ` :${formatDslIdentifier(domainLogicalName)}` : '';
 
   return `${indent}${nextLogicalName}${trailingPart}${domainPart}${optionsPart}${commentPart}`;
 }

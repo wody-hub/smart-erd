@@ -323,7 +323,11 @@ function buildScopedEdgeDiffs(input: {
   nextRelations: DiffParsedRelation[];
 }): EdgeDiff[] {
   const changedNames = new Set(input.changedTableNames);
-  const currentByKey = buildCurrentRelationMap(input.currentTables, input.currentEdges, changedNames);
+  const currentByKey = buildCurrentRelationMap(
+    input.currentTables,
+    input.currentEdges,
+    changedNames,
+  );
   const nextByKey = buildNextRelationMap(input.nextRelations, changedNames);
   const keys = new Set<string>([...currentByKey.keys(), ...nextByKey.keys()]);
   const diffs: EdgeDiff[] = [];
@@ -388,11 +392,25 @@ function buildCurrentRelationMap(
     if (!sourceTable || !targetTable) {
       continue;
     }
-    if (changedNames && !changedNames.has(sourceTable.name) && !changedNames.has(targetTable.name)) {
+    if (
+      changedNames &&
+      !changedNames.has(sourceTable.name) &&
+      !changedNames.has(targetTable.name)
+    ) {
       continue;
     }
-    const parentColumn = resolveEdgeColumnName(edge.sourceHandle, edge.source, 'source', sourceTable);
-    const childColumn = resolveEdgeColumnName(edge.targetHandle, edge.target, 'target', targetTable);
+    const parentColumn = resolveEdgeColumnName(
+      edge.sourceHandle,
+      edge.source,
+      'source',
+      sourceTable,
+    );
+    const childColumn = resolveEdgeColumnName(
+      edge.targetHandle,
+      edge.target,
+      'target',
+      targetTable,
+    );
     if (!parentColumn || !childColumn) {
       continue;
     }
@@ -432,7 +450,11 @@ function buildNextRelationMap(
 ): Map<string, DiffParsedRelation> {
   const map = new Map<string, DiffParsedRelation>();
   for (const relation of nextRelations) {
-    if (changedNames && !changedNames.has(relation.parentTable) && !changedNames.has(relation.childTable)) {
+    if (
+      changedNames &&
+      !changedNames.has(relation.parentTable) &&
+      !changedNames.has(relation.childTable)
+    ) {
       continue;
     }
     map.set(buildRelationKey(relation), relation);

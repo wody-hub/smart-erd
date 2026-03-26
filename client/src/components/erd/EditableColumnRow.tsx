@@ -246,9 +246,7 @@ export default function EditableColumnRow({
               open={domainPopoverOpen}
               onOpenChange={onDomainPopoverOpenChange}
               selectedDomainId={col.domainId}
-              onSelect={(domainId, physicalType) =>
-                onDomainChange(col.id, domainId, physicalType)
-              }
+              onSelect={(domainId, physicalType) => onDomainChange(col.id, domainId, physicalType)}
               align="end"
             >
               {domain ? (

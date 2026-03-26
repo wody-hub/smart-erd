@@ -116,14 +116,23 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
      * @param locale 요청 로케일
      * @return 검증 결과 응답
      */
-    public BulkValidationResult validateUpload(String loginId, Long teamId, Long setId, MultipartFile file, Locale locale) {
+    public BulkValidationResult validateUpload(
+        String loginId,
+        Long teamId,
+        Long setId,
+        MultipartFile file,
+        Locale locale
+    ) {
         final var team = verifyTeamAccess(loginId, teamId);
         final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
         final var rawRows = parseFile(file, file.getOriginalFilename());
         validateRowCount(rawRows);
 
         final var existingNames = findExistingLogicalNames(
-            rawRows.stream().map((row) -> AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", ""))).toList(),
+            rawRows
+                .stream()
+                .map((row) -> AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", "")))
+                .toList(),
             LOGICAL_NAME_QUERY_BATCH_SIZE,
             (names) -> wordRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, names),
             Word::getLogicalName
@@ -153,7 +162,8 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
         final var session = consumeValidationSession(loginId, teamId, setId, validationToken, ValidationSession.class);
         final var excludedRows = new HashSet<>(excludedRowNumbers);
-        final var candidateRows = session.validRows()
+        final var candidateRows = session
+            .validRows()
             .stream()
             .filter((row) -> !excludedRows.contains(row.rowNumber()))
             .map(ValidatedWordRow::row)
@@ -202,7 +212,13 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
      * @param locale 요청 로케일
      * @return 오류 리포트 엑셀 데이터
      */
-    public ExcelData generateErrorReport(String loginId, Long teamId, Long setId, String validationToken, Locale locale) {
+    public ExcelData generateErrorReport(
+        String loginId,
+        Long teamId,
+        Long setId,
+        String validationToken,
+        Locale locale
+    ) {
         final var team = verifyTeamAccess(loginId, teamId);
         dictionarySetService.findByTeamAndId(team, setId);
         final var session = resolveValidationSession(loginId, teamId, setId, validationToken, ValidationSession.class);
@@ -264,7 +280,11 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
      * @param locale 요청 로케일
      * @return 검증 결과 누적 객체
      */
-    private RowValidationResult validateRows(List<Map<String, String>> rawRows, Set<String> existingNames, Locale locale) {
+    private RowValidationResult validateRows(
+        List<Map<String, String>> rawRows,
+        Set<String> existingNames,
+        Locale locale
+    ) {
         final var seenNames = new HashSet<String>();
         final var result = new RowValidationResult(rawRows.size());
 
@@ -273,7 +293,14 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
             final var logicalName = AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", ""));
             final var physicalName = AppStringUtils.trimToEmpty(row.getOrDefault("physicalName", ""));
             final var description = AppStringUtils.trimToEmpty(row.getOrDefault("description", ""));
-            final var errors = validateSingleRow(logicalName, physicalName, description, seenNames, existingNames, locale);
+            final var errors = validateSingleRow(
+                logicalName,
+                physicalName,
+                description,
+                seenNames,
+                existingNames,
+                locale
+            );
 
             final var data = new LinkedHashMap<String, String>();
             data.put("logicalName", logicalName);
@@ -327,7 +354,9 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         if (AppStringUtils.isBlank(physicalName)) {
             errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_PHYSICAL_NAME_REQUIRED.code(), locale));
         } else if (physicalName.length() > PHYSICAL_NAME_MAX) {
-            errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_PHYSICAL_NAME_MAX_LENGTH.code(), locale, PHYSICAL_NAME_MAX));
+            errors.add(
+                msg(MessageCode.ERROR_BULK_VALIDATION_PHYSICAL_NAME_MAX_LENGTH.code(), locale, PHYSICAL_NAME_MAX)
+            );
         }
         if (description.length() > DESCRIPTION_MAX) {
             errors.add(msg(MessageCode.ERROR_BULK_VALIDATION_DESCRIPTION_MAX_LENGTH.code(), locale, DESCRIPTION_MAX));
@@ -358,7 +387,11 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         int totalRows,
         RowValidationResult validationResult
     ) {
-        final var previewRows = mergePreviewRows(validationResult.errorPreviewRows, validationResult.validPreviewRows, PREVIEW_ROW_LIMIT);
+        final var previewRows = mergePreviewRows(
+            validationResult.errorPreviewRows,
+            validationResult.validPreviewRows,
+            PREVIEW_ROW_LIMIT
+        );
         final var session = new ValidationSession(
             loginId,
             teamId,
@@ -383,6 +416,7 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
      * 검증 과정 중 누적되는 유효/오류 행 상태를 보관한다.
      */
     private static class RowValidationResult {
+
         final ArrayList<BulkValidationRowResult> errorPreviewRows;
         final ArrayList<BulkValidationRowResult> validPreviewRows;
         final ArrayList<ValidatedWordRow> validRows = new ArrayList<>();
@@ -494,6 +528,7 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
     @Getter
     @Setter
     public static class WordUploadRow {
+
         private String logicalName;
         private String physicalName;
         private String description;

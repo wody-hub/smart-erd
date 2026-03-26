@@ -2,8 +2,8 @@ package com.smarterd.config.security;
 
 import com.smarterd.collaboration.channel.CollaborationEndpointSupport;
 import com.smarterd.utils.AppStringUtils;
-import java.util.List;
 import java.util.LinkedHashSet;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;

@@ -175,15 +175,9 @@ function PreviewTableRows({
             nodeId={node.id}
             connected={isConnected(column.id)}
             handleLayout={node.data.handleLayout ?? 'split'}
-            warning={getColumnWarning(
-              column,
-              findTermById,
-              findDomainById,
-              resolveLogicalName,
-            )}
+            warning={getColumnWarning(column, findTermById, findDomainById, resolveLogicalName)}
             hasDuplicateLogicalName={
-              !!column.logicalName?.trim() &&
-              duplicatedLogicalNames.has(column.logicalName.trim())
+              !!column.logicalName?.trim() && duplicatedLogicalNames.has(column.logicalName.trim())
             }
             domainLogicalName={resolvedDomain?.logicalName}
             domainPhysicalType={resolvedDomain?.physicalType}
@@ -210,10 +204,7 @@ function PreviewTableNode(props: NodeProps<DslPreviewNode>) {
   };
   return (
     <PreviewTableNodeFrame node={node}>
-      <PreviewTableRows
-        node={node}
-        connectedHandles={connectedHandles}
-      />
+      <PreviewTableRows node={node} connectedHandles={connectedHandles} />
     </PreviewTableNodeFrame>
   );
 }
@@ -236,10 +227,7 @@ function PreviewGhostTableNode(props: NodeProps<DslPreviewNode>) {
   };
   return (
     <PreviewTableNodeFrame node={node} ghost>
-      <PreviewTableRows
-        node={node}
-        connectedHandles={connectedHandles}
-      />
+      <PreviewTableRows node={node} connectedHandles={connectedHandles} />
     </PreviewTableNodeFrame>
   );
 }
@@ -271,10 +259,7 @@ function PreviewPersistedTableFallbackNode(props: NodeProps<PersistedTableNode>)
 
   return (
     <PreviewTableNodeFrame node={node}>
-      <PreviewTableRows
-        node={node}
-        connectedHandles={connectedHandles}
-      />
+      <PreviewTableRows node={node} connectedHandles={connectedHandles} />
     </PreviewTableNodeFrame>
   );
 }

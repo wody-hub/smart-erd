@@ -87,7 +87,9 @@ export default function EdgeContextMenu({
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="bottom" sideOffset={6} className="min-w-[220px]">
-        {isLocked && <DropdownMenuLabel>{t('erd.edge.lockedBy', { name: lockedByName })}</DropdownMenuLabel>}
+        {isLocked && (
+          <DropdownMenuLabel>{t('erd.edge.lockedBy', { name: lockedByName })}</DropdownMenuLabel>
+        )}
         <DropdownMenuLabel>{t('erd.edge.contextRouting')}</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={routingType}

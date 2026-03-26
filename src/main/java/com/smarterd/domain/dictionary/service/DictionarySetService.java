@@ -103,12 +103,7 @@ public class DictionarySetService {
 
         final var isDefault = dictionarySetRepository.findFirstByTeamAndIsDefaultTrue(team).isEmpty();
         final var dictionarySet = Objects.requireNonNull(
-            DictionarySet.builder()
-                .team(team)
-                .name(name)
-                .description(description)
-                .isDefault(isDefault)
-                .build()
+            DictionarySet.builder().team(team).name(name).description(description).isDefault(isDefault).build()
         );
 
         dictionarySetRepository.save(dictionarySet);

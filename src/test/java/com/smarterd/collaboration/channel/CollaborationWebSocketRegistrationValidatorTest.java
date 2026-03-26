@@ -15,8 +15,9 @@ class CollaborationWebSocketRegistrationValidatorTest {
         final var binding = new TestBinding("/ws/diagram/*");
         final var support = new TestEndpointSupport("/ws/diagram/*", "/ws/diagram/**");
 
-        assertThatCode(() -> new CollaborationWebSocketRegistrationValidator(List.of(binding), List.of(support)))
-            .doesNotThrowAnyException();
+        assertThatCode(() ->
+            new CollaborationWebSocketRegistrationValidator(List.of(binding), List.of(support))
+        ).doesNotThrowAnyException();
     }
 
     @Test
@@ -35,8 +36,8 @@ class CollaborationWebSocketRegistrationValidatorTest {
         final var bindingB = new TestBinding("/ws/diagram/*");
         final var support = new TestEndpointSupport("/ws/diagram/*", "/ws/diagram/**");
 
-        assertThatThrownBy(
-            () -> new CollaborationWebSocketRegistrationValidator(List.of(bindingA, bindingB), List.of(support))
+        assertThatThrownBy(() ->
+            new CollaborationWebSocketRegistrationValidator(List.of(bindingA, bindingB), List.of(support))
         )
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("중복된 협업 WebSocket binding 패턴");
@@ -48,8 +49,8 @@ class CollaborationWebSocketRegistrationValidatorTest {
         final var supportA = new TestEndpointSupport("/ws/diagram/*", "/ws/diagram/**");
         final var supportB = new TestEndpointSupport("/ws/diagram/*", "/ws/diagram/**");
 
-        assertThatThrownBy(
-            () -> new CollaborationWebSocketRegistrationValidator(List.of(binding), List.of(supportA, supportB))
+        assertThatThrownBy(() ->
+            new CollaborationWebSocketRegistrationValidator(List.of(binding), List.of(supportA, supportB))
         )
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("중복된 협업 WebSocket endpoint support 패턴");
@@ -67,6 +68,8 @@ class CollaborationWebSocketRegistrationValidatorTest {
         }
     }
 
-    private record TestEndpointSupport(String websocketHandlerPattern, String websocketSecurityPattern)
-        implements CollaborationEndpointSupport {}
+    private record TestEndpointSupport(
+        String websocketHandlerPattern,
+        String websocketSecurityPattern
+    ) implements CollaborationEndpointSupport {}
 }

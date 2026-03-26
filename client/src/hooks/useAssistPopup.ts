@@ -41,7 +41,10 @@ interface UseAssistPopupReturn {
   /** 보조 팝업 리스트 DOM ref */
   assistPopupListRef: React.MutableRefObject<HTMLUListElement | null>;
   /** 보조 팝업을 연다 */
-  openAssistPopup: (options?: { position?: Monaco.IPosition; trigger?: AssistPopupTrigger }) => void;
+  openAssistPopup: (options?: {
+    position?: Monaco.IPosition;
+    trigger?: AssistPopupTrigger;
+  }) => void;
   /** 보조 팝업을 닫는다 */
   closeAssistPopup: () => void;
   /** 보조 팝업을 불투명(강조) 모드로 승격한다 */
@@ -161,7 +164,10 @@ export function useAssistPopup({
 
       const trigger = options?.trigger ?? 'manual';
       const preview = trigger !== 'manual';
-      const items = filterAssistItemsForTrigger(buildAssistItems(model, position, true, trigger), trigger);
+      const items = filterAssistItemsForTrigger(
+        buildAssistItems(model, position, true, trigger),
+        trigger,
+      );
       if (preview && assistPopupRef.current && !assistPopupRef.current.preview) {
         return;
       }

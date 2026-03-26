@@ -51,15 +51,20 @@ class DiagramSnapshotServiceTest {
         final var existingSnapshot = YjsUpdateFormat.encode(List.of(new byte[200]));
         when(diagramRepository.findYdocSnapshotById(diagramId)).thenReturn(Optional.of(existingSnapshot));
         when(diagramRepository.findContentRevisionForUpdate(diagramId)).thenReturn(contentRevision);
-        when(diagramRepository.updateYdocSnapshotAndRevisionById(eq(diagramId), any(byte[].class), eq(contentRevision)))
-            .thenReturn(1L);
+        when(
+            diagramRepository.updateYdocSnapshotAndRevisionById(eq(diagramId), any(byte[].class), eq(contentRevision))
+        ).thenReturn(1L);
 
         // when
         final var result = diagramSnapshotService.replaceSnapshot(diagramId, compactedUpdate);
 
         // then
         assertThat(result).isTrue();
-        verify(diagramRepository).updateYdocSnapshotAndRevisionById(eq(diagramId), any(byte[].class), eq(contentRevision));
+        verify(diagramRepository).updateYdocSnapshotAndRevisionById(
+            eq(diagramId),
+            any(byte[].class),
+            eq(contentRevision)
+        );
     }
 
     @Test
@@ -108,15 +113,20 @@ class DiagramSnapshotServiceTest {
 
         when(diagramRepository.findYdocSnapshotById(diagramId)).thenReturn(Optional.empty());
         when(diagramRepository.findContentRevisionForUpdate(diagramId)).thenReturn(contentRevision);
-        when(diagramRepository.updateYdocSnapshotAndRevisionById(eq(diagramId), any(byte[].class), eq(contentRevision)))
-            .thenReturn(1L);
+        when(
+            diagramRepository.updateYdocSnapshotAndRevisionById(eq(diagramId), any(byte[].class), eq(contentRevision))
+        ).thenReturn(1L);
 
         // when
         final var result = diagramSnapshotService.replaceSnapshot(diagramId, compactedUpdate);
 
         // then
         assertThat(result).isTrue();
-        verify(diagramRepository).updateYdocSnapshotAndRevisionById(eq(diagramId), any(byte[].class), eq(contentRevision));
+        verify(diagramRepository).updateYdocSnapshotAndRevisionById(
+            eq(diagramId),
+            any(byte[].class),
+            eq(contentRevision)
+        );
     }
 
     @Test
@@ -128,8 +138,9 @@ class DiagramSnapshotServiceTest {
         final var contentRevision = 11L;
         when(diagramRepository.findYdocSnapshotById(diagramId)).thenReturn(Optional.of(new byte[0]));
         when(diagramRepository.findContentRevisionForUpdate(diagramId)).thenReturn(contentRevision);
-        when(diagramRepository.updateYdocSnapshotAndRevisionById(eq(diagramId), any(byte[].class), eq(contentRevision)))
-            .thenReturn(1L);
+        when(
+            diagramRepository.updateYdocSnapshotAndRevisionById(eq(diagramId), any(byte[].class), eq(contentRevision))
+        ).thenReturn(1L);
 
         // when
         diagramSnapshotService.replaceSnapshot(diagramId, compactedUpdate);
@@ -188,7 +199,9 @@ class DiagramSnapshotServiceTest {
     }
 
     @Test
-    @DisplayName("reconcileRealtimeStateWithPersistedContentAfterCommit - snapshot 없이 저장한 구버전 클라이언트는 active room을 강제로 버리지 않는다")
+    @DisplayName(
+        "reconcileRealtimeStateWithPersistedContentAfterCommit - snapshot 없이 저장한 구버전 클라이언트는 active room을 강제로 버리지 않는다"
+    )
     void reconcileRealtimeStateWithPersistedContentAfterCommit_whenSnapshotIsNullAndRoomActive_preservesRoom() {
         // given
         final var diagramId = 12L;
@@ -209,7 +222,9 @@ class DiagramSnapshotServiceTest {
     }
 
     @Test
-    @DisplayName("reconcileRealtimeStateWithPersistedContent - full state update면 cache와 room update를 최신 상태로 교체한다")
+    @DisplayName(
+        "reconcileRealtimeStateWithPersistedContent - full state update면 cache와 room update를 최신 상태로 교체한다"
+    )
     void reconcileRealtimeStateWithPersistedContent_whenSnapshotProvided_replacesCacheAndRoomState() {
         // given
         final var diagramId = 11L;
@@ -219,8 +234,9 @@ class DiagramSnapshotServiceTest {
         diagramSnapshotService.reconcileRealtimeStateWithPersistedContent(diagramId, fullStateUpdate);
 
         // then
-        assertThat(diagramSnapshotService.getCachedSnapshot(diagramId))
-            .contains(YjsUpdateFormat.encode(List.of(fullStateUpdate)));
+        assertThat(diagramSnapshotService.getCachedSnapshot(diagramId)).contains(
+            YjsUpdateFormat.encode(List.of(fullStateUpdate))
+        );
         verify(roomManager).replaceUpdates(diagramId, fullStateUpdate);
         verify(roomManager, never()).discardRoom(diagramId);
     }

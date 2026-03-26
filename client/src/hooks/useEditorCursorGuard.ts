@@ -107,11 +107,29 @@ export function useEditorCursorGuard(
    */
   const shouldIgnoreChange = useCallback((value: string | undefined) => {
     const text = value ?? '';
-    if (pendingProgrammaticValueRef.current != null && text === pendingProgrammaticValueRef.current) {
+    if (
+      pendingProgrammaticValueRef.current != null &&
+      text === pendingProgrammaticValueRef.current
+    ) {
       pendingProgrammaticValueRef.current = null;
       return true;
     }
-    return isSyncingRef.current;
+
+    if (isSyncingRef.current) {
+      // Hydration 직후 사용자가 바로 입력을 시작하면 다음 animation frame 전에
+      // genuine input이 들어올 수 있다. 이 경우까지 막으면 dirty state 승격과
+      // shared draft flush가 모두 빠지므로, exact programmatic value만 무시하고
+      // 나머지는 즉시 사용자 입력으로 전환한다.
+      isSyncingRef.current = false;
+      pendingProgrammaticValueRef.current = null;
+      if (releaseFrameRef.current != null) {
+        cancelAnimationFrame(releaseFrameRef.current);
+        releaseFrameRef.current = null;
+      }
+      return false;
+    }
+
+    return false;
   }, []);
 
   return { syncCodeChange, isSyncing, shouldIgnoreChange };

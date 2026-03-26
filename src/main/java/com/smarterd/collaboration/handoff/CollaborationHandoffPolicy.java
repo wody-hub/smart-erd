@@ -11,7 +11,6 @@ import com.smarterd.collaboration.snapshot.CollaborationSnapshotStore;
  * 이 정책은 그 의미를 공통 계약으로 고정하기 위한 seam이다.</p>
  */
 public interface CollaborationHandoffPolicy {
-
     /**
      * 현재 채널 리소스 기준 handoff snapshot을 조립한다.
      *

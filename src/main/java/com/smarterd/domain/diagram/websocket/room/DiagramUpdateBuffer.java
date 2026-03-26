@@ -175,9 +175,8 @@ final class DiagramUpdateBuffer {
      * @param update 최신 전체 상태를 나타내는 raw Yjs update
      */
     void replaceWithSingleUpdate(Long diagramId, byte[] update) {
-        final var updates = accumulatedUpdates.computeIfAbsent(
-            diagramId,
-            (k) -> Collections.synchronizedList(new ArrayList<>())
+        final var updates = accumulatedUpdates.computeIfAbsent(diagramId, (k) ->
+            Collections.synchronizedList(new ArrayList<>())
         );
         final var sizeCounter = accumulatedSizes.computeIfAbsent(diagramId, (k) -> new AtomicLong(0));
 

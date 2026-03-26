@@ -124,14 +124,7 @@ public class DomainService {
      * @param keyword       복합 검색어
      * @return 도메인 결과 페이지
      */
-    public Page<DomainResult> getDomains(
-        String loginId,
-        Long teamId,
-        Long setId,
-        int page,
-        int size,
-        String keyword
-    ) {
+    public Page<DomainResult> getDomains(String loginId, Long teamId, Long setId, int page, int size, String keyword) {
         final var context = verifyReadAccess(loginId, teamId, setId);
 
         final var pageable = PageRequest.of(

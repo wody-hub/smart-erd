@@ -1,5 +1,7 @@
 package com.smarterd.domain.diagram.service;
 
+import com.smarterd.collaboration.metadata.DocumentMetadataService;
+import com.smarterd.collaboration.persistence.DocumentBootstrapReader;
 import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
@@ -53,6 +55,12 @@ public class DiagramService {
 
     /** 다이어그램 사전 바인딩 정리 서비스 */
     private final DiagramDictionaryBindingService diagramDictionaryBindingService;
+
+    /** 문서 메타데이터 조회 포트 */
+    private final DocumentMetadataService documentMetadataService;
+
+    /** bootstrap header 조회 포트 */
+    private final DocumentBootstrapReader documentBootstrapReader;
 
     /**
      * 다이어그램을 생성한다.
@@ -115,6 +123,33 @@ public class DiagramService {
         final var hasSnapshot = diagramRepository.existsYdocSnapshotById(diagramId);
 
         return toDiagramDetailResult(diagram, project.getId(), hasSnapshot);
+    }
+
+    /**
+     * 다이어그램 collaboration bootstrap 메타를 조회한다.
+     *
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId 팀 ID
+     * @param projectId 프로젝트 ID
+     * @param diagramId 다이어그램 ID
+     * @return bootstrap 메타 결과
+     */
+    public DiagramBootstrapResult getDiagramBootstrap(String loginId, Long teamId, Long projectId, Long diagramId) {
+        final var project = verifyReadAccess(loginId, teamId, projectId);
+        findDiagramByProjectAndId(project, diagramId);
+        final var metadata = documentMetadataService.loadDocumentMetadata(diagramId, loginId);
+        final var bootstrapHeader = documentBootstrapReader.loadBootstrapHeader(diagramId);
+
+        return new DiagramBootstrapResult(
+            metadata.pluginId(),
+            metadata.engineId(),
+            bootstrapHeader.pluginSchemaVersion(),
+            bootstrapHeader.snapshotFormatVersion(),
+            bootstrapHeader.artifactVersion(),
+            bootstrapHeader.revision(),
+            bootstrapHeader.snapshotAvailable(),
+            bootstrapHeader.artifactAvailable()
+        );
     }
 
     /**
@@ -390,6 +425,25 @@ public class DiagramService {
         Instant snapshotUpdatedAt,
         Instant createdAt,
         Instant updatedAt
+    ) {}
+
+    /**
+     * 다이어그램 bootstrap 응답용 서비스 결과.
+     *
+     * @param contentRevision content 리비전
+     * @param snapshotRevision snapshot 리비전
+     * @param hasYdocSnapshot Y.Doc 스냅샷 존재 여부
+     * @param artifactAvailable content fallback artifact 존재 여부
+     */
+    public record DiagramBootstrapResult(
+        String pluginId,
+        String engineId,
+        int pluginSchemaVersion,
+        int snapshotFormatVersion,
+        Integer artifactVersion,
+        long revision,
+        boolean snapshotAvailable,
+        boolean artifactAvailable
     ) {}
 
     /**

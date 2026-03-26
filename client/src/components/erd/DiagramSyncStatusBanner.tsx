@@ -1,9 +1,13 @@
 import { LoaderCircle, Lock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
 import type { ConnectionStatus } from '@/types/collaboration';
+import type { DiagramCollaborationSetupErrorKind } from '@/collaboration/channel/diagram/use-diagram-collaboration-provider';
 
 interface DiagramSyncStatusBannerProps {
   connectionStatus: ConnectionStatus;
+  setupErrorKind?: DiagramCollaborationSetupErrorKind;
+  onRetry?: (() => void) | undefined;
 }
 
 /**
@@ -11,9 +15,12 @@ interface DiagramSyncStatusBannerProps {
  */
 export default function DiagramSyncStatusBanner({
   connectionStatus,
+  setupErrorKind = null,
+  onRetry,
 }: DiagramSyncStatusBannerProps) {
   const { t } = useTranslation();
   const isDisconnected = connectionStatus === 'disconnected';
+  const isAuthoritativeBootstrapBlocked = setupErrorKind === 'authoritative-bootstrap-required';
 
   return (
     <div
@@ -34,18 +41,31 @@ export default function DiagramSyncStatusBanner({
               </span>
             </div>
             <p className="mt-0.5 text-sm text-amber-900/80">
-              {t(
-                isDisconnected
-                  ? 'diagram.previewSync.banner.descriptionDisconnected'
-                  : 'diagram.previewSync.banner.description',
-              )}
+              {isAuthoritativeBootstrapBlocked
+                ? t('erd.collabSync.overlay.failed')
+                : t(
+                    isDisconnected
+                      ? 'diagram.previewSync.banner.descriptionDisconnected'
+                      : 'diagram.previewSync.banner.description',
+                  )}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 self-start rounded-full border border-amber-300/80 bg-white/70 px-3 py-1 text-xs font-medium text-amber-900 md:self-center">
-          <Lock className="h-3.5 w-3.5" />
-          <span>{t('diagram.previewSync.banner.locked')}</span>
-        </div>
+        {isAuthoritativeBootstrapBlocked && onRetry ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="self-start border-amber-300/80 bg-white/70 text-amber-900 hover:bg-white md:self-center"
+            onClick={onRetry}
+          >
+            {t('erd.collabSync.overlay.retry')}
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2 self-start rounded-full border border-amber-300/80 bg-white/70 px-3 py-1 text-xs font-medium text-amber-900 md:self-center">
+            <Lock className="h-3.5 w-3.5" />
+            <span>{t('diagram.previewSync.banner.locked')}</span>
+          </div>
+        )}
       </div>
     </div>
   );

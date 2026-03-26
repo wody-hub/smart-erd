@@ -7,7 +7,6 @@ package com.smarterd.collaboration.channel;
  * ticket, snapshot, handoff, access 같은 런타임 정책은 별도 support 포트로 분리한다.</p>
  */
 public interface CollaborationChannelPlugin {
-
     /**
      * 채널 타입을 반환한다.
      *
@@ -21,5 +20,4 @@ public interface CollaborationChannelPlugin {
      * @return resource key factory
      */
     CollaborationResourceKeyFactory resourceKeyFactory();
-
 }

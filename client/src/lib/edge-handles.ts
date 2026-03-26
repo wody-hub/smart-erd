@@ -57,9 +57,7 @@ export function buildStableEdgeId(parts: RelationKeyParts): string {
   return `rel:${encodeURIComponent(buildRelationKey(parts))}`;
 }
 
-export function getAllowedHandleSides(
-  layout: TableHandleLayout | undefined,
-): ColumnHandleSide[] {
+export function getAllowedHandleSides(layout: TableHandleLayout | undefined): ColumnHandleSide[] {
   if (layout === 'left') {
     return ['left'];
   }
@@ -132,15 +130,8 @@ export function resolveEdgeHandlesFromPreference(params: {
   sourceSide?: EdgeHandleSide;
   targetSide?: EdgeHandleSide;
 }): EdgeHandleResolution {
-  const {
-    sourceNode,
-    targetNode,
-    sourceColId,
-    targetColId,
-    handleMode,
-    sourceSide,
-    targetSide,
-  } = params;
+  const { sourceNode, targetNode, sourceColId, targetColId, handleMode, sourceSide, targetSide } =
+    params;
 
   if (handleMode === 'manual' && sourceSide && targetSide) {
     return resolveManualEdgeHandles({
@@ -201,7 +192,9 @@ export function resolveAutoEdgeHandles(params: {
 
   for (const sourceSide of sourceAllowedSides) {
     for (const targetSide of targetAllowedSides) {
-      const cost = Math.abs(getSideX(sourceBounds, sourceSide) - getSideX(targetBounds, targetSide));
+      const cost = Math.abs(
+        getSideX(sourceBounds, sourceSide) - getSideX(targetBounds, targetSide),
+      );
       const preferenceRank = preferredPairs.findIndex(
         (pair) => pair[0] === sourceSide && pair[1] === targetSide,
       );
@@ -249,10 +242,10 @@ function resolveManualEdgeHandles(params: {
   const targetAllowedSides = getAllowedHandleSides(targetNode.data.handleLayout);
   const effectiveSourceSide = sourceAllowedSides.includes(sourceSide)
     ? sourceSide
-    : sourceAllowedSides[0] ?? 'right';
+    : (sourceAllowedSides[0] ?? 'right');
   const effectiveTargetSide = targetAllowedSides.includes(targetSide)
     ? targetSide
-    : targetAllowedSides[0] ?? 'left';
+    : (targetAllowedSides[0] ?? 'left');
 
   return {
     handleMode: 'manual',
@@ -326,7 +319,9 @@ function isStackedOverlap(
   sourceBounds: { left: number; right: number; width: number },
   targetBounds: { left: number; right: number; width: number },
 ): boolean {
-  const overlapWidth = Math.min(sourceBounds.right, targetBounds.right) - Math.max(sourceBounds.left, targetBounds.left);
+  const overlapWidth =
+    Math.min(sourceBounds.right, targetBounds.right) -
+    Math.max(sourceBounds.left, targetBounds.left);
   if (overlapWidth <= 0) {
     return false;
   }

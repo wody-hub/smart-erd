@@ -47,16 +47,19 @@ export function getGroupsMap(doc: Y.Doc): Y.Map<Y.Map<unknown>> {
 const TABLE_POSITION_X_KEY = 'positionX';
 const TABLE_POSITION_Y_KEY = 'positionY';
 
-function readNodePosition(
-  rawPosition: unknown,
-): { x: number; y: number } | null {
+function readNodePosition(rawPosition: unknown): { x: number; y: number } | null {
   if (rawPosition instanceof Y.Map) {
     if (!rawPosition.doc) {
       return null;
     }
     const x = rawPosition.get('x');
     const y = rawPosition.get('y');
-    if (typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)) {
+    if (
+      typeof x === 'number' &&
+      Number.isFinite(x) &&
+      typeof y === 'number' &&
+      Number.isFinite(y)
+    ) {
       return { x, y };
     }
     return null;
@@ -109,43 +112,47 @@ export function yTablesMapToNodes(tablesMap: Y.Map<Y.Map<unknown>>): Node<TableN
   const nodes: Node<TableNodeData>[] = [];
 
   tablesMap.forEach((tableYMap, tableId) => {
-    const position = readTablePosition(tableYMap);
-    const columnsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-
-    const columns: Column[] = [];
-    if (columnsYArray) {
-      columnsYArray.forEach((colYMap) => {
-        columns.push({
-          id: colYMap.get('id') as string,
-          name: colYMap.get('name') as string,
-          type: colYMap.get('type') as string,
-          pk: (colYMap.get('pk') as boolean) ?? undefined,
-          fk: (colYMap.get('fk') as boolean) ?? undefined,
-          nullable: (colYMap.get('nullable') as boolean) ?? undefined,
-          autoIncrement: (colYMap.get('autoIncrement') as boolean) ?? undefined,
-          logicalName: (colYMap.get('logicalName') as string) ?? undefined,
-          termId: (colYMap.get('termId') as number) ?? undefined,
-          domainId: (colYMap.get('domainId') as number) ?? undefined,
-        });
-      });
-    }
-
-    nodes.push({
-      id: tableId,
-      type: 'table',
-      position: position ?? { x: 100, y: 100 },
-      data: {
-        label: (tableYMap.get('label') as string) ?? 'Untitled',
-        logicalTableName: (tableYMap.get('logicalTableName') as string) ?? undefined,
-        tableTermId: (tableYMap.get('tableTermId') as number) ?? undefined,
-        headerColor: (tableYMap.get('headerColor') as TableHeaderColor) ?? undefined,
-        handleLayout: (tableYMap.get('handleLayout') as TableHandleLayout) ?? undefined,
-        columns,
-      },
-    });
+    nodes.push(yTableYMapToNode(tableId, tableYMap));
   });
 
   return nodes;
+}
+
+export function yTableYMapToNode(tableId: string, tableYMap: Y.Map<unknown>): Node<TableNodeData> {
+  const position = readTablePosition(tableYMap);
+  const columnsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+
+  const columns: Column[] = [];
+  if (columnsYArray) {
+    columnsYArray.forEach((colYMap) => {
+      columns.push({
+        id: colYMap.get('id') as string,
+        name: colYMap.get('name') as string,
+        type: colYMap.get('type') as string,
+        pk: (colYMap.get('pk') as boolean) ?? undefined,
+        fk: (colYMap.get('fk') as boolean) ?? undefined,
+        nullable: (colYMap.get('nullable') as boolean) ?? undefined,
+        autoIncrement: (colYMap.get('autoIncrement') as boolean) ?? undefined,
+        logicalName: (colYMap.get('logicalName') as string) ?? undefined,
+        termId: (colYMap.get('termId') as number) ?? undefined,
+        domainId: (colYMap.get('domainId') as number) ?? undefined,
+      });
+    });
+  }
+
+  return {
+    id: tableId,
+    type: 'table',
+    position: position ?? { x: 100, y: 100 },
+    data: {
+      label: (tableYMap.get('label') as string) ?? 'Untitled',
+      logicalTableName: (tableYMap.get('logicalTableName') as string) ?? undefined,
+      tableTermId: (tableYMap.get('tableTermId') as number) ?? undefined,
+      headerColor: (tableYMap.get('headerColor') as TableHeaderColor) ?? undefined,
+      handleLayout: (tableYMap.get('handleLayout') as TableHandleLayout) ?? undefined,
+      columns,
+    },
+  };
 }
 
 /**
@@ -158,26 +165,30 @@ export function yEdgesMapToEdges(edgesMap: Y.Map<Y.Map<unknown>>): Edge<ERDEdgeD
   const edges: Edge<ERDEdgeData>[] = [];
 
   edgesMap.forEach((edgeYMap, edgeId) => {
-    const waypoints = readWaypointsFromEdgeYMap(edgeYMap);
-    edges.push({
-      id: edgeId,
-      source: edgeYMap.get('source') as string,
-      target: edgeYMap.get('target') as string,
-      sourceHandle: (edgeYMap.get('sourceHandle') as string) ?? undefined,
-      targetHandle: (edgeYMap.get('targetHandle') as string) ?? undefined,
-      type: 'erdRelation',
-      data: {
-        relationType: (edgeYMap.get('relationType') as RelationType) ?? 'non-identifying',
-        routingType: (edgeYMap.get('routingType') as EdgeRoutingType) ?? 'smoothstep',
-        handleMode: (edgeYMap.get('handleMode') as EdgeHandleMode) ?? 'auto',
-        sourceSide: (edgeYMap.get('sourceSide') as EdgeHandleSide) ?? undefined,
-        targetSide: (edgeYMap.get('targetSide') as EdgeHandleSide) ?? undefined,
-        waypoints: waypoints.length > 0 ? waypoints : undefined,
-      },
-    });
+    edges.push(yEdgeYMapToEdge(edgeId, edgeYMap));
   });
 
   return edges;
+}
+
+export function yEdgeYMapToEdge(edgeId: string, edgeYMap: Y.Map<unknown>): Edge<ERDEdgeData> {
+  const waypoints = readWaypointsFromEdgeYMap(edgeYMap);
+  return {
+    id: edgeId,
+    source: edgeYMap.get('source') as string,
+    target: edgeYMap.get('target') as string,
+    sourceHandle: (edgeYMap.get('sourceHandle') as string) ?? undefined,
+    targetHandle: (edgeYMap.get('targetHandle') as string) ?? undefined,
+    type: 'erdRelation',
+    data: {
+      relationType: (edgeYMap.get('relationType') as RelationType) ?? 'non-identifying',
+      routingType: (edgeYMap.get('routingType') as EdgeRoutingType) ?? 'smoothstep',
+      handleMode: (edgeYMap.get('handleMode') as EdgeHandleMode) ?? 'auto',
+      sourceSide: (edgeYMap.get('sourceSide') as EdgeHandleSide) ?? undefined,
+      targetSide: (edgeYMap.get('targetSide') as EdgeHandleSide) ?? undefined,
+      waypoints: waypoints.length > 0 ? waypoints : undefined,
+    },
+  };
 }
 
 /**
@@ -190,39 +201,43 @@ export function yGroupsMapToTableGroups(groupsMap: Y.Map<Y.Map<unknown>>): Table
   const groups: TableGroup[] = [];
 
   groupsMap.forEach((groupYMap, groupId) => {
-    const tableIdsYArray = groupYMap.get('tableIds') as Y.Array<string> | undefined;
-
-    // CRDT 동시 추가로 중복이 들어올 수 있으므로 읽기 시 deduplicate한다.
-    const seen = new Set<string>();
-    const tableIds: string[] = [];
-    if (tableIdsYArray) {
-      tableIdsYArray.forEach((tableId) => {
-        if (!seen.has(tableId)) {
-          seen.add(tableId);
-          tableIds.push(tableId);
-        }
-      });
-    }
-
-    groups.push({
-      id: groupId,
-      label: (groupYMap.get('label') as string) ?? 'Group',
-      color: (groupYMap.get('color') as TableHeaderColor) ?? undefined,
-      tableIds,
-    });
+    groups.push(yGroupYMapToTableGroup(groupId, groupYMap));
   });
 
   return groups;
+}
+
+export function yGroupYMapToTableGroup(groupId: string, groupYMap: Y.Map<unknown>): TableGroup {
+  const tableIdsYArray = groupYMap.get('tableIds') as Y.Array<string> | undefined;
+
+  const seen = new Set<string>();
+  const tableIds: string[] = [];
+  if (tableIdsYArray) {
+    tableIdsYArray.forEach((tableId) => {
+      if (!seen.has(tableId)) {
+        seen.add(tableId);
+        tableIds.push(tableId);
+      }
+    });
+  }
+
+  return {
+    id: groupId,
+    label: (groupYMap.get('label') as string) ?? 'Group',
+    color: (groupYMap.get('color') as TableHeaderColor) ?? undefined,
+    tableIds,
+  };
 }
 
 /**
  * 기존 React Flow JSON (nodes + edges + groups)을 Y.Doc으로 마이그레이션한다.
  * content(JSON)은 있지만 ydocSnapshot이 없는 기존 다이어그램을 변환할 때 사용한다.
  *
- * @param doc  대상 Y.Doc
- * @param json 기존 React Flow JSON 문자열
+ * @param doc    대상 Y.Doc
+ * @param json   기존 React Flow JSON 문자열
+ * @param origin Yjs transaction origin
  */
-export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
+export function migrateJsonToYDoc(doc: Y.Doc, json: string, origin: unknown): void {
   try {
     const parsed = JSON.parse(json) as {
       nodes?: Node<TableNodeData>[];
@@ -279,7 +294,7 @@ export function migrateJsonToYDoc(doc: Y.Doc, json: string): void {
         }
         groupsMap.set(group.id, createGroupYMap(group.label, group.tableIds, group.color));
       }
-    });
+    }, origin);
   } catch (err) {
     // JSON → Y.Doc 마이그레이션 실패: 기존 JSON이 유효하지 않은 경우 빈 Y.Doc으로 시작
     console.warn('[yjsBridge] migrateJsonToYDoc failed, starting with empty Y.Doc:', err);

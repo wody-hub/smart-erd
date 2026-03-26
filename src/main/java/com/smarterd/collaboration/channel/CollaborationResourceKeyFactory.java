@@ -7,7 +7,6 @@ package com.smarterd.collaboration.channel;
  * key 생성 책임을 공통 협업 플러그인 계약에 포함한다.</p>
  */
 public interface CollaborationResourceKeyFactory {
-
     /**
      * 이 factory가 담당하는 채널 타입을 반환한다.
      *

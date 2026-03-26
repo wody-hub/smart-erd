@@ -23,9 +23,7 @@ public enum MessageCode {
     ERROR_BULK_VALIDATION_DATA_TYPE_MAX_LENGTH("error.bulk.validation.data-type-max-length"),
     ERROR_BULK_VALIDATION_DATA_TYPE_REQUIRED("error.bulk.validation.data-type-required"),
     ERROR_BULK_VALIDATION_DESCRIPTION_MAX_LENGTH("error.bulk.validation.description-max-length"),
-    ERROR_BULK_VALIDATION_DOMAIN_CLASSIFICATION_MAX_LENGTH(
-        "error.bulk.validation.domain-classification-max-length"
-    ),
+    ERROR_BULK_VALIDATION_DOMAIN_CLASSIFICATION_MAX_LENGTH("error.bulk.validation.domain-classification-max-length"),
     ERROR_BULK_VALIDATION_DOMAIN_GROUP_MAX_LENGTH("error.bulk.validation.domain-group-max-length"),
     ERROR_BULK_VALIDATION_DOMAIN_NOT_FOUND("error.bulk.validation.domain-not-found"),
     ERROR_BULK_VALIDATION_DUPLICATE_IN_DB("error.bulk.validation.duplicate-in-db"),

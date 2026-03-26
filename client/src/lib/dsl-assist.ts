@@ -160,9 +160,9 @@ export function extractColumnTermAssistContext(
 
   const logicalName = unwrapAssistQuotedIdentifier(
     core
-    .replace(/\s+::\s*.+$/u, '')
-    .replace(/\s+:(?!:)\s*.+$/u, '')
-    .trim(),
+      .replace(/\s+::\s*.+$/u, '')
+      .replace(/\s+:(?!:)\s*.+$/u, '')
+      .trim(),
   );
   if (!logicalName) {
     return null;

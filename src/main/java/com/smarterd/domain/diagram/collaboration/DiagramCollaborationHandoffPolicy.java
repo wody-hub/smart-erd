@@ -1,8 +1,8 @@
 package com.smarterd.domain.diagram.collaboration;
 
 import com.smarterd.collaboration.channel.CollaborationResourceKey;
-import com.smarterd.collaboration.handoff.CollaborationHandoffResult;
 import com.smarterd.collaboration.handoff.CollaborationHandoffPolicy;
+import com.smarterd.collaboration.handoff.CollaborationHandoffResult;
 import com.smarterd.collaboration.snapshot.CollaborationSnapshotStore;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;

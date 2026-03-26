@@ -26,12 +26,12 @@ import { useDdlParse } from '@/hooks/useDdlParse';
 import { useApplyToErd } from '@/hooks/useApplyToErd';
 import { useBidirectionalCodeSync } from '@/hooks/useBidirectionalCodeSync';
 import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
+import { useDiagramErdStructureSnapshot } from '@/collaboration/channel/diagram/use-diagram-erd-read-snapshot';
 import { useCodeEditorTableLock } from '@/hooks/useCodeEditorTableLock';
 import { useCodeEditorTableNavigation } from '@/hooks/useCodeEditorTableNavigation';
 import { useCodeEditorTableReveal } from '@/hooks/useCodeEditorTableReveal';
 import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
 import { useEditorCursorGuard } from '@/hooks/useEditorCursorGuard';
-import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
 import { buildParsedSchemaHash } from '@/lib/code-sync-schema-hash';
 import type {
@@ -44,7 +44,11 @@ import type { DiagramWorkMode } from '@/lib/diagram-work-mode';
 import type { DslPreviewCanvasState } from '@/lib/dsl-preview-graph';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import type { DdlParseResult } from '@/lib/ddl-parser';
-import { getSyncStatusMeta, type SyncStatusMeta } from '@/lib/sync-status-meta';
+import { isCodeEditorApplyBlocked } from '@/lib/code-editor-draft-policy';
+import {
+  getCodeEditorStatusMeta,
+  type SyncStatusMeta,
+} from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import { generateDdl } from '@/lib/ddl-generator';
 import CodeEditorFooter from './CodeEditorFooter';
@@ -113,6 +117,8 @@ interface DdlCodeEditorPanelProps {
   onScheduleCodeModeSnapshotPersist?: () => void;
   /** code 모드 shared schema draft snapshot 저장 상태 즉시 정리 */
   onResetCodeModeSnapshotPersistState?: () => void;
+  /** snapshot persist 직전 editor draft flush 등록 */
+  registerBeforeCodeModeSnapshotPersist?: (callback: (() => void) | null) => void;
   /** code 모드 shared schema draft 서버 저장 상태 */
   codeModeDraftPersistStatus?: CodeModeDraftPersistStatus;
   /** code 모드 shared schema draft 서버 저장 완료 시각 */
@@ -147,6 +153,7 @@ export default function DdlCodeEditorPanel({
   persistedDiagramHasContent = false,
   onScheduleCodeModeSnapshotPersist,
   onResetCodeModeSnapshotPersistState,
+  registerBeforeCodeModeSnapshotPersist,
   codeModeDraftPersistStatus = 'inactive',
   codeModeDraftPersistedAt = null,
   onPersistPublishedDiagram,
@@ -217,14 +224,14 @@ export default function DdlCodeEditorPanel({
       {/* 모드별 에디터 */}
       <div className="flex-1 min-h-0" role="tabpanel">
         {mode === 'sql' ? (
-            <SqlDdlEditor
-              canEdit={canEdit}
-              enableCodeToErdAutoSync={enableCodeToErdAutoSync}
-              enableErdToCodeAutoSync={enableErdToCodeAutoSync}
-              enableTableLock={enableTableLock}
-              onNavigateToTable={onNavigateToTable}
-              tableRevealRequest={tableRevealRequest}
-            />
+          <SqlDdlEditor
+            canEdit={canEdit}
+            enableCodeToErdAutoSync={enableCodeToErdAutoSync}
+            enableErdToCodeAutoSync={enableErdToCodeAutoSync}
+            enableTableLock={enableTableLock}
+            onNavigateToTable={onNavigateToTable}
+            tableRevealRequest={tableRevealRequest}
+          />
         ) : (
           <Suspense fallback={<Spinner text={t('common.loading')} />}>
             <DslCodeEditorPanel
@@ -242,6 +249,7 @@ export default function DdlCodeEditorPanel({
               persistedDiagramHasContent={persistedDiagramHasContent}
               onScheduleCodeModeSnapshotPersist={onScheduleCodeModeSnapshotPersist}
               onResetCodeModeSnapshotPersistState={onResetCodeModeSnapshotPersistState}
+              registerBeforeCodeModeSnapshotPersist={registerBeforeCodeModeSnapshotPersist}
               codeModeDraftPersistStatus={codeModeDraftPersistStatus}
               codeModeDraftPersistedAt={codeModeDraftPersistedAt}
               onPersistPublishedDiagram={onPersistPublishedDiagram}
@@ -392,6 +400,7 @@ function SqlDdlEditor({
   }>();
   const remoteEditLocks = useRemoteEditLocks();
   const hasRemoteEditLocks = remoteEditLocks.hasTableLocks;
+  const diagramErdStructureSnapshot = useDiagramErdStructureSnapshot();
 
   const { dbms, ddlText, parseResult, parsing, handleDdlChange, handleDbmsChange } = useDdlParse({
     persistDbms: true,
@@ -421,9 +430,9 @@ function SqlDdlEditor({
 
   /** 현재 ERD 상태를 SQL DDL 텍스트로 생성한다. */
   const generateFromErd = useCallback(() => {
-    const { nodes, edges } = useCanvasStore.getState();
-    return generate(nodes as TableNode[], edges as ERDEdge[]);
-  }, [generate]);
+    const { nodes, edges } = diagramErdStructureSnapshot.readCurrentStructure();
+    return generate(nodes, edges);
+  }, [diagramErdStructureSnapshot, generate]);
 
   const hasBlockingErrors =
     (parseResult?.diagnostics.some((d) => d.severity === 'error') ?? false) ||
@@ -439,7 +448,13 @@ function SqlDdlEditor({
   // ERD→Code 동기화 시 커서/스크롤 보존 가드
   const { syncCodeChange, shouldIgnoreChange } = useEditorCursorGuard(editorRef, handleDdlChange);
 
-  const { handleUserCodeChange, handleGeneratedCodeChange, clearQueueTimeoutHold, syncStatus } =
+  const {
+    handleUserCodeChange,
+    handleGeneratedCodeChange,
+    clearQueueTimeoutHold,
+    syncStatus,
+    draftState,
+  } =
     useBidirectionalCodeSync({
       enableCodeToErdSync: canEdit && enableCodeToErdAutoSync,
       enableErdToCodeSync: canEdit && enableErdToCodeAutoSync,
@@ -452,27 +467,36 @@ function SqlDdlEditor({
       onCodeTextChange: handleDdlChange,
       onSyncCodeTextChange: syncCodeChange,
       generateCodeFromErd: generateFromErd,
+      currentErdRevisionHash: diagramErdStructureSnapshot.currentRevisionHash,
       applyParsedToErd,
     });
 
   const handleApplyWithSyncReset = useCallback(() => {
+    if (isCodeEditorApplyBlocked(draftState)) {
+      return;
+    }
     clearQueueTimeoutHold();
     handleApply();
-  }, [clearQueueTimeoutHold, handleApply]);
+  }, [clearQueueTimeoutHold, draftState, handleApply]);
 
   const executeApplyWithSyncReset = useCallback(() => {
+    if (isCodeEditorApplyBlocked(draftState)) {
+      return;
+    }
     clearQueueTimeoutHold();
     executeApply();
-  }, [clearQueueTimeoutHold, executeApply]);
+  }, [clearQueueTimeoutHold, draftState, executeApply]);
 
   const { executeRefresh, handleRefresh, hasNodes, refreshConfirmOpen, setRefreshConfirmOpen } =
     useCodeEditorRefresh({
-      generate,
+      generateFromErd,
       onGenerated: handleGeneratedCodeChange,
+      hasNodes: diagramErdStructureSnapshot.hasNodes,
       currentText: ddlText,
     });
 
-  const syncStatusMeta = getSyncStatusMeta(t, syncStatus);
+  const syncStatusMeta = getCodeEditorStatusMeta(t, syncStatus, draftState);
+  const canApplyWithDraftState = canApply && !isCodeEditorApplyBlocked(draftState);
   const navigableTables = useMemo<CodeEditorNavigableTable[]>(
     () => buildCodeEditorNavigableTables(parseResult?.tables ?? [], parseResult?.tableRanges ?? []),
     [parseResult?.tableRanges, parseResult?.tables],
@@ -649,7 +673,7 @@ function SqlDdlEditor({
       {/* 파싱 결과 프리뷰 + Apply/Refresh 버튼 */}
       <CodeEditorFooter
         onApply={handleApplyWithSyncReset}
-        canApply={canApply}
+        canApply={canApplyWithDraftState}
         executeApply={executeApplyWithSyncReset}
         confirmOpen={confirmOpen}
         setConfirmOpen={setConfirmOpen}
@@ -729,9 +753,7 @@ const SqlFooterStatus = memo(function SqlFooterStatus({
           className={cn('flex items-center gap-1', syncStatusMeta.className)}
           aria-label={t('erd.sync.statusAria')}
         >
-          <syncStatusMeta.Icon
-            className={cn('h-3 w-3', syncStatusMeta.spin && 'animate-spin')}
-          />
+          <syncStatusMeta.Icon className={cn('h-3 w-3', syncStatusMeta.spin && 'animate-spin')} />
           {syncStatusMeta.label}
         </span>
       )}

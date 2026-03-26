@@ -6,6 +6,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.smarterd.collaboration.metadata.DocumentMetadataService;
+import com.smarterd.collaboration.persistence.DocumentBootstrapReader;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
@@ -58,6 +60,12 @@ class DiagramServiceTest {
     @Mock
     private DiagramDictionaryBindingService diagramDictionaryBindingService;
 
+    @Mock
+    private DocumentMetadataService documentMetadataService;
+
+    @Mock
+    private DocumentBootstrapReader documentBootstrapReader;
+
     @InjectMocks
     private DiagramService diagramService;
 
@@ -88,7 +96,9 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(teamId)).thenReturn(team);
         when(projectService.findProjectById(projectId)).thenReturn(project);
-        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(
+            Optional.of(diagram)
+        );
         when(roomManager.getSessionCount(diagramId)).thenReturn(0);
         when(dictionarySetService.findByTeamAndId(team, targetSetId)).thenReturn(targetSet);
         when(diagramDictionaryBindingService.invalidateBindings(diagram, targetSet)).thenReturn(invalidationCounts);
@@ -136,7 +146,9 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(teamId)).thenReturn(team);
         when(projectService.findProjectById(projectId)).thenReturn(project);
-        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(
+            Optional.of(diagram)
+        );
         when(roomManager.getSessionCount(diagramId)).thenReturn(0);
         when(dictionarySetService.findByTeamAndId(team, targetSetId)).thenReturn(targetSet);
         when(diagramDictionaryBindingService.invalidateBindings(diagram, targetSet)).thenThrow(
@@ -145,13 +157,7 @@ class DiagramServiceTest {
 
         // when & then
         assertThatThrownBy(() ->
-            diagramService.updateDiagramDictionarySet(
-                loginId,
-                teamId,
-                projectId,
-                diagramId,
-                targetSetId
-            )
+            diagramService.updateDiagramDictionarySet(loginId, teamId, projectId, diagramId, targetSetId)
         )
             .isInstanceOf(BusinessException.class)
             .hasMessage(MessageCode.ERROR_BUSINESS_DIAGRAM_CONTENT_INVALID_JSON.code());
@@ -178,18 +184,14 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(teamId)).thenReturn(team);
         when(projectService.findProjectById(projectId)).thenReturn(project);
-        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(
+            Optional.of(diagram)
+        );
         when(roomManager.getSessionCount(diagramId)).thenReturn(1);
 
         // when & then
         assertThatThrownBy(() ->
-            diagramService.updateDiagramDictionarySet(
-                loginId,
-                teamId,
-                projectId,
-                diagramId,
-                300L
-            )
+            diagramService.updateDiagramDictionarySet(loginId, teamId, projectId, diagramId, 300L)
         ).isInstanceOf(ConflictException.class);
     }
 
@@ -213,7 +215,9 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(teamId)).thenReturn(team);
         when(projectService.findProjectById(projectId)).thenReturn(project);
-        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(
+            Optional.of(diagram)
+        );
 
         // when
         diagramService.deleteDiagram(loginId, teamId, projectId, diagramId);
@@ -267,7 +271,9 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(teamId)).thenReturn(team);
         when(projectService.findProjectById(projectId)).thenReturn(project);
-        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(
+            Optional.of(diagram)
+        );
 
         final var loaded = diagramService.loadWritableDiagram(loginId, teamId, projectId, diagramId);
 
@@ -315,5 +321,4 @@ class DiagramServiceTest {
         ReflectionTestUtils.setField(dictionarySet, "id", id);
         return dictionarySet;
     }
-
 }

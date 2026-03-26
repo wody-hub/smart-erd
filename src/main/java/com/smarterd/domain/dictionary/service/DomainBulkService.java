@@ -109,7 +109,15 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
 
     @Override
     protected List<String> excelColumnKeys() {
-        return List.of("domainGroup", "domainClassification", "logicalName", "dataType", "dataLength", "dataScale", "description");
+        return List.of(
+            "domainGroup",
+            "domainClassification",
+            "logicalName",
+            "dataType",
+            "dataLength",
+            "dataScale",
+            "description"
+        );
     }
 
     @Override
@@ -506,13 +514,7 @@ public class DomainBulkService extends AbstractBulkService<DomainBulkService.Dom
     ) {
         final var team = verifyTeamAccess(loginId, teamId);
         final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
-        final var session = consumeValidationSession(
-            loginId,
-            teamId,
-            setId,
-            validationToken,
-            ValidationSession.class
-        );
+        final var session = consumeValidationSession(loginId, teamId, setId, validationToken, ValidationSession.class);
         final var excludedRows = new HashSet<>(excludedRowNumbers);
         final var candidateRows = session
             .validRows()
