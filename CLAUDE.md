@@ -8,9 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## gstack
 
-- 이 저장소는 repo-local gstack 스킬을 사용한다. 경로: `.agents/skills/gstack`
 - 브라우저 QA, 배포 확인, 리뷰, 조사 워크플로우가 필요하면 gstack 계열 스킬을 우선 사용한다.
-- 새로 추가한 repo-local 스킬이 보이지 않으면 현재 Codex/Claude 세션을 다시 시작해 `.agents/skills`를 다시 스캔한다.
 
 ## Build & Run Commands
 

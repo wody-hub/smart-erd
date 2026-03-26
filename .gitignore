@@ -2,8 +2,6 @@
 .gradle/
 build/
 bin/
-!.agents/skills/gstack/bin/
-!.agents/skills/gstack/bin/**
 
 # IDE
 .idea/
