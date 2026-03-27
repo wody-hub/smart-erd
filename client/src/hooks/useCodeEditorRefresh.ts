@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import type { CodeEditorRefreshConfirmReason } from '@/lib/code-editor-draft-policy';
 /**
  * useCodeEditorRefresh 훅의 옵션.
  */
@@ -9,8 +10,8 @@ interface UseCodeEditorRefreshOptions {
   onGenerated: (text: string) => void;
   /** 현재 persisted ERD에 노드가 있는지 여부 */
   hasNodes: boolean;
-  /** 현재 로컬 draft가 authoritative ERD와 달라 확인이 필요한지 여부 */
-  hasUnsavedChanges: boolean;
+  /** 현재 로컬 draft refresh 확인 사유 */
+  refreshConfirmReason: CodeEditorRefreshConfirmReason | null;
   /** 초기화 가능 여부 (사전 데이터 로딩 등 선행 조건) */
   ready?: boolean;
   /** 초기 ERD -> 코드 자동 채우기를 건너뛸지 여부 */
@@ -48,7 +49,7 @@ export function useCodeEditorRefresh({
   generateFromErd,
   onGenerated,
   hasNodes,
-  hasUnsavedChanges,
+  refreshConfirmReason,
   ready = true,
   skipInitialRefresh = false,
   beforeExecuteRefresh,
@@ -67,12 +68,12 @@ export function useCodeEditorRefresh({
 
   /** Refresh 버튼 핸들러 (편집 내용이 있으면 확인 다이얼로그) */
   const handleRefresh = useCallback(() => {
-    if (hasUnsavedChanges) {
+    if (refreshConfirmReason != null) {
       setRefreshConfirmOpen(true);
     } else {
       executeRefresh();
     }
-  }, [executeRefresh, hasUnsavedChanges]);
+  }, [executeRefresh, refreshConfirmReason]);
 
   // 마운트 시 ERD → 코드 초기 채우기 (1회)
   useEffect(() => {

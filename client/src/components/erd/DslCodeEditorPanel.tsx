@@ -90,7 +90,6 @@ import {
 import { buildDslCopyTextWithPhysicalNames } from '@/lib/dsl-copy-with-physical-names';
 import {
   getCodeEditorRefreshConfirmReason,
-  hasCodeEditorUnsavedChanges,
   isCodeEditorApplyBlocked,
   isCodeEditorFinalizeBlocked,
 } from '@/lib/code-editor-draft-policy';
@@ -950,16 +949,17 @@ export default function DslCodeEditorPanel({
     executeApply();
   }, [clearQueueTimeoutHold, draftState, executeApply]);
 
+  const refreshConfirmReason = getCodeEditorRefreshConfirmReason({
+    draftState,
+    hasPendingFinalizeChanges: hasPendingDraftChanges,
+    isPersistedDraftStale: codeModeDraftPersistStatus === 'stale',
+  });
   const { executeRefresh, handleRefresh, hasNodes, refreshConfirmOpen, setRefreshConfirmOpen } =
     useCodeEditorRefresh({
       generateFromErd,
       onGenerated: handleGeneratedCodeChange,
       hasNodes: diagramErdStructureSnapshot.hasNodes,
-      hasUnsavedChanges: hasCodeEditorUnsavedChanges({
-        draftState,
-        hasPendingFinalizeChanges: hasPendingDraftChanges,
-        isPersistedDraftStale: codeModeDraftPersistStatus === 'stale',
-      }),
+      refreshConfirmReason,
       ready: hasDictionary,
       skipInitialRefresh: persistDraft,
       beforeExecuteRefresh: persistDraft
@@ -1175,14 +1175,7 @@ export default function DslCodeEditorPanel({
   ]);
 
   const syncStatusMeta = getCodeEditorStatusMeta(t, syncStatus, draftState);
-  const refreshConfirmCopy = getCodeEditorRefreshConfirmCopy(
-    t,
-    getCodeEditorRefreshConfirmReason({
-      draftState,
-      hasPendingFinalizeChanges: hasPendingDraftChanges,
-      isPersistedDraftStale: codeModeDraftPersistStatus === 'stale',
-    }),
-  );
+  const refreshConfirmCopy = getCodeEditorRefreshConfirmCopy(t, refreshConfirmReason);
   const draftPersistStatusMeta = useMemo(() => {
     switch (codeModeDraftPersistStatus) {
       case 'dirty':
