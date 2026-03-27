@@ -40,6 +40,7 @@ type DiagramSummary = {
 };
 
 type UseDiagramPageRuntimeStateParams = {
+  beforeViewGroup?: () => void;
   canEdit: boolean;
   collaborationSetupErrorKind: string | null;
   diagram: DiagramSummary | undefined;
@@ -57,6 +58,7 @@ type UseDiagramPageRuntimeStateParams = {
   setLeftPanel: (panel: 'sidebar' | 'code') => void;
   sharedSchemaDraft: SharedSchemaDraftSnapshot | null;
   storeHasRenderableGraph: boolean;
+  toggleCodeEditorPanel?: () => void;
   t: TFunction;
   workModeCapabilities: DiagramWorkModeCapabilities;
   workMode: DiagramWorkMode;
@@ -82,6 +84,7 @@ type UseDiagramPageRuntimeStateResult = {
   handleNavigateToTableFromEditor: (request: CodeEditorTableFocusRequest) => void;
   handleOpenDictionary: (() => void) | undefined;
   handleSharedSchemaDraftPositionsChange: (nextPositions: DiagramPreviewPositionRecord) => void;
+  handleToggleCodeEditor: (() => void) | undefined;
   handleViewGroup: (groupId: string) => void;
   previewReadOnlyMessage: string | undefined;
   renderDictionaryDialog: boolean;
@@ -94,6 +97,7 @@ type UseDiagramPageRuntimeStateResult = {
 };
 
 export function useDiagramPageRuntimeState({
+  beforeViewGroup,
   canEdit,
   collaborationSetupErrorKind,
   diagram,
@@ -111,6 +115,7 @@ export function useDiagramPageRuntimeState({
   setLeftPanel,
   sharedSchemaDraft,
   storeHasRenderableGraph,
+  toggleCodeEditorPanel,
   t,
   workModeCapabilities,
   workMode,
@@ -209,12 +214,20 @@ export function useDiagramPageRuntimeState({
     return () => setDictionaryDialogOpen(true);
   }, [canOpenDictionary, setDictionaryDialogOpen]);
 
+  const handleToggleCodeEditor = useMemo(() => {
+    if (!workModeRuntimeState.canToggleCodeEditor || !toggleCodeEditorPanel) {
+      return undefined;
+    }
+    return () => toggleCodeEditorPanel();
+  }, [toggleCodeEditorPanel, workModeRuntimeState.canToggleCodeEditor]);
+
   const handleViewGroup = useCallback(
     (groupId: string) => {
+      beforeViewGroup?.();
       setActiveGroupId(groupId);
       setLeftPanel('sidebar');
     },
-    [setActiveGroupId, setLeftPanel],
+    [beforeViewGroup, setActiveGroupId, setLeftPanel],
   );
 
   const handleBackToAll = useCallback(() => {
@@ -368,6 +381,7 @@ export function useDiagramPageRuntimeState({
     handleNavigateToTableFromEditor,
     handleOpenDictionary,
     handleSharedSchemaDraftPositionsChange,
+    handleToggleCodeEditor,
     handleViewGroup,
     previewReadOnlyMessage,
     renderDictionaryDialog,

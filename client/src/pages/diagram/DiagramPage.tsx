@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
@@ -85,7 +85,7 @@ export default function DiagramPage() {
     handleExportColumnDefinition,
     handleExportIndexDefinition,
     handleExportTableDefinition,
-    handleToggleCodeEditor,
+    handleToggleCodeEditor: toggleCodeEditorPanel,
     handleToggleValidation,
     indexDefinitionExporting,
     leftPanel,
@@ -169,7 +169,8 @@ export default function DiagramPage() {
     handleNavigateToTableFromEditor,
     handleOpenDictionary,
     handleSharedSchemaDraftPositionsChange,
-    handleViewGroup: handleViewGroupState,
+    handleToggleCodeEditor,
+    handleViewGroup,
     previewReadOnlyMessage,
     renderDictionaryDialog,
     sharedDraftOverlayGraph,
@@ -179,6 +180,10 @@ export default function DiagramPage() {
     tableFocusRequest,
     workModeRuntimeState,
   } = useDiagramPageRuntimeState({
+    beforeViewGroup: () => {
+      setActiveEditNodeId(null);
+      clearHighlights();
+    },
     canEdit,
     collaborationSetupErrorKind,
     diagram,
@@ -196,27 +201,18 @@ export default function DiagramPage() {
     setLeftPanel,
     sharedSchemaDraft,
     storeHasRenderableGraph,
+    toggleCodeEditorPanel,
     t,
     workModeCapabilities,
     workMode,
     writePreviewPositionOverrides,
   });
-
   /**
    * 현재 포커스가 캔버스 undo 단축키를 가로채면 안 되는 입력 필드인지 확인한다.
    *
    * @returns 텍스트 입력 계열 포커스면 true
    */
   const shouldBypassCanvasUndo = () => isTextInputLikeTarget(document.activeElement);
-
-  const handleViewGroup = useCallback(
-    (groupId: string) => {
-      setActiveEditNodeId(null);
-      clearHighlights();
-      handleViewGroupState(groupId);
-    },
-    [clearHighlights, handleViewGroupState, setActiveEditNodeId],
-  );
 
   useHotkeys(KEYBINDINGS.SAVE, handleSave, {
     preventDefault: true,
@@ -453,11 +449,7 @@ export default function DiagramPage() {
                             activeGroupName={activeGroup?.label}
                             activeGroupTableIds={activeGroupTableIds}
                             codeEditorActive={leftPanel === 'code'}
-                            onToggleCodeEditor={
-                              workModeRuntimeState.canToggleCodeEditor
-                                ? handleToggleCodeEditor
-                                : undefined
-                            }
+                            onToggleCodeEditor={handleToggleCodeEditor}
                             isSidebarResizing={isSidebarResizing}
                             onExportTableDefinition={handleExportTableDefinition}
                             onExportColumnDefinition={handleExportColumnDefinition}
