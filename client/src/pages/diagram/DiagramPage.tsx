@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
@@ -30,10 +30,11 @@ import { useSidebarResize, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH } from '@/hooks/
 import { useDiagramDictionaryReconciliation } from '@/hooks/useDiagramDictionaryReconciliation';
 import { useDiagramSharedSchemaDraft } from '@/collaboration/channel/diagram/use-diagram-shared-schema-draft';
 import { useDiagramDocumentSession } from '@/collaboration/channel/diagram/use-diagram-document-session';
-import { createDiagramWorkModeCapabilities, type DiagramWorkMode } from '@/lib/diagram-work-mode';
+import { createDiagramWorkModeCapabilities } from '@/lib/diagram-work-mode';
 import type { ERDEdge, TableNode } from '@/types/erd';
 import { useDiagramPageControls } from './use-diagram-page-controls';
 import { useDiagramPageRuntimeState } from './use-diagram-page-runtime-state';
+import { useDiagramWorkModeState } from './use-diagram-work-mode-state';
 
 const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPanel'));
 
@@ -72,10 +73,11 @@ export default function DiagramPage() {
 
   const { t } = useTranslation();
 
-  /** 다이어그램 작업 모드 */
-  const [workMode, setWorkMode] = useState<DiagramWorkMode>('sync');
-  /** 현재 다이어그램 스코프의 작업 모드 로드 완료 여부 */
-  const [workModeHydrated, setWorkModeHydrated] = useState(false);
+  const { workMode, handleWorkModeChange } = useDiagramWorkModeState({
+    teamId,
+    projectId,
+    diagramId,
+  });
   const { canEdit } = useTeamRole(teamId);
   const {
     columnDefinitionExporting,
@@ -161,7 +163,6 @@ export default function DiagramPage() {
     handleNavigateToTableFromEditor,
     handleSharedSchemaDraftPositionsChange,
     handleViewGroup: handleViewGroupState,
-    handleWorkModeChange,
     previewReadOnlyMessage,
     sharedDraftOverlayGraph,
     showOverlay,
@@ -184,15 +185,11 @@ export default function DiagramPage() {
     projectId,
     setDictionaryDialogOpen,
     setLeftPanel,
-    setWorkMode,
-    setWorkModeHydrated,
     sharedSchemaDraft,
     storeHasRenderableGraph,
     t,
-    teamId,
     workModeCapabilities,
     workMode,
-    workModeHydrated,
     writePreviewPositionOverrides,
   });
 

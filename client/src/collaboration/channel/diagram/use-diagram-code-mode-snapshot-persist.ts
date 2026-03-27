@@ -150,6 +150,16 @@ export function useDiagramCodeModeSnapshotPersist({
         if (persistResult.refreshedDiagram) {
           queryClient.setQueryData(diagramDetailQueryKey, persistResult.refreshedDiagram);
         }
+        if (persistResult.status === 'stale') {
+          codeModeSnapshotPersistDirtyRef.current = false;
+          codeModeSnapshotKeepalivePendingRef.current = false;
+          if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
+            setCodeModeDraftPersistStatus('stale');
+            setCodeModeDraftPersistedAt(null);
+          }
+          console.warn('[DiagramPage] code mode snapshot persist became stale');
+          return;
+        }
         if (persistResult.status !== 'persisted') {
           codeModeSnapshotPersistDirtyRef.current = true;
           if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {

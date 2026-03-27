@@ -19,12 +19,6 @@ import type {
   Waypoint,
 } from '@/types/erd';
 
-export interface ErdDocumentGraphSnapshot {
-  nodes: TableNode[];
-  edges: ERDEdge[];
-  groups: TableGroup[];
-}
-
 export interface ErdDocumentStructureSnapshot {
   nodes: TableNode[];
   edges: ERDEdge[];
@@ -163,16 +157,6 @@ export function readErdDocumentStructure(read: DocumentReadExecutor): ErdDocumen
 export function readErdDocumentGroups(read: DocumentReadExecutor): TableGroup[] {
   return read.execute({
     run: (context) => readGroups(context),
-  });
-}
-
-export function readErdDocumentGraph(read: DocumentReadExecutor): ErdDocumentGraphSnapshot {
-  return read.execute({
-    run: (context) => ({
-      nodes: readTableNodes(context),
-      edges: readEdges(context),
-      groups: readGroups(context),
-    }),
   });
 }
 

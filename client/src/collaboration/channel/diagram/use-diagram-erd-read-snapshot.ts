@@ -22,7 +22,10 @@ export interface DiagramErdNodesSnapshot {
   readCurrentNodes: () => TableNode[];
 }
 
-type DiagramErdStructureGraphSnapshot = Pick<DiagramErdGraphSnapshot, 'nodes' | 'edges'>;
+type DiagramErdStructureGraphSnapshot = {
+  nodes: TableNode[];
+  edges: ERDEdge[];
+};
 
 export interface DiagramErdStructureSnapshot {
   currentNodes: TableNode[];

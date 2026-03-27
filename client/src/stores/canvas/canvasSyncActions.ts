@@ -289,6 +289,29 @@ export function createCanvasSyncActions(
     set(nextState);
   }
 
+  function collectObservedEntityIds(events: Y.YEvent<Y.AbstractType<unknown>>[]): string[] | null {
+    const ids = new Set<string>();
+
+    for (const event of events) {
+      const scopedId = event.path[0];
+      if (typeof scopedId === 'string' && scopedId.length > 0) {
+        ids.add(scopedId);
+        continue;
+      }
+
+      if (event.target instanceof Y.Map) {
+        for (const [key] of event.changes.keys) {
+          ids.add(String(key));
+        }
+        continue;
+      }
+
+      return null;
+    }
+
+    return ids.size > 0 ? [...ids] : null;
+  }
+
   function queueDeferredProjectionSync(request?: ProjectionSyncRequest): void {
     const internal = get().internal;
     if (request?.forceFull) {
@@ -402,21 +425,37 @@ export function createCanvasSyncActions(
         if (shouldDeferProjectionToProjector(events)) {
           return;
         }
+        const nodeIds = collectObservedEntityIds(events);
         if (get().internal.isNodeDragging) {
-          queueDeferredProjectionSync({ targets: ['nodes'] });
+          queueDeferredProjectionSync(
+            nodeIds ? { targets: ['nodes'], nodeIds } : { targets: ['nodes'] },
+          );
           return;
         }
-        const nextNodes = yTablesMapToNodes(tablesMap);
-        set({ nodes: nextNodes });
+        if (nodeIds) {
+          syncProjectionFromYDocWithRequest({ targets: ['nodes'], nodeIds });
+          return;
+        }
+        set({ nodes: yTablesMapToNodes(tablesMap) });
       };
       internal.edgesObserver = (events) => {
         if (shouldDeferProjectionToProjector(events)) {
+          return;
+        }
+        const edgeIds = collectObservedEntityIds(events);
+        if (edgeIds) {
+          syncProjectionFromYDocWithRequest({ targets: ['edges'], edgeIds });
           return;
         }
         set({ edges: yEdgesMapToEdges(edgesMap) });
       };
       internal.groupsObserver = (events) => {
         if (shouldDeferProjectionToProjector(events)) {
+          return;
+        }
+        const groupIds = collectObservedEntityIds(events);
+        if (groupIds) {
+          syncProjectionFromYDocWithRequest({ targets: ['groups'], groupIds });
           return;
         }
         set({ groups: yGroupsMapToTableGroups(groupsMap) });

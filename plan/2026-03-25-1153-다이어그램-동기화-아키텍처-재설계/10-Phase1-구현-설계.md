@@ -604,17 +604,22 @@ Phase 2부터가 본격적인 ERD plugin 추출과 code path 재구성 단계다
 - latest `DiagramPage` runtime state 소유권 정리 이후에도 `client npm run build`, `diagram-work-mode-shared-draft.spec.ts` 의 `code mode shared draft is visible across sessions and matched node moves persist` 가 재통과했다.
 - latest `diagramName / activeGroupId / initialLoadComplete` 상태 이동 이후에도 `client npm run build`, `diagram-work-mode-shared-draft.spec.ts` 의 `code mode shared draft is visible across sessions and matched node moves persist` 가 재통과했다.
 - latest projector deferred refresh id 보존 정리 이후에도 `client npm run build`, `diagram-collaboration.spec.ts`, `diagram-work-mode-shared-draft.spec.ts` 의 `code mode shared draft is visible across sessions and matched node moves persist` 가 재통과했다.
+- latest `save/reload/stale UX` 보완 이후에는 code-mode snapshot persist가 `stale` 상태를 실제로 보존하고, `workMode/workModeHydrated` 소유권은 page 밖으로 이동했다. `client npm run build`, `diagram-auto-apply-layout-and-domain-focus.spec.ts` 의 `code auto apply preserves existing layout and appends new table` 가 재통과했다.
+- latest read/projector follow-up 이후에는 non-projector Y.Doc observer도 changed id 기준 partial refresh를 우선 사용하고, broad graph read public escape hatch는 제거했다.
 
 ### 아직 남아 있는 우선 작업
 
-1. 브라우저 통합 검증
-- 로컬 편집, 원격 반영, save/reload, 재진입, code apply, DDL import/replace, dictionary reconcile을 실제 런타임에서 재현 검증
-- shared-draft 묶음 실행 종료 이슈는 다시 터질 때만 artifact를 보존해 재조사한다. 지금은 수정 대상이 아니라 관측 대상이다.
-- 현재 핵심 smoke 묶음은 모두 닫혔다. 남은 검증은 broad regression 유지와 deferred 관측 항목 관리다.
+#### 묶음 1. 제품 마감
+
+1. save/reload / stale UX 검증 및 보완
+- `content`와 `ydocSnapshot` 저장 시점 정합성 추가 확인
+- 409/stale 처리 후 UX와 재동기화 정책 점검
 
 2. `DiagramPage` / runtime 오케스트레이션 축소
 - `DiagramPage` 와 diagram channel 훅들에 남아 있는 overlay / dialog / work-mode 주변 조합 책임을 더 얇게 만들기
 - page는 화면 상태와 wiring만, runtime은 조립만, channel/session은 행위만 갖도록 재정리
+
+#### 묶음 2. 성능 / 후속
 
 3. read authority 추가 정리
 - `useDiagramErdReadSnapshot()` 의 canvas projection fallback은 제거했지만, apply/code/read 전 경로가 문서 read를 일관되게 우선하는지 추가 점검
@@ -624,9 +629,9 @@ Phase 2부터가 본격적인 ERD plugin 추출과 code path 재구성 단계다
 - 현재 scope-aware refresh는 들어갔지만, 일부 경로는 여전히 full refresh fallback을 사용한다.
 - large diagram 기준 incremental projector/read model로 더 좁혀야 함
 
-5. save/reload / stale UX 검증 및 보완
-- `content`와 `ydocSnapshot` 저장 시점 정합성 추가 확인
-- 409/stale 처리 후 UX와 재동기화 정책 점검
+5. deferred 관측 항목 관리
+- shared-draft 묶음 실행 종료 이슈는 다시 터질 때만 artifact를 보존해 재조사한다. 지금은 수정 대상이 아니라 관측 대상이다.
+- 현재 핵심 smoke 묶음은 모두 닫혔다. 남은 검증은 broad regression 유지와 deferred 관측 항목 관리다.
 
 6. code path 2차 전환 준비
 - `DraftState` / reconcile state machine을 실제 code editor 경로에 연결
@@ -634,5 +639,5 @@ Phase 2부터가 본격적인 ERD plugin 추출과 code path 재구성 단계다
 
 ### 다음 우선순위
 
-지금 시점의 최우선은 broad 통합 검증 유지와 남은 page/runtime 상태 조합 정리다.  
-shared-draft 묶음 실행 이슈는 현재 비재현이라 deferred로 두고, mutation/save/apply/dictionary/code read 경계 위에 남아 있는 오케스트레이션만 줄여간다.
+지금 시점의 최우선은 묶음 1인 `save/reload/stale UX` 와 `DiagramPage/runtime` 마감이다.  
+묶음 2는 성능/후속 정리로 분리하고, shared-draft 묶음 실행 이슈는 현재 비재현이라 deferred로 유지한다.

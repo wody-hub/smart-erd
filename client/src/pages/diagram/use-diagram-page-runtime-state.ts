@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
 import type { TFunction } from 'i18next';
 import { toast } from 'sonner';
 import type { PreviewSyncStatus } from '@/collaboration/core/collaboration-preview-sync-status';
@@ -20,8 +19,6 @@ import {
 } from '@/lib/shared-schema-draft';
 import {
   resolveDiagramWorkModeRuntimeState,
-  loadDiagramWorkMode,
-  saveDiagramWorkMode,
 } from '@/lib/diagram-work-mode';
 import type { DiagramWorkModeCapabilities } from '@/lib/diagram-work-mode';
 import { buildPreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
@@ -53,17 +50,13 @@ type UseDiagramPageRuntimeStateParams = {
   persistedNodes: TableNode[];
   previewSyncStatus: PreviewSyncStatus;
   projectId: string | undefined;
-  setDictionaryDialogOpen: Dispatch<SetStateAction<boolean>>;
-  setLeftPanel: Dispatch<SetStateAction<'sidebar' | 'code'>>;
-  setWorkMode: Dispatch<SetStateAction<DiagramWorkMode>>;
-  setWorkModeHydrated: Dispatch<SetStateAction<boolean>>;
+  setDictionaryDialogOpen: (open: boolean) => void;
+  setLeftPanel: (panel: 'sidebar' | 'code') => void;
   sharedSchemaDraft: SharedSchemaDraftSnapshot | null;
   storeHasRenderableGraph: boolean;
   t: TFunction;
-  teamId: string | undefined;
   workModeCapabilities: DiagramWorkModeCapabilities;
   workMode: DiagramWorkMode;
-  workModeHydrated: boolean;
   writePreviewPositionOverrides: (positions: DiagramPreviewPositionRecord) => void;
 };
 
@@ -80,7 +73,6 @@ type UseDiagramPageRuntimeStateResult = {
   handleNavigateToTableFromEditor: (request: CodeEditorTableFocusRequest) => void;
   handleSharedSchemaDraftPositionsChange: (nextPositions: DiagramPreviewPositionRecord) => void;
   handleViewGroup: (groupId: string) => void;
-  handleWorkModeChange: (nextMode: DiagramWorkMode) => void;
   previewReadOnlyMessage: string | undefined;
   sharedDraftOverlayGraph: ReturnType<typeof buildPreviewDraftOverlayGraph> | null;
   showOverlay: boolean;
@@ -105,15 +97,11 @@ export function useDiagramPageRuntimeState({
   projectId,
   setDictionaryDialogOpen,
   setLeftPanel,
-  setWorkMode,
-  setWorkModeHydrated,
   sharedSchemaDraft,
   storeHasRenderableGraph,
   t,
-  teamId,
   workModeCapabilities,
   workMode,
-  workModeHydrated,
   writePreviewPositionOverrides,
 }: UseDiagramPageRuntimeStateParams): UseDiagramPageRuntimeStateResult {
   const [diagramName, setDiagramName] = useState('');
@@ -243,23 +231,6 @@ export function useDiagramPageRuntimeState({
     setDslPreviewState(nextState);
   }, []);
 
-  const handleWorkModeChange = useCallback((nextMode: DiagramWorkMode) => {
-    setWorkMode(nextMode);
-  }, [setWorkMode]);
-
-  useEffect(() => {
-    setWorkModeHydrated(false);
-    setWorkMode(loadDiagramWorkMode({ teamId, projectId, diagramId }));
-    setWorkModeHydrated(true);
-  }, [diagramId, projectId, setWorkMode, setWorkModeHydrated, teamId]);
-
-  useEffect(() => {
-    if (!workModeHydrated) {
-      return;
-    }
-    saveDiagramWorkMode({ teamId, projectId, diagramId }, workMode);
-  }, [diagramId, projectId, teamId, workMode, workModeHydrated]);
-
   useEffect(() => {
     setDslPreviewPositionOverrides(sharedSchemaDraft?.positions ?? {});
   }, [setDslPreviewPositionOverrides, sharedSchemaDraft]);
@@ -274,7 +245,6 @@ export function useDiagramPageRuntimeState({
     setDslPreviewPositionOverrides,
     setTableCodeRevealRequest,
     setTableFocusRequest,
-    teamId,
   ]);
 
   useEffect(() => {
@@ -370,7 +340,6 @@ export function useDiagramPageRuntimeState({
     handleNavigateToTableFromEditor,
     handleSharedSchemaDraftPositionsChange,
     handleViewGroup,
-    handleWorkModeChange,
     previewReadOnlyMessage,
     sharedDraftOverlayGraph,
     showOverlay,
