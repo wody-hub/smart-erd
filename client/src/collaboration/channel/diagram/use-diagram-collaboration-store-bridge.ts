@@ -5,6 +5,20 @@ import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import type { DiagramCollaborationStoreBridge } from './diagram-collaboration-store-bridge.js';
 
+function collectProjectionTargets(request?: ProjectionRefreshRequest): Set<'nodes' | 'edges' | 'groups'> {
+  const targets = new Set<'nodes' | 'edges' | 'groups'>(request?.targets ?? []);
+  if ((request?.nodeIds?.length ?? 0) > 0) {
+    targets.add('nodes');
+  }
+  if ((request?.edgeIds?.length ?? 0) > 0) {
+    targets.add('edges');
+  }
+  if ((request?.groupIds?.length ?? 0) > 0) {
+    targets.add('groups');
+  }
+  return targets;
+}
+
 /**
  * 다이어그램 채널의 canvas/collaboration store 액션을 하나의 bridge로 묶는다.
  */
@@ -31,41 +45,49 @@ export function useDiagramCollaborationStoreBridge(): DiagramCollaborationStoreB
       loadPreview,
       applyPreviewPositionChangesToPersisted,
       refreshPersistedCanvasFromYDoc: (request?: ProjectionRefreshRequest) => {
-        if (request?.forceFull || !request?.scopeHints || request.scopeHints.length === 0) {
+        if (request?.forceFull) {
           syncFromYDoc({ forceFull: true });
           return;
         }
 
-        const targets = new Set<'nodes' | 'edges' | 'groups'>();
-        const nodeIds = new Set<string>(request.nodeIds ?? []);
-        const edgeIds = new Set<string>(request.edgeIds ?? []);
-        const groupIds = new Set<string>(request.groupIds ?? []);
-        for (const scope of request.scopeHints) {
-          if (scope.kind === 'table') {
-            targets.add('nodes');
-            nodeIds.add(scope.id);
-            continue;
-          }
-          if (scope.kind === 'column') {
-            const columnRef = parseErdColumnEntityId(scope.id);
-            if (!columnRef) {
-              syncFromYDoc({ forceFull: true });
-              return;
+        const targets = collectProjectionTargets(request);
+        const nodeIds = new Set<string>(request?.nodeIds ?? []);
+        const edgeIds = new Set<string>(request?.edgeIds ?? []);
+        const groupIds = new Set<string>(request?.groupIds ?? []);
+
+        if (request?.scopeHints?.length) {
+          for (const scope of request.scopeHints) {
+            if (scope.kind === 'table') {
+              targets.add('nodes');
+              nodeIds.add(scope.id);
+              continue;
             }
-            targets.add('nodes');
-            nodeIds.add(columnRef.tableId);
-            continue;
+            if (scope.kind === 'column') {
+              const columnRef = parseErdColumnEntityId(scope.id);
+              if (!columnRef) {
+                syncFromYDoc({ forceFull: true });
+                return;
+              }
+              targets.add('nodes');
+              nodeIds.add(columnRef.tableId);
+              continue;
+            }
+            if (scope.kind === 'edge') {
+              targets.add('edges');
+              edgeIds.add(scope.id);
+              continue;
+            }
+            if (scope.kind === 'group') {
+              targets.add('groups');
+              groupIds.add(scope.id);
+              continue;
+            }
+            syncFromYDoc({ forceFull: true });
+            return;
           }
-          if (scope.kind === 'edge') {
-            targets.add('edges');
-            edgeIds.add(scope.id);
-            continue;
-          }
-          if (scope.kind === 'group') {
-            targets.add('groups');
-            groupIds.add(scope.id);
-            continue;
-          }
+        }
+
+        if (targets.size === 0) {
           syncFromYDoc({ forceFull: true });
           return;
         }

@@ -36,6 +36,10 @@ interface CodeEditorFooterProps {
   refreshConfirmOpen: boolean;
   /** Refresh 확인 다이얼로그 열림 상태 세터 */
   setRefreshConfirmOpen: (open: boolean) => void;
+  /** Refresh 확인 다이얼로그 제목 */
+  refreshConfirmTitle?: string;
+  /** Refresh 확인 다이얼로그 설명 */
+  refreshConfirmDescription?: string;
   /** code 모드 최종 저장 버튼 클릭 핸들러 */
   onFinalize?: () => void;
   /** code 모드 최종 저장 버튼 활성화 여부 */
@@ -75,6 +79,8 @@ const CodeEditorFooter = memo(function CodeEditorFooter({
   hasNodes,
   refreshConfirmOpen,
   setRefreshConfirmOpen,
+  refreshConfirmTitle,
+  refreshConfirmDescription,
   onFinalize,
   canFinalize = false,
   finalizing = false,
@@ -158,8 +164,8 @@ const CodeEditorFooter = memo(function CodeEditorFooter({
       <ConfirmDialog
         open={refreshConfirmOpen}
         onOpenChange={setRefreshConfirmOpen}
-        title={t('erd.codeEditor.refreshConfirmTitle')}
-        description={t('erd.codeEditor.refreshConfirmDescription')}
+        title={refreshConfirmTitle ?? t('erd.codeEditor.refreshConfirmTitle')}
+        description={refreshConfirmDescription ?? t('erd.codeEditor.refreshConfirmDescription')}
         onConfirm={executeRefresh}
       />
     </>

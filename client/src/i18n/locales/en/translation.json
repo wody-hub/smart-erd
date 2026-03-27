@@ -328,7 +328,10 @@
       "copyWithPhysicalNamesFailed": "Failed to copy code with physical names",
       "refreshButton": "Refresh from ERD",
       "refreshConfirmTitle": "Refresh Code",
-      "refreshConfirmDescription": "Current edits will be replaced with code generated from the ERD. Continue?"
+      "refreshConfirmDescription": "Current edits will be replaced with code generated from the ERD. Continue?",
+      "refreshConfirmDescriptionRemotePending": "To reconcile remote changes, your local draft will be discarded and the code will be regenerated from the ERD. Continue?",
+      "refreshConfirmDescriptionInvalidDraft": "Your current draft has syntax errors. It will be discarded and regenerated from the ERD. Continue?",
+      "refreshConfirmDescriptionStaleDraft": "Your stale shared draft will be discarded and the code will be reset to the saved ERD state. Continue?"
     },
     "lock": {
       "lockedBy": "{{name}} is editing",

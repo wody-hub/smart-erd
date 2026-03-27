@@ -154,18 +154,27 @@ export default function DiagramPage() {
     activeGroupId,
     activeGroup,
     activeGroupTableIds,
+    canOpenDictionary,
+    captureCodeEditorPreviewState,
+    codeDraftPersistEnabled,
+    delayCodeDraftHydration,
     diagramName,
+    dictionaryContextName,
+    dictionaryContextSetId,
     dslPreviewPositionOverrides,
     dslPreviewState,
     handleBackToAll,
     handleDslPreviewStateChange,
     handleNavigateToCodeFromDiagram,
     handleNavigateToTableFromEditor,
+    handleOpenDictionary,
     handleSharedSchemaDraftPositionsChange,
     handleViewGroup: handleViewGroupState,
     previewReadOnlyMessage,
+    renderDictionaryDialog,
     sharedDraftOverlayGraph,
     showOverlay,
+    showPreviewCanvas,
     tableCodeRevealRequest,
     tableFocusRequest,
     workModeRuntimeState,
@@ -271,8 +280,6 @@ export default function DiagramPage() {
     );
   }
 
-  const dictionaryContextSetId = diagram?.dictionarySetId ? String(diagram.dictionarySetId) : '';
-
   return (
     <ReactFlowProvider>
       <DocumentMutationSessionProvider value={documentMutationSession}>
@@ -332,9 +339,9 @@ export default function DiagramPage() {
                       {t('diagram.workMode.codeInfo')}
                     </div>
                   )}
-                  {diagram?.dictionarySetName && (
+                  {dictionaryContextName && (
                     <div className="px-4 py-1 text-xs text-muted-foreground border-b bg-background">
-                      {t('diagram.edit.dictionaryContext', { name: diagram.dictionarySetName })}
+                      {t('diagram.edit.dictionaryContext', { name: dictionaryContextName })}
                     </div>
                   )}
                   <div className="flex flex-1 overflow-hidden">
@@ -357,7 +364,7 @@ export default function DiagramPage() {
                             enableCodeToErdAutoSync={workModeCapabilities.enableCodeToErdAutoSync}
                             enableErdToCodeAutoSync={workModeCapabilities.enableErdToCodeAutoSync}
                             enableTableLock={workModeCapabilities.enableCodeEditorTableLock}
-                            persistDraft={workModeCapabilities.persistCodeDraft}
+                            persistDraft={codeDraftPersistEnabled}
                             dslOnly={workModeCapabilities.dslOnlyCodeEditor}
                             workMode={workMode}
                             previewPositionOverrides={dslPreviewPositionOverrides}
@@ -366,36 +373,28 @@ export default function DiagramPage() {
                             }
                             onNavigateToTable={handleNavigateToTableFromEditor}
                             tableRevealRequest={tableCodeRevealRequest}
-                            delayDraftHydration={
-                              workModeCapabilities.persistCodeDraft &&
-                              !!diagram?.hasYdocSnapshot &&
-                              isPreviewMode
-                            }
+                            delayDraftHydration={delayCodeDraftHydration}
                             persistedDiagramHasContent={!!diagram?.content}
                             onScheduleCodeModeSnapshotPersist={
-                              workModeCapabilities.persistCodeDraft
-                                ? scheduleCodeModeSnapshotPersist
-                                : undefined
+                              codeDraftPersistEnabled ? scheduleCodeModeSnapshotPersist : undefined
                             }
                             onResetCodeModeSnapshotPersistState={
-                              workModeCapabilities.persistCodeDraft
+                              codeDraftPersistEnabled
                                 ? resetCodeModeSnapshotPersistState
                                 : undefined
                             }
                             registerBeforeCodeModeSnapshotPersist={
-                              workModeCapabilities.persistCodeDraft
+                              codeDraftPersistEnabled
                                 ? registerBeforeCodeModeSnapshotPersist
                                 : undefined
                             }
                             codeModeDraftPersistStatus={codeModeDraftPersistStatus}
                             codeModeDraftPersistedAt={codeModeDraftPersistedAt}
                             onPersistPublishedDiagram={
-                              workModeCapabilities.persistCodeDraft
-                                ? persistPublishedDiagramNow
-                                : undefined
+                              codeDraftPersistEnabled ? persistPublishedDiagramNow : undefined
                             }
                             onDslPreviewStateChange={
-                              workModeCapabilities.canvasSource === 'preview'
+                              captureCodeEditorPreviewState
                                 ? handleDslPreviewStateChange
                                 : undefined
                             }
@@ -421,7 +420,7 @@ export default function DiagramPage() {
                       <div className="w-px h-full bg-border/80 group-hover:bg-primary/80 group-active:bg-primary transition-colors" />
                     </div>
                     <main className="flex-1 relative">
-                      {workModeCapabilities.canvasSource === 'preview' ? (
+                      {showPreviewCanvas ? (
                         <PreviewCanvas
                           previewState={dslPreviewState}
                           diagramName={diagramName || 'diagram'}
@@ -429,16 +428,8 @@ export default function DiagramPage() {
                           positionOverrides={dslPreviewPositionOverrides}
                           onPositionOverridesChange={handleSharedSchemaDraftPositionsChange}
                           canEdit={workModeRuntimeState.effectiveCodeCanEdit}
-                          canOpenDictionary={
-                            !!dictionaryContextSetId &&
-                            workModeRuntimeState.canOpenDictionaryManagement
-                          }
-                          onOpenDictionary={
-                            dictionaryContextSetId &&
-                            workModeRuntimeState.canOpenDictionaryManagement
-                              ? () => setDictionaryDialogOpen(true)
-                              : undefined
-                          }
+                          canOpenDictionary={canOpenDictionary}
+                          onOpenDictionary={handleOpenDictionary}
                           onExportTableDefinition={handleExportTableDefinition}
                           onExportColumnDefinition={handleExportColumnDefinition}
                           onExportIndexDefinition={handleExportIndexDefinition}
@@ -456,12 +447,7 @@ export default function DiagramPage() {
                             validationOpen={validationOpen}
                             onToggleValidation={handleToggleValidation}
                             dictionaryOpen={dictionaryDialogOpen}
-                            onOpenDictionary={
-                              dictionaryContextSetId &&
-                              workModeRuntimeState.canOpenDictionaryManagement
-                                ? () => setDictionaryDialogOpen(true)
-                                : undefined
-                            }
+                            onOpenDictionary={handleOpenDictionary}
                             canEdit={workModeRuntimeState.effectiveCanvasCanEdit}
                             activeGroupId={activeGroupId}
                             activeGroupName={activeGroup?.label}
@@ -494,14 +480,14 @@ export default function DiagramPage() {
                     {validationOpen && <ValidationPanel onClose={() => setValidationOpen(false)} />}
                   </div>
 
-                  {dictionaryContextSetId && (
+                  {renderDictionaryDialog && (
                     <DictionaryManagementDialog
                       open={dictionaryDialogOpen}
                       onOpenChange={setDictionaryDialogOpen}
                       teamId={teamId!}
                       canEdit={workModeRuntimeState.canEditDictionaryManagement}
                       dictionarySetId={dictionaryContextSetId}
-                      dictionarySetName={diagram?.dictionarySetName}
+                      dictionarySetName={dictionaryContextName}
                     />
                   )}
                 </div>

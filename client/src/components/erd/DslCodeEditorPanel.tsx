@@ -89,10 +89,13 @@ import {
 } from '@/lib/dsl-physical-name-hints';
 import { buildDslCopyTextWithPhysicalNames } from '@/lib/dsl-copy-with-physical-names';
 import {
+  getCodeEditorRefreshConfirmReason,
+  hasCodeEditorUnsavedChanges,
   isCodeEditorApplyBlocked,
   isCodeEditorFinalizeBlocked,
 } from '@/lib/code-editor-draft-policy';
 import {
+  getCodeEditorRefreshConfirmCopy,
   getCodeEditorStatusMeta,
   type SyncStatusMeta,
 } from '@/lib/sync-status-meta';
@@ -467,6 +470,8 @@ export default function DslCodeEditorPanel({
     setRequiresApplyBeforeFinalize(false);
     setRequiresPublishedSave(false);
   }, [persistDraft]);
+  const hasPendingDraftChanges =
+    persistDraft && (requiresApplyBeforeFinalize || requiresPublishedSave);
 
   /**
    * 현재 텍스트가 persisted ERD에서 생성한 bootstrap fallback 그대로인지 판단한다.
@@ -950,7 +955,11 @@ export default function DslCodeEditorPanel({
       generateFromErd,
       onGenerated: handleGeneratedCodeChange,
       hasNodes: diagramErdStructureSnapshot.hasNodes,
-      currentText: dslText,
+      hasUnsavedChanges: hasCodeEditorUnsavedChanges({
+        draftState,
+        hasPendingFinalizeChanges: hasPendingDraftChanges,
+        isPersistedDraftStale: codeModeDraftPersistStatus === 'stale',
+      }),
       ready: hasDictionary,
       skipInitialRefresh: persistDraft,
       beforeExecuteRefresh: persistDraft
@@ -1050,6 +1059,9 @@ export default function DslCodeEditorPanel({
     if (!persistDraft || !onPersistPublishedDiagram || finalizing) {
       return;
     }
+    if (codeModeDraftPersistStatus === 'stale') {
+      return;
+    }
     if (isCodeEditorFinalizeBlocked(draftState)) {
       return;
     }
@@ -1088,6 +1100,7 @@ export default function DslCodeEditorPanel({
     resetFinalizationState();
   }, [
     buildCurrentPersistedRevisionHash,
+    codeModeDraftPersistStatus,
     draftScope,
     finalizing,
     handleApplyWithSyncReset,
@@ -1106,6 +1119,9 @@ export default function DslCodeEditorPanel({
     if (!persistDraft || !onPersistPublishedDiagram || finalizing) {
       return false;
     }
+    if (codeModeDraftPersistStatus === 'stale') {
+      return false;
+    }
     if (isCodeEditorFinalizeBlocked(draftState)) {
       return false;
     }
@@ -1118,6 +1134,7 @@ export default function DslCodeEditorPanel({
     return true;
   }, [
     canApply,
+    codeModeDraftPersistStatus,
     finalizing,
     onPersistPublishedDiagram,
     persistDraft,
@@ -1125,11 +1142,9 @@ export default function DslCodeEditorPanel({
     requiresApplyBeforeFinalize,
     requiresPublishedSave,
   ]);
-  const hasPendingDraftChanges =
-    persistDraft && (requiresApplyBeforeFinalize || requiresPublishedSave);
   const canApplyWithDraftState = useMemo(
-    () => canApply && !isCodeEditorApplyBlocked(draftState),
-    [canApply, draftState],
+    () => canApply && codeModeDraftPersistStatus !== 'stale' && !isCodeEditorApplyBlocked(draftState),
+    [canApply, codeModeDraftPersistStatus, draftState],
   );
 
   useEffect(() => {
@@ -1160,6 +1175,14 @@ export default function DslCodeEditorPanel({
   ]);
 
   const syncStatusMeta = getCodeEditorStatusMeta(t, syncStatus, draftState);
+  const refreshConfirmCopy = getCodeEditorRefreshConfirmCopy(
+    t,
+    getCodeEditorRefreshConfirmReason({
+      draftState,
+      hasPendingFinalizeChanges: hasPendingDraftChanges,
+      isPersistedDraftStale: codeModeDraftPersistStatus === 'stale',
+    }),
+  );
   const draftPersistStatusMeta = useMemo(() => {
     switch (codeModeDraftPersistStatus) {
       case 'dirty':
@@ -1206,8 +1229,20 @@ export default function DslCodeEditorPanel({
         return null;
     }
   }, [codeModeDraftPersistStatus, codeModeDraftPersistedAt, t]);
+  const previousDraftPersistStatusRef = useRef(codeModeDraftPersistStatus);
+  useEffect(() => {
+    const previousStatus = previousDraftPersistStatusRef.current;
+    previousDraftPersistStatusRef.current = codeModeDraftPersistStatus;
+    if (codeModeDraftPersistStatus !== 'stale' || previousStatus === 'stale') {
+      return;
+    }
+    toast.warning(t('erd.codeEditor.draftStatusStale'));
+  }, [codeModeDraftPersistStatus, t]);
   const finalizeStatusMeta = useMemo(() => {
     if (!persistDraft) {
+      return null;
+    }
+    if (codeModeDraftPersistStatus === 'stale') {
       return null;
     }
     if (finalizing) {
@@ -1241,6 +1276,7 @@ export default function DslCodeEditorPanel({
       spin: false,
     };
   }, [
+    codeModeDraftPersistStatus,
     finalizing,
     persistDraft,
     requiresApplyBeforeFinalize,
@@ -2301,6 +2337,8 @@ export default function DslCodeEditorPanel({
         hasNodes={hasNodes}
         refreshConfirmOpen={refreshConfirmOpen}
         setRefreshConfirmOpen={setRefreshConfirmOpen}
+        refreshConfirmTitle={refreshConfirmCopy.title}
+        refreshConfirmDescription={refreshConfirmCopy.description}
         onFinalize={persistDraft ? handleFinalize : undefined}
         canFinalize={canFinalize}
         finalizing={finalizing}

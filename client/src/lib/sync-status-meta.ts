@@ -3,6 +3,7 @@ import type { TFunction } from 'i18next';
 import type { SyncStatus } from '@/constants/sync-status';
 import type { DraftState } from '@/collaboration/core/draft/draft-state';
 import { isDraftRemotePending } from '@/collaboration/core/draft/draft-state';
+import type { CodeEditorRefreshConfirmReason } from './code-editor-draft-policy';
 
 /** 동기화 상태 UI 메타 정보 */
 export interface SyncStatusMeta {
@@ -94,4 +95,33 @@ export function getCodeEditorStatusMeta(
   }
 
   return getBaseSyncStatusMeta(t, syncStatus);
+}
+
+export function getCodeEditorRefreshConfirmCopy(
+  t: TFunction,
+  reason: CodeEditorRefreshConfirmReason | null,
+): { title: string; description: string } {
+  switch (reason) {
+    case 'remote-pending':
+      return {
+        title: t('erd.codeEditor.refreshConfirmTitle'),
+        description: t('erd.codeEditor.refreshConfirmDescriptionRemotePending'),
+      };
+    case 'invalid-draft':
+      return {
+        title: t('erd.codeEditor.refreshConfirmTitle'),
+        description: t('erd.codeEditor.refreshConfirmDescriptionInvalidDraft'),
+      };
+    case 'stale-draft':
+      return {
+        title: t('erd.codeEditor.refreshConfirmTitle'),
+        description: t('erd.codeEditor.refreshConfirmDescriptionStaleDraft'),
+      };
+    case 'local-dirty':
+    default:
+      return {
+        title: t('erd.codeEditor.refreshConfirmTitle'),
+        description: t('erd.codeEditor.refreshConfirmDescription'),
+      };
+  }
 }

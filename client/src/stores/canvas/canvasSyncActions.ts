@@ -91,6 +91,20 @@ export function createCanvasSyncActions(
   set: CanvasSetState,
   get: CanvasGetState,
 ): Pick<CanvasState, CanvasSyncActionKeys> {
+  function collectProjectionTargets(request?: ProjectionSyncRequest): Set<ProjectionSyncTarget> {
+    const targets = new Set<ProjectionSyncTarget>(request?.targets ?? []);
+    if ((request?.nodeIds?.length ?? 0) > 0) {
+      targets.add('nodes');
+    }
+    if ((request?.edgeIds?.length ?? 0) > 0) {
+      targets.add('edges');
+    }
+    if ((request?.groupIds?.length ?? 0) > 0) {
+      targets.add('groups');
+    }
+    return targets;
+  }
+
   function isFinitePosition(
     position: { x: number; y: number } | null | undefined,
   ): position is { x: number; y: number } {
@@ -213,7 +227,7 @@ export function createCanvasSyncActions(
     }
 
     const forceFull = request?.forceFull ?? false;
-    const targets = forceFull ? new Set<ProjectionSyncTarget>() : new Set(request?.targets ?? []);
+    const targets = forceFull ? new Set<ProjectionSyncTarget>() : collectProjectionTargets(request);
 
     if (forceFull || targets.size === 0) {
       const nextNodes = yTablesMapToNodes(getTablesMap(ydoc));
@@ -324,7 +338,7 @@ export function createCanvasSyncActions(
       return;
     }
 
-    const targets = request?.targets ?? [];
+    const targets = [...collectProjectionTargets(request)];
     if (targets.length === 0) {
       internal.deferredProjectionForceFull = true;
       internal.hasDeferredProjectionSync = true;

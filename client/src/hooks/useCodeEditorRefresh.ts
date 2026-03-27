@@ -9,8 +9,8 @@ interface UseCodeEditorRefreshOptions {
   onGenerated: (text: string) => void;
   /** 현재 persisted ERD에 노드가 있는지 여부 */
   hasNodes: boolean;
-  /** 현재 에디터 텍스트 (Refresh 시 확인 다이얼로그 표시 판단용) */
-  currentText: string;
+  /** 현재 로컬 draft가 authoritative ERD와 달라 확인이 필요한지 여부 */
+  hasUnsavedChanges: boolean;
   /** 초기화 가능 여부 (사전 데이터 로딩 등 선행 조건) */
   ready?: boolean;
   /** 초기 ERD -> 코드 자동 채우기를 건너뛸지 여부 */
@@ -48,7 +48,7 @@ export function useCodeEditorRefresh({
   generateFromErd,
   onGenerated,
   hasNodes,
-  currentText,
+  hasUnsavedChanges,
   ready = true,
   skipInitialRefresh = false,
   beforeExecuteRefresh,
@@ -67,12 +67,12 @@ export function useCodeEditorRefresh({
 
   /** Refresh 버튼 핸들러 (편집 내용이 있으면 확인 다이얼로그) */
   const handleRefresh = useCallback(() => {
-    if (currentText.trim()) {
+    if (hasUnsavedChanges) {
       setRefreshConfirmOpen(true);
     } else {
       executeRefresh();
     }
-  }, [currentText, executeRefresh]);
+  }, [executeRefresh, hasUnsavedChanges]);
 
   // 마운트 시 ERD → 코드 초기 채우기 (1회)
   useEffect(() => {

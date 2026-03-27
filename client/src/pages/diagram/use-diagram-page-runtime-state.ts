@@ -34,6 +34,9 @@ type GroupSummary = {
 type DiagramSummary = {
   name: string;
   content?: string | null;
+  hasYdocSnapshot?: boolean;
+  dictionarySetId?: number | null;
+  dictionarySetName?: string | null;
 };
 
 type UseDiagramPageRuntimeStateParams = {
@@ -64,18 +67,27 @@ type UseDiagramPageRuntimeStateResult = {
   activeGroupId: string | null;
   activeGroup: GroupSummary | null;
   activeGroupTableIds: Set<string> | null;
+  canOpenDictionary: boolean;
+  captureCodeEditorPreviewState: boolean;
+  codeDraftPersistEnabled: boolean;
+  delayCodeDraftHydration: boolean;
   diagramName: string;
+  dictionaryContextName?: string;
+  dictionaryContextSetId: string;
   dslPreviewPositionOverrides: DiagramPreviewPositionRecord;
   dslPreviewState: DslPreviewCanvasState | null;
   handleBackToAll: () => void;
   handleDslPreviewStateChange: (nextState: DslPreviewCanvasState | null) => void;
   handleNavigateToCodeFromDiagram: (request: CodeEditorTableRevealRequest) => void;
   handleNavigateToTableFromEditor: (request: CodeEditorTableFocusRequest) => void;
+  handleOpenDictionary: (() => void) | undefined;
   handleSharedSchemaDraftPositionsChange: (nextPositions: DiagramPreviewPositionRecord) => void;
   handleViewGroup: (groupId: string) => void;
   previewReadOnlyMessage: string | undefined;
+  renderDictionaryDialog: boolean;
   sharedDraftOverlayGraph: ReturnType<typeof buildPreviewDraftOverlayGraph> | null;
   showOverlay: boolean;
+  showPreviewCanvas: boolean;
   tableCodeRevealRequest: CodeEditorTableRevealRequest | null;
   tableFocusRequest: CodeEditorTableFocusRequest | null;
   workModeRuntimeState: ReturnType<typeof resolveDiagramWorkModeRuntimeState>;
@@ -104,7 +116,6 @@ export function useDiagramPageRuntimeState({
   workMode,
   writePreviewPositionOverrides,
 }: UseDiagramPageRuntimeStateParams): UseDiagramPageRuntimeStateResult {
-  const [diagramName, setDiagramName] = useState('');
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [dslPreviewState, setDslPreviewState] = useState<DslPreviewCanvasState | null>(null);
@@ -128,10 +139,19 @@ export function useDiagramPageRuntimeState({
     () => (activeGroup ? new Set(activeGroup.tableIds) : null),
     [activeGroup],
   );
+  const dictionaryContextSetId = diagram?.dictionarySetId ? String(diagram.dictionarySetId) : '';
+  const dictionaryContextName = diagram?.dictionarySetName ?? undefined;
 
   const diagramHasContent = !!diagram?.content;
   const isPersistedEmptyDiagram = !diagramHasContent;
   const showOverlay = !isPersistedEmptyDiagram && !storeHasRenderableGraph && !initialLoadComplete;
+  const diagramName = diagram?.name ?? '';
+  const codeDraftPersistEnabled = workModeCapabilities.persistCodeDraft;
+  const delayCodeDraftHydration =
+    codeDraftPersistEnabled && !!diagram?.hasYdocSnapshot && isPreviewMode;
+  const showPreviewCanvas = workModeCapabilities.canvasSource === 'preview';
+  const captureCodeEditorPreviewState = showPreviewCanvas;
+  const renderDictionaryDialog = !!dictionaryContextSetId;
 
   const sharedDraftOverlayGraph = useMemo(() => {
     if (workModeCapabilities.canvasSource === 'preview' || activeGroupId) {
@@ -180,6 +200,14 @@ export function useDiagramPageRuntimeState({
   const previewReadOnlyMessage = isPreviewMode
     ? t('diagram.previewSync.headerReadonly')
     : undefined;
+  const canOpenDictionary =
+    !!dictionaryContextSetId && workModeRuntimeState.canOpenDictionaryManagement;
+  const handleOpenDictionary = useMemo(() => {
+    if (!canOpenDictionary) {
+      return undefined;
+    }
+    return () => setDictionaryDialogOpen(true);
+  }, [canOpenDictionary, setDictionaryDialogOpen]);
 
   const handleViewGroup = useCallback(
     (groupId: string) => {
@@ -286,12 +314,6 @@ export function useDiagramPageRuntimeState({
   }, [canEdit, latchKey, previewSyncStatus, t]);
 
   useEffect(() => {
-    if (diagram) {
-      setDiagramName(diagram.name);
-    }
-  }, [diagram, setDiagramName]);
-
-  useEffect(() => {
     if (prevLatchKeyRef.current !== latchKey) {
       prevLatchKeyRef.current = latchKey;
       skipLatchEvalRef.current = true;
@@ -331,18 +353,27 @@ export function useDiagramPageRuntimeState({
     activeGroupId,
     activeGroup,
     activeGroupTableIds,
+    canOpenDictionary,
+    captureCodeEditorPreviewState,
+    codeDraftPersistEnabled,
+    delayCodeDraftHydration,
     diagramName,
+    dictionaryContextName,
+    dictionaryContextSetId,
     dslPreviewPositionOverrides,
     dslPreviewState,
     handleBackToAll,
     handleDslPreviewStateChange,
     handleNavigateToCodeFromDiagram,
     handleNavigateToTableFromEditor,
+    handleOpenDictionary,
     handleSharedSchemaDraftPositionsChange,
     handleViewGroup,
     previewReadOnlyMessage,
+    renderDictionaryDialog,
     sharedDraftOverlayGraph,
     showOverlay,
+    showPreviewCanvas,
     tableCodeRevealRequest,
     tableFocusRequest,
     workModeRuntimeState,

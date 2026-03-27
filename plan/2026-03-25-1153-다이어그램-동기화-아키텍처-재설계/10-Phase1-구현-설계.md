@@ -82,6 +82,12 @@ Phase 1은 반드시 옵션 B로 간다.
 6. checkpoint save 후 reload했을 때 같은 상태가 복원된다.
 7. 새 코어 패키지에는 `table`, `edge`, `dsl`, `reactflow`, `monaco` 같은 용어가 없다.
 
+### 상태 정리 (2026-03-27)
+
+위 완료 조건은 현재 충족된 상태로 본다.  
+이 문서는 Phase 1 구현 설계와 완료 근거를 보존하는 문서로 유지하고,
+남은 마감/최적화/Phase 2 준비 작업은 [11-후속-마감-및-최적화.md](/Users/j.jaeyo/Project/ETC/smart-erd/plan/2026-03-25-1153-다이어그램-동기화-아키텍처-재설계/11-후속-마감-및-최적화.md) 로 분리한다.
+
 ## 구현 원칙
 
 1. 기존 페이지 엔트리는 유지하고 내부 wiring만 교체한다.
@@ -607,37 +613,7 @@ Phase 2부터가 본격적인 ERD plugin 추출과 code path 재구성 단계다
 - latest `save/reload/stale UX` 보완 이후에는 code-mode snapshot persist가 `stale` 상태를 실제로 보존하고, `workMode/workModeHydrated` 소유권은 page 밖으로 이동했다. `client npm run build`, `diagram-auto-apply-layout-and-domain-focus.spec.ts` 의 `code auto apply preserves existing layout and appends new table` 가 재통과했다.
 - latest read/projector follow-up 이후에는 non-projector Y.Doc observer도 changed id 기준 partial refresh를 우선 사용하고, broad graph read public escape hatch는 제거했다.
 
-### 아직 남아 있는 우선 작업
+### 후속 작업 이동
 
-#### 묶음 1. 제품 마감
-
-1. save/reload / stale UX 검증 및 보완
-- `content`와 `ydocSnapshot` 저장 시점 정합성 추가 확인
-- 409/stale 처리 후 UX와 재동기화 정책 점검
-
-2. `DiagramPage` / runtime 오케스트레이션 축소
-- `DiagramPage` 와 diagram channel 훅들에 남아 있는 overlay / dialog / work-mode 주변 조합 책임을 더 얇게 만들기
-- page는 화면 상태와 wiring만, runtime은 조립만, channel/session은 행위만 갖도록 재정리
-
-#### 묶음 2. 성능 / 후속
-
-3. read authority 추가 정리
-- `useDiagramErdReadSnapshot()` 의 canvas projection fallback은 제거했지만, apply/code/read 전 경로가 문서 read를 일관되게 우선하는지 추가 점검
-- 남아 있는 full graph 의존은 주로 `groups` 가 필요한 경로와 일부 on-demand graph read 쪽이라, targeted query를 더 내려야 하는지 마지막 판단 필요
-
-4. projector/read model 고도화
-- 현재 scope-aware refresh는 들어갔지만, 일부 경로는 여전히 full refresh fallback을 사용한다.
-- large diagram 기준 incremental projector/read model로 더 좁혀야 함
-
-5. deferred 관측 항목 관리
-- shared-draft 묶음 실행 종료 이슈는 다시 터질 때만 artifact를 보존해 재조사한다. 지금은 수정 대상이 아니라 관측 대상이다.
-- 현재 핵심 smoke 묶음은 모두 닫혔다. 남은 검증은 broad regression 유지와 deferred 관측 항목 관리다.
-
-6. code path 2차 전환 준비
-- `DraftState` / reconcile state machine을 실제 code editor 경로에 연결
-- `dirty-invalid`, `remote-pending`, overwrite guard를 새 경계에 맞춰 재구성
-
-### 다음 우선순위
-
-지금 시점의 최우선은 묶음 1인 `save/reload/stale UX` 와 `DiagramPage/runtime` 마감이다.  
-묶음 2는 성능/후속 정리로 분리하고, shared-draft 묶음 실행 이슈는 현재 비재현이라 deferred로 유지한다.
+- 남은 작업은 [11-후속-마감-및-최적화.md](/Users/j.jaeyo/Project/ETC/smart-erd/plan/2026-03-25-1153-다이어그램-동기화-아키텍처-재설계/11-후속-마감-및-최적화.md) 에서 관리한다.
+- 이 문서는 더 이상 backlog 문서가 아니라, Phase 1 완료 범위와 완료 근거를 남기는 기준 문서로 본다.

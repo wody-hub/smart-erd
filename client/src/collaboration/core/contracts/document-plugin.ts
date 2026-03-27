@@ -102,6 +102,7 @@ export interface PresenceMapper {
 
 export interface ProjectionRefreshRequest {
   forceFull?: boolean;
+  targets?: Array<'nodes' | 'edges' | 'groups'>;
   scopeHints?: ScopeRef[];
   nodeIds?: string[];
   edgeIds?: string[];

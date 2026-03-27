@@ -45,8 +45,13 @@ import type { DiagramWorkMode } from '@/lib/diagram-work-mode';
 import type { DslPreviewCanvasState } from '@/lib/dsl-preview-graph';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import type { DdlParseResult } from '@/lib/ddl-parser';
-import { isCodeEditorApplyBlocked } from '@/lib/code-editor-draft-policy';
 import {
+  getCodeEditorRefreshConfirmReason,
+  hasCodeEditorUnsavedChanges,
+  isCodeEditorApplyBlocked,
+} from '@/lib/code-editor-draft-policy';
+import {
+  getCodeEditorRefreshConfirmCopy,
   getCodeEditorStatusMeta,
   type SyncStatusMeta,
 } from '@/lib/sync-status-meta';
@@ -493,10 +498,14 @@ function SqlDdlEditor({
       generateFromErd,
       onGenerated: handleGeneratedCodeChange,
       hasNodes: diagramErdStructureSnapshot.hasNodes,
-      currentText: ddlText,
+      hasUnsavedChanges: hasCodeEditorUnsavedChanges({ draftState }),
     });
 
   const syncStatusMeta = getCodeEditorStatusMeta(t, syncStatus, draftState);
+  const refreshConfirmCopy = getCodeEditorRefreshConfirmCopy(
+    t,
+    getCodeEditorRefreshConfirmReason({ draftState }),
+  );
   const canApplyWithDraftState = canApply && !isCodeEditorApplyBlocked(draftState);
   const navigableTables = useMemo<CodeEditorNavigableTable[]>(
     () => buildCodeEditorNavigableTables(parseResult?.tables ?? [], parseResult?.tableRanges ?? []),
@@ -684,6 +693,8 @@ function SqlDdlEditor({
         hasNodes={hasNodes}
         refreshConfirmOpen={refreshConfirmOpen}
         setRefreshConfirmOpen={setRefreshConfirmOpen}
+        refreshConfirmTitle={refreshConfirmCopy.title}
+        refreshConfirmDescription={refreshConfirmCopy.description}
       >
         <SqlFooterStatus
           parsing={parsing}
