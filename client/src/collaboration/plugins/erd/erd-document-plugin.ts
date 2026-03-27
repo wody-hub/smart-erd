@@ -394,19 +394,10 @@ class ErdProjector implements Projector {
   }
 
   private buildRefreshRequest(
-    read: PluginContext['read'],
+    _read: PluginContext['read'],
     event: DocumentChangeEvent,
   ): ProjectionRefreshRequest {
     if (event.engineOrigin.source === 'system' || event.affectedScopes.length === 0) {
-      return { forceFull: true };
-    }
-    const hasMissingEntity = read.execute({
-      run: (context) =>
-        event.affectedScopes.some(
-          (scope) => context.getEntity({ kind: scope.kind, id: scope.id }) == null,
-        ),
-    });
-    if (hasMissingEntity) {
       return { forceFull: true };
     }
     return { scopeHints: event.affectedScopes };
