@@ -315,6 +315,7 @@
       "draftStatusSaved": "공유 초안 서버 저장됨",
       "draftStatusError": "공유 초안 서버 저장 실패",
       "draftStatusStale": "공유 초안 저장이 보류되었습니다. 새로고침 후 다시 시도하세요.",
+      "draftStatusReloadAction": "지금 새로고침",
       "remotePending": "원격 변경 반영 대기 중",
       "finalizeApplyRequired": "최종 저장 전 ERD 적용 필요",
       "finalizeRemotePending": "원격 변경 반영 후 최종 저장 가능",

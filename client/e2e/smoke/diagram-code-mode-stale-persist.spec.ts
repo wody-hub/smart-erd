@@ -203,6 +203,11 @@ test('code mode stale snapshot persist blocks apply and finalize until reload @s
       ownerPage.getByRole('button', { name: /최종 저장|Finalize save/i }),
     ).toBeDisabled();
 
+    const reloadAction = ownerPage.getByRole('button', {
+      name: /지금 새로고침|Reload now/i,
+    });
+    await expect(reloadAction).toBeVisible({ timeout: 15_000 });
+
     const refreshButton = ownerPage.getByRole('button', {
       name: /ERD에서 새로고침|refresh from erd/i,
     });
@@ -215,7 +220,10 @@ test('code mode stale snapshot persist blocks apply and finalize until reload @s
     ).toBeVisible();
     await ownerPage.getByRole('button', { name: /취소|cancel/i }).click();
 
-    await ownerPage.reload({ waitUntil: 'domcontentloaded' });
+    await Promise.all([
+      ownerPage.waitForLoadState('domcontentloaded'),
+      reloadAction.click(),
+    ]);
     await expectDiagramHeaderVisible(ownerPage, fixture.target);
     await waitForMonacoModelValueContains(ownerPage, 'Table users {');
     await expect(

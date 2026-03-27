@@ -316,6 +316,7 @@
       "draftStatusSaved": "Shared draft saved",
       "draftStatusError": "Shared draft save failed",
       "draftStatusStale": "Shared draft save paused. Refresh and try again.",
+      "draftStatusReloadAction": "Reload now",
       "remotePending": "Waiting for remote changes to reconcile",
       "finalizeApplyRequired": "Apply to ERD before final save",
       "finalizeRemotePending": "Finalize after remote changes are reconciled",

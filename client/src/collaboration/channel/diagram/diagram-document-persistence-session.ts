@@ -63,16 +63,6 @@ export class DiagramDocumentPersistenceSession {
     };
   }
 
-  async saveContent(content: string): Promise<SaveDiagramResult> {
-    return saveDiagram(
-      this.params.teamId,
-      this.params.projectId,
-      this.params.diagramId,
-      content,
-      this.getLatestCheckpoint()?.snapshot,
-    );
-  }
-
   async savePublishedBackup(backup: DiagramPublishedBackup): Promise<SaveDiagramResult> {
     return saveDiagram(
       this.params.teamId,

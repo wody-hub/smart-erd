@@ -1229,7 +1229,14 @@ export default function DslCodeEditorPanel({
     if (codeModeDraftPersistStatus !== 'stale' || previousStatus === 'stale') {
       return;
     }
-    toast.warning(t('erd.codeEditor.draftStatusStale'));
+    toast.warning(t('erd.codeEditor.draftStatusStale'), {
+      action: {
+        label: t('erd.codeEditor.draftStatusReloadAction'),
+        onClick: () => {
+          window.location.reload();
+        },
+      },
+    });
   }, [codeModeDraftPersistStatus, t]);
   const finalizeStatusMeta = useMemo(() => {
     if (!persistDraft) {
