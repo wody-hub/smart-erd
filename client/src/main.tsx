@@ -12,7 +12,6 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import './i18n';
 import { isElectron, initServerUrl } from '@/lib/platform';
-import './lib/monaco-setup';
 import App from './App';
 
 /**

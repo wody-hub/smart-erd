@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { TFunction } from 'i18next';
 import { toast } from 'sonner';
@@ -40,14 +40,12 @@ type DiagramSummary = {
 };
 
 type UseDiagramPageRuntimeStateParams = {
-  activeGroupId: string | null;
   canEdit: boolean;
   collaborationSetupErrorKind: string | null;
   diagram: DiagramSummary | undefined;
   diagramId: string | undefined;
   dictionaryDialogOpen: boolean;
   groups: GroupSummary[];
-  initialLoadComplete: boolean;
   isLoading: boolean;
   isPreviewMode: boolean;
   leftPanel: 'sidebar' | 'code';
@@ -55,15 +53,8 @@ type UseDiagramPageRuntimeStateParams = {
   persistedNodes: TableNode[];
   previewSyncStatus: PreviewSyncStatus;
   projectId: string | undefined;
-  setActiveGroupId: Dispatch<SetStateAction<string | null>>;
-  setDiagramName: Dispatch<SetStateAction<string>>;
   setDictionaryDialogOpen: Dispatch<SetStateAction<boolean>>;
-  setDslPreviewPositionOverrides: Dispatch<SetStateAction<DiagramPreviewPositionRecord>>;
-  setDslPreviewState: Dispatch<SetStateAction<DslPreviewCanvasState | null>>;
-  setInitialLoadComplete: Dispatch<SetStateAction<boolean>>;
   setLeftPanel: Dispatch<SetStateAction<'sidebar' | 'code'>>;
-  setTableCodeRevealRequest: Dispatch<SetStateAction<CodeEditorTableRevealRequest | null>>;
-  setTableFocusRequest: Dispatch<SetStateAction<CodeEditorTableFocusRequest | null>>;
   setWorkMode: Dispatch<SetStateAction<DiagramWorkMode>>;
   setWorkModeHydrated: Dispatch<SetStateAction<boolean>>;
   sharedSchemaDraft: SharedSchemaDraftSnapshot | null;
@@ -77,9 +68,14 @@ type UseDiagramPageRuntimeStateParams = {
 };
 
 type UseDiagramPageRuntimeStateResult = {
+  activeGroupId: string | null;
   activeGroup: GroupSummary | null;
   activeGroupTableIds: Set<string> | null;
+  diagramName: string;
+  dslPreviewPositionOverrides: DiagramPreviewPositionRecord;
+  dslPreviewState: DslPreviewCanvasState | null;
   handleBackToAll: () => void;
+  handleDslPreviewStateChange: (nextState: DslPreviewCanvasState | null) => void;
   handleNavigateToCodeFromDiagram: (request: CodeEditorTableRevealRequest) => void;
   handleNavigateToTableFromEditor: (request: CodeEditorTableFocusRequest) => void;
   handleSharedSchemaDraftPositionsChange: (nextPositions: DiagramPreviewPositionRecord) => void;
@@ -88,18 +84,18 @@ type UseDiagramPageRuntimeStateResult = {
   previewReadOnlyMessage: string | undefined;
   sharedDraftOverlayGraph: ReturnType<typeof buildPreviewDraftOverlayGraph> | null;
   showOverlay: boolean;
+  tableCodeRevealRequest: CodeEditorTableRevealRequest | null;
+  tableFocusRequest: CodeEditorTableFocusRequest | null;
   workModeRuntimeState: ReturnType<typeof resolveDiagramWorkModeRuntimeState>;
 };
 
 export function useDiagramPageRuntimeState({
-  activeGroupId,
   canEdit,
   collaborationSetupErrorKind,
   diagram,
   diagramId,
   dictionaryDialogOpen,
   groups,
-  initialLoadComplete,
   isLoading,
   isPreviewMode,
   leftPanel,
@@ -107,15 +103,8 @@ export function useDiagramPageRuntimeState({
   persistedNodes,
   previewSyncStatus,
   projectId,
-  setActiveGroupId,
-  setDiagramName,
   setDictionaryDialogOpen,
-  setDslPreviewPositionOverrides,
-  setDslPreviewState,
-  setInitialLoadComplete,
   setLeftPanel,
-  setTableCodeRevealRequest,
-  setTableFocusRequest,
   setWorkMode,
   setWorkModeHydrated,
   sharedSchemaDraft,
@@ -127,6 +116,17 @@ export function useDiagramPageRuntimeState({
   workModeHydrated,
   writePreviewPositionOverrides,
 }: UseDiagramPageRuntimeStateParams): UseDiagramPageRuntimeStateResult {
+  const [diagramName, setDiagramName] = useState('');
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [dslPreviewState, setDslPreviewState] = useState<DslPreviewCanvasState | null>(null);
+  const [dslPreviewPositionOverrides, setDslPreviewPositionOverrides] =
+    useState<DiagramPreviewPositionRecord>({});
+  const [tableFocusRequest, setTableFocusRequest] = useState<CodeEditorTableFocusRequest | null>(
+    null,
+  );
+  const [tableCodeRevealRequest, setTableCodeRevealRequest] =
+    useState<CodeEditorTableRevealRequest | null>(null);
   const latchKey = `${projectId}:${diagramId}`;
   const prevLatchKeyRef = useRef(latchKey);
   const prevPreviewSyncStatusRef = useRef<PreviewSyncStatus>('inactive');
@@ -238,6 +238,10 @@ export function useDiagramPageRuntimeState({
     },
     [setDslPreviewPositionOverrides, writePreviewPositionOverrides],
   );
+
+  const handleDslPreviewStateChange = useCallback((nextState: DslPreviewCanvasState | null) => {
+    setDslPreviewState(nextState);
+  }, []);
 
   const handleWorkModeChange = useCallback((nextMode: DiagramWorkMode) => {
     setWorkMode(nextMode);
@@ -354,9 +358,14 @@ export function useDiagramPageRuntimeState({
   }, [activeGroupId, groups, setActiveGroupId, t]);
 
   return {
+    activeGroupId,
     activeGroup,
     activeGroupTableIds,
+    diagramName,
+    dslPreviewPositionOverrides,
+    dslPreviewState,
     handleBackToAll,
+    handleDslPreviewStateChange,
     handleNavigateToCodeFromDiagram,
     handleNavigateToTableFromEditor,
     handleSharedSchemaDraftPositionsChange,
@@ -365,6 +374,8 @@ export function useDiagramPageRuntimeState({
     previewReadOnlyMessage,
     sharedDraftOverlayGraph,
     showOverlay,
+    tableCodeRevealRequest,
+    tableFocusRequest,
     workModeRuntimeState,
   };
 }

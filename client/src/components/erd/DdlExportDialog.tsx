@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { generateDdl } from '@/lib/ddl-generator';
+import '@/lib/monaco-setup';
 import type { DbmsType, ERDEdge, TableNode } from '@/types/erd';
 
 /** DdlExportDialog 컴포넌트의 props. */

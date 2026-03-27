@@ -50,7 +50,6 @@ import RemoteEditLocksProvider from './RemoteEditLocksProvider';
 import CanvasToolbar from './CanvasToolbar';
 import EdgeContextMenu from './EdgeContextMenu';
 import DeleteEdgeDialog from './DeleteEdgeDialog';
-import DdlExportDialog from './DdlExportDialog';
 import ExportProgressDialog from './ExportProgressDialog';
 import FkTypeDialog from './FkTypeDialog';
 import ErdRelationEdge from './ErdRelationEdge';
@@ -73,6 +72,7 @@ import {
   toggleOrthogonalSegmentDetail,
 } from './edgeWaypointGeometry';
 
+const DdlExportDialog = lazy(() => import('./DdlExportDialog'));
 const DdlImportDialog = lazy(() => import('./DdlImportDialog'));
 
 /** React Flow에 등록할 커스텀 노드 타입 매핑 */
@@ -1052,11 +1052,15 @@ function ERDCanvas({
         />
       )}
 
-      <DdlExportDialog
-        open={ddlDialogOpen}
-        onOpenChange={setDdlDialogOpen}
-        diagramName={diagramName}
-      />
+      {ddlDialogOpen && (
+        <Suspense fallback={null}>
+          <DdlExportDialog
+            open={ddlDialogOpen}
+            onOpenChange={setDdlDialogOpen}
+            diagramName={diagramName}
+          />
+        </Suspense>
+      )}
 
       {ddlImportOpen && (
         <Suspense fallback={null}>

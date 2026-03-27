@@ -295,6 +295,9 @@ export function createCanvasSyncActions(
       internal.deferredProjectionForceFull = true;
       internal.hasDeferredProjectionSync = true;
       internal.deferredProjectionTargets.clear();
+      internal.deferredProjectionNodeIds.clear();
+      internal.deferredProjectionEdgeIds.clear();
+      internal.deferredProjectionGroupIds.clear();
       return;
     }
 
@@ -303,12 +306,24 @@ export function createCanvasSyncActions(
       internal.deferredProjectionForceFull = true;
       internal.hasDeferredProjectionSync = true;
       internal.deferredProjectionTargets.clear();
+      internal.deferredProjectionNodeIds.clear();
+      internal.deferredProjectionEdgeIds.clear();
+      internal.deferredProjectionGroupIds.clear();
       return;
     }
 
     internal.hasDeferredProjectionSync = true;
     for (const target of targets) {
       internal.deferredProjectionTargets.add(target);
+    }
+    for (const nodeId of request?.nodeIds ?? []) {
+      internal.deferredProjectionNodeIds.add(nodeId);
+    }
+    for (const edgeId of request?.edgeIds ?? []) {
+      internal.deferredProjectionEdgeIds.add(edgeId);
+    }
+    for (const groupId of request?.groupIds ?? []) {
+      internal.deferredProjectionGroupIds.add(groupId);
     }
   }
 
@@ -320,10 +335,18 @@ export function createCanvasSyncActions(
 
     const request: ProjectionSyncRequest = internal.deferredProjectionForceFull
       ? { forceFull: true }
-      : { targets: [...internal.deferredProjectionTargets] };
+      : {
+          targets: [...internal.deferredProjectionTargets],
+          nodeIds: [...internal.deferredProjectionNodeIds],
+          edgeIds: [...internal.deferredProjectionEdgeIds],
+          groupIds: [...internal.deferredProjectionGroupIds],
+        };
     internal.hasDeferredProjectionSync = false;
     internal.deferredProjectionForceFull = false;
     internal.deferredProjectionTargets.clear();
+    internal.deferredProjectionNodeIds.clear();
+    internal.deferredProjectionEdgeIds.clear();
+    internal.deferredProjectionGroupIds.clear();
     syncProjectionFromYDocWithRequest(request);
   }
 
@@ -451,6 +474,9 @@ export function createCanvasSyncActions(
       internal.hasDeferredProjectionSync = false;
       internal.deferredProjectionForceFull = false;
       internal.deferredProjectionTargets.clear();
+      internal.deferredProjectionNodeIds.clear();
+      internal.deferredProjectionEdgeIds.clear();
+      internal.deferredProjectionGroupIds.clear();
 
       set({
         ydoc: null,

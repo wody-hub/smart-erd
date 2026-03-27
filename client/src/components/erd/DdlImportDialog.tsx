@@ -21,6 +21,7 @@ import {
 import { useDiagramErdCrudActions } from '@/collaboration/channel/diagram/use-diagram-erd-crud-actions';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import { useDdlParse } from '@/hooks/useDdlParse';
+import '@/lib/monaco-setup';
 import type { DbmsType } from '@/types/erd';
 
 /** DdlImportDialog 컴포넌트의 props */

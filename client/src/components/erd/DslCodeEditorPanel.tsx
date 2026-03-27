@@ -12,6 +12,7 @@ import { useBidirectionalCodeSync } from '@/hooks/useBidirectionalCodeSync';
 import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
 import { useDiagramPreviewPositionActions } from '@/collaboration/channel/diagram/use-diagram-preview-position-actions';
 import { useDiagramErdStructureSnapshot } from '@/collaboration/channel/diagram/use-diagram-erd-read-snapshot';
+import '@/lib/monaco-setup';
 import { useCodeEditorTableLock } from '@/hooks/useCodeEditorTableLock';
 import { useCodeEditorTableNavigation } from '@/hooks/useCodeEditorTableNavigation';
 import { useCodeEditorTableReveal } from '@/hooks/useCodeEditorTableReveal';

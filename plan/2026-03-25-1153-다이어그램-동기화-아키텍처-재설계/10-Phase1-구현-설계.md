@@ -563,6 +563,9 @@ Phase 2부터가 본격적인 ERD plugin 추출과 code path 재구성 단계다
 - `preview position` fallback도 `DiagramCollaborationStoreBridge` 뒤로 올려, channel action 훅이 canvas store 구현을 직접 알지 않게 정리
 - ERD read 경계를 `nodes-only` / `structure(nodes+edges)` / `groups reader` / `full graph`로 나눠, dictionary / DDL / DSL / apply runtime이 모두 같은 full graph snapshot 기본 경로를 강제하지 않게 정리
 - `apply runtime` 도 `nodes + structure` 이중 구독을 없애고 `structure + groups reader` 기준으로 정리했으며, broad `useDiagramErdReadSnapshot()` public surface는 제거했다.
+- projector의 drag defer 경로도 `targets`만 보존하던 큐를 `nodeIds / edgeIds / groupIds`까지 유지하도록 바꿔, 드래그 종료 후 flush가 다시 broad refresh로 넓어지지 않게 정리했다.
+- `DiagramPage`가 직접 들고 있던 `tableFocusRequest / tableCodeRevealRequest / dslPreviewState / dslPreviewPositionOverrides` 상태 소유권을 `use-diagram-page-runtime-state` 로 옮겨, page-level setter 전달과 preview/code-navigation wiring을 더 줄였다.
+- 추가로 `diagramName / activeGroupId / initialLoadComplete` 도 `use-diagram-page-runtime-state` 안으로 옮겨, `DiagramPage` 에 남는 page-local 상태를 `workMode / workModeHydrated` 중심으로 더 줄였다.
 
 ### 현재까지 확인한 검증
 
@@ -598,6 +601,9 @@ Phase 2부터가 본격적인 ERD plugin 추출과 code path 재구성 단계다
   - `diagram-work-mode-shared-draft.spec.ts`
   - `diagram-auto-apply-layout-and-domain-focus.spec.ts`
 - latest cleanup review 대응 이후에도 `client npm run build`, `diagram-dictionary-reentry-reconciliation.spec.ts`, `diagram-auto-apply-layout-and-domain-focus.spec.ts` 가 재통과했다.
+- latest `DiagramPage` runtime state 소유권 정리 이후에도 `client npm run build`, `diagram-work-mode-shared-draft.spec.ts` 의 `code mode shared draft is visible across sessions and matched node moves persist` 가 재통과했다.
+- latest `diagramName / activeGroupId / initialLoadComplete` 상태 이동 이후에도 `client npm run build`, `diagram-work-mode-shared-draft.spec.ts` 의 `code mode shared draft is visible across sessions and matched node moves persist` 가 재통과했다.
+- latest projector deferred refresh id 보존 정리 이후에도 `client npm run build`, `diagram-collaboration.spec.ts`, `diagram-work-mode-shared-draft.spec.ts` 의 `code mode shared draft is visible across sessions and matched node moves persist` 가 재통과했다.
 
 ### 아직 남아 있는 우선 작업
 

@@ -31,12 +31,6 @@ import { useDiagramDictionaryReconciliation } from '@/hooks/useDiagramDictionary
 import { useDiagramSharedSchemaDraft } from '@/collaboration/channel/diagram/use-diagram-shared-schema-draft';
 import { useDiagramDocumentSession } from '@/collaboration/channel/diagram/use-diagram-document-session';
 import { createDiagramWorkModeCapabilities, type DiagramWorkMode } from '@/lib/diagram-work-mode';
-import type {
-  CodeEditorTableFocusRequest,
-  CodeEditorTableRevealRequest,
-} from '@/lib/code-editor-table-navigation';
-import type { DslPreviewCanvasState } from '@/lib/dsl-preview-graph';
-import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import type { ERDEdge, TableNode } from '@/types/erd';
 import { useDiagramPageControls } from './use-diagram-page-controls';
 import { useDiagramPageRuntimeState } from './use-diagram-page-runtime-state';
@@ -78,28 +72,10 @@ export default function DiagramPage() {
 
   const { t } = useTranslation();
 
-  /** 헤더에 표시할 다이어그램 이름 */
-  const [diagramName, setDiagramName] = useState('');
   /** 다이어그램 작업 모드 */
   const [workMode, setWorkMode] = useState<DiagramWorkMode>('sync');
   /** 현재 다이어그램 스코프의 작업 모드 로드 완료 여부 */
   const [workModeHydrated, setWorkModeHydrated] = useState(false);
-  /** code 모드의 DSL preview 상태 */
-  const [dslPreviewState, setDslPreviewState] = useState<DslPreviewCanvasState | null>(null);
-  /** code 모드의 shared schema draft 위치 정보 */
-  const [dslPreviewPositionOverrides, setDslPreviewPositionOverrides] =
-    useState<DiagramPreviewPositionRecord>({});
-  /** 코드 에디터에서 요청한 테이블 포커스 대상 */
-  const [tableFocusRequest, setTableFocusRequest] = useState<CodeEditorTableFocusRequest | null>(
-    null,
-  );
-  /** ERD에서 요청한 코드 reveal 대상 */
-  const [tableCodeRevealRequest, setTableCodeRevealRequest] =
-    useState<CodeEditorTableRevealRequest | null>(null);
-  /** 활성 그룹 ID (null이면 전체 보기) */
-  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
-  /** 초기 진입 렌더 완료 래치 (한 번 true가 되면 동일 다이어그램 세션에서 유지) */
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const { canEdit } = useTeamRole(teamId);
   const {
     columnDefinitionExporting,
@@ -173,9 +149,14 @@ export default function DiagramPage() {
   });
   const { sharedSchemaDraft, writePreviewPositionOverrides } = useDiagramSharedSchemaDraft();
   const {
+    activeGroupId,
     activeGroup,
     activeGroupTableIds,
+    diagramName,
+    dslPreviewPositionOverrides,
+    dslPreviewState,
     handleBackToAll,
+    handleDslPreviewStateChange,
     handleNavigateToCodeFromDiagram,
     handleNavigateToTableFromEditor,
     handleSharedSchemaDraftPositionsChange,
@@ -184,16 +165,16 @@ export default function DiagramPage() {
     previewReadOnlyMessage,
     sharedDraftOverlayGraph,
     showOverlay,
+    tableCodeRevealRequest,
+    tableFocusRequest,
     workModeRuntimeState,
   } = useDiagramPageRuntimeState({
-    activeGroupId,
     canEdit,
     collaborationSetupErrorKind,
     diagram,
     diagramId,
     dictionaryDialogOpen,
     groups,
-    initialLoadComplete,
     isLoading,
     isPreviewMode,
     leftPanel,
@@ -201,15 +182,8 @@ export default function DiagramPage() {
     persistedNodes,
     previewSyncStatus,
     projectId,
-    setActiveGroupId,
-    setDiagramName,
     setDictionaryDialogOpen,
-    setDslPreviewPositionOverrides,
-    setDslPreviewState,
-    setInitialLoadComplete,
     setLeftPanel,
-    setTableCodeRevealRequest,
-    setTableFocusRequest,
     setWorkMode,
     setWorkModeHydrated,
     sharedSchemaDraft,
@@ -425,7 +399,7 @@ export default function DiagramPage() {
                             }
                             onDslPreviewStateChange={
                               workModeCapabilities.canvasSource === 'preview'
-                                ? setDslPreviewState
+                                ? handleDslPreviewStateChange
                                 : undefined
                             }
                           />

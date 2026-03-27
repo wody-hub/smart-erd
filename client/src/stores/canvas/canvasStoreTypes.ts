@@ -65,6 +65,9 @@ export interface InternalState {
   hasDeferredProjectionSync: boolean;
   deferredProjectionForceFull: boolean;
   deferredProjectionTargets: Set<ProjectionSyncTarget>;
+  deferredProjectionNodeIds: Set<string>;
+  deferredProjectionEdgeIds: Set<string>;
+  deferredProjectionGroupIds: Set<string>;
   tablePositionQueue: PositionQueueCtx;
 }
 
