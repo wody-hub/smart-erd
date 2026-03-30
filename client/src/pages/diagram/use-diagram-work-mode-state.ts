@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  DEFAULT_DIAGRAM_WORK_MODE,
   loadDiagramWorkMode,
   saveDiagramWorkMode,
   type DiagramWorkMode,
@@ -22,7 +23,7 @@ export function useDiagramWorkModeState({
   projectId,
   diagramId,
 }: UseDiagramWorkModeStateParams): UseDiagramWorkModeStateResult {
-  const [workMode, setWorkMode] = useState<DiagramWorkMode>('sync');
+  const [workMode, setWorkMode] = useState<DiagramWorkMode>(DEFAULT_DIAGRAM_WORK_MODE);
   const [workModeHydrated, setWorkModeHydrated] = useState(false);
 
   const handleWorkModeChange = useCallback((nextMode: DiagramWorkMode) => {

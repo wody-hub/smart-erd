@@ -1,7 +1,7 @@
 import { STORAGE_KEYS } from '../constants/storage.js';
 
 /** 다이어그램 작업 모드 */
-export type DiagramWorkMode = 'sync' | 'code' | 'erd';
+export type DiagramWorkMode = 'code' | 'erd';
 
 /** 다이어그램 작업 모드 저장 스코프 */
 export interface DiagramWorkModeScope {
@@ -88,7 +88,7 @@ interface StorageLike {
 }
 
 /** 작업 모드 기본값 */
-export const DEFAULT_DIAGRAM_WORK_MODE: DiagramWorkMode = 'sync';
+export const DEFAULT_DIAGRAM_WORK_MODE: DiagramWorkMode = 'erd';
 
 /**
  * 접근 가능한 localStorage를 반환한다.
@@ -121,9 +121,10 @@ export function buildDiagramWorkModeStorageKey(scope: DiagramWorkModeScope): str
  * @returns 유효한 작업 모드. 유효하지 않으면 기본값
  */
 function normalizeDiagramWorkMode(value: unknown): DiagramWorkMode {
-  if (value === 'sync' || value === 'code' || value === 'erd') {
+  if (value === 'code' || value === 'erd') {
     return value;
   }
+  // legacy `sync` 저장값은 persisted 저장 의미가 가장 분명한 ERD 모드로 수렴한다.
   return DEFAULT_DIAGRAM_WORK_MODE;
 }
 
@@ -192,6 +193,7 @@ export function createDiagramWorkModeCapabilities(
         forcedLeftPanel: 'code',
       };
     case 'erd':
+    default:
       return {
         canEditCode: false,
         canEditCanvas: true,
@@ -205,22 +207,6 @@ export function createDiagramWorkModeCapabilities(
         showPreviewSyncBanner: true,
         enableCodeEditorTableLock: false,
         forcedLeftPanel: 'sidebar',
-      };
-    case 'sync':
-    default:
-      return {
-        canEditCode: true,
-        canEditCanvas: true,
-        enableCodeToErdAutoSync: true,
-        enableErdToCodeAutoSync: true,
-        canvasSource: 'persisted',
-        showCodePanel: true,
-        persistCodeDraft: false,
-        dslOnlyCodeEditor: false,
-        showPersistedSave: true,
-        showPreviewSyncBanner: true,
-        enableCodeEditorTableLock: true,
-        forcedLeftPanel: null,
       };
   }
 }

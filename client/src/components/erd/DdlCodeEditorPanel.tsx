@@ -147,7 +147,7 @@ export default function DdlCodeEditorPanel({
   enableErdToCodeAutoSync = true,
   enableTableLock = true,
   dslOnly = false,
-  workMode = 'sync',
+  workMode = 'erd',
   onDslPreviewStateChange,
   persistDraft = false,
   previewPositionOverrides,

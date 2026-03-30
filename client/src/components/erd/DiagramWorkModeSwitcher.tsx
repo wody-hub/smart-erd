@@ -40,7 +40,6 @@ export default function DiagramWorkModeSwitcher({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="sync">{t('diagram.workMode.sync')}</SelectItem>
           <SelectItem value="code">{t('diagram.workMode.code')}</SelectItem>
           <SelectItem value="erd">{t('diagram.workMode.erd')}</SelectItem>
         </SelectContent>
