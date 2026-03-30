@@ -185,6 +185,12 @@
         "title": "Preview is already visible",
         "description": "Editing will unlock automatically once real-time sync finishes.",
         "descriptionDisconnected": "Real-time sync is delayed. Editing will unlock automatically once the connection recovers.",
+        "descriptionIssue": {
+          "connection-limit-exceeded": "Too many collaboration tabs are open for this user. Close unused tabs or windows, then reconnect.",
+          "room-capacity-exceeded": "This diagram has reached its collaboration session limit. Please reconnect in a moment.",
+          "policy-violation": "The collaboration connection was rejected by server policy. Refresh the page or reconnect."
+        },
+        "retryConnection": "Reconnect",
         "locked": "Editing locked until sync completes"
       },
       "toast": {

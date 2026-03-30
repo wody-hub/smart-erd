@@ -67,6 +67,12 @@ export interface YjsProviderOptions {
  */
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
 
+/** WebSocket 연결 끊김의 사용자 노출용 원인 */
+export type ConnectionIssueKind =
+  | 'connection-limit-exceeded'
+  | 'room-capacity-exceeded'
+  | 'policy-violation';
+
 /** Presence 모드. */
 export type PresenceMode = 'active' | 'degraded';
 

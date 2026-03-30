@@ -12,6 +12,7 @@ import com.smarterd.application.diagram.model.DiagramPresenceSnapshotPayload;
 import com.smarterd.application.diagram.model.DiagramSessionJoinCompletion;
 import com.smarterd.application.diagram.model.DiagramSessionLeaveCompletion;
 import com.smarterd.application.diagram.port.DiagramSessionRef;
+import com.smarterd.domain.diagram.websocket.model.JoinRejectionReason;
 import com.smarterd.domain.diagram.websocket.model.JoinResult;
 import com.smarterd.domain.diagram.websocket.model.LeaveResult;
 import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionInfo;
@@ -40,12 +41,12 @@ class DiagramWebSocketSessionLifecycleTest {
         final var info = sessionInfo();
 
         when(diagramSessionTransportUseCase.join(session, info.diagramId(), info.userId(), info.userName())).thenReturn(
-            new JoinResult(false, null, null, 0L)
+            new JoinResult(false, JoinRejectionReason.CONNECTION_LIMIT_EXCEEDED, null, null, 0L)
         );
 
         lifecycle.establish(session, info);
 
-        verify(session).close(CloseStatus.POLICY_VIOLATION);
+        verify(session).close(new CloseStatus(CloseStatus.POLICY_VIOLATION.getCode(), "connection-limit-exceeded"));
         verify(diagramSessionTransportUseCase).join(session, info.diagramId(), info.userId(), info.userName());
         verifyNoMoreInteractions(completeJoinUseCase);
         verifyNoMoreInteractions(completeLeaveUseCase);
@@ -67,7 +68,7 @@ class DiagramWebSocketSessionLifecycleTest {
         );
         final var session = mock(WebSocketSession.class);
         final var info = sessionInfo();
-        final var joinResult = new JoinResult(true, null, null, 0L);
+        final var joinResult = new JoinResult(true, null, null, null, 0L);
         when(session.getId()).thenReturn("session-1");
 
         when(diagramSessionTransportUseCase.join(session, info.diagramId(), info.userId(), info.userName())).thenReturn(

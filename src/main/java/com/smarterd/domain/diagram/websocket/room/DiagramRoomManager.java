@@ -1,6 +1,7 @@
 package com.smarterd.domain.diagram.websocket.room;
 
 import com.smarterd.config.websocket.WebSocketProperties;
+import com.smarterd.domain.diagram.websocket.model.JoinRejectionReason;
 import com.smarterd.domain.diagram.websocket.model.JoinResult;
 import com.smarterd.domain.diagram.websocket.model.LeaveResult;
 import com.smarterd.domain.diagram.websocket.model.PresenceSnapshot;
@@ -95,8 +96,13 @@ public class DiagramRoomManager {
             webSocketProperties.getMaxConnectionsPerUser()
         );
         if (!acquired) {
-            log.warn("사용자 {} 연결 수 초과 (최대 {})", userId, webSocketProperties.getMaxConnectionsPerUser());
-            return new JoinResult(false, null, null, 0);
+            log.warn(
+                "사용자 {} 연결 수 초과 (현재 {}, 최대 {})",
+                userId,
+                sessionRegistry.getUserConnectionCount(userId),
+                webSocketProperties.getMaxConnectionsPerUser()
+            );
+            return new JoinResult(false, JoinRejectionReason.CONNECTION_LIMIT_EXCEEDED, null, null, 0);
         }
 
         final var sessions = sessionRegistry.getOrCreateSessions(diagramId);
@@ -107,11 +113,12 @@ public class DiagramRoomManager {
             if (sessions.size() >= webSocketProperties.getMaxSessionsPerRoom()) {
                 sessionRegistry.releaseUserConnection(userId); // 롤백
                 log.warn(
-                    "다이어그램 {} 방 입장 거부: 최대 인원({}) 초과",
+                    "다이어그램 {} 방 입장 거부: 현재 {}명, 최대 {}명",
                     diagramId,
+                    sessions.size(),
                     webSocketProperties.getMaxSessionsPerRoom()
                 );
-                return new JoinResult(false, null, null, 0);
+                return new JoinResult(false, JoinRejectionReason.ROOM_CAPACITY_EXCEEDED, null, null, 0);
             }
 
             sessions.add(session);
@@ -126,6 +133,7 @@ public class DiagramRoomManager {
 
         return new JoinResult(
             true,
+            null,
             presenceJoinResult.snapshot(),
             presenceJoinResult.joinedParticipant(),
             presenceJoinResult.joinedPresenceVersion()

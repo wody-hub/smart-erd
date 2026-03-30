@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type {
   AwarenessState,
+  ConnectionIssueKind,
   ConnectionStatus,
   DocumentChangeSummary,
   PresenceMode,
@@ -30,6 +31,8 @@ export interface LocalEdgeWaypointDrag {
 interface CollaborationState {
   /** WebSocket 연결 상태 */
   connectionStatus: ConnectionStatus;
+  /** 최근 연결 끊김 사유 */
+  connectionIssue: ConnectionIssueKind | null;
   /** Presence 모드 */
   presenceMode: PresenceMode;
   /** 최근 room epoch */
@@ -51,6 +54,8 @@ interface CollaborationState {
 
   /** 연결 상태를 설정한다. */
   setConnectionStatus: (status: ConnectionStatus) => void;
+  /** 연결 끊김 사유를 설정한다. */
+  setConnectionIssue: (issue: ConnectionIssueKind | null) => void;
   /** Presence 모드를 설정한다. */
   setPresenceMode: (mode: PresenceMode) => void;
   /** 현재 사용자 userId를 설정한다. */
@@ -204,6 +209,7 @@ function removeByIdentity(
  */
 const useCollaborationStore = create<CollaborationState>((set, get) => ({
   connectionStatus: 'disconnected',
+  connectionIssue: null,
   presenceMode: 'active',
   lastRoomEpoch: null,
   lastPresenceVersion: 0,
@@ -215,6 +221,8 @@ const useCollaborationStore = create<CollaborationState>((set, get) => ({
   lastDocumentChange: null,
 
   setConnectionStatus: (status) => set({ connectionStatus: status }),
+
+  setConnectionIssue: (issue) => set({ connectionIssue: issue }),
 
   setPresenceMode: (mode) => set({ presenceMode: mode }),
   setSelfUserId: (userId) =>
@@ -415,6 +423,7 @@ const useCollaborationStore = create<CollaborationState>((set, get) => ({
   reset: () =>
     set({
       connectionStatus: 'disconnected',
+      connectionIssue: null,
       presenceMode: 'active',
       lastRoomEpoch: null,
       lastPresenceVersion: 0,

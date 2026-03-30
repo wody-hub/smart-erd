@@ -3,6 +3,7 @@ import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import type { DslPreviewNode } from '@/lib/dsl-preview-graph';
 import type {
   AwarenessState,
+  ConnectionIssueKind,
   ConnectionStatus,
   DocumentChangeSummary,
   PresenceMode,
@@ -19,6 +20,7 @@ export interface DiagramCollaborationStoreBridge {
     positionOverrides: DiagramPreviewPositionRecord,
   ) => string[];
   setConnectionStatus: (status: ConnectionStatus) => void;
+  setConnectionIssue: (issue: ConnectionIssueKind | null) => void;
   setPresenceMode: (mode: PresenceMode) => void;
   setSelfUserId: (userId: string) => void;
   applyPresenceSnapshot: (payload: PresenceSnapshotPayload) => void;

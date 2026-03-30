@@ -21,7 +21,7 @@ class DiagramSessionTransportUseCaseTest {
         final var roomManager = mock(DiagramRoomManager.class);
         final var useCase = new DiagramSessionTransportUseCase(roomManager);
         final var session = mock(WebSocketSession.class);
-        final var joinResult = new JoinResult(true, null, null, 0L);
+        final var joinResult = new JoinResult(true, null, null, null, 0L);
         final var diagramId = 100L;
         final var userId = "user-1";
         final var userName = "User 1";

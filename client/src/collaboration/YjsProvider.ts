@@ -4,6 +4,7 @@ import { getWsBaseUrl } from '@/lib/platform';
 import { WS_MSG_TYPE, WS_PRESENCE, WS_RECONNECT } from '@/constants/ws';
 import type {
   AwarenessState,
+  ConnectionIssueKind,
   ConnectionStatus,
   PresenceMode,
   PresencePeerJoinedPayload,
@@ -14,6 +15,19 @@ import type {
 
 /** snapshot 재요청 rate limit (분당 최대 횟수) */
 const MAX_SNAPSHOT_REQUESTS_PER_MINUTE = 6;
+
+function mapCloseEventToConnectionIssue(code: number, reason: string): ConnectionIssueKind | null {
+  if (code !== 1008) {
+    return null;
+  }
+  if (reason === 'connection-limit-exceeded') {
+    return 'connection-limit-exceeded';
+  }
+  if (reason === 'room-capacity-exceeded') {
+    return 'room-capacity-exceeded';
+  }
+  return 'policy-violation';
+}
 
 function shouldSendLocalUpdate(origin: unknown): boolean {
   return !(origin === 'remote' || origin === 'bootstrap');
@@ -66,6 +80,9 @@ export class YjsProvider {
 
   /** 연결 상태 변경 콜백 */
   onConnectionStatusChange: ((status: ConnectionStatus) => void) | null = null;
+
+  /** 연결 거부/종료 사유 콜백 */
+  onConnectionIssueDetected: ((issue: ConnectionIssueKind | null) => void) | null = null;
 
   /** presence 모드 변경 콜백 */
   onPresenceModeChange: ((mode: PresenceMode) => void) | null = null;
@@ -284,6 +301,7 @@ export class YjsProvider {
         this.lastRoomEpoch = null;
         this.lastPresenceVersion = 0;
         this.snapshotRequestTimestamps = [];
+        this.onConnectionIssueDetected?.(null);
         this.emitConnectionStatus('connected');
 
         if (this.presenceProtocolVersion >= 1) {
@@ -303,12 +321,18 @@ export class YjsProvider {
         }
       };
 
-      this.ws.onclose = () => {
+      this.ws.onclose = (event) => {
         this.ws = null;
         this.synced = false;
         this.clearPresenceBootstrapTimer();
+        const connectionIssue = this.intentionalClose
+          ? null
+          : mapCloseEventToConnectionIssue(event.code, event.reason);
+        if (connectionIssue) {
+          this.onConnectionIssueDetected?.(connectionIssue);
+        }
         this.emitConnectionStatus('disconnected');
-        if (!this.intentionalClose) {
+        if (!this.intentionalClose && !connectionIssue) {
           this.scheduleReconnect();
         }
       };

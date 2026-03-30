@@ -220,6 +220,11 @@ final class DiagramSessionRegistry {
         return sessionDiagramIds.get(sessionId);
     }
 
+    int getUserConnectionCount(String userId) {
+        final var userCount = userSessionCounts.get(userId);
+        return userCount != null ? userCount.get() : 0;
+    }
+
     /**
      * 다이어그램 flush 락을 반환한다.
      *

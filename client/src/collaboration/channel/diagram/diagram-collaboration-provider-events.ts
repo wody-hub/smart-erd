@@ -1,7 +1,7 @@
 import type { CollaborationRuntimeEvent } from '../../core/collaboration-runtime-types.js';
 import type { DiagramCollaborationProviderBindingCallbacks } from './diagram-collaboration-provider-callbacks.js';
 import type { DiagramCollaborationStoreBridge } from './diagram-collaboration-store-bridge.js';
-import type { ConnectionStatus } from '../../../types/collaboration.js';
+import type { ConnectionIssueKind, ConnectionStatus } from '../../../types/collaboration.js';
 
 interface DiagramCollaborationProviderEventsOptions {
   storeBridge: DiagramCollaborationStoreBridge;
@@ -45,6 +45,9 @@ export class DiagramCollaborationProviderEvents {
       onConnectionStatusChange: (status) => {
         this.currentConnectionStatus = status;
         this.options.storeBridge.setConnectionStatus(status);
+        if (status !== 'disconnected') {
+          this.options.storeBridge.setConnectionIssue(null);
+        }
         if (status === 'connecting' && this.wsConnectedAt !== null) {
           this.options.dispatchRuntimeEvent('reconnect-start');
         }
@@ -64,6 +67,9 @@ export class DiagramCollaborationProviderEvents {
           );
           onConnected(this.wsConnectedAt);
         }
+      },
+      onConnectionIssueDetected: (issue: ConnectionIssueKind | null) => {
+        this.options.storeBridge.setConnectionIssue(issue);
       },
       onIdentityResolved: (userId) => {
         this.options.storeBridge.setSelfUserId(userId);

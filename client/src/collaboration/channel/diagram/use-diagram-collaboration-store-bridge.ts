@@ -29,6 +29,7 @@ export function useDiagramCollaborationStoreBridge(): DiagramCollaborationStoreB
     (state) => state.applyPreviewPositionChangesToPersisted,
   );
   const setConnectionStatus = useCollaborationStore((s) => s.setConnectionStatus);
+  const setConnectionIssue = useCollaborationStore((s) => s.setConnectionIssue);
   const setPresenceMode = useCollaborationStore((s) => s.setPresenceMode);
   const setSelfUserId = useCollaborationStore((s) => s.setSelfUserId);
   const applyPresenceSnapshot = useCollaborationStore((s) => s.applyPresenceSnapshot);
@@ -101,6 +102,7 @@ export function useDiagramCollaborationStoreBridge(): DiagramCollaborationStoreB
         syncFromYDoc(nextRequest);
       },
       setConnectionStatus,
+      setConnectionIssue,
       setPresenceMode,
       setSelfUserId,
       applyPresenceSnapshot,
@@ -122,6 +124,7 @@ export function useDiagramCollaborationStoreBridge(): DiagramCollaborationStoreB
       removePeerByLoginId,
       removePeerByUserId,
       resetCollaboration,
+      setConnectionIssue,
       setConnectionStatus,
       setPresenceMode,
       setSelfUserId,

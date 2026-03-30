@@ -116,6 +116,7 @@ export default function DiagramPage() {
   const setActiveEditNodeId = useCanvasStore((s) => s.setActiveEditNodeId);
   const clearHighlights = useCanvasStore((s) => s.clearHighlights);
   const connectionStatus = useCollaborationStore((s) => s.connectionStatus);
+  const connectionIssue = useCollaborationStore((s) => s.connectionIssue);
   /** store에 렌더 가능한 노드/엣지가 존재하는지 (boolean selector로 리렌더 최소화) */
   const storeHasRenderableGraph = useCanvasStore((s) => s.nodes.length > 0 || s.edges.length > 0);
   const { persistedNodes, persistedEdges } = useCanvasStore(
@@ -320,12 +321,16 @@ export default function DiagramPage() {
                       </div>
                     }
                   />
-                  {(workModeRuntimeState.showPreviewSyncBanner || collaborationSetupErrorKind) && (
+                  {(workModeRuntimeState.showPreviewSyncBanner ||
+                    collaborationSetupErrorKind ||
+                    connectionIssue) && (
                     <DiagramSyncStatusBanner
                       connectionStatus={connectionStatus}
+                      connectionIssue={connectionIssue}
                       setupErrorKind={collaborationSetupErrorKind}
                       onRetry={
-                        collaborationSetupErrorKind === 'authoritative-bootstrap-required'
+                        collaborationSetupErrorKind === 'authoritative-bootstrap-required' ||
+                        connectionIssue
                           ? retryCollaborationSetup
                           : undefined
                       }

@@ -1,11 +1,12 @@
 import { LoaderCircle, Lock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import type { ConnectionStatus } from '@/types/collaboration';
+import type { ConnectionIssueKind, ConnectionStatus } from '@/types/collaboration';
 import type { DiagramCollaborationSetupErrorKind } from '@/collaboration/channel/diagram/use-diagram-collaboration-provider';
 
 interface DiagramSyncStatusBannerProps {
   connectionStatus: ConnectionStatus;
+  connectionIssue?: ConnectionIssueKind | null;
   setupErrorKind?: DiagramCollaborationSetupErrorKind;
   onRetry?: (() => void) | undefined;
 }
@@ -15,12 +16,24 @@ interface DiagramSyncStatusBannerProps {
  */
 export default function DiagramSyncStatusBanner({
   connectionStatus,
+  connectionIssue = null,
   setupErrorKind = null,
   onRetry,
 }: DiagramSyncStatusBannerProps) {
   const { t } = useTranslation();
   const isDisconnected = connectionStatus === 'disconnected';
   const isAuthoritativeBootstrapBlocked = setupErrorKind === 'authoritative-bootstrap-required';
+  const shouldShowRetry = (isAuthoritativeBootstrapBlocked || connectionIssue !== null) && !!onRetry;
+
+  const description = isAuthoritativeBootstrapBlocked
+    ? t('erd.collabSync.overlay.failed')
+    : connectionIssue
+      ? t(`diagram.previewSync.banner.descriptionIssue.${connectionIssue}`)
+      : t(
+          isDisconnected
+            ? 'diagram.previewSync.banner.descriptionDisconnected'
+            : 'diagram.previewSync.banner.description',
+        );
 
   return (
     <div
@@ -31,7 +44,9 @@ export default function DiagramSyncStatusBanner({
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 rounded-full bg-amber-500/15 p-2 text-amber-700">
-            <LoaderCircle className={`h-4 w-4 ${isDisconnected ? '' : 'animate-spin'}`} />
+            <LoaderCircle
+              className={`h-4 w-4 ${isDisconnected || connectionIssue ? '' : 'animate-spin'}`}
+            />
           </div>
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold">
@@ -40,25 +55,21 @@ export default function DiagramSyncStatusBanner({
                 {t(`collaboration.status.${connectionStatus}`)}
               </span>
             </div>
-            <p className="mt-0.5 text-sm text-amber-900/80">
-              {isAuthoritativeBootstrapBlocked
-                ? t('erd.collabSync.overlay.failed')
-                : t(
-                    isDisconnected
-                      ? 'diagram.previewSync.banner.descriptionDisconnected'
-                      : 'diagram.previewSync.banner.description',
-                  )}
-            </p>
+            <p className="mt-0.5 text-sm text-amber-900/80">{description}</p>
           </div>
         </div>
-        {isAuthoritativeBootstrapBlocked && onRetry ? (
+        {shouldShowRetry ? (
           <Button
             variant="outline"
             size="sm"
             className="self-start border-amber-300/80 bg-white/70 text-amber-900 hover:bg-white md:self-center"
             onClick={onRetry}
           >
-            {t('erd.collabSync.overlay.retry')}
+            {t(
+              connectionIssue
+                ? 'diagram.previewSync.banner.retryConnection'
+                : 'erd.collabSync.overlay.retry',
+            )}
           </Button>
         ) : (
           <div className="flex items-center gap-2 self-start rounded-full border border-amber-300/80 bg-white/70 px-3 py-1 text-xs font-medium text-amber-900 md:self-center">
