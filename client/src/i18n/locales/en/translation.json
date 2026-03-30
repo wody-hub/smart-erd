@@ -180,6 +180,7 @@
     },
     "previewSync": {
       "headerReadonly": "Real-time sync in progress",
+      "sharedDraftOverlaySuppressed": "Large diagrams hide the shared draft preview to keep the canvas responsive. Code-first drafts will appear on the ERD after they are applied.",
       "banner": {
         "title": "Preview is already visible",
         "description": "Editing will unlock automatically once real-time sync finishes.",

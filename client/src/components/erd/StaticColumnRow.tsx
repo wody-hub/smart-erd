@@ -40,7 +40,7 @@ interface StaticColumnRowProps {
  * 편집 불가 상태의 컬럼을 가볍게 렌더링한다.
  * DndContext, SortableContext, ColumnAutocomplete, DomainSelectPopover 없이
  * 순수 span/div만 사용하여 렌더링 비용을 최소화한다.
- * Handle은 항상 렌더링하여 엣지 위치 계산을 보장한다.
+ * Handle은 연결된 컬럼이거나 FK 모드일 때만 렌더링해 초기 DOM 비용을 줄인다.
  *
  * @param props.col                 컬럼 데이터
  * @param props.nodeId              노드 ID
@@ -63,6 +63,7 @@ function StaticColumnRow({
   const fkMode = useErdFkMode();
   const targetHandlePlacements = getColumnHandlePlacements(handleLayout, 'target');
   const sourceHandlePlacements = getColumnHandlePlacements(handleLayout, 'source');
+  const shouldRenderHandles = connected || fkMode;
 
   return (
     <div
@@ -72,19 +73,17 @@ function StaticColumnRow({
       )}
     >
       <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
-        {targetHandlePlacements.map((placement) => (
-          <Handle
-            key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
-            type="target"
-            position={placement.position}
-            id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
-            className={cn(
-              '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
-              !(connected || fkMode) && '!opacity-0 !pointer-events-none',
-            )}
-            style={placement.style}
-          />
-        ))}
+        {shouldRenderHandles &&
+          targetHandlePlacements.map((placement) => (
+            <Handle
+              key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+              type="target"
+              position={placement.position}
+              id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+              className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+              style={placement.style}
+            />
+          ))}
 
         {/* PK badge */}
         <span
@@ -191,19 +190,17 @@ function StaticColumnRow({
           NN
         </span>
 
-        {sourceHandlePlacements.map((placement) => (
-          <Handle
-            key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
-            type="source"
-            position={placement.position}
-            id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
-            className={cn(
-              '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
-              !(connected || fkMode) && '!opacity-0 !pointer-events-none',
-            )}
-            style={placement.style}
-          />
-        ))}
+        {shouldRenderHandles &&
+          sourceHandlePlacements.map((placement) => (
+            <Handle
+              key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+              type="source"
+              position={placement.position}
+              id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+              className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+              style={placement.style}
+            />
+          ))}
       </div>
     </div>
   );

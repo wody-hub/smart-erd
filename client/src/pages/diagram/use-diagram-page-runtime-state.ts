@@ -15,6 +15,7 @@ import {
 } from '@/lib/dsl-preview-graph';
 import type { DiagramWorkMode } from '@/lib/diagram-work-mode';
 import {
+  hasSharedSchemaDraftContent,
   type SharedSchemaDraftSnapshot,
 } from '@/lib/shared-schema-draft';
 import {
@@ -24,6 +25,21 @@ import type { DiagramWorkModeCapabilities } from '@/lib/diagram-work-mode';
 import { buildPreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
 import { buildParseResultFromSharedSchemaDraft } from '@/lib/shared-schema-draft';
 import type { ERDEdge, TableNode } from '@/types/erd';
+
+/**
+ * persisted 캔버스에서 shared draft overlay를 허용할 최대 테이블 수.
+ *
+ * 큰 다이어그램에서 overlay를 전체 렌더하면 persisted 노드와 draft overlay 노드가
+ * 거의 두 배로 겹쳐져 React Flow startup과 상호작용이 급격히 느려진다.
+ */
+const MAX_VISIBLE_SHARED_DRAFT_OVERLAY_TABLES = 80;
+
+/**
+ * persisted 캔버스에서 shared draft overlay를 허용할 최대 컬럼 수.
+ *
+ * split handle 레이아웃 기준 컬럼 수가 많을수록 handle/measurement 비용이 급격히 커진다.
+ */
+const MAX_VISIBLE_SHARED_DRAFT_OVERLAY_COLUMNS = 1000;
 
 type GroupSummary = {
   id: string;
@@ -89,6 +105,7 @@ type UseDiagramPageRuntimeStateResult = {
   previewReadOnlyMessage: string | undefined;
   renderDictionaryDialog: boolean;
   sharedDraftOverlayGraph: ReturnType<typeof buildPreviewDraftOverlayGraph> | null;
+  sharedDraftOverlaySuppressed: boolean;
   showOverlay: boolean;
   showPreviewCanvas: boolean;
   tableCodeRevealRequest: CodeEditorTableRevealRequest | null;
@@ -157,12 +174,26 @@ export function useDiagramPageRuntimeState({
   const showPreviewCanvas = workModeCapabilities.canvasSource === 'preview';
   const captureCodeEditorPreviewState = showPreviewCanvas;
   const renderDictionaryDialog = !!dictionaryContextSetId;
+  const hasSharedDraftContent = hasSharedSchemaDraftContent(sharedSchemaDraft);
+  const persistedColumnCount = useMemo(
+    () => persistedNodes.reduce((sum, node) => sum + node.data.columns.length, 0),
+    [persistedNodes],
+  );
+  const sharedDraftOverlaySuppressed =
+    workModeCapabilities.canvasSource !== 'preview' &&
+    !activeGroupId &&
+    hasSharedDraftContent &&
+    (persistedNodes.length > MAX_VISIBLE_SHARED_DRAFT_OVERLAY_TABLES ||
+      persistedColumnCount > MAX_VISIBLE_SHARED_DRAFT_OVERLAY_COLUMNS);
 
   const sharedDraftOverlayGraph = useMemo(() => {
     if (workModeCapabilities.canvasSource === 'preview' || activeGroupId) {
       return null;
     }
     if (!sharedSchemaDraft) {
+      return null;
+    }
+    if (sharedDraftOverlaySuppressed) {
       return null;
     }
 
@@ -178,6 +209,7 @@ export function useDiagramPageRuntimeState({
     persistedEdges,
     persistedNodes,
     sharedSchemaDraft,
+    sharedDraftOverlaySuppressed,
     workModeCapabilities.canvasSource,
   ]);
 
@@ -386,6 +418,7 @@ export function useDiagramPageRuntimeState({
     previewReadOnlyMessage,
     renderDictionaryDialog,
     sharedDraftOverlayGraph,
+    sharedDraftOverlaySuppressed,
     showOverlay,
     showPreviewCanvas,
     tableCodeRevealRequest,

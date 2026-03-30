@@ -174,6 +174,7 @@ export default function DiagramPage() {
     previewReadOnlyMessage,
     renderDictionaryDialog,
     sharedDraftOverlayGraph,
+    sharedDraftOverlaySuppressed,
     showOverlay,
     showPreviewCanvas,
     tableCodeRevealRequest,
@@ -333,6 +334,11 @@ export default function DiagramPage() {
                   {workModeRuntimeState.showCodeModeInfoBanner && (
                     <div className="px-4 py-1 text-xs text-muted-foreground border-b bg-background">
                       {t('diagram.workMode.codeInfo')}
+                    </div>
+                  )}
+                  {sharedDraftOverlaySuppressed && (
+                    <div className="px-4 py-2 text-xs text-amber-900 border-b border-amber-200/80 bg-[linear-gradient(90deg,rgba(255,251,235,0.92),rgba(255,247,237,0.92),rgba(254,243,199,0.84))]">
+                      {t('diagram.previewSync.sharedDraftOverlaySuppressed')}
                     </div>
                   )}
                   {dictionaryContextName && (

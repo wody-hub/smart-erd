@@ -179,6 +179,7 @@
     },
     "previewSync": {
       "headerReadonly": "실시간 동기화 연결 중",
+      "sharedDraftOverlaySuppressed": "대형 다이어그램에서는 캔버스 응답성을 위해 shared draft 미리보기를 숨깁니다. code-first 초안은 적용 후 ERD에 반영됩니다.",
       "banner": {
         "title": "미리보기를 먼저 표시했습니다",
         "description": "실시간 동기화가 연결되면 편집이 자동으로 활성화됩니다.",

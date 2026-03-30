@@ -39,6 +39,46 @@ import TableNodeHeader from './TableNodeHeader';
 import EditableColumnRow from './EditableColumnRow';
 import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
 
+const TABLE_NODE_INTERNALS_BATCH_SIZE = 6;
+
+const pendingNodeInternalsUpdates = new Map<string, (id: string) => void>();
+let nodeInternalsFlushHandle: number | null = null;
+
+function flushPendingNodeInternalsUpdates() {
+  nodeInternalsFlushHandle = null;
+
+  const queued = Array.from(pendingNodeInternalsUpdates.entries()).slice(
+    0,
+    TABLE_NODE_INTERNALS_BATCH_SIZE,
+  );
+
+  for (const [nodeId, updateInternals] of queued) {
+    pendingNodeInternalsUpdates.delete(nodeId);
+    updateInternals(nodeId);
+  }
+
+  if (pendingNodeInternalsUpdates.size > 0) {
+    nodeInternalsFlushHandle = window.requestAnimationFrame(flushPendingNodeInternalsUpdates);
+  }
+}
+
+function scheduleNodeInternalsUpdate(nodeId: string, updateInternals: (id: string) => void) {
+  pendingNodeInternalsUpdates.set(nodeId, updateInternals);
+
+  if (nodeInternalsFlushHandle == null) {
+    nodeInternalsFlushHandle = window.requestAnimationFrame(flushPendingNodeInternalsUpdates);
+  }
+}
+
+function cancelScheduledNodeInternalsUpdate(nodeId: string) {
+  pendingNodeInternalsUpdates.delete(nodeId);
+
+  if (pendingNodeInternalsUpdates.size === 0 && nodeInternalsFlushHandle != null) {
+    window.cancelAnimationFrame(nodeInternalsFlushHandle);
+    nodeInternalsFlushHandle = null;
+  }
+}
+
 /** 빠른 용어 등록 대상 정보 */
 interface QuickTermTarget {
   /** 노드 ID */
@@ -439,8 +479,16 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   };
 
   useEffect(() => {
-    updateNodeInternals(id);
-  }, [columns.length, handleLayout, id, updateNodeInternals]);
+    if (!fkMode && connectedHandles.size === 0) {
+      cancelScheduledNodeInternalsUpdate(id);
+      return;
+    }
+
+    scheduleNodeInternalsUpdate(id, updateNodeInternals);
+    return () => {
+      cancelScheduledNodeInternalsUpdate(id);
+    };
+  }, [columns.length, connectedHandles, fkMode, handleLayout, id, updateNodeInternals]);
 
   return (
     <TooltipProvider delayDuration={300}>
