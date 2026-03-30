@@ -17,6 +17,12 @@ import type {
 const MAX_SNAPSHOT_REQUESTS_PER_MINUTE = 6;
 
 function mapCloseEventToConnectionIssue(code: number, reason: string): ConnectionIssueKind | null {
+  if (code === 4408) {
+    return 'connection-limit-exceeded';
+  }
+  if (code === 4409) {
+    return 'room-capacity-exceeded';
+  }
   if (code !== 1008) {
     return null;
   }

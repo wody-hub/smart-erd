@@ -46,7 +46,7 @@ class DiagramWebSocketSessionLifecycleTest {
 
         lifecycle.establish(session, info);
 
-        verify(session).close(new CloseStatus(CloseStatus.POLICY_VIOLATION.getCode(), "connection-limit-exceeded"));
+        verify(session).close(new CloseStatus(4408, "connection-limit-exceeded"));
         verify(diagramSessionTransportUseCase).join(session, info.diagramId(), info.userId(), info.userName());
         verifyNoMoreInteractions(completeJoinUseCase);
         verifyNoMoreInteractions(completeLeaveUseCase);
