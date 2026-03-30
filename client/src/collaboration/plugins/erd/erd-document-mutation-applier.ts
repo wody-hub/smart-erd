@@ -770,6 +770,7 @@ export class ErdDocumentMutationApplier {
   }
 
   private applyEdgeConnect(mutation: DocumentMutation): boolean {
+    const requestedEdgeId = this.readString(mutation.payload?.edgeId);
     const sourceTableId = this.readString(mutation.payload?.sourceTableId);
     const targetTableId = this.readString(mutation.payload?.targetTableId);
     const sourceHandle = this.readString(mutation.payload?.sourceHandle);
@@ -793,12 +794,14 @@ export class ErdDocumentMutationApplier {
       return false;
     }
 
-    const edgeId = buildStableEdgeId({
-      parentTable: this.readString(sourceTableYMap.get('label')) ?? sourceTableId,
-      parentColumn: sourceColumn.name,
-      childTable: this.readString(targetTableYMap.get('label')) ?? targetTableId,
-      childColumn: targetColumn.name,
-    });
+    const edgeId =
+      requestedEdgeId ??
+      buildStableEdgeId({
+        parentTable: this.readString(sourceTableYMap.get('label')) ?? sourceTableId,
+        parentColumn: sourceColumn.name,
+        childTable: this.readString(targetTableYMap.get('label')) ?? targetTableId,
+        childColumn: targetColumn.name,
+      });
 
     doc.transact(() => {
       const edgeYMap = createEdgeYMap(

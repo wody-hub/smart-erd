@@ -18,14 +18,16 @@ import type {
 import type {
   DocumentChangeEvent,
   DocumentMutation,
+  DocumentReadExecutor,
   MutationMeta,
   ScopeRef,
 } from '@/collaboration/core/contracts/document-read-executor';
 import { YJS_SHARED_DOCUMENT_ENGINE_ID } from '@/collaboration/core/engines/yjs-shared-document-engine';
-import type { EdgeHandleSelectionValue } from '@/lib/edge-handles';
+import { buildStableEdgeId, type EdgeHandleSelectionValue } from '@/lib/edge-handles';
 import type { DdlParseResult } from '@/lib/ddl-parser';
 import type { DiagramDictionaryReconciliationPlan } from '@/lib/diagram-dictionary-reconciliation';
 import type { DiffPlan } from '@/lib/erd-diff-plan';
+import { extractColId } from '@/lib/handle-id';
 import type { EdgeRoutingType, TableHeaderColor, Waypoint } from '@/types/erd';
 import { buildErdColumnEntityId } from './erd-column-entity-id';
 import { yDocToJson } from '@/collaboration/yjsBridge';
@@ -428,9 +430,11 @@ class ErdScopeResolver implements ScopeResolver {
       return [{ kind: 'table', id: tableId, mode: 'exclusive' }];
     }
     if (command.key === 'edge:connect') {
+      const edgeId = this.readString(command.payload?.edgeId);
       const sourceTableId = this.readString(command.payload?.sourceTableId);
       const targetTableId = this.readString(command.payload?.targetTableId);
       return [
+        ...(edgeId ? [{ kind: 'edge' as const, id: edgeId, mode: 'exclusive' as const }] : []),
         ...(sourceTableId
           ? [{ kind: 'table' as const, id: sourceTableId, mode: 'shared' as const }]
           : []),
@@ -504,14 +508,97 @@ class ErdScopeResolver implements ScopeResolver {
 }
 
 class ErdMutationPolicy implements MutationPolicy {
-  constructor(private readonly scopeResolver: ScopeResolver) {}
+  constructor(
+    private readonly scopeResolver: ScopeResolver,
+    private readonly read: DocumentReadExecutor,
+  ) {}
 
   toMutation(command: DocumentCommand, _meta: MutationMeta): DocumentMutation {
+    const resolvedCommand = this.resolveCommand(command);
     return {
-      key: command.key,
-      payload: command.payload,
-      affectedScopes: this.scopeResolver.resolve(command),
+      key: resolvedCommand.key,
+      payload: resolvedCommand.payload,
+      affectedScopes: this.scopeResolver.resolve(resolvedCommand),
     };
+  }
+
+  private resolveCommand(command: DocumentCommand): DocumentCommand {
+    if (command.key !== 'edge:connect') {
+      return command;
+    }
+
+    const edgeId = this.resolveStableEdgeId(command.payload);
+    if (!edgeId) {
+      return command;
+    }
+
+    return {
+      ...command,
+      payload: {
+        ...command.payload,
+        edgeId,
+      },
+    };
+  }
+
+  private resolveStableEdgeId(payload?: Record<string, unknown>): string | null {
+    const sourceTableId = this.readString(payload?.sourceTableId);
+    const targetTableId = this.readString(payload?.targetTableId);
+    const sourceHandle = this.readString(payload?.sourceHandle);
+    const targetHandle = this.readString(payload?.targetHandle);
+    if (!sourceTableId || !targetTableId || !sourceHandle || !targetHandle) {
+      return null;
+    }
+
+    const sourceColId = extractColId(sourceHandle, sourceTableId);
+    const targetColId = extractColId(targetHandle, targetTableId);
+    if (!sourceColId || !targetColId) {
+      return null;
+    }
+
+    return this.read.execute({
+      run: (context) => {
+        const sourceTableRef = { kind: 'table', id: sourceTableId };
+        const targetTableRef = { kind: 'table', id: targetTableId };
+        const sourceTable = context.getEntity(sourceTableRef);
+        const targetTable = context.getEntity(targetTableRef);
+        if (!sourceTable || !targetTable) {
+          return null;
+        }
+
+        const sourceColumn = context.getEntity({
+          kind: 'column',
+          id: buildErdColumnEntityId(sourceTableId, sourceColId),
+        });
+        const targetColumn = context.getEntity({
+          kind: 'column',
+          id: buildErdColumnEntityId(targetTableId, targetColId),
+        });
+        if (!sourceColumn || !targetColumn) {
+          return null;
+        }
+
+        const parentTable =
+          typeof sourceTable.props.label === 'string' ? sourceTable.props.label : sourceTableId;
+        const childTable =
+          typeof targetTable.props.label === 'string' ? targetTable.props.label : targetTableId;
+        const parentColumn =
+          typeof sourceColumn.props.name === 'string' ? sourceColumn.props.name : sourceColId;
+        const childColumn =
+          typeof targetColumn.props.name === 'string' ? targetColumn.props.name : targetColId;
+
+        return buildStableEdgeId({
+          parentTable,
+          parentColumn,
+          childTable,
+          childColumn,
+        });
+      },
+    });
+  }
+
+  private readString(value: unknown): string | null {
+    return typeof value === 'string' && value.length > 0 ? value : null;
   }
 }
 
@@ -547,7 +634,7 @@ export class ErdDocumentPlugin implements ArtifactFallbackCapablePlugin {
   }
 
   createMutationPolicy(_context: PluginContext): MutationPolicy {
-    return new ErdMutationPolicy(this.createScopeResolver(_context));
+    return new ErdMutationPolicy(this.createScopeResolver(_context), _context.read);
   }
 
   createProjectors(_context: PluginContext): Projector[] {
