@@ -272,6 +272,9 @@ export function useBidirectionalCodeSync({
     [acceptCurrentRevision, codeText, draftTrackingEnabled, enableErdToCodeSync, syncUpdate, setStatus],
   );
 
+  const shouldBlockCodeToErdAutoSync =
+    blockCodeToErdAutoSync || pendingRemoteRevision != null;
+
   // 코드 -> ERD 자동 반영
   useEffect(() => {
     clearCodeToErdTimer();
@@ -279,7 +282,10 @@ export function useBidirectionalCodeSync({
       setStatus(null);
       return;
     }
-    if (!enableCodeToErdSync || blockCodeToErdAutoSync) {
+    if (!enableCodeToErdSync || shouldBlockCodeToErdAutoSync) {
+      if (pendingRemoteRevision) {
+        setStatus('hold-manual-confirm');
+      }
       return;
     }
     if (autoApplyBlockedRef.current) {
@@ -369,13 +375,14 @@ export function useBidirectionalCodeSync({
     codeText,
     currentRevisionHash,
     enableCodeToErdSync,
-    blockCodeToErdAutoSync,
+    shouldBlockCodeToErdAutoSync,
     hasBlockingErrors,
     hasParsedTables,
     hasRemoteEditLocks,
     autoApplyIdleMs,
     maxQueueWaitMs,
     parsing,
+    pendingRemoteRevision,
     parsedSchemaHash,
     syncExecutionReady,
     setStatus,

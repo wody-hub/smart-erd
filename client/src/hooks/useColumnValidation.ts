@@ -82,6 +82,30 @@ export interface ColumnRenderMeta {
   domain: Domain | undefined;
 }
 
+export function countDuplicateLogicalNameColumns(columns: Column[]): number {
+  const counts = new Map<string, number>();
+  for (const column of columns) {
+    const key = column.logicalName?.trim();
+    if (!key) {
+      continue;
+    }
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  let duplicateLogicalNameColumnCount = 0;
+  for (const column of columns) {
+    const normalizedLogicalName = column.logicalName?.trim();
+    if (!normalizedLogicalName) {
+      continue;
+    }
+    if ((counts.get(normalizedLogicalName) ?? 0) > 1) {
+      duplicateLogicalNameColumnCount += 1;
+    }
+  }
+
+  return duplicateLogicalNameColumnCount;
+}
+
 export function buildColumnRenderMeta(
   columns: Column[],
   options: {
@@ -89,6 +113,7 @@ export function buildColumnRenderMeta(
     findTermById: (id: number) => { physicalName: string; domainId: number | null } | undefined;
     findDomainById: (id: number) => Domain | undefined;
   },
+  metaColumns: Column[] = columns,
 ): {
   renderMetaById: Map<string, ColumnRenderMeta>;
   duplicateLogicalNameColumnCount: number;
@@ -113,7 +138,7 @@ export function buildColumnRenderMeta(
   const renderMetaById = new Map<string, ColumnRenderMeta>();
   let duplicateLogicalNameColumnCount = 0;
 
-  for (const column of columns) {
+  for (const column of metaColumns) {
     const normalizedLogicalName = column.logicalName?.trim() ?? '';
     const hasDuplicateLogicalName =
       normalizedLogicalName.length > 0 && duplicatedLogicalNames.has(normalizedLogicalName);

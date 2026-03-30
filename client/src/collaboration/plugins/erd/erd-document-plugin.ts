@@ -79,6 +79,7 @@ class ErdCanvasInputAdapterImpl implements ErdCanvasInputAdapter {
     return {
       key: 'table:add',
       payload: {
+        tableId: `table-${crypto.randomUUID()}`,
         name,
       },
     };
@@ -265,6 +266,7 @@ class ErdCanvasInputAdapterImpl implements ErdCanvasInputAdapter {
     return {
       key: 'group:add',
       payload: {
+        groupId: `group-${crypto.randomUUID()}`,
         label,
       },
     };
@@ -413,8 +415,8 @@ class ErdScopeResolver implements ScopeResolver {
     if (command.key.startsWith('table:') && tableId) {
       return [{ kind: 'table', id: tableId, mode: 'exclusive' }];
     }
-    if (command.key === 'table:add') {
-      return [];
+    if (command.key === 'table:add' && tableId) {
+      return [{ kind: 'table', id: tableId, mode: 'exclusive' }];
     }
     if (command.key.startsWith('column:') && tableId && colId) {
       return [
@@ -466,6 +468,9 @@ class ErdScopeResolver implements ScopeResolver {
     ) {
       const edgeId = this.readString(command.payload?.edgeId);
       return edgeId ? [{ kind: 'edge', id: edgeId, mode: 'exclusive' }] : [];
+    }
+    if (command.key === 'group:add' && groupId) {
+      return [{ kind: 'group', id: groupId, mode: 'exclusive' }];
     }
     if (command.key.startsWith('group:') && groupId) {
       return [{ kind: 'group', id: groupId, mode: 'exclusive' }];

@@ -142,9 +142,13 @@ export class ErdDocumentMutationApplier {
       typeof mutation.payload?.name === 'string' && mutation.payload.name.trim().length > 0
         ? mutation.payload.name.trim()
         : null;
+    const requestedTableId =
+      typeof mutation.payload?.tableId === 'string' && mutation.payload.tableId.trim().length > 0
+        ? mutation.payload.tableId.trim()
+        : null;
     const doc = this.engine.getDocument();
     const tablesMap = getTablesMap(doc);
-    const tableId = `table-${crypto.randomUUID()}`;
+    const tableId = requestedTableId ?? `table-${crypto.randomUUID()}`;
     const label = nextName ?? `Table ${tablesMap.size + 1}`;
 
     let positionX = 100;
@@ -517,9 +521,13 @@ export class ErdDocumentMutationApplier {
       typeof mutation.payload?.label === 'string' && mutation.payload.label.trim().length > 0
         ? mutation.payload.label.trim()
         : `Group ${groupsMap.size + 1}`;
+    const requestedGroupId =
+      typeof mutation.payload?.groupId === 'string' && mutation.payload.groupId.trim().length > 0
+        ? mutation.payload.groupId.trim()
+        : null;
 
     doc.transact(() => {
-      groupsMap.set(`group-${crypto.randomUUID()}`, createGroupYMap(nextLabel));
+      groupsMap.set(requestedGroupId ?? `group-${crypto.randomUUID()}`, createGroupYMap(nextLabel));
     }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
     return true;
   }

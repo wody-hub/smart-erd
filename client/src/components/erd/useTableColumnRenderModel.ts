@@ -5,6 +5,7 @@ import type { Domain } from '@/types/dictionary';
 import type { Column } from '@/types/erd';
 import {
   buildColumnRenderMeta,
+  countDuplicateLogicalNameColumns,
   getValidationStatusI18nKey,
 } from '@/hooks/useColumnValidation';
 import { selectCompactOverviewColumns } from './CompactTableRenderingContext';
@@ -34,14 +35,30 @@ export function useTableColumnRenderModel({
   findTermById,
   findDomainById,
 }: UseTableColumnRenderModelOptions) {
-  const { renderMetaById, duplicateLogicalNameColumnCount } = useMemo(
+  const visibleColumns = useMemo(() => {
+    if (!compactRows) {
+      return columns;
+    }
+    return selectCompactOverviewColumns(columns, connectedColumnIds);
+  }, [columns, compactRows, connectedColumnIds]);
+
+  const duplicateLogicalNameColumnCount = useMemo(
+    () => countDuplicateLogicalNameColumns(columns),
+    [columns],
+  );
+
+  const { renderMetaById } = useMemo(
     () =>
-      buildColumnRenderMeta(columns, {
-        resolveLogicalName,
-        findTermById,
-        findDomainById,
-      }),
-    [columns, findDomainById, findTermById, resolveLogicalName],
+      buildColumnRenderMeta(
+        columns,
+        {
+          resolveLogicalName,
+          findTermById,
+          findDomainById,
+        },
+        visibleColumns,
+      ),
+    [columns, findDomainById, findTermById, resolveLogicalName, visibleColumns],
   );
 
   const validationWarningTextByStatus = useMemo(
@@ -52,13 +69,6 @@ export function useTableColumnRenderModel({
     }),
     [t],
   );
-
-  const visibleColumns = useMemo(() => {
-    if (!compactRows) {
-      return columns;
-    }
-    return selectCompactOverviewColumns(columns, connectedColumnIds);
-  }, [columns, compactRows, connectedColumnIds]);
 
   const hiddenUnconnectedColumnCount = compactRows ? columns.length - visibleColumns.length : 0;
 
