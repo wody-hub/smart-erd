@@ -28,7 +28,11 @@ import { useErdDictionary } from './ErdDictionaryContext';
 import { useErdPermission } from './ErdPermissionContext';
 import { useErdFkMode } from './ErdFkModeContext';
 import { useRemoteEditLocksContext } from './RemoteEditLocksContext';
-import { getColumnWarningFromResolution } from '@/hooks/useColumnValidation';
+import {
+  getColumnWarningFromResolution,
+  getValidationStatusI18nKey,
+  type WarningValidationStatus,
+} from '@/hooks/useColumnValidation';
 import { cn } from '@/lib/utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { revertDomainTypeIfNeeded } from './erdDictionaryData';
@@ -39,6 +43,8 @@ import TableNodeHeader from './TableNodeHeader';
 import EditableColumnRow from './EditableColumnRow';
 import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
 import type { Domain } from '@/types/dictionary';
+import { extractColId } from '@/lib/handle-id';
+import { getColumnHandlePlacements } from './columnHandleLayout';
 
 const TABLE_NODE_INTERNALS_BATCH_SIZE = 6;
 
@@ -181,15 +187,24 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   /** 편집 권한이 있고, 이 노드가 편집 모드로 활성화된 상태 */
   const isEditing = canEdit && isEditingState;
   const fkMode = useErdFkMode();
+  const resolvedHandleLayout = handleLayout ?? 'split';
+  const targetHandlePlacements = useMemo(
+    () => getColumnHandlePlacements(resolvedHandleLayout, 'target'),
+    [resolvedHandleLayout],
+  );
+  const sourceHandlePlacements = useMemo(
+    () => getColumnHandlePlacements(resolvedHandleLayout, 'source'),
+    [resolvedHandleLayout],
+  );
 
-  /** 연결된 Handle ID 셋 (이 노드에 연결된 핸들만 수집) */
-  const connectedHandles = useStore(
+  /** 관계선이 연결된 컬럼 ID 셋 */
+  const connectedColumnIds = useStore(
     (s) => {
       const set = new Set<string>();
       const prefix = `${id}-`;
       for (const edge of s.edges) {
-        if (edge.sourceHandle?.startsWith(prefix)) set.add(edge.sourceHandle);
-        if (edge.targetHandle?.startsWith(prefix)) set.add(edge.targetHandle);
+        if (edge.sourceHandle?.startsWith(prefix)) set.add(extractColId(edge.sourceHandle, id));
+        if (edge.targetHandle?.startsWith(prefix)) set.add(extractColId(edge.targetHandle, id));
       }
       return set;
     },
@@ -207,15 +222,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   );
 
   /** 해당 컬럼이 엣지에 연결되어 있는지 확인한다. */
-  const isConnected = (colId: string) => {
-    const prefix = `${id}-${colId}-`;
-    for (const handleId of connectedHandles) {
-      if (handleId.startsWith(prefix)) {
-        return true;
-      }
-    }
-    return false;
-  };
+  const isConnected = (colId: string) => connectedColumnIds.has(colId);
 
   /** 빠른 용어 등록 대상 */
   const [quickTermTarget, setQuickTermTarget] = useState<QuickTermTarget | null>(null);
@@ -508,7 +515,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   };
 
   useEffect(() => {
-    if (!fkMode && connectedHandles.size === 0) {
+    if (!fkMode && connectedColumnIds.size === 0) {
       cancelScheduledNodeInternalsUpdate(id);
       return;
     }
@@ -517,7 +524,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
     return () => {
       cancelScheduledNodeInternalsUpdate(id);
     };
-  }, [columns.length, connectedHandles, fkMode, handleLayout, id, updateNodeInternals]);
+  }, [columns.length, connectedColumnIds, fkMode, handleLayout, id, updateNodeInternals]);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -592,7 +599,7 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                         canEdit={canEdit}
                         fkMode={fkMode}
                         connected={isConnected(col.id)}
-                        handleLayout={handleLayout ?? 'split'}
+                        handleLayout={resolvedHandleLayout}
                         warning={renderMeta.warning}
                         hasDuplicateLogicalName={renderMeta.hasDuplicateLogicalName}
                         normalizedLogicalName={renderMeta.normalizedLogicalName}
@@ -626,18 +633,49 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
               if (!renderMeta) {
                 return null;
               }
-              return (
-                <StaticColumnRow
-                  key={col.id}
-                  col={col}
-                  nodeId={id}
-                  connected={isConnected(col.id)}
-                  handleLayout={handleLayout ?? 'split'}
-                  warning={renderMeta.warning}
-                  hasDuplicateLogicalName={renderMeta.hasDuplicateLogicalName}
-                  domainLogicalName={renderMeta.domain?.logicalName}
-                  domainPhysicalType={renderMeta.domain?.physicalType}
-                />
+                  return (
+                    <StaticColumnRow
+                      key={col.id}
+                      col={col}
+                      nodeId={id}
+                      showHandles={fkMode || isConnected(col.id)}
+                      targetHandlePlacements={targetHandlePlacements}
+                      sourceHandlePlacements={sourceHandlePlacements}
+                      warning={renderMeta.warning}
+                      validationWarningLabel={
+                        renderMeta.warning.status
+                          ? t('erd.tableNode.aria.validationWarning', {
+                              name: col.name,
+                            })
+                          : undefined
+                      }
+                      validationWarningText={
+                        renderMeta.warning.status
+                          ? t(
+                              getValidationStatusI18nKey(
+                                renderMeta.warning.status as WarningValidationStatus,
+                              ),
+                            )
+                          : undefined
+                      }
+                      hasDuplicateLogicalName={renderMeta.hasDuplicateLogicalName}
+                      duplicateLogicalNameLabel={
+                        renderMeta.hasDuplicateLogicalName
+                          ? t('erd.tableNode.aria.duplicateLogicalNameWarning', {
+                              name: col.logicalName ?? col.name,
+                            })
+                          : undefined
+                      }
+                      duplicateLogicalNameText={
+                        renderMeta.hasDuplicateLogicalName
+                          ? t('erd.tableNode.duplicateLogicalNameWarning', {
+                              name: col.logicalName ?? col.name,
+                            })
+                          : undefined
+                      }
+                      domainLogicalName={renderMeta.domain?.logicalName}
+                      domainPhysicalType={renderMeta.domain?.physicalType}
+                    />
               );
             })}
           </div>

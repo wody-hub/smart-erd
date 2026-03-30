@@ -1,34 +1,48 @@
-import { memo, type ReactNode } from 'react';
+import { memo, useMemo, type ReactNode } from 'react';
 import { type NodeProps, type NodeTypes, useStore } from '@xyflow/react';
+import { useTranslation } from 'react-i18next';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useErdDictionary } from './ErdDictionaryContext';
 import type { DslPreviewNode } from '@/lib/dsl-preview-graph';
-import { getColumnWarning } from '@/hooks/useColumnValidation';
+import {
+  getColumnWarningFromResolution,
+  getValidationStatusI18nKey,
+  type WarningValidationStatus,
+} from '@/hooks/useColumnValidation';
 import TableNodeHeader from './TableNodeHeader';
 import StaticColumnRow from './StaticColumnRow';
 import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
 import type { TableNode as PersistedTableNode } from '@/types/erd';
+import type { Domain } from '@/types/dictionary';
+import { extractColId } from '@/lib/handle-id';
+import { getColumnHandlePlacements } from './columnHandleLayout';
+
+interface PreviewColumnRenderMeta {
+  hasDuplicateLogicalName: boolean;
+  warning: ReturnType<typeof getColumnWarningFromResolution>;
+  domain: Domain | undefined;
+}
 
 /**
- * preview 테이블 노드에서 연결된 핸들을 수집한다.
+ * preview 테이블 노드에서 관계선이 연결된 컬럼 ID를 수집한다.
  *
  * @param nodeId preview 노드 ID
- * @returns 연결된 핸들 ID 집합
+ * @returns 연결된 컬럼 ID 집합
  */
-function useConnectedHandles(nodeId: string): Set<string> {
+function useConnectedColumnIds(nodeId: string): Set<string> {
   return useStore(
     (state) => {
-      const handleIds = new Set<string>();
+      const colIds = new Set<string>();
       const prefix = `${nodeId}-`;
       for (const edge of state.edges) {
         if (edge.sourceHandle?.startsWith(prefix)) {
-          handleIds.add(edge.sourceHandle);
+          colIds.add(extractColId(edge.sourceHandle, nodeId));
         }
         if (edge.targetHandle?.startsWith(prefix)) {
-          handleIds.add(edge.targetHandle);
+          colIds.add(extractColId(edge.targetHandle, nodeId));
         }
       }
-      return handleIds;
+      return colIds;
     },
     (left, right) => {
       if (left.size !== right.size) {
@@ -121,66 +135,111 @@ function PreviewTableNodeFrame({
  */
 function PreviewTableRows({
   node,
-  connectedHandles,
+  connectedColumnIds,
 }: {
   node: DslPreviewNode;
-  connectedHandles: Set<string>;
+  connectedColumnIds: Set<string>;
 }) {
+  const { t } = useTranslation();
   const { findDomainById, findTermById, resolveLogicalName } = useErdDictionary();
-  const counts = new Map<string, number>();
-  for (const column of node.data.columns) {
-    const key = column.logicalName?.trim();
-    if (!key) {
-      continue;
-    }
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  const duplicatedLogicalNames = new Set(
-    Array.from(counts.entries())
-      .filter(([, count]) => count > 1)
-      .map(([logicalName]) => logicalName),
+  const resolvedHandleLayout = node.data.handleLayout ?? 'split';
+  const targetHandlePlacements = useMemo(
+    () => getColumnHandlePlacements(resolvedHandleLayout, 'target'),
+    [resolvedHandleLayout],
   );
-
-  /**
-   * 컬럼이 관계선에 연결되어 있는지 판정한다.
-   *
-   * @param columnId preview 컬럼 ID
-   * @returns 연결 여부
-   */
-  const isConnected = (columnId: string): boolean => {
-    const prefix = `${node.id}-${columnId}-`;
-    for (const handleId of connectedHandles) {
-      if (handleId.startsWith(prefix)) {
-        return true;
+  const sourceHandlePlacements = useMemo(
+    () => getColumnHandlePlacements(resolvedHandleLayout, 'source'),
+    [resolvedHandleLayout],
+  );
+  const columnRenderMetaById = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const column of node.data.columns) {
+      const key = column.logicalName?.trim();
+      if (!key) {
+        continue;
       }
+      counts.set(key, (counts.get(key) ?? 0) + 1);
     }
-    return false;
-  };
+
+    const duplicatedLogicalNames = new Set(
+      Array.from(counts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([logicalName]) => logicalName),
+    );
+
+    const renderMetaById = new Map<string, PreviewColumnRenderMeta>();
+    for (const column of node.data.columns) {
+      const normalizedLogicalName = column.logicalName?.trim() ?? '';
+      const resolved =
+        normalizedLogicalName.length > 0 ? resolveLogicalName(normalizedLogicalName) : null;
+      const domain =
+        column.domainId != null
+          ? findDomainById(column.domainId)
+          : resolved?.domainId
+            ? findDomainById(resolved.domainId)
+            : undefined;
+
+      renderMetaById.set(column.id, {
+        hasDuplicateLogicalName:
+          normalizedLogicalName.length > 0 && duplicatedLogicalNames.has(normalizedLogicalName),
+        warning: getColumnWarningFromResolution(column, resolved, findTermById, findDomainById),
+        domain,
+      });
+    }
+
+    return renderMetaById;
+  }, [findDomainById, findTermById, node.data.columns, resolveLogicalName]);
 
   return (
     <>
       {node.data.columns.map((column) => {
-        const resolution = column.logicalName ? resolveLogicalName(column.logicalName) : null;
-        const resolvedDomain =
-          column.domainId != null
-            ? findDomainById(column.domainId)
-            : resolution?.domainId
-              ? findDomainById(resolution.domainId)
-              : undefined;
+        const renderMeta = columnRenderMetaById.get(column.id);
+        if (!renderMeta) {
+          return null;
+        }
 
         return (
           <StaticColumnRow
             key={column.id}
             col={column}
             nodeId={node.id}
-            connected={isConnected(column.id)}
-            handleLayout={node.data.handleLayout ?? 'split'}
-            warning={getColumnWarning(column, findTermById, findDomainById, resolveLogicalName)}
-            hasDuplicateLogicalName={
-              !!column.logicalName?.trim() && duplicatedLogicalNames.has(column.logicalName.trim())
+            showHandles={connectedColumnIds.has(column.id)}
+            targetHandlePlacements={targetHandlePlacements}
+            sourceHandlePlacements={sourceHandlePlacements}
+            warning={renderMeta.warning}
+            validationWarningLabel={
+              renderMeta.warning.status
+                ? t('erd.tableNode.aria.validationWarning', {
+                    name: column.name,
+                  })
+                : undefined
             }
-            domainLogicalName={resolvedDomain?.logicalName}
-            domainPhysicalType={resolvedDomain?.physicalType}
+            validationWarningText={
+              renderMeta.warning.status
+                ? t(
+                    getValidationStatusI18nKey(
+                      renderMeta.warning.status as WarningValidationStatus,
+                    ),
+                  )
+                : undefined
+            }
+            hasDuplicateLogicalName={renderMeta.hasDuplicateLogicalName}
+            duplicateLogicalNameLabel={
+              renderMeta.hasDuplicateLogicalName
+                ? t('erd.tableNode.aria.duplicateLogicalNameWarning', {
+                    name: column.logicalName ?? column.name,
+                  })
+                : undefined
+            }
+            duplicateLogicalNameText={
+              renderMeta.hasDuplicateLogicalName
+                ? t('erd.tableNode.duplicateLogicalNameWarning', {
+                    name: column.logicalName ?? column.name,
+                  })
+                : undefined
+            }
+            domainLogicalName={renderMeta.domain?.logicalName}
+            domainPhysicalType={renderMeta.domain?.physicalType}
           />
         );
       })}
@@ -195,7 +254,7 @@ function PreviewTableRows({
  * @returns read-only preview 노드
  */
 function PreviewTableNode(props: NodeProps<DslPreviewNode>) {
-  const connectedHandles = useConnectedHandles(props.id);
+  const connectedColumnIds = useConnectedColumnIds(props.id);
   const node = {
     id: props.id,
     type: 'previewTable' as const,
@@ -204,7 +263,7 @@ function PreviewTableNode(props: NodeProps<DslPreviewNode>) {
   };
   return (
     <PreviewTableNodeFrame node={node}>
-      <PreviewTableRows node={node} connectedHandles={connectedHandles} />
+      <PreviewTableRows node={node} connectedColumnIds={connectedColumnIds} />
     </PreviewTableNodeFrame>
   );
 }
@@ -218,7 +277,7 @@ function PreviewTableNode(props: NodeProps<DslPreviewNode>) {
  * @returns invisible preview ghost 노드
  */
 function PreviewGhostTableNode(props: NodeProps<DslPreviewNode>) {
-  const connectedHandles = useConnectedHandles(props.id);
+  const connectedColumnIds = useConnectedColumnIds(props.id);
   const node = {
     id: props.id,
     type: 'previewTable' as const,
@@ -227,7 +286,7 @@ function PreviewGhostTableNode(props: NodeProps<DslPreviewNode>) {
   };
   return (
     <PreviewTableNodeFrame node={node} ghost>
-      <PreviewTableRows node={node} connectedHandles={connectedHandles} />
+      <PreviewTableRows node={node} connectedColumnIds={connectedColumnIds} />
     </PreviewTableNodeFrame>
   );
 }
@@ -242,7 +301,7 @@ function PreviewGhostTableNode(props: NodeProps<DslPreviewNode>) {
  * @returns preview-safe fallback 노드
  */
 function PreviewPersistedTableFallbackNode(props: NodeProps<PersistedTableNode>) {
-  const connectedHandles = useConnectedHandles(props.id);
+  const connectedColumnIds = useConnectedColumnIds(props.id);
   const node: DslPreviewNode = {
     id: props.id,
     type: 'previewTable',
@@ -259,7 +318,7 @@ function PreviewPersistedTableFallbackNode(props: NodeProps<PersistedTableNode>)
 
   return (
     <PreviewTableNodeFrame node={node}>
-      <PreviewTableRows node={node} connectedHandles={connectedHandles} />
+      <PreviewTableRows node={node} connectedColumnIds={connectedColumnIds} />
     </PreviewTableNodeFrame>
   );
 }

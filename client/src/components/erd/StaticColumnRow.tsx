@@ -1,18 +1,11 @@
 import { memo } from 'react';
 import { Handle } from '@xyflow/react';
 import { AlertTriangle } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import type { Column, TableHandleLayout } from '@/types/erd';
-import {
-  getValidationStatusI18nKey,
-  type ColumnWarning,
-  type WarningValidationStatus,
-} from '@/hooks/useColumnValidation';
+import type { Column } from '@/types/erd';
+import type { ColumnWarning } from '@/hooks/useColumnValidation';
 import { cn } from '@/lib/utils';
 import { buildColumnHandleId } from '@/lib/handle-id';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { useErdFkMode } from './ErdFkModeContext';
-import { getColumnHandlePlacements } from './columnHandleLayout';
+import type { ColumnHandlePlacement } from './columnHandleLayout';
 
 /** StaticColumnRow 컴포넌트 props */
 interface StaticColumnRowProps {
@@ -20,14 +13,24 @@ interface StaticColumnRowProps {
   col: Column;
   /** 노드 ID */
   nodeId: string;
-  /** 핸들 레이아웃 */
-  handleLayout: TableHandleLayout;
-  /** 엣지 연결 여부 (미리 계산된 값) */
-  connected: boolean;
+  /** 핸들 렌더 여부 */
+  showHandles: boolean;
+  /** target 핸들 배치 */
+  targetHandlePlacements: ColumnHandlePlacement[];
+  /** source 핸들 배치 */
+  sourceHandlePlacements: ColumnHandlePlacement[];
   /** 컬럼 유효성 경고 */
   warning: ColumnWarning;
+  /** 유효성 경고 aria-label */
+  validationWarningLabel?: string;
+  /** 유효성 경고 설명 */
+  validationWarningText?: string;
   /** 컬럼 논리명 중복 여부 */
   hasDuplicateLogicalName?: boolean;
+  /** 논리명 중복 경고 aria-label */
+  duplicateLogicalNameLabel?: string;
+  /** 논리명 중복 경고 설명 */
+  duplicateLogicalNameText?: string;
   /** 도메인 논리명 */
   domainLogicalName?: string;
   /** 도메인 물리 타입 */
@@ -44,7 +47,7 @@ interface StaticColumnRowProps {
  *
  * @param props.col                 컬럼 데이터
  * @param props.nodeId              노드 ID
- * @param props.connected           엣지 연결 여부
+ * @param props.showHandles         핸들 렌더 여부
  * @param props.warning             유효성 경고
  * @param props.domainLogicalName   도메인 논리명
  * @param props.domainPhysicalType  도메인 물리 타입
@@ -52,19 +55,18 @@ interface StaticColumnRowProps {
 function StaticColumnRow({
   col,
   nodeId,
-  handleLayout,
-  connected,
+  showHandles,
+  targetHandlePlacements,
+  sourceHandlePlacements,
   warning,
+  validationWarningLabel,
+  validationWarningText,
   hasDuplicateLogicalName = false,
+  duplicateLogicalNameLabel,
+  duplicateLogicalNameText,
   domainLogicalName,
   domainPhysicalType,
 }: StaticColumnRowProps) {
-  const { t } = useTranslation();
-  const fkMode = useErdFkMode();
-  const targetHandlePlacements = getColumnHandlePlacements(handleLayout, 'target');
-  const sourceHandlePlacements = getColumnHandlePlacements(handleLayout, 'source');
-  const shouldRenderHandles = connected || fkMode;
-
   return (
     <div
       className={cn(
@@ -73,7 +75,7 @@ function StaticColumnRow({
       )}
     >
       <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
-        {shouldRenderHandles &&
+        {showHandles &&
           targetHandlePlacements.map((placement) => (
             <Handle
               key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
@@ -124,38 +126,24 @@ function StaticColumnRow({
           {col.logicalName || ''}
         </span>
 
-        {warning.status && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <AlertTriangle
-                className="h-3 w-3 text-erd-warning shrink-0"
-                aria-label={t('erd.tableNode.aria.validationWarning', {
-                  name: col.name,
-                })}
-              />
-            </TooltipTrigger>
-            <TooltipContent side="top" className="text-xs">
-              {t(getValidationStatusI18nKey(warning.status as WarningValidationStatus))}
-            </TooltipContent>
-          </Tooltip>
+        {warning.status && validationWarningText && (
+          <span
+            className="inline-flex shrink-0"
+            aria-label={validationWarningLabel}
+            title={validationWarningText}
+          >
+            <AlertTriangle className="h-3 w-3 text-erd-warning" />
+          </span>
         )}
 
-        {hasDuplicateLogicalName && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <AlertTriangle
-                className="h-3 w-3 text-destructive shrink-0"
-                aria-label={t('erd.tableNode.aria.duplicateLogicalNameWarning', {
-                  name: col.logicalName ?? col.name,
-                })}
-              />
-            </TooltipTrigger>
-            <TooltipContent side="top" className="text-xs">
-              {t('erd.tableNode.duplicateLogicalNameWarning', {
-                name: col.logicalName ?? col.name,
-              })}
-            </TooltipContent>
-          </Tooltip>
+        {hasDuplicateLogicalName && duplicateLogicalNameText && (
+          <span
+            className="inline-flex shrink-0"
+            aria-label={duplicateLogicalNameLabel}
+            title={duplicateLogicalNameText}
+          >
+            <AlertTriangle className="h-3 w-3 text-destructive" />
+          </span>
         )}
 
         <span
@@ -190,7 +178,7 @@ function StaticColumnRow({
           NN
         </span>
 
-        {shouldRenderHandles &&
+        {showHandles &&
           sourceHandlePlacements.map((placement) => (
             <Handle
               key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
