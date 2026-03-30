@@ -41,6 +41,9 @@ export class YjsProvider {
   /** WebSocket 인스턴스 */
   private ws: WebSocket | null = null;
 
+  /** ticket 발급 + socket 생성 진행 중 여부 */
+  private socketCreationInFlight = false;
+
   /** 연결 옵션 */
   private readonly options: YjsProviderOptions;
 
@@ -157,7 +160,14 @@ export class YjsProvider {
     if (this.destroyed) {
       return;
     }
+    if (this.socketCreationInFlight) {
+      return;
+    }
+    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+      return;
+    }
     this.intentionalClose = false;
+    this.clearReconnectTimer();
     void this.createWebSocket();
   }
 
@@ -213,87 +223,102 @@ export class YjsProvider {
     if (this.destroyed || this.intentionalClose) {
       return;
     }
+    if (this.socketCreationInFlight) {
+      return;
+    }
+    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+      return;
+    }
+    this.socketCreationInFlight = true;
 
-    let ticketData;
     try {
-      ticketData = await this.options.getTicket();
-    } catch (e) {
-      if (this.destroyed || this.intentionalClose) {
-        return;
-      }
-      console.error('[YjsProvider] ticket 발급 실패:', e);
-      this.emitConnectionStatus('disconnected');
-      this.scheduleReconnect();
-      return;
-    }
-
-    if (this.destroyed || this.intentionalClose) {
-      return;
-    }
-
-    this.selfUserId = ticketData.userId;
-    this.presenceProtocolVersion = ticketData.presenceProtocolVersion ?? 0;
-    this.onIdentityResolved?.(ticketData.userId);
-
-    // 티켓 응답 수신 후 userId를 알게 되므로, 기존 로컬 awareness에 병합한다.
-    if (this.localAwareness && !this.localAwareness.user.userId) {
-      this.localAwareness = {
-        ...this.localAwareness,
-        user: {
-          ...this.localAwareness.user,
-          userId: this.selfUserId,
-        },
-      };
-    }
-
-    const serverUrl = this.buildWsUrl(ticketData.ticket);
-    this.emitConnectionStatus('connecting');
-
-    this.ws = new WebSocket(serverUrl);
-    this.ws.binaryType = 'arraybuffer';
-
-    this.ws.onopen = () => {
-      if (this.destroyed || this.intentionalClose) {
-        this.ws?.close();
-        this.ws = null;
-        return;
-      }
-      this.reconnectDelay = WS_RECONNECT.INITIAL_DELAY;
-      this.lastRoomEpoch = null;
-      this.lastPresenceVersion = 0;
-      this.snapshotRequestTimestamps = [];
-      this.emitConnectionStatus('connected');
-
-      if (this.presenceProtocolVersion >= 1) {
-        this.startPresenceBootstrapTimer();
-      } else {
-        this.emitPresenceMode('degraded');
-      }
-
-      this.requestSnapshot();
-      this.requestSync();
-      this.flushPendingLocalState();
-    };
-
-    this.ws.onmessage = (event: MessageEvent) => {
-      if (event.data instanceof ArrayBuffer) {
-        this.handleMessage(new Uint8Array(event.data));
-      }
-    };
-
-    this.ws.onclose = () => {
-      this.ws = null;
-      this.synced = false;
-      this.clearPresenceBootstrapTimer();
-      this.emitConnectionStatus('disconnected');
-      if (!this.intentionalClose) {
+      let ticketData;
+      try {
+        ticketData = await this.options.getTicket();
+      } catch (e) {
+        if (this.destroyed || this.intentionalClose) {
+          return;
+        }
+        console.error('[YjsProvider] ticket 발급 실패:', e);
+        this.emitConnectionStatus('disconnected');
         this.scheduleReconnect();
+        return;
       }
-    };
 
-    this.ws.onerror = () => {
-      // onclose가 자동으로 뒤따르므로 여기서는 별도 처리 불필요
-    };
+      if (this.destroyed || this.intentionalClose) {
+        return;
+      }
+      if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+        return;
+      }
+
+      this.selfUserId = ticketData.userId;
+      this.presenceProtocolVersion = ticketData.presenceProtocolVersion ?? 0;
+      this.onIdentityResolved?.(ticketData.userId);
+
+      // 티켓 응답 수신 후 userId를 알게 되므로, 기존 로컬 awareness에 병합한다.
+      if (this.localAwareness && !this.localAwareness.user.userId) {
+        this.localAwareness = {
+          ...this.localAwareness,
+          user: {
+            ...this.localAwareness.user,
+            userId: this.selfUserId,
+          },
+        };
+      }
+
+      const serverUrl = this.buildWsUrl(ticketData.ticket);
+      this.emitConnectionStatus('connecting');
+
+      this.ws = new WebSocket(serverUrl);
+      this.ws.binaryType = 'arraybuffer';
+
+      this.ws.onopen = () => {
+        if (this.destroyed || this.intentionalClose) {
+          this.ws?.close();
+          this.ws = null;
+          return;
+        }
+        this.clearReconnectTimer();
+        this.reconnectDelay = WS_RECONNECT.INITIAL_DELAY;
+        this.lastRoomEpoch = null;
+        this.lastPresenceVersion = 0;
+        this.snapshotRequestTimestamps = [];
+        this.emitConnectionStatus('connected');
+
+        if (this.presenceProtocolVersion >= 1) {
+          this.startPresenceBootstrapTimer();
+        } else {
+          this.emitPresenceMode('degraded');
+        }
+
+        this.requestSnapshot();
+        this.requestSync();
+        this.flushPendingLocalState();
+      };
+
+      this.ws.onmessage = (event: MessageEvent) => {
+        if (event.data instanceof ArrayBuffer) {
+          this.handleMessage(new Uint8Array(event.data));
+        }
+      };
+
+      this.ws.onclose = () => {
+        this.ws = null;
+        this.synced = false;
+        this.clearPresenceBootstrapTimer();
+        this.emitConnectionStatus('disconnected');
+        if (!this.intentionalClose) {
+          this.scheduleReconnect();
+        }
+      };
+
+      this.ws.onerror = () => {
+        // onclose가 자동으로 뒤따르므로 여기서는 별도 처리 불필요
+      };
+    } finally {
+      this.socketCreationInFlight = false;
+    }
   }
 
   /**
@@ -670,6 +695,7 @@ export class YjsProvider {
   private scheduleReconnect(): void {
     this.clearReconnectTimer();
     this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
       void this.createWebSocket();
     }, this.reconnectDelay);
 
