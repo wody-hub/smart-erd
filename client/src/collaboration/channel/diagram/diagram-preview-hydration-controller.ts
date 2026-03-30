@@ -5,6 +5,8 @@ import type { CollaborationRuntimeEvent } from '@/collaboration/core/collaborati
 import type { DiagramYjsDocumentAdapter } from '@/collaboration/yjs/diagram-yjs-document-adapter';
 import type { DiagramCollaborationBootstrap } from '@/collaboration/channel/diagram/diagram-collaboration-bootstrap';
 
+const REMOTE_SNAPSHOT_CONNECTED_GRACE_MS = 1_000;
+
 interface DiagramPreviewHydrationControllerOptions {
   ydoc: Y.Doc;
   bootstrap: DiagramCollaborationBootstrap;
@@ -36,7 +38,76 @@ export class DiagramPreviewHydrationController {
 
   private snapshotFallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
+  private connectedGraceFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor(private readonly options: DiagramPreviewHydrationControllerOptions) {}
+
+  private clearFallbackTimers(): void {
+    if (this.snapshotFallbackTimer) {
+      clearTimeout(this.snapshotFallbackTimer);
+      this.snapshotFallbackTimer = null;
+    }
+    if (this.connectedGraceFallbackTimer) {
+      clearTimeout(this.connectedGraceFallbackTimer);
+      this.connectedGraceFallbackTimer = null;
+    }
+  }
+
+  private finishPreviewUnlock(source: 'remote' | 'fallback', updatesApplied: number): void {
+    if (this.previewUnlockedAt != null) {
+      return;
+    }
+
+    this.previewHydrationSource ??= source;
+    if (this.previewExitObserver) {
+      getTablesMap(this.options.ydoc).unobserveDeep(this.previewExitObserver);
+      this.previewExitObserver = null;
+    }
+    this.clearFallbackTimers();
+
+    this.options.updatePreviewMode(false);
+    this.previewUnlockedAt = performance.now();
+    console.info(
+      '%s preview-unlocked source=%s totalMs=%d afterPreviewMs=%d updatesApplied=%d',
+      this.options.handoffLogPrefix,
+      this.previewHydrationSource,
+      Math.round(this.previewUnlockedAt - this.options.handoffStartedAt),
+      Math.round(this.previewUnlockedAt - (this.previewShownAt ?? this.options.handoffStartedAt)),
+      updatesApplied,
+    );
+
+    if (this.previewHydrationSource === 'fallback') {
+      this.options.dispatchRuntimeEvent('fallback-timeout');
+      return;
+    }
+
+    this.options.dispatchRuntimeEvent('remote-snapshot-applied');
+    if (this.options.getConnectionStatus() !== 'connected') {
+      this.previewRemoteReadyPending = true;
+    }
+  }
+
+  private applyFallback(reason: 'timeout' | 'connected-grace', waitMs: number): void {
+    if (this.previewUnlockedAt != null) {
+      return;
+    }
+
+    const tablesMap = getTablesMap(this.options.ydoc);
+    if (tablesMap.size > 0) {
+      this.finishPreviewUnlock('remote', tablesMap.size);
+      return;
+    }
+
+    console.warn(
+      '%s snapshot-fallback reason=%s waitMs=%d totalMs=%d',
+      this.options.handoffLogPrefix,
+      reason,
+      waitMs,
+      Math.round(performance.now() - this.options.handoffStartedAt),
+    );
+    this.previewHydrationSource = 'fallback';
+    this.options.documentAdapter.applyBootstrapToDoc(this.options.ydoc, this.options.bootstrap, 'remote');
+  }
 
   /**
    * preview가 필요한 다이어그램이면 preview를 표시하고 remote unlock/fallback 감시를 시작한다.
@@ -63,47 +134,18 @@ export class DiagramPreviewHydrationController {
       if (tablesMap.size === 0) {
         return;
       }
-
-      this.previewHydrationSource ??= 'remote';
-      tablesMap.unobserveDeep(this.previewExitObserver!);
-      this.previewExitObserver = null;
-      updatePreviewMode(false);
-      this.previewUnlockedAt = performance.now();
-      console.info(
-        '%s preview-unlocked source=%s totalMs=%d afterPreviewMs=%d updatesApplied=%d',
-        this.options.handoffLogPrefix,
-        this.previewHydrationSource,
-        Math.round(this.previewUnlockedAt - this.options.handoffStartedAt),
-        Math.round(this.previewUnlockedAt - (this.previewShownAt ?? this.options.handoffStartedAt)),
-        tablesMap.size,
-      );
-
-      if (this.previewHydrationSource === 'fallback') {
-        dispatchRuntimeEvent('fallback-timeout');
-        return;
-      }
-
-      dispatchRuntimeEvent('remote-snapshot-applied');
-      if (this.options.getConnectionStatus() !== 'connected') {
-        this.previewRemoteReadyPending = true;
-      }
+      this.finishPreviewUnlock('remote', tablesMap.size);
     };
     tablesMap.observeDeep(this.previewExitObserver);
 
+    if (tablesMap.size > 0) {
+      this.finishPreviewUnlock('remote', tablesMap.size);
+      return;
+    }
+
     this.snapshotFallbackTimer = setTimeout(() => {
       this.snapshotFallbackTimer = null;
-      if (getTablesMap(this.options.ydoc).size > 0) {
-        return;
-      }
-
-      console.warn(
-        '%s snapshot-fallback timeoutMs=%d totalMs=%d',
-        this.options.handoffLogPrefix,
-        this.options.fallbackTimeoutMs,
-        Math.round(performance.now() - this.options.handoffStartedAt),
-      );
-      this.previewHydrationSource = 'fallback';
-      this.options.documentAdapter.applyBootstrapToDoc(this.options.ydoc, bootstrap, 'remote');
+      this.applyFallback('timeout', this.options.fallbackTimeoutMs);
     }, this.options.fallbackTimeoutMs);
   }
 
@@ -111,7 +153,27 @@ export class DiagramPreviewHydrationController {
    * WS 연결 직후, preview가 remote snapshot unlock을 기다리던 상태면 live-ready 로그를 마무리한다.
    */
   onConnected(wsConnectedAt: number): void {
+    const tablesMap = getTablesMap(this.options.ydoc);
+    if (tablesMap.size > 0) {
+      this.finishPreviewUnlock('remote', tablesMap.size);
+    }
+
     if (!this.previewRemoteReadyPending) {
+      if (this.previewUnlockedAt != null || this.connectedGraceFallbackTimer) {
+        return;
+      }
+
+      const elapsedMs = performance.now() - this.options.handoffStartedAt;
+      const remainingMs = Math.max(0, this.options.fallbackTimeoutMs - elapsedMs);
+      const graceMs = Math.min(REMOTE_SNAPSHOT_CONNECTED_GRACE_MS, remainingMs);
+      if (graceMs === 0) {
+        return;
+      }
+
+      this.connectedGraceFallbackTimer = setTimeout(() => {
+        this.connectedGraceFallbackTimer = null;
+        this.applyFallback('connected-grace', graceMs);
+      }, graceMs);
       return;
     }
 
@@ -131,9 +193,7 @@ export class DiagramPreviewHydrationController {
     if (this.previewExitObserver) {
       getTablesMap(this.options.ydoc).unobserveDeep(this.previewExitObserver);
     }
-    if (this.snapshotFallbackTimer) {
-      clearTimeout(this.snapshotFallbackTimer);
-    }
+    this.clearFallbackTimers();
     this.options.updatePreviewMode(false);
   }
 }
