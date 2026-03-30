@@ -6,6 +6,7 @@ import type { ColumnWarning } from '@/hooks/useColumnValidation';
 import { cn } from '@/lib/utils';
 import { buildColumnHandleId } from '@/lib/handle-id';
 import type { ColumnHandlePlacement } from './columnHandleLayout';
+import type { CompactTableRenderingMode } from './CompactTableRenderingContext';
 
 /** StaticColumnRow 컴포넌트 props */
 interface StaticColumnRowProps {
@@ -13,8 +14,10 @@ interface StaticColumnRowProps {
   col: Column;
   /** 노드 ID */
   nodeId: string;
-  /** 핸들 렌더 여부 */
-  showHandles: boolean;
+  /** target 핸들 렌더 여부 */
+  showTargetHandles: boolean;
+  /** source 핸들 렌더 여부 */
+  showSourceHandles: boolean;
   /** target 핸들 배치 */
   targetHandlePlacements: ColumnHandlePlacement[];
   /** source 핸들 배치 */
@@ -35,8 +38,8 @@ interface StaticColumnRowProps {
   domainLogicalName?: string;
   /** 도메인 물리 타입 */
   domainPhysicalType?: string;
-  /** 대형 다이어그램 overview용 compact 렌더 여부 */
-  compact?: boolean;
+  /** 대형 다이어그램 overview용 compact 렌더 모드 */
+  compactMode?: CompactTableRenderingMode;
 }
 
 /**
@@ -57,7 +60,8 @@ interface StaticColumnRowProps {
 function StaticColumnRow({
   col,
   nodeId,
-  showHandles,
+  showTargetHandles,
+  showSourceHandles,
   targetHandlePlacements,
   sourceHandlePlacements,
   warning,
@@ -68,9 +72,43 @@ function StaticColumnRow({
   duplicateLogicalNameText,
   domainLogicalName,
   domainPhysicalType,
-  compact = false,
+  compactMode = 'off',
 }: StaticColumnRowProps) {
-  if (compact) {
+  if (compactMode === 'aggressive') {
+    return (
+      <div className="relative px-3 py-1 text-xs group/col">
+        <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
+          {showTargetHandles &&
+            targetHandlePlacements.map((placement) => (
+              <Handle
+                key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+                type="target"
+                position={placement.position}
+                id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+                className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+                style={placement.style}
+              />
+            ))}
+
+          <span className="min-w-0 flex-1 truncate text-xs">{col.logicalName || col.name}</span>
+
+          {showSourceHandles &&
+            sourceHandlePlacements.map((placement) => (
+              <Handle
+                key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+                type="source"
+                position={placement.position}
+                id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+                className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+                style={placement.style}
+              />
+            ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (compactMode === 'compact') {
     return (
       <div
         className={cn(
@@ -79,7 +117,7 @@ function StaticColumnRow({
         )}
       >
         <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
-          {showHandles &&
+          {showTargetHandles &&
             targetHandlePlacements.map((placement) => (
               <Handle
                 key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
@@ -112,7 +150,7 @@ function StaticColumnRow({
             {col.name}
           </span>
 
-          {showHandles &&
+          {showSourceHandles &&
             sourceHandlePlacements.map((placement) => (
               <Handle
                 key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
@@ -136,7 +174,7 @@ function StaticColumnRow({
       )}
     >
       <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
-        {showHandles &&
+        {showTargetHandles &&
           targetHandlePlacements.map((placement) => (
             <Handle
               key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
@@ -239,7 +277,7 @@ function StaticColumnRow({
           NN
         </span>
 
-        {showHandles &&
+        {showSourceHandles &&
           sourceHandlePlacements.map((placement) => (
             <Handle
               key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}

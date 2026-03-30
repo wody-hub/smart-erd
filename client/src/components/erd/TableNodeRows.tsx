@@ -13,6 +13,8 @@ import type { ColumnRenderMeta, WarningValidationStatus } from '@/hooks/useColum
 import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
 import type { TermSelectResult } from './ColumnAutocomplete';
 import type { ColumnHandlePlacement } from './columnHandleLayout';
+import type { CompactTableRenderingMode } from './CompactTableRenderingContext';
+import type { ColumnConnectionDirections } from './ConnectedColumnIdsContext';
 import StaticColumnRow from './StaticColumnRow';
 import EditableColumnRow from './EditableColumnRow';
 
@@ -143,13 +145,14 @@ interface TableNodeStaticRowsProps {
   nodeId: string;
   visibleColumns: Column[];
   hiddenUnconnectedColumnCount: number;
-  compactRows: boolean;
+  compactMode: CompactTableRenderingMode;
   fkMode: boolean;
   targetHandlePlacements: ColumnHandlePlacement[];
   sourceHandlePlacements: ColumnHandlePlacement[];
   renderMetaById: Map<string, ColumnRenderMeta>;
   validationWarningTextByStatus: Record<WarningValidationStatus, string>;
-  isConnected: (colId: string) => boolean;
+  getConnectedDirections: (colId: string) => ColumnConnectionDirections;
+  onExpandHiddenColumns?: () => void;
   t: TFunction;
 }
 
@@ -157,13 +160,14 @@ export function TableNodeStaticRows({
   nodeId,
   visibleColumns,
   hiddenUnconnectedColumnCount,
-  compactRows,
+  compactMode,
   fkMode,
   targetHandlePlacements,
   sourceHandlePlacements,
   renderMetaById,
   validationWarningTextByStatus,
-  isConnected,
+  getConnectedDirections,
+  onExpandHiddenColumns,
   t,
 }: TableNodeStaticRowsProps) {
   return (
@@ -179,7 +183,8 @@ export function TableNodeStaticRows({
             key={column.id}
             col={column}
             nodeId={nodeId}
-            showHandles={fkMode || isConnected(column.id)}
+            showTargetHandles={fkMode || getConnectedDirections(column.id).target}
+            showSourceHandles={fkMode || getConnectedDirections(column.id).source}
             targetHandlePlacements={targetHandlePlacements}
             sourceHandlePlacements={sourceHandlePlacements}
             warning={renderMeta.warning}
@@ -210,14 +215,27 @@ export function TableNodeStaticRows({
             }
             domainLogicalName={renderMeta.domain?.logicalName}
             domainPhysicalType={renderMeta.domain?.physicalType}
-            compact={compactRows}
+            compactMode={compactMode}
           />
         );
       })}
       {hiddenUnconnectedColumnCount > 0 && (
-        <div className="px-3 py-1 text-2xs text-muted-foreground">
-          {t('erd.tableNode.hiddenColumnSummary', { count: hiddenUnconnectedColumnCount })}
-        </div>
+        onExpandHiddenColumns ? (
+          <button
+            type="button"
+            className="w-full px-3 py-1 text-left text-2xs text-muted-foreground hover:bg-accent hover:text-foreground"
+            onClick={onExpandHiddenColumns}
+            aria-label={t('erd.tableNode.aria.expandHiddenColumns', {
+              count: hiddenUnconnectedColumnCount,
+            })}
+          >
+            {t('erd.tableNode.hiddenColumnSummary', { count: hiddenUnconnectedColumnCount })}
+          </button>
+        ) : (
+          <div className="px-3 py-1 text-2xs text-muted-foreground">
+            {t('erd.tableNode.hiddenColumnSummary', { count: hiddenUnconnectedColumnCount })}
+          </div>
+        )
       )}
     </div>
   );

@@ -63,8 +63,8 @@ import RemoteCursors from './RemoteCursors';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ConnectedColumnIdsProvider } from './ConnectedColumnIdsContext';
 import {
-  COMPACT_TABLE_RENDERING_NODE_LIMIT,
   CompactTableRenderingProvider,
+  resolveCompactTableRenderingMode,
 } from './CompactTableRenderingContext';
 import { ErdFkModeProvider } from './ErdFkModeContext';
 import {
@@ -840,10 +840,19 @@ function ERDCanvas({
     ],
   );
 
-  const compactTableRendering = displayNodes.length > COMPACT_TABLE_RENDERING_NODE_LIMIT;
+  const lastViewportZoomRef = useRef(0.4);
+  const [compactTableRenderingMode, setCompactTableRenderingMode] = useState(() =>
+    resolveCompactTableRenderingMode(displayNodes.length, lastViewportZoomRef.current),
+  );
   const showOverlayWidgets = !isDraggingNode;
   const showPerformanceOverlays = showOverlayWidgets && !isSidebarResizing;
   const showMiniMap = showPerformanceOverlays && displayNodes.length <= MINIMAP_NODE_LIMIT;
+
+  useEffect(() => {
+    setCompactTableRenderingMode(
+      resolveCompactTableRenderingMode(displayNodes.length, lastViewportZoomRef.current),
+    );
+  }, [displayNodes.length]);
 
   return (
     <div
@@ -860,7 +869,7 @@ function ERDCanvas({
         <ErdFkModeProvider value={fkMode}>
           <RemoteEditLocksProvider value={tableLockContextValue}>
             <EdgeEditingProvider value={edgeEditingContextValue}>
-            <CompactTableRenderingProvider compact={compactTableRendering}>
+            <CompactTableRenderingProvider mode={compactTableRenderingMode}>
             <ConnectedColumnIdsProvider edges={displayEdges}>
               <ReactFlow
                 nodes={displayNodes}
@@ -907,9 +916,17 @@ function ERDCanvas({
                 onEdgeContextMenu={effectiveCanEdit ? handleEdgeContextMenu : undefined}
                 onPaneClick={handlePaneClick}
                 onInit={(instance) => {
+                  lastViewportZoomRef.current = instance.getZoom();
+                  setCompactTableRenderingMode(
+                    resolveCompactTableRenderingMode(displayNodes.length, lastViewportZoomRef.current),
+                  );
                   applyZoomTextCompensation(instance.getZoom());
                 }}
                 onMoveEnd={(_event, viewport) => {
+                  lastViewportZoomRef.current = viewport.zoom;
+                  setCompactTableRenderingMode(
+                    resolveCompactTableRenderingMode(displayNodes.length, viewport.zoom),
+                  );
                   const autoFitMovePending = autoFitViewportMovePendingRef.current;
                   autoFitViewportMovePendingRef.current = false;
                   if (!autoFitMovePending) {

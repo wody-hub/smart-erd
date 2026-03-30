@@ -500,7 +500,8 @@
         "changeColor": "Change table color",
         "changeHandleLayout": "Change table handle layout",
         "navigateToCode": "Go to the code for this table",
-        "reorderColumn": "Reorder column {{name}}"
+        "reorderColumn": "Reorder column {{name}}",
+        "expandHiddenColumns": "Expand {{count}} hidden unconnected columns"
       }
     },
     "colorPicker": {

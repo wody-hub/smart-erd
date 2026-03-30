@@ -11,8 +11,15 @@ import StaticColumnRow from './StaticColumnRow';
 import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
 import type { TableNode as PersistedTableNode } from '@/types/erd';
 import { getColumnHandlePlacements } from './columnHandleLayout';
-import { useConnectedColumnIds } from './ConnectedColumnIdsContext';
-import { useCompactTableRendering } from './CompactTableRenderingContext';
+import {
+  useConnectedColumnDirections,
+  useConnectedColumnIds,
+} from './ConnectedColumnIdsContext';
+import {
+  type CompactTableRenderingMode,
+  resolvePreviewCompactTableMode,
+  useCompactTableRenderingMode,
+} from './CompactTableRenderingContext';
 import { useTableColumnRenderModel } from './useTableColumnRenderModel';
 
 /**
@@ -91,16 +98,23 @@ function PreviewTableNodeFrame({
 function PreviewTableRows({
   node,
   connectedColumnIds,
-  compactRowsOverride,
+  compactModeOverride,
+  ghost = false,
 }: {
   node: DslPreviewNode;
   connectedColumnIds: Set<string>;
-  compactRowsOverride?: boolean;
+  compactModeOverride?: CompactTableRenderingMode;
+  ghost?: boolean;
 }) {
   const { t } = useTranslation();
   const { findDomainById, findTermById, resolveLogicalName } = useErdDictionary();
-  const compactTableRendering = useCompactTableRendering();
-  const compactRows = compactRowsOverride ?? compactTableRendering;
+  const connectedColumnDirections = useConnectedColumnDirections(node.id);
+  const compactTableRenderingMode = useCompactTableRenderingMode();
+  const compactMode = resolvePreviewCompactTableMode(compactTableRenderingMode, {
+    override: compactModeOverride,
+    ghost,
+  });
+  const compactRows = compactMode !== 'off';
   const resolvedHandleLayout = node.data.handleLayout ?? 'split';
   const targetHandlePlacements = useMemo(
     () => getColumnHandlePlacements(resolvedHandleLayout, 'target'),
@@ -138,7 +152,8 @@ function PreviewTableRows({
             key={column.id}
             col={column}
             nodeId={node.id}
-            showHandles={connectedColumnIds.has(column.id)}
+            showSourceHandles={connectedColumnDirections.get(column.id)?.source ?? false}
+            showTargetHandles={connectedColumnDirections.get(column.id)?.target ?? false}
             targetHandlePlacements={targetHandlePlacements}
             sourceHandlePlacements={sourceHandlePlacements}
             warning={renderMeta.warning}
@@ -173,7 +188,7 @@ function PreviewTableRows({
             }
             domainLogicalName={renderMeta.domain?.logicalName}
             domainPhysicalType={renderMeta.domain?.physicalType}
-            compact={compactRows}
+            compactMode={compactMode}
           />
         );
       })}
@@ -228,7 +243,8 @@ function PreviewGhostTableNode(props: NodeProps<DslPreviewNode>) {
       <PreviewTableRows
         node={node}
         connectedColumnIds={connectedColumnIds}
-        compactRowsOverride={false}
+        compactModeOverride="off"
+        ghost
       />
     </PreviewTableNodeFrame>
   );

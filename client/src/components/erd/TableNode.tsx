@@ -14,11 +14,17 @@ import QuickTermDialog from './QuickTermDialog';
 import TableNodeHeader from './TableNodeHeader';
 import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
 import { getColumnHandlePlacements } from './columnHandleLayout';
-import { useConnectedColumnIds } from './ConnectedColumnIdsContext';
-import { useCompactTableRendering } from './CompactTableRenderingContext';
+import {
+  useConnectedColumnDirections,
+  useConnectedColumnIds,
+} from './ConnectedColumnIdsContext';
+import {
+  useCompactTableRenderingMode,
+} from './CompactTableRenderingContext';
 import { useTableColumnRenderModel } from './useTableColumnRenderModel';
 import { useTableNodeInteractions } from './useTableNodeInteractions';
 import { TableNodeEditableRows, TableNodeStaticRows } from './TableNodeRows';
+import { useCompactTableRowExpansion } from './useCompactTableRowExpansion';
 
 const TABLE_NODE_INTERNALS_BATCH_SIZE = 6;
 
@@ -102,12 +108,23 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
 
   /** 관계선이 연결된 컬럼 ID 셋 */
   const connectedColumnIds = useConnectedColumnIds(id);
-  const compactTableRendering = useCompactTableRendering();
+  const connectedColumnDirections = useConnectedColumnDirections(id);
+  const compactTableRenderingMode = useCompactTableRenderingMode();
 
   /** 해당 컬럼이 엣지에 연결되어 있는지 확인한다. */
   const isConnected = (colId: string) => connectedColumnIds.has(colId);
-
-  const compactRows = compactTableRendering && !selected && !isEditing && !fkMode;
+  const getConnectedDirections = (colId: string) =>
+    connectedColumnDirections.get(colId) ?? { source: false, target: false };
+  const {
+    compactMode: staticRowCompactMode,
+    canExpandHiddenColumns,
+    expandHiddenColumns,
+  } = useCompactTableRowExpansion(compactTableRenderingMode, {
+    selected,
+    isEditing,
+    fkMode,
+  });
+  const effectiveCompactRows = staticRowCompactMode !== 'off';
   const {
     renderMetaById: columnRenderMetaById,
     duplicateLogicalNameColumnCount,
@@ -117,7 +134,7 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
   } = useTableColumnRenderModel({
     columns,
     connectedColumnIds,
-    compactRows,
+    compactRows: effectiveCompactRows,
     t,
     resolveLogicalName,
     findTermById,
@@ -235,7 +252,7 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
             nodeId={id}
             visibleColumns={visibleStaticColumns}
             hiddenUnconnectedColumnCount={hiddenUnconnectedColumnCount}
-            compactRows={compactRows}
+            compactMode={staticRowCompactMode}
             fkMode={fkMode}
             targetHandlePlacements={targetHandlePlacements}
             sourceHandlePlacements={sourceHandlePlacements}
@@ -244,7 +261,12 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
               WarningValidationStatus,
               string
             >}
-            isConnected={isConnected}
+            getConnectedDirections={getConnectedDirections}
+            onExpandHiddenColumns={
+              canExpandHiddenColumns && hiddenUnconnectedColumnCount > 0
+                ? expandHiddenColumns
+                : undefined
+            }
             t={t}
           />
         )}
