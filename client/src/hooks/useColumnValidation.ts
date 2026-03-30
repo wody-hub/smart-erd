@@ -74,27 +74,27 @@ export interface ColumnWarning {
 }
 
 /**
- * 개별 컬럼의 사전 유효성 경고를 계산하는 순수 함수.
+ * 미리 계산된 논리명 해석 결과를 기반으로 컬럼 경고를 계산한다.
  *
- * TableNode(인라인 경고)와 useColumnValidation(패널 집계) 양쪽에서 공통으로 사용한다.
+ * TableNode처럼 같은 렌더 경로에서 logical name resolution을 재사용해야 하는 경우에 쓴다.
  *
  * @param col        컬럼 데이터
+ * @param resolved   미리 계산한 논리명 해석 결과
  * @param findTerm   Term 조회 함수
  * @param findDomain Domain 조회 함수
  * @returns 경고 결과 (status가 null이면 문제 없음)
  */
-export function getColumnWarning(
+export function getColumnWarningFromResolution(
   col: { logicalName?: string; name: string; type: string; termId?: number },
+  resolved: LogicalNameResolution | null | undefined,
   findTerm: (id: number) => { physicalName: string; domainId: number | null } | undefined,
   findDomain: (id: number) => { physicalType: string } | undefined,
-  resolveLogicalName?: (logicalName: string) => LogicalNameResolution,
 ): ColumnWarning {
   const logicalName = col.logicalName?.trim();
   if (!logicalName) {
     return { status: null };
   }
 
-  const resolved = resolveLogicalName?.(logicalName);
   if (resolved) {
     if (resolved.isRegisteredTerm) {
       if (col.name !== resolved.physicalName) {
@@ -141,6 +141,27 @@ export function getColumnWarning(
   }
 
   return { status: null };
+}
+
+/**
+ * 개별 컬럼의 사전 유효성 경고를 계산하는 순수 함수.
+ *
+ * TableNode(인라인 경고)와 useColumnValidation(패널 집계) 양쪽에서 공통으로 사용한다.
+ *
+ * @param col        컬럼 데이터
+ * @param findTerm   Term 조회 함수
+ * @param findDomain Domain 조회 함수
+ * @returns 경고 결과 (status가 null이면 문제 없음)
+ */
+export function getColumnWarning(
+  col: { logicalName?: string; name: string; type: string; termId?: number },
+  findTerm: (id: number) => { physicalName: string; domainId: number | null } | undefined,
+  findDomain: (id: number) => { physicalType: string } | undefined,
+  resolveLogicalName?: (logicalName: string) => LogicalNameResolution,
+): ColumnWarning {
+  const logicalName = col.logicalName?.trim();
+  const resolved = logicalName && resolveLogicalName ? resolveLogicalName(logicalName) : undefined;
+  return getColumnWarningFromResolution(col, resolved, findTerm, findDomain);
 }
 
 /**

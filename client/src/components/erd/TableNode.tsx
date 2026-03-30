@@ -28,7 +28,7 @@ import { useErdDictionary } from './ErdDictionaryContext';
 import { useErdPermission } from './ErdPermissionContext';
 import { useErdFkMode } from './ErdFkModeContext';
 import { useRemoteEditLocksContext } from './RemoteEditLocksContext';
-import { getColumnWarning } from '@/hooks/useColumnValidation';
+import { getColumnWarningFromResolution } from '@/hooks/useColumnValidation';
 import { cn } from '@/lib/utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { revertDomainTypeIfNeeded } from './erdDictionaryData';
@@ -38,6 +38,7 @@ import StaticColumnRow from './StaticColumnRow';
 import TableNodeHeader from './TableNodeHeader';
 import EditableColumnRow from './EditableColumnRow';
 import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
+import type { Domain } from '@/types/dictionary';
 
 const TABLE_NODE_INTERNALS_BATCH_SIZE = 6;
 
@@ -103,6 +104,13 @@ interface SortableColumnRowProps {
   isConnected: (colId: string) => boolean;
   /** 자식 렌더링 함수 */
   children: React.ReactNode;
+}
+
+interface ColumnRenderMeta {
+  normalizedLogicalName: string;
+  hasDuplicateLogicalName: boolean;
+  warning: ReturnType<typeof getColumnWarningFromResolution>;
+  domain: Domain | undefined;
 }
 
 /**
@@ -216,29 +224,50 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
   /** 테이블 빠른 용어 등록 대상 논리명 */
   const [tableQuickTermLogicalName, setTableQuickTermLogicalName] = useState<string | null>(null);
 
-  /** 테이블 내부 중복 컬럼 논리명 집합 */
-  const duplicatedLogicalNames = useMemo(() => {
+  const columnRenderMetaById = useMemo(() => {
     const counts = new Map<string, number>();
     for (const col of columns) {
       const key = col.logicalName?.trim();
       if (!key) continue;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
-    return new Set(
+
+    const duplicatedLogicalNames = new Set(
       Array.from(counts.entries())
         .filter(([, count]) => count > 1)
         .map(([name]) => name),
     );
-  }, [columns]);
+
+    const renderMetaById = new Map<string, ColumnRenderMeta>();
+    for (const col of columns) {
+      const normalizedLogicalName = col.logicalName?.trim() ?? '';
+      const resolved =
+        normalizedLogicalName.length > 0 ? resolveLogicalName(normalizedLogicalName) : null;
+      const domain =
+        col.domainId != null
+          ? findDomainById(col.domainId)
+          : resolved?.domainId
+            ? findDomainById(resolved.domainId)
+            : undefined;
+
+      renderMetaById.set(col.id, {
+        normalizedLogicalName,
+        hasDuplicateLogicalName:
+          normalizedLogicalName.length > 0 && duplicatedLogicalNames.has(normalizedLogicalName),
+        warning: getColumnWarningFromResolution(col, resolved, findTermById, findDomainById),
+        domain,
+      });
+    }
+
+    return renderMetaById;
+  }, [columns, findDomainById, findTermById, resolveLogicalName]);
 
   /** 중복 논리명을 가진 컬럼 개수 */
   const duplicateLogicalNameColumnCount = useMemo(
     () =>
-      columns.filter((col) => {
-        const key = col.logicalName?.trim();
-        return !!key && duplicatedLogicalNames.has(key);
-      }).length,
-    [columns, duplicatedLogicalNames],
+      Array.from(columnRenderMetaById.values()).filter((meta) => meta.hasDuplicateLogicalName)
+        .length,
+    [columnRenderMetaById],
   );
   const crudActions = useDiagramErdCrudActions();
   const edgeActions = useDiagramErdEdgeActions();
@@ -543,17 +572,10 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
             >
               <div className="divide-y divide-border">
                 {columns.map((col) => {
-                  const warning = getColumnWarning(
-                    col,
-                    findTermById,
-                    findDomainById,
-                    resolveLogicalName,
-                  );
-                  const domain = col.domainId != null ? findDomainById(col.domainId) : undefined;
-                  const normalizedLogicalName = col.logicalName?.trim() ?? '';
-                  const hasDuplicateLogicalName =
-                    normalizedLogicalName.length > 0 &&
-                    duplicatedLogicalNames.has(normalizedLogicalName);
+                  const renderMeta = columnRenderMetaById.get(col.id);
+                  if (!renderMeta) {
+                    return null;
+                  }
 
                   return (
                     <SortableColumnRow
@@ -571,10 +593,10 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                         fkMode={fkMode}
                         connected={isConnected(col.id)}
                         handleLayout={handleLayout ?? 'split'}
-                        warning={warning}
-                        hasDuplicateLogicalName={hasDuplicateLogicalName}
-                        normalizedLogicalName={normalizedLogicalName}
-                        domain={domain}
+                        warning={renderMeta.warning}
+                        hasDuplicateLogicalName={renderMeta.hasDuplicateLogicalName}
+                        normalizedLogicalName={renderMeta.normalizedLogicalName}
+                        domain={renderMeta.domain}
                         domainPopoverOpen={domainPopoverColId === col.id}
                         onDomainPopoverOpenChange={(o) => setDomainPopoverColId(o ? col.id : null)}
                         onUpdateColumn={applyColumnUpdates}
@@ -600,7 +622,10 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
         ) : (
           <div className="divide-y divide-border">
             {columns.map((col) => {
-              const domain = col.domainId != null ? findDomainById(col.domainId) : undefined;
+              const renderMeta = columnRenderMetaById.get(col.id);
+              if (!renderMeta) {
+                return null;
+              }
               return (
                 <StaticColumnRow
                   key={col.id}
@@ -608,12 +633,10 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
                   nodeId={id}
                   connected={isConnected(col.id)}
                   handleLayout={handleLayout ?? 'split'}
-                  warning={getColumnWarning(col, findTermById, findDomainById, resolveLogicalName)}
-                  hasDuplicateLogicalName={
-                    !!col.logicalName?.trim() && duplicatedLogicalNames.has(col.logicalName.trim())
-                  }
-                  domainLogicalName={domain?.logicalName}
-                  domainPhysicalType={domain?.physicalType}
+                  warning={renderMeta.warning}
+                  hasDuplicateLogicalName={renderMeta.hasDuplicateLogicalName}
+                  domainLogicalName={renderMeta.domain?.logicalName}
+                  domainPhysicalType={renderMeta.domain?.physicalType}
                 />
               );
             })}
@@ -634,23 +657,26 @@ function TableNode({ id, data }: NodeProps<TableNodeType>) {
         )}
       </div>
 
-      {/* Quick Term Dialog */}
-      <QuickTermDialog
-        open={!!quickTermTarget}
-        onOpenChange={(open) => {
-          if (!open) setQuickTermTarget(null);
-        }}
-        initialLogicalName={quickTermTarget?.logicalName ?? ''}
-        onApply={handleQuickTermApply}
-      />
-      <QuickTermDialog
-        open={!!tableQuickTermLogicalName}
-        onOpenChange={(open) => {
-          if (!open) setTableQuickTermLogicalName(null);
-        }}
-        initialLogicalName={tableQuickTermLogicalName ?? ''}
-        onApply={handleTableQuickTermApply}
-      />
+      {quickTermTarget && (
+        <QuickTermDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setQuickTermTarget(null);
+          }}
+          initialLogicalName={quickTermTarget.logicalName}
+          onApply={handleQuickTermApply}
+        />
+      )}
+      {tableQuickTermLogicalName && (
+        <QuickTermDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setTableQuickTermLogicalName(null);
+          }}
+          initialLogicalName={tableQuickTermLogicalName}
+          onApply={handleTableQuickTermApply}
+        />
+      )}
     </TooltipProvider>
   );
 }
