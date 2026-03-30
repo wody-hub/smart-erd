@@ -235,6 +235,7 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
             nodeId={id}
             visibleColumns={visibleStaticColumns}
             hiddenUnconnectedColumnCount={hiddenUnconnectedColumnCount}
+            compactRows={compactRows}
             fkMode={fkMode}
             targetHandlePlacements={targetHandlePlacements}
             sourceHandlePlacements={sourceHandlePlacements}

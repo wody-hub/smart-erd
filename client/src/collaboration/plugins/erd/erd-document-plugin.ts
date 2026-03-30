@@ -397,7 +397,7 @@ class ErdProjector implements Projector {
     _read: PluginContext['read'],
     event: DocumentChangeEvent,
   ): ProjectionRefreshRequest {
-    if (event.engineOrigin.source === 'system' || event.affectedScopes.length === 0) {
+    if (event.affectedScopes.length === 0) {
       return { forceFull: true };
     }
     return { scopeHints: event.affectedScopes };

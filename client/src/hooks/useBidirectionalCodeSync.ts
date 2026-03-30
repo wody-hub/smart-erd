@@ -17,6 +17,8 @@ type SyncOrigin = 'user-code' | 'code-auto-sync' | 'erd-auto-sync' | null;
 interface UseBidirectionalCodeSyncOptions {
   /** 코드 -> ERD 자동 동기화 활성 여부 */
   enableCodeToErdSync: boolean;
+  /** 코드 -> ERD 자동 동기화를 정책상 차단해야 하는지 여부 */
+  blockCodeToErdAutoSync?: boolean;
   /** ERD -> 코드 자동 동기화 활성 여부 */
   enableErdToCodeSync: boolean;
   /** 선행 조건 충족 여부 (사전 로딩 등) */
@@ -78,6 +80,7 @@ interface UseBidirectionalCodeSyncReturn {
  */
 export function useBidirectionalCodeSync({
   enableCodeToErdSync,
+  blockCodeToErdAutoSync = false,
   enableErdToCodeSync,
   ready = true,
   codeText,
@@ -276,7 +279,7 @@ export function useBidirectionalCodeSync({
       setStatus(null);
       return;
     }
-    if (!enableCodeToErdSync) {
+    if (!enableCodeToErdSync || blockCodeToErdAutoSync) {
       return;
     }
     if (autoApplyBlockedRef.current) {
@@ -366,6 +369,7 @@ export function useBidirectionalCodeSync({
     codeText,
     currentRevisionHash,
     enableCodeToErdSync,
+    blockCodeToErdAutoSync,
     hasBlockingErrors,
     hasParsedTables,
     hasRemoteEditLocks,

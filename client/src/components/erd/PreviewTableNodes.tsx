@@ -91,13 +91,16 @@ function PreviewTableNodeFrame({
 function PreviewTableRows({
   node,
   connectedColumnIds,
+  compactRowsOverride,
 }: {
   node: DslPreviewNode;
   connectedColumnIds: Set<string>;
+  compactRowsOverride?: boolean;
 }) {
   const { t } = useTranslation();
   const { findDomainById, findTermById, resolveLogicalName } = useErdDictionary();
   const compactTableRendering = useCompactTableRendering();
+  const compactRows = compactRowsOverride ?? compactTableRendering;
   const resolvedHandleLayout = node.data.handleLayout ?? 'split';
   const targetHandlePlacements = useMemo(
     () => getColumnHandlePlacements(resolvedHandleLayout, 'target'),
@@ -115,7 +118,7 @@ function PreviewTableRows({
   } = useTableColumnRenderModel({
     columns: node.data.columns,
     connectedColumnIds,
-    compactRows: compactTableRendering,
+    compactRows,
     t,
     resolveLogicalName,
     findTermById,
@@ -170,6 +173,7 @@ function PreviewTableRows({
             }
             domainLogicalName={renderMeta.domain?.logicalName}
             domainPhysicalType={renderMeta.domain?.physicalType}
+            compact={compactRows}
           />
         );
       })}
@@ -221,7 +225,11 @@ function PreviewGhostTableNode(props: NodeProps<DslPreviewNode>) {
   };
   return (
     <PreviewTableNodeFrame node={node} ghost>
-      <PreviewTableRows node={node} connectedColumnIds={connectedColumnIds} />
+      <PreviewTableRows
+        node={node}
+        connectedColumnIds={connectedColumnIds}
+        compactRowsOverride={false}
+      />
     </PreviewTableNodeFrame>
   );
 }

@@ -910,6 +910,7 @@ export default function DslCodeEditorPanel({
     draftState,
   } = useBidirectionalCodeSync({
     enableCodeToErdSync: canEdit && enableCodeToErdAutoSync,
+    blockCodeToErdAutoSync: codeModeDraftPersistStatus === 'stale',
     enableErdToCodeSync: canEdit && enableErdToCodeAutoSync,
     ready: hasDictionary,
     codeText: dslText,
@@ -925,6 +926,8 @@ export default function DslCodeEditorPanel({
     applyParsedToErd,
   });
 
+  const isPersistedDraftStale = codeModeDraftPersistStatus === 'stale';
+
   useEffect(() => {
     canEditRef.current = canEdit;
     handleUserCodeChangeRef.current = handleUserCodeChange;
@@ -934,25 +937,25 @@ export default function DslCodeEditorPanel({
   }, [canEdit, handleUserCodeChange, markFinalizationDirty, markLocalEditStarted, shouldIgnoreChange]);
 
   const handleApplyWithSyncReset = useCallback(() => {
-    if (isCodeEditorApplyBlocked(draftState)) {
+    if (isCodeEditorApplyBlocked(draftState, isPersistedDraftStale)) {
       return;
     }
     clearQueueTimeoutHold();
     handleApply();
-  }, [clearQueueTimeoutHold, draftState, handleApply]);
+  }, [clearQueueTimeoutHold, draftState, handleApply, isPersistedDraftStale]);
 
   const executeApplyWithSyncReset = useCallback(() => {
-    if (isCodeEditorApplyBlocked(draftState)) {
+    if (isCodeEditorApplyBlocked(draftState, isPersistedDraftStale)) {
       return;
     }
     clearQueueTimeoutHold();
     executeApply();
-  }, [clearQueueTimeoutHold, draftState, executeApply]);
+  }, [clearQueueTimeoutHold, draftState, executeApply, isPersistedDraftStale]);
 
   const refreshConfirmReason = getCodeEditorRefreshConfirmReason({
     draftState,
     hasPendingFinalizeChanges: hasPendingDraftChanges,
-    isPersistedDraftStale: codeModeDraftPersistStatus === 'stale',
+    isPersistedDraftStale,
   });
   const { executeRefresh, handleRefresh, hasNodes, refreshConfirmOpen, setRefreshConfirmOpen } =
     useCodeEditorRefresh({
@@ -1059,10 +1062,7 @@ export default function DslCodeEditorPanel({
     if (!persistDraft || !onPersistPublishedDiagram || finalizing) {
       return;
     }
-    if (codeModeDraftPersistStatus === 'stale') {
-      return;
-    }
-    if (isCodeEditorFinalizeBlocked(draftState)) {
+    if (isCodeEditorFinalizeBlocked(draftState, isPersistedDraftStale)) {
       return;
     }
 
@@ -1100,7 +1100,6 @@ export default function DslCodeEditorPanel({
     resetFinalizationState();
   }, [
     buildCurrentPersistedRevisionHash,
-    codeModeDraftPersistStatus,
     draftScope,
     finalizing,
     handleApplyWithSyncReset,
@@ -1109,7 +1108,8 @@ export default function DslCodeEditorPanel({
     parsedSchemaHash,
     persistDraft,
     reconcileSharedDraftAfterPersistedApply,
-    draftState.reconcileState,
+    draftState,
+    isPersistedDraftStale,
     requiresApplyBeforeFinalize,
     requiresPublishedSave,
     resetFinalizationState,
@@ -1119,10 +1119,7 @@ export default function DslCodeEditorPanel({
     if (!persistDraft || !onPersistPublishedDiagram || finalizing) {
       return false;
     }
-    if (codeModeDraftPersistStatus === 'stale') {
-      return false;
-    }
-    if (isCodeEditorFinalizeBlocked(draftState)) {
+    if (isCodeEditorFinalizeBlocked(draftState, isPersistedDraftStale)) {
       return false;
     }
     if (!requiresApplyBeforeFinalize && !requiresPublishedSave) {
@@ -1134,17 +1131,17 @@ export default function DslCodeEditorPanel({
     return true;
   }, [
     canApply,
-    codeModeDraftPersistStatus,
+    draftState,
     finalizing,
+    isPersistedDraftStale,
     onPersistPublishedDiagram,
     persistDraft,
-    draftState.reconcileState,
     requiresApplyBeforeFinalize,
     requiresPublishedSave,
   ]);
   const canApplyWithDraftState = useMemo(
-    () => canApply && codeModeDraftPersistStatus !== 'stale' && !isCodeEditorApplyBlocked(draftState),
-    [canApply, codeModeDraftPersistStatus, draftState],
+    () => canApply && !isCodeEditorApplyBlocked(draftState, isPersistedDraftStale),
+    [canApply, draftState, isPersistedDraftStale],
   );
 
   useEffect(() => {

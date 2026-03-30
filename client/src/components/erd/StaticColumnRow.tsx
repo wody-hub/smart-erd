@@ -35,6 +35,8 @@ interface StaticColumnRowProps {
   domainLogicalName?: string;
   /** 도메인 물리 타입 */
   domainPhysicalType?: string;
+  /** 대형 다이어그램 overview용 compact 렌더 여부 */
+  compact?: boolean;
 }
 
 /**
@@ -66,7 +68,66 @@ function StaticColumnRow({
   duplicateLogicalNameText,
   domainLogicalName,
   domainPhysicalType,
+  compact = false,
 }: StaticColumnRowProps) {
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          'relative px-3 py-1 text-xs group/col',
+          hasDuplicateLogicalName && 'bg-destructive/5',
+        )}
+      >
+        <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
+          {showHandles &&
+            targetHandlePlacements.map((placement) => (
+              <Handle
+                key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+                type="target"
+                position={placement.position}
+                id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+                className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+                style={placement.style}
+              />
+            ))}
+
+          <span
+            className={cn(
+              'w-5 shrink-0 text-center font-bold text-2xs',
+              col.pk ? 'text-erd-pk' : 'text-muted-foreground/40',
+            )}
+          >
+            PK
+          </span>
+          <span
+            className={cn(
+              'w-5 shrink-0 text-center font-bold text-2xs',
+              col.fk ? 'text-erd-fk' : 'text-muted-foreground/40',
+            )}
+          >
+            FK
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs">{col.logicalName || col.name}</span>
+          <span className="min-w-0 flex-1 truncate px-1 font-mono text-muted-foreground">
+            {col.name}
+          </span>
+
+          {showHandles &&
+            sourceHandlePlacements.map((placement) => (
+              <Handle
+                key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+                type="source"
+                position={placement.position}
+                id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+                className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+                style={placement.style}
+              />
+            ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(

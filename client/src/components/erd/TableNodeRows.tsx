@@ -143,6 +143,7 @@ interface TableNodeStaticRowsProps {
   nodeId: string;
   visibleColumns: Column[];
   hiddenUnconnectedColumnCount: number;
+  compactRows: boolean;
   fkMode: boolean;
   targetHandlePlacements: ColumnHandlePlacement[];
   sourceHandlePlacements: ColumnHandlePlacement[];
@@ -156,6 +157,7 @@ export function TableNodeStaticRows({
   nodeId,
   visibleColumns,
   hiddenUnconnectedColumnCount,
+  compactRows,
   fkMode,
   targetHandlePlacements,
   sourceHandlePlacements,
@@ -208,6 +210,7 @@ export function TableNodeStaticRows({
             }
             domainLogicalName={renderMeta.domain?.logicalName}
             domainPhysicalType={renderMeta.domain?.physicalType}
+            compact={compactRows}
           />
         );
       })}

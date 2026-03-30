@@ -3,7 +3,7 @@ import { createContext, useContext } from 'react';
 /** 대형 다이어그램 overview 모드에서 compact table 렌더링을 켜는 노드 수 기준 */
 export const COMPACT_TABLE_RENDERING_NODE_LIMIT = 80;
 /** overview 모드에서 관계가 없는 컬럼을 최소 몇 개까지만 노출할지의 기준 */
-export const MAX_OVERVIEW_UNCONNECTED_COLUMNS = 1;
+export const MAX_OVERVIEW_UNCONNECTED_COLUMNS = 0;
 
 const CompactTableRenderingContext = createContext(false);
 
