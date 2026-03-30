@@ -468,6 +468,7 @@
       "tableLogicalName": "Enter table logical name...",
       "duplicateLogicalNameWarning": "Duplicate column logical name: {{name}}",
       "duplicateLogicalNameCount": "{{count}} duplicate logical names",
+      "hiddenColumnSummary": "+ {{count}} hidden unconnected columns",
       "handleLayout": {
         "label": "Handle layout",
         "split": "Split",

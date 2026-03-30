@@ -1,62 +1,19 @@
 import { memo, useMemo, type ReactNode } from 'react';
-import { type NodeProps, type NodeTypes, useStore } from '@xyflow/react';
+import { type NodeProps, type NodeTypes } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { useErdDictionary } from './ErdDictionaryContext';
 import type { DslPreviewNode } from '@/lib/dsl-preview-graph';
 import {
-  getColumnWarningFromResolution,
-  getValidationStatusI18nKey,
   type WarningValidationStatus,
 } from '@/hooks/useColumnValidation';
 import TableNodeHeader from './TableNodeHeader';
 import StaticColumnRow from './StaticColumnRow';
 import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
 import type { TableNode as PersistedTableNode } from '@/types/erd';
-import type { Domain } from '@/types/dictionary';
-import { extractColId } from '@/lib/handle-id';
 import { getColumnHandlePlacements } from './columnHandleLayout';
-
-interface PreviewColumnRenderMeta {
-  hasDuplicateLogicalName: boolean;
-  warning: ReturnType<typeof getColumnWarningFromResolution>;
-  domain: Domain | undefined;
-}
-
-/**
- * preview 테이블 노드에서 관계선이 연결된 컬럼 ID를 수집한다.
- *
- * @param nodeId preview 노드 ID
- * @returns 연결된 컬럼 ID 집합
- */
-function useConnectedColumnIds(nodeId: string): Set<string> {
-  return useStore(
-    (state) => {
-      const colIds = new Set<string>();
-      const prefix = `${nodeId}-`;
-      for (const edge of state.edges) {
-        if (edge.sourceHandle?.startsWith(prefix)) {
-          colIds.add(extractColId(edge.sourceHandle, nodeId));
-        }
-        if (edge.targetHandle?.startsWith(prefix)) {
-          colIds.add(extractColId(edge.targetHandle, nodeId));
-        }
-      }
-      return colIds;
-    },
-    (left, right) => {
-      if (left.size !== right.size) {
-        return false;
-      }
-      for (const value of left) {
-        if (!right.has(value)) {
-          return false;
-        }
-      }
-      return true;
-    },
-  );
-}
+import { useConnectedColumnIds } from './ConnectedColumnIdsContext';
+import { useCompactTableRendering } from './CompactTableRenderingContext';
+import { useTableColumnRenderModel } from './useTableColumnRenderModel';
 
 /**
  * preview 테이블 외곽을 렌더한다.
@@ -94,35 +51,33 @@ function PreviewTableNodeFrame({
   };
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <div
-        data-table-node-kind={ghost ? 'ghost' : 'preview'}
-        data-table-name={node.data.label}
-        data-table-logical-name={node.data.logicalTableName ?? ''}
-        className="w-max min-w-[420px] rounded border border-border bg-card shadow-md"
-        style={ghost ? { opacity: 0, pointerEvents: 'none' } : undefined}
-      >
-        <TableNodeHeader
-          label={node.data.label}
-          logicalTableName={node.data.logicalTableName}
-          tableTermId={node.data.tableTermId}
-          headerColor={node.data.headerColor}
-          handleLayout={node.data.handleLayout}
-          isEditing={false}
-          duplicateLogicalNameColumnCount={0}
-          lockInfo={undefined}
-          onLogicalNameChange={() => {}}
-          onSelectTerm={() => {}}
-          onSelectDerived={() => {}}
-          onRegisterNew={() => {}}
-          onNavigateToCode={canNavigateToCode && !ghost ? handleNavigateToCode : undefined}
-          onRename={() => {}}
-          onColorChange={() => {}}
-          onHandleLayoutChange={() => {}}
-        />
-        <div className="divide-y divide-border">{children}</div>
-      </div>
-    </TooltipProvider>
+    <div
+      data-table-node-kind={ghost ? 'ghost' : 'preview'}
+      data-table-name={node.data.label}
+      data-table-logical-name={node.data.logicalTableName ?? ''}
+      className="w-max min-w-[420px] rounded border border-border bg-card shadow-md"
+      style={ghost ? { opacity: 0, pointerEvents: 'none' } : undefined}
+    >
+      <TableNodeHeader
+        label={node.data.label}
+        logicalTableName={node.data.logicalTableName}
+        tableTermId={node.data.tableTermId}
+        headerColor={node.data.headerColor}
+        handleLayout={node.data.handleLayout}
+        isEditing={false}
+        duplicateLogicalNameColumnCount={0}
+        lockInfo={undefined}
+        onLogicalNameChange={() => {}}
+        onSelectTerm={() => {}}
+        onSelectDerived={() => {}}
+        onRegisterNew={() => {}}
+        onNavigateToCode={canNavigateToCode && !ghost ? handleNavigateToCode : undefined}
+        onRename={() => {}}
+        onColorChange={() => {}}
+        onHandleLayoutChange={() => {}}
+      />
+      <div className="divide-y divide-border">{children}</div>
+    </div>
   );
 }
 
@@ -142,6 +97,7 @@ function PreviewTableRows({
 }) {
   const { t } = useTranslation();
   const { findDomainById, findTermById, resolveLogicalName } = useErdDictionary();
+  const compactTableRendering = useCompactTableRendering();
   const resolvedHandleLayout = node.data.handleLayout ?? 'split';
   const targetHandlePlacements = useMemo(
     () => getColumnHandlePlacements(resolvedHandleLayout, 'target'),
@@ -151,48 +107,24 @@ function PreviewTableRows({
     () => getColumnHandlePlacements(resolvedHandleLayout, 'source'),
     [resolvedHandleLayout],
   );
-  const columnRenderMetaById = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const column of node.data.columns) {
-      const key = column.logicalName?.trim();
-      if (!key) {
-        continue;
-      }
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-
-    const duplicatedLogicalNames = new Set(
-      Array.from(counts.entries())
-        .filter(([, count]) => count > 1)
-        .map(([logicalName]) => logicalName),
-    );
-
-    const renderMetaById = new Map<string, PreviewColumnRenderMeta>();
-    for (const column of node.data.columns) {
-      const normalizedLogicalName = column.logicalName?.trim() ?? '';
-      const resolved =
-        normalizedLogicalName.length > 0 ? resolveLogicalName(normalizedLogicalName) : null;
-      const domain =
-        column.domainId != null
-          ? findDomainById(column.domainId)
-          : resolved?.domainId
-            ? findDomainById(resolved.domainId)
-            : undefined;
-
-      renderMetaById.set(column.id, {
-        hasDuplicateLogicalName:
-          normalizedLogicalName.length > 0 && duplicatedLogicalNames.has(normalizedLogicalName),
-        warning: getColumnWarningFromResolution(column, resolved, findTermById, findDomainById),
-        domain,
-      });
-    }
-
-    return renderMetaById;
-  }, [findDomainById, findTermById, node.data.columns, resolveLogicalName]);
+  const {
+    renderMetaById: columnRenderMetaById,
+    validationWarningTextByStatus,
+    visibleColumns,
+    hiddenUnconnectedColumnCount,
+  } = useTableColumnRenderModel({
+    columns: node.data.columns,
+    connectedColumnIds,
+    compactRows: compactTableRendering,
+    t,
+    resolveLogicalName,
+    findTermById,
+    findDomainById,
+  });
 
   return (
     <>
-      {node.data.columns.map((column) => {
+      {visibleColumns.map((column) => {
         const renderMeta = columnRenderMetaById.get(column.id);
         if (!renderMeta) {
           return null;
@@ -216,11 +148,9 @@ function PreviewTableRows({
             }
             validationWarningText={
               renderMeta.warning.status
-                ? t(
-                    getValidationStatusI18nKey(
-                      renderMeta.warning.status as WarningValidationStatus,
-                    ),
-                  )
+                ? validationWarningTextByStatus[
+                    renderMeta.warning.status as WarningValidationStatus
+                  ]
                 : undefined
             }
             hasDuplicateLogicalName={renderMeta.hasDuplicateLogicalName}
@@ -243,6 +173,11 @@ function PreviewTableRows({
           />
         );
       })}
+      {hiddenUnconnectedColumnCount > 0 && (
+        <div className="px-3 py-1 text-2xs text-muted-foreground">
+          {t('erd.tableNode.hiddenColumnSummary', { count: hiddenUnconnectedColumnCount })}
+        </div>
+      )}
     </>
   );
 }

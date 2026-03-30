@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { useErdDictionary } from '@/components/erd/ErdDictionaryContext';
 import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
+import type { Domain } from '@/types/dictionary';
+import type { Column } from '@/types/erd';
 
 /** 컬럼 유효성 검사 상태 */
 export type ValidationStatus =
@@ -71,6 +73,89 @@ export interface ColumnWarning {
   expectedType?: string;
   /** 현재 타입 (type-mismatch 시) */
   actualType?: string;
+}
+
+export interface ColumnRenderMeta {
+  normalizedLogicalName: string;
+  hasDuplicateLogicalName: boolean;
+  warning: ColumnWarning;
+  domain: Domain | undefined;
+}
+
+export function buildColumnRenderMeta(
+  columns: Column[],
+  options: {
+    resolveLogicalName: (logicalName: string) => LogicalNameResolution;
+    findTermById: (id: number) => { physicalName: string; domainId: number | null } | undefined;
+    findDomainById: (id: number) => Domain | undefined;
+  },
+): {
+  renderMetaById: Map<string, ColumnRenderMeta>;
+  duplicateLogicalNameColumnCount: number;
+} {
+  const counts = new Map<string, number>();
+  for (const column of columns) {
+    const key = column.logicalName?.trim();
+    if (!key) {
+      continue;
+    }
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  const duplicatedLogicalNames = new Set(
+    Array.from(counts.entries())
+      .filter(([, count]) => count > 1)
+      .map(([logicalName]) => logicalName),
+  );
+
+  const resolutionCache = new Map<string, LogicalNameResolution | null>();
+  const domainCache = new Map<number, Domain | undefined>();
+  const renderMetaById = new Map<string, ColumnRenderMeta>();
+  let duplicateLogicalNameColumnCount = 0;
+
+  for (const column of columns) {
+    const normalizedLogicalName = column.logicalName?.trim() ?? '';
+    const hasDuplicateLogicalName =
+      normalizedLogicalName.length > 0 && duplicatedLogicalNames.has(normalizedLogicalName);
+
+    if (hasDuplicateLogicalName) {
+      duplicateLogicalNameColumnCount += 1;
+    }
+
+    let resolved: LogicalNameResolution | null = null;
+    if (normalizedLogicalName.length > 0) {
+      if (!resolutionCache.has(normalizedLogicalName)) {
+        resolutionCache.set(
+          normalizedLogicalName,
+          options.resolveLogicalName(normalizedLogicalName),
+        );
+      }
+      resolved = resolutionCache.get(normalizedLogicalName) ?? null;
+    }
+
+    const resolvedDomainId = column.domainId ?? resolved?.domainId ?? null;
+    let domain: Domain | undefined;
+    if (resolvedDomainId != null) {
+      if (!domainCache.has(resolvedDomainId)) {
+        domainCache.set(resolvedDomainId, options.findDomainById(resolvedDomainId));
+      }
+      domain = domainCache.get(resolvedDomainId);
+    }
+
+    renderMetaById.set(column.id, {
+      normalizedLogicalName,
+      hasDuplicateLogicalName,
+      warning: getColumnWarningFromResolution(
+        column,
+        resolved,
+        options.findTermById,
+        options.findDomainById,
+      ),
+      domain,
+    });
+  }
+
+  return { renderMetaById, duplicateLogicalNameColumnCount };
 }
 
 /**
