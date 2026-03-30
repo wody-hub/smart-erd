@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { ProjectionRefreshRequest } from '@/collaboration/core/contracts/document-plugin';
-import { parseErdColumnEntityId } from '@/collaboration/plugins/erd/erd-column-entity-id';
+import { buildErdProjectionRefreshRequest } from '@/collaboration/plugins/erd/erd-projection-refresh-request';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import type { DiagramCollaborationStoreBridge } from './diagram-collaboration-store-bridge.js';
@@ -46,59 +46,15 @@ export function useDiagramCollaborationStoreBridge(): DiagramCollaborationStoreB
       loadPreview,
       applyPreviewPositionChangesToPersisted,
       refreshPersistedCanvasFromYDoc: (request?: ProjectionRefreshRequest) => {
-        if (request?.forceFull) {
+        const nextRequest = buildErdProjectionRefreshRequest(request);
+        if (nextRequest?.forceFull) {
           syncFromYDoc({ forceFull: true });
           return;
         }
-
-        const targets = collectProjectionTargets(request);
-        const nodeIds = new Set<string>(request?.nodeIds ?? []);
-        const edgeIds = new Set<string>(request?.edgeIds ?? []);
-        const groupIds = new Set<string>(request?.groupIds ?? []);
-
-        if (request?.scopeHints?.length) {
-          for (const scope of request.scopeHints) {
-            if (scope.kind === 'table') {
-              targets.add('nodes');
-              nodeIds.add(scope.id);
-              continue;
-            }
-            if (scope.kind === 'column') {
-              const columnRef = parseErdColumnEntityId(scope.id);
-              if (!columnRef) {
-                syncFromYDoc({ forceFull: true });
-                return;
-              }
-              targets.add('nodes');
-              nodeIds.add(columnRef.tableId);
-              continue;
-            }
-            if (scope.kind === 'edge') {
-              targets.add('edges');
-              edgeIds.add(scope.id);
-              continue;
-            }
-            if (scope.kind === 'group') {
-              targets.add('groups');
-              groupIds.add(scope.id);
-              continue;
-            }
-            syncFromYDoc({ forceFull: true });
-            return;
-          }
-        }
-
-        if (targets.size === 0) {
+        if (!nextRequest || collectProjectionTargets(nextRequest).size === 0) {
           syncFromYDoc({ forceFull: true });
           return;
         }
-
-        const nextRequest = {
-          targets: [...targets],
-          nodeIds: [...nodeIds],
-          edgeIds: [...edgeIds],
-          groupIds: [...groupIds],
-        };
         syncFromYDoc(nextRequest);
       },
       setConnectionStatus,

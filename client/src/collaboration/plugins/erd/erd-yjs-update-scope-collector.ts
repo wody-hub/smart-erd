@@ -16,7 +16,25 @@ export function collectErdAffectedScopes(
     return [];
   }
 
-  const doc = engine.getDocument();
+  return collectErdAffectedScopesFromTransaction(engine.getDocument(), transaction);
+}
+
+export function collectErdAffectedScopesFromEvents(
+  doc: Y.Doc,
+  events: Y.YEvent<Y.AbstractType<unknown>>[],
+): ScopeRef[] {
+  const transaction = events[0]?.transaction;
+  if (!(transaction instanceof Y.Transaction)) {
+    return [];
+  }
+
+  return collectErdAffectedScopesFromTransaction(doc, transaction);
+}
+
+export function collectErdAffectedScopesFromTransaction(
+  doc: Y.Doc,
+  transaction: Y.Transaction,
+): ScopeRef[] {
   const tablesMap = getTablesMap(doc);
   const edgesMap = getEdgesMap(doc);
   const groupsMap = getGroupsMap(doc);

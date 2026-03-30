@@ -33,6 +33,8 @@ import {
   yGroupsMapToTableGroups,
   yTablesMapToNodes,
 } from '@/collaboration/yjsBridge';
+import { collectErdAffectedScopesFromEvents } from '@/collaboration/plugins/erd/erd-yjs-update-scope-collector';
+import { buildErdProjectionRefreshRequest } from '@/collaboration/plugins/erd/erd-projection-refresh-request';
 import type { EdgeRoutingType, Waypoint } from '@/types/erd';
 import { buildPersistedPreviewPositionChanges } from '@/lib/preview-position-sync';
 import {
@@ -440,14 +442,29 @@ export function createCanvasSyncActions(
           return;
         }
         const nodeIds = collectObservedEntityIds(events);
+        const scopedRequest = nodeIds
+          ? null
+          : buildErdProjectionRefreshRequest(
+              { scopeHints: collectErdAffectedScopesFromEvents(ydoc, events) },
+              {
+                allowedTargets: ['nodes'],
+                fallbackTarget: 'nodes',
+              },
+            );
         if (get().internal.isNodeDragging) {
           queueDeferredProjectionSync(
-            nodeIds ? { targets: ['nodes'], nodeIds } : { targets: ['nodes'] },
+            nodeIds
+              ? { targets: ['nodes'], nodeIds }
+              : (scopedRequest ?? { targets: ['nodes'] }),
           );
           return;
         }
         if (nodeIds) {
           syncProjectionFromYDocWithRequest({ targets: ['nodes'], nodeIds });
+          return;
+        }
+        if (scopedRequest) {
+          syncProjectionFromYDocWithRequest(scopedRequest);
           return;
         }
         set({ nodes: yTablesMapToNodes(tablesMap) });
@@ -457,8 +474,21 @@ export function createCanvasSyncActions(
           return;
         }
         const edgeIds = collectObservedEntityIds(events);
+        const scopedRequest = edgeIds
+          ? null
+          : buildErdProjectionRefreshRequest(
+              { scopeHints: collectErdAffectedScopesFromEvents(ydoc, events) },
+              {
+                allowedTargets: ['edges'],
+                fallbackTarget: 'edges',
+              },
+            );
         if (edgeIds) {
           syncProjectionFromYDocWithRequest({ targets: ['edges'], edgeIds });
+          return;
+        }
+        if (scopedRequest) {
+          syncProjectionFromYDocWithRequest(scopedRequest);
           return;
         }
         set({ edges: yEdgesMapToEdges(edgesMap) });
@@ -468,8 +498,21 @@ export function createCanvasSyncActions(
           return;
         }
         const groupIds = collectObservedEntityIds(events);
+        const scopedRequest = groupIds
+          ? null
+          : buildErdProjectionRefreshRequest(
+              { scopeHints: collectErdAffectedScopesFromEvents(ydoc, events) },
+              {
+                allowedTargets: ['groups'],
+                fallbackTarget: 'groups',
+              },
+            );
         if (groupIds) {
           syncProjectionFromYDocWithRequest({ targets: ['groups'], groupIds });
+          return;
+        }
+        if (scopedRequest) {
+          syncProjectionFromYDocWithRequest(scopedRequest);
           return;
         }
         set({ groups: yGroupsMapToTableGroups(groupsMap) });

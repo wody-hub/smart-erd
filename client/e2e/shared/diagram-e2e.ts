@@ -227,9 +227,38 @@ function parseRenderableNodeCount(content: string | null | undefined): number {
   }
 }
 
+function isListeningOnPort(port: number): boolean {
+  try {
+    const pid = execSync(`lsof -nP -iTCP:${port} -sTCP:LISTEN -t | head -n1`, {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return pid.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function resolveDefaultE2EEndpoints(): { baseUrl: string; apiBaseUrl: string } {
+  const localFrontend = isListeningOnPort(4501);
+  const localBackend = isListeningOnPort(9501);
+  if (localFrontend && localBackend) {
+    return {
+      baseUrl: 'http://localhost:4501',
+      apiBaseUrl: 'http://localhost:9501/api',
+    };
+  }
+
+  return {
+    baseUrl: 'http://localhost:4502',
+    apiBaseUrl: 'http://localhost:9502/api',
+  };
+}
+
 export function getE2EConfig(): E2EConfig {
-  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:4502';
-  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? 'http://localhost:9502/api';
+  const defaults = resolveDefaultE2EEndpoints();
+  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? defaults.baseUrl;
+  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? defaults.apiBaseUrl;
   const repoDir = process.env.SMART_ERD_E2E_REPO_DIR ?? path.resolve(process.cwd(), '..');
   const frontendEndpoint = resolveEndpointConfig(
     baseUrl,
@@ -268,8 +297,9 @@ export function getE2EConfig(): E2EConfig {
 }
 
 export function getE2EProvisioningConfig(): E2EConfig {
-  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:4502';
-  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? 'http://localhost:9502/api';
+  const defaults = resolveDefaultE2EEndpoints();
+  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? defaults.baseUrl;
+  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? defaults.apiBaseUrl;
   const repoDir = process.env.SMART_ERD_E2E_REPO_DIR ?? path.resolve(process.cwd(), '..');
   const frontendEndpoint = resolveEndpointConfig(
     baseUrl,
