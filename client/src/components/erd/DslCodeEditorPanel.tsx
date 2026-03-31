@@ -90,6 +90,7 @@ import {
 import { buildDslCopyTextWithPhysicalNames } from '@/lib/dsl-copy-with-physical-names';
 import {
   getCodeEditorRefreshConfirmReason,
+  getCodeEditorFinalizeBlockReason,
   isCodeEditorApplyBlocked,
   isCodeEditorFinalizeBlocked,
 } from '@/lib/code-editor-draft-policy';
@@ -1173,7 +1174,7 @@ export default function DslCodeEditorPanel({
 
   const syncStatusMeta = getCodeEditorStatusMeta(t, syncStatus, draftState);
   const refreshConfirmCopy = getCodeEditorRefreshConfirmCopy(t, refreshConfirmReason);
-  const draftPersistStatusMeta = useMemo(() => {
+  const draftPersistStatusMeta = useMemo<StatusIndicatorMeta | null>(() => {
     switch (codeModeDraftPersistStatus) {
       case 'dirty':
         return {
@@ -1235,13 +1236,19 @@ export default function DslCodeEditorPanel({
       },
     });
   }, [codeModeDraftPersistStatus, t]);
-  const finalizeStatusMeta = useMemo(() => {
+  const codeFinalizeBlockReason = useMemo(
+    () => getCodeEditorFinalizeBlockReason({ draftState, isPersistedDraftStale }),
+    [draftState, isPersistedDraftStale],
+  );
+  const codeStatusMeta = useMemo<StatusIndicatorMeta | null>(() => {
     if (!persistDraft) {
-      return null;
+      return syncStatusMeta;
     }
-    if (codeModeDraftPersistStatus === 'stale') {
-      return null;
+
+    if (isPersistedDraftStale) {
+      return draftPersistStatusMeta;
     }
+
     if (finalizing) {
       return {
         className: 'text-muted-foreground',
@@ -1250,6 +1257,28 @@ export default function DslCodeEditorPanel({
         spin: true,
       };
     }
+
+    switch (codeFinalizeBlockReason) {
+      case 'remote-pending':
+        return {
+          className: 'text-erd-warning',
+          label: t('erd.codeEditor.finalizeRemotePending'),
+          Icon: AlertTriangle,
+          spin: false,
+        };
+      case 'invalid-draft':
+        return {
+          className: 'text-destructive',
+          label: t('erd.codeEditor.finalizeInvalidDraft'),
+          Icon: XCircle,
+          spin: false,
+        };
+      case 'stale-draft':
+        return draftPersistStatusMeta;
+      default:
+        break;
+    }
+
     if (requiresApplyBeforeFinalize) {
       return {
         className: 'text-erd-warning',
@@ -1258,6 +1287,7 @@ export default function DslCodeEditorPanel({
         spin: false,
       };
     }
+
     if (requiresPublishedSave) {
       return {
         className: 'text-muted-foreground',
@@ -1266,6 +1296,15 @@ export default function DslCodeEditorPanel({
         spin: false,
       };
     }
+
+    if (
+      codeModeDraftPersistStatus === 'dirty' ||
+      codeModeDraftPersistStatus === 'saving' ||
+      codeModeDraftPersistStatus === 'error'
+    ) {
+      return draftPersistStatusMeta;
+    }
+
     return {
       className: 'text-success',
       label: t('erd.codeEditor.finalizeSaved'),
@@ -1273,11 +1312,15 @@ export default function DslCodeEditorPanel({
       spin: false,
     };
   }, [
+    codeFinalizeBlockReason,
     codeModeDraftPersistStatus,
+    draftPersistStatusMeta,
     finalizing,
+    isPersistedDraftStale,
     persistDraft,
     requiresApplyBeforeFinalize,
     requiresPublishedSave,
+    syncStatusMeta,
     t,
   ]);
   const physicalNameHints = useMemo(
@@ -2350,9 +2393,7 @@ export default function DslCodeEditorPanel({
           errorCount={errorCount}
           warningCount={warningCount}
           hasDslText={dslText.trim().length > 0}
-          syncStatusMeta={syncStatusMeta}
-          draftPersistStatusMeta={draftPersistStatusMeta}
-          finalizeStatusMeta={finalizeStatusMeta}
+          statusMeta={codeStatusMeta}
         />
       </CodeEditorFooter>
 
@@ -2411,7 +2452,7 @@ export default function DslCodeEditorPanel({
   );
 }
 
-/** draftPersistStatusMeta / finalizeStatusMeta 공통 형태 */
+/** code editor 상태 표시 공통 형태 */
 interface StatusIndicatorMeta {
   className: string;
   label: string;
@@ -2431,18 +2472,14 @@ const DslFooterStatus = memo(function DslFooterStatus({
   errorCount,
   warningCount,
   hasDslText,
-  syncStatusMeta,
-  draftPersistStatusMeta,
-  finalizeStatusMeta,
+  statusMeta,
 }: {
   parsing: boolean;
   parseResult: DslParseResult | null;
   errorCount: number;
   warningCount: number;
   hasDslText: boolean;
-  syncStatusMeta: SyncStatusMeta | null;
-  draftPersistStatusMeta: StatusIndicatorMeta | null;
-  finalizeStatusMeta: StatusIndicatorMeta | null;
+  statusMeta: SyncStatusMeta | StatusIndicatorMeta | null;
 }) {
   const { t } = useTranslation();
 
@@ -2489,34 +2526,14 @@ const DslFooterStatus = memo(function DslFooterStatus({
         </>
       )}
 
-      {syncStatusMeta && (
+      {statusMeta && (
         <span
-          className={cn('flex items-center gap-1', syncStatusMeta.className)}
+          className={cn('flex items-center gap-1', statusMeta.className)}
           aria-label={t('erd.sync.statusAria')}
+          title={'title' in statusMeta ? statusMeta.title : undefined}
         >
-          <syncStatusMeta.Icon className={cn('h-3 w-3', syncStatusMeta.spin && 'animate-spin')} />
-          {syncStatusMeta.label}
-        </span>
-      )}
-
-      {draftPersistStatusMeta && (
-        <span
-          className={cn('flex items-center gap-1', draftPersistStatusMeta.className)}
-          title={draftPersistStatusMeta.title}
-        >
-          <draftPersistStatusMeta.Icon
-            className={cn('h-3 w-3', draftPersistStatusMeta.spin && 'animate-spin')}
-          />
-          {draftPersistStatusMeta.label}
-        </span>
-      )}
-
-      {finalizeStatusMeta && (
-        <span className={cn('flex items-center gap-1', finalizeStatusMeta.className)}>
-          <finalizeStatusMeta.Icon
-            className={cn('h-3 w-3', finalizeStatusMeta.spin && 'animate-spin')}
-          />
-          {finalizeStatusMeta.label}
+          <statusMeta.Icon className={cn('h-3 w-3', statusMeta.spin && 'animate-spin')} />
+          {statusMeta.label}
         </span>
       )}
     </div>
