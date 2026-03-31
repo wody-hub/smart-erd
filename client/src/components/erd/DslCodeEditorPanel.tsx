@@ -313,6 +313,7 @@ export default function DslCodeEditorPanel({
   const previousEditorScopeKeyRef = useRef(editorScopeKey);
   const dslTextScopeKeyRef = useRef(editorScopeKey);
   const dslTextValueRef = useRef('');
+  const flushPendingDraftImmediatelyRef = useRef<() => void>(() => {});
   /** 에디터 인스턴스 ref */
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   /** Monaco 인스턴스 ref */
@@ -1063,6 +1064,9 @@ export default function DslCodeEditorPanel({
     if (!persistDraft || !onPersistPublishedDiagram || finalizing) {
       return;
     }
+
+    flushPendingDraftImmediatelyRef.current();
+
     if (isCodeEditorFinalizeBlocked(draftState, isPersistedDraftStale)) {
       return;
     }
@@ -1140,6 +1144,12 @@ export default function DslCodeEditorPanel({
     requiresApplyBeforeFinalize,
     requiresPublishedSave,
   ]);
+  const finalizeButtonLabel = useMemo(() => {
+    if (requiresApplyBeforeFinalize) {
+      return t('erd.codeEditor.finalizeApplyAndSaveButton');
+    }
+    return t('erd.codeEditor.finalizeSaveButton');
+  }, [requiresApplyBeforeFinalize, t]);
   const canApplyWithDraftState = useMemo(
     () => canApply && !isCodeEditorApplyBlocked(draftState, isPersistedDraftStale),
     [canApply, draftState, isPersistedDraftStale],
@@ -1918,6 +1928,7 @@ export default function DslCodeEditorPanel({
     readCurrentDslText,
     ydoc,
   ]);
+  flushPendingDraftImmediatelyRef.current = flushPendingDraftImmediately;
 
   useEffect(() => {
     if (!persistDraft) {
@@ -2380,6 +2391,7 @@ export default function DslCodeEditorPanel({
         refreshConfirmTitle={refreshConfirmCopy.title}
         refreshConfirmDescription={refreshConfirmCopy.description}
         onFinalize={persistDraft ? handleFinalize : undefined}
+        finalizeButtonLabel={persistDraft ? finalizeButtonLabel : undefined}
         canFinalize={canFinalize}
         finalizing={finalizing}
         onCopyWithPhysicalNames={handleCopyWithPhysicalNames}

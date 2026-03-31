@@ -316,6 +316,7 @@
       "success": "{{count}}개 테이블이 ERD에 적용되었습니다",
       "failed": "DDL 적용에 실패했습니다",
       "finalizeSaveButton": "저장",
+      "finalizeApplyAndSaveButton": "적용 후 저장",
       "finalizeSavingButton": "저장 중...",
       "draftStatusDirty": "임시 저장 대기 중",
       "draftStatusSaving": "임시 저장 중",

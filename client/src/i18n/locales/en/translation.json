@@ -317,6 +317,7 @@
       "success": "Applied {{count}} tables to ERD",
       "failed": "Failed to apply DDL",
       "finalizeSaveButton": "Save",
+      "finalizeApplyAndSaveButton": "Apply and save",
       "finalizeSavingButton": "Saving...",
       "draftStatusDirty": "Temporary save pending",
       "draftStatusSaving": "Saving temporary draft",

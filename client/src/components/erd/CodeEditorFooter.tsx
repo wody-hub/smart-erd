@@ -42,6 +42,8 @@ interface CodeEditorFooterProps {
   refreshConfirmDescription?: string;
   /** code 모드 최종 저장 버튼 클릭 핸들러 */
   onFinalize?: () => void;
+  /** code 모드 최종 저장 버튼 라벨 */
+  finalizeButtonLabel?: string;
   /** code 모드 최종 저장 버튼 활성화 여부 */
   canFinalize?: boolean;
   /** code 모드 최종 저장 진행 여부 */
@@ -82,6 +84,7 @@ const CodeEditorFooter = memo(function CodeEditorFooter({
   refreshConfirmTitle,
   refreshConfirmDescription,
   onFinalize,
+  finalizeButtonLabel,
   canFinalize = false,
   finalizing = false,
   onCopyWithPhysicalNames,
@@ -113,7 +116,7 @@ const CodeEditorFooter = memo(function CodeEditorFooter({
               <Save className="h-3.5 w-3.5" />
               {finalizing
                 ? t('erd.codeEditor.finalizeSavingButton')
-                : t('erd.codeEditor.finalizeSaveButton')}
+                : (finalizeButtonLabel ?? t('erd.codeEditor.finalizeSaveButton'))}
             </Button>
           )}
           {onFormat && (
