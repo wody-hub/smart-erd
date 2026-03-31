@@ -50,6 +50,7 @@ export function useDiagramCodeModeSnapshotPersist({
   const codeModeSnapshotPersistInFlightRef = useRef(false);
   const codeModeSnapshotPersistDirtyRef = useRef(false);
   const codeModeSnapshotPersistEpochRef = useRef(0);
+  const codeModeSnapshotPersistEnabledRef = useRef(enabled);
   const codeModeSnapshotLastKeepaliveAtRef = useRef(0);
   const codeModeSnapshotKeepalivePendingRef = useRef(false);
   const beforeSnapshotPersistRef = useRef<(() => void) | null>(null);
@@ -87,6 +88,9 @@ export function useDiagramCodeModeSnapshotPersist({
 
   const persistCodeModeSnapshotNow = useCallback(
     async (useKeepalive = false) => {
+      if (!codeModeSnapshotPersistEnabledRef.current) {
+        return;
+      }
       if (!diagramPersistenceSession) {
         return;
       }
@@ -185,7 +189,11 @@ export function useDiagramCodeModeSnapshotPersist({
         if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
           codeModeSnapshotPersistInFlightRef.current = false;
         }
-        if (codeModeSnapshotPersistDirtyRef.current) {
+        if (
+          requestEpoch === codeModeSnapshotPersistEpochRef.current &&
+          codeModeSnapshotPersistEnabledRef.current &&
+          codeModeSnapshotPersistDirtyRef.current
+        ) {
           setCodeModeDraftPersistStatus('dirty');
           if (codeModeSnapshotPersistTimerRef.current) {
             clearTimeout(codeModeSnapshotPersistTimerRef.current);
@@ -206,6 +214,9 @@ export function useDiagramCodeModeSnapshotPersist({
   );
 
   const scheduleCodeModeSnapshotPersist = useCallback(() => {
+    if (!codeModeSnapshotPersistEnabledRef.current) {
+      return;
+    }
     codeModeSnapshotPersistDirtyRef.current = true;
     setCodeModeDraftPersistStatus('dirty');
     if (codeModeSnapshotPersistTimerRef.current) {
@@ -217,7 +228,7 @@ export function useDiagramCodeModeSnapshotPersist({
   }, [getNextPersistDelayMs, persistCodeModeSnapshotNow]);
 
   const flushSnapshotKeepaliveNow = useCallback(() => {
-    if (!enabled || !ydoc || !diagramPersistenceSession) {
+    if (!codeModeSnapshotPersistEnabledRef.current || !ydoc || !diagramPersistenceSession) {
       return;
     }
     if (codeModeSnapshotPersistTimerRef.current) {
@@ -225,15 +236,15 @@ export function useDiagramCodeModeSnapshotPersist({
       codeModeSnapshotPersistTimerRef.current = null;
     }
     void persistCodeModeSnapshotNow(true);
-  }, [diagramPersistenceSession, enabled, persistCodeModeSnapshotNow, ydoc]);
+  }, [diagramPersistenceSession, persistCodeModeSnapshotNow, ydoc]);
 
   useEffect(() => {
+    codeModeSnapshotPersistEnabledRef.current = enabled;
     if (!enabled) {
-      setCodeModeDraftPersistStatus('inactive');
-      setCodeModeDraftPersistedAt(null);
+      resetCodeModeSnapshotPersistState('inactive');
       return;
     }
-  }, [enabled]);
+  }, [enabled, resetCodeModeSnapshotPersistState]);
 
   useEffect(() => {
     if (!enabled || !ydoc || !diagramPersistenceSession) {
