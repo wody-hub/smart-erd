@@ -1,14 +1,16 @@
 import * as Y from 'yjs';
-import type {
-  EdgeHandleMode,
-  EdgeHandleSide,
-  EdgeRoutingType,
-  Waypoint,
-} from '../types/erd.js';
+import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
+import type { EdgeHandleMode, EdgeHandleSide, EdgeRoutingType, Waypoint } from '../types/erd.js';
 import type { DiffPlan, DiffParsedColumn, DiffRelationType } from './erd-diff-plan.js';
-import { createWaypointsYArray, readWaypointsFromEdgeYMap } from '../collaboration/yjsBridge.js';
+import {
+  createWaypointsYArray,
+  readWaypointsFromEdgeYMap,
+  setTableYMapPosition,
+  syncLegacyWaypointsInEdgeYMap,
+} from '../collaboration/yjsBridge.js';
 import { buildStableEdgeId, resolveEdgeHandlesFromPreference } from './edge-handles.js';
-import { extractColId } from './handle-id.js';
+import { extractColId, extractHandleSide } from './handle-id.js';
+import { resolvePreservedWaypoints } from './edge-presentation-restore.js';
 
 /** DiffPlan 적용 결과 요약 */
 export interface ApplyDiffResult {
@@ -52,6 +54,20 @@ interface EdgePresentationSnapshot {
   handleMode?: EdgeHandleMode;
   sourceSide?: EdgeHandleSide;
   targetSide?: EdgeHandleSide;
+  resolvedSourceSide?: EdgeHandleSide;
+  resolvedTargetSide?: EdgeHandleSide;
+}
+
+function readLegacyPositionAxis(rawPosition: unknown, axis: 'x' | 'y'): number | undefined {
+  if (rawPosition instanceof Y.Map) {
+    const value = rawPosition.get(axis);
+    return typeof value === 'number' ? value : undefined;
+  }
+  if (!rawPosition || typeof rawPosition !== 'object') {
+    return undefined;
+  }
+  const value = (rawPosition as Record<'x' | 'y', unknown>)[axis];
+  return typeof value === 'number' ? value : undefined;
 }
 
 /**
@@ -108,7 +124,7 @@ export function applyDiffToYDoc(doc: Y.Doc, plan: DiffPlan, origin?: unknown): A
       context.groupsMap,
       context.tablesMap,
     );
-  }, origin);
+  }, origin ?? CANVAS_HISTORY_ORIGIN.SYSTEM_CODE_SYNC);
 
   const { appliedOperations, skippedOperations, droppedByPolicy, droppedByMissing } =
     context.counters;
@@ -215,10 +231,7 @@ function applyTableAdds(context: DiffApplyContext): void {
       tableYMap.set('tableTermId', tableDiff.next.tableTermId);
     }
 
-    const positionYMap = new Y.Map<number>();
-    positionYMap.set('x', nextPosition.x);
-    positionYMap.set('y', nextPosition.y);
-    tableYMap.set('position', positionYMap);
+    setTableYMapPosition(tableYMap, nextPosition);
     nextPosition.x += 300;
 
     const columnsYArray = new Y.Array<Y.Map<unknown>>();
@@ -410,28 +423,35 @@ function applyEdgeAdds(context: DiffApplyContext): void {
       childTable: edgeDiff.next.childTable,
       childColumn: edgeDiff.next.childColumn,
     });
-    const nextRoutingType = carriedPresentation?.routingType ?? edgeDiff.routingType ?? 'smoothstep';
+    const nextRoutingType =
+      carriedPresentation?.routingType ?? edgeDiff.routingType ?? 'smoothstep';
     const preservedWaypoints =
-      nextRoutingType === 'straight' &&
-      carriedPresentation?.sourceHandle === sourceHandle &&
-      carriedPresentation?.targetHandle === targetHandle
-        ? carriedPresentation.waypoints
-        : edgeDiff.waypoints;
-    context.edgesMap.set(
-      edgeId,
-      createEdgeYMap(
-        parentTableId,
-        childTableId,
-        sourceHandle,
-        targetHandle,
-        edgeDiff.relationType,
-        nextRoutingType,
-        preservedWaypoints,
-        resolution.handleMode,
-        resolution.sourceSide,
-        resolution.targetSide,
-      ),
+      resolvePreservedWaypoints({
+        routingType: nextRoutingType,
+        previousSourceHandle: carriedPresentation?.sourceHandle,
+        previousTargetHandle: carriedPresentation?.targetHandle,
+        nextSourceHandle: sourceHandle,
+        nextTargetHandle: targetHandle,
+        previousSourceSide: carriedPresentation?.resolvedSourceSide,
+        previousTargetSide: carriedPresentation?.resolvedTargetSide,
+        nextSourceSide: resolution.sourceSide,
+        nextTargetSide: resolution.targetSide,
+        waypoints: carriedPresentation?.waypoints,
+      }) ?? edgeDiff.waypoints;
+    const edgeYMap = createEdgeYMap(
+      parentTableId,
+      childTableId,
+      sourceHandle,
+      targetHandle,
+      edgeDiff.relationType,
+      nextRoutingType,
+      preservedWaypoints,
+      resolution.handleMode,
+      resolution.sourceSide,
+      resolution.targetSide,
     );
+    context.edgesMap.set(edgeId, edgeYMap);
+    syncLegacyWaypointsInEdgeYMap(edgeYMap);
     context.counters.appliedOperations += 1;
   }
 }
@@ -463,6 +483,8 @@ function captureExistingEdgePresentation(context: DiffApplyContext): void {
         handleMode: (edgeYMap.get('handleMode') as EdgeHandleMode | undefined) ?? undefined,
         sourceSide: (edgeYMap.get('sourceSide') as EdgeHandleSide | undefined) ?? undefined,
         targetSide: (edgeYMap.get('targetSide') as EdgeHandleSide | undefined) ?? undefined,
+        resolvedSourceSide: extractHandleSide(sourceHandle) ?? undefined,
+        resolvedTargetSide: extractHandleSide(targetHandle) ?? undefined,
       },
     );
   });
@@ -487,9 +509,11 @@ function computeNextTablePosition(tablesMap: Y.Map<Y.Map<unknown>>): { x: number
   let maxX = 100;
   let baseY = 100;
   tablesMap.forEach((tableYMap) => {
-    const posYMap = tableYMap.get('position') as Y.Map<number> | undefined;
-    const x = posYMap?.get('x');
-    const y = posYMap?.get('y');
+    const topLevelX = tableYMap.get('positionX');
+    const topLevelY = tableYMap.get('positionY');
+    const rawPosition = tableYMap.get('position');
+    const x = typeof topLevelX === 'number' ? topLevelX : readLegacyPositionAxis(rawPosition, 'x');
+    const y = typeof topLevelY === 'number' ? topLevelY : readLegacyPositionAxis(rawPosition, 'y');
     if (typeof x === 'number' && x > maxX) {
       maxX = x;
       if (typeof y === 'number') {
@@ -530,16 +554,24 @@ function buildTableNodeLike(
   if (!tableYMap) {
     return null;
   }
-  const positionYMap = tableYMap.get('position') as Y.Map<number> | undefined;
+  const topLevelX = tableYMap.get('positionX');
+  const topLevelY = tableYMap.get('positionY');
+  const rawPosition = tableYMap.get('position');
   return {
     id: tableId,
     position: {
-      x: (positionYMap?.get('x') as number | undefined) ?? 100,
-      y: (positionYMap?.get('y') as number | undefined) ?? 100,
+      x:
+        (typeof topLevelX === 'number' ? topLevelX : undefined) ??
+        readLegacyPositionAxis(rawPosition, 'x') ??
+        100,
+      y:
+        (typeof topLevelY === 'number' ? topLevelY : undefined) ??
+        readLegacyPositionAxis(rawPosition, 'y') ??
+        100,
     },
     data: {
-      handleLayout: (tableYMap.get('handleLayout') as 'split' | 'left' | 'right' | undefined) ??
-        'split',
+      handleLayout:
+        (tableYMap.get('handleLayout') as 'split' | 'left' | 'right' | undefined) ?? 'split',
     },
   };
 }

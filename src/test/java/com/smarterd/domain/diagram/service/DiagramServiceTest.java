@@ -6,9 +6,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
+import com.smarterd.collaboration.metadata.DocumentMetadataService;
+import com.smarterd.collaboration.persistence.DocumentBootstrapReader;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
@@ -17,10 +16,6 @@ import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.dictionary.entity.DictionarySet;
-import com.smarterd.domain.dictionary.entity.Domain;
-import com.smarterd.domain.dictionary.entity.Term;
-import com.smarterd.domain.dictionary.repository.DomainRepository;
-import com.smarterd.domain.dictionary.repository.TermRepository;
 import com.smarterd.domain.dictionary.service.DictionarySetService;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.service.ProjectService;
@@ -28,7 +23,6 @@ import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.service.AuthService;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -64,13 +58,13 @@ class DiagramServiceTest {
     private DiagramSnapshotService diagramSnapshotService;
 
     @Mock
-    private TermRepository termRepository;
+    private DiagramDictionaryBindingService diagramDictionaryBindingService;
 
     @Mock
-    private DomainRepository domainRepository;
+    private DocumentMetadataService documentMetadataService;
 
     @Mock
-    private ObjectMapper objectMapper;
+    private DocumentBootstrapReader documentBootstrapReader;
 
     @InjectMocks
     private DiagramService diagramService;
@@ -90,23 +84,8 @@ class DiagramServiceTest {
         final var team = createTeam(teamId, user);
         final var project = createProject(projectId, team);
         final var targetSet = createDictionarySet(targetSetId, team);
-        final var validTerm = createTerm(100L, team, targetSet);
-        final var validDomain = createDomain(200L, team, targetSet);
-
-        final var content = """
-            {"nodes":[{"id":"table-1","data":{"tableTermId":9,"columns":[
-            {"id":"c1","termId":11,"domainId":21},
-            {"id":"c2","termId":100,"domainId":21},
-            {"id":"c3","termId":11,"domainId":200}
-            ]}}],"edges":[],"groups":[]}
-            """;
-        final var updatedContent = """
-            {"nodes":[{"id":"table-1","data":{"columns":[
-            {"id":"c1"},
-            {"id":"c2","termId":100},
-            {"id":"c3","domainId":200}
-            ]}}],"edges":[],"groups":[]}
-            """;
+        final var invalidationCounts = new DiagramDictionaryBindingService.InvalidationCounts(3, 2);
+        final var content = "{\"nodes\":[]}";
 
         final var diagram = Objects.requireNonNull(
             Diagram.builder().name("D").project(project).dictionarySet(targetSet).content(content).build()
@@ -117,15 +96,12 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(teamId)).thenReturn(team);
         when(projectService.findProjectById(projectId)).thenReturn(project);
-        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(
+            Optional.of(diagram)
+        );
         when(roomManager.getSessionCount(diagramId)).thenReturn(0);
         when(dictionarySetService.findByTeamAndId(team, targetSetId)).thenReturn(targetSet);
-        when(termRepository.findByDictionarySet(targetSet)).thenReturn(List.of(validTerm));
-        when(domainRepository.findByDictionarySet(targetSet)).thenReturn(List.of(validDomain));
-        when(objectMapper.readTree(content)).thenReturn(new ObjectMapper().readTree(content));
-        when(objectMapper.writeValueAsString(org.mockito.ArgumentMatchers.any())).thenReturn(
-            new ObjectMapper().writeValueAsString(new ObjectMapper().readTree(updatedContent))
-        );
+        when(diagramDictionaryBindingService.invalidateBindings(diagram, targetSet)).thenReturn(invalidationCounts);
 
         // when
         final var response = diagramService.updateDiagramDictionarySet(
@@ -133,7 +109,7 @@ class DiagramServiceTest {
             teamId,
             projectId,
             diagramId,
-            new UpdateDiagramDictionarySetRequest(targetSetId)
+            targetSetId
         );
 
         // then
@@ -141,10 +117,7 @@ class DiagramServiceTest {
         assertThat(response.invalidatedTermBindingCount()).isEqualTo(3);
         assertThat(response.invalidatedDomainBindingCount()).isEqualTo(2);
         assertThat(diagram.getYdocSnapshot()).isNull();
-        assertThat(diagram.getContent()).contains("\"termId\":100");
-        assertThat(diagram.getContent()).contains("\"domainId\":200");
-        assertThat(diagram.getContent()).doesNotContain("\"termId\":11");
-        assertThat(diagram.getContent()).doesNotContain("\"domainId\":21");
+        verify(diagramDictionaryBindingService).invalidateBindings(diagram, targetSet);
     }
 
     @Test
@@ -173,22 +146,18 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(teamId)).thenReturn(team);
         when(projectService.findProjectById(projectId)).thenReturn(project);
-        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(
+            Optional.of(diagram)
+        );
         when(roomManager.getSessionCount(diagramId)).thenReturn(0);
         when(dictionarySetService.findByTeamAndId(team, targetSetId)).thenReturn(targetSet);
-        when(termRepository.findByDictionarySet(targetSet)).thenReturn(List.of());
-        when(domainRepository.findByDictionarySet(targetSet)).thenReturn(List.of());
-        when(objectMapper.readTree(content)).thenThrow(new JsonProcessingException("bad json") {});
+        when(diagramDictionaryBindingService.invalidateBindings(diagram, targetSet)).thenThrow(
+            new BusinessException(MessageCode.ERROR_BUSINESS_DIAGRAM_CONTENT_INVALID_JSON.code())
+        );
 
         // when & then
         assertThatThrownBy(() ->
-            diagramService.updateDiagramDictionarySet(
-                loginId,
-                teamId,
-                projectId,
-                diagramId,
-                new UpdateDiagramDictionarySetRequest(targetSetId)
-            )
+            diagramService.updateDiagramDictionarySet(loginId, teamId, projectId, diagramId, targetSetId)
         )
             .isInstanceOf(BusinessException.class)
             .hasMessage(MessageCode.ERROR_BUSINESS_DIAGRAM_CONTENT_INVALID_JSON.code());
@@ -215,18 +184,14 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(teamId)).thenReturn(team);
         when(projectService.findProjectById(projectId)).thenReturn(project);
-        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(
+            Optional.of(diagram)
+        );
         when(roomManager.getSessionCount(diagramId)).thenReturn(1);
 
         // when & then
         assertThatThrownBy(() ->
-            diagramService.updateDiagramDictionarySet(
-                loginId,
-                teamId,
-                projectId,
-                diagramId,
-                new UpdateDiagramDictionarySetRequest(300L)
-            )
+            diagramService.updateDiagramDictionarySet(loginId, teamId, projectId, diagramId, 300L)
         ).isInstanceOf(ConflictException.class);
     }
 
@@ -250,7 +215,9 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(teamId)).thenReturn(team);
         when(projectService.findProjectById(projectId)).thenReturn(project);
-        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(Optional.of(diagram));
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(
+            Optional.of(diagram)
+        );
 
         // when
         diagramService.deleteDiagram(loginId, teamId, projectId, diagramId);
@@ -259,8 +226,7 @@ class DiagramServiceTest {
         assertThat(diagram.isDeleted()).isTrue();
         assertThat(diagram.getYdocSnapshot()).isNull();
         assertThat(ReflectionTestUtils.getField(diagram, "deletedBy")).isEqualTo(loginId);
-        verify(roomManager).discardRoom(diagramId);
-        verify(diagramSnapshotService).clearCompactionCoolDown(diagramId);
+        verify(diagramSnapshotService).discardRealtimeStateAfterCommit(diagramId);
         verify(diagramRepository, never()).delete(diagram);
     }
 
@@ -287,6 +253,49 @@ class DiagramServiceTest {
             .hasMessage(MessageCode.ERROR_NOT_FOUND_DIAGRAM.code());
     }
 
+    @Test
+    @DisplayName("loadWritableDiagram - 쓰기 가능한 다이어그램 엔티티를 반환한다")
+    void loadWritableDiagram_returnsWritableDiagram() {
+        final var loginId = "tester";
+        final var teamId = 1L;
+        final var projectId = 10L;
+        final var diagramId = 100L;
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(teamId, user);
+        final var project = createProject(projectId, team);
+        final var diagram = Objects.requireNonNull(
+            Diagram.builder().name("D").project(project).content("{\"nodes\":[]}").build()
+        );
+        ReflectionTestUtils.setField(diagram, "id", diagramId);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(teamId)).thenReturn(team);
+        when(projectService.findProjectById(projectId)).thenReturn(project);
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(
+            Optional.of(diagram)
+        );
+
+        final var loaded = diagramService.loadWritableDiagram(loginId, teamId, projectId, diagramId);
+
+        assertThat(loaded).isSameAs(diagram);
+    }
+
+    @Test
+    @DisplayName("buildSaveDiagramResult - 현재 다이어그램 상태를 저장 응답으로 변환한다")
+    void buildSaveDiagramResult_returnsCurrentDiagramState() {
+        final var diagram = Objects.requireNonNull(
+            Diagram.builder().name("D").project(createProject(10L, createTeam(1L, createUser(1L, "tester")))).build()
+        );
+        ReflectionTestUtils.setField(diagram, "id", 100L);
+        diagram.updateYdocSnapshot(new byte[] { 1, 2, 3 });
+        diagram.syncSnapshotRevision(diagram.getContentRevision());
+
+        final var result = diagramService.buildSaveDiagramResult(diagram);
+
+        assertThat(result.hasYdocSnapshot()).isTrue();
+        assertThat(result.snapshotRevision()).isEqualTo(diagram.getSnapshotRevision());
+    }
+
     private User createUser(Long id, String loginId) {
         final var user = Objects.requireNonNull(User.builder().loginId(loginId).password("pw").name("Tester").build());
         ReflectionTestUtils.setField(user, "id", id);
@@ -311,26 +320,5 @@ class DiagramServiceTest {
         );
         ReflectionTestUtils.setField(dictionarySet, "id", id);
         return dictionarySet;
-    }
-
-    private Term createTerm(Long id, Team team, DictionarySet dictionarySet) {
-        final var term = Objects.requireNonNull(
-            Term.builder().logicalName("L").physicalName("P").team(team).dictionarySet(dictionarySet).build()
-        );
-        ReflectionTestUtils.setField(term, "id", id);
-        return term;
-    }
-
-    private Domain createDomain(Long id, Team team, DictionarySet dictionarySet) {
-        final var domain = Objects.requireNonNull(
-            Domain.builder()
-                .logicalName("D")
-                .physicalType("VARCHAR(20)")
-                .team(team)
-                .dictionarySet(dictionarySet)
-                .build()
-        );
-        ReflectionTestUtils.setField(domain, "id", id);
-        return domain;
     }
 }

@@ -1,15 +1,20 @@
 package com.smarterd.api.dictionary;
 
 import com.smarterd.api.common.dto.PageResponse;
-import com.smarterd.api.common.dto.PageSearchRequest;
 import com.smarterd.api.dictionary.dto.BulkSaveResponse;
 import com.smarterd.api.dictionary.dto.BulkTermSaveRequest;
 import com.smarterd.api.dictionary.dto.BulkValidationResponse;
+import com.smarterd.api.dictionary.dto.BulkValidationRow;
 import com.smarterd.api.dictionary.dto.CreateTermRequest;
 import com.smarterd.api.dictionary.dto.TermResponse;
 import com.smarterd.api.dictionary.dto.UpdateTermRequest;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkSaveResult;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationResult;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationRowResult;
 import com.smarterd.domain.dictionary.service.TermBulkService;
+import com.smarterd.domain.dictionary.service.TermDictionaryExportService;
 import com.smarterd.domain.dictionary.service.TermService;
+import com.smarterd.domain.dictionary.service.TermService.TermResult;
 import com.smarterd.utils.ExcelUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -56,6 +61,9 @@ public class TermController {
     /** 용어 일괄 업로드 서비스 */
     private final TermBulkService termBulkService;
 
+    /** 용어 사전 엑셀 다운로드 서비스 */
+    private final TermDictionaryExportService termDictionaryExportService;
+
     /**
      * 용어를 생성한다.
      *
@@ -79,9 +87,16 @@ public class TermController {
         @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Valid @RequestBody CreateTermRequest request
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-            termService.createTerm(jwt.getSubject(), teamId, setId, request)
+        final var result = termService.createTerm(
+            jwt.getSubject(),
+            teamId,
+            setId,
+            request.logicalName(),
+            request.physicalName(),
+            request.domainId(),
+            request.description()
         );
+        return ResponseEntity.status(HttpStatus.CREATED).body(toTermResponse(result));
     }
 
     /**
@@ -106,8 +121,10 @@ public class TermController {
             name = "q"
         ) String keyword
     ) {
-        final var searchRequest = new PageSearchRequest(page, size, keyword);
-        return ResponseEntity.ok(termService.getTerms(jwt.getSubject(), teamId, setId, searchRequest));
+        final var resultPage = termService
+            .getTerms(jwt.getSubject(), teamId, setId, page, size, keyword)
+            .map(this::toTermResponse);
+        return ResponseEntity.ok(PageResponse.from(resultPage));
     }
 
     /**
@@ -128,7 +145,7 @@ public class TermController {
         @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Parameter(description = "용어 ID") @PathVariable Long termId
     ) {
-        return ResponseEntity.ok(termService.getTerm(jwt.getSubject(), teamId, setId, termId));
+        return ResponseEntity.ok(toTermResponse(termService.getTerm(jwt.getSubject(), teamId, setId, termId)));
     }
 
     /**
@@ -152,7 +169,20 @@ public class TermController {
         @Parameter(description = "용어 ID") @PathVariable Long termId,
         @Valid @RequestBody UpdateTermRequest request
     ) {
-        return ResponseEntity.ok(termService.updateTerm(jwt.getSubject(), teamId, setId, termId, request));
+        return ResponseEntity.ok(
+            toTermResponse(
+                termService.updateTerm(
+                    jwt.getSubject(),
+                    teamId,
+                    setId,
+                    termId,
+                    request.logicalName(),
+                    request.physicalName(),
+                    request.domainId(),
+                    request.description()
+                )
+            )
+        );
     }
 
     /**
@@ -174,7 +204,9 @@ public class TermController {
         @RequestParam("file") MultipartFile file,
         Locale locale
     ) {
-        return ResponseEntity.ok(termBulkService.validateUpload(jwt.getSubject(), teamId, setId, file, locale));
+        return ResponseEntity.ok(
+            toBulkValidationResponse(termBulkService.validateUpload(jwt.getSubject(), teamId, setId, file, locale))
+        );
     }
 
     /**
@@ -195,7 +227,17 @@ public class TermController {
         @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Valid @RequestBody BulkTermSaveRequest request
     ) {
-        return ResponseEntity.ok(termBulkService.bulkSave(jwt.getSubject(), teamId, setId, request));
+        return ResponseEntity.ok(
+            toBulkSaveResponse(
+                termBulkService.bulkSave(
+                    jwt.getSubject(),
+                    teamId,
+                    setId,
+                    request.validationToken(),
+                    request.excludedRowNumbers()
+                )
+            )
+        );
     }
 
     /**
@@ -258,6 +300,28 @@ public class TermController {
     }
 
     /**
+     * 용어 사전 엑셀을 다운로드한다.
+     *
+     * @param jwt 인증된 JWT 토큰
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @param response HTTP 응답
+     * @throws IOException 엑셀 생성 실패 시
+     */
+    @Operation(summary = "용어 사전 엑셀 다운로드", description = "현재 사전 세트의 용어 사전을 엑셀로 다운로드한다.")
+    @ApiResponse(responseCode = "200", description = "용어 사전 다운로드 성공")
+    @GetMapping("/download/excel")
+    public void downloadTermDictionary(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
+        HttpServletResponse response
+    ) throws IOException {
+        final var excelData = termDictionaryExportService.generateTermDictionary(jwt.getSubject(), teamId, setId);
+        ExcelUtils.download(excelData, response);
+    }
+
+    /**
      * 용어를 삭제한다.
      *
      * @param jwt    인증된 JWT 토큰
@@ -277,5 +341,63 @@ public class TermController {
     ) {
         termService.deleteTerm(jwt.getSubject(), teamId, setId, termId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 서비스 계층 용어 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private TermResponse toTermResponse(TermResult result) {
+        return new TermResponse(
+            result.id(),
+            result.logicalName(),
+            result.physicalName(),
+            result.description(),
+            result.teamId(),
+            result.dictionarySetId(),
+            result.domainId(),
+            result.domainLogicalName(),
+            result.createdAt(),
+            result.updatedAt()
+        );
+    }
+
+    /**
+     * 서비스 계층 벌크 검증 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private BulkValidationResponse toBulkValidationResponse(BulkValidationResult result) {
+        return new BulkValidationResponse(
+            result.validationToken(),
+            result.totalCount(),
+            result.validCount(),
+            result.errorCount(),
+            result.previewTruncated(),
+            result.rows().stream().map(this::toBulkValidationRow).toList()
+        );
+    }
+
+    /**
+     * 서비스 계층 벌크 검증 행을 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과 행
+     * @return HTTP 응답 DTO
+     */
+    private BulkValidationRow toBulkValidationRow(BulkValidationRowResult result) {
+        return new BulkValidationRow(result.rowNumber(), result.valid(), result.errors(), result.data());
+    }
+
+    /**
+     * 서비스 계층 벌크 저장 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private BulkSaveResponse toBulkSaveResponse(BulkSaveResult result) {
+        return new BulkSaveResponse(result.savedCount(), result.failedCount());
     }
 }

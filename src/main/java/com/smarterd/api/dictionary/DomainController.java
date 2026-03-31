@@ -1,15 +1,20 @@
 package com.smarterd.api.dictionary;
 
 import com.smarterd.api.common.dto.PageResponse;
-import com.smarterd.api.common.dto.PageSearchRequest;
 import com.smarterd.api.dictionary.dto.BulkDomainSaveRequest;
 import com.smarterd.api.dictionary.dto.BulkSaveResponse;
 import com.smarterd.api.dictionary.dto.BulkValidationResponse;
+import com.smarterd.api.dictionary.dto.BulkValidationRow;
 import com.smarterd.api.dictionary.dto.CreateDomainRequest;
 import com.smarterd.api.dictionary.dto.DomainResponse;
 import com.smarterd.api.dictionary.dto.UpdateDomainRequest;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkSaveResult;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationResult;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationRowResult;
 import com.smarterd.domain.dictionary.service.DomainBulkService;
+import com.smarterd.domain.dictionary.service.DomainDictionaryExportService;
 import com.smarterd.domain.dictionary.service.DomainService;
+import com.smarterd.domain.dictionary.service.DomainService.DomainResult;
 import com.smarterd.utils.ExcelUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -56,6 +61,9 @@ public class DomainController {
     /** 도메인 일괄 업로드 서비스 */
     private final DomainBulkService domainBulkService;
 
+    /** 도메인 사전 엑셀 다운로드 서비스 */
+    private final DomainDictionaryExportService domainDictionaryExportService;
+
     /**
      * 도메인을 생성한다.
      *
@@ -79,9 +87,20 @@ public class DomainController {
         @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Valid @RequestBody CreateDomainRequest request
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-            domainService.createDomain(jwt.getSubject(), teamId, setId, request)
+        final var result = domainService.createDomain(
+            jwt.getSubject(),
+            teamId,
+            setId,
+            request.domainGroup(),
+            request.domainClassification(),
+            request.logicalName(),
+            request.physicalType(),
+            request.dataType(),
+            request.dataLength(),
+            request.dataScale(),
+            request.description()
         );
+        return ResponseEntity.status(HttpStatus.CREATED).body(toDomainResponse(result));
     }
 
     /**
@@ -106,8 +125,10 @@ public class DomainController {
             name = "q"
         ) String keyword
     ) {
-        final var searchRequest = new PageSearchRequest(page, size, keyword);
-        return ResponseEntity.ok(domainService.getDomains(jwt.getSubject(), teamId, setId, searchRequest));
+        final var resultPage = domainService
+            .getDomains(jwt.getSubject(), teamId, setId, page, size, keyword)
+            .map(this::toDomainResponse);
+        return ResponseEntity.ok(PageResponse.from(resultPage));
     }
 
     /**
@@ -128,7 +149,7 @@ public class DomainController {
         @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Parameter(description = "도메인 ID") @PathVariable Long domainId
     ) {
-        return ResponseEntity.ok(domainService.getDomain(jwt.getSubject(), teamId, setId, domainId));
+        return ResponseEntity.ok(toDomainResponse(domainService.getDomain(jwt.getSubject(), teamId, setId, domainId)));
     }
 
     /**
@@ -152,7 +173,24 @@ public class DomainController {
         @Parameter(description = "도메인 ID") @PathVariable Long domainId,
         @Valid @RequestBody UpdateDomainRequest request
     ) {
-        return ResponseEntity.ok(domainService.updateDomain(jwt.getSubject(), teamId, setId, domainId, request));
+        return ResponseEntity.ok(
+            toDomainResponse(
+                domainService.updateDomain(
+                    jwt.getSubject(),
+                    teamId,
+                    setId,
+                    domainId,
+                    request.domainGroup(),
+                    request.domainClassification(),
+                    request.logicalName(),
+                    request.physicalType(),
+                    request.dataType(),
+                    request.dataLength(),
+                    request.dataScale(),
+                    request.description()
+                )
+            )
+        );
     }
 
     /**
@@ -174,7 +212,9 @@ public class DomainController {
         @RequestParam("file") MultipartFile file,
         Locale locale
     ) {
-        return ResponseEntity.ok(domainBulkService.validateUpload(jwt.getSubject(), teamId, setId, file, locale));
+        return ResponseEntity.ok(
+            toBulkValidationResponse(domainBulkService.validateUpload(jwt.getSubject(), teamId, setId, file, locale))
+        );
     }
 
     /**
@@ -195,7 +235,17 @@ public class DomainController {
         @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Valid @RequestBody BulkDomainSaveRequest request
     ) {
-        return ResponseEntity.ok(domainBulkService.bulkSave(jwt.getSubject(), teamId, setId, request));
+        return ResponseEntity.ok(
+            toBulkSaveResponse(
+                domainBulkService.bulkSave(
+                    jwt.getSubject(),
+                    teamId,
+                    setId,
+                    request.validationToken(),
+                    request.excludedRowNumbers()
+                )
+            )
+        );
     }
 
     /**
@@ -263,6 +313,31 @@ public class DomainController {
     }
 
     /**
+     * 도메인 사전 엑셀을 다운로드한다.
+     *
+     * @param jwt 인증된 JWT 토큰
+     * @param teamId 팀 ID
+     * @param setId 사전 세트 ID
+     * @param response HTTP 응답
+     * @throws IOException 엑셀 생성 실패 시
+     */
+    @Operation(
+        summary = "도메인 사전 엑셀 다운로드",
+        description = "현재 사전 세트의 도메인 사전을 엑셀로 다운로드한다."
+    )
+    @ApiResponse(responseCode = "200", description = "도메인 사전 다운로드 성공")
+    @GetMapping("/download/excel")
+    public void downloadDomainDictionary(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
+        HttpServletResponse response
+    ) throws IOException {
+        final var excelData = domainDictionaryExportService.generateDomainDictionary(jwt.getSubject(), teamId, setId);
+        ExcelUtils.download(excelData, response);
+    }
+
+    /**
      * 도메인을 삭제한다.
      *
      * @param jwt      인증된 JWT 토큰
@@ -282,5 +357,66 @@ public class DomainController {
     ) {
         domainService.deleteDomain(jwt.getSubject(), teamId, setId, domainId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 서비스 계층 도메인 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private DomainResponse toDomainResponse(DomainResult result) {
+        return new DomainResponse(
+            result.id(),
+            result.logicalName(),
+            result.domainGroup(),
+            result.domainClassification(),
+            result.dataType(),
+            result.dataLength(),
+            result.dataScale(),
+            result.physicalType(),
+            result.description(),
+            result.teamId(),
+            result.dictionarySetId(),
+            result.createdAt(),
+            result.updatedAt()
+        );
+    }
+
+    /**
+     * 서비스 계층 벌크 검증 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private BulkValidationResponse toBulkValidationResponse(BulkValidationResult result) {
+        return new BulkValidationResponse(
+            result.validationToken(),
+            result.totalCount(),
+            result.validCount(),
+            result.errorCount(),
+            result.previewTruncated(),
+            result.rows().stream().map(this::toBulkValidationRow).toList()
+        );
+    }
+
+    /**
+     * 서비스 계층 벌크 검증 행을 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과 행
+     * @return HTTP 응답 DTO
+     */
+    private BulkValidationRow toBulkValidationRow(BulkValidationRowResult result) {
+        return new BulkValidationRow(result.rowNumber(), result.valid(), result.errors(), result.data());
+    }
+
+    /**
+     * 서비스 계층 벌크 저장 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private BulkSaveResponse toBulkSaveResponse(BulkSaveResult result) {
+        return new BulkSaveResponse(result.savedCount(), result.failedCount());
     }
 }

@@ -180,15 +180,35 @@
     },
     "previewSync": {
       "headerReadonly": "Real-time sync in progress",
+      "sharedDraftOverlaySuppressed": "Large diagrams hide the shared draft preview to keep the canvas responsive. Code-first drafts will appear on the ERD after they are applied.",
       "banner": {
         "title": "Preview is already visible",
         "description": "Editing will unlock automatically once real-time sync finishes.",
         "descriptionDisconnected": "Real-time sync is delayed. Editing will unlock automatically once the connection recovers.",
+        "descriptionIssue": {
+          "connection-limit-exceeded": "Too many collaboration tabs are open for this user. Close unused tabs or windows, then reconnect.",
+          "room-capacity-exceeded": "This diagram has reached its collaboration session limit. Please reconnect in a moment.",
+          "policy-violation": "The collaboration connection was rejected by server policy. Refresh the page or reconnect."
+        },
+        "retryConnection": "Reconnect",
         "locked": "Editing locked until sync completes"
       },
       "toast": {
         "connected": "Real-time sync connected. Editing is now enabled."
       }
+    },
+    "workMode": {
+      "label": "Work mode",
+      "sync": "Two-way",
+      "code": "Code-first",
+      "erd": "ERD-only",
+      "codeInfo": "In code-first mode, the canvas shows a read-only ERD preview generated from the DSL. Changes are reflected only after you click 'Apply to ERD'.",
+      "codeDslOnly": "Phase 1 supports the DSL tab only",
+      "codePreviewParsing": "Building the DSL preview ERD.",
+      "codePreviewBlocked": "Fix the DSL errors to show the preview ERD.",
+      "codePreviewFallback": "Showing the saved diagram for now.",
+      "codePreviewEmpty": "Add DSL tables to show the preview ERD.",
+      "sharedDraftConflict": "The persisted ERD changed since this shared draft started. Refresh before applying it again."
     },
     "toast": {
       "created": "Diagram created",
@@ -243,6 +263,10 @@
       "fkConnectActive": "FK Connect (Active)",
       "autoLayout": "Auto Layout",
       "export": "Export",
+      "exporting": "Exporting...",
+      "tableDefinitionExport": "Table Definition",
+      "columnDefinitionExport": "Column Definition",
+      "indexDefinitionExport": "Index Definition",
       "validate": "Validate",
       "validateActive": "Validate (active)",
       "ddlExport": "SQL DDL",
@@ -269,9 +293,22 @@
       "copyFailed": "Failed to copy to clipboard",
       "noTables": "No tables to export"
     },
+    "tableDefinitionExport": {
+      "downloaded": "Table definition downloaded",
+      "failed": "Failed to download table definition"
+    },
+    "columnDefinitionExport": {
+      "downloaded": "Column definition downloaded",
+      "failed": "Failed to download column definition"
+    },
+    "indexDefinitionExport": {
+      "downloaded": "Index definition downloaded",
+      "failed": "Failed to download index definition"
+    },
     "codeEditor": {
       "placeholder": "-- Enter SQL DDL here...\n-- Example:\n-- CREATE TABLE users (\n--   id SERIAL PRIMARY KEY,\n--   name VARCHAR(100) NOT NULL\n-- );",
       "applyButton": "Apply to ERD",
+      "applyOnlyButton": "Apply only",
       "applying": "Applying...",
       "confirmTitle": "Replace ERD",
       "confirmDescription": "Applying DDL will replace all existing tables and relationships. This action cannot be undone. Do you want to continue?",
@@ -280,9 +317,31 @@
       "diffFallbackApplied": "Incremental apply failed, so full replacement was used. {{dropped}} group memberships were excluded.",
       "success": "Applied {{count}} tables to ERD",
       "failed": "Failed to apply DDL",
+      "finalizeSaveButton": "Save",
+      "finalizeApplyAndSaveButton": "Apply and save",
+      "finalizeSavingButton": "Saving...",
+      "draftStatusDirty": "Temporary save pending",
+      "draftStatusSaving": "Saving temporary draft",
+      "draftStatusSaved": "Temporarily saved",
+      "draftStatusError": "Temporary save failed",
+      "draftStatusStale": "Shared draft save paused. Refresh and try again.",
+      "draftStatusReloadAction": "Reload now",
+      "remotePending": "Waiting for remote changes to reconcile",
+      "finalizeApplyRequired": "Apply to ERD before saving",
+      "finalizeRemotePending": "Save after remote changes are reconciled",
+      "finalizeInvalidDraft": "Resolve syntax errors before saving",
+      "finalizePending": "Save required",
+      "finalizeSaved": "Saved",
+      "formatButton": "Format code",
+      "copyWithPhysicalNamesButton": "Copy with physical names",
+      "copyWithPhysicalNamesCopied": "Code with physical names copied to clipboard",
+      "copyWithPhysicalNamesFailed": "Failed to copy code with physical names",
       "refreshButton": "Refresh from ERD",
       "refreshConfirmTitle": "Refresh Code",
-      "refreshConfirmDescription": "Current edits will be replaced with code generated from the ERD. Continue?"
+      "refreshConfirmDescription": "Current edits will be replaced with code generated from the ERD. Continue?",
+      "refreshConfirmDescriptionRemotePending": "To reconcile remote changes, your local draft will be discarded and the code will be regenerated from the ERD. Continue?",
+      "refreshConfirmDescriptionInvalidDraft": "Your current draft has syntax errors. It will be discarded and regenerated from the ERD. Continue?",
+      "refreshConfirmDescriptionStaleDraft": "Your stale shared draft will be discarded and the code will be reset to the saved ERD state. Continue?"
     },
     "lock": {
       "lockedBy": "{{name}} is editing",
@@ -338,8 +397,30 @@
       "noNodes": "No tables to export",
       "success": "Diagram exported successfully",
       "failed": "Failed to export diagram",
+      "inProgress": "Another export is already in progress",
       "largeDiagramHint": "This diagram is very large, so PNG/JPG quality may be limited. Use SVG or PDF for higher clarity.",
-      "pdfTiled": "Large diagram exported as a tiled PDF ({{count}} pages)"
+      "pdfTiled": "Large diagram exported as a tiled PDF ({{count}} pages)",
+      "progress": {
+        "preparing": "Preparing export",
+        "rendering": "Rendering diagram",
+        "encoding": "Generating file",
+        "assembling": "Building PDF",
+        "downloading": "Preparing download",
+        "failed": "Export failed",
+        "stepPreparing": "Prepare",
+        "stepRendering": "Render",
+        "stepFinalizing": "Finalize",
+        "stepDownloading": "Save",
+        "preparingDiagram": "Checking diagram bounds and the current viewport state.",
+        "loadingResources": "Loading fonts and rendering resources.",
+        "renderingDiagram": "Rendering the current diagram into an exportable image.",
+        "encodingImage": "Encoding the rendered canvas into an image file.",
+        "encodingSvg": "Finalizing SVG file data.",
+        "assemblingPdf": "Placing rendered images into PDF pages.",
+        "downloadReady": "Finishing the file save sequence.",
+        "retryLater": "Please try again in a moment.",
+        "pdfPage": "Processing page {{current}} of {{total}}."
+      }
     },
     "fkMode": {
       "selectParent": "Select parent table (PK source)",
@@ -362,7 +443,7 @@
       "keepFk": "Keep FK",
       "contextDelete": "Delete connection",
       "contextMenuAria": "Edge context menu",
-      "contextRouting": "Routing type",
+      "contextRouting": "Path mode",
       "contextHandleSide": "Connection side",
       "contextResetPath": "Reset path",
       "lockedBy": "{{name}} is editing this path",
@@ -376,9 +457,12 @@
       "handleLeftRight": "Left-Right",
       "handleRightLeft": "Right-Left",
       "handleRightRight": "Right-Right",
-      "routingSmoothstep": "Orthogonal",
-      "routingBezier": "Bezier",
-      "routingStraight": "Straight"
+      "routingSmoothstep": "Auto orthogonal",
+      "routingSmoothstepDescription": "Automatically calculates an orthogonal path",
+      "routingBezier": "Auto curved",
+      "routingBezierDescription": "Automatically calculates a smooth curved path",
+      "routingStraight": "Manual path edit",
+      "routingStraightDescription": "Lets you drag segments to tidy the path"
     },
     "tableNode": {
       "addColumn": "Add Column",
@@ -386,6 +470,7 @@
       "tableLogicalName": "Enter table logical name...",
       "duplicateLogicalNameWarning": "Duplicate column logical name: {{name}}",
       "duplicateLogicalNameCount": "{{count}} duplicate logical names",
+      "hiddenColumnSummary": "+ {{count}} hidden unconnected columns",
       "handleLayout": {
         "label": "Handle layout",
         "split": "Split",
@@ -416,7 +501,9 @@
         "selectDomain": "Select domain for {{colName}}",
         "changeColor": "Change table color",
         "changeHandleLayout": "Change table handle layout",
-        "reorderColumn": "Reorder column {{name}}"
+        "navigateToCode": "Go to the code for this table",
+        "reorderColumn": "Reorder column {{name}}",
+        "expandHiddenColumns": "Expand {{count}} hidden unconnected columns"
       }
     },
     "colorPicker": {
@@ -716,7 +803,7 @@
     },
     "search": {
       "wordPlaceholder": "Search words (logical/physical/description)",
-      "domainPlaceholder": "Search domains (logical/physical type/description)",
+      "domainPlaceholder": "Search domains (group/domain name/standard name/type/description)",
       "termPlaceholder": "Search terms (logical/physical/description)"
     },
     "word": {
@@ -783,8 +870,13 @@
     },
     "domain": {
       "table": {
-        "logicalName": "Logical Name",
-        "physicalType": "Physical Type",
+        "domainGroup": "Domain Group",
+        "domainClassification": "Domain Name",
+        "logicalName": "Standard Domain Name",
+        "dataType": "Data Type",
+        "dataLength": "Data Length",
+        "dataScale": "Data Scale",
+        "physicalType": "Display Type",
         "description": "Description",
         "actions": "Actions",
         "empty": "No domains yet. Add your first domain."
@@ -793,11 +885,23 @@
         "createTitle": "Add Domain",
         "editTitle": "Edit Domain",
         "createDescription": "Register a new domain in the dictionary set.",
-        "editDescription": "Update the selected domain's logical name, physical type, and description.",
-        "logicalName": "Logical Name",
-        "logicalNamePlaceholder": "e.g. Amount",
+        "editDescription": "Update the selected domain name, type rule, and description.",
+        "domainGroup": "Domain Group",
+        "domainGroupPlaceholder": "e.g. Naming",
+        "domainClassification": "Domain Name",
+        "domainClassificationPlaceholder": "e.g. Name",
+        "logicalName": "Standard Domain Name",
+        "logicalNamePlaceholder": "e.g. Name_V300",
+        "dataType": "Data Type",
+        "dataTypePlaceholder": "e.g. VARCHAR",
+        "dataLength": "Data Length",
+        "dataLengthPlaceholder": "e.g. 300",
+        "dataScale": "Data Scale",
+        "dataScalePlaceholder": "e.g. 2",
         "physicalType": "Physical Type",
         "physicalTypePlaceholder": "e.g. DECIMAL(15,2)",
+        "physicalTypePreview": "Display Type Preview",
+        "physicalTypePreviewPlaceholder": "Generated automatically from type and length",
         "description": "Description",
         "descriptionPlaceholder": "Optional description"
       },
@@ -939,6 +1043,19 @@
         "selectRow": "Select row {{row}}"
       }
     },
+    "export": {
+      "button": "Download Excel",
+      "allButton": "Export All",
+      "allExporting": "Exporting all...",
+      "allDownloaded": "All dictionaries downloaded",
+      "allFailed": "Failed to download all dictionaries",
+      "wordDownloaded": "Word dictionary downloaded",
+      "wordFailed": "Failed to download word dictionary",
+      "termDownloaded": "Term dictionary downloaded",
+      "termFailed": "Failed to download term dictionary",
+      "domainDownloaded": "Domain dictionary downloaded",
+      "domainFailed": "Failed to download domain dictionary"
+    },
     "suggest": {
       "hint": "Suggestion: {{details}}",
       "noMatch": "No matching terms found",
@@ -965,7 +1082,7 @@
     "title": "Server Settings",
     "description": "Configure the backend server URL for Smart ERD.",
     "serverUrlLabel": "Server URL",
-    "serverUrlPlaceholder": "e.g. http://localhost:8190",
+    "serverUrlPlaceholder": "e.g. http://localhost:9503",
     "testConnection": "Test Connection",
     "testing": "Testing...",
     "testSuccess": "Connection successful",

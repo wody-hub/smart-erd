@@ -4,6 +4,7 @@ import {
   expectDiagramHeaderVisible,
   getE2EProvisioningConfig,
   loginViaUi,
+  openCodeEditor,
   provisionCollaborationFixture,
   waitForEditableDiagram,
 } from '../shared/diagram-e2e';
@@ -74,12 +75,7 @@ test('quick term domain dropdown scrolls inside the diagram code flow @smoke', a
   await expectDiagramHeaderVisible(page, fixture.target);
   await waitForEditableDiagram(page, 30_000);
 
-  await page.getByRole('button', { name: /코드|code/i }).click();
-  await page.waitForFunction(
-    () => Boolean(window.monaco?.editor?.getModels?.().length),
-    undefined,
-    { timeout: 15_000 },
-  );
+  await openCodeEditor(page);
 
   await page.evaluate(() => {
     const model = window.monaco?.editor?.getModels?.()[0];

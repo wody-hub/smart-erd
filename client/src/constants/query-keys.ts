@@ -52,6 +52,9 @@ export const queryKeys = {
     /** 프로젝트별 다이어그램 목록 */
     byProject: (teamId: string, projectId: string) =>
       ['teams', teamId, 'projects', projectId, 'diagrams'] as const,
+    /** 다이어그램 bootstrap */
+    bootstrap: (teamId: string, projectId: string, diagramId: string) =>
+      ['teams', teamId, 'projects', projectId, 'diagrams', diagramId, 'bootstrap'] as const,
     /** 다이어그램 상세 */
     detail: (teamId: string, projectId: string, diagramId: string) =>
       ['teams', teamId, 'projects', projectId, 'diagrams', diagramId] as const,

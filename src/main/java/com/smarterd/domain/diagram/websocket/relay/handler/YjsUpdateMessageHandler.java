@@ -1,10 +1,10 @@
 package com.smarterd.domain.diagram.websocket.relay.handler;
 
+import com.smarterd.application.diagram.command.DiagramRealtimeSessionUseCase;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageContext;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
-import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import java.util.Arrays;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +23,7 @@ public class YjsUpdateMessageHandler implements DiagramMessageHandler {
 
     private static final Set<Byte> SUPPORTED_TYPES = Set.of(DiagramMessageTypes.MSG_YJS_UPDATE);
 
-    private final DiagramRoomManager roomManager;
+    private final DiagramRealtimeSessionUseCase diagramRealtimeSessionUseCase;
     private final DiagramMessageSender messageSender;
 
     /**
@@ -41,17 +41,17 @@ public class YjsUpdateMessageHandler implements DiagramMessageHandler {
      */
     @Override
     public void handle(DiagramMessageContext context) {
-        messageSender.broadcastToRoom(context.diagramId(), context.session(), context.message());
+        messageSender.broadcastToRoom(context.diagramId(), context.sessionId(), context.message());
 
         // 타입 바이트(0x03) 제외한 순수 Yjs update만 누적
         final var payload = context.payload();
         final var update = Arrays.copyOfRange(payload, 1, payload.length);
-        final var accepted = roomManager.appendUpdate(context.diagramId(), update);
+        final var accepted = diagramRealtimeSessionUseCase.appendRealtimeUpdate(context.diagramId(), update);
         if (!accepted) {
             log.warn(
                 "누적 update 크기 초과로 저장 거부 (diagramId={}, 세션 {})",
                 context.diagramId(),
-                context.session().getId()
+                context.sessionId()
             );
         }
     }

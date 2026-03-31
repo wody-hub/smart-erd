@@ -33,8 +33,10 @@ public class LoginIdAuditorAware implements AuditorAware<String> {
     }
 
     private boolean isAuditableAuthentication(Authentication authentication) {
-        return authentication != null &&
-        authentication.isAuthenticated() &&
-        !(authentication instanceof AnonymousAuthenticationToken);
+        return (
+            authentication != null &&
+            authentication.isAuthenticated() &&
+            !(authentication instanceof AnonymousAuthenticationToken)
+        );
     }
 }

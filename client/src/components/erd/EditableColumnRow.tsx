@@ -92,6 +92,7 @@ export default function EditableColumnRow({
   const { t } = useTranslation();
   const targetHandlePlacements = getColumnHandlePlacements(handleLayout, 'target');
   const sourceHandlePlacements = getColumnHandlePlacements(handleLayout, 'source');
+  const shouldRenderHandles = connected || fkMode;
 
   return (
     <div
@@ -104,19 +105,17 @@ export default function EditableColumnRow({
         className="flex items-center gap-1.5"
         style={{ paddingLeft: canEdit ? '12px' : undefined }}
       >
-        {targetHandlePlacements.map((placement) => (
-          <Handle
-            key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
-            type="target"
-            position={placement.position}
-            id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
-            className={cn(
-              '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
-              !(connected || fkMode) && '!opacity-0 !pointer-events-none',
-            )}
-            style={placement.style}
-          />
-        ))}
+        {shouldRenderHandles &&
+          targetHandlePlacements.map((placement) => (
+            <Handle
+              key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+              type="target"
+              position={placement.position}
+              id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+              className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+              style={placement.style}
+            />
+          ))}
 
         {/* PK toggle */}
         <button
@@ -246,9 +245,7 @@ export default function EditableColumnRow({
               open={domainPopoverOpen}
               onOpenChange={onDomainPopoverOpenChange}
               selectedDomainId={col.domainId}
-              onSelect={(domainId, physicalType) =>
-                onDomainChange(col.id, domainId, physicalType)
-              }
+              onSelect={(domainId, physicalType) => onDomainChange(col.id, domainId, physicalType)}
               align="end"
             >
               {domain ? (
@@ -318,19 +315,17 @@ export default function EditableColumnRow({
           </button>
         )}
 
-        {sourceHandlePlacements.map((placement) => (
-          <Handle
-            key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
-            type="source"
-            position={placement.position}
-            id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
-            className={cn(
-              '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
-              !(connected || fkMode) && '!opacity-0 !pointer-events-none',
-            )}
-            style={placement.style}
-          />
-        ))}
+        {shouldRenderHandles &&
+          sourceHandlePlacements.map((placement) => (
+            <Handle
+              key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+              type="source"
+              position={placement.position}
+              id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+              className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+              style={placement.style}
+            />
+          ))}
       </div>
     </div>
   );

@@ -88,6 +88,12 @@ public class InMemoryWsTicketStore implements WsTicketStore {
         }
     }
 
+    /**
+     * 기준 시각 이전에 만료된 ticket을 제거한다.
+     *
+     * @param now 만료 판정 기준 시각
+     * @return 하나 이상 제거되면 {@code true}
+     */
     private boolean cleanupExpiredTickets(Instant now) {
         return tickets.entrySet().removeIf((e) -> e.getValue().expiresAt().isBefore(now));
     }

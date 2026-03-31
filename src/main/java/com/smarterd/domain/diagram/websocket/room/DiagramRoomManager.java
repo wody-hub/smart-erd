@@ -1,9 +1,12 @@
 package com.smarterd.domain.diagram.websocket.room;
 
 import com.smarterd.config.websocket.WebSocketProperties;
+import com.smarterd.domain.diagram.websocket.model.JoinRejectionReason;
 import com.smarterd.domain.diagram.websocket.model.JoinResult;
 import com.smarterd.domain.diagram.websocket.model.LeaveResult;
 import com.smarterd.domain.diagram.websocket.model.PresenceSnapshot;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -93,8 +96,13 @@ public class DiagramRoomManager {
             webSocketProperties.getMaxConnectionsPerUser()
         );
         if (!acquired) {
-            log.warn("사용자 {} 연결 수 초과 (최대 {})", userId, webSocketProperties.getMaxConnectionsPerUser());
-            return new JoinResult(false, null, null, 0);
+            log.warn(
+                "사용자 {} 연결 수 초과 (현재 {}, 최대 {})",
+                userId,
+                sessionRegistry.getUserConnectionCount(userId),
+                webSocketProperties.getMaxConnectionsPerUser()
+            );
+            return new JoinResult(false, JoinRejectionReason.CONNECTION_LIMIT_EXCEEDED, null, null, 0);
         }
 
         final var sessions = sessionRegistry.getOrCreateSessions(diagramId);
@@ -105,17 +113,19 @@ public class DiagramRoomManager {
             if (sessions.size() >= webSocketProperties.getMaxSessionsPerRoom()) {
                 sessionRegistry.releaseUserConnection(userId); // 롤백
                 log.warn(
-                    "다이어그램 {} 방 입장 거부: 최대 인원({}) 초과",
+                    "다이어그램 {} 방 입장 거부: 현재 {}명, 최대 {}명",
                     diagramId,
+                    sessions.size(),
                     webSocketProperties.getMaxSessionsPerRoom()
                 );
-                return new JoinResult(false, null, null, 0);
+                return new JoinResult(false, JoinRejectionReason.ROOM_CAPACITY_EXCEEDED, null, null, 0);
             }
 
             sessions.add(session);
             presenceJoinResult = presenceManager.onJoin(sessions, diagramId, userId, displayName);
         }
 
+        sessionRegistry.bindSession(session);
         sessionRegistry.ensureSessionLock(session.getId());
         sessionRegistry.bindSessionUser(session.getId(), userId);
         sessionRegistry.bindSessionDiagram(session.getId(), diagramId);
@@ -123,6 +133,7 @@ public class DiagramRoomManager {
 
         return new JoinResult(
             true,
+            null,
             presenceJoinResult.snapshot(),
             presenceJoinResult.joinedParticipant(),
             presenceJoinResult.joinedPresenceVersion()
@@ -139,7 +150,7 @@ public class DiagramRoomManager {
      * @return 퇴장 결과
      */
     public LeaveResult leave(Long diagramId, WebSocketSession session, String userId) {
-        final var mappedDiagramId = sessionRegistry.findDiagramIdBySession(session);
+        final var mappedDiagramId = sessionRegistry.findDiagramIdBySessionId(session.getId());
         final var sessions = sessionRegistry.getSessions(diagramId);
         if (sessions == null) {
             // 다른 room에 속한 세션에 대해 잘못 호출된 leave는 상태를 건드리지 않는다.
@@ -151,6 +162,7 @@ public class DiagramRoomManager {
             final var mappedUserId = sessionRegistry.unbindSessionUser(session.getId());
             sessionRegistry.unbindSessionDiagram(session.getId());
             sessionRegistry.removeSessionLock(session.getId());
+            sessionRegistry.removeSession(session.getId());
             if (mappedUserId != null) {
                 sessionRegistry.releaseUserConnection(mappedUserId);
             }
@@ -170,6 +182,7 @@ public class DiagramRoomManager {
             }
 
             sessionRegistry.removeSessionLock(session.getId());
+            sessionRegistry.removeSession(session.getId());
             sessionRegistry.unbindSessionDiagram(session.getId());
             log.info("다이어그램 {} 방 퇴장: {} (남은 {}명)", diagramId, session.getId(), sessions.size());
 
@@ -220,27 +233,22 @@ public class DiagramRoomManager {
         }
     }
 
-    /**
-     * 같은 방의 다른 모든 세션에 바이너리 메시지를 브로드캐스트한다.
-     *
-     * @param diagramId 다이어그램 ID
-     * @param sender    발신 세션 (자신에게는 전송하지 않음)
-     * @param message   전송할 바이너리 메시지
-     */
-    public void broadcast(@NonNull Long diagramId, @NonNull WebSocketSession sender, @NonNull BinaryMessage message) {
+    public void broadcast(@NonNull Long diagramId, @NonNull String senderSessionId, @NonNull BinaryMessage message) {
         final var nonNullDiagramId = Objects.requireNonNull(diagramId, "diagramId must not be null");
-        final var nonNullSender = Objects.requireNonNull(sender, "sender must not be null");
+        final var nonNullSenderSessionId = Objects.requireNonNull(senderSessionId, "senderSessionId must not be null");
         final var nonNullMessage = Objects.requireNonNull(message, "message must not be null");
+        final var payload = copyPayload(nonNullMessage);
+        final var isLast = nonNullMessage.isLast();
 
         final var sessions = sessionRegistry.getSessionsOrEmpty(nonNullDiagramId);
         for (final var session : sessions) {
-            if (session.equals(nonNullSender) || !session.isOpen()) {
+            if (nonNullSenderSessionId.equals(session.getId()) || !session.isOpen()) {
                 continue;
             }
             try {
                 final var lock = getSessionLock(session);
                 synchronized (lock) {
-                    session.sendMessage(nonNullMessage);
+                    session.sendMessage(new BinaryMessage(Arrays.copyOf(payload, payload.length), isLast));
                 }
             } catch (Exception e) {
                 log.warn("메시지 전송 실패 (세션 {})", session.getId(), e);
@@ -258,14 +266,8 @@ public class DiagramRoomManager {
         return rateLimiter.checkRateLimit(session.getId(), webSocketProperties.getMaxMessagesPerSecond());
     }
 
-    /**
-     * presence snapshot 재요청 rate limit을 검사한다.
-     *
-     * @param session WebSocket 세션
-     * @return 허용 여부
-     */
-    public boolean allowPresenceSnapshotRequest(WebSocketSession session) {
-        return rateLimiter.allowPresenceSnapshotRequest(session.getId());
+    public boolean allowPresenceSnapshotRequest(String sessionId) {
+        return rateLimiter.allowPresenceSnapshotRequest(sessionId);
     }
 
     /**
@@ -300,14 +302,8 @@ public class DiagramRoomManager {
         sessionRegistry.removeFlushLock(diagramId);
     }
 
-    /**
-     * 세션의 rate limit 상태를 정리한다.
-     * 연결 종료 시 호출한다.
-     *
-     * @param session WebSocket 세션
-     */
-    public void cleanupRateLimit(WebSocketSession session) {
-        rateLimiter.cleanup(session.getId());
+    public void cleanupRateLimit(String sessionId) {
+        rateLimiter.cleanup(sessionId);
     }
 
     /**
@@ -392,23 +388,36 @@ public class DiagramRoomManager {
     }
 
     /**
-     * 세션에 매핑된 사용자 ID를 조회한다.
+     * 다이어그램의 누적 update 버퍼를 최신 단일 update 기준으로 교체한다.
      *
-     * @param session WebSocket 세션
-     * @return 사용자 ID (없으면 {@code null})
+     * 클라이언트가 전체 Y.Doc 상태를 서버 persisted snapshot으로 밀어넣은 직후,
+     * room warm handoff/연결 종료 flush도 같은 기준을 보도록 맞춘다.
+     *
+     * @param diagramId 다이어그램 ID
+     * @param update 최신 전체 상태를 나타내는 raw Yjs update
      */
-    public String findUserIdBySession(WebSocketSession session) {
-        return sessionRegistry.getSessionUser(session.getId());
+    public void replaceUpdates(Long diagramId, byte[] update) {
+        synchronized (getFlushLock(diagramId)) {
+            updateBuffer.replaceWithSingleUpdate(diagramId, update);
+        }
+    }
+
+    public String findUserIdBySessionId(String sessionId) {
+        return sessionRegistry.getSessionUser(sessionId);
+    }
+
+    public Long findDiagramIdBySessionId(String sessionId) {
+        return sessionRegistry.findDiagramIdBySessionId(sessionId);
     }
 
     /**
-     * 세션이 속한 다이어그램 ID를 조회한다.
+     * 세션 ID에 매핑된 실제 WebSocket 세션을 조회한다.
      *
-     * @param session WebSocket 세션
-     * @return 다이어그램 ID (없으면 {@code null})
+     * @param sessionId WebSocket 세션 ID
+     * @return 세션 객체. 없으면 {@code null}
      */
-    public Long findDiagramIdBySession(WebSocketSession session) {
-        return sessionRegistry.findDiagramIdBySession(session);
+    public WebSocketSession getSession(String sessionId) {
+        return sessionRegistry.getSession(sessionId);
     }
 
     /**
@@ -493,6 +502,7 @@ public class DiagramRoomManager {
 
         for (final var session : sessions) {
             sessionRegistry.removeSessionLock(session.getId());
+            sessionRegistry.removeSession(session.getId());
             rateLimiter.cleanup(session.getId());
 
             // 사용자별 연결 수 감소
@@ -511,5 +521,18 @@ public class DiagramRoomManager {
             }
         }
         log.info("다이어그램 {} 방 폐기 완료 ({}개 세션)", nonNullDiagramId, sessions.size());
+    }
+
+    /**
+     * BinaryMessage payload를 세션별 재전송에 안전한 byte 배열로 복사한다.
+     *
+     * @param message 원본 바이너리 메시지
+     * @return 복사된 payload
+     */
+    private byte[] copyPayload(BinaryMessage message) {
+        final ByteBuffer buffer = message.getPayload().asReadOnlyBuffer();
+        final var payload = new byte[buffer.remaining()];
+        buffer.get(payload);
+        return payload;
     }
 }

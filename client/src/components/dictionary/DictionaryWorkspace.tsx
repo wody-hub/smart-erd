@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Trash2, Star } from 'lucide-react';
+import { Plus, Pencil, Trash2, Star, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -23,11 +23,13 @@ import { queryKeys } from '@/constants/query-keys';
 import {
   createDictionarySet,
   deleteDictionarySet,
+  downloadAllDictionary,
   fetchDictionarySets,
   setDefaultDictionarySet,
   updateDictionarySet,
 } from '@/api/dictionarySetApi';
 import { getErrorMessage } from '@/lib/api-error';
+import { cn } from '@/lib/utils';
 import type { DictionarySet } from '@/types/dictionary';
 
 /** DictionaryWorkspace 컴포넌트 props */
@@ -133,9 +135,17 @@ export default function DictionaryWorkspace({
       toast.error(getErrorMessage(err, t('dictionary.set.toast.defaultUpdateFailed'))),
   });
 
+  /** 전체 사전 일괄 엑셀 다운로드 뮤테이션 */
+  const downloadAllMutation = useMutation({
+    mutationFn: () => downloadAllDictionary(teamId, selectedSetId),
+    onSuccess: () => toast.success(t('dictionary.export.allDownloaded')),
+    onError: (err) => toast.error(getErrorMessage(err, t('dictionary.export.allFailed'))),
+  });
+
   const selectedSet: DictionarySet | undefined = dictionarySets.find(
     (set) => String(set.id) === selectedSetId,
   );
+  const isFixedDialogMode = !!fixedSetId;
 
   const handleSetDefault = () => {
     if (!selectedSet || selectedSet.isDefault) {
@@ -149,7 +159,7 @@ export default function DictionaryWorkspace({
   }
 
   return (
-    <>
+    <div className={cn(isFixedDialogMode && 'flex min-h-0 flex-1 flex-col')}>
       {fixedSetId ? (
         <div className="mb-4 rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
           {t('diagram.edit.dictionaryContext', { name: fixedSetLabel ?? selectedSet?.name ?? '-' })}
@@ -202,23 +212,37 @@ export default function DictionaryWorkspace({
               </Button>
             </>
           )}
+
+          <Button
+            variant="outline"
+            onClick={() => downloadAllMutation.mutate()}
+            disabled={downloadAllMutation.isPending || !selectedSetId}
+          >
+            <Download className="h-4 w-4 mr-1" />
+            {downloadAllMutation.isPending
+              ? t('dictionary.export.allExporting')
+              : t('dictionary.export.allButton')}
+          </Button>
         </div>
       )}
 
       {selectedSetId ? (
-        <Tabs defaultValue="words">
+        <Tabs
+          defaultValue="words"
+          className={cn(isFixedDialogMode && 'flex min-h-0 flex-1 flex-col')}
+        >
           <TabsList>
             <TabsTrigger value="words">{t('dictionary.tabs.words')}</TabsTrigger>
             <TabsTrigger value="terms">{t('dictionary.tabs.terms')}</TabsTrigger>
             <TabsTrigger value="domains">{t('dictionary.tabs.domains')}</TabsTrigger>
           </TabsList>
-          <TabsContent value="words">
+          <TabsContent value="words" className={cn(isFixedDialogMode && 'mt-4')}>
             <WordTab canEdit={canEdit} setId={selectedSetId} />
           </TabsContent>
-          <TabsContent value="terms">
+          <TabsContent value="terms" className={cn(isFixedDialogMode && 'mt-4')}>
             <TermTab canEdit={canEdit} setId={selectedSetId} />
           </TabsContent>
-          <TabsContent value="domains">
+          <TabsContent value="domains" className={cn(isFixedDialogMode && 'mt-4')}>
             <DomainTab canEdit={canEdit} setId={selectedSetId} />
           </TabsContent>
         </Tabs>
@@ -267,6 +291,6 @@ export default function DictionaryWorkspace({
           />
         </>
       )}
-    </>
+    </div>
   );
 }

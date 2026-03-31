@@ -205,3 +205,19 @@ export async function downloadTermUploadErrors(
   );
   downloadBlob(res, 'term-upload-errors.xlsx');
 }
+
+/**
+ * 용어 사전 엑셀 파일을 다운로드한다.
+ *
+ * @param teamId 대상 팀 ID
+ * @param setId 대상 사전 세트 ID
+ */
+export async function downloadTermDictionary(teamId: string, setId: string): Promise<void> {
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/dictionary-sets/${setId}/terms/download/excel`,
+    {
+      responseType: 'blob',
+    },
+  );
+  downloadBlob(res, 'term-dictionary.xlsx');
+}

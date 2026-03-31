@@ -1,5 +1,26 @@
 import type { AxiosResponse } from 'axios';
 
+function decodeRfc2047Filename(value: string): string {
+  const encodedWordMatch = value.match(/^=\?UTF-8\?Q\?(.+)\?=$/i);
+  if (!encodedWordMatch) {
+    return value;
+  }
+
+  const decoded = encodedWordMatch[1]
+    .replace(/_/g, ' ')
+    .replace(/=([0-9A-F]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+
+  try {
+    return decodeURIComponent(
+      Array.from(decoded)
+        .map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, '0')}`)
+        .join(''),
+    );
+  } catch {
+    return value;
+  }
+}
+
 /**
  * Content-Disposition 헤더에서 파일명을 추출한다.
  *
@@ -20,7 +41,7 @@ export function extractFilename(response: AxiosResponse, fallback: string): stri
 
   // Standard: filename="name" or filename=name
   const standardMatch = disposition.match(/filename="?([^";\n]+)"?/i);
-  if (standardMatch) return standardMatch[1].trim();
+  if (standardMatch) return decodeRfc2047Filename(standardMatch[1].trim());
 
   return fallback;
 }
@@ -40,6 +61,9 @@ export function downloadBlob(response: AxiosResponse, defaultName: string): void
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  a.style.display = 'none';
+  document.body.append(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

@@ -3,6 +3,7 @@ import { useReactFlow } from '@xyflow/react';
 import { useShallow } from 'zustand/react/shallow';
 import DiagramSidebarView from '@/components/erd/DiagramSidebarView';
 import GroupTableSelectDialog from '@/components/erd/GroupTableSelectDialog';
+import { useDiagramErdCrudActions } from '@/collaboration/channel/diagram/use-diagram-erd-crud-actions';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 
 /** 사이드바 엔트리 문자열 분리자 */
@@ -41,14 +42,8 @@ function DiagramSidebar({
     ),
   );
   const groups = useCanvasStore((s) => s.groups);
-  const addTable = useCanvasStore((s) => s.addTable);
-  const deleteTable = useCanvasStore((s) => s.deleteTable);
-  const renameTable = useCanvasStore((s) => s.renameTable);
-  const addGroup = useCanvasStore((s) => s.addGroup);
-  const deleteGroup = useCanvasStore((s) => s.deleteGroup);
-  const renameGroup = useCanvasStore((s) => s.renameGroup);
-  const removeTableFromGroup = useCanvasStore((s) => s.removeTableFromGroup);
   const reactFlowInstance = useReactFlow();
+  const crudActions = useDiagramErdCrudActions();
   const [tableSelectGroupId, setTableSelectGroupId] = useState<string | null>(null);
 
   const activeGroup = activeGroupId
@@ -97,6 +92,42 @@ function DiagramSidebar({
     });
   };
 
+  const handleRenameTable = (tableId: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      return;
+    }
+    crudActions.renameTable(tableId, trimmed);
+  };
+
+  const handleAddTable = () => {
+    crudActions.addTable();
+  };
+
+  const handleDeleteTable = (tableId: string) => {
+    crudActions.deleteTable(tableId);
+  };
+
+  const handleAddGroup = () => {
+    crudActions.addGroup();
+  };
+
+  const handleRenameGroup = (groupId: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      return;
+    }
+    crudActions.renameGroup(groupId, trimmed);
+  };
+
+  const handleDeleteGroup = (groupId: string) => {
+    crudActions.deleteGroup(groupId);
+  };
+
+  const handleRemoveTableFromGroup = (groupId: string, tableId: string) => {
+    crudActions.updateGroupTables(groupId, [], [tableId]);
+  };
+
   return (
     <>
       <DiagramSidebarView
@@ -105,21 +136,21 @@ function DiagramSidebar({
         tableEntries={visibleTableEntries}
         groups={groups}
         tableMap={tableMap}
-        onAddTable={() => addTable()}
-        onAddGroup={() => addGroup()}
+        onAddTable={handleAddTable}
+        onAddGroup={handleAddGroup}
         onFocusTable={handleFocusNode}
-        onRenameTable={(tableId, newName) => renameTable(tableId, newName)}
-        onDeleteTable={(tableId) => deleteTable(tableId)}
+        onRenameTable={handleRenameTable}
+        onDeleteTable={handleDeleteTable}
         onViewGroup={onViewGroup}
         onBackToAll={onBackToAll}
-        onRenameGroup={(groupId, newName) => renameGroup(groupId, newName)}
+        onRenameGroup={handleRenameGroup}
         onDeleteGroup={(groupId) => {
           if (activeGroupId === groupId) {
             onBackToAll?.();
           }
-          deleteGroup(groupId);
+          handleDeleteGroup(groupId);
         }}
-        onRemoveTableFromGroup={(groupId, tableId) => removeTableFromGroup(groupId, tableId)}
+        onRemoveTableFromGroup={handleRemoveTableFromGroup}
         onOpenGroupTableSelect={(groupId) => setTableSelectGroupId(groupId)}
       />
 

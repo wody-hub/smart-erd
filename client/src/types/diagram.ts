@@ -30,6 +30,20 @@ export interface DiagramDetail extends DiagramSummary {
   snapshotUpdatedAt: string | null;
 }
 
+/** 다이어그램 저장 응답 */
+export interface SaveDiagramResult {
+  /** 최신 content 리비전 */
+  contentRevision: string;
+  /** Y.Doc 스냅샷 존재 여부 */
+  hasYdocSnapshot: boolean;
+  /** snapshot 리비전 */
+  snapshotRevision: string | null;
+  /** snapshot 저장 시각 */
+  snapshotUpdatedAt: string | null;
+  /** 최종 수정 시각 */
+  updatedAt: string;
+}
+
 /** 다이어그램 동기화 상태 */
 export type SyncStage =
   | 'boot'

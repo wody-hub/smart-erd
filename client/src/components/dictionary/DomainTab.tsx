@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -20,14 +20,16 @@ import Spinner from '@/components/ui/spinner';
 import DomainFormDialog from '@/components/dictionary/DomainFormDialog';
 import BulkUploadDialog from '@/components/dictionary/BulkUploadDialog';
 import {
-  fetchDomainsPage,
   createDomain,
-  updateDomain,
   deleteDomain,
+  downloadDomainDictionary,
   downloadDomainTemplate,
+  fetchDomainsPage,
+  updateDomain,
 } from '@/api/domainApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
+import { rankDictionarySearchResults } from '@/lib/dictionary-search-ranking';
 import { usePaginatedSearch } from '@/hooks/usePaginatedSearch';
 import type { Domain, DomainFormData } from '@/types/dictionary';
 
@@ -77,7 +79,17 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
     enabled: !!teamId && !!setId,
     placeholderData: (previousData) => previousData,
   });
-  const domains = domainPageData?.content ?? [];
+  const domains = useMemo(
+    () =>
+      rankDictionarySearchResults(domainPageData?.content ?? [], searchKeyword, (domain) => [
+        domain.domainGroup,
+        domain.domainClassification,
+        domain.dataType,
+        domain.physicalType,
+        domain.description,
+      ]),
+    [domainPageData?.content, searchKeyword],
+  );
   const totalElements = domainPageData?.totalElements ?? 0;
   const totalPages = domainPageData?.totalPages ?? 0;
   const isLastPage = domainPageData?.last ?? true;
@@ -117,6 +129,12 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
       toast.error(getErrorMessage(err, t('dictionary.upload.toast.templateFailed'))),
   });
 
+  const downloadDictionaryMutation = useMutation({
+    mutationFn: () => downloadDomainDictionary(teamId!, setId),
+    onSuccess: () => toast.success(t('dictionary.export.domainDownloaded')),
+    onError: (err) => toast.error(getErrorMessage(err, t('dictionary.export.domainFailed'))),
+  });
+
   /**
    * 생성 버튼 클릭 핸들러.
    *
@@ -137,6 +155,9 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
     setEditTarget(domain);
     setFormOpen(true);
   };
+
+  const isActionElementTarget = (target: EventTarget | null): boolean =>
+    target instanceof HTMLElement && target.closest('button') !== null;
 
   /**
    * 폼 제출 핸들러 (생성/수정 분기).
@@ -182,26 +203,36 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
             aria-label={t('dictionary.search.domainPlaceholder')}
           />
         </div>
-        {canEdit && (
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={handleTemplateDownload}
-              disabled={downloadTemplateMutation.isPending}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {t('dictionary.upload.template')}
-            </Button>
-            <Button variant="outline" onClick={() => setUploadOpen(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              {t('dictionary.upload.button')}
-            </Button>
-            <Button onClick={handleCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              {t('dictionary.domain.form.createTitle')}
-            </Button>
-          </div>
-        )}
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => downloadDictionaryMutation.mutate()}
+            disabled={downloadDictionaryMutation.isPending}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {t('dictionary.export.button')}
+          </Button>
+          {canEdit && (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleTemplateDownload}
+                disabled={downloadTemplateMutation.isPending}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {t('dictionary.upload.template')}
+              </Button>
+              <Button variant="outline" onClick={() => setUploadOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                {t('dictionary.upload.button')}
+              </Button>
+              <Button onClick={handleCreate}>
+                <Plus className="h-4 w-4 mr-2" />
+                {t('dictionary.domain.form.createTitle')}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {totalElements === 0 ? (
@@ -209,26 +240,51 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Database className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground mb-4">{t('dictionary.domain.table.empty')}</p>
-            {canEdit && (
-              <Button onClick={handleCreate}>
-                <Plus className="h-4 w-4 mr-2" />
-                {t('dictionary.domain.form.createTitle')}
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => downloadDictionaryMutation.mutate()}
+                disabled={downloadDictionaryMutation.isPending}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {t('dictionary.export.button')}
               </Button>
-            )}
+              {canEdit && (
+                <Button onClick={handleCreate}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t('dictionary.domain.form.createTitle')}
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       ) : (
         <div className="overflow-x-auto">
-          <Table className="w-full table-fixed min-w-[1060px]">
+          <Table className="w-full table-fixed min-w-[1500px]">
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[160px] whitespace-nowrap">
+                  {t('dictionary.domain.table.domainGroup')}
+                </TableHead>
+                <TableHead className="w-[160px] whitespace-nowrap">
+                  {t('dictionary.domain.table.domainClassification')}
+                </TableHead>
                 <TableHead className="w-[220px] whitespace-nowrap">
                   {t('dictionary.domain.table.logicalName')}
+                </TableHead>
+                <TableHead className="w-[160px] whitespace-nowrap">
+                  {t('dictionary.domain.table.dataType')}
+                </TableHead>
+                <TableHead className="w-[120px] whitespace-nowrap text-center">
+                  {t('dictionary.domain.table.dataLength')}
+                </TableHead>
+                <TableHead className="w-[140px] whitespace-nowrap text-center">
+                  {t('dictionary.domain.table.dataScale')}
                 </TableHead>
                 <TableHead className="w-[220px] whitespace-nowrap">
                   {t('dictionary.domain.table.physicalType')}
                 </TableHead>
-                <TableHead className="w-[520px] max-w-[520px]">
+                <TableHead className="w-[360px] max-w-[360px]">
                   {t('dictionary.domain.table.description')}
                 </TableHead>
                 {canEdit && (
@@ -240,14 +296,47 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
             </TableHeader>
             <TableBody>
               {domains.map((domain) => (
-                <TableRow key={domain.id}>
+                <TableRow
+                  key={domain.id}
+                  className={
+                    canEdit ? 'cursor-pointer transition-colors hover:bg-muted/50' : undefined
+                  }
+                  onClick={canEdit ? () => handleEdit(domain) : undefined}
+                  onKeyDown={
+                    canEdit
+                      ? (e) => {
+                          if (isActionElementTarget(e.target)) {
+                            return;
+                          }
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleEdit(domain);
+                          }
+                        }
+                      : undefined
+                  }
+                  tabIndex={canEdit ? 0 : undefined}
+                >
+                  <TableCell className="whitespace-nowrap">{domain.domainGroup ?? ''}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {domain.domainClassification ?? ''}
+                  </TableCell>
                   <TableCell className="font-medium whitespace-nowrap">
                     {domain.logicalName}
                   </TableCell>
                   <TableCell className="font-mono whitespace-nowrap">
+                    {domain.dataType ?? ''}
+                  </TableCell>
+                  <TableCell className="text-center whitespace-nowrap">
+                    {domain.dataLength ?? ''}
+                  </TableCell>
+                  <TableCell className="text-center whitespace-nowrap">
+                    {domain.dataScale ?? ''}
+                  </TableCell>
+                  <TableCell className="font-mono whitespace-nowrap">
                     {domain.physicalType}
                   </TableCell>
-                  <TableCell className="max-w-[520px] whitespace-normal break-words text-muted-foreground">
+                  <TableCell className="max-w-[360px] whitespace-normal break-words text-muted-foreground">
                     {domain.description ?? ''}
                   </TableCell>
                   {canEdit && (
@@ -257,7 +346,11 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => handleEdit(domain)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(domain);
+                          }}
+                          onKeyDown={(e) => e.stopPropagation()}
                           aria-label={t('dictionary.domain.aria.editDomain', {
                             name: domain.logicalName,
                           })}
@@ -268,7 +361,11 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => setDeleteTarget(domain.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(domain.id);
+                          }}
+                          onKeyDown={(e) => e.stopPropagation()}
                           aria-label={t('dictionary.domain.aria.deleteDomain', {
                             name: domain.logicalName,
                           })}

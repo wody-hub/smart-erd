@@ -17,6 +17,8 @@ interface UseAssistPopupOptions {
   monacoRef: React.MutableRefObject<typeof Monaco | null>;
   /** 편집 가능 여부 */
   canEdit: boolean;
+  /** 현재 controlled 코드 텍스트를 읽는다. */
+  getCurrentText?: () => string;
   /** 보조 항목 빌드 함수 */
   buildAssistItems: (
     model: Monaco.editor.ITextModel,
@@ -24,6 +26,8 @@ interface UseAssistPopupOptions {
     includeSnippets: boolean,
     trigger?: AssistPopupTrigger,
   ) => AssistPopupItem[];
+  /** Monaco executeEdits 이후 controlled 상태가 비동기 누락되면 동기화한다. */
+  onSyncInsertedText?: (nextText: string) => void;
   /** 용어 등록 요청 핸들러 */
   onRegisterTerm: (logicalName: string, lineNumber?: number | null) => void;
   /** 도메인 등록 요청 핸들러 */
@@ -37,7 +41,10 @@ interface UseAssistPopupReturn {
   /** 보조 팝업 리스트 DOM ref */
   assistPopupListRef: React.MutableRefObject<HTMLUListElement | null>;
   /** 보조 팝업을 연다 */
-  openAssistPopup: (options?: { position?: Monaco.IPosition; trigger?: AssistPopupTrigger }) => void;
+  openAssistPopup: (options?: {
+    position?: Monaco.IPosition;
+    trigger?: AssistPopupTrigger;
+  }) => void;
   /** 보조 팝업을 닫는다 */
   closeAssistPopup: () => void;
   /** 보조 팝업을 불투명(강조) 모드로 승격한다 */
@@ -63,7 +70,9 @@ export function useAssistPopup({
   editorRef,
   monacoRef,
   canEdit,
+  getCurrentText,
   buildAssistItems,
+  onSyncInsertedText,
   onRegisterTerm,
   onRegisterDomain,
 }: UseAssistPopupOptions): UseAssistPopupReturn {
@@ -155,7 +164,10 @@ export function useAssistPopup({
 
       const trigger = options?.trigger ?? 'manual';
       const preview = trigger !== 'manual';
-      const items = filterAssistItemsForTrigger(buildAssistItems(model, position, true, trigger), trigger);
+      const items = filterAssistItemsForTrigger(
+        buildAssistItems(model, position, true, trigger),
+        trigger,
+      );
       if (preview && assistPopupRef.current && !assistPopupRef.current.preview) {
         return;
       }
@@ -216,6 +228,7 @@ export function useAssistPopup({
       if (!monaco || !item.insertText) {
         return;
       }
+      const insertText = item.insertText;
       editor.executeEdits('dsl-assist', [
         {
           range: new monaco.Range(
@@ -224,14 +237,30 @@ export function useAssistPopup({
             item.lineNumber,
             item.endColumn,
           ),
-          text: item.insertText,
+          text: insertText,
           forceMoveMarkers: true,
         },
       ]);
+      const nextModelText = editor.getModel()?.getValue();
+      if (nextModelText != null && onSyncInsertedText && getCurrentText) {
+        queueMicrotask(() => {
+          if (getCurrentText() !== nextModelText) {
+            onSyncInsertedText(nextModelText);
+          }
+        });
+      }
       editor.focus();
       closeAssistPopup();
     },
-    [closeAssistPopup, editorRef, monacoRef, onRegisterDomain, onRegisterTerm],
+    [
+      closeAssistPopup,
+      editorRef,
+      getCurrentText,
+      monacoRef,
+      onRegisterDomain,
+      onRegisterTerm,
+      onSyncInsertedText,
+    ],
   );
 
   /** 최신 보조 팝업 상태를 ref로 유지한다. */

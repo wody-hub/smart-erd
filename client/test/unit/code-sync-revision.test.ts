@@ -76,3 +76,74 @@ test('buildRevisionHash 는 의미 있는 변경 시 다른 해시를 반환한�
 
   assert.notEqual(baseHash, changedHash);
 });
+
+test('buildRevisionHash 는 시각 편집만 바뀌면 동일 해시를 유지한다', () => {
+  const baseNode = {
+    id: 'n-a',
+    type: 'table',
+    parentId: null,
+    data: {
+      label: 'A',
+      logicalTableName: '에이',
+      tableTermId: 1,
+      headerColor: 'blue',
+      handleLayout: 'split',
+      columns: [{ id: 'c1', name: 'id', type: 'BIGINT', pk: true }],
+    },
+    position: { x: 100, y: 120 },
+  } as RevisionSnapshotNode;
+  const movedNode = {
+    id: 'n-a',
+    type: 'table',
+    parentId: null,
+    data: {
+      label: 'A',
+      logicalTableName: '에이',
+      tableTermId: 1,
+      headerColor: 'pink',
+      handleLayout: 'right',
+      columns: [{ id: 'c1', name: 'id', type: 'BIGINT', pk: true }],
+    },
+    position: { x: 520, y: 340 },
+  } as RevisionSnapshotNode;
+  const baseEdge = {
+    id: 'e-1',
+    source: 'n-a',
+    target: 'n-b',
+    sourceHandle: 'n-a-c1-source-right',
+    targetHandle: 'n-b-c9-target-left',
+    type: 'erdRelation',
+    data: {
+      relationType: 'non-identifying',
+      routingType: 'straight',
+      waypoints: [
+        { x: 220, y: 120 },
+        { x: 220, y: 260 },
+      ],
+      handleMode: 'manual',
+      sourceSide: 'right',
+      targetSide: 'left',
+    },
+  } as RevisionSnapshotEdge;
+  const movedEdge = {
+    id: 'e-1',
+    source: 'n-a',
+    target: 'n-b',
+    sourceHandle: 'n-a-c1-source-left',
+    targetHandle: 'n-b-c9-target-right',
+    type: 'erdRelation',
+    data: {
+      relationType: 'non-identifying',
+      routingType: 'bezier',
+      waypoints: [{ x: 480, y: 300 }],
+      handleMode: 'manual',
+      sourceSide: 'left',
+      targetSide: 'right',
+    },
+  } as RevisionSnapshotEdge;
+
+  const baseHash = buildRevisionHash([baseNode], [baseEdge]);
+  const movedHash = buildRevisionHash([movedNode], [movedEdge]);
+
+  assert.equal(baseHash, movedHash);
+});

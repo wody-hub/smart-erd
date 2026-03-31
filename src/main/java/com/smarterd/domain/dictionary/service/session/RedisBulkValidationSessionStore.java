@@ -20,6 +20,9 @@ public class RedisBulkValidationSessionStore implements BulkValidationSessionSto
 
     private final StringRedisTemplate redisTemplate;
 
+    /**
+     * @param redisTemplate Redis 문자열 템플릿
+     */
     public RedisBulkValidationSessionStore(StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
@@ -62,6 +65,14 @@ public class RedisBulkValidationSessionStore implements BulkValidationSessionSto
         redisTemplate.delete(key);
     }
 
+    /**
+     * classpath의 Lua 스크립트를 로드해 Redis script 객체를 생성한다.
+     *
+     * @param path classpath 기준 Lua 스크립트 경로
+     * @param resultType 스크립트 결과 타입
+     * @param <T> 결과 제네릭 타입
+     * @return 로드된 Redis script 객체
+     */
     private static <T> DefaultRedisScript<T> loadScript(String path, Class<T> resultType) {
         final var script = new DefaultRedisScript<T>();
         script.setLocation(new ClassPathResource(Objects.requireNonNull(path)));

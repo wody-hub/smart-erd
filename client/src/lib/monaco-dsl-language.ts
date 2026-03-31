@@ -1,5 +1,6 @@
 import type * as Monaco from 'monaco-editor';
 import type { Term, Domain } from '@/types/dictionary';
+import { DSL_LANGUAGE_CONFIGURATION } from '@/lib/monaco-dsl-language-config';
 import {
   DSL_TABLE_KEYWORD,
   DSL_TABLE_AFTER_REGEX,
@@ -34,11 +35,9 @@ const TABLE_KEYWORD_LOWER = DSL_TABLE_KEYWORD.toLowerCase();
  * @param monaco Monaco 네임스페이스
  */
 export function registerDslLanguage(monaco: typeof Monaco): void {
-  if (monaco.languages.getLanguages().some((lang) => lang.id === DSL_LANGUAGE_ID)) {
-    return;
+  if (!monaco.languages.getLanguages().some((lang) => lang.id === DSL_LANGUAGE_ID)) {
+    monaco.languages.register({ id: DSL_LANGUAGE_ID });
   }
-
-  monaco.languages.register({ id: DSL_LANGUAGE_ID });
 
   /** Table 키워드 정규식 (상태 전환 트리거) */
   const tableKeywordRegex = new RegExp(`\\b${DSL_TABLE_KEYWORD}\\b`);
@@ -87,6 +86,8 @@ export function registerDslLanguage(monaco: typeof Monaco): void {
       ],
     },
   });
+
+  monaco.languages.setLanguageConfiguration(DSL_LANGUAGE_ID, DSL_LANGUAGE_CONFIGURATION);
 }
 
 /** DSL 내 파싱된 테이블 정보 (자동완성용) */

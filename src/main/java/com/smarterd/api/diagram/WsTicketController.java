@@ -2,7 +2,7 @@ package com.smarterd.api.diagram;
 
 import com.smarterd.api.diagram.dto.WsTicketRequest;
 import com.smarterd.api.diagram.dto.WsTicketResponse;
-import com.smarterd.domain.diagram.websocket.ticket.WsTicketService;
+import com.smarterd.application.diagram.command.IssueDiagramCollaborationTicketUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,8 +23,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class WsTicketController {
 
-    /** ticket 발급/검증 서비스 */
-    private final WsTicketService wsTicketService;
+    /** 협업 ticket 발급 유스케이스 */
+    private final IssueDiagramCollaborationTicketUseCase issueDiagramCollaborationTicketUseCase;
 
     /**
      * WebSocket 일회용 ticket을 발급한다.
@@ -36,7 +36,7 @@ public class WsTicketController {
     @PostMapping
     public WsTicketResponse issueTicket(@AuthenticationPrincipal Jwt jwt, @RequestBody @Valid WsTicketRequest request) {
         final var loginId = jwt.getSubject();
-        final var result = wsTicketService.issueVerifiedTicket(loginId, request.diagramId());
+        final var result = issueDiagramCollaborationTicketUseCase.execute(loginId, request.diagramId());
         return new WsTicketResponse(result.ticket(), result.userId(), result.presenceProtocolVersion());
     }
 }

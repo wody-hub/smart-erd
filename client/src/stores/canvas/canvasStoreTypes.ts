@@ -2,9 +2,11 @@ import * as Y from 'yjs';
 import type { Edge, Node, OnEdgesChange, OnNodesChange } from '@xyflow/react';
 import type { CanvasUndoManager } from '@/constants/canvas-history';
 import type { DdlParseResult } from '@/lib/ddl-parser';
+import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import type { ApplyDiffResult } from '@/lib/erd-diff-apply';
 import type { DiffPlan } from '@/lib/erd-diff-plan';
 import type { EdgeHandleSelectionValue } from '@/lib/edge-handles';
+import type { DslPreviewNode } from '@/lib/dsl-preview-graph';
 import type {
   Column,
   EdgeRoutingType,
@@ -36,6 +38,16 @@ export interface PositionQueueCtx {
   pending: Map<string, { x: number; y: number }>;
 }
 
+export type ProjectionSyncTarget = 'nodes' | 'edges' | 'groups';
+
+export interface ProjectionSyncRequest {
+  forceFull?: boolean;
+  targets?: ProjectionSyncTarget[];
+  nodeIds?: string[];
+  edgeIds?: string[];
+  groupIds?: string[];
+}
+
 /**
  * 렌더링과 무관한 스토어 내부 상태.
  *
@@ -46,11 +58,16 @@ export interface PositionQueueCtx {
  */
 export interface InternalState {
   tablesObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null;
-  edgesObserver: (() => void) | null;
-  groupsObserver: (() => void) | null;
+  edgesObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null;
+  groupsObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null;
   undoManager: CanvasUndoManager | null;
   isNodeDragging: boolean;
-  hasDeferredTableSync: boolean;
+  hasDeferredProjectionSync: boolean;
+  deferredProjectionForceFull: boolean;
+  deferredProjectionTargets: Set<ProjectionSyncTarget>;
+  deferredProjectionNodeIds: Set<string>;
+  deferredProjectionEdgeIds: Set<string>;
+  deferredProjectionGroupIds: Set<string>;
   tablePositionQueue: PositionQueueCtx;
 }
 
@@ -125,6 +142,13 @@ export interface CanvasState {
     origin?: unknown,
   ) => void;
   applyLayout: (nodes: Node<TableNodeData>[]) => void;
+  finalizeNodeDrag: (
+    nodePositions?: Array<{ nodeId: string; position: { x: number; y: number } }>,
+  ) => void;
+  applyPreviewPositionChangesToPersisted: (
+    previewNodes: readonly DslPreviewNode[],
+    positionOverrides: DiagramPreviewPositionRecord,
+  ) => string[];
   serialize: () => string;
   addFkRelation: (params: AddFkRelationParams) => number;
   connectWithRelationType: (
@@ -159,6 +183,7 @@ export interface CanvasState {
   internal: InternalState;
   initYDoc: (ydoc: Y.Doc) => void;
   destroyYDoc: () => void;
+  syncFromYDoc: (request?: ProjectionSyncRequest) => void;
   /** API JSON을 Y.Doc을 거치지 않고 Zustand에 직접 주입한다 (프리뷰 전용). */
   loadPreview: (json: string) => void;
 }

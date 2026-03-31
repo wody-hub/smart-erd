@@ -1,40 +1,22 @@
 package com.smarterd.domain.diagram.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.smarterd.api.diagram.dto.CreateDiagramRequest;
-import com.smarterd.api.diagram.dto.DiagramDetailResponse;
-import com.smarterd.api.diagram.dto.DiagramResponse;
-import com.smarterd.api.diagram.dto.RenameDiagramRequest;
-import com.smarterd.api.diagram.dto.SaveDiagramRequest;
-import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
-import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetResponse;
-import com.smarterd.domain.common.exception.BusinessException;
+import com.smarterd.collaboration.metadata.DocumentMetadataService;
+import com.smarterd.collaboration.persistence.DocumentBootstrapReader;
 import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
-import com.smarterd.domain.dictionary.entity.DictionarySet;
-import com.smarterd.domain.dictionary.repository.DomainRepository;
-import com.smarterd.domain.dictionary.repository.TermRepository;
 import com.smarterd.domain.dictionary.service.DictionarySetService;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.service.ProjectService;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
-import com.smarterd.utils.AppStringUtils;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
  * </p>
  */
 @Service
-@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class DiagramService {
@@ -72,14 +53,14 @@ public class DiagramService {
     /** 다이어그램 스냅샷 서비스 */
     private final DiagramSnapshotService diagramSnapshotService;
 
-    /** 용어 레포지토리 */
-    private final TermRepository termRepository;
+    /** 다이어그램 사전 바인딩 정리 서비스 */
+    private final DiagramDictionaryBindingService diagramDictionaryBindingService;
 
-    /** 도메인 레포지토리 */
-    private final DomainRepository domainRepository;
+    /** 문서 메타데이터 조회 포트 */
+    private final DocumentMetadataService documentMetadataService;
 
-    /** JSON 파서 */
-    private final ObjectMapper objectMapper;
+    /** bootstrap header 조회 포트 */
+    private final DocumentBootstrapReader documentBootstrapReader;
 
     /**
      * 다이어그램을 생성한다.
@@ -87,22 +68,25 @@ public class DiagramService {
      * @param loginId   요청 사용자의 로그인 ID
      * @param teamId    팀 ID
      * @param projectId 프로젝트 ID
-     * @param request   다이어그램 생성 요청
-     * @return 생성된 다이어그램 응답
+     * @param name      다이어그램 이름
+     * @param dictionarySetId 사전 세트 ID
+     * @return 생성된 다이어그램 요약 결과
      */
     @Transactional
-    public DiagramResponse createDiagram(String loginId, Long teamId, Long projectId, CreateDiagramRequest request) {
+    public DiagramSummaryResult createDiagram(
+        String loginId,
+        Long teamId,
+        Long projectId,
+        String name,
+        Long dictionarySetId
+    ) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
-        final var dictionarySet = dictionarySetService.findByTeamAndId(project.getTeam(), request.dictionarySetId());
+        final var dictionarySet = dictionarySetService.findByTeamAndId(project.getTeam(), dictionarySetId);
 
-        final var diagram = Diagram.builder()
-            .name(request.name())
-            .project(project)
-            .dictionarySet(dictionarySet)
-            .build();
+        final var diagram = Diagram.builder().name(name).project(project).dictionarySet(dictionarySet).build();
         diagramRepository.save(Objects.requireNonNull(diagram));
 
-        return DiagramResponse.from(diagram, project.getId());
+        return toDiagramSummaryResult(diagram, project.getId());
     }
 
     /**
@@ -111,16 +95,16 @@ public class DiagramService {
      * @param loginId   요청 사용자의 로그인 ID
      * @param teamId    팀 ID
      * @param projectId 프로젝트 ID
-     * @return 다이어그램 응답 목록
+     * @return 다이어그램 요약 결과 목록
      */
-    public List<DiagramResponse> getDiagrams(String loginId, Long teamId, Long projectId) {
+    public List<DiagramSummaryResult> getDiagrams(String loginId, Long teamId, Long projectId) {
         final var project = verifyReadAccess(loginId, teamId, projectId);
         final var pid = project.getId();
 
         return diagramRepository
             .findByProjectAndDeletedAtIsNull(project)
             .stream()
-            .map((d) -> DiagramResponse.from(d, pid))
+            .map((diagram) -> toDiagramSummaryResult(diagram, pid))
             .toList();
     }
 
@@ -131,35 +115,41 @@ public class DiagramService {
      * @param teamId     팀 ID
      * @param projectId  프로젝트 ID
      * @param diagramId  다이어그램 ID
-     * @return 다이어그램 상세 응답
+     * @return 다이어그램 상세 결과
      */
-    public DiagramDetailResponse getDiagram(String loginId, Long teamId, Long projectId, Long diagramId) {
+    public DiagramDetailResult getDiagram(String loginId, Long teamId, Long projectId, Long diagramId) {
         final var project = verifyReadAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
-        // 새로고침 직후에도 최신 상태를 반환하도록 조회 직전에 누적 update를 즉시 flush한다.
-        diagramSnapshotService.flushDiagramSnapshotNow(diagram.getId());
         final var hasSnapshot = diagramRepository.existsYdocSnapshotById(diagramId);
 
-        return DiagramDetailResponse.from(diagram, project.getId(), hasSnapshot);
+        return toDiagramDetailResult(diagram, project.getId(), hasSnapshot);
     }
 
     /**
-     * 다이어그램 콘텐츠를 저장한다.
+     * 다이어그램 collaboration bootstrap 메타를 조회한다.
      *
-     * @param loginId    요청 사용자의 로그인 ID
-     * @param teamId     팀 ID
-     * @param projectId  프로젝트 ID
-     * @param diagramId  다이어그램 ID
-     * @param request    저장 요청 (content)
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId 팀 ID
+     * @param projectId 프로젝트 ID
+     * @param diagramId 다이어그램 ID
+     * @return bootstrap 메타 결과
      */
-    @Transactional
-    public void saveDiagram(String loginId, Long teamId, Long projectId, Long diagramId, SaveDiagramRequest request) {
-        final var project = verifyWriteAccess(loginId, teamId, projectId);
-        final var diagram = findDiagramByProjectAndId(project, diagramId);
+    public DiagramBootstrapResult getDiagramBootstrap(String loginId, Long teamId, Long projectId, Long diagramId) {
+        final var project = verifyReadAccess(loginId, teamId, projectId);
+        findDiagramByProjectAndId(project, diagramId);
+        final var metadata = documentMetadataService.loadDocumentMetadata(diagramId, loginId);
+        final var bootstrapHeader = documentBootstrapReader.loadBootstrapHeader(diagramId);
 
-        diagram.updateContent(request.content());
-        // content 저장 직후 stale snapshot 우선 로딩을 피하기 위해 기존 스냅샷을 무효화한다.
-        diagram.updateYdocSnapshot(null);
+        return new DiagramBootstrapResult(
+            metadata.pluginId(),
+            metadata.engineId(),
+            bootstrapHeader.pluginSchemaVersion(),
+            bootstrapHeader.snapshotFormatVersion(),
+            bootstrapHeader.artifactVersion(),
+            bootstrapHeader.revision(),
+            bootstrapHeader.snapshotAvailable(),
+            bootstrapHeader.artifactAvailable()
+        );
     }
 
     /**
@@ -169,23 +159,23 @@ public class DiagramService {
      * @param teamId     팀 ID
      * @param projectId  프로젝트 ID
      * @param diagramId  다이어그램 ID
-     * @param request    이름 변경 요청
-     * @return 다이어그램 응답
+     * @param name       변경할 다이어그램 이름
+     * @return 다이어그램 요약 결과
      */
     @Transactional
-    public DiagramResponse renameDiagram(
+    public DiagramSummaryResult renameDiagram(
         String loginId,
         Long teamId,
         Long projectId,
         Long diagramId,
-        RenameDiagramRequest request
+        String name
     ) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
 
-        diagram.rename(request.name());
+        diagram.rename(name);
 
-        return DiagramResponse.from(diagram, project.getId());
+        return toDiagramSummaryResult(diagram, project.getId());
     }
 
     /**
@@ -195,16 +185,16 @@ public class DiagramService {
      * @param teamId    팀 ID
      * @param projectId 프로젝트 ID
      * @param diagramId 다이어그램 ID
-     * @param request   사전 세트 변경 요청
+     * @param dictionarySetId 변경할 사전 세트 ID
      * @return 변경 결과
      */
     @Transactional
-    public UpdateDiagramDictionarySetResponse updateDiagramDictionarySet(
+    public DictionarySetChangeResult updateDiagramDictionarySet(
         String loginId,
         Long teamId,
         Long projectId,
         Long diagramId,
-        UpdateDiagramDictionarySetRequest request
+        Long dictionarySetId
     ) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
@@ -213,11 +203,12 @@ public class DiagramService {
             throw new ConflictException(MessageCode.ERROR_BUSINESS_DIAGRAM_DICTIONARY_SET_CHANGE_WHILE_EDITING.code());
         }
 
-        final var dictionarySet = dictionarySetService.findByTeamAndId(project.getTeam(), request.dictionarySetId());
-        final var invalidationCounts = invalidateDictionaryBindings(diagram, dictionarySet);
+        final var dictionarySet = dictionarySetService.findByTeamAndId(project.getTeam(), dictionarySetId);
+        final var invalidationCounts = diagramDictionaryBindingService.invalidateBindings(diagram, dictionarySet);
         diagram.changeDictionarySet(dictionarySet);
-        diagram.updateYdocSnapshot(null);
-        return new UpdateDiagramDictionarySetResponse(
+        diagram.nullifySnapshot();
+        diagramSnapshotService.discardRealtimeStateAfterCommit(diagramId);
+        return new DictionarySetChangeResult(
             dictionarySet.getId(),
             invalidationCounts.invalidatedTermBindingCount(),
             invalidationCounts.invalidatedDomainBindingCount()
@@ -239,8 +230,7 @@ public class DiagramService {
         final var resolvedDiagramId = Objects.requireNonNull(diagram.getId());
         diagram.softDelete(loginId);
         diagram.nullifySnapshot();
-        roomManager.discardRoom(resolvedDiagramId);
-        diagramSnapshotService.clearCompactionCoolDown(resolvedDiagramId);
+        diagramSnapshotService.discardRealtimeStateAfterCommit(resolvedDiagramId);
     }
 
     /**
@@ -296,182 +286,193 @@ public class DiagramService {
     }
 
     /**
-     * 다이어그램 content의 term/domain 바인딩을 대상 세트 기준으로 정리한다.
+     * 쓰기 가능한 다이어그램 엔티티를 로드한다.
      *
-     * <p>세트에 존재하지 않는 termId/domainId는 제거한다.</p>
-     *
-     * @param diagram   대상 다이어그램
-     * @param targetSet 변경 대상 사전 세트
-     * @return 무효화 카운트
+     * @param loginId   요청 사용자의 로그인 ID
+     * @param teamId    팀 ID
+     * @param projectId 프로젝트 ID
+     * @param diagramId 다이어그램 ID
+     * @return 쓰기 가능한 다이어그램 엔티티
      */
-    private InvalidationCounts invalidateDictionaryBindings(Diagram diagram, DictionarySet targetSet) {
-        final var content = diagram.getContent();
-        if (AppStringUtils.isBlank(content)) {
-            return InvalidationCounts.empty();
-        }
-
-        final Set<Long> validTermIds = termRepository
-            .findByDictionarySet(targetSet)
-            .stream()
-            .map((term) -> term.getId())
-            .collect(Collectors.toSet());
-        final Set<Long> validDomainIds = domainRepository
-            .findByDictionarySet(targetSet)
-            .stream()
-            .map((domain) -> domain.getId())
-            .collect(Collectors.toSet());
-
-        try {
-            final var rootNode = objectMapper.readTree(content);
-            if (!(rootNode instanceof ObjectNode rootObject)) {
-                return InvalidationCounts.empty();
-            }
-
-            final var counts = invalidateRootAndNodes(rootObject, validTermIds, validDomainIds);
-
-            if (counts.invalidatedTermBindingCount() > 0 || counts.invalidatedDomainBindingCount() > 0) {
-                diagram.updateContent(objectMapper.writeValueAsString(rootObject));
-            }
-            return counts;
-        } catch (JsonProcessingException e) {
-            log.warn("Failed to invalidate dictionary bindings for diagramId={}", diagram.getId(), e);
-            throw new BusinessException(MessageCode.ERROR_BUSINESS_DIAGRAM_CONTENT_INVALID_JSON.code());
-        }
+    public Diagram loadWritableDiagram(String loginId, Long teamId, Long projectId, Long diagramId) {
+        final var project = verifyWriteAccess(loginId, teamId, projectId);
+        return findDiagramByProjectAndId(project, diagramId);
     }
 
     /**
-     * 루트 객체와 노드 배열의 바인딩을 무효화한다.
+     * 읽기 가능한 다이어그램 엔티티를 로드한다.
      *
-     * @param rootObject    JSON 루트 객체
-     * @param validTermIds  유효한 용어 ID 집합
-     * @param validDomainIds 유효한 도메인 ID 집합
-     * @return 무효화 카운트
+     * @param loginId 요청 사용자의 로그인 ID
+     * @param teamId 팀 ID
+     * @param projectId 프로젝트 ID
+     * @param diagramId 다이어그램 ID
+     * @return 읽기 가능한 다이어그램 엔티티
      */
-    private InvalidationCounts invalidateRootAndNodes(
-        ObjectNode rootObject,
-        Set<Long> validTermIds,
-        Set<Long> validDomainIds
-    ) {
-        var invalidatedTermBindingCount = 0;
-        var invalidatedDomainBindingCount = 0;
-
-        final var tableTermId = toLongValue(rootObject.path("tableTermId"));
-        if (tableTermId != null && !validTermIds.contains(tableTermId)) {
-            rootObject.remove("tableTermId");
-            invalidatedTermBindingCount++;
-        }
-
-        final var nodesNode = rootObject.get("nodes");
-        if (nodesNode instanceof ArrayNode nodesArray) {
-            for (final var node : nodesArray) {
-                if (!(node instanceof ObjectNode nodeObject)) {
-                    continue;
-                }
-                final var nodeCounts = invalidateNodeBindings(nodeObject, validTermIds, validDomainIds);
-                invalidatedTermBindingCount += nodeCounts.invalidatedTermBindingCount();
-                invalidatedDomainBindingCount += nodeCounts.invalidatedDomainBindingCount();
-            }
-        }
-
-        return new InvalidationCounts(invalidatedTermBindingCount, invalidatedDomainBindingCount);
+    public Diagram loadReadableDiagram(String loginId, Long teamId, Long projectId, Long diagramId) {
+        final var project = verifyReadAccess(loginId, teamId, projectId);
+        return findDiagramByProjectAndId(project, diagramId);
     }
 
     /**
-     * 개별 노드의 data 객체에서 term/domain 바인딩을 무효화한다.
+     * Diagram 엔티티를 목록/이름변경 응답용 결과로 변환한다.
      *
-     * @param nodeObject     노드 JSON 객체
-     * @param validTermIds   유효한 용어 ID 집합
-     * @param validDomainIds 유효한 도메인 ID 집합
-     * @return 무효화 카운트
+     * @param diagram    다이어그램 엔티티
+     * @param projectId  소속 프로젝트 ID
+     * @return 서비스 계층 목록 결과
      */
-    private InvalidationCounts invalidateNodeBindings(
-        ObjectNode nodeObject,
-        Set<Long> validTermIds,
-        Set<Long> validDomainIds
-    ) {
-        final var dataNode = nodeObject.get("data");
-        if (!(dataNode instanceof ObjectNode dataObject)) {
-            return InvalidationCounts.empty();
-        }
-
-        var invalidatedTermBindingCount = 0;
-        var invalidatedDomainBindingCount = 0;
-
-        final var tableTermId = toLongValue(dataObject.get("tableTermId"));
-        if (tableTermId != null && !validTermIds.contains(tableTermId)) {
-            dataObject.remove("tableTermId");
-            invalidatedTermBindingCount++;
-        }
-
-        final var columnsNode = dataObject.get("columns");
-        if (columnsNode instanceof ArrayNode columnsArray) {
-            final var columnCounts = invalidateColumnBindings(columnsArray, validTermIds, validDomainIds);
-            invalidatedTermBindingCount += columnCounts.invalidatedTermBindingCount();
-            invalidatedDomainBindingCount += columnCounts.invalidatedDomainBindingCount();
-        }
-
-        return new InvalidationCounts(invalidatedTermBindingCount, invalidatedDomainBindingCount);
+    private DiagramSummaryResult toDiagramSummaryResult(Diagram diagram, Long projectId) {
+        final var dictionarySet = diagram.getDictionarySet();
+        return new DiagramSummaryResult(
+            diagram.getId(),
+            diagram.getName(),
+            projectId,
+            dictionarySet != null ? dictionarySet.getId() : null,
+            dictionarySet != null ? dictionarySet.getName() : null,
+            diagram.getCreatedAt(),
+            diagram.getUpdatedAt()
+        );
     }
 
     /**
-     * 컬럼 배열에서 term/domain 바인딩을 무효화한다.
+     * Diagram 엔티티를 상세 조회용 결과로 변환한다.
      *
-     * @param columnsArray   컬럼 JSON 배열
-     * @param validTermIds   유효한 용어 ID 집합
-     * @param validDomainIds 유효한 도메인 ID 집합
-     * @return 무효화 카운트
+     * @param diagram          다이어그램 엔티티
+     * @param projectId        소속 프로젝트 ID
+     * @param hasYdocSnapshot  Y.Doc 스냅샷 존재 여부
+     * @return 서비스 계층 상세 결과
      */
-    private InvalidationCounts invalidateColumnBindings(
-        ArrayNode columnsArray,
-        Set<Long> validTermIds,
-        Set<Long> validDomainIds
-    ) {
-        var invalidatedTermBindingCount = 0;
-        var invalidatedDomainBindingCount = 0;
-
-        for (final var columnNode : columnsArray) {
-            if (!(columnNode instanceof ObjectNode columnObject)) {
-                continue;
-            }
-
-            final var termId = toLongValue(columnObject.get("termId"));
-            if (termId != null && !validTermIds.contains(termId)) {
-                columnObject.remove("termId");
-                invalidatedTermBindingCount++;
-            }
-
-            final var domainId = toLongValue(columnObject.get("domainId"));
-            if (domainId != null && !validDomainIds.contains(domainId)) {
-                columnObject.remove("domainId");
-                invalidatedDomainBindingCount++;
-            }
-        }
-
-        return new InvalidationCounts(invalidatedTermBindingCount, invalidatedDomainBindingCount);
+    private DiagramDetailResult toDiagramDetailResult(Diagram diagram, Long projectId, boolean hasYdocSnapshot) {
+        final var dictionarySet = diagram.getDictionarySet();
+        return new DiagramDetailResult(
+            diagram.getId(),
+            diagram.getName(),
+            projectId,
+            dictionarySet != null ? dictionarySet.getId() : null,
+            dictionarySet != null ? dictionarySet.getName() : null,
+            diagram.getContent(),
+            hasYdocSnapshot,
+            diagram.getContentRevision(),
+            diagram.getSnapshotRevision(),
+            diagram.getSnapshotUpdatedAt(),
+            diagram.getCreatedAt(),
+            diagram.getUpdatedAt()
+        );
     }
 
-    @Nullable
-    private Long toLongValue(JsonNode valueNode) {
-        if (valueNode == null || valueNode.isNull()) {
-            return null;
-        }
-        if (valueNode.canConvertToLong()) {
-            return valueNode.longValue();
-        }
-        if (valueNode.isTextual()) {
-            try {
-                return Long.parseLong(valueNode.textValue());
-            } catch (NumberFormatException e) {
-                log.trace("텍스트를 Long으로 변환 불가: '{}'", valueNode.textValue(), e);
-                return null;
-            }
-        }
-        return null;
+    /**
+     * Diagram 엔티티를 저장 응답용 결과로 변환한다.
+     *
+     * @param diagram 저장 직후 다이어그램 엔티티
+     * @return 서비스 계층 저장 결과
+     */
+    public SaveDiagramResult buildSaveDiagramResult(Diagram diagram) {
+        return new SaveDiagramResult(
+            diagram.getContentRevision(),
+            diagram.getYdocSnapshot() != null,
+            diagram.getSnapshotRevision(),
+            diagram.getSnapshotUpdatedAt(),
+            diagram.getUpdatedAt()
+        );
     }
 
-    private record InvalidationCounts(int invalidatedTermBindingCount, int invalidatedDomainBindingCount) {
-        private static InvalidationCounts empty() {
-            return new InvalidationCounts(0, 0);
-        }
-    }
+    /**
+     * 다이어그램 목록/이름변경 응답용 서비스 결과.
+     *
+     * @param id                다이어그램 ID
+     * @param name              다이어그램 이름
+     * @param projectId         소속 프로젝트 ID
+     * @param dictionarySetId   사전 세트 ID
+     * @param dictionarySetName 사전 세트 이름
+     * @param createdAt         생성 시각
+     * @param updatedAt         수정 시각
+     */
+    public record DiagramSummaryResult(
+        Long id,
+        String name,
+        Long projectId,
+        Long dictionarySetId,
+        String dictionarySetName,
+        Instant createdAt,
+        Instant updatedAt
+    ) {}
+
+    /**
+     * 다이어그램 상세 응답용 서비스 결과.
+     *
+     * @param id                다이어그램 ID
+     * @param name              다이어그램 이름
+     * @param projectId         소속 프로젝트 ID
+     * @param dictionarySetId   사전 세트 ID
+     * @param dictionarySetName 사전 세트 이름
+     * @param content           직렬화된 React Flow JSON
+     * @param hasYdocSnapshot   Y.Doc 스냅샷 존재 여부
+     * @param contentRevision   content 리비전
+     * @param snapshotRevision  snapshot 리비전
+     * @param snapshotUpdatedAt snapshot 저장 시각
+     * @param createdAt         생성 시각
+     * @param updatedAt         수정 시각
+     */
+    public record DiagramDetailResult(
+        Long id,
+        String name,
+        Long projectId,
+        Long dictionarySetId,
+        String dictionarySetName,
+        String content,
+        boolean hasYdocSnapshot,
+        long contentRevision,
+        Long snapshotRevision,
+        Instant snapshotUpdatedAt,
+        Instant createdAt,
+        Instant updatedAt
+    ) {}
+
+    /**
+     * 다이어그램 bootstrap 응답용 서비스 결과.
+     *
+     * @param contentRevision content 리비전
+     * @param snapshotRevision snapshot 리비전
+     * @param hasYdocSnapshot Y.Doc 스냅샷 존재 여부
+     * @param artifactAvailable content fallback artifact 존재 여부
+     */
+    public record DiagramBootstrapResult(
+        String pluginId,
+        String engineId,
+        int pluginSchemaVersion,
+        int snapshotFormatVersion,
+        Integer artifactVersion,
+        long revision,
+        boolean snapshotAvailable,
+        boolean artifactAvailable
+    ) {}
+
+    /**
+     * 다이어그램 저장 응답용 서비스 결과.
+     *
+     * @param contentRevision   최신 content 리비전
+     * @param hasYdocSnapshot   Y.Doc 스냅샷 존재 여부
+     * @param snapshotRevision  snapshot 리비전
+     * @param snapshotUpdatedAt snapshot 저장 시각
+     * @param updatedAt         최종 수정 시각
+     */
+    public record SaveDiagramResult(
+        long contentRevision,
+        boolean hasYdocSnapshot,
+        Long snapshotRevision,
+        Instant snapshotUpdatedAt,
+        Instant updatedAt
+    ) {}
+
+    /**
+     * 다이어그램 사전 세트 변경 결과.
+     *
+     * @param dictionarySetId              변경된 사전 세트 ID
+     * @param invalidatedTermBindingCount  무효화된 term 바인딩 수
+     * @param invalidatedDomainBindingCount 무효화된 domain 바인딩 수
+     */
+    public record DictionarySetChangeResult(
+        Long dictionarySetId,
+        int invalidatedTermBindingCount,
+        int invalidatedDomainBindingCount
+    ) {}
 }

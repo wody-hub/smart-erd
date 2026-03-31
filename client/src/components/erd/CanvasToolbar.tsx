@@ -17,6 +17,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,12 @@ interface CanvasToolbarProps {
   onExportPdf: () => void;
   /** SQL DDL 내보내기 핸들러 */
   onExportDdl?: () => void;
+  /** 테이블 정의서 내보내기 핸들러 */
+  onExportTableDefinition?: () => void;
+  /** 컬럼 정의서 내보내기 핸들러 */
+  onExportColumnDefinition?: () => void;
+  /** 인덱스 정의서 내보내기 핸들러 */
+  onExportIndexDefinition?: () => void;
   /** SQL DDL 가져오기 핸들러 */
   onImportDdl?: () => void;
   /** 코드 에디터 활성 여부 */
@@ -63,6 +70,8 @@ interface CanvasToolbarProps {
   onUndo?: () => void;
   /** redo 핸들러 */
   onRedo?: () => void;
+  /** export 진행 여부 */
+  isExporting?: boolean;
 }
 
 /**
@@ -78,6 +87,9 @@ interface CanvasToolbarProps {
  * @param props.onExportSvg         SVG 내보내기 핸들러
  * @param props.onExportPdf         PDF 내보내기 핸들러
  * @param props.onExportDdl         SQL DDL 내보내기 핸들러
+ * @param props.onExportTableDefinition 테이블 정의서 내보내기 핸들러
+ * @param props.onExportColumnDefinition 컬럼 정의서 내보내기 핸들러
+ * @param props.onExportIndexDefinition 인덱스 정의서 내보내기 핸들러
  * @param props.onImportDdl         SQL DDL 가져오기 핸들러
  * @param props.codeEditorActive    코드 에디터 활성 여부
  * @param props.onToggleCodeEditor  코드 에디터 토글 핸들러
@@ -97,6 +109,9 @@ export default function CanvasToolbar({
   onExportSvg,
   onExportPdf,
   onExportDdl,
+  onExportTableDefinition,
+  onExportColumnDefinition,
+  onExportIndexDefinition,
   onImportDdl,
   codeEditorActive,
   onToggleCodeEditor,
@@ -109,6 +124,7 @@ export default function CanvasToolbar({
   canRedo = false,
   onUndo,
   onRedo,
+  isExporting = false,
 }: CanvasToolbarProps) {
   const { t } = useTranslation();
 
@@ -185,17 +201,46 @@ export default function CanvasToolbar({
               variant="ghost"
               size="sm"
               className="gap-1.5"
-              aria-label={t('erd.toolbar.export')}
+              aria-label={isExporting ? t('erd.toolbar.exporting') : t('erd.toolbar.export')}
+              disabled={isExporting}
             >
               <Download className="h-4 w-4" />
-              {t('erd.toolbar.export')}
+              {isExporting ? t('erd.toolbar.exporting') : t('erd.toolbar.export')}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onExportPng}>PNG</DropdownMenuItem>
-            <DropdownMenuItem onClick={onExportJpg}>JPG</DropdownMenuItem>
-            <DropdownMenuItem onClick={onExportSvg}>SVG</DropdownMenuItem>
-            <DropdownMenuItem onClick={onExportPdf}>PDF</DropdownMenuItem>
+            <DropdownMenuItem onClick={onExportPng} disabled={isExporting}>
+              PNG
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onExportJpg} disabled={isExporting}>
+              JPG
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onExportSvg} disabled={isExporting}>
+              SVG
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onExportPdf} disabled={isExporting}>
+              PDF
+            </DropdownMenuItem>
+            {(onExportTableDefinition || onExportColumnDefinition || onExportIndexDefinition) && (
+              <>
+                <DropdownMenuSeparator />
+                {onExportTableDefinition && (
+                  <DropdownMenuItem onClick={onExportTableDefinition} disabled={isExporting}>
+                    {t('erd.toolbar.tableDefinitionExport')}
+                  </DropdownMenuItem>
+                )}
+                {onExportColumnDefinition && (
+                  <DropdownMenuItem onClick={onExportColumnDefinition} disabled={isExporting}>
+                    {t('erd.toolbar.columnDefinitionExport')}
+                  </DropdownMenuItem>
+                )}
+                {onExportIndexDefinition && (
+                  <DropdownMenuItem onClick={onExportIndexDefinition} disabled={isExporting}>
+                    {t('erd.toolbar.indexDefinitionExport')}
+                  </DropdownMenuItem>
+                )}
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
         {onExportDdl && (

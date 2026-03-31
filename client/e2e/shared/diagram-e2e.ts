@@ -46,6 +46,8 @@ export interface Point {
 export interface E2EConfig {
   baseUrl: string;
   apiBaseUrl: string;
+  frontendHost: string;
+  backendHost: string;
   loginId: string;
   password: string;
   pinnedTeamId: number | null;
@@ -82,6 +84,45 @@ function parseOptionalPositiveInt(value: string | undefined): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function parseRequiredUrl(url: string, envName: string): URL {
+  try {
+    return new URL(url);
+  } catch {
+    throw new Error(`Invalid URL in ${envName}: ${url}`);
+  }
+}
+
+function resolveEndpointConfig(
+  url: string,
+  urlEnvName: string,
+  portEnvName: string,
+  portEnvValue: string | undefined,
+  fallbackPort: number,
+): { url: string; host: string; port: number } {
+  const parsedUrl = parseRequiredUrl(url, urlEnvName);
+  const explicitUrlPort = parsedUrl.port ? parsePositiveInt(parsedUrl.port, fallbackPort) : null;
+  const configuredPort = portEnvValue ? parsePositiveInt(portEnvValue, fallbackPort) : explicitUrlPort ?? fallbackPort;
+  if (explicitUrlPort !== null && configuredPort !== explicitUrlPort) {
+    throw new Error(
+      `Conflicting E2E endpoint configuration: ${urlEnvName}=${url} but ${portEnvName}=${configuredPort}`,
+    );
+  }
+  parsedUrl.port = String(configuredPort);
+
+  return {
+    url: parsedUrl.toString().replace(/\/$/, ''),
+    host: parsedUrl.hostname,
+    port: configuredPort,
+  };
+}
+
+function assertLocalHost(host: string, label: string): void {
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+    return;
+  }
+  throw new Error(`${label} only supports local hosts, but received ${host}`);
+}
+
 function parseTranslate(transform: string): Point {
   const matched = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(transform);
   if (!matched) {
@@ -105,11 +146,26 @@ function parseScale(transform: string): number {
   return Number.isFinite(values[0]) && values[0] > 0 ? values[0] : 1;
 }
 
-async function waitForPortState(port: number, open: boolean, timeoutMs: number): Promise<void> {
+function resolveDefaultBackendRestartCommand(port: number): string {
+  if (port === 9501) {
+    return './bootRun-local.sh';
+  }
+  if (port === 9502) {
+    return './bootRun-test.sh';
+  }
+  return port === 9503 ? './bootRun-dev.sh' : `SERVER_PORT=${port} ./gradlew bootRun`;
+}
+
+async function waitForPortState(
+  port: number,
+  open: boolean,
+  timeoutMs: number,
+  host = '127.0.0.1',
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const connected = await new Promise<boolean>((resolve) => {
-      const socket = net.createConnection({ port, host: '127.0.0.1' });
+      const socket = net.createConnection({ port, host });
       socket.once('connect', () => {
         socket.destroy();
         resolve(true);
@@ -171,22 +227,69 @@ function parseRenderableNodeCount(content: string | null | undefined): number {
   }
 }
 
-export function getE2EConfig(): E2EConfig {
-  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:3000';
-  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? 'http://localhost:8190/api';
-  const repoDir = process.env.SMART_ERD_E2E_REPO_DIR ?? path.resolve(process.cwd(), '..');
+function isListeningOnPort(port: number): boolean {
+  try {
+    const pid = execSync(`lsof -nP -iTCP:${port} -sTCP:LISTEN -t | head -n1`, {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return pid.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function resolveDefaultE2EEndpoints(): { baseUrl: string; apiBaseUrl: string } {
+  const localFrontend = isListeningOnPort(4501);
+  const localBackend = isListeningOnPort(9501);
+  if (localFrontend && localBackend) {
+    return {
+      baseUrl: 'http://localhost:4501',
+      apiBaseUrl: 'http://localhost:9501/api',
+    };
+  }
 
   return {
+    baseUrl: 'http://localhost:4502',
+    apiBaseUrl: 'http://localhost:9502/api',
+  };
+}
+
+export function getE2EConfig(): E2EConfig {
+  const defaults = resolveDefaultE2EEndpoints();
+  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? defaults.baseUrl;
+  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? defaults.apiBaseUrl;
+  const repoDir = process.env.SMART_ERD_E2E_REPO_DIR ?? path.resolve(process.cwd(), '..');
+  const frontendEndpoint = resolveEndpointConfig(
     baseUrl,
+    'SMART_ERD_E2E_BASE_URL',
+    'SMART_ERD_E2E_FRONTEND_PORT',
+    process.env.SMART_ERD_E2E_FRONTEND_PORT,
+    4502,
+  );
+  const backendEndpoint = resolveEndpointConfig(
     apiBaseUrl,
+    'SMART_ERD_E2E_API_URL',
+    'SMART_ERD_E2E_BACKEND_PORT',
+    process.env.SMART_ERD_E2E_BACKEND_PORT,
+    9502,
+  );
+
+  return {
+    baseUrl: frontendEndpoint.url,
+    apiBaseUrl: backendEndpoint.url,
+    frontendHost: frontendEndpoint.host,
+    backendHost: backendEndpoint.host,
     loginId: requireEnv('SMART_ERD_E2E_LOGIN'),
     password: requireEnv('SMART_ERD_E2E_PASSWORD'),
     pinnedTeamId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_TEAM_ID),
     pinnedProjectId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_PROJECT_ID),
     pinnedDiagramId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_DIAGRAM_ID),
-    backendPort: parsePositiveInt(process.env.SMART_ERD_E2E_BACKEND_PORT, 8190),
-    frontendPort: parsePositiveInt(process.env.SMART_ERD_E2E_FRONTEND_PORT, 3000),
-    backendRestartCommand: process.env.SMART_ERD_E2E_BACKEND_RESTART_CMD ?? './gradlew bootRun',
+    backendPort: backendEndpoint.port,
+    frontendPort: frontendEndpoint.port,
+    backendRestartCommand:
+      process.env.SMART_ERD_E2E_BACKEND_RESTART_CMD ??
+      resolveDefaultBackendRestartCommand(backendEndpoint.port),
     repoDir,
     bootLogPath:
       process.env.SMART_ERD_E2E_BOOT_LOG_PATH ?? '/tmp/smart-erd-e2e-recovery-backend.log',
@@ -194,21 +297,40 @@ export function getE2EConfig(): E2EConfig {
 }
 
 export function getE2EProvisioningConfig(): E2EConfig {
-  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:3000';
-  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? 'http://localhost:8190/api';
+  const defaults = resolveDefaultE2EEndpoints();
+  const baseUrl = process.env.SMART_ERD_E2E_BASE_URL ?? defaults.baseUrl;
+  const apiBaseUrl = process.env.SMART_ERD_E2E_API_URL ?? defaults.apiBaseUrl;
   const repoDir = process.env.SMART_ERD_E2E_REPO_DIR ?? path.resolve(process.cwd(), '..');
+  const frontendEndpoint = resolveEndpointConfig(
+    baseUrl,
+    'SMART_ERD_E2E_BASE_URL',
+    'SMART_ERD_E2E_FRONTEND_PORT',
+    process.env.SMART_ERD_E2E_FRONTEND_PORT,
+    4502,
+  );
+  const backendEndpoint = resolveEndpointConfig(
+    apiBaseUrl,
+    'SMART_ERD_E2E_API_URL',
+    'SMART_ERD_E2E_BACKEND_PORT',
+    process.env.SMART_ERD_E2E_BACKEND_PORT,
+    9502,
+  );
 
   return {
-    baseUrl,
-    apiBaseUrl,
+    baseUrl: frontendEndpoint.url,
+    apiBaseUrl: backendEndpoint.url,
+    frontendHost: frontendEndpoint.host,
+    backendHost: backendEndpoint.host,
     loginId: process.env.SMART_ERD_E2E_LOGIN ?? 'e2e-provision@example.com',
     password: process.env.SMART_ERD_E2E_PASSWORD ?? 'e2e-provision-password',
     pinnedTeamId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_TEAM_ID),
     pinnedProjectId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_PROJECT_ID),
     pinnedDiagramId: parseOptionalPositiveInt(process.env.SMART_ERD_E2E_DIAGRAM_ID),
-    backendPort: parsePositiveInt(process.env.SMART_ERD_E2E_BACKEND_PORT, 8190),
-    frontendPort: parsePositiveInt(process.env.SMART_ERD_E2E_FRONTEND_PORT, 3000),
-    backendRestartCommand: process.env.SMART_ERD_E2E_BACKEND_RESTART_CMD ?? './gradlew bootRun',
+    backendPort: backendEndpoint.port,
+    frontendPort: frontendEndpoint.port,
+    backendRestartCommand:
+      process.env.SMART_ERD_E2E_BACKEND_RESTART_CMD ??
+      resolveDefaultBackendRestartCommand(backendEndpoint.port),
     repoDir,
     bootLogPath:
       process.env.SMART_ERD_E2E_BOOT_LOG_PATH ?? '/tmp/smart-erd-e2e-recovery-backend.log',
@@ -273,7 +395,12 @@ export async function provisionCollaborationFixture(
 }
 
 export async function loginViaUi(page: Page, config: E2EConfig): Promise<string> {
-  await page.goto(`${config.baseUrl}/login`, { waitUntil: 'networkidle' });
+  await waitForPortState(config.frontendPort, true, 5_000, config.frontendHost).catch((error) => {
+    throw new Error(
+      `Frontend server is not ready on ${config.frontendHost}:${config.frontendPort} for ${config.baseUrl}: ${String(error)}`,
+    );
+  });
+  await page.goto(`${config.baseUrl}/login`, { waitUntil: 'domcontentloaded' });
   await page.fill('#login-id', config.loginId);
   await page.fill('#password', config.password);
   await page.getByRole('button', { name: /로그인|login/i }).click();
@@ -284,6 +411,30 @@ export async function loginViaUi(page: Page, config: E2EConfig): Promise<string>
     throw new Error('Access token not found after login');
   }
   return token;
+}
+
+export async function openCodeEditor(page: Page, timeoutMs = 15_000): Promise<void> {
+  await page.getByRole('button', { name: /^(코드|Code)$/ }).click();
+  await page.waitForFunction(
+    () => Boolean(window.monaco?.editor?.getModels?.().length),
+    undefined,
+    { timeout: timeoutMs },
+  );
+}
+
+export async function waitForMonacoModelValueContains(
+  page: Page,
+  fragment: string,
+  timeoutMs = 15_000,
+): Promise<void> {
+  await page.waitForFunction(
+    (expected) => {
+      const model = window.monaco?.editor?.getModels?.()[0];
+      return model?.getValue().includes(expected) ?? false;
+    },
+    fragment,
+    { timeout: timeoutMs },
+  );
 }
 
 export async function resolveTargetDiagram(
@@ -490,7 +641,28 @@ export async function clickBackup(page: Page): Promise<void> {
   await delay(1_000);
 }
 
+export async function clickBackupAndWaitForPersistedDiagramSave(
+  page: Page,
+  target: DiagramTarget,
+  timeoutMs = 30_000,
+): Promise<void> {
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'PUT' &&
+      response.url().includes(
+        `/teams/${target.teamId}/projects/${target.projectId}/diagrams/${target.diagramId}`,
+      ) &&
+      response.status() >= 200 &&
+      response.status() < 300,
+    { timeout: timeoutMs },
+  );
+
+  await clickBackup(page);
+  await responsePromise;
+}
+
 export async function restartBackend(config: E2EConfig): Promise<number> {
+  assertLocalHost(config.backendHost, 'restartBackend');
   const pid = execSync(`lsof -nP -iTCP:${config.backendPort} -sTCP:LISTEN -t | head -n1`, {
     encoding: 'utf-8',
   }).trim();
@@ -499,7 +671,7 @@ export async function restartBackend(config: E2EConfig): Promise<number> {
   }
 
   process.kill(Number(pid), 'SIGTERM');
-  await waitForPortState(config.backendPort, false, 20_000);
+  await waitForPortState(config.backendPort, false, 20_000, config.backendHost);
 
   execSync(`: > ${config.bootLogPath}`, { shell: '/bin/zsh' });
   const child = spawn(
@@ -513,7 +685,7 @@ export async function restartBackend(config: E2EConfig): Promise<number> {
   );
   child.unref();
 
-  await waitForPortState(config.backendPort, true, 120_000);
+  await waitForPortState(config.backendPort, true, 120_000, config.backendHost);
   await delay(3_000);
   return child.pid ?? 0;
 }

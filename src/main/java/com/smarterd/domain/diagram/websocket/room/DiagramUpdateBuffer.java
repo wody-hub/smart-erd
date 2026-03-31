@@ -166,6 +166,40 @@ final class DiagramUpdateBuffer {
     }
 
     /**
+     * 다이어그램의 누적 update 버퍼를 단일 update 기준으로 교체한다.
+     *
+     * 서버가 최신 전체 상태 스냅샷을 이미 확보한 경우, room 버퍼도 같은 상태 기준으로
+     * 정렬해 이후 warm handoff/flush가 더 오래된 누적 update로 되돌아가지 않게 한다.
+     *
+     * @param diagramId 다이어그램 ID
+     * @param update 최신 전체 상태를 나타내는 raw Yjs update
+     */
+    void replaceWithSingleUpdate(Long diagramId, byte[] update) {
+        final var updates = accumulatedUpdates.computeIfAbsent(diagramId, (k) ->
+            Collections.synchronizedList(new ArrayList<>())
+        );
+        final var sizeCounter = accumulatedSizes.computeIfAbsent(diagramId, (k) -> new AtomicLong(0));
+
+        synchronized (updates) {
+            updates.clear();
+            if (update != null && update.length > 0) {
+                updates.add(update);
+                sizeCounter.set(update.length);
+            } else {
+                sizeCounter.set(0);
+            }
+        }
+
+        synchronized (dirtyLock) {
+            if (update != null && update.length > 0) {
+                dirtyDiagramIds.add(diagramId);
+            } else {
+                dirtyDiagramIds.remove(diagramId);
+            }
+        }
+    }
+
+    /**
      * 해당 다이어그램에 누적된 update가 있는지 확인한다.
      *
      * @param diagramId 다이어그램 ID

@@ -1,11 +1,6 @@
 package com.smarterd.domain.dictionary.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smarterd.api.dictionary.dto.BulkSaveResponse;
-import com.smarterd.api.dictionary.dto.BulkTermRow;
-import com.smarterd.api.dictionary.dto.BulkTermSaveRequest;
-import com.smarterd.api.dictionary.dto.BulkValidationResponse;
-import com.smarterd.api.dictionary.dto.BulkValidationRow;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.dictionary.entity.DictionarySet;
@@ -13,6 +8,9 @@ import com.smarterd.domain.dictionary.entity.Domain;
 import com.smarterd.domain.dictionary.entity.Term;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
 import com.smarterd.domain.dictionary.repository.TermRepository;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkSaveResult;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationResult;
+import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationRowResult;
 import com.smarterd.domain.dictionary.service.session.BulkValidationSessionStore;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
@@ -131,7 +129,7 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
      * @param locale  요청 로케일
      * @return 검증 결과 응답
      */
-    public BulkValidationResponse validateUpload(
+    public BulkValidationResult validateUpload(
         String loginId,
         Long teamId,
         Long setId,
@@ -199,14 +197,14 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
 
             final var rowNumber = i + 2;
             final var valid = errors.isEmpty();
-            final var previewRow = new BulkValidationRow(rowNumber, valid, errors, data);
+            final var previewRow = new BulkValidationRowResult(rowNumber, valid, errors, data);
 
             if (valid) {
                 result.addValid(
                     previewRow,
                     new ValidatedTermRow(
                         rowNumber,
-                        new BulkTermRow(logicalName, physicalName, domainLogicalName, description)
+                        new TermBulkRow(logicalName, physicalName, domainLogicalName, description)
                     )
                 );
             } else {
@@ -290,7 +288,7 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
      * @param validationResult 검증 결과 누적 객체
      * @return 검증 결과 응답
      */
-    private BulkValidationResponse createValidationResponse(
+    private BulkValidationResult createValidationResponse(
         String loginId,
         Long teamId,
         Long setId,
@@ -313,7 +311,7 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
             false
         );
         final var validationToken = issueValidationToken(session);
-        return new BulkValidationResponse(
+        return new BulkValidationResult(
             validationToken,
             totalRows,
             validationResult.validCount,
@@ -328,8 +326,8 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
      */
     private static class RowValidationResult {
 
-        final ArrayList<BulkValidationRow> errorPreviewRows;
-        final ArrayList<BulkValidationRow> validPreviewRows;
+        final ArrayList<BulkValidationRowResult> errorPreviewRows;
+        final ArrayList<BulkValidationRowResult> validPreviewRows;
         final ArrayList<ValidatedTermRow> validRows = new ArrayList<>();
         final ArrayList<TermErrorReportRow> errorRows = new ArrayList<>();
         int validCount = 0;
@@ -340,7 +338,7 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
             this.validPreviewRows = new ArrayList<>(Math.min(estimatedSize, PREVIEW_ROW_LIMIT));
         }
 
-        void addValid(BulkValidationRow previewRow, ValidatedTermRow validatedRow) {
+        void addValid(BulkValidationRowResult previewRow, ValidatedTermRow validatedRow) {
             validCount++;
             validRows.add(validatedRow);
             if (validPreviewRows.size() < PREVIEW_ROW_LIMIT) {
@@ -348,7 +346,7 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
             }
         }
 
-        void addError(BulkValidationRow previewRow, TermErrorReportRow errorReportRow) {
+        void addError(BulkValidationRowResult previewRow, TermErrorReportRow errorReportRow) {
             errorCount++;
             errorRows.add(errorReportRow);
             if (errorPreviewRows.size() < PREVIEW_ROW_LIMIT) {
@@ -366,21 +364,21 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
      * @return 저장 결과 응답
      */
     @Transactional
-    public BulkSaveResponse bulkSave(String loginId, Long teamId, Long setId, BulkTermSaveRequest request) {
+    public BulkSaveResult bulkSave(
+        String loginId,
+        Long teamId,
+        Long setId,
+        String validationToken,
+        List<Integer> excludedRowNumbers
+    ) {
         final var team = verifyTeamAccess(loginId, teamId);
         final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
-        final var session = consumeValidationSession(
-            loginId,
-            teamId,
-            setId,
-            request.validationToken(),
-            ValidationSession.class
-        );
-        final var excludedRowNumbers = new HashSet<>(request.excludedRowNumbers());
+        final var session = consumeValidationSession(loginId, teamId, setId, validationToken, ValidationSession.class);
+        final var excludedRows = new HashSet<>(excludedRowNumbers);
         final var candidateRows = session
             .validRows()
             .stream()
-            .filter((row) -> !excludedRowNumbers.contains(row.rowNumber()))
+            .filter((row) -> !excludedRows.contains(row.rowNumber()))
             .map(ValidatedTermRow::row)
             .toList();
 
@@ -393,12 +391,12 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
         // 기존 용어 일괄 조회 (upsert 대상)
         final var existingTermsByLogicalName = findExistingTermsByLogicalName(
             dictionarySet,
-            candidateRows.stream().map(BulkTermRow::logicalName).toList()
+            candidateRows.stream().map(TermBulkRow::logicalName).toList()
         );
 
         final var termsToSave = new ArrayList<Term>();
 
-        for (BulkTermRow row : candidateRows) {
+        for (TermBulkRow row : candidateRows) {
             Domain domain = null;
             if (AppStringUtils.isNotBlank(row.domainLogicalName())) {
                 domain = domainMap.get(row.domainLogicalName());
@@ -426,7 +424,7 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
         } catch (DataIntegrityViolationException e) {
             throw new DuplicateException(MessageCode.ERROR_BULK_CONCURRENT_DUPLICATE.code());
         }
-        return new BulkSaveResponse(termsToSave.size(), 0);
+        return new BulkSaveResult(termsToSave.size(), 0);
     }
 
     /**
@@ -536,8 +534,23 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
         private String description;
     }
 
-    /** 검증 후 저장 가능한 용어 행. */
-    private record ValidatedTermRow(int rowNumber, BulkTermRow row) {}
+    /**
+     * 검증 통과 후 저장 후보로 유지하는 용어 행.
+     *
+     * @param rowNumber 원본 행 번호
+     * @param row 저장 후보 용어 행
+     */
+    private record ValidatedTermRow(int rowNumber, TermBulkRow row) {}
+
+    /**
+     * 벌크 저장 단계에서 사용하는 용어 행 모델.
+     *
+     * @param logicalName 논리명
+     * @param physicalName 물리명
+     * @param domainLogicalName 도메인 논리명
+     * @param description 설명
+     */
+    private record TermBulkRow(String logicalName, String physicalName, String domainLogicalName, String description) {}
 
     /** 오류 보고서 엑셀 행. */
     public record TermErrorReportRow(

@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
 import type { UseMutationResult } from '@tanstack/react-query';
+import type {
+  DiagramDocumentPersistenceSession,
+  DiagramPublishedBackup,
+} from '@/collaboration/channel/diagram/diagram-document-persistence-session';
+import type { SaveDiagramResult } from '@/types/diagram';
+import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 
 /** 자동 백업 주기 (밀리초) — 60초 */
@@ -103,30 +108,34 @@ function logAutosaveMetrics(
   });
 }
 
+interface UseAutoBackupParams {
+  saveMutation: UseMutationResult<SaveDiagramResult, Error, DiagramPublishedBackup>;
+  diagramPersistenceSession: DiagramDocumentPersistenceSession | null;
+}
+
 /**
  * 60초 주기 자동 백업, 변경 후 idle 10초 백업, 탭 이탈 시 즉시 백업을 수행하는 훅.
  *
  * 변경이 없으면 백업을 생략하고, 수동 백업(saveMutation) 진행 중이면 자동 백업을 건너뛴다.
  * 자동 백업 성공 시 토스트 없이 해시만 갱신한다.
  *
- * @param saveMutation saveDiagram 뮤테이션 결과
- * @param teamId       팀 ID
- * @param projectId    프로젝트 ID
- * @param diagramId    다이어그램 ID
+ * @param params save mutation과 diagram persistence session
  */
-export function useAutoBackup(
-  saveMutation: UseMutationResult<void, Error, string>,
-  teamId: string,
-  projectId: string,
-  diagramId: string,
-): void {
-  const ydoc = useCanvasStore((s) => s.ydoc);
+export function useAutoBackup({
+  saveMutation,
+  diagramPersistenceSession,
+}: UseAutoBackupParams): void {
+  const markBackedUp = useCanvasStore((s) => s.markBackedUp);
+  const lastBackupHash = useCanvasStore((s) => s.lastBackupHash);
+  const lastDocumentChange = useCollaborationStore((state) => state.lastDocumentChange);
   /** 동시 실행 방지 뮤텍스 */
   const backupMutex = useRef(false);
   /** 최근 저장 이후 로컬(비-remote origin) 변경 발생 여부 */
   const hasLocalChangeRef = useRef(false);
   /** idle 트리거 타이머 */
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 마지막으로 관찰한 문서 변경 시각 */
+  const lastObservedDocumentChangeAtRef = useRef<number | null>(null);
   /** 자동 백업 메트릭 누적 상태 */
   const metricsRef = useRef<AutoBackupMetricsState>({
     attempts: 0,
@@ -143,6 +152,22 @@ export function useAutoBackup(
 
   /** 자동 백업 시도 함수 — 렌더 본문에서 직접 갱신하여 항상 최신 saveMutation을 참조한다 */
   const attemptBackup = useRef<(trigger: AutoBackupTrigger) => void>(() => {});
+
+  const clearIdleTimer = () => {
+    if (!idleTimerRef.current) {
+      return;
+    }
+    clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = null;
+  };
+
+  const scheduleIdleBackup = () => {
+    clearIdleTimer();
+    idleTimerRef.current = setTimeout(() => {
+      idleTimerRef.current = null;
+      attemptBackup.current('idle');
+    }, AUTO_BACKUP_IDLE_MS);
+  };
 
   // 렌더마다 최신 saveMutation 클로저로 갱신 (latest ref 패턴)
   attemptBackup.current = (trigger) => {
@@ -161,9 +186,8 @@ export function useAutoBackup(
       logAutosaveMetrics('skip', trigger, metricsRef.current, { reason: 'no-local-change' });
       return;
     }
-    const prepareBackup = useCanvasStore.getState().prepareBackup;
-    const result = prepareBackup();
-    if (!result) {
+    const backup = diagramPersistenceSession?.preparePublishedBackup(lastBackupHash) ?? null;
+    if (!backup) {
       // 마지막 저장 직후/수동 저장 직후처럼 더 이상 미저장 로컬 변경이 없으면 플래그를 내린다.
       hasLocalChangeRef.current = false;
       metricsRef.current.skipCounts.unchanged += 1;
@@ -174,8 +198,7 @@ export function useAutoBackup(
     metricsRef.current.attempts += 1;
     const startedAt = performance.now();
     backupMutex.current = true;
-    const markBackedUp = useCanvasStore.getState().markBackedUp;
-    saveMutation.mutate(result.content, {
+    saveMutation.mutate(backup, {
       onSuccess: () => {
         const latencyMs = performance.now() - startedAt;
         metricsRef.current.successes += 1;
@@ -183,7 +206,7 @@ export function useAutoBackup(
           metricsRef.current.successLatenciesMs,
           latencyMs,
         );
-        markBackedUp(result.hash);
+        markBackedUp(backup.hash);
         hasLocalChangeRef.current = false;
         backupMutex.current = false;
         logAutosaveMetrics('success', trigger, metricsRef.current, {
@@ -204,32 +227,6 @@ export function useAutoBackup(
 
   useEffect(() => {
     hasLocalChangeRef.current = false;
-
-    /**
-     * 등록된 idle 타이머를 해제한다.
-     *
-     * @returns 없음
-     */
-    const clearIdleTimer = () => {
-      if (!idleTimerRef.current) {
-        return;
-      }
-      clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = null;
-    };
-
-    /**
-     * 마지막 변경 후 유휴 구간에 백업을 예약한다.
-     *
-     * @returns 없음
-     */
-    const scheduleIdleBackup = () => {
-      clearIdleTimer();
-      idleTimerRef.current = setTimeout(() => {
-        idleTimerRef.current = null;
-        attemptBackup.current('idle');
-      }, AUTO_BACKUP_IDLE_MS);
-    };
 
     // 60초 주기 자동 백업
     const intervalId = setInterval(() => {
@@ -264,25 +261,9 @@ export function useAutoBackup(
     const handleBeforeUnload = () => {
       attemptBackup.current('beforeunload');
     };
-
-    /**
-     * Y.Doc 업데이트를 감지해 로컬 변경만 idle 백업 대상으로 표시한다.
-     *
-     * @param _update Yjs 업데이트 페이로드
-     * @param origin  업데이트 origin (remote면 원격 반영)
-     * @returns 없음
-     */
-    const handleYDocUpdate = (_update: Uint8Array, origin: unknown) => {
-      if (origin === 'remote' || origin === CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE) {
-        return;
-      }
-      hasLocalChangeRef.current = true;
-      scheduleIdleBackup();
-    };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('pagehide', handlePageHide);
     window.addEventListener('beforeunload', handleBeforeUnload);
-    ydoc?.on('update', handleYDocUpdate);
 
     return () => {
       attemptBackup.current('cleanup');
@@ -291,7 +272,26 @@ export function useAutoBackup(
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('pagehide', handlePageHide);
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      ydoc?.off('update', handleYDocUpdate);
     };
-  }, [teamId, projectId, diagramId, ydoc]);
+  }, [diagramPersistenceSession]);
+
+  useEffect(() => {
+    hasLocalChangeRef.current = false;
+    lastObservedDocumentChangeAtRef.current = lastDocumentChange?.changedAt ?? null;
+  }, [diagramPersistenceSession]);
+
+  useEffect(() => {
+    if (!diagramPersistenceSession || !lastDocumentChange) {
+      return;
+    }
+    if (lastObservedDocumentChangeAtRef.current === lastDocumentChange.changedAt) {
+      return;
+    }
+    lastObservedDocumentChangeAtRef.current = lastDocumentChange.changedAt;
+    if (lastDocumentChange.origin !== 'local') {
+      return;
+    }
+    hasLocalChangeRef.current = true;
+    scheduleIdleBackup();
+  }, [diagramPersistenceSession, lastDocumentChange]);
 }

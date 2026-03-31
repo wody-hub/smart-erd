@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Play, RefreshCw } from 'lucide-react';
+import { Copy, Play, RefreshCw, Save, WandSparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 
@@ -10,6 +10,8 @@ import ConfirmDialog from '@/components/ui/confirm-dialog';
 interface CodeEditorFooterProps {
   /** Apply 버튼 클릭 핸들러 */
   onApply: () => void;
+  /** Apply 버튼 라벨 */
+  applyButtonLabel?: string;
   /** Apply 버튼 활성화 여부 */
   canApply: boolean;
   /** Apply 확인 다이얼로그 실행 함수 */
@@ -24,6 +26,10 @@ interface CodeEditorFooterProps {
   confirmDescription?: string;
   /** Refresh 버튼 클릭 핸들러 */
   onRefresh: () => void;
+  /** Format 버튼 클릭 핸들러 */
+  onFormat?: () => void;
+  /** Format 버튼 활성화 여부 */
+  canFormat?: boolean;
   /** Refresh 실행 함수 (확인 다이얼로그에서 사용) */
   executeRefresh: () => void;
   /** ERD에 노드가 있는지 여부 (Refresh 비활성화 판단) */
@@ -32,6 +38,24 @@ interface CodeEditorFooterProps {
   refreshConfirmOpen: boolean;
   /** Refresh 확인 다이얼로그 열림 상태 세터 */
   setRefreshConfirmOpen: (open: boolean) => void;
+  /** Refresh 확인 다이얼로그 제목 */
+  refreshConfirmTitle?: string;
+  /** Refresh 확인 다이얼로그 설명 */
+  refreshConfirmDescription?: string;
+  /** code 모드 최종 저장 버튼 클릭 핸들러 */
+  onFinalize?: () => void;
+  /** code 모드에서 저장 버튼을 주 액션으로 올릴지 여부 */
+  prioritizeFinalizeAction?: boolean;
+  /** code 모드 최종 저장 버튼 라벨 */
+  finalizeButtonLabel?: string;
+  /** code 모드 최종 저장 버튼 활성화 여부 */
+  canFinalize?: boolean;
+  /** code 모드 최종 저장 진행 여부 */
+  finalizing?: boolean;
+  /** 물리명 포함 복사 버튼 클릭 핸들러 */
+  onCopyWithPhysicalNames?: () => void;
+  /** 물리명 포함 복사 버튼 활성화 여부 */
+  canCopyWithPhysicalNames?: boolean;
   /** 파싱 상태 표시 영역 (에디터별 커스텀 렌더링) */
   children: ReactNode;
 }
@@ -46,8 +70,9 @@ interface CodeEditorFooterProps {
  * @param props 컴포넌트 props
  * @returns 코드 에디터 하단 푸터 JSX
  */
-export default function CodeEditorFooter({
+const CodeEditorFooter = memo(function CodeEditorFooter({
   onApply,
+  applyButtonLabel,
   canApply,
   executeApply,
   confirmOpen,
@@ -55,13 +80,50 @@ export default function CodeEditorFooter({
   confirmTitle,
   confirmDescription,
   onRefresh,
+  onFormat,
+  canFormat = false,
   executeRefresh,
   hasNodes,
   refreshConfirmOpen,
   setRefreshConfirmOpen,
+  refreshConfirmTitle,
+  refreshConfirmDescription,
+  onFinalize,
+  prioritizeFinalizeAction = false,
+  finalizeButtonLabel,
+  canFinalize = false,
+  finalizing = false,
+  onCopyWithPhysicalNames,
+  canCopyWithPhysicalNames = false,
   children,
 }: CodeEditorFooterProps) {
   const { t } = useTranslation();
+  const applyButton = (
+    <Button
+      className={onFinalize && prioritizeFinalizeAction ? 'gap-1.5' : 'flex-1 gap-1.5'}
+      variant={onFinalize && prioritizeFinalizeAction ? 'outline' : 'default'}
+      size="sm"
+      onClick={onApply}
+      disabled={!canApply}
+    >
+      <Play className="h-3.5 w-3.5" />
+      {applyButtonLabel ?? t('erd.codeEditor.applyButton')}
+    </Button>
+  );
+  const finalizeButton = onFinalize ? (
+    <Button
+      variant={prioritizeFinalizeAction ? 'default' : 'outline'}
+      className={prioritizeFinalizeAction ? 'flex-1 gap-1.5' : 'gap-1.5'}
+      size="sm"
+      onClick={onFinalize}
+      disabled={!canFinalize || finalizing}
+    >
+      <Save className="h-3.5 w-3.5" />
+      {finalizing
+        ? t('erd.codeEditor.finalizeSavingButton')
+        : (finalizeButtonLabel ?? t('erd.codeEditor.finalizeSaveButton'))}
+    </Button>
+  ) : null;
 
   return (
     <>
@@ -71,10 +133,31 @@ export default function CodeEditorFooter({
 
         {/* Apply + Refresh 버튼 */}
         <div className="flex gap-1.5">
-          <Button className="flex-1 gap-1.5" size="sm" onClick={onApply} disabled={!canApply}>
-            <Play className="h-3.5 w-3.5" />
-            {t('erd.codeEditor.applyButton')}
-          </Button>
+          {prioritizeFinalizeAction ? finalizeButton : applyButton}
+          {prioritizeFinalizeAction ? applyButton : finalizeButton}
+          {onFormat && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onFormat}
+              disabled={!canFormat}
+              aria-label={t('erd.codeEditor.formatButton')}
+            >
+              <WandSparkles className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          {onCopyWithPhysicalNames && (
+            <Button
+              variant="outline"
+              className="gap-1.5"
+              size="sm"
+              onClick={onCopyWithPhysicalNames}
+              disabled={!canCopyWithPhysicalNames}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              {t('erd.codeEditor.copyWithPhysicalNamesButton')}
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -100,10 +183,12 @@ export default function CodeEditorFooter({
       <ConfirmDialog
         open={refreshConfirmOpen}
         onOpenChange={setRefreshConfirmOpen}
-        title={t('erd.codeEditor.refreshConfirmTitle')}
-        description={t('erd.codeEditor.refreshConfirmDescription')}
+        title={refreshConfirmTitle ?? t('erd.codeEditor.refreshConfirmTitle')}
+        description={refreshConfirmDescription ?? t('erd.codeEditor.refreshConfirmDescription')}
         onConfirm={executeRefresh}
       />
     </>
   );
-}
+});
+
+export default CodeEditorFooter;

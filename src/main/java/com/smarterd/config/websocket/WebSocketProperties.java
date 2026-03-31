@@ -1,5 +1,6 @@
 package com.smarterd.config.websocket;
 
+import com.smarterd.collaboration.CollaborationLimits;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -30,7 +31,7 @@ public class WebSocketProperties {
     private int maxConnectionsPerUser = 5;
 
     /** 다이어그램별 누적 update 최대 크기 (바이트) */
-    private long maxAccumulatedUpdatesSize = 10 * 1024 * 1024;
+    private long maxAccumulatedUpdatesSize = CollaborationLimits.MAX_SNAPSHOT_BYTES;
 
     /** WebSocket 세션 최대 유지 시간 (밀리초) */
     private long sessionMaxDuration = 1800000;

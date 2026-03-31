@@ -1,10 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:3000';
+const baseURL = process.env.SMART_ERD_E2E_BASE_URL ?? 'http://localhost:4502';
 const browserChannel = process.env.SMART_ERD_E2E_BROWSER_CHANNEL;
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: process.env.SMART_ERD_INCLUDE_TMP_E2E ? [] : ['**/tmp/**'],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

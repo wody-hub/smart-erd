@@ -27,18 +27,83 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 | 포맷팅      | Prettier (Java + TypeScript 통합), prettier-plugin-java                                   |
 | 코드 품질   | ESLint, SonarQube / SonarLint                                                             |
 
+## AI 확장 아키텍처 원칙
+
+이 프로젝트는 ERD/사전 중심 제품을 유지하되, 향후 AI 추천/검증/자동화 기능을 추가할 때 아래 원칙을 따른다.
+
+### 아키텍처 원칙
+
+- 기본 구조는 Layered Architecture를 유지한다 (`Controller → Service → Repository`).
+- 핵심 비즈니스 규칙은 Domain 중심으로 설계하고, UI와 인프라 로직이 Domain 규칙을 침범하지 않도록 한다.
+- LLM, 외부 AI API, 벡터 저장소, 프롬프트 관리 계층은 Port & Adapter 경계 밖으로 분리한다.
+- Domain과 Service는 특정 AI 벤더 SDK에 직접 의존하지 않고 인터페이스를 통해 연동한다.
+- 설계 순서는 `Domain → 데이터 계약 → API/Workflow → UI`를 우선한다.
+- ERD, 사전(Dictionary), 협업 데이터는 시스템의 기준 데이터이며, AI는 이를 보조하거나 제안하는 역할로만 사용한다.
+
+### Harness Engineering
+
+AI 기능은 반드시 통제 가능한 Harness 안에서만 실행한다.
+
+```text
+입력 → 전처리 → 프롬프트 생성 → AI 실행 → 결과 검증 → 보정/재시도 → 승인 → 저장
+```
+
+- 검증되지 않은 AI 출력은 저장하거나 화면 상태에 바로 반영하지 않는다.
+- 재시도와 보정은 개별 화면이 아니라 Harness 계층에서 책임진다.
+- 승인 전 단계의 AI 결과는 "자동 적용"이 아니라 "제안 결과"로 취급한다.
+- 변경 영향이 큰 작업(ERD 수정, 컬럼 생성, 사전 반영)은 승인 게이트를 거친 뒤 저장한다.
+
+### Harness 구성 요소
+
+AI 기능을 도입할 때는 아래 구성 요소를 기준으로 설계한다.
+
+- `Input Normalizer`: 다이어그램, 사전, 사용자 입력을 안정된 구조로 정규화
+- `Prompt Engine`: 프롬프트 템플릿/버전 관리, 인라인 하드코딩 방지
+- `LLM Client`: 모델/벤더별 호출 어댑터
+- `Output Validator`: JSON 스키마 및 비즈니스 규칙 검증
+- `Corrector`: 파싱 실패, 필드 누락, 규칙 위반 시 보정 및 재시도
+- `Approval Gate`: 사용자 승인 또는 정책 기반 승인 처리
+- `Logger`: 프롬프트 버전, 모델, 응답, 검증 결과, 승인 결과 감사 로그 기록
+
+### AI 출력 규칙
+
+- 모든 AI 출력은 구조화된 JSON으로 받는 것을 기본으로 한다.
+- 필수 필드 누락, 타입 불일치, 참조 무결성 오류가 있으면 실패로 처리한다.
+- 검증기를 통과하지 못한 결과는 사용하지 않는다.
+- AI 결과가 엔티티 변경으로 이어질 경우, 저장 전 서비스 계층에서 한 번 더 도메인 규칙을 검증한다.
+
+### 금지 사항
+
+- Controller, Page, Component에서 LLM을 직접 호출하는 구현 금지
+- 코드 내부에 하드코딩된 프롬프트 문자열을 중심으로 기능을 구성하는 방식 금지
+- 검증 없는 AI 결과를 DB 또는 협업 상태에 직접 반영하는 방식 금지
+- Domain 계층이 특정 AI 벤더 구현에 직접 결합되는 구조 금지
+
 ## 시작하기
 
 ### 사전 요구사항
 
 - Java 25+
 - Node.js 20+
-- Docker Desktop (PostgreSQL 컨테이너 자동 기동)
+- Docker Desktop
 
 ### 백엔드
 
 ```bash
-./gradlew bootRun          # http://localhost:8190 (Docker PostgreSQL 자동 시작)
+./bootRun-dev.sh          # http://localhost:9503 (dev 기본, 현재 프로젝트 compose 기준 Docker PostgreSQL 자동 시작)
+```
+
+### 백엔드 프로파일별 기동
+
+`local` 프로파일은 Docker Compose 자동 기동을 끄고, 이미 실행 중인 PostgreSQL(`localhost:15432`)에 붙는다.
+`test` 프로파일은 테스트 지원 설정을 유지하면서 `9502` 포트로 기동한다.
+
+```bash
+docker compose -f ../smart-erd/compose.yaml -p smart-erd up -d postgres  # 최초 1회 또는 DB가 내려가 있을 때만
+
+./bootRun-local.sh   # http://localhost:9501
+./bootRun-test.sh    # http://localhost:9502
+./bootRun-dev.sh     # http://localhost:9503
 ```
 
 ### 프론트엔드
@@ -46,7 +111,9 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 ```bash
 cd client
 npm install
-npm run dev                # http://localhost:3000 (프록시 /api → :8190)
+npm run dev                # http://localhost:4503 (프록시 /api → :9503)
+npm run local              # http://localhost:4501 (프록시 /api → :9501)
+npm run test:frontend      # http://localhost:4502 (프록시 /api → :9502)
 npm run perf:erd:apply     # S50/S200/S500 parse/apply/layout/total p50/p95 리포트 생성 (/tmp/smart-erd/perf)
 npm run perf:erd:apply:sample  # 저장소 샘플 리포트 갱신 (client/perf-reports/erd-apply-report.json)
 npm run test:e2e:smoke:collaboration  # 협업 생성/undo 전파 스모크
@@ -68,15 +135,19 @@ npm run test:e2e:smoke:collaboration  # 협업 생성/undo 전파 스모크
 | `VITE_ERD_DIFF_APPLY_INTERNAL_IDS`                  | internal 모드 허용 loginId 목록(csv)                  | 빈 값                                     |
 | `SMART_ERD_E2E_LOGIN`                               | Playwright E2E 로그인 ID                              | 없음                                      |
 | `SMART_ERD_E2E_PASSWORD`                            | Playwright E2E 비밀번호                               | 없음                                      |
-| `SMART_ERD_E2E_BASE_URL`                            | Playwright 대상 프런트 주소                           | `http://localhost:3000`                   |
-| `SMART_ERD_E2E_API_URL`                             | Playwright 대상 API 주소                              | `http://localhost:8190/api`               |
+| `SMART_ERD_E2E_BASE_URL`                            | Playwright 대상 프런트 주소                           | `http://localhost:4502`                   |
+| `SMART_ERD_E2E_API_URL`                             | Playwright 대상 API 주소                              | `http://localhost:9502/api`               |
 | `SMART_ERD_E2E_TEAM_ID`                             | 고정 smoke/recovery 대상 팀 ID                        | 자동 탐색                                 |
 | `SMART_ERD_E2E_PROJECT_ID`                          | 고정 smoke/recovery 대상 프로젝트 ID                  | 자동 탐색                                 |
 | `SMART_ERD_E2E_DIAGRAM_ID`                          | 고정 smoke/recovery 대상 다이어그램 ID                | 자동 탐색                                 |
-| `SMART_ERD_E2E_BACKEND_PORT`                        | recovery 테스트가 재기동할 백엔드 포트                | `8190`                                    |
-| `SMART_ERD_E2E_BACKEND_RESTART_CMD`                 | recovery 테스트 백엔드 재기동 명령                    | `./gradlew bootRun`                       |
+| `SMART_ERD_E2E_BACKEND_PORT`                        | recovery 테스트가 재기동할 백엔드 포트                | `9502`                                    |
+| `SMART_ERD_E2E_BACKEND_RESTART_CMD`                 | recovery 테스트 백엔드 재기동 명령                    | 포트 기준 기본값 사용 (`9501`=`./bootRun-local.sh`, `9502`=`./bootRun-test.sh`, `9503`=`./bootRun-dev.sh`) |
 | `SMART_ERD_E2E_BOOT_LOG_PATH`                       | recovery 재기동 로그 파일 경로                        | `/tmp/smart-erd-e2e-recovery-backend.log` |
 | `SMART_ERD_E2E_BROWSER_CHANNEL`                     | Playwright 브라우저 채널 강제값 (`chrome` 등)         | Playwright 기본 Chromium                  |
+| `SERVER_PORT`                                       | `bootRun-*.sh`가 사용할 백엔드 포트                   | 프로파일별 기본값 사용                    |
+| `VITE_DEV_SERVER_PORT`                              | Vite 개발 서버 포트                                   | `4503` (`frontend-local`은 `4501`, `frontend-test`는 `4502`) |
+| `VITE_API_PROXY_TARGET`                             | Vite `/api` 프록시 대상                               | `http://localhost:9503`                   |
+| `VITE_WS_PROXY_TARGET`                              | Vite `/ws` 프록시 대상                                | `ws://localhost:9503`                     |
 
 ## Playwright E2E 운영
 
@@ -100,10 +171,10 @@ npm run test:e2e:smoke
 - 목적: 서로 다른 브라우저 컨텍스트 간 생성/undo 전파가 유지되는지 확인
 - 범위: 로그인, 동일 다이어그램 동시 접속, 테이블 생성 전파, undo 전파
 - 권장 시점: Yjs, websocket, history/undo, collaboration 관련 수정 후
-- 주의: `test` 프로파일에서 로그인 비밀번호 검증을 우회하려면 백엔드를 `SPRING_PROFILES_ACTIVE=test`로 띄운다.
+- 주의: `test` 프로파일에서 로그인 비밀번호 검증을 우회하려면 백엔드를 `./bootRun-test.sh`로 띄운다.
 
 ```bash
-SPRING_PROFILES_ACTIVE=test ./gradlew bootRun
+./bootRun-test.sh
 
 cd client
 SMART_ERD_E2E_LOGIN='your-login-id' \
@@ -167,11 +238,18 @@ src/main/java/com/smarterd/
 │   │   └── dto/                     #   CreateTeamRequest, TeamResponse, AddMemberRequest 등
 │   ├── project/
 │   │   ├── ProjectController.java   #   프로젝트 CRUD (4 엔드포인트)
-│   │   └── dto/                     #   CreateProjectRequest, ProjectResponse
+│   │   └── dto/                     #   Create/Update request, ProjectResponse
 │   ├── dictionary/
-│   │   ├── DomainController.java    #   도메인 사전 CRUD (5 엔드포인트)
-│   │   ├── TermController.java      #   용어 사전 CRUD (5 엔드포인트)
-│   │   └── dto/                     #   Create/Update/Response record (Domain, Term)
+│   │   ├── DictionarySetController.java # 사전 세트 CRUD + 기본 세트 지정
+│   │   ├── DomainController.java    #   도메인 CRUD + bulk 업로드/오류 리포트/템플릿
+│   │   ├── TermController.java      #   용어 CRUD + bulk 업로드/오류 리포트/템플릿
+│   │   ├── WordController.java      #   단어 CRUD + bulk 업로드/오류 리포트/템플릿
+│   │   ├── DictionarySuggestController.java # 용어/도메인 조합 기반 물리명 추천
+│   │   └── dto/                     #   Create/Update/Response + Bulk + Suggest record
+│   ├── diagram/
+│   │   ├── DiagramController.java   #   다이어그램 CRUD + 저장 + Y.Doc snapshot + 사전 세트 변경
+│   │   ├── WsTicketController.java  #   WebSocket 접속용 일회용 ticket 발급
+│   │   └── dto/                     #   Create/Save/Rename/Detail/Response, Snapshot, WsTicket record
 │   └── common/
 │       └── GlobalExceptionHandler.java  # 전역 예외 처리 (404/403/409/400 매핑)
 ├── config/                          # 설정
@@ -187,13 +265,17 @@ src/main/java/com/smarterd/
 │   └── PrettySqlFormat.java         #   p6spy SQL 포맷터 (Hibernate FormatStyle.BASIC 기반 들여쓰기)
 └── domain/                          # 도메인 계층 (Service도 여기에 위치)
     ├── common/
-    │   ├── entity/                   #   BaseTimeEntity (createdAt, updatedAt UTC Instant 자동 감사)
-    │   └── exception/               #   커스텀 예외 계층 (5종, 모두 LocalizedException 상속)
-    │       ├── LocalizedException.java          # 추상 베이스 — messageCode + messageArgs
-    │       ├── EntityNotFoundException.java     # → 404
-    │       ├── DomainAccessDeniedException.java # → 403
-    │       ├── DuplicateException.java          # → 409
-    │       └── BusinessException.java           # → 400
+    │   ├── entity/                  #   BaseTimeEntity, BaseAuditEntity (시각/작성자 감사 공통 베이스)
+    │   ├── exception/               #   커스텀 예외 계층 (7종, 모두 LocalizedException 상속)
+    │   │   ├── LocalizedException.java          # 추상 베이스 — messageCode + messageArgs
+    │   │   ├── EntityNotFoundException.java     # → 404
+    │   │   ├── DomainAccessDeniedException.java # → 403
+    │   │   ├── DuplicateException.java          # → 409
+    │   │   ├── ConflictException.java           # → 409
+    │   │   ├── TooManyRequestsException.java    # → 429
+    │   │   └── BusinessException.java           # → 400
+    │   └── message/
+    │       └── MessageCode.java     #   공통 다국어 메시지 코드 enum
     ├── user/
     │   ├── entity/                   #   User, RefreshToken (loginId unique, BCrypt password)
     │   ├── repository/              #   UserRepository, RefreshTokenRepository (+Custom — QueryDSL bulk delete)
@@ -207,12 +289,14 @@ src/main/java/com/smarterd/
     │   ├── repository/             #   ProjectRepository (findByTeam)
     │   └── service/                #   ProjectService (프로젝트 CRUD, 팀 소속 확인)
     ├── diagram/
-    │   ├── entity/                  #   Diagram (TEXT content — React Flow JSON 직렬화)
-    │   └── repository/             #   DiagramRepository
+    │   ├── entity/                  #   Diagram (TEXT content + Y.Doc snapshot + revision 메타), SaveSource
+    │   ├── repository/             #   DiagramRepository + Custom + snapshot/projection 조회 타입
+    │   ├── service/                #   DiagramService, DiagramSnapshotService, DiagramDictionaryBindingService
+    │   └── websocket/              #   diagram 협업 전용 ticket / transport / room / relay / protocol / session / model
     └── dictionary/
-        ├── entity/                  #   Domain (논리명→물리타입), Term (논리명→물리명)
-        ├── repository/             #   DomainRepository, TermRepository (+Custom — QueryDSL fetch join)
-        └── service/                #   DomainService, TermService (CRUD + 팀 소속/중복 검증)
+        ├── entity/                  #   DictionarySet, Domain, Term, Word
+        ├── repository/             #   DictionarySet/Domain/Term/Word repository (+Custom — QueryDSL fetch join)
+        └── service/                #   CRUD 서비스 + *BulkService + Suggest/Migration + bulk session store
 ```
 
 ### 프론트엔드
@@ -223,7 +307,7 @@ client/
 ├── package.json                     # "type": "module" (ESM)
 ├── tailwind.config.js               # CSS 변수 기반 색상, darkMode: ["class"], tailwindcss-animate
 ├── postcss.config.js                # tailwindcss + autoprefixer
-├── vite.config.ts                   # @/ alias → ./src, 프록시 /api → :8190
+├── vite.config.ts                   # @/ alias → ./src, 프록시 /api → :9503 (frontend-test는 :9502)
 ├── tsconfig.app.json                # paths: { "@/*": ["./src/*"] }
 ├── .prettierrc.json                 # Prettier 설정
 ├── .prettierignore                  # Prettier 무시 파일
@@ -396,9 +480,11 @@ import jakarta.persistence.Id;
 | `EntityNotFoundException`     | 404 Not Found   | 엔티티 조회 실패                           |
 | `DomainAccessDeniedException` | 403 Forbidden   | 권한 부족 (팀 미소속, ADMIN 아님)          |
 | `DuplicateException`          | 409 Conflict    | 중복 리소스 (팀 멤버 중복, 로그인 ID 중복) |
+| `ConflictException`           | 409 Conflict    | 동시 수정/버전 충돌, 상태 경합             |
 | `BusinessException`           | 400 Bad Request | 비즈니스 규칙 위반 (소유자 제거 시도 등)   |
+| `TooManyRequestsException`    | 429 Too Many Requests | 요청 횟수 제한 초과                   |
 
-모든 예외는 `LocalizedException(messageCode, messageArgs...)` 을 상속하며, `domain/common/exception/` 패키지에 위치한다. `GlobalExceptionHandler`가 `MessageSource`를 통해 요청 로케일에 맞는 다국어 메시지로 변환하여 HTTP 응답으로 반환한다.
+모든 예외는 `LocalizedException(messageCode, messageArgs...)` 을 상속하며, `domain/common/exception/` 패키지에 위치한다. 메시지 키는 `domain/common/message/MessageCode` 에서 공통 관리하고, `GlobalExceptionHandler`가 `MessageSource`를 통해 요청 로케일에 맞는 다국어 메시지로 변환하여 HTTP 응답으로 반환한다.
 
 ```java
 // Good — 메시지 코드 + 인자 (MessageSource가 로케일에 맞게 번역)
@@ -654,7 +740,7 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 | ---------------- | -------------------- | ----------------------------------------------------------------- |
 | `api/`           | HTTP 인터페이스 계층 | Controller, DTO (record)                                          |
 | `domain/`        | 비즈니스 도메인 계층 | Entity, Repository, Service                                       |
-| `domain/common/` | 공통 코드            | BaseTimeEntity, 커스텀 예외                                       |
+| `domain/common/` | 공통 코드            | BaseTimeEntity, BaseAuditEntity, MessageCode, 커스텀 예외         |
 | `config/`        | 설정                 | Security, JWT, CORS, Locale, Validation, OpenAPI, QueryDSL, Blaze |
 
 - DTO는 Java `record`로 작성, `@Valid` 검증 포함
@@ -708,11 +794,11 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 - **Team** : 프로젝트와 데이터 사전을 소유하는 조직 단위
 - **TeamMember** : 팀-사용자 다대다 조인 (`@IdClass(TeamMemberId)` record 복합키, 역할: ADMIN, MEMBER, VIEWER)
 - **Project** : ERD 프로젝트 그룹 (Team 소속)
-- **Diagram** : React Flow JSON을 TEXT로 저장하는 ERD 다이어그램 (Project 소속)
+- **Diagram** : React Flow JSON `content`와 Y.Doc snapshot, content/snapshot revision 메타를 함께 관리하는 ERD 다이어그램 (Project 소속)
 - **Domain** : 논리명→물리 데이터타입 매핑 사전 (예: "금액" → `DECIMAL(15,2)`)
 - **Term** : 논리명→물리명 매핑 사전 (예: "사용자명" → `user_name`), Domain 참조 가능
 
-모든 엔티티는 `BaseTimeEntity`를 상속하여 `createdAt`, `updatedAt`을 UTC 기준 `Instant`로 자동 기록한다.
+모든 엔티티는 `BaseTimeEntity` 계층을 통해 `createdAt`, `updatedAt`을 UTC 기준 `Instant`로 자동 기록한다. 감사 주체(`createdBy`, `updatedBy`)가 필요한 엔티티는 `BaseAuditEntity`를 상속한다.
 
 ## API 엔드포인트
 
@@ -746,6 +832,25 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 | GET    | `/api/teams/{teamId}/projects/{id}` | 프로젝트 상세 | —            |
 | DELETE | `/api/teams/{teamId}/projects/{id}` | 프로젝트 삭제 | —            |
 
+### 다이어그램 (`/api/teams/{teamId}/projects/{projectId}/diagrams/**` — 인증 필요)
+
+| Method | Path                                                                    | 설명                    | Request Body                                             |
+| ------ | ----------------------------------------------------------------------- | ----------------------- | -------------------------------------------------------- |
+| POST   | `/api/teams/{teamId}/projects/{projectId}/diagrams`                     | 다이어그램 생성         | `{ name, dictionarySetId }`                              |
+| GET    | `/api/teams/{teamId}/projects/{projectId}/diagrams`                     | 다이어그램 목록         | —                                                        |
+| GET    | `/api/teams/{teamId}/projects/{projectId}/diagrams/{diagramId}`         | 다이어그램 상세         | —                                                        |
+| PUT    | `/api/teams/{teamId}/projects/{projectId}/diagrams/{diagramId}`         | 다이어그램 content 저장 | `{ content }`                                            |
+| POST   | `/api/teams/{teamId}/projects/{projectId}/diagrams/{diagramId}/ydoc-snapshot` | Y.Doc snapshot 즉시 저장 | `{ expectedContentRevision, ydocSnapshot(base64) }`      |
+| PATCH  | `/api/teams/{teamId}/projects/{projectId}/diagrams/{diagramId}`         | 다이어그램 이름 변경    | `{ name }`                                               |
+| PATCH  | `/api/teams/{teamId}/projects/{projectId}/diagrams/{diagramId}/dictionary-set` | 다이어그램 사전 세트 변경 | `{ dictionarySetId }`                                    |
+| DELETE | `/api/teams/{teamId}/projects/{projectId}/diagrams/{diagramId}`         | 다이어그램 삭제         | —                                                        |
+
+### WebSocket Ticket (`/api/ws-ticket` — 인증 필요)
+
+| Method | Path             | 설명                               | Request Body     | Response                                      |
+| ------ | ---------------- | ---------------------------------- | ---------------- | --------------------------------------------- |
+| POST   | `/api/ws-ticket` | 다이어그램 협업 접속용 ticket 발급 | `{ diagramId }`  | `{ ticket, userId, presenceProtocolVersion }` |
+
 ### 도메인 사전 (`/api/teams/{teamId}/domains/**` — 인증 필요)
 
 | Method | Path                                     | 설명        | Request Body                                  |
@@ -768,7 +873,7 @@ User ─┬─< TeamMember >─── Team ─┬─< Project ─< Diagram
 
 ### Swagger UI
 
-`http://localhost:8190/swagger-ui/index.html`
+`http://localhost:9503/swagger-ui/index.html`
 
 모든 컨트롤러에 `@Operation`, `@ApiResponse`, `@Parameter`, `@Schema` 어노테이션 적용됨. JWT Bearer 인증이 필요한 엔드포인트는 Swagger UI에서 Authorize 버튼으로 토큰 설정 후 테스트 가능.
 
@@ -980,7 +1085,7 @@ ERD 편집기 영역(Header, Sidebar, TableNode, ERDCanvas)에서 사용하는 �
 ### Axios 인스턴스
 
 ```text
-baseURL: /api  →  Vite 프록시  →  localhost:8190
+baseURL: /api  →  Vite 프록시  →  localhost:9503
 요청 인터셉터: Accept-Language (i18n.language) + localStorage Access Token → Authorization: Bearer <token>
 응답 인터셉터: 401 → Refresh Token으로 갱신 시도 (큐 패턴) → 실패 시 로그인 리다이렉트
 ```
@@ -1021,7 +1126,7 @@ decorator:
 
 smart-erd:
     cors:
-        allowed-origins: http://localhost:3000
+        allowed-origins: http://localhost:4501, http://localhost:4502, http://localhost:4503
     jwt:
         secret: ${SMART_ERD_JWT_SECRET:기본값}
         access-expiration: 1800000 # 30분 (ms)
@@ -1054,14 +1159,14 @@ annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
 
 ```bash
 # 백엔드
-./gradlew bootRun            # 개발 서버 기동 (:8190, Docker PostgreSQL 자동 시작)
+./bootRun-dev.sh            # 개발 서버 기동 (:9503, Docker PostgreSQL 자동 시작)
 ./gradlew build              # 전체 빌드 (컴파일 + 테스트)
 ./gradlew test               # 테스트 실행
 ./gradlew compileJava        # 컴파일만 (QueryDSL/Lombok AP 트리거)
 
 # 프론트엔드
 cd client
-npm run dev                  # 개발 서버 기동 (:3000, 프록시 /api → :8190)
+npm run dev                  # 개발 서버 기동 (:4503, 프록시 /api → :9503)
 npm run build                # 프로덕션 빌드 (tsc + vite)
 npm run lint                 # ESLint
 

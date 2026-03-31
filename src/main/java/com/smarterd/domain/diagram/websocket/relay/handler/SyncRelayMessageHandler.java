@@ -37,6 +37,6 @@ public class SyncRelayMessageHandler implements DiagramMessageHandler {
      */
     @Override
     public void handle(DiagramMessageContext context) {
-        messageSender.broadcastToRoom(context.diagramId(), context.session(), context.message());
+        messageSender.broadcastToRoom(context.diagramId(), context.sessionId(), context.message());
     }
 }

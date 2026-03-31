@@ -23,28 +23,49 @@ import {
   getCurrentEdgeHandleSelectionValue,
 } from '@/lib/edge-handles';
 import { extractColId } from '@/lib/handle-id';
-import type { EdgeRoutingType, TableNodeData, Waypoint } from '@/types/erd';
+import type {
+  ERDEdge,
+  EdgeRoutingType,
+  TableNode as ERDTableNode,
+  TableNodeData,
+  Waypoint,
+} from '@/types/erd';
 import type { YjsProvider } from '@/collaboration/YjsProvider';
-import {
-  CANVAS_HISTORY_ORIGIN,
-  DRAG_TRANSACTION_ORIGIN,
-} from '@/constants/canvas-history';
+import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { applyDagreLayout } from '@/lib/auto-layout';
+import type { CodeEditorTableFocusRequest } from '@/lib/code-editor-table-navigation';
+import { serializeDiagramDefinitionExportContent } from '@/lib/diagram-definition-export';
+import { findPersistedTableNodeForFocus } from '@/lib/diagram-table-focus';
+import type { PreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
 import { cn } from '@/lib/utils';
 import { useFkConnectMode } from '@/hooks/useFkConnectMode';
 import { useExportDiagram } from '@/hooks/useExportDiagram';
 import { useAwareness } from '@/hooks/useAwareness';
 import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
+import { useDiagramErdEdgeActions } from '@/collaboration/channel/diagram/use-diagram-erd-edge-actions';
+import { useDiagramErdDragActions } from '@/collaboration/channel/diagram/use-diagram-erd-drag-actions';
 import TableNode from './TableNode';
 import RemoteEditLocksProvider from './RemoteEditLocksProvider';
 import CanvasToolbar from './CanvasToolbar';
 import EdgeContextMenu from './EdgeContextMenu';
 import DeleteEdgeDialog from './DeleteEdgeDialog';
-import DdlExportDialog from './DdlExportDialog';
+import ExportProgressDialog from './ExportProgressDialog';
 import FkTypeDialog from './FkTypeDialog';
 import ErdRelationEdge from './ErdRelationEdge';
+import { previewNodeTypes } from './PreviewTableNodes';
+import {
+  applyHeaderZoomCssVariables,
+  TABLE_HEADER_ZOOM_CHANGE_EPSILON,
+  TABLE_HEADER_ZOOM_COMPENSATION_DELAY_MS,
+} from './tableHeaderZoom';
 import RemoteCursors from './RemoteCursors';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { ConnectedColumnIdsProvider } from './ConnectedColumnIdsContext';
+import {
+  CompactTableRenderingProvider,
+  resolveCompactTableRenderingMode,
+} from './CompactTableRenderingContext';
 import { ErdFkModeProvider } from './ErdFkModeContext';
 import {
   EdgeEditingProvider,
@@ -57,11 +78,13 @@ import {
   toggleOrthogonalSegmentDetail,
 } from './edgeWaypointGeometry';
 
+const DdlExportDialog = lazy(() => import('./DdlExportDialog'));
 const DdlImportDialog = lazy(() => import('./DdlImportDialog'));
 
 /** React Flow에 등록할 커스텀 노드 타입 매핑 */
 const nodeTypes: NodeTypes = {
   table: TableNode,
+  ...previewNodeTypes,
 };
 
 /** React Flow에 등록할 커스텀 엣지 타입 매핑 */
@@ -73,6 +96,12 @@ const edgeTypes: EdgeTypes = {
 const MINIMAP_NODE_LIMIT = 80;
 const EMPTY_EDGE_LOCKS = new Map();
 const EMPTY_EDGE_PREVIEWS = new Map();
+
+function isFiniteCanvasPosition(
+  position: { x: number; y: number } | null | undefined,
+): position is { x: number; y: number } {
+  return !!position && Number.isFinite(position.x) && Number.isFinite(position.y);
+}
 
 function areRoutePointsEqual(left: Waypoint[], right: Waypoint[]): boolean {
   if (left.length !== right.length) {
@@ -117,6 +146,22 @@ interface ERDCanvasProps {
   activeGroupName?: string | null;
   /** 활성 그룹의 테이블 ID 집합 */
   activeGroupTableIds?: Set<string> | null;
+  /** code 모드 shared draft overlay 그래프 */
+  draftOverlayGraph?: PreviewDraftOverlayGraph | null;
+  /** 코드 에디터 테이블 포커스 요청 */
+  tableFocusRequest?: CodeEditorTableFocusRequest | null;
+  /** 테이블 정의서 엑셀 다운로드 핸들러 */
+  onExportTableDefinition?: (content: string) => Promise<void> | void;
+  /** 컬럼 정의서 엑셀 다운로드 핸들러 */
+  onExportColumnDefinition?: (content: string) => Promise<void> | void;
+  /** 인덱스 정의서 엑셀 다운로드 핸들러 */
+  onExportIndexDefinition?: (content: string) => Promise<void> | void;
+  /** 테이블 정의서 엑셀 다운로드 진행 여부 */
+  tableDefinitionExporting?: boolean;
+  /** 컬럼 정의서 엑셀 다운로드 진행 여부 */
+  columnDefinitionExporting?: boolean;
+  /** 인덱스 정의서 엑셀 다운로드 진행 여부 */
+  indexDefinitionExporting?: boolean;
 }
 
 /** 삭제 다이얼로그 상태 */
@@ -157,9 +202,19 @@ function ERDCanvas({
   activeGroupId,
   activeGroupName,
   activeGroupTableIds,
+  draftOverlayGraph,
+  tableFocusRequest,
+  onExportTableDefinition,
+  tableDefinitionExporting = false,
+  onExportColumnDefinition,
+  columnDefinitionExporting = false,
+  onExportIndexDefinition,
+  indexDefinitionExporting = false,
 }: ERDCanvasProps) {
   const { t } = useTranslation();
   const reactFlowInstance = useReactFlow();
+  const edgeActions = useDiagramErdEdgeActions();
+  const dragActions = useDiagramErdDragActions();
   /** 캔버스 컨테이너 ref (Awareness 커서 추적용) */
   const canvasRef = useRef<HTMLDivElement>(null);
   /** 동일 락 토스트 중복 방지용 ref */
@@ -179,19 +234,11 @@ function ERDCanvas({
   const setHighlightedEdge = useCanvasStore((s) => s.setHighlightedEdge);
   const setHighlightedNodes = useCanvasStore((s) => s.setHighlightedNodes);
   const clearHighlights = useCanvasStore((s) => s.clearHighlights);
-  const removeEdge = useCanvasStore((s) => s.removeEdge);
-  const removeEdgeWithFkColumn = useCanvasStore((s) => s.removeEdgeWithFkColumn);
-  const updateEdgeRoutingType = useCanvasStore((s) => s.updateEdgeRoutingType);
-  const updateEdgeHandleSelection = useCanvasStore((s) => s.updateEdgeHandleSelection);
-  const updateEdgeWaypoints = useCanvasStore((s) => s.updateEdgeWaypoints);
-  const resetEdgeWaypoints = useCanvasStore((s) => s.resetEdgeWaypoints);
-  const normalizeEdgeHandles = useCanvasStore((s) => s.normalizeEdgeHandles);
   const applyLayout = useCanvasStore((s) => s.applyLayout);
   const undo = useCanvasStore((s) => s.undo);
   const redo = useCanvasStore((s) => s.redo);
   const canUndo = useCanvasStore((s) => s.canUndo);
   const canRedo = useCanvasStore((s) => s.canRedo);
-  const stopHistoryCapture = useCanvasStore((s) => s.stopHistoryCapture);
   const setActiveEditNodeId = useCanvasStore((s) => s.setActiveEditNodeId);
   const localEdgeDrag = useCollaborationStore((s) => s.localEdgeDrag);
   const setLocalEdgeDrag = useCollaborationStore((s) => s.setLocalEdgeDrag);
@@ -200,6 +247,29 @@ function ERDCanvas({
   const remoteEditLocks = useRemoteEditLocks();
   const { locksByNodeId } = remoteEditLocks;
   const localEdgeDragRef = useRef(localEdgeDrag);
+  const headerZoomCompensationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAppliedHeaderZoomRef = useRef<number | null>(null);
+  const lastHandledTableFocusRequestIdRef = useRef<number | null>(null);
+  const applyZoomTextCompensation = useCallback((zoom: number) => {
+    applyHeaderZoomCssVariables(canvasRef.current, zoom);
+    lastAppliedHeaderZoomRef.current = zoom;
+  }, []);
+  const clearZoomCompensationTimer = useCallback(() => {
+    if (headerZoomCompensationTimerRef.current) {
+      clearTimeout(headerZoomCompensationTimerRef.current);
+      headerZoomCompensationTimerRef.current = null;
+    }
+  }, []);
+  const scheduleZoomTextCompensation = useCallback(
+    (zoom: number) => {
+      clearZoomCompensationTimer();
+      headerZoomCompensationTimerRef.current = setTimeout(() => {
+        applyZoomTextCompensation(zoom);
+        headerZoomCompensationTimerRef.current = null;
+      }, TABLE_HEADER_ZOOM_COMPENSATION_DELAY_MS);
+    },
+    [applyZoomTextCompensation, clearZoomCompensationTimer],
+  );
 
   const {
     fkMode,
@@ -211,7 +281,33 @@ function ERDCanvas({
     handleFkTypeSelect,
     handleFkTypeDialogClose,
   } = useFkConnectMode();
-  const { exportPng, exportJpg, exportSvg, exportPdf } = useExportDiagram(diagramName);
+
+  const handleExportTableDefinition = useCallback(() => {
+    if (!onExportTableDefinition) {
+      return;
+    }
+    void onExportTableDefinition(
+      serializeDiagramDefinitionExportContent(nodes as ERDTableNode[], edges as ERDEdge[]),
+    );
+  }, [edges, nodes, onExportTableDefinition]);
+  const handleExportColumnDefinition = useCallback(() => {
+    if (!onExportColumnDefinition) {
+      return;
+    }
+    void onExportColumnDefinition(
+      serializeDiagramDefinitionExportContent(nodes as ERDTableNode[], edges as ERDEdge[]),
+    );
+  }, [edges, nodes, onExportColumnDefinition]);
+  const handleExportIndexDefinition = useCallback(() => {
+    if (!onExportIndexDefinition) {
+      return;
+    }
+    void onExportIndexDefinition(
+      serializeDiagramDefinitionExportContent(nodes as ERDTableNode[], edges as ERDEdge[]),
+    );
+  }, [edges, nodes, onExportIndexDefinition]);
+  const { exportPng, exportJpg, exportSvg, exportPdf, exportProgress } =
+    useExportDiagram(diagramName);
 
   /** 엣지 컨텍스트 메뉴 상태 */
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -223,6 +319,10 @@ function ERDCanvas({
   const [ddlImportOpen, setDdlImportOpen] = useState(false);
   /** 노드 드래그 진행 여부 (드래그 중 성능 우선 렌더링 제어용) */
   const [isDraggingNode, setIsDraggingNode] = useState(false);
+  /** 마지막으로 fitView 적용한 draft overlay 그래프 시그니처 */
+  const lastDraftOverlayFitSignatureRef = useRef<string | null>(null);
+  const manualViewportInteractionRef = useRef(false);
+  const autoFitViewportMovePendingRef = useRef(false);
 
   /** 그룹 뷰 활성 여부 */
   const isGroupView = !!activeGroupId && !!activeGroupTableIds;
@@ -231,32 +331,39 @@ function ERDCanvas({
 
   /** 그룹 뷰일 때 필터링된 노드, 아닐 때 전체 노드 */
   const displayNodes = useMemo(() => {
+    const overlayNodes = draftOverlayGraph?.nodes ?? [];
     if (!activeGroupTableIds) {
-      return nodes;
+      return [...nodes, ...overlayNodes];
     }
-    return nodes.filter((node) => activeGroupTableIds.has(node.id));
-  }, [nodes, activeGroupTableIds]);
+    return [...nodes.filter((node) => activeGroupTableIds.has(node.id)), ...overlayNodes];
+  }, [nodes, activeGroupTableIds, draftOverlayGraph?.nodes]);
 
   /** 그룹 뷰일 때 양쪽 노드가 모두 속한 엣지만 노출한다. */
   const displayEdges = useMemo(() => {
+    const overlayEdges = draftOverlayGraph?.edges ?? [];
     if (!activeGroupTableIds) {
-      return edges;
+      return [...edges, ...overlayEdges];
     }
-    return edges.filter(
-      (edge) => activeGroupTableIds.has(edge.source) && activeGroupTableIds.has(edge.target),
-    );
-  }, [edges, activeGroupTableIds]);
+    return [
+      ...edges.filter(
+        (edge) => activeGroupTableIds.has(edge.source) && activeGroupTableIds.has(edge.target),
+      ),
+      ...overlayEdges,
+    ];
+  }, [edges, activeGroupTableIds, draftOverlayGraph?.edges]);
 
   const contextMenuEdge = useMemo(
-    () => (contextMenu ? edges.find((edge) => edge.id === contextMenu.edgeId) ?? null : null),
+    () => (contextMenu ? (edges.find((edge) => edge.id === contextMenu.edgeId) ?? null) : null),
     [contextMenu, edges],
   );
   const contextMenuSourceNode = useMemo(
-    () => (contextMenuEdge ? nodes.find((node) => node.id === contextMenuEdge.source) ?? null : null),
+    () =>
+      contextMenuEdge ? (nodes.find((node) => node.id === contextMenuEdge.source) ?? null) : null,
     [contextMenuEdge, nodes],
   );
   const contextMenuTargetNode = useMemo(
-    () => (contextMenuEdge ? nodes.find((node) => node.id === contextMenuEdge.target) ?? null : null),
+    () =>
+      contextMenuEdge ? (nodes.find((node) => node.id === contextMenuEdge.target) ?? null) : null,
     [contextMenuEdge, nodes],
   );
   const contextMenuHandleSelection = useMemo(() => {
@@ -264,15 +371,12 @@ function ERDCanvas({
       return 'auto';
     }
     return getCurrentEdgeHandleSelectionValue({
-      handleMode: (
-        contextMenuEdge.data as { handleMode?: 'auto' | 'manual' } | undefined
-      )?.handleMode,
-      sourceSide: (
-        contextMenuEdge.data as { sourceSide?: 'left' | 'right' } | undefined
-      )?.sourceSide,
-      targetSide: (
-        contextMenuEdge.data as { targetSide?: 'left' | 'right' } | undefined
-      )?.targetSide,
+      handleMode: (contextMenuEdge.data as { handleMode?: 'auto' | 'manual' } | undefined)
+        ?.handleMode,
+      sourceSide: (contextMenuEdge.data as { sourceSide?: 'left' | 'right' } | undefined)
+        ?.sourceSide,
+      targetSide: (contextMenuEdge.data as { targetSide?: 'left' | 'right' } | undefined)
+        ?.targetSide,
       sourceHandle: contextMenuEdge.sourceHandle,
       targetHandle: contextMenuEdge.targetHandle,
     });
@@ -288,12 +392,50 @@ function ERDCanvas({
     localEdgeDragRef.current = localEdgeDrag;
   }, [localEdgeDrag]);
 
+  useEffect(() => {
+    applyZoomTextCompensation(reactFlowInstance.getZoom());
+  }, [applyZoomTextCompensation, reactFlowInstance]);
+
+  useEffect(() => {
+    return () => {
+      clearZoomCompensationTimer();
+    };
+  }, [clearZoomCompensationTimer]);
+
+  useEffect(() => {
+    const overlayNodes = draftOverlayGraph?.nodes ?? [];
+    if (overlayNodes.length === 0) {
+      lastDraftOverlayFitSignatureRef.current = null;
+      return;
+    }
+
+    const overlaySignature = JSON.stringify({
+      nodes: overlayNodes.map((node) => node.id),
+      edges: (draftOverlayGraph?.edges ?? []).map((edge) => edge.id),
+    });
+
+    if (lastDraftOverlayFitSignatureRef.current === overlaySignature) {
+      return;
+    }
+
+    if (manualViewportInteractionRef.current) {
+      return;
+    }
+
+    lastDraftOverlayFitSignatureRef.current = overlaySignature;
+    requestAnimationFrame(() => {
+      autoFitViewportMovePendingRef.current = true;
+      reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+    });
+  }, [draftOverlayGraph?.edges, draftOverlayGraph?.nodes, reactFlowInstance]);
+
   // 그룹 뷰 전환 시 필터링된 노드에 맞춰 뷰포트를 보정한다.
   useEffect(() => {
     if (!isGroupView || displayNodes.length === 0) {
       return;
     }
     requestAnimationFrame(() => {
+      autoFitViewportMovePendingRef.current = true;
       reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
     });
   }, [activeGroupId, displayNodes.length, isGroupView, reactFlowInstance]);
@@ -355,21 +497,28 @@ function ERDCanvas({
         return;
       }
       if (commit) {
-        const edge = useCanvasStore.getState().edges.find((candidate) => candidate.id === drag.edgeId);
-        const routingType =
-          ((edge?.data as { routingType?: EdgeRoutingType } | undefined)?.routingType ??
-            'smoothstep') as EdgeRoutingType;
+        const edge = edges.find((candidate) => candidate.id === drag.edgeId);
+        const routingType = ((edge?.data as { routingType?: EdgeRoutingType } | undefined)
+          ?.routingType ?? 'smoothstep') as EdgeRoutingType;
         if (edge && routingType === 'straight') {
-          updateEdgeWaypoints(drag.edgeId, drag.previewWaypoints);
+          edgeActions.updateEdgeWaypoints(drag.edgeId, drag.previewWaypoints);
         }
       }
       clearLocalEdgeDrag();
     },
-    [clearLocalEdgeDrag, updateEdgeWaypoints],
+    [clearLocalEdgeDrag, edgeActions, edges],
   );
 
   const beginSegmentDrag = useCallback(
-    ({ edgeId, pointerId, segmentIndex, axis, kind, routePoints, waypoints }: BeginSegmentDragParams) => {
+    ({
+      edgeId,
+      pointerId,
+      segmentIndex,
+      axis,
+      kind,
+      routePoints,
+      waypoints,
+    }: BeginSegmentDragParams) => {
       const edgeLockInfo = remoteEditLocks.edgeLocksById.get(edgeId);
       if (edgeLockInfo) {
         toast.info(t('erd.edge.blockedEditToast', { name: edgeLockInfo.name }));
@@ -424,17 +573,17 @@ function ERDCanvas({
         return;
       }
       clearLocalEdgeDrag();
-      updateEdgeWaypoints(edgeId, routePointsToWaypoints(nextRoutePoints));
+      edgeActions.updateEdgeWaypoints(edgeId, routePointsToWaypoints(nextRoutePoints));
     },
     [
       clearLocalEdgeDrag,
       edges,
+      edgeActions,
       remoteEditLocks.edgeLocksById,
       setActiveEditNodeId,
       setHighlightedEdge,
       setHighlightedNodes,
       t,
-      updateEdgeWaypoints,
     ],
   );
 
@@ -575,13 +724,44 @@ function ERDCanvas({
   ]);
 
   useEffect(() => {
+    if (!tableFocusRequest) {
+      return;
+    }
+    if (lastHandledTableFocusRequestIdRef.current === tableFocusRequest.requestId) {
+      return;
+    }
+
+    const targetNode = findPersistedTableNodeForFocus(nodes as ERDTableNode[], tableFocusRequest);
+    if (!targetNode) {
+      return;
+    }
+    lastHandledTableFocusRequestIdRef.current = tableFocusRequest.requestId;
+
+    const reactFlowNode = reactFlowInstance.getNode(targetNode.id) as
+      | Node<TableNodeData>
+      | undefined;
+    const width = reactFlowNode?.width ?? 420;
+    const height = reactFlowNode?.height ?? 80;
+    setHighlightedEdge(null);
+    setHighlightedNodes([targetNode.id]);
+    autoFitViewportMovePendingRef.current = true;
+    reactFlowInstance.setCenter(
+      targetNode.position.x + width / 2,
+      targetNode.position.y + height / 2,
+      {
+        duration: 300,
+        zoom: Math.max(reactFlowInstance.getZoom(), 0.8),
+      },
+    );
+  }, [nodes, reactFlowInstance, setHighlightedEdge, setHighlightedNodes, tableFocusRequest]);
+
+  useEffect(() => {
     if (!localEdgeDrag) {
       return;
     }
     const edge = edges.find((candidate) => candidate.id === localEdgeDrag.edgeId);
-    const routingType =
-      ((edge?.data as { routingType?: EdgeRoutingType } | undefined)?.routingType ??
-        'smoothstep') as EdgeRoutingType;
+    const routingType = ((edge?.data as { routingType?: EdgeRoutingType } | undefined)
+      ?.routingType ?? 'smoothstep') as EdgeRoutingType;
     if (edge && routingType === 'straight') {
       return;
     }
@@ -598,11 +778,10 @@ function ERDCanvas({
     const layoutedNodes = applyDagreLayout(nodes, edges);
     applyLayout(layoutedNodes);
     requestAnimationFrame(() => {
-      normalizeEdgeHandles(
-        undefined,
-        reactFlowInstance.getNodes() as Node<TableNodeData>[],
-        CANVAS_HISTORY_ORIGIN.USER_LAYOUT,
-      );
+      edgeActions.normalizeEdgeHandles(undefined, 'layout', {
+        nodeOverrides: reactFlowInstance.getNodes() as Node<TableNodeData>[],
+        origin: CANVAS_HISTORY_ORIGIN.USER_LAYOUT,
+      });
     });
   };
 
@@ -661,9 +840,19 @@ function ERDCanvas({
     ],
   );
 
+  const lastViewportZoomRef = useRef(0.4);
+  const [compactTableRenderingMode, setCompactTableRenderingMode] = useState(() =>
+    resolveCompactTableRenderingMode(displayNodes.length, lastViewportZoomRef.current),
+  );
   const showOverlayWidgets = !isDraggingNode;
   const showPerformanceOverlays = showOverlayWidgets && !isSidebarResizing;
   const showMiniMap = showPerformanceOverlays && displayNodes.length <= MINIMAP_NODE_LIMIT;
+
+  useEffect(() => {
+    setCompactTableRenderingMode(
+      resolveCompactTableRenderingMode(displayNodes.length, lastViewportZoomRef.current),
+    );
+  }, [displayNodes.length]);
 
   return (
     <div
@@ -676,86 +865,148 @@ function ERDCanvas({
           : undefined
       }
     >
-      <ErdFkModeProvider value={fkMode}>
-        <RemoteEditLocksProvider value={tableLockContextValue}>
-      <EdgeEditingProvider value={edgeEditingContextValue}>
-            <ReactFlow
-            nodes={displayNodes}
-            edges={styledEdges}
-            onNodesChange={effectiveCanEdit ? onNodesChange : undefined}
-            onEdgesChange={effectiveCanEdit ? onEdgesChange : undefined}
-            onConnect={effectiveCanEdit ? handleDragConnect : undefined}
-            onNodeClick={handleNodeClick}
-            onNodeDragStart={effectiveCanEdit ? () => setIsDraggingNode(true) : undefined}
-            onNodeDragStop={
-              effectiveCanEdit
-                ? (_event, node) => {
-                    setIsDraggingNode(false);
-                    requestAnimationFrame(() => {
-                      const latestNode =
-                        (reactFlowInstance.getNode(node.id) as Node<TableNodeData> | undefined) ??
-                        node;
-                      normalizeEdgeHandles([node.id], [latestNode], DRAG_TRANSACTION_ORIGIN);
-                      stopHistoryCapture();
-                    });
+      <TooltipProvider delayDuration={300}>
+        <ErdFkModeProvider value={fkMode}>
+          <RemoteEditLocksProvider value={tableLockContextValue}>
+            <EdgeEditingProvider value={edgeEditingContextValue}>
+            <CompactTableRenderingProvider mode={compactTableRenderingMode}>
+            <ConnectedColumnIdsProvider edges={displayEdges}>
+              <ReactFlow
+                nodes={displayNodes}
+                edges={styledEdges}
+                onNodesChange={effectiveCanEdit ? onNodesChange : undefined}
+                onEdgesChange={effectiveCanEdit ? onEdgesChange : undefined}
+                onConnect={effectiveCanEdit ? handleDragConnect : undefined}
+                onNodeClick={handleNodeClick}
+                onNodeDragStart={effectiveCanEdit ? () => setIsDraggingNode(true) : undefined}
+                onNodeDragStop={
+                  effectiveCanEdit
+                    ? (_event, node) => {
+                        setIsDraggingNode(false);
+                        requestAnimationFrame(() => {
+                          const latestNode =
+                            (reactFlowInstance.getNode(node.id) as Node<TableNodeData> | undefined) ??
+                            node;
+                          const storeNode = useCanvasStore
+                            .getState()
+                            .nodes.find((candidate) => candidate.id === node.id) as
+                            | Node<TableNodeData>
+                            | undefined;
+                          const resolvedPosition = isFiniteCanvasPosition(latestNode.position)
+                            ? latestNode.position
+                            : isFiniteCanvasPosition(node.position)
+                              ? node.position
+                              : isFiniteCanvasPosition(storeNode?.position)
+                                ? storeNode.position
+                                : null;
+                          if (!resolvedPosition) {
+                            return;
+                          }
+                          const normalizedNode =
+                            latestNode.position.x === resolvedPosition.x &&
+                            latestNode.position.y === resolvedPosition.y
+                              ? latestNode
+                              : { ...latestNode, position: resolvedPosition };
+                          dragActions.commitTableDrag(latestNode.id, resolvedPosition, normalizedNode);
+                        });
+                      }
+                    : undefined
+                }
+                onEdgeClick={handleEdgeClick}
+                onEdgeContextMenu={effectiveCanEdit ? handleEdgeContextMenu : undefined}
+                onPaneClick={handlePaneClick}
+                onInit={(instance) => {
+                  lastViewportZoomRef.current = instance.getZoom();
+                  setCompactTableRenderingMode(
+                    resolveCompactTableRenderingMode(displayNodes.length, lastViewportZoomRef.current),
+                  );
+                  applyZoomTextCompensation(instance.getZoom());
+                }}
+                onMoveEnd={(_event, viewport) => {
+                  lastViewportZoomRef.current = viewport.zoom;
+                  setCompactTableRenderingMode(
+                    resolveCompactTableRenderingMode(displayNodes.length, viewport.zoom),
+                  );
+                  const autoFitMovePending = autoFitViewportMovePendingRef.current;
+                  autoFitViewportMovePendingRef.current = false;
+                  if (!autoFitMovePending) {
+                    manualViewportInteractionRef.current = true;
                   }
-                : undefined
-            }
-            onEdgeClick={handleEdgeClick}
-            onEdgeContextMenu={effectiveCanEdit ? handleEdgeContextMenu : undefined}
-            onPaneClick={handlePaneClick}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            deleteKeyCode={null}
-            panActivationKeyCode={null}
-            nodesDraggable={effectiveCanEdit}
-            nodesConnectable={effectiveCanEdit}
-            elementsSelectable={effectiveCanEdit}
-            snapToGrid
-            snapGrid={[16, 16]}
-            defaultEdgeOptions={{
-              type: 'erdRelation',
-            }}
-            fitView
-            className={cn(fkMode && 'cursor-crosshair')}
-          >
-            {showPerformanceOverlays && (
-              <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-            )}
-            {showPerformanceOverlays && <Controls />}
-            {showMiniMap && (
-              <MiniMap
-                nodeStrokeColor="hsl(var(--muted-foreground))"
-                nodeColor="hsl(var(--card))"
-                nodeBorderRadius={4}
-              />
-            )}
-            <CanvasToolbar
-              fkMode={fkMode}
-              onToggleFkMode={toggleFkMode}
-              onAutoLayout={handleAutoLayout}
-              onExportPng={exportPng}
-              onExportJpg={exportJpg}
-              onExportSvg={exportSvg}
-              onExportPdf={exportPdf}
-              onExportDdl={() => setDdlDialogOpen(true)}
-              onImportDdl={() => setDdlImportOpen(true)}
-              codeEditorActive={codeEditorActive}
-              onToggleCodeEditor={onToggleCodeEditor}
-              validationOpen={validationOpen}
-              onToggleValidation={onToggleValidation}
-              dictionaryOpen={dictionaryOpen}
-              onOpenDictionary={onOpenDictionary}
-              canUndo={effectiveCanEdit && canUndo}
-              canRedo={effectiveCanEdit && canRedo}
-              onUndo={undo}
-              onRedo={redo}
-              canEdit={effectiveCanEdit}
-            />
-            </ReactFlow>
-          </EdgeEditingProvider>
-        </RemoteEditLocksProvider>
-      </ErdFkModeProvider>
+                  const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
+                  if (
+                    lastAppliedZoom != null &&
+                    Math.abs(viewport.zoom - lastAppliedZoom) <= TABLE_HEADER_ZOOM_CHANGE_EPSILON
+                  ) {
+                    return;
+                  }
+                  scheduleZoomTextCompensation(viewport.zoom);
+                }}
+                nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
+                deleteKeyCode={null}
+                panActivationKeyCode={null}
+                nodesDraggable={effectiveCanEdit}
+                nodesConnectable={effectiveCanEdit}
+                elementsSelectable={effectiveCanEdit}
+                snapToGrid
+                snapGrid={[16, 16]}
+                defaultEdgeOptions={{
+                  type: 'erdRelation',
+                }}
+                fitView
+                className={cn(fkMode && 'cursor-crosshair')}
+              >
+                {showPerformanceOverlays && (
+                  <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+                )}
+                {showPerformanceOverlays && <Controls />}
+                {showMiniMap && (
+                  <MiniMap
+                    nodeStrokeColor="hsl(var(--muted-foreground))"
+                    nodeColor="hsl(var(--card))"
+                    nodeBorderRadius={4}
+                  />
+                )}
+                <CanvasToolbar
+                  fkMode={fkMode}
+                  onToggleFkMode={toggleFkMode}
+                  onAutoLayout={handleAutoLayout}
+                  onExportPng={exportPng}
+                  onExportJpg={exportJpg}
+                  onExportSvg={exportSvg}
+                  onExportPdf={exportPdf}
+                  onExportTableDefinition={handleExportTableDefinition}
+                  onExportColumnDefinition={handleExportColumnDefinition}
+                  onExportIndexDefinition={handleExportIndexDefinition}
+                  onExportDdl={() => setDdlDialogOpen(true)}
+                  onImportDdl={() => setDdlImportOpen(true)}
+                  codeEditorActive={codeEditorActive}
+                  onToggleCodeEditor={onToggleCodeEditor}
+                  validationOpen={validationOpen}
+                  onToggleValidation={onToggleValidation}
+                  dictionaryOpen={dictionaryOpen}
+                  onOpenDictionary={onOpenDictionary}
+                  canUndo={effectiveCanEdit && canUndo}
+                  canRedo={effectiveCanEdit && canRedo}
+                  onUndo={undo}
+                  onRedo={redo}
+                  canEdit={effectiveCanEdit}
+                  isExporting={
+                    exportProgress.isExporting ||
+                    tableDefinitionExporting ||
+                    columnDefinitionExporting ||
+                    indexDefinitionExporting
+                  }
+                />
+              </ReactFlow>
+            </ConnectedColumnIdsProvider>
+            </CompactTableRenderingProvider>
+            </EdgeEditingProvider>
+          </RemoteEditLocksProvider>
+        </ErdFkModeProvider>
+      </TooltipProvider>
+
+      <ExportProgressDialog progress={exportProgress} />
 
       {showPerformanceOverlays && <RemoteCursors />}
 
@@ -769,16 +1020,16 @@ function ERDCanvas({
           handleSelection={contextMenuHandleSelection}
           allowedHandleSelections={contextMenuAllowedHandleSelections}
           canResetPath={
-            (((contextMenuEdge.data as { routingType?: EdgeRoutingType } | undefined)?.routingType ??
-              'smoothstep') as EdgeRoutingType) === 'straight' &&
-            (((contextMenuEdge.data as { waypoints?: Waypoint[] } | undefined)?.waypoints?.length ?? 0) >
-              0)
+            (((contextMenuEdge.data as { routingType?: EdgeRoutingType } | undefined)
+              ?.routingType ?? 'smoothstep') as EdgeRoutingType) === 'straight' &&
+            ((contextMenuEdge.data as { waypoints?: Waypoint[] } | undefined)?.waypoints?.length ??
+              0) > 0
           }
           onResetPath={() => {
             if (remoteEditLocks.edgeLocksById.has(contextMenu.edgeId)) {
               return;
             }
-            resetEdgeWaypoints(contextMenu.edgeId);
+            edgeActions.resetEdgeWaypoints(contextMenu.edgeId);
             setContextMenu(null);
           }}
           lockedByName={remoteEditLocks.edgeLocksById.get(contextMenu.edgeId)?.name ?? null}
@@ -786,7 +1037,7 @@ function ERDCanvas({
             if (remoteEditLocks.edgeLocksById.has(contextMenu.edgeId)) {
               return;
             }
-            updateEdgeRoutingType(contextMenu.edgeId, routingType);
+            edgeActions.updateEdgeRoutingType(contextMenu.edgeId, routingType);
             setContextMenu(null);
           }}
           onHandleSelectionChange={(selection) => {
@@ -796,10 +1047,8 @@ function ERDCanvas({
             const nodeOverrides = [
               reactFlowInstance.getNode(contextMenuEdge.source),
               reactFlowInstance.getNode(contextMenuEdge.target),
-            ].filter(
-              (node): node is Node<TableNodeData> => !!node,
-            );
-            updateEdgeHandleSelection(contextMenu.edgeId, selection, nodeOverrides);
+            ].filter((node): node is Node<TableNodeData> => !!node);
+            edgeActions.updateEdgeHandleSelection(contextMenu.edgeId, selection, nodeOverrides);
             setContextMenu(null);
           }}
           onDelete={() => {
@@ -819,21 +1068,25 @@ function ERDCanvas({
           childTableName={deleteDialog.childTableName}
           fkColumnsText={deleteDialog.fkColumnsText}
           onRemoveFk={() => {
-            removeEdgeWithFkColumn(deleteDialog.edgeId);
+            edgeActions.deleteEdge(deleteDialog.edgeId, true);
             setDeleteDialog(null);
           }}
           onKeepFk={() => {
-            removeEdge(deleteDialog.edgeId);
+            edgeActions.deleteEdge(deleteDialog.edgeId, false);
             setDeleteDialog(null);
           }}
         />
       )}
 
-      <DdlExportDialog
-        open={ddlDialogOpen}
-        onOpenChange={setDdlDialogOpen}
-        diagramName={diagramName}
-      />
+      {ddlDialogOpen && (
+        <Suspense fallback={null}>
+          <DdlExportDialog
+            open={ddlDialogOpen}
+            onOpenChange={setDdlDialogOpen}
+            diagramName={diagramName}
+          />
+        </Suspense>
+      )}
 
       {ddlImportOpen && (
         <Suspense fallback={null}>

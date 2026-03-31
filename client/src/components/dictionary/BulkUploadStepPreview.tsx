@@ -39,7 +39,15 @@ interface BulkUploadStepPreviewProps {
 }
 
 /** 도메인 데이터 컬럼 키 */
-const DOMAIN_COLUMNS = ['logicalName', 'physicalType', 'description'] as const;
+const DOMAIN_COLUMNS = [
+  'domainGroup',
+  'domainClassification',
+  'logicalName',
+  'dataType',
+  'dataLength',
+  'dataScale',
+  'description',
+] as const;
 
 /** 용어 데이터 컬럼 키 */
 const TERM_COLUMNS = ['logicalName', 'physicalName', 'domainLogicalName', 'description'] as const;
@@ -55,8 +63,12 @@ function getColumnHeaderKey(mode: 'domain' | 'term' | 'word', col: string): stri
   const headerMap: Record<string, string> =
     mode === 'domain'
       ? {
+          domainGroup: 'dictionary.domain.table.domainGroup',
+          domainClassification: 'dictionary.domain.table.domainClassification',
           logicalName: 'dictionary.domain.table.logicalName',
-          physicalType: 'dictionary.domain.table.physicalType',
+          dataType: 'dictionary.domain.table.dataType',
+          dataLength: 'dictionary.domain.table.dataLength',
+          dataScale: 'dictionary.domain.table.dataScale',
           description: 'dictionary.domain.table.description',
         }
       : mode === 'term'
@@ -82,8 +94,12 @@ function getColumnHeaderKey(mode: 'domain' | 'term' | 'word', col: string): stri
  */
 function getColumnWidthClass(col: string): string {
   const widthMap: Record<string, string> = {
+    domainGroup: 'w-[160px]',
+    domainClassification: 'w-[160px]',
     logicalName: 'w-[180px]',
-    physicalType: 'w-[200px]',
+    dataType: 'w-[160px]',
+    dataLength: 'w-[120px]',
+    dataScale: 'w-[140px]',
     physicalName: 'w-[200px]',
     domainLogicalName: 'w-[180px]',
     description: 'w-[320px]',
@@ -118,7 +134,8 @@ export default function BulkUploadStepPreview({
   const isPreviewTruncated = validationResult.previewTruncated;
   const previewErrorCount = previewRows.filter((row) => !row.valid).length;
   const filteredPreviewRows = showErrorOnly ? previewRows.filter((row) => !row.valid) : previewRows;
-  const tableMinWidthClass = mode === 'term' ? 'min-w-[980px]' : 'min-w-[840px]';
+  const tableMinWidthClass =
+    mode === 'domain' ? 'min-w-[1320px]' : mode === 'term' ? 'min-w-[980px]' : 'min-w-[840px]';
 
   return (
     <div className="space-y-4 min-w-0">

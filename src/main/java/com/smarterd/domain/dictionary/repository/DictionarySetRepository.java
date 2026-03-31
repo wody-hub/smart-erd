@@ -28,6 +28,14 @@ public interface DictionarySetRepository extends JpaRepository<DictionarySet, Lo
     Optional<DictionarySet> findByTeamAndId(Team team, Long id);
 
     /**
+     * 이름이 동일한 사전 세트를 ID 오름차순으로 조회한다.
+     *
+     * @param name 사전 세트 이름
+     * @return 사전 세트 목록
+     */
+    List<DictionarySet> findByNameOrderByIdAsc(String name);
+
+    /**
      * 팀의 기본 사전 세트를 조회한다.
      *
      * @param team 팀 엔티티

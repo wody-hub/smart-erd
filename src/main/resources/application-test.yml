@@ -1,3 +1,6 @@
+server:
+  port: ${SERVER_PORT:9502}
+
 smart-erd:
   auth:
     test-support:

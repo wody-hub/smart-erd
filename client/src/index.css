@@ -192,3 +192,14 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 }
+
+@layer components {
+  .monaco-editor .dsl-physical-name-hint {
+    color: hsl(var(--muted-foreground));
+    opacity: 0.52;
+    font-size: 0.82em;
+    font-style: normal;
+    letter-spacing: 0.01em;
+    pointer-events: none;
+  }
+}

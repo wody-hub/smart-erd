@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 다이어그램 content 내 사전 바인딩(termId/domainId) 무효화 서비스.
@@ -32,6 +33,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Slf4j
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class DiagramDictionaryBindingService {
 
     /** 용어 레포지토리 */
@@ -52,6 +54,7 @@ public class DiagramDictionaryBindingService {
      * @param targetSet 변경 대상 사전 세트
      * @return 무효화 카운트
      */
+    @Transactional
     public InvalidationCounts invalidateBindings(Diagram diagram, DictionarySet targetSet) {
         final var content = diagram.getContent();
         if (AppStringUtils.isBlank(content)) {
@@ -230,7 +233,6 @@ public class DiagramDictionaryBindingService {
      * @param invalidatedDomainBindingCount 무효화된 도메인 바인딩 수
      */
     public record InvalidationCounts(int invalidatedTermBindingCount, int invalidatedDomainBindingCount) {
-
         /**
          * 무효화 없음을 나타내는 빈 카운트를 반환한다.
          *

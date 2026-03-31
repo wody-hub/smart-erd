@@ -119,6 +119,8 @@ public class Diagram extends BaseAuditEntity {
      */
     public void updateContent(String content) {
         this.content = content;
+        incrementContentRevision();
+        nullifySnapshot();
     }
 
     /**

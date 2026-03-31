@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useCallback, useRef, useEffect } from 'react';
+import { lazy, memo, Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle, CircleHelp } from 'lucide-react';
@@ -26,12 +26,34 @@ import { useDdlParse } from '@/hooks/useDdlParse';
 import { useApplyToErd } from '@/hooks/useApplyToErd';
 import { useBidirectionalCodeSync } from '@/hooks/useBidirectionalCodeSync';
 import { useCodeEditorRefresh } from '@/hooks/useCodeEditorRefresh';
+import { useDiagramErdStructureSnapshot } from '@/collaboration/channel/diagram/use-diagram-erd-read-snapshot';
+import '@/lib/monaco-setup';
 import { useCodeEditorTableLock } from '@/hooks/useCodeEditorTableLock';
+import { useCodeEditorTableNavigation } from '@/hooks/useCodeEditorTableNavigation';
+import { useCodeEditorTableReveal } from '@/hooks/useCodeEditorTableReveal';
 import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
 import { useEditorCursorGuard } from '@/hooks/useEditorCursorGuard';
-import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { DSL_TABLE_KEYWORD, DSL_COLUMN_OPTIONS } from '@/lib/dsl-keywords';
-import { getSyncStatusMeta } from '@/lib/sync-status-meta';
+import { buildParsedSchemaHash } from '@/lib/code-sync-schema-hash';
+import type {
+  CodeEditorNavigableTable,
+  CodeEditorTableFocusRequest,
+  CodeEditorTableRevealRequest,
+} from '@/lib/code-editor-table-navigation';
+import { buildCodeEditorNavigableTables } from '@/lib/code-editor-table-navigation';
+import type { DiagramWorkMode } from '@/lib/diagram-work-mode';
+import type { DslPreviewCanvasState } from '@/lib/dsl-preview-graph';
+import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
+import type { DdlParseResult } from '@/lib/ddl-parser';
+import {
+  getCodeEditorRefreshConfirmReason,
+  isCodeEditorApplyBlocked,
+} from '@/lib/code-editor-draft-policy';
+import {
+  getCodeEditorRefreshConfirmCopy,
+  getCodeEditorStatusMeta,
+  type SyncStatusMeta,
+} from '@/lib/sync-status-meta';
 import { cn } from '@/lib/utils';
 import { generateDdl } from '@/lib/ddl-generator';
 import CodeEditorFooter from './CodeEditorFooter';
@@ -64,11 +86,50 @@ const DslCodeEditorPanel = lazy(() => import('./DslCodeEditorPanel'));
 /** 코드 에디터 모드 */
 type EditorMode = 'sql' | 'dsl';
 const [OPT_PK, OPT_AI, OPT_NN] = DSL_COLUMN_OPTIONS;
+type CodeModeDraftPersistStatus = 'inactive' | 'dirty' | 'saving' | 'saved' | 'error' | 'stale';
 
 /** DdlCodeEditorPanel 컴포넌트의 props */
 interface DdlCodeEditorPanelProps {
   /** 편집 가능 여부 (VIEWER일 때 false) */
   canEdit?: boolean;
+  /** 코드 -> ERD 자동동기화 활성 여부 */
+  enableCodeToErdAutoSync?: boolean;
+  /** ERD -> 코드 자동생성 활성 여부 */
+  enableErdToCodeAutoSync?: boolean;
+  /** 코드 에디터 테이블 락 발행 여부 */
+  enableTableLock?: boolean;
+  /** DSL 탭만 허용 여부 */
+  dslOnly?: boolean;
+  /** 현재 작업 모드 */
+  workMode?: DiagramWorkMode;
+  /** DSL preview 상태 변경 핸들러 */
+  onDslPreviewStateChange?: (previewState: DslPreviewCanvasState | null) => void;
+  /** shared schema draft 저장 활성 여부 */
+  persistDraft?: boolean;
+  /** code 모드 preview 위치 override */
+  previewPositionOverrides?: DiagramPreviewPositionRecord;
+  /** code 모드 preview 위치 override 변경 핸들러 */
+  onPreviewPositionOverridesChange?: (next: DiagramPreviewPositionRecord) => void;
+  /** 코드 에디터에서 테이블 포커스 요청 핸들러 */
+  onNavigateToTable?: (request: CodeEditorTableFocusRequest) => void;
+  /** ERD에서 요청한 코드 reveal 대상 */
+  tableRevealRequest?: CodeEditorTableRevealRequest | null;
+  /** remote Y.Doc snapshot/bootstrap 완료 전 draft hydrate 보류 여부 */
+  delayDraftHydration?: boolean;
+  /** 현재 persisted 다이어그램에 저장된 내용 존재 여부 */
+  persistedDiagramHasContent?: boolean;
+  /** code 모드 shared schema draft snapshot 서버 저장 예약 요청 */
+  onScheduleCodeModeSnapshotPersist?: () => void;
+  /** code 모드 shared schema draft snapshot 저장 상태 즉시 정리 */
+  onResetCodeModeSnapshotPersistState?: () => void;
+  /** snapshot persist 직전 editor draft flush 등록 */
+  registerBeforeCodeModeSnapshotPersist?: (callback: (() => void) | null) => void;
+  /** code 모드 shared schema draft 서버 저장 상태 */
+  codeModeDraftPersistStatus?: CodeModeDraftPersistStatus;
+  /** code 모드 shared schema draft 서버 저장 완료 시각 */
+  codeModeDraftPersistedAt?: number | null;
+  /** code 모드 published 다이어그램 최종 저장 요청 */
+  onPersistPublishedDiagram?: () => Promise<boolean>;
 }
 
 /**
@@ -80,46 +141,84 @@ interface DdlCodeEditorPanelProps {
  * @param props.canEdit 편집 가능 여부
  * @returns 코드 에디터 패널 JSX
  */
-export default function DdlCodeEditorPanel({ canEdit = true }: DdlCodeEditorPanelProps) {
+export default function DdlCodeEditorPanel({
+  canEdit = true,
+  enableCodeToErdAutoSync = true,
+  enableErdToCodeAutoSync = true,
+  enableTableLock = true,
+  dslOnly = false,
+  workMode = 'erd',
+  onDslPreviewStateChange,
+  persistDraft = false,
+  previewPositionOverrides,
+  onPreviewPositionOverridesChange,
+  onNavigateToTable,
+  tableRevealRequest,
+  delayDraftHydration = false,
+  persistedDiagramHasContent = false,
+  onScheduleCodeModeSnapshotPersist,
+  onResetCodeModeSnapshotPersistState,
+  registerBeforeCodeModeSnapshotPersist,
+  codeModeDraftPersistStatus = 'inactive',
+  codeModeDraftPersistedAt = null,
+  onPersistPublishedDiagram,
+}: DdlCodeEditorPanelProps) {
   const { t } = useTranslation();
 
   /** 에디터 모드 (기본값: DSL) */
   const [mode, setMode] = useState<EditorMode>('dsl');
 
+  useEffect(() => {
+    if (dslOnly && mode !== 'dsl') {
+      setMode('dsl');
+    }
+  }, [dslOnly, mode]);
+
   return (
     <div className="h-full flex flex-col bg-background border-r border-border">
       {/* 모드 탭 */}
       <div className="flex items-center border-b border-border shrink-0">
-        <div className="flex flex-1" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === 'sql'}
-            className={cn(
-              'flex-1 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-              mode === 'sql'
-                ? 'bg-background text-foreground border-b-2 border-primary'
-                : 'bg-muted text-muted-foreground hover:text-foreground',
+        {dslOnly ? (
+          <div className="flex flex-1 items-center justify-between px-3 py-1.5">
+            <div className="text-xs font-medium text-foreground">{t('erd.dsl.tabLabel')}</div>
+            {workMode === 'code' && (
+              <span className="text-[11px] text-muted-foreground">
+                {t('diagram.workMode.codeDslOnly')}
+              </span>
             )}
-            onClick={() => setMode('sql')}
-          >
-            SQL DDL
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === 'dsl'}
-            className={cn(
-              'flex-1 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-              mode === 'dsl'
-                ? 'bg-background text-foreground border-b-2 border-primary'
-                : 'bg-muted text-muted-foreground hover:text-foreground',
-            )}
-            onClick={() => setMode('dsl')}
-          >
-            {t('erd.dsl.tabLabel')}
-          </button>
-        </div>
+          </div>
+        ) : (
+          <div className="flex flex-1" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'sql'}
+              className={cn(
+                'flex-1 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                mode === 'sql'
+                  ? 'bg-background text-foreground border-b-2 border-primary'
+                  : 'bg-muted text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setMode('sql')}
+            >
+              SQL DDL
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'dsl'}
+              className={cn(
+                'flex-1 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                mode === 'dsl'
+                  ? 'bg-background text-foreground border-b-2 border-primary'
+                  : 'bg-muted text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setMode('dsl')}
+            >
+              {t('erd.dsl.tabLabel')}
+            </button>
+          </div>
+        )}
         {mode === 'dsl' && (
           <div className="px-2">
             <DslSyntaxGuideDialog />
@@ -130,10 +229,36 @@ export default function DdlCodeEditorPanel({ canEdit = true }: DdlCodeEditorPane
       {/* 모드별 에디터 */}
       <div className="flex-1 min-h-0" role="tabpanel">
         {mode === 'sql' ? (
-          <SqlDdlEditor canEdit={canEdit} />
+          <SqlDdlEditor
+            canEdit={canEdit}
+            enableCodeToErdAutoSync={enableCodeToErdAutoSync}
+            enableErdToCodeAutoSync={enableErdToCodeAutoSync}
+            enableTableLock={enableTableLock}
+            onNavigateToTable={onNavigateToTable}
+            tableRevealRequest={tableRevealRequest}
+          />
         ) : (
           <Suspense fallback={<Spinner text={t('common.loading')} />}>
-            <DslCodeEditorPanel canEdit={canEdit} />
+            <DslCodeEditorPanel
+              canEdit={canEdit}
+              enableCodeToErdAutoSync={enableCodeToErdAutoSync}
+              enableErdToCodeAutoSync={enableErdToCodeAutoSync}
+              enableTableLock={enableTableLock}
+              onPreviewStateChange={onDslPreviewStateChange}
+              persistDraft={persistDraft}
+              previewPositionOverrides={previewPositionOverrides}
+              onPreviewPositionOverridesChange={onPreviewPositionOverridesChange}
+              onNavigateToTable={onNavigateToTable}
+              tableRevealRequest={tableRevealRequest}
+              delayDraftHydration={delayDraftHydration}
+              persistedDiagramHasContent={persistedDiagramHasContent}
+              onScheduleCodeModeSnapshotPersist={onScheduleCodeModeSnapshotPersist}
+              onResetCodeModeSnapshotPersistState={onResetCodeModeSnapshotPersistState}
+              registerBeforeCodeModeSnapshotPersist={registerBeforeCodeModeSnapshotPersist}
+              codeModeDraftPersistStatus={codeModeDraftPersistStatus}
+              codeModeDraftPersistedAt={codeModeDraftPersistedAt}
+              onPersistPublishedDiagram={onPersistPublishedDiagram}
+            />
           </Suspense>
         )}
       </div>
@@ -257,7 +382,21 @@ function DslSyntaxGuideDialog() {
  * @param props.canEdit 편집 가능 여부
  * @returns SQL DDL 에디터 JSX
  */
-function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
+function SqlDdlEditor({
+  canEdit = true,
+  enableCodeToErdAutoSync = true,
+  enableErdToCodeAutoSync = true,
+  enableTableLock = true,
+  onNavigateToTable,
+  tableRevealRequest,
+}: {
+  canEdit?: boolean;
+  enableCodeToErdAutoSync?: boolean;
+  enableErdToCodeAutoSync?: boolean;
+  enableTableLock?: boolean;
+  onNavigateToTable?: (request: CodeEditorTableFocusRequest) => void;
+  tableRevealRequest?: CodeEditorTableRevealRequest | null;
+}) {
   const { t } = useTranslation();
   const { teamId, projectId, diagramId } = useParams<{
     teamId: string;
@@ -266,6 +405,7 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
   }>();
   const remoteEditLocks = useRemoteEditLocks();
   const hasRemoteEditLocks = remoteEditLocks.hasTableLocks;
+  const diagramErdStructureSnapshot = useDiagramErdStructureSnapshot();
 
   const { dbms, ddlText, parseResult, parsing, handleDdlChange, handleDbmsChange } = useDdlParse({
     persistDbms: true,
@@ -295,9 +435,9 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
 
   /** 현재 ERD 상태를 SQL DDL 텍스트로 생성한다. */
   const generateFromErd = useCallback(() => {
-    const { nodes, edges } = useCanvasStore.getState();
-    return generate(nodes as TableNode[], edges as ERDEdge[]);
-  }, [generate]);
+    const { nodes, edges } = diagramErdStructureSnapshot.readCurrentStructure();
+    return generate(nodes, edges);
+  }, [diagramErdStructureSnapshot, generate]);
 
   const hasBlockingErrors =
     (parseResult?.diagnostics.some((d) => d.severity === 'error') ?? false) ||
@@ -305,42 +445,71 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
 
   /** 에디터 인스턴스 ref (커서 가드용으로 sync 훅보다 앞에 선언) */
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const parsedSchemaHash = useMemo(
+    () => (parseResult ? buildParsedSchemaHash(parseResult) : null),
+    [parseResult],
+  );
 
   // ERD→Code 동기화 시 커서/스크롤 보존 가드
   const { syncCodeChange, shouldIgnoreChange } = useEditorCursorGuard(editorRef, handleDdlChange);
 
-  const { handleUserCodeChange, handleGeneratedCodeChange, clearQueueTimeoutHold, syncStatus } =
+  const {
+    handleUserCodeChange,
+    handleGeneratedCodeChange,
+    clearQueueTimeoutHold,
+    syncStatus,
+    draftState,
+  } =
     useBidirectionalCodeSync({
-      enabled: canEdit,
+      enableCodeToErdSync: canEdit && enableCodeToErdAutoSync,
+      enableErdToCodeSync: canEdit && enableErdToCodeAutoSync,
       codeText: ddlText,
       parsing,
       hasBlockingErrors,
       hasParsedTables: parseResult != null && !hasBlockingErrors,
       hasRemoteEditLocks,
+      parsedSchemaHash,
       onCodeTextChange: handleDdlChange,
       onSyncCodeTextChange: syncCodeChange,
       generateCodeFromErd: generateFromErd,
+      currentErdRevisionHash: diagramErdStructureSnapshot.currentRevisionHash,
       applyParsedToErd,
     });
 
   const handleApplyWithSyncReset = useCallback(() => {
+    if (isCodeEditorApplyBlocked(draftState)) {
+      return;
+    }
     clearQueueTimeoutHold();
     handleApply();
-  }, [clearQueueTimeoutHold, handleApply]);
+  }, [clearQueueTimeoutHold, draftState, handleApply]);
 
   const executeApplyWithSyncReset = useCallback(() => {
+    if (isCodeEditorApplyBlocked(draftState)) {
+      return;
+    }
     clearQueueTimeoutHold();
     executeApply();
-  }, [clearQueueTimeoutHold, executeApply]);
+  }, [clearQueueTimeoutHold, draftState, executeApply]);
 
+  const refreshConfirmReason = getCodeEditorRefreshConfirmReason({
+    draftState,
+  });
   const { executeRefresh, handleRefresh, hasNodes, refreshConfirmOpen, setRefreshConfirmOpen } =
     useCodeEditorRefresh({
-      generate,
+      generateFromErd,
       onGenerated: handleGeneratedCodeChange,
-      currentText: ddlText,
+      hasNodes: diagramErdStructureSnapshot.hasNodes,
+      refreshConfirmReason,
     });
 
-  const syncStatusMeta = getSyncStatusMeta(t, syncStatus);
+  const syncStatusMeta = getCodeEditorStatusMeta(t, syncStatus, draftState);
+  const refreshConfirmCopy = getCodeEditorRefreshConfirmCopy(t, refreshConfirmReason);
+  const canApplyWithDraftState = canApply && !isCodeEditorApplyBlocked(draftState);
+  const navigableTables = useMemo<CodeEditorNavigableTable[]>(
+    () => buildCodeEditorNavigableTables(parseResult?.tables ?? [], parseResult?.tableRanges ?? []),
+    [parseResult?.tableRanges, parseResult?.tables],
+  );
 
   /** 다크 모드 감지 (반응형) */
   const isDark = useDarkMode();
@@ -378,12 +547,41 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
   };
 
   useCodeEditorTableLock({
-    enabled: canEdit,
+    enabled: canEdit && enableTableLock,
     editorReady,
     editorRef,
     tableRanges: parseResult?.tableRanges ?? [],
     hasParseErrors: hasBlockingErrors,
   });
+  useCodeEditorTableNavigation({
+    enabled: !!onNavigateToTable,
+    editorReady,
+    editorRef,
+    monacoRef,
+    tables: navigableTables,
+    onNavigate: (table) => {
+      onNavigateToTable?.({
+        ...table,
+        requestId: Date.now(),
+      });
+    },
+  });
+  useCodeEditorTableReveal({
+    enabled: !!tableRevealRequest,
+    editorReady,
+    editorRef,
+    tables: navigableTables,
+    request: tableRevealRequest,
+  });
+  useEffect(() => {
+    if (!tableRevealRequest || !editorReady) {
+      return;
+    }
+    if (ddlText.trim().length > 0 || navigableTables.length > 0 || !hasNodes) {
+      return;
+    }
+    executeRefresh();
+  }, [ddlText, editorReady, executeRefresh, hasNodes, navigableTables.length, tableRevealRequest]);
 
   // diagnostics 변경 시 SQL 에러 마커 갱신 (라인 전체 마킹 정책)
   useEffect(() => {
@@ -484,7 +682,7 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
       {/* 파싱 결과 프리뷰 + Apply/Refresh 버튼 */}
       <CodeEditorFooter
         onApply={handleApplyWithSyncReset}
-        canApply={canApply}
+        canApply={canApplyWithDraftState}
         executeApply={executeApplyWithSyncReset}
         confirmOpen={confirmOpen}
         setConfirmOpen={setConfirmOpen}
@@ -494,56 +692,82 @@ function SqlDdlEditor({ canEdit = true }: { canEdit?: boolean }) {
         hasNodes={hasNodes}
         refreshConfirmOpen={refreshConfirmOpen}
         setRefreshConfirmOpen={setRefreshConfirmOpen}
+        refreshConfirmTitle={refreshConfirmCopy.title}
+        refreshConfirmDescription={refreshConfirmCopy.description}
       >
-        <div className="flex items-center gap-2 text-xs min-h-[20px]">
-          {parsing && (
-            <span className="flex items-center gap-1 text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              {t('erd.ddlImport.parsing')}
-            </span>
-          )}
-
-          {!parsing && parseResult && (
-            <>
-              {parseResult.tables.length > 0 && (
-                <span className="flex items-center gap-1 text-success">
-                  <CheckCircle2 className="h-3 w-3" />
-                  {t('erd.ddlImport.preview', {
-                    tables: parseResult.tables.length,
-                    relations: parseResult.relations.length,
-                  })}
-                </span>
-              )}
-
-              {parseResult.errors.length > 0 && parseResult.tables.length > 0 && (
-                <span className="flex items-center gap-1 text-erd-warning">
-                  <AlertTriangle className="h-3 w-3" />
-                  {t('erd.ddlImport.warnings', { count: parseResult.errors.length })}
-                </span>
-              )}
-
-              {parseResult.tables.length === 0 && parseResult.errors.length > 0 && (
-                <span className="flex items-center gap-1 text-destructive">
-                  <XCircle className="h-3 w-3" />
-                  {t('erd.ddlImport.parseError')}
-                </span>
-              )}
-            </>
-          )}
-
-          {syncStatusMeta && (
-            <span
-              className={cn('flex items-center gap-1', syncStatusMeta.className)}
-              aria-label={t('erd.sync.statusAria')}
-            >
-              <syncStatusMeta.Icon
-                className={cn('h-3 w-3', syncStatusMeta.spin && 'animate-spin')}
-              />
-              {syncStatusMeta.label}
-            </span>
-          )}
-        </div>
+        <SqlFooterStatus
+          parsing={parsing}
+          parseResult={parseResult}
+          syncStatusMeta={syncStatusMeta}
+        />
       </CodeEditorFooter>
     </div>
   );
 }
+
+/**
+ * SQL DDL 에디터 하단 파싱 상태 표시.
+ *
+ * React.memo로 감싸 parsing/parseResult/syncStatusMeta가 변하지 않으면 리렌더링을 스킵한다.
+ * CodeEditorFooter의 memo와 함께 작동하여 불필요한 깜빡임을 방지한다.
+ */
+const SqlFooterStatus = memo(function SqlFooterStatus({
+  parsing,
+  parseResult,
+  syncStatusMeta,
+}: {
+  parsing: boolean;
+  parseResult: DdlParseResult | null;
+  syncStatusMeta: SyncStatusMeta | null;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex items-center gap-2 text-xs min-h-[20px]">
+      {parsing && (
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {t('erd.ddlImport.parsing')}
+        </span>
+      )}
+
+      {!parsing && parseResult && (
+        <>
+          {parseResult.tables.length > 0 && (
+            <span className="flex items-center gap-1 text-success">
+              <CheckCircle2 className="h-3 w-3" />
+              {t('erd.ddlImport.preview', {
+                tables: parseResult.tables.length,
+                relations: parseResult.relations.length,
+              })}
+            </span>
+          )}
+
+          {parseResult.errors.length > 0 && parseResult.tables.length > 0 && (
+            <span className="flex items-center gap-1 text-erd-warning">
+              <AlertTriangle className="h-3 w-3" />
+              {t('erd.ddlImport.warnings', { count: parseResult.errors.length })}
+            </span>
+          )}
+
+          {parseResult.tables.length === 0 && parseResult.errors.length > 0 && (
+            <span className="flex items-center gap-1 text-destructive">
+              <XCircle className="h-3 w-3" />
+              {t('erd.ddlImport.parseError')}
+            </span>
+          )}
+        </>
+      )}
+
+      {syncStatusMeta && (
+        <span
+          className={cn('flex items-center gap-1', syncStatusMeta.className)}
+          aria-label={t('erd.sync.statusAria')}
+        >
+          <syncStatusMeta.Icon className={cn('h-3 w-3', syncStatusMeta.spin && 'animate-spin')} />
+          {syncStatusMeta.label}
+        </span>
+      )}
+    </div>
+  );
+});

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   type EdgeProps,
   EdgeLabelRenderer,
@@ -19,6 +19,7 @@ import {
   buildOrthogonalRouteSegments,
   buildStraightEdgePoints,
 } from './edgeWaypointGeometry';
+import { buildObstacleAvoidingAutoRoute } from './edgeAutoRoute';
 
 /** 카디널리티 기호 유형 */
 type CardinalitySymbol = 'one' | 'many';
@@ -64,6 +65,9 @@ const CROW_FOOT_SPREAD = 8;
 const SEGMENT_HANDLE_THICKNESS = 18;
 const SEGMENT_GRIP_LENGTH = 24;
 const SEGMENT_GRIP_THICKNESS = 4;
+const DEFAULT_NODE_WIDTH = 420;
+const DEFAULT_NODE_BASE_HEIGHT = 52;
+const DEFAULT_NODE_ROW_HEIGHT = 30;
 
 function buildSegmentHandleStyle(
   start: { x: number; y: number },
@@ -94,8 +98,16 @@ function getEdgePathByRoutingType(input: {
   waypoints: Waypoint[];
   sourceDirection: number;
   targetDirection: number;
+  autoRoutePoints?: Array<{ x: number; y: number }> | null;
 }): string {
-  const { routingType, waypoints, sourceDirection, targetDirection, ...pathInput } = input;
+  const {
+    routingType,
+    waypoints,
+    sourceDirection,
+    targetDirection,
+    autoRoutePoints,
+    ...pathInput
+  } = input;
   const adjustedPathInput = {
     ...pathInput,
     sourceX: pathInput.sourceX + sourceDirection * SOURCE_MARKER_OFFSET,
@@ -120,11 +132,18 @@ function getEdgePathByRoutingType(input: {
       }),
     );
   }
+  if (autoRoutePoints && autoRoutePoints.length > 1) {
+    return buildRoundedOrthogonalSvgPath(autoRoutePoints, 8);
+  }
   const [path] = getSmoothStepPath({
     ...adjustedPathInput,
     borderRadius: 8,
   });
   return path;
+}
+
+function estimateNodeHeight(data: TableNodeData | undefined): number {
+  return DEFAULT_NODE_BASE_HEIGHT + (data?.columns.length ?? 0) * DEFAULT_NODE_ROW_HEIGHT;
 }
 
 function renderOneMarker(x: number, y: number, direction: number, stroke: string) {
@@ -205,6 +224,7 @@ function renderTargetMarker(
 
 export default function ErdRelationEdge({
   id,
+  source,
   sourceX,
   sourceY,
   targetX,
@@ -218,6 +238,12 @@ export default function ErdRelationEdge({
 }: EdgeProps) {
   const { t } = useTranslation();
   const reactFlowInstance = useReactFlow();
+  const relationType: RelationType =
+    (data as { relationType?: RelationType } | undefined)?.relationType ?? 'non-identifying';
+  const routingType: EdgeRoutingType =
+    (data as { routingType?: EdgeRoutingType } | undefined)?.routingType ?? 'smoothstep';
+  const committedWaypoints = ((data as { waypoints?: Waypoint[] } | undefined)?.waypoints ??
+    []) as Waypoint[];
   const childData = useStore(
     useCallback(
       (s) => {
@@ -227,14 +253,37 @@ export default function ErdRelationEdge({
       [target],
     ),
   );
+  const obstacleRects = useStore(
+    useCallback(
+      (s) => {
+        if (routingType !== 'smoothstep') {
+          return [];
+        }
+
+        return s.nodes
+          .filter(
+            (node) =>
+              node.id !== source &&
+              node.id !== target &&
+              (node.type === 'table' || node.type === 'previewTable'),
+          )
+          .map((node) => {
+            const tableData = node.data as TableNodeData | undefined;
+            const width = node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH;
+            const height = node.measured?.height ?? node.height ?? estimateNodeHeight(tableData);
+            return {
+              left: node.position.x,
+              right: node.position.x + width,
+              top: node.position.y,
+              bottom: node.position.y + height,
+            };
+          });
+      },
+      [routingType, source, target],
+    ),
+  );
   const { edgeLocksById, edgePreviewsById, localEdgeDrag, beginSegmentDrag, splitSegment } =
     useEdgeEditingContext();
-  const relationType: RelationType =
-    (data as { relationType?: RelationType } | undefined)?.relationType ?? 'non-identifying';
-  const routingType: EdgeRoutingType =
-    (data as { routingType?: EdgeRoutingType } | undefined)?.routingType ?? 'smoothstep';
-  const committedWaypoints = ((data as { waypoints?: Waypoint[] } | undefined)?.waypoints ??
-    []) as Waypoint[];
   const localPreviewWaypoints =
     localEdgeDrag?.edgeId === id ? localEdgeDrag.previewWaypoints : null;
   const remotePreviewWaypoints = edgePreviewsById.get(id)?.waypoints ?? null;
@@ -248,13 +297,44 @@ export default function ErdRelationEdge({
     childData,
   );
 
-  const resolvedSourcePosition =
-    (extractHandleSide(sourceHandleId ?? '') === 'left' ? 'left' : 'right') as Position;
-  const resolvedTargetPosition =
-    (extractHandleSide(targetHandleId ?? '') === 'left' ? 'left' : 'right') as Position;
+  const resolvedSourcePosition = (
+    extractHandleSide(sourceHandleId ?? '') === 'left' ? 'left' : 'right'
+  ) as Position;
+  const resolvedTargetPosition = (
+    extractHandleSide(targetHandleId ?? '') === 'left' ? 'left' : 'right'
+  ) as Position;
 
   const sourceDirection = resolvedSourcePosition === ('left' as Position) ? -1 : 1;
   const targetDirection = resolvedTargetPosition === ('left' as Position) ? -1 : 1;
+  const autoRoutePoints = useMemo(
+    () =>
+      routingType === 'smoothstep'
+        ? buildObstacleAvoidingAutoRoute(
+            {
+              sourceX,
+              sourceY,
+              targetX,
+              targetY,
+              sourceDirection,
+              targetDirection,
+              sourceMarkerOffset: SOURCE_MARKER_OFFSET,
+              targetMarkerOffset: TARGET_MARKER_OFFSET,
+              waypoints: [],
+            },
+            obstacleRects,
+          )
+        : null,
+    [
+      obstacleRects,
+      routingType,
+      sourceDirection,
+      sourceX,
+      sourceY,
+      targetDirection,
+      targetX,
+      targetY,
+    ],
+  );
 
   const edgePath = getEdgePathByRoutingType({
     routingType,
@@ -267,6 +347,7 @@ export default function ErdRelationEdge({
     waypoints: displayWaypoints,
     sourceDirection,
     targetDirection,
+    autoRoutePoints,
   });
 
   const edgeStyle = style as React.CSSProperties | undefined;
@@ -303,11 +384,10 @@ export default function ErdRelationEdge({
           waypoints: displayWaypoints,
         })
       : [];
-  const lockBadgePoint =
-    routeSegments[Math.floor(routeSegments.length / 2)]?.center ?? {
-      x: (sourceX + targetX) / 2,
-      y: (sourceY + targetY) / 2,
-    };
+  const lockBadgePoint = routeSegments[Math.floor(routeSegments.length / 2)]?.center ?? {
+    x: (sourceX + targetX) / 2,
+    y: (sourceY + targetY) / 2,
+  };
   const isEditing = selected || localEdgeDrag?.edgeId === id;
   const showSegmentControls = routingType === 'straight' && isEditing;
 

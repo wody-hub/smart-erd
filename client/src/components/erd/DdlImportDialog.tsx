@@ -18,9 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import useCanvasStore from '@/stores/erd/useCanvasStore';
+import { useDiagramErdCrudActions } from '@/collaboration/channel/diagram/use-diagram-erd-crud-actions';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import { useDdlParse } from '@/hooks/useDdlParse';
+import '@/lib/monaco-setup';
 import type { DbmsType } from '@/types/erd';
 
 /** DdlImportDialog 컴포넌트의 props */
@@ -42,7 +43,7 @@ interface DdlImportDialogProps {
  */
 export default function DdlImportDialog({ open, onOpenChange }: DdlImportDialogProps) {
   const { t } = useTranslation();
-  const importDdl = useCanvasStore((s) => s.importDdl);
+  const crudActions = useDiagramErdCrudActions();
 
   const { dbms, ddlText, parseResult, parsing, handleDdlChange, handleDbmsChange, resetParse } =
     useDdlParse();
@@ -52,7 +53,7 @@ export default function DdlImportDialog({ open, onOpenChange }: DdlImportDialogP
     if (!parseResult || parseResult.tables.length === 0) return;
 
     try {
-      importDdl(parseResult);
+      crudActions.importDdl(parseResult);
       toast.success(t('erd.ddlImport.success', { count: parseResult.tables.length }));
       handleClose();
     } catch (err) {

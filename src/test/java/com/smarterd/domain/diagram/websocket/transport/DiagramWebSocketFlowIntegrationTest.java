@@ -7,9 +7,22 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smarterd.application.collaboration.query.LoadCollaborationHandoffUseCase;
+import com.smarterd.application.diagram.command.ApplyDiagramCompactedSnapshotUseCase;
+import com.smarterd.application.diagram.command.CompleteDiagramSessionJoinUseCase;
+import com.smarterd.application.diagram.command.CompleteDiagramSessionLeaveUseCase;
+import com.smarterd.application.diagram.command.DiagramRealtimeSessionUseCase;
+import com.smarterd.application.diagram.command.FlushDiagramDrainedUpdatesUseCase;
+import com.smarterd.collaboration.channel.DefaultCollaborationRuntimeSupportRegistry;
 import com.smarterd.config.websocket.WebSocketProperties;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationHandoffPolicy;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeyFactory;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationRuntimeSupport;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSessionMetadataPolicy;
+import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSnapshotStore;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
 import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
+import com.smarterd.domain.diagram.websocket.relay.DiagramHandoffSnapshotResponder;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
@@ -20,8 +33,10 @@ import com.smarterd.domain.diagram.websocket.relay.handler.PresenceSnapshotReque
 import com.smarterd.domain.diagram.websocket.relay.handler.SnapshotRequestMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.handler.SyncRelayMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.handler.YjsUpdateMessageHandler;
+import com.smarterd.domain.diagram.websocket.room.DiagramRealtimeSessionPortAdapter;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
+import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionResolver;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.List;
@@ -187,25 +202,59 @@ class DiagramWebSocketFlowIntegrationTest {
         final var objectMapper = new ObjectMapper();
         final var messageSender = new DiagramMessageSender(roomManager, objectMapper);
         final var presenceNotifier = new DiagramPresenceNotifier(roomManager, messageSender);
+        final var diagramRealtimeSessionUseCase = new DiagramRealtimeSessionUseCase(
+            new DiagramRealtimeSessionPortAdapter(roomManager),
+            presenceNotifier
+        );
+        final var diagramSessionTransportUseCase = new DiagramSessionTransportUseCase(roomManager);
+        final var sessionLifecycle = new DiagramWebSocketSessionLifecycle(
+            diagramSessionTransportUseCase,
+            new CompleteDiagramSessionJoinUseCase(presenceNotifier),
+            new CompleteDiagramSessionLeaveUseCase(
+                presenceNotifier,
+                new FlushDiagramDrainedUpdatesUseCase(roomManager, snapshotService)
+            ),
+            presenceNotifier
+        );
+        final var resourceKeyFactory = new DiagramCollaborationResourceKeyFactory();
+        final var diagramRuntimeSupport = new DiagramCollaborationRuntimeSupport(
+            new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory),
+            new DiagramCollaborationSnapshotStore(snapshotService, resourceKeyFactory),
+            new DiagramCollaborationHandoffPolicy(roomManager, snapshotService, resourceKeyFactory)
+        );
+        final var runtimeSupportRegistry = new DefaultCollaborationRuntimeSupportRegistry(
+            List.of(diagramRuntimeSupport)
+        );
+        final var loadCollaborationHandoffUseCase = new LoadCollaborationHandoffUseCase(runtimeSupportRegistry);
+        final var sessionResolver = new DiagramWebSocketSessionResolver(
+            resourceKeyFactory,
+            new DiagramCollaborationSessionMetadataPolicy(resourceKeyFactory)
+        );
 
         final var handlers = List.<DiagramMessageHandler>of(
             new SyncRelayMessageHandler(messageSender),
-            new YjsUpdateMessageHandler(roomManager, messageSender),
+            new YjsUpdateMessageHandler(diagramRealtimeSessionUseCase, messageSender),
             new AwarenessMessageHandler(objectMapper, messageSender),
-            new SnapshotRequestMessageHandler(roomManager, snapshotService, messageSender),
-            new CompactedSnapshotMessageHandler(roomManager, snapshotService),
-            new PresenceSnapshotRequestMessageHandler(roomManager, presenceNotifier)
+            new SnapshotRequestMessageHandler(
+                new DiagramHandoffSnapshotResponder(loadCollaborationHandoffUseCase, messageSender)
+            ),
+            new CompactedSnapshotMessageHandler(new ApplyDiagramCompactedSnapshotUseCase(roomManager, snapshotService)),
+            new PresenceSnapshotRequestMessageHandler(diagramRealtimeSessionUseCase)
+        );
+        final var messageDispatcher = new DiagramWebSocketMessageDispatcher(handlers);
+        final var inboundMessageContextFactory = new DiagramInboundMessageContextFactory(
+            diagramSessionTransportUseCase,
+            messageSender,
+            sessionResolver
         );
 
         final var handler = new DiagramWebSocketHandler(
             properties,
-            roomManager,
-            snapshotService,
-            messageSender,
-            presenceNotifier,
-            handlers
+            inboundMessageContextFactory,
+            sessionLifecycle,
+            messageDispatcher
         );
-        handler.initHandlerMap();
+        messageDispatcher.initHandlerMap();
         return new Fixture(handler, roomManager);
     }
 
@@ -213,9 +262,17 @@ class DiagramWebSocketFlowIntegrationTest {
         throws Exception {
         final var session = mock(WebSocketSession.class);
         final Map<String, Object> attributes = new ConcurrentHashMap<>();
+        final var legacySession = new AuthenticatedSession(
+            userId,
+            loginId,
+            userName,
+            diagramId,
+            Instant.now().plusSeconds(60),
+            1
+        );
         attributes.put(
-            AuthenticatedSession.SESSION_ATTR_KEY,
-            new AuthenticatedSession(userId, loginId, userName, diagramId, Instant.now().plusSeconds(60), 1)
+            com.smarterd.collaboration.session.CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
+            legacySession.toCollaborationSession()
         );
 
         final var inbox = new CopyOnWriteArrayList<BinaryMessage>();

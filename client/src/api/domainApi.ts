@@ -207,3 +207,19 @@ export async function downloadDomainUploadErrors(
   );
   downloadBlob(res, 'domain-upload-errors.xlsx');
 }
+
+/**
+ * 도메인 사전 엑셀 파일을 다운로드한다.
+ *
+ * @param teamId 대상 팀 ID
+ * @param setId 대상 사전 세트 ID
+ */
+export async function downloadDomainDictionary(teamId: string, setId: string): Promise<void> {
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/dictionary-sets/${setId}/domains/download/excel`,
+    {
+      responseType: 'blob',
+    },
+  );
+  downloadBlob(res, 'domain-dictionary.xlsx');
+}

@@ -6,12 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **항상 한글로 답변한다.**
 
+## gstack
+
+- 브라우저 QA, 배포 확인, 리뷰, 조사 워크플로우가 필요하면 gstack 계열 스킬을 우선 사용한다.
+
 ## Build & Run Commands
 
 ### Backend (Spring Boot)
 
 ```bash
-./gradlew bootRun                    # Start backend on :8190 (Docker PostgreSQL auto-start)
+./bootRun-dev.sh                    # Start backend on :9503 (Docker PostgreSQL auto-start)
+./bootRun-local.sh                  # Start backend on :9501
+./bootRun-test.sh                   # Start backend on :9502
 ./gradlew build                      # Full build (compile + test)
 ./gradlew test                       # Run all tests
 ./gradlew test --tests "com.smarterd.SomeTest.methodName"  # Single test
@@ -23,7 +29,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 cd client
-npm run dev                          # Dev server on :3000, proxies /api → :8190
+npm run dev                          # Dev server on :4503, proxies /api → :9503
+npm run local                        # Dev server on :4501, proxies /api → :9501
+npm run test:frontend                # Dev server on :4502, proxies /api → :9502
 npm run build                        # Production build (tsc + vite)
 npm run lint                         # ESLint
 ```
@@ -119,7 +127,7 @@ client/
 ├── index.html                       # SPA entry point
 ├── package.json                     # "type": "module" (ESM)
 ├── tailwind.config.js               # CSS variable colors, darkMode: ["class"]
-├── vite.config.ts                   # @/ alias → ./src, proxy /api → :8190
+├── vite.config.ts                   # @/ alias → ./src, proxy /api → :9503 (frontend-test는 :9502)
 ├── tsconfig.app.json                # paths: { "@/*": ["./src/*"] }
 └── src/
     ├── main.tsx                     # createRoot + StrictMode
@@ -186,7 +194,7 @@ client/
 ### Axios Instance
 
 ```text
-baseURL: /api  →  Vite 프록시  →  localhost:8190
+baseURL: /api  →  Vite 프록시  →  localhost:9503
 요청 인터셉터: Accept-Language (i18n.language) + localStorage Access Token → Authorization: Bearer <token>
 응답 인터셉터: 401 → Refresh Token으로 갱신 시도 (큐 패턴) → 실패 시 로그인 리다이렉트
 ```
@@ -265,7 +273,7 @@ Body: `{ logicalName, physicalType, description? }`
 CRUD (5 endpoints): POST 생성, GET 목록, GET `/{termId}` 상세, PUT `/{termId}` 수정, DELETE `/{termId}` 삭제
 Body: `{ logicalName, physicalName, domainId?, description? }`
 
-Swagger UI: `http://localhost:8190/swagger-ui/index.html`
+Swagger UI: `http://localhost:9503/swagger-ui/index.html`
 
 ### Authentication Flow
 
@@ -323,6 +331,18 @@ Accept-Language: ko → { "error": "사용자를 찾을 수 없습니다: testus
 | Shortcuts     | react-hotkeys-hook 5                                                             |
 | i18n          | i18next, react-i18next (FE) + Spring MessageSource (BE)                          |
 | Misc          | p6spy 1.12.1, Sonner, Prettier + prettier-plugin-java, ESLint, SonarQube        |
+
+## SOLID 원칙 (MUST)
+
+아키텍처와 코드는 반드시 SOLID 원칙을 준수해야 하며, 위반해서는 안 된다.
+
+| 원칙 | 설명 | 점검 기준 |
+|------|------|----------|
+| **S — 단일 책임 원칙 (SRP)** | 하나의 클래스/모듈/훅은 하나의 변경 사유만 가진다 | 여러 관심사(렌더링+동기화+직렬화 등)가 하나의 파일에 혼재하면 위반 |
+| **O — 개방-폐쇄 원칙 (OCP)** | 확장에는 열려 있고 수정에는 닫혀 있다 | 새 기능(플러그인, 핸들러, Projector 등) 추가 시 기존 코드 수정이 필요하면 위반 |
+| **L — 리스코프 치환 원칙 (LSP)** | 구현체는 상위 타입의 계약을 준수한다 | 구현체가 예외를 던지거나 부분적으로만 동작하면 위반 |
+| **I — 인터페이스 분리 원칙 (ISP)** | 클라이언트는 사용하지 않는 메서드에 의존하지 않는다 | 거대 인터페이스 대신 역할별 포트(Command/Query/Subscription)로 분리 |
+| **D — 의존성 역전 원칙 (DIP)** | 상위 모듈은 하위 모듈의 구체 타입에 직접 의존하지 않는다 | View가 Y.Doc 등 CRDT 구현체에 직접 의존하면 위반. 추상(인터페이스/포트)에 의존 |
 
 ## Code Standards
 
@@ -586,7 +606,7 @@ const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
 PostgreSQL 17 (Docker). `spring-boot-docker-compose`가 `compose.yaml` 자동 감지.
 
-- **개발:** `./gradlew bootRun` → Docker 자동 시작 (`lifecycle-management: start-only`)
+- **개발:** `./bootRun-dev.sh` → Docker 자동 시작 (`lifecycle-management: start-only`)
 - **테스트:** Testcontainers 임시 PostgreSQL 자동 생성/폐기
 - **스키마:** `ddl-auto: update`
 - **시간 컬럼:** `timestamptz` (UTC 기준)

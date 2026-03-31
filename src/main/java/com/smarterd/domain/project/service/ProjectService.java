@@ -1,8 +1,5 @@
 package com.smarterd.domain.project.service;
 
-import com.smarterd.api.project.dto.CreateProjectRequest;
-import com.smarterd.api.project.dto.ProjectResponse;
-import com.smarterd.api.project.dto.UpdateProjectRequest;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
@@ -11,6 +8,7 @@ import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.repository.ProjectRepository;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -46,19 +44,20 @@ public class ProjectService {
      *
      * @param loginId 요청 사용자의 로그인 ID
      * @param teamId  팀 ID
-     * @param request 프로젝트 생성 요청
-     * @return 생성된 프로젝트 응답
+     * @param name 프로젝트 이름
+     * @param description 프로젝트 설명
+     * @return 생성된 프로젝트 결과
      */
     @Transactional
-    public ProjectResponse createProject(String loginId, Long teamId, CreateProjectRequest request) {
+    public ProjectResult createProject(String loginId, Long teamId, String name, String description) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyEditable(team, user);
 
-        final var project = Project.builder().name(request.name()).team(team).build();
+        final var project = Project.builder().name(name).description(description).team(team).build();
         projectRepository.save(Objects.requireNonNull(project));
 
-        return ProjectResponse.from(project);
+        return toProjectResult(project);
     }
 
     /**
@@ -66,14 +65,14 @@ public class ProjectService {
      *
      * @param loginId 요청 사용자의 로그인 ID
      * @param teamId  팀 ID
-     * @return 프로젝트 응답 목록
+     * @return 프로젝트 결과 목록
      */
-    public List<ProjectResponse> getProjects(String loginId, Long teamId) {
+    public List<ProjectResult> getProjects(String loginId, Long teamId) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyMembership(team, user);
 
-        return projectRepository.findByTeam(team).stream().map(ProjectResponse::from).toList();
+        return projectRepository.findByTeam(team).stream().map(this::toProjectResult).toList();
     }
 
     /**
@@ -82,9 +81,9 @@ public class ProjectService {
      * @param loginId   요청 사용자의 로그인 ID
      * @param teamId    팀 ID
      * @param projectId 프로젝트 ID
-     * @return 프로젝트 응답
+     * @return 프로젝트 결과
      */
-    public ProjectResponse getProject(String loginId, Long teamId, Long projectId) {
+    public ProjectResult getProject(String loginId, Long teamId, Long projectId) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyMembership(team, user);
@@ -92,7 +91,7 @@ public class ProjectService {
         final var project = findProjectById(projectId);
         verifyProjectBelongsToTeam(project, teamId);
 
-        return ProjectResponse.from(project);
+        return toProjectResult(project);
     }
 
     /**
@@ -121,11 +120,12 @@ public class ProjectService {
      * @param loginId   요청 사용자의 로그인 ID
      * @param teamId    팀 ID
      * @param projectId 프로젝트 ID
-     * @param request   프로젝트 수정 요청
-     * @return 수정된 프로젝트 응답
+     * @param name 프로젝트 이름
+     * @param description 프로젝트 설명
+     * @return 수정된 프로젝트 결과
      */
     @Transactional
-    public ProjectResponse updateProject(String loginId, Long teamId, Long projectId, UpdateProjectRequest request) {
+    public ProjectResult updateProject(String loginId, Long teamId, Long projectId, String name, String description) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyEditable(team, user);
@@ -133,8 +133,8 @@ public class ProjectService {
         final var project = findProjectById(projectId);
         verifyProjectBelongsToTeam(project, teamId);
 
-        project.update(request.name(), request.description());
-        return ProjectResponse.from(project);
+        project.update(name, description);
+        return toProjectResult(project);
     }
 
     /**
@@ -162,4 +162,40 @@ public class ProjectService {
             throw new BusinessException(MessageCode.ERROR_BUSINESS_PROJECT_TEAM_MISMATCH.code());
         }
     }
+
+    /**
+     * 프로젝트 엔티티를 서비스 계층 결과로 변환한다.
+     *
+     * @param project 프로젝트 엔티티
+     * @return 서비스 계층 결과
+     */
+    private ProjectResult toProjectResult(Project project) {
+        return new ProjectResult(
+            project.getId(),
+            project.getName(),
+            project.getDescription(),
+            project.getTeam().getId(),
+            project.getCreatedAt(),
+            project.getUpdatedAt()
+        );
+    }
+
+    /**
+     * 프로젝트 응답용 서비스 결과.
+     *
+     * @param id 프로젝트 ID
+     * @param name 프로젝트 이름
+     * @param description 프로젝트 설명
+     * @param teamId 팀 ID
+     * @param createdAt 생성 시각
+     * @param updatedAt 수정 시각
+     */
+    public record ProjectResult(
+        Long id,
+        String name,
+        String description,
+        Long teamId,
+        Instant createdAt,
+        Instant updatedAt
+    ) {}
 }

@@ -14,6 +14,10 @@ export const STORAGE_KEYS = {
   DDL_DBMS: 'smart-erd-ddl-dbms',
   /** 다이어그램 단위 코드 동기화 정책 prefix */
   ERD_SYNC_POLICY_PREFIX: 'smart-erd-sync-policy',
+  /** 다이어그램 단위 작업 모드 prefix */
+  DIAGRAM_WORK_MODE_PREFIX: 'smart-erd-work-mode',
+  /** 다이어그램 단위 DSL draft prefix */
+  DIAGRAM_DSL_DRAFT_PREFIX: 'smart-erd-dsl-draft',
   /** Diff Apply rollout 강제 모드 override */
   ERD_DIFF_APPLY_FORCE_MODE: 'smart-erd-diff-apply-force-mode',
   /** Internal rollout 로컬 opt-in 토글 */

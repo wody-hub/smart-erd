@@ -4,6 +4,7 @@ import com.smarterd.api.project.dto.CreateProjectRequest;
 import com.smarterd.api.project.dto.ProjectResponse;
 import com.smarterd.api.project.dto.UpdateProjectRequest;
 import com.smarterd.domain.project.service.ProjectService;
+import com.smarterd.domain.project.service.ProjectService.ProjectResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -63,7 +64,7 @@ public class ProjectController {
         @Valid @RequestBody CreateProjectRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(
-            projectService.createProject(jwt.getSubject(), teamId, request)
+            toProjectResponse(projectService.createProject(jwt.getSubject(), teamId, request.name(), null))
         );
     }
 
@@ -82,7 +83,9 @@ public class ProjectController {
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId
     ) {
-        return ResponseEntity.ok(projectService.getProjects(jwt.getSubject(), teamId));
+        return ResponseEntity.ok(
+            projectService.getProjects(jwt.getSubject(), teamId).stream().map(this::toProjectResponse).toList()
+        );
     }
 
     /**
@@ -102,7 +105,7 @@ public class ProjectController {
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
         @Parameter(description = "프로젝트 ID") @PathVariable Long projectId
     ) {
-        return ResponseEntity.ok(projectService.getProject(jwt.getSubject(), teamId, projectId));
+        return ResponseEntity.ok(toProjectResponse(projectService.getProject(jwt.getSubject(), teamId, projectId)));
     }
 
     /**
@@ -151,6 +154,26 @@ public class ProjectController {
         @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
         @Valid @RequestBody UpdateProjectRequest request
     ) {
-        return ResponseEntity.ok(projectService.updateProject(jwt.getSubject(), teamId, projectId, request));
+        return ResponseEntity.ok(
+            toProjectResponse(
+                projectService.updateProject(jwt.getSubject(), teamId, projectId, request.name(), request.description())
+            )
+        );
+    }
+
+    /**
+     * 서비스 계층 프로젝트 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private ProjectResponse toProjectResponse(ProjectResult result) {
+        return new ProjectResponse(
+            result.id(),
+            result.name(),
+            result.description(),
+            result.teamId(),
+            result.createdAt()
+        );
     }
 }

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 /** 사이드바 최소 너비(px) */
 export const SIDEBAR_MIN_WIDTH = 180;
 /** 사이드바 최대 너비(px) */
-export const SIDEBAR_MAX_WIDTH = 480;
+export const SIDEBAR_MAX_WIDTH = 960;
 /** 키보드 리사이즈 이동 단위(px) */
 const SIDEBAR_KEYBOARD_STEP = 16;
 /** 기본 사이드바 너비(px) */

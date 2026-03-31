@@ -50,7 +50,7 @@ public final class DiagramMessageTypes {
     public static final byte MSG_SNAPSHOT_RESPONSE_V2 = 0x0E;
 
     /**
-     * 유틸리티 클래스 인스턴스화 방지.
+     * 메시지 타입 상수 전용 유틸리티 클래스 인스턴스화를 방지한다.
      */
     private DiagramMessageTypes() {}
 }

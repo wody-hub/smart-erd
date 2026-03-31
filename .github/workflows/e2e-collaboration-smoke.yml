@@ -51,7 +51,7 @@ jobs:
           SPRING_PROFILES_ACTIVE=test ./gradlew bootRun > /tmp/smart-erd-backend.log 2>&1 &
           echo $! > /tmp/smart-erd-backend.pid
           for i in {1..120}; do
-            if curl -sf http://127.0.0.1:8190/api/health > /dev/null; then
+            if curl -sf http://127.0.0.1:9500/api/health > /dev/null; then
               exit 0
             fi
             sleep 1
@@ -63,10 +63,10 @@ jobs:
       - name: Start frontend
         working-directory: client
         run: |
-          npm run dev -- --host 127.0.0.1 --port 3000 > /tmp/smart-erd-frontend.log 2>&1 &
+          npm run dev -- --host 127.0.0.1 --port 4500 > /tmp/smart-erd-frontend.log 2>&1 &
           echo $! > /tmp/smart-erd-frontend.pid
           for i in {1..120}; do
-            if curl -sf http://127.0.0.1:3000 > /dev/null; then
+            if curl -sf http://127.0.0.1:4500 > /dev/null; then
               exit 0
             fi
             sleep 1
@@ -78,8 +78,8 @@ jobs:
       - name: Run collaboration smoke
         working-directory: client
         env:
-          SMART_ERD_E2E_BASE_URL: http://127.0.0.1:3000
-          SMART_ERD_E2E_API_URL: http://127.0.0.1:8190/api
+          SMART_ERD_E2E_BASE_URL: http://127.0.0.1:4500
+          SMART_ERD_E2E_API_URL: http://127.0.0.1:9500/api
         run: npm run test:e2e:smoke:collaboration
 
       - name: Upload Playwright artifacts

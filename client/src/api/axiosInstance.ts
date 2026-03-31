@@ -9,7 +9,7 @@ import useAuthStore from '@/stores/useAuthStore';
  * API 통신용 Axios 인스턴스.
  *
  * baseURL은 request interceptor에서 매 요청마다 동적으로 결정된다.
- * - Web: '/api' (Vite 프록시 → localhost:8190)
+ * - Web: '/api' (Vite 프록시 → localhost:9503, frontend-test는 localhost:9502)
  * - Electron: '{serverUrl}/api' (직접 HTTP 요청)
  *
  * 요청 인터셉터에서 localStorage의 Access Token을 Authorization 헤더에 자동으로 첨부한다.

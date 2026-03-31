@@ -16,13 +16,23 @@ export interface DictionarySet {
   updatedAt: string;
 }
 
-/** 도메인(데이터 타입 사전) 정보. 팀에 속하며 논리명-물리 타입 매핑을 정의한다. */
+/** 도메인(데이터 타입 사전) 정보. 팀에 속하며 표준 도메인 메타데이터와 표시용 물리 타입을 함께 제공한다. */
 export interface Domain {
   /** 도메인 고유 ID */
   id: number;
-  /** 논리명 (예: "금액") */
+  /** 공통표준도메인명 (예: "금액_DECIMAL15_2") */
   logicalName: string;
-  /** 물리 데이터 타입 (예: "DECIMAL(15,2)") */
+  /** 도메인 그룹 */
+  domainGroup: string | null;
+  /** 도메인명 */
+  domainClassification: string | null;
+  /** 구조화 데이터 타입 */
+  dataType: string | null;
+  /** 데이터 길이 */
+  dataLength: number | null;
+  /** 데이터 소수점 길이 */
+  dataScale: number | null;
+  /** 표시용 물리 데이터 타입 (예: "DECIMAL(15,2)") */
   physicalType: string;
   /** 설명 (nullable) */
   description: string | null;
@@ -92,10 +102,20 @@ export interface PagedResponse<T> {
 
 /** 도메인 생성/수정 요청 페이로드 */
 export interface DomainFormData {
-  /** 논리명 */
+  /** 공통표준도메인명 */
   logicalName: string;
-  /** 물리 데이터 타입 */
-  physicalType: string;
+  /** 도메인 그룹 */
+  domainGroup?: string;
+  /** 도메인명 */
+  domainClassification?: string;
+  /** 호환용 물리 데이터 타입 */
+  physicalType?: string;
+  /** 구조화 데이터 타입 */
+  dataType?: string;
+  /** 데이터 길이 */
+  dataLength?: number;
+  /** 데이터 소수점 길이 */
+  dataScale?: number;
   /** 설명 (선택) */
   description?: string;
 }

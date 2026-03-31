@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -20,14 +20,16 @@ import Spinner from '@/components/ui/spinner';
 import TermFormDialog from '@/components/dictionary/TermFormDialog';
 import BulkUploadDialog from '@/components/dictionary/BulkUploadDialog';
 import {
-  fetchTermsPage,
   createTerm,
-  updateTerm,
   deleteTerm,
+  downloadTermDictionary,
   downloadTermTemplate,
+  fetchTermsPage,
+  updateTerm,
 } from '@/api/termApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
+import { rankDictionarySearchResults } from '@/lib/dictionary-search-ranking';
 import { usePaginatedSearch } from '@/hooks/usePaginatedSearch';
 import type { Term, TermFormData } from '@/types/dictionary';
 
@@ -77,7 +79,15 @@ export default function TermTab({ canEdit = true, setId }: TermTabProps) {
     enabled: !!teamId && !!setId,
     placeholderData: (previousData) => previousData,
   });
-  const terms = termPageData?.content ?? [];
+  const terms = useMemo(
+    () =>
+      rankDictionarySearchResults(termPageData?.content ?? [], searchKeyword, (term) => [
+        term.physicalName,
+        term.domainLogicalName,
+        term.description,
+      ]),
+    [searchKeyword, termPageData?.content],
+  );
   const totalElements = termPageData?.totalElements ?? 0;
   const totalPages = termPageData?.totalPages ?? 0;
   const isLastPage = termPageData?.last ?? true;
@@ -115,6 +125,12 @@ export default function TermTab({ canEdit = true, setId }: TermTabProps) {
     mutationFn: () => downloadTermTemplate(teamId!, setId),
     onError: (err) =>
       toast.error(getErrorMessage(err, t('dictionary.upload.toast.templateFailed'))),
+  });
+
+  const downloadDictionaryMutation = useMutation({
+    mutationFn: () => downloadTermDictionary(teamId!, setId),
+    onSuccess: () => toast.success(t('dictionary.export.termDownloaded')),
+    onError: (err) => toast.error(getErrorMessage(err, t('dictionary.export.termFailed'))),
   });
 
   /**
@@ -182,26 +198,36 @@ export default function TermTab({ canEdit = true, setId }: TermTabProps) {
             aria-label={t('dictionary.search.termPlaceholder')}
           />
         </div>
-        {canEdit && (
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={handleTemplateDownload}
-              disabled={downloadTemplateMutation.isPending}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {t('dictionary.upload.template')}
-            </Button>
-            <Button variant="outline" onClick={() => setUploadOpen(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              {t('dictionary.upload.button')}
-            </Button>
-            <Button onClick={handleCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              {t('dictionary.term.form.createTitle')}
-            </Button>
-          </div>
-        )}
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => downloadDictionaryMutation.mutate()}
+            disabled={downloadDictionaryMutation.isPending}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {t('dictionary.export.button')}
+          </Button>
+          {canEdit && (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleTemplateDownload}
+                disabled={downloadTemplateMutation.isPending}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {t('dictionary.upload.template')}
+              </Button>
+              <Button variant="outline" onClick={() => setUploadOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                {t('dictionary.upload.button')}
+              </Button>
+              <Button onClick={handleCreate}>
+                <Plus className="h-4 w-4 mr-2" />
+                {t('dictionary.term.form.createTitle')}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {totalElements === 0 ? (
@@ -209,12 +235,22 @@ export default function TermTab({ canEdit = true, setId }: TermTabProps) {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground mb-4">{t('dictionary.term.table.empty')}</p>
-            {canEdit && (
-              <Button onClick={handleCreate}>
-                <Plus className="h-4 w-4 mr-2" />
-                {t('dictionary.term.form.createTitle')}
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => downloadDictionaryMutation.mutate()}
+                disabled={downloadDictionaryMutation.isPending}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {t('dictionary.export.button')}
               </Button>
-            )}
+              {canEdit && (
+                <Button onClick={handleCreate}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t('dictionary.term.form.createTitle')}
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       ) : (

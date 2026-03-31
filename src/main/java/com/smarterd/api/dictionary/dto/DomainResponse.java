@@ -8,8 +8,13 @@ import java.time.Instant;
  * 도메인 응답 DTO.
  *
  * @param id           도메인 ID
- * @param logicalName  논리명
- * @param physicalType 물리 데이터 타입
+ * @param logicalName  공통 표준 도메인명
+ * @param domainGroup 도메인 그룹
+ * @param domainClassification 도메인명
+ * @param dataType 구조화 데이터 타입
+ * @param dataLength 데이터 길이
+ * @param dataScale 데이터 소수점 길이
+ * @param physicalType 표시 물리 데이터 타입
  * @param description  설명 (nullable)
  * @param teamId       소속 팀 ID
  * @param dictionarySetId 소속 사전 세트 ID
@@ -20,9 +25,19 @@ import java.time.Instant;
 public record DomainResponse(
     @Schema(description = "도메인 ID", example = "1") Long id,
 
-    @Schema(description = "논리명", example = "금액") String logicalName,
+    @Schema(description = "공통 표준 도메인명", example = "금액_DECIMAL15_2") String logicalName,
 
-    @Schema(description = "물리 데이터 타입", example = "DECIMAL(15,2)") String physicalType,
+    @Schema(description = "도메인 그룹", example = "수치") String domainGroup,
+
+    @Schema(description = "도메인명", example = "금액") String domainClassification,
+
+    @Schema(description = "데이터 타입", example = "DECIMAL") String dataType,
+
+    @Schema(description = "데이터 길이", example = "15") Integer dataLength,
+
+    @Schema(description = "데이터 소수점 길이", example = "2") Integer dataScale,
+
+    @Schema(description = "표시 물리 데이터 타입", example = "DECIMAL(15,2)") String physicalType,
 
     @Schema(description = "설명") String description,
 
@@ -44,6 +59,11 @@ public record DomainResponse(
         return new DomainResponse(
             domain.getId(),
             domain.getLogicalName(),
+            domain.getDomainGroup(),
+            domain.getDomainClassification(),
+            domain.getDataType(),
+            domain.getDataLength(),
+            domain.getDataScale(),
             domain.getPhysicalType(),
             domain.getDescription(),
             domain.getTeam().getId(),

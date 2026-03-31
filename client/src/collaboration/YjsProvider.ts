@@ -1,9 +1,10 @@
 import * as Y from 'yjs';
-import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
+import { CANVAS_HISTORY_ORIGIN, DRAG_TRANSACTION_ORIGIN } from '@/constants/canvas-history';
 import { getWsBaseUrl } from '@/lib/platform';
 import { WS_MSG_TYPE, WS_PRESENCE, WS_RECONNECT } from '@/constants/ws';
 import type {
   AwarenessState,
+  ConnectionIssueKind,
   ConnectionStatus,
   PresenceMode,
   PresencePeerJoinedPayload,
@@ -14,6 +15,37 @@ import type {
 
 /** snapshot 재요청 rate limit (분당 최대 횟수) */
 const MAX_SNAPSHOT_REQUESTS_PER_MINUTE = 6;
+
+function mapCloseEventToConnectionIssue(code: number, reason: string): ConnectionIssueKind | null {
+  if (code === 4408) {
+    return 'connection-limit-exceeded';
+  }
+  if (code === 4409) {
+    return 'room-capacity-exceeded';
+  }
+  if (code !== 1008) {
+    return null;
+  }
+  if (reason === 'connection-limit-exceeded') {
+    return 'connection-limit-exceeded';
+  }
+  if (reason === 'room-capacity-exceeded') {
+    return 'room-capacity-exceeded';
+  }
+  return 'policy-violation';
+}
+
+function shouldSendLocalUpdate(origin: unknown): boolean {
+  return !(origin === 'remote' || origin === 'bootstrap');
+}
+
+function shouldQueuePendingLocalStatePush(origin: unknown): boolean {
+  return !(
+    origin === 'remote' ||
+    origin === 'bootstrap' ||
+    origin === CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE
+  );
+}
 
 /**
  * Raw WebSocket 기반 Yjs sync provider.
@@ -28,6 +60,9 @@ export class YjsProvider {
 
   /** WebSocket 인스턴스 */
   private ws: WebSocket | null = null;
+
+  /** ticket 발급 + socket 생성 진행 중 여부 */
+  private socketCreationInFlight = false;
 
   /** 연결 옵션 */
   private readonly options: YjsProviderOptions;
@@ -51,6 +86,9 @@ export class YjsProvider {
 
   /** 연결 상태 변경 콜백 */
   onConnectionStatusChange: ((status: ConnectionStatus) => void) | null = null;
+
+  /** 연결 거부/종료 사유 콜백 */
+  onConnectionIssueDetected: ((issue: ConnectionIssueKind | null) => void) | null = null;
 
   /** presence 모드 변경 콜백 */
   onPresenceModeChange: ((mode: PresenceMode) => void) | null = null;
@@ -97,6 +135,9 @@ export class YjsProvider {
   /** 초기 sync 완료 여부 */
   private synced = false;
 
+  /** WS가 열리기 전에 발생한 로컬 상태 업로드 필요 여부 */
+  private hasPendingLocalStatePush = false;
+
   /** 현재 presence 모드 */
   private presenceMode: PresenceMode = 'active';
 
@@ -113,10 +154,18 @@ export class YjsProvider {
 
     // Y.Doc update 이벤트 -> 'remote' origin이 아닌 경우만 WebSocket 전송
     this.updateHandler = (update: Uint8Array, origin: unknown) => {
-      if (origin === 'remote' || origin === CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE) {
+      if (!shouldSendLocalUpdate(origin)) {
         return;
       }
-      this.sendMessage(WS_MSG_TYPE.YJS_UPDATE, update);
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        if (shouldQueuePendingLocalStatePush(origin)) {
+          this.hasPendingLocalStatePush = true;
+        }
+        return;
+      }
+      const outboundUpdate =
+        origin === DRAG_TRANSACTION_ORIGIN ? Y.encodeStateAsUpdate(this.doc) : update;
+      this.sendMessage(WS_MSG_TYPE.YJS_UPDATE, outboundUpdate);
     };
 
     this.doc.on('update', this.updateHandler);
@@ -134,7 +183,14 @@ export class YjsProvider {
     if (this.destroyed) {
       return;
     }
+    if (this.socketCreationInFlight) {
+      return;
+    }
+    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+      return;
+    }
     this.intentionalClose = false;
+    this.clearReconnectTimer();
     void this.createWebSocket();
   }
 
@@ -190,86 +246,109 @@ export class YjsProvider {
     if (this.destroyed || this.intentionalClose) {
       return;
     }
+    if (this.socketCreationInFlight) {
+      return;
+    }
+    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+      return;
+    }
+    this.socketCreationInFlight = true;
 
-    let ticketData;
     try {
-      ticketData = await this.options.getTicket();
-    } catch (e) {
-      if (this.destroyed || this.intentionalClose) {
-        return;
-      }
-      console.error('[YjsProvider] ticket 발급 실패:', e);
-      this.emitConnectionStatus('disconnected');
-      this.scheduleReconnect();
-      return;
-    }
-
-    if (this.destroyed || this.intentionalClose) {
-      return;
-    }
-
-    this.selfUserId = ticketData.userId;
-    this.presenceProtocolVersion = ticketData.presenceProtocolVersion ?? 0;
-    this.onIdentityResolved?.(ticketData.userId);
-
-    // 티켓 응답 수신 후 userId를 알게 되므로, 기존 로컬 awareness에 병합한다.
-    if (this.localAwareness && !this.localAwareness.user.userId) {
-      this.localAwareness = {
-        ...this.localAwareness,
-        user: {
-          ...this.localAwareness.user,
-          userId: this.selfUserId,
-        },
-      };
-    }
-
-    const serverUrl = this.buildWsUrl(ticketData.ticket);
-    this.emitConnectionStatus('connecting');
-
-    this.ws = new WebSocket(serverUrl);
-    this.ws.binaryType = 'arraybuffer';
-
-    this.ws.onopen = () => {
-      if (this.destroyed || this.intentionalClose) {
-        this.ws?.close();
-        this.ws = null;
-        return;
-      }
-      this.reconnectDelay = WS_RECONNECT.INITIAL_DELAY;
-      this.lastRoomEpoch = null;
-      this.lastPresenceVersion = 0;
-      this.snapshotRequestTimestamps = [];
-      this.emitConnectionStatus('connected');
-
-      if (this.presenceProtocolVersion >= 1) {
-        this.startPresenceBootstrapTimer();
-      } else {
-        this.emitPresenceMode('degraded');
-      }
-
-      this.requestSnapshot();
-      this.requestSync();
-    };
-
-    this.ws.onmessage = (event: MessageEvent) => {
-      if (event.data instanceof ArrayBuffer) {
-        this.handleMessage(new Uint8Array(event.data));
-      }
-    };
-
-    this.ws.onclose = () => {
-      this.ws = null;
-      this.synced = false;
-      this.clearPresenceBootstrapTimer();
-      this.emitConnectionStatus('disconnected');
-      if (!this.intentionalClose) {
+      let ticketData;
+      try {
+        ticketData = await this.options.getTicket();
+      } catch (e) {
+        if (this.destroyed || this.intentionalClose) {
+          return;
+        }
+        console.error('[YjsProvider] ticket 발급 실패:', e);
+        this.emitConnectionStatus('disconnected');
         this.scheduleReconnect();
+        return;
       }
-    };
 
-    this.ws.onerror = () => {
-      // onclose가 자동으로 뒤따르므로 여기서는 별도 처리 불필요
-    };
+      if (this.destroyed || this.intentionalClose) {
+        return;
+      }
+      if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+        return;
+      }
+
+      this.selfUserId = ticketData.userId;
+      this.presenceProtocolVersion = ticketData.presenceProtocolVersion ?? 0;
+      this.onIdentityResolved?.(ticketData.userId);
+
+      // 티켓 응답 수신 후 userId를 알게 되므로, 기존 로컬 awareness에 병합한다.
+      if (this.localAwareness && !this.localAwareness.user.userId) {
+        this.localAwareness = {
+          ...this.localAwareness,
+          user: {
+            ...this.localAwareness.user,
+            userId: this.selfUserId,
+          },
+        };
+      }
+
+      const serverUrl = this.buildWsUrl(ticketData.ticket);
+      this.emitConnectionStatus('connecting');
+
+      this.ws = new WebSocket(serverUrl);
+      this.ws.binaryType = 'arraybuffer';
+
+      this.ws.onopen = () => {
+        if (this.destroyed || this.intentionalClose) {
+          this.ws?.close();
+          this.ws = null;
+          return;
+        }
+        this.clearReconnectTimer();
+        this.reconnectDelay = WS_RECONNECT.INITIAL_DELAY;
+        this.lastRoomEpoch = null;
+        this.lastPresenceVersion = 0;
+        this.snapshotRequestTimestamps = [];
+        this.onConnectionIssueDetected?.(null);
+        this.emitConnectionStatus('connected');
+
+        if (this.presenceProtocolVersion >= 1) {
+          this.startPresenceBootstrapTimer();
+        } else {
+          this.emitPresenceMode('degraded');
+        }
+
+        this.requestSnapshot();
+        this.requestSync();
+        this.flushPendingLocalState();
+      };
+
+      this.ws.onmessage = (event: MessageEvent) => {
+        if (event.data instanceof ArrayBuffer) {
+          this.handleMessage(new Uint8Array(event.data));
+        }
+      };
+
+      this.ws.onclose = (event) => {
+        this.ws = null;
+        this.synced = false;
+        this.clearPresenceBootstrapTimer();
+        const connectionIssue = this.intentionalClose
+          ? null
+          : mapCloseEventToConnectionIssue(event.code, event.reason);
+        if (connectionIssue) {
+          this.onConnectionIssueDetected?.(connectionIssue);
+        }
+        this.emitConnectionStatus('disconnected');
+        if (!this.intentionalClose && !connectionIssue) {
+          this.scheduleReconnect();
+        }
+      };
+
+      this.ws.onerror = () => {
+        // onclose가 자동으로 뒤따르므로 여기서는 별도 처리 불필요
+      };
+    } finally {
+      this.socketCreationInFlight = false;
+    }
   }
 
   /**
@@ -386,6 +465,20 @@ export class YjsProvider {
     message.set(payload, 1);
 
     this.ws.send(message);
+  }
+
+  /**
+   * 연결 전/재연결 대기 중 누적된 로컬 상태를 전체 state update로 밀어 넣는다.
+   *
+   * Yjs update는 merge 가능하므로, 세부 diff를 보관하기보다 현재 문서 전체 상태를
+   * 한 번 전송하는 편이 초기 연결/재연결 경계에서 더 안전하다.
+   */
+  private flushPendingLocalState(): void {
+    if (!this.hasPendingLocalStatePush) {
+      return;
+    }
+    this.hasPendingLocalStatePush = false;
+    this.sendMessage(WS_MSG_TYPE.YJS_UPDATE, Y.encodeStateAsUpdate(this.doc));
   }
 
   /**
@@ -632,6 +725,7 @@ export class YjsProvider {
   private scheduleReconnect(): void {
     this.clearReconnectTimer();
     this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
       void this.createWebSocket();
     }, this.reconnectDelay);
 
@@ -658,7 +752,8 @@ export class YjsProvider {
    * @returns WebSocket URL
    */
   private buildWsUrl(ticket: string): string {
-    return `${getWsBaseUrl()}/ws/diagram/${this.options.diagramId}?ticket=${encodeURIComponent(ticket)}`;
+    const websocketPath = this.options.websocketPath ?? `/ws/diagram/${this.options.diagramId}`;
+    return `${getWsBaseUrl()}${websocketPath}?ticket=${encodeURIComponent(ticket)}`;
   }
 
   /**

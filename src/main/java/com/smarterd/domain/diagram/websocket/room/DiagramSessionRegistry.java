@@ -17,6 +17,9 @@ final class DiagramSessionRegistry {
     /** 세션별 전송 동기화 락 객체 (세션 ID → 락) */
     private final Map<String, Object> sessionLocks = new ConcurrentHashMap<>();
 
+    /** 세션 ID → 실제 WebSocket 세션 */
+    private final Map<String, WebSocketSession> sessionsById = new ConcurrentHashMap<>();
+
     /** 다이어그램별 flush 동기화 락 */
     private final Map<Long, Object> flushLocks = new ConcurrentHashMap<>();
 
@@ -117,6 +120,15 @@ final class DiagramSessionRegistry {
     }
 
     /**
+     * 세션 ID와 실제 세션 객체 매핑을 등록한다.
+     *
+     * @param session WebSocket 세션
+     */
+    void bindSession(WebSocketSession session) {
+        sessionsById.put(session.getId(), session);
+    }
+
+    /**
      * 세션 전송 락을 반환한다.
      *
      * @param session WebSocket 세션
@@ -133,6 +145,25 @@ final class DiagramSessionRegistry {
      */
     void removeSessionLock(String sessionId) {
         sessionLocks.remove(sessionId);
+    }
+
+    /**
+     * 세션 ID로 실제 WebSocket 세션을 조회한다.
+     *
+     * @param sessionId 세션 ID
+     * @return 세션 객체. 없으면 {@code null}
+     */
+    WebSocketSession getSession(String sessionId) {
+        return sessionsById.get(sessionId);
+    }
+
+    /**
+     * 세션 ID와 실제 세션 매핑을 제거한다.
+     *
+     * @param sessionId 세션 ID
+     */
+    void removeSession(String sessionId) {
+        sessionsById.remove(sessionId);
     }
 
     /**
@@ -185,14 +216,13 @@ final class DiagramSessionRegistry {
         return sessionUserIds.get(sessionId);
     }
 
-    /**
-     * 세션이 속한 다이어그램 ID를 조회한다.
-     *
-     * @param session WebSocket 세션
-     * @return 다이어그램 ID (없으면 {@code null})
-     */
-    Long findDiagramIdBySession(WebSocketSession session) {
-        return sessionDiagramIds.get(session.getId());
+    Long findDiagramIdBySessionId(String sessionId) {
+        return sessionDiagramIds.get(sessionId);
+    }
+
+    int getUserConnectionCount(String userId) {
+        final var userCount = userSessionCounts.get(userId);
+        return userCount != null ? userCount.get() : 0;
     }
 
     /**

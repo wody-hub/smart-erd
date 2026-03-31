@@ -1,8 +1,5 @@
 package com.smarterd.domain.dictionary.service;
 
-import com.smarterd.api.dictionary.dto.SuggestMatch;
-import com.smarterd.api.dictionary.dto.SuggestRequest;
-import com.smarterd.api.dictionary.dto.SuggestResponse;
 import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.entity.Term;
 import com.smarterd.domain.dictionary.repository.DomainRepository;
@@ -58,28 +55,29 @@ public class DictionarySuggestService {
      *
      * @param loginId 요청 사용자의 로그인 ID
      * @param teamId  팀 ID
-     * @param request 추천 요청
-     * @return 추천 응답
+     * @param setId   사전 세트 ID
+     * @param keyword 추천 대상 키워드
+     * @return 추천 결과
      */
-    public SuggestResponse suggest(String loginId, Long teamId, Long setId, SuggestRequest request) {
+    public SuggestResult suggest(String loginId, Long teamId, Long setId, String keyword) {
         final var user = authService.findUserByLoginId(loginId);
         final var team = teamService.findTeamById(teamId);
         teamService.verifyMembership(team, user);
         final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
 
-        final var keyword = AppStringUtils.trimToEmpty(request.keyword());
-        if (keyword.length() < 2) {
-            return new SuggestResponse(null, null, null, List.of());
+        final var normalizedKeyword = AppStringUtils.trimToEmpty(keyword);
+        if (normalizedKeyword.length() < 2) {
+            return new SuggestResult(null, null, null, List.of());
         }
 
         // 토큰 분리 (최대 MAX_TOKENS개)
-        final var tokens = Arrays.stream(keyword.split("\\s+"))
+        final var tokens = Arrays.stream(normalizedKeyword.split("\\s+"))
             .filter(AppStringUtils::isNotBlank)
             .limit(MAX_TOKENS)
             .toList();
 
         if (tokens.isEmpty()) {
-            return new SuggestResponse(null, null, null, List.of());
+            return new SuggestResult(null, null, null, List.of());
         }
 
         // 1. 배치 완전 일치 조회 (1회 쿼리)
@@ -103,7 +101,7 @@ public class DictionarySuggestService {
         termByNameMap.putAll(exactMatchMap);
 
         // 토큰별 매칭 결과 조합
-        final var matches = new ArrayList<SuggestMatch>();
+        final var matches = new ArrayList<SuggestMatchResult>();
         final var physicalParts = new ArrayList<String>();
 
         for (final var token : tokens) {
@@ -111,7 +109,7 @@ public class DictionarySuggestService {
             final var exactTerm = exactMatchMap.get(token);
             if (exactTerm != null) {
                 physicalParts.add(exactTerm.getPhysicalName());
-                matches.add(new SuggestMatch(token, true, exactTerm.getPhysicalName(), "exact"));
+                matches.add(new SuggestMatchResult(token, true, exactTerm.getPhysicalName(), "exact"));
                 continue;
             }
 
@@ -120,7 +118,7 @@ public class DictionarySuggestService {
             if (decomposed != null) {
                 final var groupPhysical = decomposed.stream().map(Term::getPhysicalName).collect(Collectors.joining());
                 physicalParts.add(groupPhysical);
-                matches.add(new SuggestMatch(token, true, groupPhysical, "compound"));
+                matches.add(new SuggestMatchResult(token, true, groupPhysical, "compound"));
                 continue;
             }
 
@@ -133,11 +131,11 @@ public class DictionarySuggestService {
 
             if (partialTerm != null) {
                 physicalParts.add(partialTerm.getPhysicalName());
-                matches.add(new SuggestMatch(token, true, partialTerm.getPhysicalName(), "partial"));
+                matches.add(new SuggestMatchResult(token, true, partialTerm.getPhysicalName(), "partial"));
                 continue;
             }
 
-            matches.add(new SuggestMatch(token, false, null, null));
+            matches.add(new SuggestMatchResult(token, false, null, null));
         }
 
         // 물리명 조합
@@ -148,7 +146,9 @@ public class DictionarySuggestService {
         String domainLogicalName = null;
 
         final var lastToken = tokens.getLast();
-        final var domainSearchKeys = lastToken.equals(keyword) ? List.of(keyword) : List.of(lastToken, keyword);
+        final var domainSearchKeys = lastToken.equals(normalizedKeyword)
+            ? List.of(normalizedKeyword)
+            : List.of(lastToken, normalizedKeyword);
         final var domainMatches = domainRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, domainSearchKeys);
 
         if (!domainMatches.isEmpty()) {
@@ -162,7 +162,7 @@ public class DictionarySuggestService {
             domainLogicalName = domain.getLogicalName();
         }
 
-        return new SuggestResponse(physicalName, domainId, domainLogicalName, matches);
+        return new SuggestResult(physicalName, domainId, domainLogicalName, matches);
     }
 
     /**
@@ -225,4 +225,29 @@ public class DictionarySuggestService {
 
         return result.size() >= 2 ? result : null;
     }
+
+    /**
+     * 추천 응답용 서비스 결과.
+     *
+     * @param physicalName 추천 물리명
+     * @param domainId 추천 도메인 ID
+     * @param domainLogicalName 추천 도메인 논리명
+     * @param matches 토큰별 매칭 결과
+     */
+    public record SuggestResult(
+        String physicalName,
+        Long domainId,
+        String domainLogicalName,
+        List<SuggestMatchResult> matches
+    ) {}
+
+    /**
+     * 토큰별 추천 매칭 결과.
+     *
+     * @param token 입력 토큰
+     * @param matched 매칭 성공 여부
+     * @param physicalName 추천 물리명
+     * @param matchType 매칭 유형
+     */
+    public record SuggestMatchResult(String token, boolean matched, String physicalName, String matchType) {}
 }

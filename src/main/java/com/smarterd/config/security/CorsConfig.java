@@ -44,6 +44,7 @@ public class CorsConfig {
         configuration.setAllowedOrigins(corsProperties.getAllowedOrigins());
         configuration.setAllowedMethods(corsProperties.getAllowedMethods());
         configuration.setAllowedHeaders(corsProperties.getAllowedHeaders());
+        configuration.setExposedHeaders(corsProperties.getExposedHeaders());
         configuration.setAllowCredentials(corsProperties.isAllowCredentials());
 
         final var source = new UrlBasedCorsConfigurationSource();
@@ -68,6 +69,9 @@ public class CorsConfig {
 
         /** 허용할 헤더 목록 */
         private List<String> allowedHeaders = List.of("*");
+
+        /** 브라우저 JS에 노출할 응답 헤더 목록 */
+        private List<String> exposedHeaders = List.of("Content-Disposition");
 
         /** 자격 증명(쿠키, Authorization 헤더) 허용 여부 */
         private boolean allowCredentials = true;

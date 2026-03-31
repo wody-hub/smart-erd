@@ -145,23 +145,23 @@ class DiagramRoomManagerTest {
     }
 
     @Test
-    @DisplayName("findDiagramIdBySession - 입장한 세션의 다이어그램 ID를 O(1)로 조회한다")
-    void findDiagramIdBySession_afterJoin_returnsDiagramId() {
+    @DisplayName("findDiagramIdBySessionId - 입장한 세션의 다이어그램 ID를 O(1)로 조회한다")
+    void findDiagramIdBySessionId_afterJoin_returnsDiagramId() {
         // given
         final var diagramId = 77L;
         final var session = createMockSession("session-77");
         roomManager.join(diagramId, session, "user1", "User 1");
 
         // when
-        final var foundDiagramId = roomManager.findDiagramIdBySession(session);
+        final var foundDiagramId = roomManager.findDiagramIdBySessionId(session.getId());
 
         // then
         assertThat(foundDiagramId).isEqualTo(diagramId);
     }
 
     @Test
-    @DisplayName("findDiagramIdBySession - 퇴장한 세션의 매핑은 제거된다")
-    void findDiagramIdBySession_afterLeave_returnsNull() {
+    @DisplayName("findDiagramIdBySessionId - 퇴장한 세션의 매핑은 제거된다")
+    void findDiagramIdBySessionId_afterLeave_returnsNull() {
         // given
         final var diagramId = 88L;
         final var session = createMockSession("session-88");
@@ -169,7 +169,7 @@ class DiagramRoomManagerTest {
         roomManager.leave(diagramId, session, "user1");
 
         // when
-        final var foundDiagramId = roomManager.findDiagramIdBySession(session);
+        final var foundDiagramId = roomManager.findDiagramIdBySessionId(session.getId());
 
         // then
         assertThat(foundDiagramId).isNull();
@@ -188,7 +188,7 @@ class DiagramRoomManagerTest {
         roomManager.leave(wrongDiagramId, session, "user1");
 
         // then
-        assertThat(roomManager.findDiagramIdBySession(session)).isEqualTo(actualDiagramId);
+        assertThat(roomManager.findDiagramIdBySessionId(session.getId())).isEqualTo(actualDiagramId);
         assertThat(roomManager.getSessionCount(actualDiagramId)).isEqualTo(1);
     }
 
@@ -207,7 +207,7 @@ class DiagramRoomManagerTest {
         roomManager.leave(roomA, sessionB, "userB");
 
         // then
-        assertThat(roomManager.findDiagramIdBySession(sessionB)).isEqualTo(roomB);
+        assertThat(roomManager.findDiagramIdBySessionId(sessionB.getId())).isEqualTo(roomB);
         assertThat(roomManager.getSessionCount(roomB)).isEqualTo(1);
     }
 

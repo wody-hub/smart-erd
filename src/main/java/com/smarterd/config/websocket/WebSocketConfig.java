@@ -1,8 +1,8 @@
 package com.smarterd.config.websocket;
 
+import com.smarterd.collaboration.channel.CollaborationWebSocketBinding;
 import com.smarterd.config.security.CorsConfig;
-import com.smarterd.domain.diagram.websocket.transport.DiagramWebSocketHandler;
-import com.smarterd.domain.diagram.websocket.transport.WsTicketHandshakeInterceptor;
+import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -15,9 +15,8 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 /**
  * WebSocket 설정.
  *
- * <p>Raw WebSocket 엔드포인트 {@code /ws/diagram/{diagramId}}를 등록한다.
- * Yjs 바이너리 프로토콜을 사용하므로 STOMP 대신 Raw WebSocket을 사용한다.
- * 인증은 {@link WsTicketHandshakeInterceptor}에서 일회용 ticket으로 처리한다.</p>
+ * <p>채널별 Raw WebSocket 엔드포인트를 등록한다.
+ * Yjs 바이너리 프로토콜을 사용하므로 STOMP 대신 Raw WebSocket을 사용한다.</p>
  */
 @Configuration
 @EnableWebSocket
@@ -25,11 +24,8 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketConfigurer {
 
-    /** 다이어그램 WebSocket 핸들러 */
-    private final DiagramWebSocketHandler diagramWebSocketHandler;
-
-    /** ticket 핸드셰이크 인터셉터 */
-    private final WsTicketHandshakeInterceptor wsTicketHandshakeInterceptor;
+    /** 등록된 채널 WebSocket 바인딩 */
+    private final List<CollaborationWebSocketBinding> webSocketBindings;
 
     /** CORS 프로퍼티 */
     private final CorsConfig.CorsProperties corsProperties;
@@ -42,17 +38,22 @@ public class WebSocketConfig implements WebSocketConfigurer {
     @Override
     public void registerWebSocketHandlers(@NonNull WebSocketHandlerRegistry registry) {
         final var nonNullRegistry = Objects.requireNonNull(registry, "registry must not be null");
-        final var nonNullDiagramWebSocketHandler = Objects.requireNonNull(
-            diagramWebSocketHandler,
-            "diagramWebSocketHandler must not be null"
-        );
         final var nonNullAllowedOrigins = Objects.requireNonNull(
             corsProperties.getAllowedOrigins().toArray(String[]::new)
         );
-
-        nonNullRegistry
-            .addHandler(nonNullDiagramWebSocketHandler, "/ws/diagram/*")
-            .addInterceptors(wsTicketHandshakeInterceptor)
-            .setAllowedOrigins(nonNullAllowedOrigins);
+        for (final var binding : webSocketBindings) {
+            nonNullRegistry
+                .addHandler(
+                    Objects.requireNonNull(binding.webSocketHandler(), "webSocketHandler must not be null"),
+                    Objects.requireNonNull(
+                        binding.websocketHandlerPattern(),
+                        "websocketHandlerPattern must not be null"
+                    )
+                )
+                .addInterceptors(
+                    Objects.requireNonNull(binding.handshakeInterceptor(), "handshakeInterceptor must not be null")
+                )
+                .setAllowedOrigins(nonNullAllowedOrigins);
+        }
     }
 }

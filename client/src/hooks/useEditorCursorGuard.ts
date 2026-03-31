@@ -47,10 +47,8 @@ export function useEditorCursorGuard(
         return;
       }
 
-      // 1) 커서 · 스크롤 스냅샷
-      const position = editor.getPosition();
-      const scrollTop = editor.getScrollTop();
-      const scrollLeft = editor.getScrollLeft();
+      // 1) 전체 뷰 상태 스냅샷 (커서 + 스크롤 + 선택 영역 + 접힌 영역)
+      const viewState = editor.saveViewState();
 
       // 2) onChange 억제 후 모델 직접 갱신
       isSyncingRef.current = true;
@@ -67,17 +65,26 @@ export function useEditorCursorGuard(
         releaseFrameRef.current = null;
       });
 
-      // 3) 커서 복원 (문서 범위 내로 클램프)
-      if (position) {
+      // 3) 뷰 상태 복원 — 커서 위치를 새 문서 범위 내로 클램프한 뒤 전체 복원
+      if (viewState) {
         const lineCount = model.getLineCount();
-        const line = Math.min(position.lineNumber, lineCount);
-        const maxCol = model.getLineMaxColumn(line);
-        editor.setPosition({
-          lineNumber: line,
-          column: Math.min(position.column, maxCol),
-        });
+        const cursorState = viewState.cursorState;
+        if (cursorState?.length) {
+          const clampPos = (pos: Monaco.IPosition) => {
+            const line = Math.min(pos.lineNumber, lineCount);
+            return { lineNumber: line, column: Math.min(pos.column, model.getLineMaxColumn(line)) };
+          };
+          for (let i = 0; i < cursorState.length; i++) {
+            const cs = cursorState[i];
+            cursorState[i] = {
+              ...cs,
+              position: clampPos(cs.position),
+              selectionStart: clampPos(cs.selectionStart),
+            };
+          }
+        }
+        editor.restoreViewState(viewState);
       }
-      editor.setScrollPosition({ scrollTop, scrollLeft });
 
       // 4) React 상태 동기화
       onCodeTextChange(value);
@@ -100,11 +107,29 @@ export function useEditorCursorGuard(
    */
   const shouldIgnoreChange = useCallback((value: string | undefined) => {
     const text = value ?? '';
-    if (pendingProgrammaticValueRef.current != null && text === pendingProgrammaticValueRef.current) {
+    if (
+      pendingProgrammaticValueRef.current != null &&
+      text === pendingProgrammaticValueRef.current
+    ) {
       pendingProgrammaticValueRef.current = null;
       return true;
     }
-    return isSyncingRef.current;
+
+    if (isSyncingRef.current) {
+      // Hydration 직후 사용자가 바로 입력을 시작하면 다음 animation frame 전에
+      // genuine input이 들어올 수 있다. 이 경우까지 막으면 dirty state 승격과
+      // shared draft flush가 모두 빠지므로, exact programmatic value만 무시하고
+      // 나머지는 즉시 사용자 입력으로 전환한다.
+      isSyncingRef.current = false;
+      pendingProgrammaticValueRef.current = null;
+      if (releaseFrameRef.current != null) {
+        cancelAnimationFrame(releaseFrameRef.current);
+        releaseFrameRef.current = null;
+      }
+      return false;
+    }
+
+    return false;
   }, []);
 
   return { syncCodeChange, isSyncing, shouldIgnoreChange };

@@ -3,6 +3,8 @@ package com.smarterd.api.dictionary;
 import com.smarterd.api.dictionary.dto.SuggestRequest;
 import com.smarterd.api.dictionary.dto.SuggestResponse;
 import com.smarterd.domain.dictionary.service.DictionarySuggestService;
+import com.smarterd.domain.dictionary.service.DictionarySuggestService.SuggestMatchResult;
+import com.smarterd.domain.dictionary.service.DictionarySuggestService.SuggestResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -57,6 +59,38 @@ public class DictionarySuggestController {
         @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Valid @RequestBody SuggestRequest request
     ) {
-        return ResponseEntity.ok(dictionarySuggestService.suggest(jwt.getSubject(), teamId, setId, request));
+        return ResponseEntity.ok(
+            toSuggestResponse(dictionarySuggestService.suggest(jwt.getSubject(), teamId, setId, request.keyword()))
+        );
+    }
+
+    /**
+     * 서비스 계층 추천 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private SuggestResponse toSuggestResponse(SuggestResult result) {
+        return new SuggestResponse(
+            result.physicalName(),
+            result.domainId(),
+            result.domainLogicalName(),
+            result.matches().stream().map(this::toSuggestMatch).toList()
+        );
+    }
+
+    /**
+     * 서비스 계층 토큰 매칭 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private com.smarterd.api.dictionary.dto.SuggestMatch toSuggestMatch(SuggestMatchResult result) {
+        return new com.smarterd.api.dictionary.dto.SuggestMatch(
+            result.token(),
+            result.matched(),
+            result.physicalName(),
+            result.matchType()
+        );
     }
 }

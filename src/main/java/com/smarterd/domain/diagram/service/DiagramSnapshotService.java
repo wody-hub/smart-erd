@@ -1,6 +1,8 @@
 package com.smarterd.domain.diagram.service;
 
 import com.smarterd.config.websocket.WebSocketProperties;
+import com.smarterd.domain.common.exception.ConflictException;
+import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.diagram.repository.SnapshotWithRevision;
 import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
@@ -24,6 +26,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -113,9 +117,8 @@ public class DiagramSnapshotService implements SmartLifecycle {
      * @return Y.Doc 스냅샷 바이트 배열, 없으면 빈 배열
      */
     public byte[] loadSnapshot(Long diagramId) {
-        return snapshotCache.computeIfAbsent(
-            diagramId,
-            (id) -> diagramRepository.findYdocSnapshotById(id).orElse(new byte[0])
+        return snapshotCache.computeIfAbsent(diagramId, (id) ->
+            diagramRepository.findYdocSnapshotById(id).orElse(new byte[0])
         );
     }
 
@@ -138,6 +141,166 @@ public class DiagramSnapshotService implements SmartLifecycle {
      */
     public Optional<SnapshotWithRevision> loadSnapshotWithRevision(Long diagramId) {
         return diagramRepository.findYdocSnapshotWithRevisionById(diagramId);
+    }
+
+    /**
+     * 캐시된 persisted snapshot을 제거한다.
+     *
+     * REST 저장 등으로 snapshot을 무효화한 직후 stale cache가 handoff에 재사용되지 않게 한다.
+     *
+     * @param diagramId 다이어그램 ID
+     */
+    public void evictCachedSnapshot(Long diagramId) {
+        snapshotCache.remove(diagramId);
+    }
+
+    /**
+     * authoritative persisted 저장 이후 realtime 상태를 after-commit 시점에 정렬한다.
+     *
+     * <p>DB 커밋이 확정되기 전에 room/cache를 바꾸면 잠깐 동안 persisted와 handoff가 엇갈릴 수 있으므로
+     * 정렬 자체는 커밋 이후에만 수행한다.</p>
+     *
+     * @param diagramId       다이어그램 ID
+     * @param fullStateUpdate 저장 시점의 전체 Y.Doc 상태 update (없으면 null)
+     */
+    public void reconcileRealtimeStateWithPersistedContentAfterCommit(Long diagramId, byte[] fullStateUpdate) {
+        final var snapshotCopy = fullStateUpdate == null ? null : fullStateUpdate.clone();
+        runAfterCommit(() -> reconcileRealtimeStateWithPersistedContent(diagramId, snapshotCopy, true));
+    }
+
+    /**
+     * authoritative persisted 변경 후 stale realtime 상태를 after-commit 시점에 폐기한다.
+     *
+     * <p>사전 세트 변경/삭제처럼 기존 room 상태를 그대로 둘 수 없는 경로에서 사용한다.</p>
+     *
+     * @param diagramId 다이어그램 ID
+     */
+    public void discardRealtimeStateAfterCommit(Long diagramId) {
+        runAfterCommit(() -> reconcileRealtimeStateWithPersistedContent(diagramId, null, false));
+    }
+
+    /**
+     * REST 저장 이후 실시간 협업 상태를 최신 persisted 기준으로 정렬한다.
+     *
+     * <p>저장 시점의 전체 Y.Doc 상태가 있으면 cache/room 버퍼를 같은 기준으로 교체하고,
+     * 없으면 stale snapshot/update가 다시 살아나지 않도록 비운다.</p>
+     *
+     * @param diagramId        다이어그램 ID
+     * @param fullStateUpdate  저장 시점의 전체 Y.Doc 상태 update (없으면 null)
+     * @returns 없음
+     */
+    public void reconcileRealtimeStateWithPersistedContent(Long diagramId, byte[] fullStateUpdate) {
+        reconcileRealtimeStateWithPersistedContent(diagramId, fullStateUpdate, false);
+    }
+
+    /**
+     * 클라이언트가 보낸 현재 Y.Doc 전체 상태로 persisted snapshot을 즉시 교체한다.
+     *
+     * <p>코드 모드의 shared draft가 페이지 이탈 직전에도 세션 간 복원될 수 있도록
+     * keepalive 요청에서 사용한다.</p>
+     *
+     * @param diagramId               다이어그램 ID
+     * @param expectedContentRevision 클라이언트가 기준으로 삼은 contentRevision
+     * @param fullStateUpdate         클라이언트가 보낸 현재 Y.Doc 전체 상태 update
+     * @param persistOnlyIfMissing    true면 기존 persisted snapshot이 없을 때만 저장한다.
+     * @return 저장 성공 여부
+     */
+    @Transactional
+    public boolean replaceSnapshotWithClientState(
+        Long diagramId,
+        String expectedContentRevision,
+        byte[] fullStateUpdate,
+        boolean persistOnlyIfMissing
+    ) {
+        if (fullStateUpdate == null || fullStateUpdate.length == 0) {
+            return false;
+        }
+
+        final var contentRevision = diagramRepository.findContentRevisionForUpdate(diagramId);
+        if (contentRevision == null) {
+            log.warn("클라이언트 snapshot 저장 실패: 다이어그램 미존재 (id={})", diagramId);
+            return false;
+        }
+        if (!String.valueOf(contentRevision).equals(expectedContentRevision)) {
+            throw new ConflictException(MessageCode.ERROR_BUSINESS_DIAGRAM_SNAPSHOT_STALE.code());
+        }
+        if (persistOnlyIfMissing) {
+            final var existingSnapshot = diagramRepository.findYdocSnapshotById(diagramId).orElse(new byte[0]);
+            if (existingSnapshot.length > 0) {
+                return false;
+            }
+        }
+
+        final var snapshot = YjsUpdateFormat.encode(List.of(fullStateUpdate));
+        final var updated = diagramRepository.updateYdocSnapshotAndRevisionById(diagramId, snapshot, contentRevision);
+        if (updated == 0) {
+            log.warn("클라이언트 snapshot 저장 실패: UPDATE 실패 (id={})", diagramId);
+            return false;
+        }
+
+        snapshotCache.put(diagramId, snapshot);
+        roomManager.replaceUpdates(diagramId, fullStateUpdate);
+        log.info(
+            "클라이언트 Y.Doc 스냅샷 저장 완료: diagramId={}, size={}bytes, snapshotRevision={}",
+            diagramId,
+            snapshot.length,
+            contentRevision
+        );
+        return true;
+    }
+
+    /**
+     * persisted 기준으로 realtime 상태를 실제로 정렬한다.
+     *
+     * @param diagramId                          다이어그램 ID
+     * @param fullStateUpdate                    저장 시점의 전체 Y.Doc 상태 update (없으면 null)
+     * @param preserveActiveRoomWhenSnapshotMissing snapshot이 없을 때 active room 보존 여부
+     */
+    private void reconcileRealtimeStateWithPersistedContent(
+        Long diagramId,
+        byte[] fullStateUpdate,
+        boolean preserveActiveRoomWhenSnapshotMissing
+    ) {
+        if (fullStateUpdate == null || fullStateUpdate.length == 0) {
+            snapshotCache.remove(diagramId);
+            clearCompactionCoolDown(diagramId);
+            if (preserveActiveRoomWhenSnapshotMissing && roomManager.getSessionCount(diagramId) > 0) {
+                log.info(
+                    "authoritative content 저장 후 realtime room 보존: diagramId={}, activeSessions={}",
+                    diagramId,
+                    roomManager.getSessionCount(diagramId)
+                );
+                return;
+            }
+            roomManager.discardRoom(diagramId);
+            return;
+        }
+
+        snapshotCache.put(diagramId, YjsUpdateFormat.encode(List.of(fullStateUpdate)));
+        roomManager.replaceUpdates(diagramId, fullStateUpdate);
+    }
+
+    /**
+     * 현재 트랜잭션이 있으면 after-commit으로, 없으면 즉시 실행한다.
+     *
+     * @param task 실행할 작업
+     */
+    private void runAfterCommit(Runnable task) {
+        if (
+            TransactionSynchronizationManager.isSynchronizationActive() &&
+            TransactionSynchronizationManager.isActualTransactionActive()
+        ) {
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        task.run();
+                    }
+                }
+            );
+            return;
+        }
+        task.run();
     }
 
     /**
