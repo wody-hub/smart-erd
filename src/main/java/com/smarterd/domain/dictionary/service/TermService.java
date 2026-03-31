@@ -16,9 +16,9 @@ import com.smarterd.utils.AppStringUtils;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -105,14 +105,7 @@ public class TermService {
      * @param keyword       복합 검색어
      * @return 용어 결과 페이지
      */
-    public Page<TermResult> getTerms(
-        String loginId,
-        Long teamId,
-        Long setId,
-        int page,
-        int size,
-        String keyword
-    ) {
+    public Page<TermResult> getTerms(String loginId, Long teamId, Long setId, int page, int size, String keyword) {
         final var context = verifyReadAccess(loginId, teamId, setId);
 
         final var pageable = PageRequest.of(
@@ -196,13 +189,7 @@ public class TermService {
         verifyTermBelongsToTeam(term, teamId);
         verifyTermBelongsToSet(term, setId);
 
-        if (
-            termRepository.existsByDictionarySetAndLogicalNameAndIdNot(
-                context.dictionarySet(),
-                logicalName,
-                termId
-            )
-        ) {
+        if (termRepository.existsByDictionarySetAndLogicalNameAndIdNot(context.dictionarySet(), logicalName, termId)) {
             throw new DuplicateException(MessageCode.ERROR_DUPLICATE_TERM_LOGICAL_NAME.code(), logicalName);
         }
 

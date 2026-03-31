@@ -26,21 +26,17 @@ public class ValidateDiagramCollaborationHandshakeUseCase {
      * @param protocolVersion 클라이언트 프로토콜 버전
      * @return 검증 성공 시 세션/diagramId 결과
      */
-    public Optional<DiagramHandshakeValidationResult> validate(
-        String path,
-        String ticket,
-        int protocolVersion
-    ) {
+    public Optional<DiagramHandshakeValidationResult> validate(String path, String ticket, int protocolVersion) {
         final var requestedResourceKey = parseResourceKey(path);
         if (requestedResourceKey == null) {
             return Optional.empty();
         }
 
-        return validateCollaborationTicketUseCase.validateAndConsume(ticket, requestedResourceKey, protocolVersion)
-            .map((session) -> new DiagramHandshakeValidationResult(
-                session,
-                resourceKeyFactory.parseDiagramId(requestedResourceKey)
-            ));
+        return validateCollaborationTicketUseCase
+            .validateAndConsume(ticket, requestedResourceKey, protocolVersion)
+            .map((session) ->
+                new DiagramHandshakeValidationResult(session, resourceKeyFactory.parseDiagramId(requestedResourceKey))
+            );
     }
 
     private com.smarterd.collaboration.channel.CollaborationResourceKey parseResourceKey(String path) {

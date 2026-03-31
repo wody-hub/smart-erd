@@ -1,18 +1,12 @@
 import { memo } from 'react';
 import { Handle } from '@xyflow/react';
 import { AlertTriangle } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import type { Column, TableHandleLayout } from '@/types/erd';
-import {
-  getValidationStatusI18nKey,
-  type ColumnWarning,
-  type WarningValidationStatus,
-} from '@/hooks/useColumnValidation';
+import type { Column } from '@/types/erd';
+import type { ColumnWarning } from '@/hooks/useColumnValidation';
 import { cn } from '@/lib/utils';
 import { buildColumnHandleId } from '@/lib/handle-id';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { useErdFkMode } from './ErdFkModeContext';
-import { getColumnHandlePlacements } from './columnHandleLayout';
+import type { ColumnHandlePlacement } from './columnHandleLayout';
+import type { CompactTableRenderingMode } from './CompactTableRenderingContext';
 
 /** StaticColumnRow 컴포넌트 props */
 interface StaticColumnRowProps {
@@ -20,18 +14,32 @@ interface StaticColumnRowProps {
   col: Column;
   /** 노드 ID */
   nodeId: string;
-  /** 핸들 레이아웃 */
-  handleLayout: TableHandleLayout;
-  /** 엣지 연결 여부 (미리 계산된 값) */
-  connected: boolean;
+  /** target 핸들 렌더 여부 */
+  showTargetHandles: boolean;
+  /** source 핸들 렌더 여부 */
+  showSourceHandles: boolean;
+  /** target 핸들 배치 */
+  targetHandlePlacements: ColumnHandlePlacement[];
+  /** source 핸들 배치 */
+  sourceHandlePlacements: ColumnHandlePlacement[];
   /** 컬럼 유효성 경고 */
   warning: ColumnWarning;
+  /** 유효성 경고 aria-label */
+  validationWarningLabel?: string;
+  /** 유효성 경고 설명 */
+  validationWarningText?: string;
   /** 컬럼 논리명 중복 여부 */
   hasDuplicateLogicalName?: boolean;
+  /** 논리명 중복 경고 aria-label */
+  duplicateLogicalNameLabel?: string;
+  /** 논리명 중복 경고 설명 */
+  duplicateLogicalNameText?: string;
   /** 도메인 논리명 */
   domainLogicalName?: string;
   /** 도메인 물리 타입 */
   domainPhysicalType?: string;
+  /** 대형 다이어그램 overview용 compact 렌더 모드 */
+  compactMode?: CompactTableRenderingMode;
 }
 
 /**
@@ -40,11 +48,11 @@ interface StaticColumnRowProps {
  * 편집 불가 상태의 컬럼을 가볍게 렌더링한다.
  * DndContext, SortableContext, ColumnAutocomplete, DomainSelectPopover 없이
  * 순수 span/div만 사용하여 렌더링 비용을 최소화한다.
- * Handle은 항상 렌더링하여 엣지 위치 계산을 보장한다.
+ * Handle은 연결된 컬럼이거나 FK 모드일 때만 렌더링해 초기 DOM 비용을 줄인다.
  *
  * @param props.col                 컬럼 데이터
  * @param props.nodeId              노드 ID
- * @param props.connected           엣지 연결 여부
+ * @param props.showHandles         핸들 렌더 여부
  * @param props.warning             유효성 경고
  * @param props.domainLogicalName   도메인 논리명
  * @param props.domainPhysicalType  도메인 물리 타입
@@ -52,17 +60,111 @@ interface StaticColumnRowProps {
 function StaticColumnRow({
   col,
   nodeId,
-  handleLayout,
-  connected,
+  showTargetHandles,
+  showSourceHandles,
+  targetHandlePlacements,
+  sourceHandlePlacements,
   warning,
+  validationWarningLabel,
+  validationWarningText,
   hasDuplicateLogicalName = false,
+  duplicateLogicalNameLabel,
+  duplicateLogicalNameText,
   domainLogicalName,
   domainPhysicalType,
+  compactMode = 'off',
 }: StaticColumnRowProps) {
-  const { t } = useTranslation();
-  const fkMode = useErdFkMode();
-  const targetHandlePlacements = getColumnHandlePlacements(handleLayout, 'target');
-  const sourceHandlePlacements = getColumnHandlePlacements(handleLayout, 'source');
+  if (compactMode === 'aggressive') {
+    return (
+      <div className="relative px-3 py-1 text-xs group/col">
+        <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
+          {showTargetHandles &&
+            targetHandlePlacements.map((placement) => (
+              <Handle
+                key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+                type="target"
+                position={placement.position}
+                id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+                className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+                style={placement.style}
+              />
+            ))}
+
+          <span className="min-w-0 flex-1 truncate text-xs">{col.logicalName || col.name}</span>
+
+          {showSourceHandles &&
+            sourceHandlePlacements.map((placement) => (
+              <Handle
+                key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+                type="source"
+                position={placement.position}
+                id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+                className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+                style={placement.style}
+              />
+            ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (compactMode === 'compact') {
+    return (
+      <div
+        className={cn(
+          'relative px-3 py-1 text-xs group/col',
+          hasDuplicateLogicalName && 'bg-destructive/5',
+        )}
+      >
+        <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
+          {showTargetHandles &&
+            targetHandlePlacements.map((placement) => (
+              <Handle
+                key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+                type="target"
+                position={placement.position}
+                id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+                className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+                style={placement.style}
+              />
+            ))}
+
+          <span
+            className={cn(
+              'w-5 shrink-0 text-center font-bold text-2xs',
+              col.pk ? 'text-erd-pk' : 'text-muted-foreground/40',
+            )}
+          >
+            PK
+          </span>
+          <span
+            className={cn(
+              'w-5 shrink-0 text-center font-bold text-2xs',
+              col.fk ? 'text-erd-fk' : 'text-muted-foreground/40',
+            )}
+          >
+            FK
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs">{col.logicalName || col.name}</span>
+          <span className="min-w-0 flex-1 truncate px-1 font-mono text-muted-foreground">
+            {col.name}
+          </span>
+
+          {showSourceHandles &&
+            sourceHandlePlacements.map((placement) => (
+              <Handle
+                key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+                type="source"
+                position={placement.position}
+                id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+                className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+                style={placement.style}
+              />
+            ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -72,19 +174,17 @@ function StaticColumnRow({
       )}
     >
       <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
-        {targetHandlePlacements.map((placement) => (
-          <Handle
-            key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
-            type="target"
-            position={placement.position}
-            id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
-            className={cn(
-              '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
-              !(connected || fkMode) && '!opacity-0 !pointer-events-none',
-            )}
-            style={placement.style}
-          />
-        ))}
+        {showTargetHandles &&
+          targetHandlePlacements.map((placement) => (
+            <Handle
+              key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+              type="target"
+              position={placement.position}
+              id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+              className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+              style={placement.style}
+            />
+          ))}
 
         {/* PK badge */}
         <span
@@ -125,38 +225,24 @@ function StaticColumnRow({
           {col.logicalName || ''}
         </span>
 
-        {warning.status && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <AlertTriangle
-                className="h-3 w-3 text-erd-warning shrink-0"
-                aria-label={t('erd.tableNode.aria.validationWarning', {
-                  name: col.name,
-                })}
-              />
-            </TooltipTrigger>
-            <TooltipContent side="top" className="text-xs">
-              {t(getValidationStatusI18nKey(warning.status as WarningValidationStatus))}
-            </TooltipContent>
-          </Tooltip>
+        {warning.status && validationWarningText && (
+          <span
+            className="inline-flex shrink-0"
+            aria-label={validationWarningLabel}
+            title={validationWarningText}
+          >
+            <AlertTriangle className="h-3 w-3 text-erd-warning" />
+          </span>
         )}
 
-        {hasDuplicateLogicalName && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <AlertTriangle
-                className="h-3 w-3 text-destructive shrink-0"
-                aria-label={t('erd.tableNode.aria.duplicateLogicalNameWarning', {
-                  name: col.logicalName ?? col.name,
-                })}
-              />
-            </TooltipTrigger>
-            <TooltipContent side="top" className="text-xs">
-              {t('erd.tableNode.duplicateLogicalNameWarning', {
-                name: col.logicalName ?? col.name,
-              })}
-            </TooltipContent>
-          </Tooltip>
+        {hasDuplicateLogicalName && duplicateLogicalNameText && (
+          <span
+            className="inline-flex shrink-0"
+            aria-label={duplicateLogicalNameLabel}
+            title={duplicateLogicalNameText}
+          >
+            <AlertTriangle className="h-3 w-3 text-destructive" />
+          </span>
         )}
 
         <span
@@ -191,19 +277,17 @@ function StaticColumnRow({
           NN
         </span>
 
-        {sourceHandlePlacements.map((placement) => (
-          <Handle
-            key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
-            type="source"
-            position={placement.position}
-            id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
-            className={cn(
-              '!w-2 !h-2 !bg-erd-handle !border-erd-handle-border',
-              !(connected || fkMode) && '!opacity-0 !pointer-events-none',
-            )}
-            style={placement.style}
-          />
-        ))}
+        {showSourceHandles &&
+          sourceHandlePlacements.map((placement) => (
+            <Handle
+              key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+              type="source"
+              position={placement.position}
+              id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+              className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+              style={placement.style}
+            />
+          ))}
       </div>
     </div>
   );

@@ -21,9 +21,7 @@ class WsTicketControllerTest {
 
     @Test
     void issueTicket_delegatesToCollaborationUseCase() {
-        final var controller = new WsTicketController(
-            issueDiagramCollaborationTicketUseCase
-        );
+        final var controller = new WsTicketController(issueDiagramCollaborationTicketUseCase);
         final var jwt = jwt("tester");
         final var request = new WsTicketRequest(100L);
         final var result = new CollaborationTicketIssueResult("ticket-1", "user-1", 1);
@@ -39,9 +37,6 @@ class WsTicketControllerTest {
     }
 
     private Jwt jwt(String subject) {
-        return Jwt.withTokenValue("token")
-            .header("alg", "none")
-            .subject(subject)
-            .build();
+        return Jwt.withTokenValue("token").header("alg", "none").subject(subject).build();
     }
 }

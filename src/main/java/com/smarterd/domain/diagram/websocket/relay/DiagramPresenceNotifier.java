@@ -43,12 +43,17 @@ public class DiagramPresenceNotifier implements DiagramPresencePort, DiagramLega
         try {
             final var session = roomManager.getSession(sessionRef.sessionId());
             if (session == null) {
-                log.warn("Presence snapshot 대상 세션을 찾지 못함 (diagramId={}, sessionId={})", diagramId, sessionRef.sessionId());
+                log.warn(
+                    "Presence snapshot 대상 세션을 찾지 못함 (diagramId={}, sessionId={})",
+                    diagramId,
+                    sessionRef.sessionId()
+                );
                 return;
             }
-            final var snapshot = snapshotOverride != null
-                ? snapshotOverride
-                : DiagramApplicationPayloadMapper.toSnapshotPayload(roomManager.getPresenceSnapshot(diagramId));
+            final var snapshot =
+                snapshotOverride != null
+                    ? snapshotOverride
+                    : DiagramApplicationPayloadMapper.toSnapshotPayload(roomManager.getPresenceSnapshot(diagramId));
             if (snapshot == null) {
                 return;
             }
@@ -156,7 +161,11 @@ public class DiagramPresenceNotifier implements DiagramPresencePort, DiagramLega
      * @param sender    발신 세션
      * @param loginId   퇴장한 사용자 loginId
      */
-    public void broadcastPeerLeftLegacy(@NonNull Long diagramId, @NonNull DiagramSessionRef senderSessionRef, String loginId) {
+    public void broadcastPeerLeftLegacy(
+        @NonNull Long diagramId,
+        @NonNull DiagramSessionRef senderSessionRef,
+        String loginId
+    ) {
         try {
             final var payloadMap = Map.of("loginId", loginId);
             messageSender.broadcastJsonToRoom(
@@ -169,5 +178,4 @@ public class DiagramPresenceNotifier implements DiagramPresencePort, DiagramLega
             log.warn("Legacy PEER_LEFT 메시지 생성 실패 (loginId={})", loginId, e);
         }
     }
-
 }

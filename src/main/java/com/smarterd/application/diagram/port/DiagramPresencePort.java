@@ -8,7 +8,6 @@ import org.springframework.lang.NonNull;
  * 다이어그램 presence 알림 전송 포트.
  */
 public interface DiagramPresencePort {
-
     void sendPresenceSnapshotToSession(
         DiagramSessionRef sessionRef,
         Long diagramId,

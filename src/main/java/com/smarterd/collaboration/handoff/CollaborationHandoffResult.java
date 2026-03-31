@@ -6,7 +6,4 @@ package com.smarterd.collaboration.handoff;
  * @param snapshot handoff에 사용할 전체 update 스냅샷
  * @param source   handoff 출처 (`warm`, `cached`, `db`)
  */
-public record CollaborationHandoffResult(
-    byte[] snapshot,
-    String source
-) {}
+public record CollaborationHandoffResult(byte[] snapshot, String source) {}

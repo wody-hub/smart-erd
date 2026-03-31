@@ -48,9 +48,8 @@ export function useExportDiagram(diagramName: string) {
   const jsPdfModulePromiseRef = useRef<Promise<typeof import('jspdf')> | null>(null);
   const fontEmbedCssPromiseRef = useRef<Promise<string> | null>(null);
   const exportInFlightRef = useRef(false);
-  const [exportProgress, setExportProgress] = useState<ExportProgressState>(
-    createIdleExportProgress,
-  );
+  const [exportProgress, setExportProgress] =
+    useState<ExportProgressState>(createIdleExportProgress);
 
   const translateProgress = (key: string, values?: Record<string, number | string>) =>
     String(t(key as never, values as never));
@@ -151,7 +150,7 @@ export function useExportDiagram(diagramName: string) {
   };
 
   /** 포맷별 export 실행과 공통 성공/실패 처리를 감싼다. */
-  const runExport = async <Result,>(
+  const runExport = async <Result>(
     format: ExportFormat,
     execute: (opts: CaptureOptions) => Promise<Result>,
     onSuccess: (result: Result) => void,

@@ -14,8 +14,7 @@ import type { DiagramYjsDocumentAdapter } from '@/collaboration/yjs/diagram-yjs-
 import type { DiagramCollaborationTransport } from './diagram-collaboration-transport.js';
 import type { DiagramContentOnlySnapshotSeeder } from './diagram-content-only-snapshot-seeder.js';
 
-export interface CreateDiagramCollaborationProviderLifecycleOptions
-  extends DiagramCollaborationProviderLifecycleOptions {
+export interface CreateDiagramCollaborationProviderLifecycleOptions extends DiagramCollaborationProviderLifecycleOptions {
   previewEnabled: boolean;
   fallbackTimeoutMs: number;
   documentAdapter: DiagramYjsDocumentAdapter;
@@ -62,7 +61,10 @@ export function createDiagramCollaborationProviderLifecycle(
       previewHydrationController.onConnected(wsConnectedAt);
     }),
   );
-  const providerConnection = new DiagramCollaborationProviderConnection<YjsProvider, WsTicketIssueResponse>(
+  const providerConnection = new DiagramCollaborationProviderConnection<
+    YjsProvider,
+    WsTicketIssueResponse
+  >(
     {
       ydoc: options.ydoc,
       diagramId: options.diagramId,
@@ -73,7 +75,8 @@ export function createDiagramCollaborationProviderLifecycle(
       transport: dependencies.transport,
       providerBinding,
       providerEvents,
-      createProvider: (doc, providerOptions) => new YjsProvider(doc, providerOptions as YjsProviderOptions),
+      createProvider: (doc, providerOptions) =>
+        new YjsProvider(doc, providerOptions as YjsProviderOptions),
     },
   );
 

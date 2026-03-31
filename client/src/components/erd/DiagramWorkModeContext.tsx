@@ -1,8 +1,5 @@
 import { createContext, useContext } from 'react';
-import type {
-  DiagramWorkMode,
-  DiagramWorkModeCapabilities,
-} from '@/lib/diagram-work-mode';
+import type { DiagramWorkMode, DiagramWorkModeCapabilities } from '@/lib/diagram-work-mode';
 
 /** 작업 모드 컨텍스트 값 */
 interface DiagramWorkModeContextValue {

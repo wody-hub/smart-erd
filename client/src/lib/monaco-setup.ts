@@ -5,7 +5,7 @@
  * 로컬에 설치된 monaco-editor 패키지를 직접 사용하도록 설정한다.
  * 웹 환경에서는 기본 CDN 로더를 그대로 사용한다.
  *
- * main.tsx에서 side-effect import로 불러온다: `import './lib/monaco-setup'`
+ * Monaco Editor를 실제로 렌더하는 컴포넌트에서 side-effect import로 불러온다.
  *
  * @module monaco-setup
  */

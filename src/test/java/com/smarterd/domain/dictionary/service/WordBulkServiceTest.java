@@ -4,16 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smarterd.domain.dictionary.service.session.InMemoryBulkValidationSessionStore;
 import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.entity.Word;
 import com.smarterd.domain.dictionary.repository.WordRepository;
+import com.smarterd.domain.dictionary.service.session.InMemoryBulkValidationSessionStore;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.service.AuthService;
-import java.util.Locale;
 import java.util.List;
+import java.util.Locale;
 import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.junit.jupiter.api.DisplayName;
@@ -81,7 +81,9 @@ class WordBulkServiceTest {
         assertThat(dataSheet.getSheetName()).isEqualTo("단어");
         assertThat(dataSheet.getPaneInformation()).isNotNull();
         assertThat(dataSheet.getPaneInformation().isFreezePane()).isTrue();
-        assertThat(dataSheet.getRow(0).getCell(0).getCellStyle().getFillPattern()).isEqualTo(FillPatternType.SOLID_FOREGROUND);
+        assertThat(dataSheet.getRow(0).getCell(0).getCellStyle().getFillPattern()).isEqualTo(
+            FillPatternType.SOLID_FOREGROUND
+        );
         assertThat(guideSheet).isNotNull();
         assertThat(guideSheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("업로드 템플릿 가이드");
     }
@@ -120,7 +122,9 @@ class WordBulkServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(teamId)).thenReturn(team);
         when(dictionarySetService.findByTeamAndId(team, setId)).thenReturn(dictionarySet);
-        when(wordRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, List.of("사용자"))).thenReturn(List.<Word>of());
+        when(wordRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, List.of("사용자"))).thenReturn(
+            List.<Word>of()
+        );
 
         // when
         final var response = wordBulkService.validateUpload(loginId, teamId, setId, file, Locale.KOREAN);

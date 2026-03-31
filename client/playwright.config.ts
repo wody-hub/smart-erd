@@ -5,6 +5,7 @@ const browserChannel = process.env.SMART_ERD_E2E_BROWSER_CHANNEL;
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: process.env.SMART_ERD_INCLUDE_TMP_E2E ? [] : ['**/tmp/**'],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

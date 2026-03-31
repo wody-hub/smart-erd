@@ -184,10 +184,7 @@ public class DiagramTableDefinitionExportService {
             DiagramDefinitionWorkbookSupport.writeCell(row, 10, definitionRow.dataCount(), centeredBodyStyle);
         }
 
-        return new ExcelData(
-            workbook,
-            AppStringUtils.defaultIfBlank(diagramName, "diagram") + "-table-definition"
-        );
+        return new ExcelData(workbook, AppStringUtils.defaultIfBlank(diagramName, "diagram") + "-table-definition");
     }
 
     /**

@@ -81,4 +81,22 @@ public interface DiagramRepositoryCustom {
      * @return DiagramWithSnapshotFlag Optional
      */
     Optional<DiagramWithSnapshotFlag> findByProjectAndIdWithSnapshotFlag(Project project, Long diagramId);
+
+    /**
+     * 다이어그램 bootstrap 메타를 경량 프로젝션으로 조회한다.
+     * bootstrap 진입 시 content TEXT 전체 로딩을 피하기 위해 사용한다.
+     *
+     * @param project 프로젝트 엔티티
+     * @param diagramId 다이어그램 ID
+     * @return DiagramBootstrapProjection Optional
+     */
+    Optional<DiagramBootstrapProjection> findBootstrapByProjectAndId(Project project, Long diagramId);
+
+    /**
+     * 다이어그램 ID만으로 bootstrap 메타를 경량 프로젝션 조회한다.
+     *
+     * @param diagramId 다이어그램 ID
+     * @return DiagramBootstrapProjection Optional
+     */
+    Optional<DiagramBootstrapProjection> findBootstrapById(Long diagramId);
 }

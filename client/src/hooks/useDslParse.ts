@@ -16,6 +16,8 @@ interface UseDslParseOptions {
 interface UseDslParseReturn {
   /** DSL 텍스트 */
   dslText: string;
+  /** 현재 parseResult가 반영한 DSL 텍스트 */
+  parsedText: string | null;
   /** 파싱 결과 */
   parseResult: DslParseResult | null;
   /** 파싱 중 여부 */
@@ -51,6 +53,8 @@ const EMPTY_PARSE_RESULT: DslParseResult = {
 export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseReturn {
   /** DSL 텍스트 */
   const [dslText, setDslText] = useState('');
+  /** parseResult가 반영한 최신 DSL 텍스트 */
+  const [parsedText, setParsedText] = useState<string | null>(null);
   /** 파싱 결과 */
   const [parseResult, setParseResult] = useState<DslParseResult | null>(null);
   /** 파싱 중 여부 */
@@ -116,6 +120,7 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
       if (message.type === 'parsed') {
         lastExecutedParseKeyRef.current = message.parseKey;
         setParseResult(message.result);
+        setParsedText(dslTextRef.current);
         setParsing(false);
         return;
       }
@@ -130,6 +135,7 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
       }
       lastExecutedParseKeyRef.current = message.parseKey;
       setParseResult(fallbackResult);
+      setParsedText(dslTextRef.current);
       setParsing(false);
     };
 
@@ -150,6 +156,7 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
       }
       lastExecutedParseKeyRef.current = parseKey;
       setParseResult(result);
+      setParsedText(latestText);
       setParsing(false);
     };
 
@@ -186,6 +193,7 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
 
     if (!text.trim()) {
       setParseResult(EMPTY_PARSE_RESULT);
+      setParsedText('');
       setParsing(false);
       return;
     }
@@ -214,6 +222,7 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
         return;
       }
       setParseResult(result);
+      setParsedText(text);
       setParsing(false);
     }, 300);
   }, []);
@@ -275,6 +284,7 @@ export function useDslParse({ dictionary }: UseDslParseOptions): UseDslParseRetu
 
   return {
     dslText,
+    parsedText,
     parseResult,
     parsing,
     handleDslChange,

@@ -411,10 +411,12 @@ public class ExcelWriter<T> implements AutoCloseable {
         }
 
         final var asciiFallback = buildAsciiFallbackFileName(normalizedFileName);
-        return "attachment; filename=\""
-            + escapeQuotedValue(asciiFallback)
-            + "\"; filename*=UTF-8''"
-            + UriUtils.encode(normalizedFileName, StandardCharsets.UTF_8);
+        return (
+            "attachment; filename=\"" +
+            escapeQuotedValue(asciiFallback) +
+            "\"; filename*=UTF-8''" +
+            UriUtils.encode(normalizedFileName, StandardCharsets.UTF_8)
+        );
     }
 
     private static String normalizeDownloadFileName(String fileName) {
@@ -431,7 +433,10 @@ public class ExcelWriter<T> implements AutoCloseable {
             sanitized.append(character);
         }
 
-        return AppStringUtils.defaultIfBlank(AppStringUtils.trimToNull(sanitized.toString()), DEFAULT_DOWNLOAD_FILE_NAME);
+        return AppStringUtils.defaultIfBlank(
+            AppStringUtils.trimToNull(sanitized.toString()),
+            DEFAULT_DOWNLOAD_FILE_NAME
+        );
     }
 
     private static boolean isAsciiFileName(String fileName) {
@@ -445,7 +450,9 @@ public class ExcelWriter<T> implements AutoCloseable {
 
     private static String buildAsciiFallbackFileName(String fileName) {
         final var extension = AppStringUtils.endsWithIgnoreCase(fileName, ".xlsx") ? ".xlsx" : "";
-        final var baseName = extension.isEmpty() ? fileName : fileName.substring(0, fileName.length() - extension.length());
+        final var baseName = extension.isEmpty()
+            ? fileName
+            : fileName.substring(0, fileName.length() - extension.length());
         final var asciiBaseName = sanitizeAsciiBaseName(baseName);
 
         if (AppStringUtils.isBlank(asciiBaseName)) {

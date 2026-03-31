@@ -7,7 +7,6 @@ import java.util.Optional;
  * 채널별 WebSocket ticket 검증/소멸 정책.
  */
 public interface CollaborationTicketAuthenticator {
-
     /**
      * ticket을 검증하고 세션 메타데이터로 변환한다.
      *

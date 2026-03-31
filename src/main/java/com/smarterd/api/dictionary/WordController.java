@@ -16,13 +16,13 @@ import com.smarterd.domain.dictionary.service.WordDictionaryExportService;
 import com.smarterd.domain.dictionary.service.WordService;
 import com.smarterd.domain.dictionary.service.WordService.WordResult;
 import com.smarterd.utils.ExcelUtils;
-import jakarta.servlet.http.HttpServletResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.Locale;
@@ -88,9 +88,13 @@ public class WordController {
         @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
         @Parameter(description = "페이지 번호 (0-base)") @RequestParam(defaultValue = "0") int page,
         @Parameter(description = "페이지 크기 (최대 200)") @RequestParam(defaultValue = "20") int size,
-        @Parameter(description = "복합 검색어 (논리명/물리명/설명)") @RequestParam(required = false, name = "q") String keyword
+        @Parameter(description = "복합 검색어 (논리명/물리명/설명)") @RequestParam(
+            required = false,
+            name = "q"
+        ) String keyword
     ) {
-        final var resultPage = wordService.getWords(jwt.getSubject(), teamId, setId, page, size, keyword)
+        final var resultPage = wordService
+            .getWords(jwt.getSubject(), teamId, setId, page, size, keyword)
             .map(this::toWordResponse);
         return ResponseEntity.ok(PageResponse.from(resultPage));
     }
@@ -130,7 +134,10 @@ public class WordController {
         );
     }
 
-    @Operation(summary = "단어 업로드 오류 엑셀 다운로드", description = "단어 업로드 검증 오류 행을 엑셀로 다운로드한다.")
+    @Operation(
+        summary = "단어 업로드 오류 엑셀 다운로드",
+        description = "단어 업로드 검증 오류 행을 엑셀로 다운로드한다."
+    )
     @GetMapping("/upload/errors")
     public void downloadErrorReport(
         @AuthenticationPrincipal Jwt jwt,

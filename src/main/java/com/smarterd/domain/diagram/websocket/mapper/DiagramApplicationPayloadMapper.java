@@ -39,7 +39,8 @@ public final class DiagramApplicationPayloadMapper {
         if (snapshot == null) {
             return null;
         }
-        final List<DiagramPresenceParticipantPayload> participants = snapshot.participants()
+        final List<DiagramPresenceParticipantPayload> participants = snapshot
+            .participants()
             .stream()
             .map(DiagramApplicationPayloadMapper::toParticipantPayload)
             .toList();
@@ -50,6 +51,10 @@ public final class DiagramApplicationPayloadMapper {
         if (participant == null) {
             return null;
         }
-        return new DiagramPresenceParticipantPayload(participant.userId(), participant.displayName(), participant.joinSeq());
+        return new DiagramPresenceParticipantPayload(
+            participant.userId(),
+            participant.displayName(),
+            participant.joinSeq()
+        );
     }
 }

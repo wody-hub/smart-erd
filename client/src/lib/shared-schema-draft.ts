@@ -64,7 +64,12 @@ function extractLegacyDraftPositions(
   for (const node of snapshot.graph?.nodes ?? []) {
     const x = node?.position?.x;
     const y = node?.position?.y;
-    if (typeof x !== 'number' || !Number.isFinite(x) || typeof y !== 'number' || !Number.isFinite(y)) {
+    if (
+      typeof x !== 'number' ||
+      !Number.isFinite(x) ||
+      typeof y !== 'number' ||
+      !Number.isFinite(y)
+    ) {
       continue;
     }
     normalized[node.id] = { x, y };
@@ -120,7 +125,12 @@ function normalizePreviewPositions(value: unknown): DiagramPreviewPositionRecord
     }
     const x = (position as { x?: unknown }).x;
     const y = (position as { y?: unknown }).y;
-    if (typeof x !== 'number' || !Number.isFinite(x) || typeof y !== 'number' || !Number.isFinite(y)) {
+    if (
+      typeof x !== 'number' ||
+      !Number.isFinite(x) ||
+      typeof y !== 'number' ||
+      !Number.isFinite(y)
+    ) {
       continue;
     }
     normalized[nodeId] = { x, y };

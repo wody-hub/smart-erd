@@ -9,9 +9,7 @@ import type { DiagramCollaborationBootstrap } from '@/collaboration/channel/diag
 /**
  * 다이어그램 채널의 preview/runtime 의미를 판정하는 정책.
  */
-export class DiagramCollaborationPreviewPolicy
-  implements CollaborationPreviewPolicy<DiagramCollaborationBootstrap>
-{
+export class DiagramCollaborationPreviewPolicy implements CollaborationPreviewPolicy<DiagramCollaborationBootstrap> {
   /**
    * {@inheritDoc}
    */

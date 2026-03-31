@@ -7,8 +7,8 @@ import static org.mockito.Mockito.when;
 import com.smarterd.collaboration.channel.CollaborationResourceKey;
 import com.smarterd.collaboration.channel.CollaborationRuntimeSupport;
 import com.smarterd.collaboration.channel.CollaborationRuntimeSupportRegistry;
-import com.smarterd.collaboration.handoff.CollaborationHandoffResult;
 import com.smarterd.collaboration.handoff.CollaborationHandoffPolicy;
+import com.smarterd.collaboration.handoff.CollaborationHandoffResult;
 import com.smarterd.collaboration.snapshot.CollaborationSnapshotStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,8 +39,9 @@ class LoadCollaborationHandoffUseCaseTest {
         when(collaborationRuntimeSupportRegistry.getRequired(expectedKey)).thenReturn(collaborationRuntimeSupport);
         when(collaborationRuntimeSupport.snapshotStore()).thenReturn(collaborationSnapshotStore);
         when(collaborationRuntimeSupport.handoffPolicy()).thenReturn(collaborationHandoffPolicy);
-        when(collaborationHandoffPolicy.buildHandoffSnapshot(expectedKey, collaborationSnapshotStore))
-            .thenReturn(expected);
+        when(collaborationHandoffPolicy.buildHandoffSnapshot(expectedKey, collaborationSnapshotStore)).thenReturn(
+            expected
+        );
 
         assertThat(useCase.loadHandoffSnapshot(expectedKey)).isEqualTo(expected);
 

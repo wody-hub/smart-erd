@@ -28,9 +28,11 @@ public class CollaborationWebSocketRegistrationValidator {
         final Set<String> supportPatterns = supportsByPattern.keySet();
         if (!bindingPatterns.equals(supportPatterns)) {
             throw new IllegalStateException(
-                "협업 WebSocket binding/support 등록 패턴이 일치하지 않음. "
-                    + "bindings=" + bindingPatterns
-                    + ", supports=" + supportPatterns
+                "협업 WebSocket binding/support 등록 패턴이 일치하지 않음. " +
+                    "bindings=" +
+                    bindingPatterns +
+                    ", supports=" +
+                    supportPatterns
             );
         }
     }

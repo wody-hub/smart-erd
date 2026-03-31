@@ -22,8 +22,8 @@ import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSessionMeta
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSnapshotStore;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
 import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
-import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.DiagramHandoffSnapshotResponder;
+import com.smarterd.domain.diagram.websocket.relay.DiagramMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageSender;
 import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
 import com.smarterd.domain.diagram.websocket.relay.DiagramPresenceNotifier;
@@ -33,8 +33,8 @@ import com.smarterd.domain.diagram.websocket.relay.handler.PresenceSnapshotReque
 import com.smarterd.domain.diagram.websocket.relay.handler.SnapshotRequestMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.handler.SyncRelayMessageHandler;
 import com.smarterd.domain.diagram.websocket.relay.handler.YjsUpdateMessageHandler;
-import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.diagram.websocket.room.DiagramRealtimeSessionPortAdapter;
+import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.diagram.websocket.session.AuthenticatedSession;
 import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionResolver;
 import java.nio.ByteBuffer;
@@ -222,7 +222,9 @@ class DiagramWebSocketFlowIntegrationTest {
             new DiagramCollaborationSnapshotStore(snapshotService, resourceKeyFactory),
             new DiagramCollaborationHandoffPolicy(roomManager, snapshotService, resourceKeyFactory)
         );
-        final var runtimeSupportRegistry = new DefaultCollaborationRuntimeSupportRegistry(List.of(diagramRuntimeSupport));
+        final var runtimeSupportRegistry = new DefaultCollaborationRuntimeSupportRegistry(
+            List.of(diagramRuntimeSupport)
+        );
         final var loadCollaborationHandoffUseCase = new LoadCollaborationHandoffUseCase(runtimeSupportRegistry);
         final var sessionResolver = new DiagramWebSocketSessionResolver(
             resourceKeyFactory,

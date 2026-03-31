@@ -26,16 +26,16 @@ class DiagramIndexDefinitionExportServiceTest {
         final var service = new DiagramIndexDefinitionExportService(diagramService, new ObjectMapper());
         final var diagram = buildDiagram(
             """
-                {"nodes":[
-                  {"id":"table-1","data":{"label":"common_code","logicalTableName":"공통코드","columns":[
-                    {"id":"c1","name":"code_id","logicalName":"코드 ID","type":"varchar(50)","pk":true,"nullable":false},
-                    {"id":"c2","name":"parent_code_id","logicalName":"상위 코드 ID","type":"varchar(50)","fk":true,"nullable":true}
-                  ]}},
-                  {"id":"table-2","data":{"label":"code_group","logicalTableName":"코드그룹","columns":[
-                    {"id":"p1","name":"id","logicalName":"ID","type":"BIGINT","pk":true,"nullable":false}
-                  ]}}
-                ],"edges":[],"groups":[]}
-                """
+            {"nodes":[
+              {"id":"table-1","data":{"label":"common_code","logicalTableName":"공통코드","columns":[
+                {"id":"c1","name":"code_id","logicalName":"코드 ID","type":"varchar(50)","pk":true,"nullable":false},
+                {"id":"c2","name":"parent_code_id","logicalName":"상위 코드 ID","type":"varchar(50)","fk":true,"nullable":true}
+              ]}},
+              {"id":"table-2","data":{"label":"code_group","logicalTableName":"코드그룹","columns":[
+                {"id":"p1","name":"id","logicalName":"ID","type":"BIGINT","pk":true,"nullable":false}
+              ]}}
+            ],"edges":[],"groups":[]}
+            """
         );
         when(diagramService.loadReadableDiagram("tester", 1L, 10L, 100L)).thenReturn(diagram);
 
@@ -62,10 +62,10 @@ class DiagramIndexDefinitionExportServiceTest {
         final var service = new DiagramIndexDefinitionExportService(diagramService, new ObjectMapper());
         final var diagram = buildDiagram(
             """
-                {"nodes":[
-                  {"id":"table-1","data":{"label":"saved_table","logicalTableName":"저장 테이블","columns":[{"id":"c1","name":"saved_id","pk":true}]}}
-                ],"edges":[],"groups":[]}
-                """
+            {"nodes":[
+              {"id":"table-1","data":{"label":"saved_table","logicalTableName":"저장 테이블","columns":[{"id":"c1","name":"saved_id","pk":true}]}}
+            ],"edges":[],"groups":[]}
+            """
         );
         when(diagramService.loadReadableDiagram("tester", 1L, 10L, 100L)).thenReturn(diagram);
 
@@ -75,10 +75,10 @@ class DiagramIndexDefinitionExportServiceTest {
             10L,
             100L,
             """
-                {"nodes":[
-                  {"id":"table-1","data":{"label":"override_table","logicalTableName":"현재 테이블","columns":[{"id":"c1","name":"override_id","pk":true}]}}
-                ],"edges":[],"groups":[]}
-                """
+            {"nodes":[
+              {"id":"table-1","data":{"label":"override_table","logicalTableName":"현재 테이블","columns":[{"id":"c1","name":"override_id","pk":true}]}}
+            ],"edges":[],"groups":[]}
+            """
         );
 
         final var sheet = excelData.excelBook().getSheetAt(0);
@@ -98,10 +98,10 @@ class DiagramIndexDefinitionExportServiceTest {
             10L,
             100L,
             """
-                {"metadata":{"databaseName":"common","tableOwner":"riskzero"},"nodes":[
-                  {"id":"table-1","data":{"label":"override_table","logicalTableName":"현재 테이블","columns":[{"id":"c1","name":"override_id","pk":true}]}}
-                ],"edges":[],"groups":[]}
-                """
+            {"metadata":{"databaseName":"common","tableOwner":"riskzero"},"nodes":[
+              {"id":"table-1","data":{"label":"override_table","logicalTableName":"현재 테이블","columns":[{"id":"c1","name":"override_id","pk":true}]}}
+            ],"edges":[],"groups":[]}
+            """
         );
 
         final var sheet = excelData.excelBook().getSheetAt(0);
@@ -114,29 +114,15 @@ class DiagramIndexDefinitionExportServiceTest {
         final var service = new DiagramIndexDefinitionExportService(diagramService, new ObjectMapper());
         when(diagramService.loadReadableDiagram("tester", 1L, 10L, 100L)).thenReturn(buildDiagram("{invalid"));
 
-        assertThatThrownBy(() -> service.generateIndexDefinition("tester", 1L, 10L, 100L, null))
-            .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.generateIndexDefinition("tester", 1L, 10L, 100L, null)).isInstanceOf(
+            BusinessException.class
+        );
     }
 
     private Diagram buildDiagram(String content) {
-        final var owner = User.builder()
-            .loginId("riskzero")
-            .password("hashed")
-            .name("Risk Zero")
-            .build();
-        final var team = Team.builder()
-            .name("core-team")
-            .owner(owner)
-            .build();
-        final var project = Project.builder()
-            .name("common")
-            .description("Shared database")
-            .team(team)
-            .build();
-        return Diagram.builder()
-            .name("mail-diagram")
-            .project(project)
-            .content(content)
-            .build();
+        final var owner = User.builder().loginId("riskzero").password("hashed").name("Risk Zero").build();
+        final var team = Team.builder().name("core-team").owner(owner).build();
+        final var project = Project.builder().name("common").description("Shared database").team(team).build();
+        return Diagram.builder().name("mail-diagram").project(project).content(content).build();
     }
 }

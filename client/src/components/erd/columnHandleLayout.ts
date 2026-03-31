@@ -4,7 +4,7 @@ import type { TableHandleLayout } from '@/types/erd';
 import { getAllowedHandleSides } from '@/lib/edge-handles';
 import type { ColumnHandleSide } from '@/lib/handle-id';
 
-interface ColumnHandlePlacement {
+export interface ColumnHandlePlacement {
   side: ColumnHandleSide;
   position: Position;
   style?: CSSProperties;

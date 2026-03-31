@@ -88,10 +88,7 @@ public class DiagramInboundMessageContextFactory {
         );
     }
 
-    private DiagramWebSocketSessionInfo resolveSessionOrClose(
-        WebSocketSession session,
-        String missingSessionMessage
-    ) {
+    private DiagramWebSocketSessionInfo resolveSessionOrClose(WebSocketSession session, String missingSessionMessage) {
         final var info = sessionResolver.resolve(session);
         if (info == null) {
             log.warn("{} (세션 {})", missingSessionMessage, session.getId());

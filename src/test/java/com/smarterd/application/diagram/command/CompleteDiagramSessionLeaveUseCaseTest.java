@@ -8,9 +8,9 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import com.smarterd.application.diagram.model.DiagramSessionLeaveCompletion;
 import com.smarterd.application.diagram.port.DiagramPresencePort;
 import com.smarterd.application.diagram.port.DiagramSessionRef;
-import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class CompleteDiagramSessionLeaveUseCaseTest {
 

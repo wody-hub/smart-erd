@@ -1,7 +1,10 @@
 import { createContext, useContext } from 'react';
 import type { RemoteEditLockInfo } from '@/lib/remote-edit-locks';
 import type { EdgeWaypointPreview } from '@/types/collaboration';
-import type { LocalEdgeWaypointDrag, LocalEdgeWaypointDragKind } from '@/stores/erd/useCollaborationStore';
+import type {
+  LocalEdgeWaypointDrag,
+  LocalEdgeWaypointDragKind,
+} from '@/stores/erd/useCollaborationStore';
 import type { Waypoint } from '@/types/erd';
 import type { EdgePoint } from './edgeWaypointGeometry';
 

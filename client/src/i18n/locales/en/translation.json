@@ -180,10 +180,17 @@
     },
     "previewSync": {
       "headerReadonly": "Real-time sync in progress",
+      "sharedDraftOverlaySuppressed": "Large diagrams hide the shared draft preview to keep the canvas responsive. Code-first drafts will appear on the ERD after they are applied.",
       "banner": {
         "title": "Preview is already visible",
         "description": "Editing will unlock automatically once real-time sync finishes.",
         "descriptionDisconnected": "Real-time sync is delayed. Editing will unlock automatically once the connection recovers.",
+        "descriptionIssue": {
+          "connection-limit-exceeded": "Too many collaboration tabs are open for this user. Close unused tabs or windows, then reconnect.",
+          "room-capacity-exceeded": "This diagram has reached its collaboration session limit. Please reconnect in a moment.",
+          "policy-violation": "The collaboration connection was rejected by server policy. Refresh the page or reconnect."
+        },
+        "retryConnection": "Reconnect",
         "locked": "Editing locked until sync completes"
       },
       "toast": {
@@ -301,6 +308,7 @@
     "codeEditor": {
       "placeholder": "-- Enter SQL DDL here...\n-- Example:\n-- CREATE TABLE users (\n--   id SERIAL PRIMARY KEY,\n--   name VARCHAR(100) NOT NULL\n-- );",
       "applyButton": "Apply to ERD",
+      "applyOnlyButton": "Apply only",
       "applying": "Applying...",
       "confirmTitle": "Replace ERD",
       "confirmDescription": "Applying DDL will replace all existing tables and relationships. This action cannot be undone. Do you want to continue?",
@@ -309,23 +317,31 @@
       "diffFallbackApplied": "Incremental apply failed, so full replacement was used. {{dropped}} group memberships were excluded.",
       "success": "Applied {{count}} tables to ERD",
       "failed": "Failed to apply DDL",
-      "finalizeSaveButton": "Finalize save",
+      "finalizeSaveButton": "Save",
+      "finalizeApplyAndSaveButton": "Apply and save",
       "finalizeSavingButton": "Saving...",
-      "draftStatusDirty": "Shared draft save pending",
-      "draftStatusSaving": "Saving shared draft",
-      "draftStatusSaved": "Shared draft saved",
-      "draftStatusError": "Shared draft save failed",
+      "draftStatusDirty": "Temporary save pending",
+      "draftStatusSaving": "Saving temporary draft",
+      "draftStatusSaved": "Temporarily saved",
+      "draftStatusError": "Temporary save failed",
       "draftStatusStale": "Shared draft save paused. Refresh and try again.",
-      "finalizeApplyRequired": "Apply to ERD before final save",
-      "finalizePending": "Final save required",
-      "finalizeSaved": "Final save complete",
+      "draftStatusReloadAction": "Reload now",
+      "remotePending": "Waiting for remote changes to reconcile",
+      "finalizeApplyRequired": "Apply to ERD before saving",
+      "finalizeRemotePending": "Save after remote changes are reconciled",
+      "finalizeInvalidDraft": "Resolve syntax errors before saving",
+      "finalizePending": "Save required",
+      "finalizeSaved": "Saved",
       "formatButton": "Format code",
       "copyWithPhysicalNamesButton": "Copy with physical names",
       "copyWithPhysicalNamesCopied": "Code with physical names copied to clipboard",
       "copyWithPhysicalNamesFailed": "Failed to copy code with physical names",
       "refreshButton": "Refresh from ERD",
       "refreshConfirmTitle": "Refresh Code",
-      "refreshConfirmDescription": "Current edits will be replaced with code generated from the ERD. Continue?"
+      "refreshConfirmDescription": "Current edits will be replaced with code generated from the ERD. Continue?",
+      "refreshConfirmDescriptionRemotePending": "To reconcile remote changes, your local draft will be discarded and the code will be regenerated from the ERD. Continue?",
+      "refreshConfirmDescriptionInvalidDraft": "Your current draft has syntax errors. It will be discarded and regenerated from the ERD. Continue?",
+      "refreshConfirmDescriptionStaleDraft": "Your stale shared draft will be discarded and the code will be reset to the saved ERD state. Continue?"
     },
     "lock": {
       "lockedBy": "{{name}} is editing",
@@ -454,6 +470,7 @@
       "tableLogicalName": "Enter table logical name...",
       "duplicateLogicalNameWarning": "Duplicate column logical name: {{name}}",
       "duplicateLogicalNameCount": "{{count}} duplicate logical names",
+      "hiddenColumnSummary": "+ {{count}} hidden unconnected columns",
       "handleLayout": {
         "label": "Handle layout",
         "split": "Split",
@@ -485,7 +502,8 @@
         "changeColor": "Change table color",
         "changeHandleLayout": "Change table handle layout",
         "navigateToCode": "Go to the code for this table",
-        "reorderColumn": "Reorder column {{name}}"
+        "reorderColumn": "Reorder column {{name}}",
+        "expandHiddenColumns": "Expand {{count}} hidden unconnected columns"
       }
     },
     "colorPicker": {
@@ -1027,6 +1045,10 @@
     },
     "export": {
       "button": "Download Excel",
+      "allButton": "Export All",
+      "allExporting": "Exporting all...",
+      "allDownloaded": "All dictionaries downloaded",
+      "allFailed": "Failed to download all dictionaries",
       "wordDownloaded": "Word dictionary downloaded",
       "wordFailed": "Failed to download word dictionary",
       "termDownloaded": "Term dictionary downloaded",

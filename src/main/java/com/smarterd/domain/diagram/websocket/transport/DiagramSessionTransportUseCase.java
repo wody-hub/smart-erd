@@ -48,7 +48,11 @@ public class DiagramSessionTransportUseCase {
      * @return 종료 후속 처리에 필요한 결과. room을 찾지 못하면 {@code null}
      */
     @Nullable
-    public DiagramSessionCloseResult close(WebSocketSession session, @Nullable Long diagramId, @Nullable String userId) {
+    public DiagramSessionCloseResult close(
+        WebSocketSession session,
+        @Nullable Long diagramId,
+        @Nullable String userId
+    ) {
         final var sessionId = session.getId();
         roomManager.cleanupRateLimit(sessionId);
 

@@ -1,7 +1,7 @@
 import type { CollaborationRuntimeEvent } from '../../core/collaboration-runtime-types.js';
 import type { DiagramCollaborationProviderBindingCallbacks } from './diagram-collaboration-provider-callbacks.js';
 import type { DiagramCollaborationStoreBridge } from './diagram-collaboration-store-bridge.js';
-import type { ConnectionStatus } from '../../../types/collaboration.js';
+import type { ConnectionIssueKind, ConnectionStatus } from '../../../types/collaboration.js';
 
 interface DiagramCollaborationProviderEventsOptions {
   storeBridge: DiagramCollaborationStoreBridge;
@@ -20,9 +20,7 @@ export class DiagramCollaborationProviderEvents {
 
   private wsConnectedAt: number | null = null;
 
-  constructor(
-    private readonly options: DiagramCollaborationProviderEventsOptions,
-  ) {}
+  constructor(private readonly options: DiagramCollaborationProviderEventsOptions) {}
 
   getConnectionStatus = (): ConnectionStatus => this.currentConnectionStatus;
 
@@ -47,6 +45,9 @@ export class DiagramCollaborationProviderEvents {
       onConnectionStatusChange: (status) => {
         this.currentConnectionStatus = status;
         this.options.storeBridge.setConnectionStatus(status);
+        if (status !== 'disconnected') {
+          this.options.storeBridge.setConnectionIssue(null);
+        }
         if (status === 'connecting' && this.wsConnectedAt !== null) {
           this.options.dispatchRuntimeEvent('reconnect-start');
         }
@@ -60,10 +61,15 @@ export class DiagramCollaborationProviderEvents {
             '%s ws-connected totalMs=%d afterTicketMs=%s',
             this.options.handoffLogPrefix,
             Math.round(this.wsConnectedAt - this.options.handoffStartedAt),
-            this.ticketRequestedAt === null ? 'n/a' : Math.round(this.wsConnectedAt - this.ticketRequestedAt),
+            this.ticketRequestedAt === null
+              ? 'n/a'
+              : Math.round(this.wsConnectedAt - this.ticketRequestedAt),
           );
           onConnected(this.wsConnectedAt);
         }
+      },
+      onConnectionIssueDetected: (issue: ConnectionIssueKind | null) => {
+        this.options.storeBridge.setConnectionIssue(issue);
       },
       onIdentityResolved: (userId) => {
         this.options.storeBridge.setSelfUserId(userId);

@@ -100,8 +100,14 @@ function getEdgePathByRoutingType(input: {
   targetDirection: number;
   autoRoutePoints?: Array<{ x: number; y: number }> | null;
 }): string {
-  const { routingType, waypoints, sourceDirection, targetDirection, autoRoutePoints, ...pathInput } =
-    input;
+  const {
+    routingType,
+    waypoints,
+    sourceDirection,
+    targetDirection,
+    autoRoutePoints,
+    ...pathInput
+  } = input;
   const adjustedPathInput = {
     ...pathInput,
     sourceX: pathInput.sourceX + sourceDirection * SOURCE_MARKER_OFFSET,
@@ -291,10 +297,12 @@ export default function ErdRelationEdge({
     childData,
   );
 
-  const resolvedSourcePosition =
-    (extractHandleSide(sourceHandleId ?? '') === 'left' ? 'left' : 'right') as Position;
-  const resolvedTargetPosition =
-    (extractHandleSide(targetHandleId ?? '') === 'left' ? 'left' : 'right') as Position;
+  const resolvedSourcePosition = (
+    extractHandleSide(sourceHandleId ?? '') === 'left' ? 'left' : 'right'
+  ) as Position;
+  const resolvedTargetPosition = (
+    extractHandleSide(targetHandleId ?? '') === 'left' ? 'left' : 'right'
+  ) as Position;
 
   const sourceDirection = resolvedSourcePosition === ('left' as Position) ? -1 : 1;
   const targetDirection = resolvedTargetPosition === ('left' as Position) ? -1 : 1;
@@ -316,7 +324,16 @@ export default function ErdRelationEdge({
             obstacleRects,
           )
         : null,
-    [obstacleRects, routingType, sourceDirection, sourceX, sourceY, targetDirection, targetX, targetY],
+    [
+      obstacleRects,
+      routingType,
+      sourceDirection,
+      sourceX,
+      sourceY,
+      targetDirection,
+      targetX,
+      targetY,
+    ],
   );
 
   const edgePath = getEdgePathByRoutingType({
@@ -367,11 +384,10 @@ export default function ErdRelationEdge({
           waypoints: displayWaypoints,
         })
       : [];
-  const lockBadgePoint =
-    routeSegments[Math.floor(routeSegments.length / 2)]?.center ?? {
-      x: (sourceX + targetX) / 2,
-      y: (sourceY + targetY) / 2,
-    };
+  const lockBadgePoint = routeSegments[Math.floor(routeSegments.length / 2)]?.center ?? {
+    x: (sourceX + targetX) / 2,
+    y: (sourceY + targetY) / 2,
+  };
   const isEditing = selected || localEdgeDrag?.edgeId === id;
   const showSegmentControls = routingType === 'straight' && isEditing;
 

@@ -139,12 +139,11 @@ export function buildPersistedDiagramSchemaHash(
           .sort((a, b) => a.name.localeCompare(b.name)),
       }))
       .sort((a, b) => a.name.localeCompare(b.name)),
-    relations: relations
-      .sort((a, b) =>
-        `${a.parentTable}.${a.parentColumn}->${a.childTable}.${a.childColumn}`.localeCompare(
-          `${b.parentTable}.${b.parentColumn}->${b.childTable}.${b.childColumn}`,
-        ),
+    relations: relations.sort((a, b) =>
+      `${a.parentTable}.${a.parentColumn}->${a.childTable}.${a.childColumn}`.localeCompare(
+        `${b.parentTable}.${b.parentColumn}->${b.childTable}.${b.childColumn}`,
       ),
+    ),
   };
 
   return djb2(JSON.stringify(sortObjectKeys(payload)));

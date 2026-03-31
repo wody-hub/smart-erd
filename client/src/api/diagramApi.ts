@@ -2,6 +2,7 @@ import axiosInstance from './axiosInstance';
 import { STORAGE_KEYS } from '@/constants/storage';
 import { downloadBlob } from '@/lib/download';
 import { getApiBaseUrl } from '@/lib/platform';
+import type { DocumentBootstrapPayload } from '@/collaboration/core/contracts/document-bootstrap';
 import type {
   DiagramSummary,
   DiagramDetail,
@@ -64,6 +65,25 @@ export async function fetchDiagram(
 }
 
 /**
+ * 다이어그램 collaboration bootstrap 메타를 조회한다.
+ *
+ * @param teamId 팀 ID
+ * @param projectId 프로젝트 ID
+ * @param diagramId 다이어그램 ID
+ * @returns bootstrap payload
+ */
+export async function fetchDiagramBootstrap(
+  teamId: string,
+  projectId: string,
+  diagramId: string,
+): Promise<DocumentBootstrapPayload> {
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/bootstrap`,
+  );
+  return res.data;
+}
+
+/**
  * 다이어그램을 생성한다.
  *
  * @param teamId    팀 ID
@@ -100,10 +120,14 @@ export async function saveDiagram(
   content: string,
   ydocSnapshot?: Uint8Array | null,
 ): Promise<SaveDiagramResult> {
-  const res = await axiosInstance.put(`/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`, {
-    content,
-    ydocSnapshot: ydocSnapshot && ydocSnapshot.length > 0 ? encodeBytesToBase64(ydocSnapshot) : undefined,
-  });
+  const res = await axiosInstance.put(
+    `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`,
+    {
+      content,
+      ydocSnapshot:
+        ydocSnapshot && ydocSnapshot.length > 0 ? encodeBytesToBase64(ydocSnapshot) : undefined,
+    },
+  );
   return res.data;
 }
 
@@ -122,11 +146,18 @@ export async function persistDiagramYdocSnapshot(
   diagramId: string,
   expectedContentRevision: string,
   ydocSnapshot: Uint8Array,
+  options?: {
+    persistOnlyIfMissing?: boolean;
+  },
 ): Promise<boolean> {
-  const response = await axiosInstance.post(`/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/ydoc-snapshot`, {
-    expectedContentRevision,
-    ydocSnapshot: encodeBytesToBase64(ydocSnapshot),
-  });
+  const response = await axiosInstance.post(
+    `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/ydoc-snapshot`,
+    {
+      expectedContentRevision,
+      ydocSnapshot: encodeBytesToBase64(ydocSnapshot),
+      persistOnlyIfMissing: options?.persistOnlyIfMissing === true,
+    },
+  );
   return Boolean(response.data?.persisted);
 }
 

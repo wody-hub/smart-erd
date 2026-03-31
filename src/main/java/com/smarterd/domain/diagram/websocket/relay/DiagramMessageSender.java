@@ -62,12 +62,8 @@ public class DiagramMessageSender {
      * @param payloadMap JSON 직렬화할 payload 객체
      * @throws Exception JSON 직렬화 또는 전송 중 오류가 발생한 경우
      */
-    public void broadcastJsonToRoom(
-        Long diagramId,
-        String senderSessionId,
-        byte messageType,
-        Map<String, ?> payloadMap
-    ) throws Exception {
+    public void broadcastJsonToRoom(Long diagramId, String senderSessionId, byte messageType, Map<String, ?> payloadMap)
+        throws Exception {
         final var payloadBytes = objectMapper.writeValueAsBytes(payloadMap);
         final var payload = wrapMessage(messageType, payloadBytes);
         broadcastToRoom(diagramId, senderSessionId, new BinaryMessage(Objects.requireNonNull(payload)));
@@ -110,11 +106,8 @@ public class DiagramMessageSender {
      * @return 전송한 body 총 바이트 수
      * @throws Exception 전송 중 오류가 발생한 경우
      */
-    public int sendWrappedMessagesToSession(
-        WebSocketSession session,
-        byte messageType,
-        Collection<byte[]> bodies
-    ) throws Exception {
+    public int sendWrappedMessagesToSession(WebSocketSession session, byte messageType, Collection<byte[]> bodies)
+        throws Exception {
         final var lock = roomManager.getSessionLock(session);
         var sentBytes = 0;
         synchronized (lock) {

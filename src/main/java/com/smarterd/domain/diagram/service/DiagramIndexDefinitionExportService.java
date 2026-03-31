@@ -41,15 +41,7 @@ public class DiagramIndexDefinitionExportService {
         "순서",
         "비고"
     );
-    private static final int[] COLUMN_WIDTHS = {
-        16 * 256,
-        16 * 256,
-        22 * 256,
-        34 * 256,
-        20 * 256,
-        8 * 256,
-        18 * 256
-    };
+    private static final int[] COLUMN_WIDTHS = { 16 * 256, 16 * 256, 22 * 256, 34 * 256, 20 * 256, 8 * 256, 18 * 256 };
 
     private final DiagramService diagramService;
     private final ObjectMapper objectMapper;
@@ -254,10 +246,7 @@ public class DiagramIndexDefinitionExportService {
             DiagramDefinitionWorkbookSupport.writeCell(row, 6, indexDefinitionRow.remark(), bodyStyle);
         }
 
-        return new ExcelData(
-            workbook,
-            AppStringUtils.defaultIfBlank(diagramName, "diagram") + "-index-definition"
-        );
+        return new ExcelData(workbook, AppStringUtils.defaultIfBlank(diagramName, "diagram") + "-index-definition");
     }
 
     /**

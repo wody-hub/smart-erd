@@ -128,9 +128,11 @@ public class InMemoryBulkValidationSessionStore implements BulkValidationSession
      * @return 소유자 정보가 모두 일치하면 {@code true}
      */
     private boolean matchesOwnership(ObjectNode payloadNode, String loginId, Long teamId, Long setId) {
-        return loginId.equals(payloadNode.path("loginId").asText()) &&
-        String.valueOf(teamId).equals(payloadNode.path("teamId").asText()) &&
-        String.valueOf(setId).equals(payloadNode.path("setId").asText());
+        return (
+            loginId.equals(payloadNode.path("loginId").asText()) &&
+            String.valueOf(teamId).equals(payloadNode.path("teamId").asText()) &&
+            String.valueOf(setId).equals(payloadNode.path("setId").asText())
+        );
     }
 
     /**

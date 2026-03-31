@@ -7,8 +7,4 @@ package com.smarterd.collaboration.channel;
  * @param userId                  사용자 ID
  * @param presenceProtocolVersion presence 프로토콜 버전
  */
-public record CollaborationTicketIssueResult(
-    String ticket,
-    String userId,
-    int presenceProtocolVersion
-) {}
+public record CollaborationTicketIssueResult(String ticket, String userId, int presenceProtocolVersion) {}

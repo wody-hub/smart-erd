@@ -1,4 +1,6 @@
-import * as Y from 'yjs';
+import type * as Y from 'yjs';
+import type { DocumentSnapshotCodec } from '@/collaboration/core/contracts/document-snapshot-codec';
+import type { YjsSharedDocumentEngine } from '@/collaboration/core/engines/yjs-shared-document-engine';
 import type { DiagramCollaborationBootstrap } from './diagram-collaboration-bootstrap.js';
 import type {
   CreateDiagramCollaborationProviderLifecycle,
@@ -8,6 +10,8 @@ import type { DiagramCollaborationProviderLike } from './diagram-collaboration-p
 
 interface DiagramCollaborationProviderSessionOptions {
   collaborationBootstrap: DiagramCollaborationBootstrap;
+  sharedDocumentEngine: YjsSharedDocumentEngine;
+  snapshotCodec: DocumentSnapshotCodec;
   diagramId: string;
   teamId: string | undefined;
   projectId: string | undefined;
@@ -15,6 +19,7 @@ interface DiagramCollaborationProviderSessionOptions {
   destroyYDoc: () => void;
   resetCollaboration: () => void;
   resetRuntimeState: () => void;
+  beforeDestroyYDoc?: (() => void) | null;
   createProviderLifecycle: CreateDiagramCollaborationProviderLifecycle;
   updatePreviewMode: (next: boolean) => void;
   onProviderReady: (provider: DiagramCollaborationProviderLike) => void;
@@ -31,12 +36,10 @@ export class DiagramCollaborationProviderSession {
 
   private hasCleanedUp = false;
 
-  constructor(
-    private readonly options: DiagramCollaborationProviderSessionOptions,
-  ) {}
+  constructor(private readonly options: DiagramCollaborationProviderSessionOptions) {}
 
   async setup(): Promise<void> {
-    const ydoc = new Y.Doc();
+    const ydoc = this.options.sharedDocumentEngine.getDocument();
     this.options.initYDoc(ydoc);
     try {
       if (this.isDisposed) {
@@ -46,6 +49,8 @@ export class DiagramCollaborationProviderSession {
 
       this.providerLifecycle = this.options.createProviderLifecycle({
         ydoc,
+        sharedDocumentEngine: this.options.sharedDocumentEngine,
+        snapshotCodec: this.options.snapshotCodec,
         diagramId: this.options.diagramId,
         teamId: this.options.teamId,
         projectId: this.options.projectId,
@@ -77,6 +82,7 @@ export class DiagramCollaborationProviderSession {
     this.hasCleanedUp = true;
     this.providerLifecycle?.dispose();
     this.providerLifecycle = null;
+    this.options.beforeDestroyYDoc?.();
     this.options.resetRuntimeState();
     this.options.destroyYDoc();
     this.options.resetCollaboration();

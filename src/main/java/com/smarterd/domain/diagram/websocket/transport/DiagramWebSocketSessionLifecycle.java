@@ -34,10 +34,32 @@ public class DiagramWebSocketSessionLifecycle {
      * @param info 정규화된 세션 메타데이터
      */
     public void establish(WebSocketSession session, DiagramWebSocketSessionInfo info) {
-        final var joinResult = diagramSessionTransportUseCase.join(session, info.diagramId(), info.userId(), info.userName());
+        final var joinResult = diagramSessionTransportUseCase.join(
+            session,
+            info.diagramId(),
+            info.userId(),
+            info.userName()
+        );
         if (!joinResult.accepted()) {
             try {
-                session.close(Objects.requireNonNull(CloseStatus.POLICY_VIOLATION));
+                final var rejectionReason = joinResult.rejectionReason();
+                final var closeCode =
+                    rejectionReason != null
+                        ? rejectionReason.closeCode()
+                        : CloseStatus.POLICY_VIOLATION.getCode();
+                final var closeReason =
+                    rejectionReason != null
+                        ? rejectionReason.closeReason()
+                        : "policy-violation";
+                log.warn(
+                    "WebSocket room join 거부 후 세션 종료 (session={}, diagramId={}, userId={}, code={}, reason={})",
+                    session.getId(),
+                    info.diagramId(),
+                    info.userId(),
+                    closeCode,
+                    closeReason
+                );
+                session.close(new CloseStatus(closeCode, closeReason));
             } catch (Exception e) {
                 log.warn("방 입장 거부 후 세션 종료 실패", e);
             }
@@ -84,5 +106,4 @@ public class DiagramWebSocketSessionLifecycle {
             );
         }
     }
-
 }

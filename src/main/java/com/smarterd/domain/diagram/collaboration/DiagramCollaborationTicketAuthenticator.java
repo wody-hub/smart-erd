@@ -34,14 +34,17 @@ public class DiagramCollaborationTicketAuthenticator implements CollaborationTic
      */
     @Override
     public Optional<CollaborationAuthenticatedSession> validateAndConsume(String ticket, int protocolVersion) {
-        return wsTicketService.validateAndConsume(ticket)
-            .map((session) -> new CollaborationAuthenticatedSession(
-                session.userId(),
-                session.loginId(),
-                session.userName(),
-                resourceKeyFactory.forDiagramId(session.diagramId()),
-                session.expiresAt(),
-                protocolVersion
-            ));
+        return wsTicketService
+            .validateAndConsume(ticket)
+            .map((session) ->
+                new CollaborationAuthenticatedSession(
+                    session.userId(),
+                    session.loginId(),
+                    session.userName(),
+                    resourceKeyFactory.forDiagramId(session.diagramId()),
+                    session.expiresAt(),
+                    protocolVersion
+                )
+            );
     }
 }

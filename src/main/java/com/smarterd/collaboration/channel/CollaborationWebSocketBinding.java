@@ -7,7 +7,6 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
  * 채널별 WebSocket handler / handshake interceptor 배선을 제공하는 support 포트.
  */
 public interface CollaborationWebSocketBinding {
-
     /**
      * 채널 WebSocket 핸들러 등록 패턴을 반환한다.
      *

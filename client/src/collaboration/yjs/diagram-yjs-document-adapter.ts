@@ -3,6 +3,8 @@ import type { DiagramCollaborationBootstrap } from '@/collaboration/channel/diag
 import { migrateJsonToYDoc } from '@/collaboration/yjsBridge';
 import type { YjsDocumentAdapter } from './yjs-document-adapter.js';
 
+export const DIAGRAM_BOOTSTRAP_TRANSACTION_ORIGIN = 'bootstrap';
+
 /**
  * 다이어그램 bootstrap/Y.Doc 변환 어댑터.
  */
@@ -10,11 +12,15 @@ export class DiagramYjsDocumentAdapter implements YjsDocumentAdapter<DiagramColl
   /**
    * {@inheritDoc}
    */
-  applyBootstrapToDoc(doc: Y.Doc, bootstrap: DiagramCollaborationBootstrap): void {
+  applyBootstrapToDoc(
+    doc: Y.Doc,
+    bootstrap: DiagramCollaborationBootstrap,
+    origin: unknown,
+  ): void {
     if (!bootstrap.content) {
       return;
     }
-    migrateJsonToYDoc(doc, bootstrap.content);
+    migrateJsonToYDoc(doc, bootstrap.content, origin);
   }
 
   /**

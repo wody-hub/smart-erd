@@ -42,8 +42,9 @@ class ValidateDiagramCollaborationHandshakeUseCaseTest {
 
         when(diagramCollaborationResourceKeyFactory.fromWebSocketPath("/ws/diagram/42")).thenReturn(resourceKey);
         when(diagramCollaborationResourceKeyFactory.parseDiagramId(resourceKey)).thenReturn(42L);
-        when(validateCollaborationTicketUseCase.validateAndConsume("ticket-1", resourceKey, 2))
-            .thenReturn(Optional.of(session));
+        when(validateCollaborationTicketUseCase.validateAndConsume("ticket-1", resourceKey, 2)).thenReturn(
+            Optional.of(session)
+        );
 
         final var actual = useCase.validate("/ws/diagram/42", "ticket-1", 2);
 
@@ -58,8 +59,9 @@ class ValidateDiagramCollaborationHandshakeUseCaseTest {
             diagramCollaborationResourceKeyFactory
         );
 
-        when(diagramCollaborationResourceKeyFactory.fromWebSocketPath("/ws/unknown/42"))
-            .thenThrow(new IllegalArgumentException("bad path"));
+        when(diagramCollaborationResourceKeyFactory.fromWebSocketPath("/ws/unknown/42")).thenThrow(
+            new IllegalArgumentException("bad path")
+        );
 
         assertThat(useCase.validate("/ws/unknown/42", "ticket-1", 1)).isEmpty();
     }

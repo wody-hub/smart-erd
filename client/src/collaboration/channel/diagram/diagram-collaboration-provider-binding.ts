@@ -5,15 +5,14 @@ import { YjsProvider } from '@/collaboration/YjsProvider';
  * 다이어그램 채널의 provider -> store 이벤트 배선을 캡슐화한다.
  */
 export class DiagramCollaborationProviderBinding {
-  constructor(
-    private readonly callbacks: DiagramCollaborationProviderBindingCallbacks,
-  ) {}
+  constructor(private readonly callbacks: DiagramCollaborationProviderBindingCallbacks) {}
 
   /**
    * provider 이벤트를 store 콜백에 연결한다.
    */
   bind(provider: YjsProvider): void {
     provider.onConnectionStatusChange = this.callbacks.onConnectionStatusChange;
+    provider.onConnectionIssueDetected = this.callbacks.onConnectionIssueDetected;
     provider.onIdentityResolved = this.callbacks.onIdentityResolved;
     provider.onPresenceModeChange = this.callbacks.onPresenceModeChange;
     provider.onPresenceSnapshot = this.callbacks.onPresenceSnapshot;
@@ -31,6 +30,7 @@ export class DiagramCollaborationProviderBinding {
       return;
     }
     provider.onConnectionStatusChange = null;
+    provider.onConnectionIssueDetected = null;
     provider.onIdentityResolved = null;
     provider.onPresenceModeChange = null;
     provider.onPresenceSnapshot = null;

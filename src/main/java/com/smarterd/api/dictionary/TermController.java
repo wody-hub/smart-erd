@@ -121,7 +121,8 @@ public class TermController {
             name = "q"
         ) String keyword
     ) {
-        final var resultPage = termService.getTerms(jwt.getSubject(), teamId, setId, page, size, keyword)
+        final var resultPage = termService
+            .getTerms(jwt.getSubject(), teamId, setId, page, size, keyword)
             .map(this::toTermResponse);
         return ResponseEntity.ok(PageResponse.from(resultPage));
     }

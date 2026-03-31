@@ -70,7 +70,7 @@ public class DiagramColumnDefinitionExportService {
         12 * 256,
         12 * 256,
         14 * 256,
-        16 * 256
+        16 * 256,
     };
     private static final String HANDLE_SUFFIX_PATTERN = "-(?:source|target)(?:-(?:left|right))?$";
 
@@ -165,15 +165,7 @@ public class DiagramColumnDefinitionExportService {
                     }
                 }
 
-                tablesByNodeId.put(
-                    nodeId,
-                    new TableSnapshot(
-                        nodeId,
-                        physicalTableName,
-                        logicalTableName,
-                        columns
-                    )
-                );
+                tablesByNodeId.put(nodeId, new TableSnapshot(nodeId, physicalTableName, logicalTableName, columns));
             }
 
             final var fkInfoByColumnKey = buildFkInfoByColumnKey(rootNode.path("edges"), tablesByNodeId);
@@ -222,10 +214,7 @@ public class DiagramColumnDefinitionExportService {
      * @param tablesByNodeId 테이블 스냅샷 맵
      * @return 컬럼 키 -> FK 정보
      */
-    private Map<String, String> buildFkInfoByColumnKey(
-        JsonNode edgesNode,
-        Map<String, TableSnapshot> tablesByNodeId
-    ) {
+    private Map<String, String> buildFkInfoByColumnKey(JsonNode edgesNode, Map<String, TableSnapshot> tablesByNodeId) {
         final Map<String, String> fkInfoByColumnKey = new LinkedHashMap<>();
         if (!(edgesNode instanceof ArrayNode edgesArray)) {
             return fkInfoByColumnKey;
@@ -300,16 +289,23 @@ public class DiagramColumnDefinitionExportService {
             DiagramDefinitionWorkbookSupport.writeCell(row, 11, columnDefinitionRow.akInfo(), bodyStyle);
             DiagramDefinitionWorkbookSupport.writeCell(row, 12, columnDefinitionRow.fkInfo(), bodyStyle);
             DiagramDefinitionWorkbookSupport.writeCell(row, 13, columnDefinitionRow.constraintInfo(), bodyStyle);
-            DiagramDefinitionWorkbookSupport.writeCell(row, 14, columnDefinitionRow.personalInfoFlag(), centeredBodyStyle);
+            DiagramDefinitionWorkbookSupport.writeCell(
+                row,
+                14,
+                columnDefinitionRow.personalInfoFlag(),
+                centeredBodyStyle
+            );
             DiagramDefinitionWorkbookSupport.writeCell(row, 15, columnDefinitionRow.encryptedFlag(), centeredBodyStyle);
-            DiagramDefinitionWorkbookSupport.writeCell(row, 16, columnDefinitionRow.visibilityFlag(), centeredBodyStyle);
+            DiagramDefinitionWorkbookSupport.writeCell(
+                row,
+                16,
+                columnDefinitionRow.visibilityFlag(),
+                centeredBodyStyle
+            );
             DiagramDefinitionWorkbookSupport.writeCell(row, 17, columnDefinitionRow.remark(), bodyStyle);
         }
 
-        return new ExcelData(
-            workbook,
-            AppStringUtils.defaultIfBlank(diagramName, "diagram") + "-column-definition"
-        );
+        return new ExcelData(workbook, AppStringUtils.defaultIfBlank(diagramName, "diagram") + "-column-definition");
     }
 
     private String extractColumnId(String handleId, String nodeId) {
@@ -371,8 +367,9 @@ public class DiagramColumnDefinitionExportService {
         List<ColumnSnapshot> columns
     ) {
         private ColumnSnapshot findColumn(String columnId) {
-            return columns.stream()
-                .filter(column -> column.columnId().equals(columnId))
+            return columns
+                .stream()
+                .filter((column) -> column.columnId().equals(columnId))
                 .findFirst()
                 .orElse(null);
         }

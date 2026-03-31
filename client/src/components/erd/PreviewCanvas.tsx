@@ -23,6 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import ExportProgressDialog from './ExportProgressDialog';
 import type { DslPreviewCanvasState, DslPreviewNode } from '@/lib/dsl-preview-graph';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
@@ -30,6 +31,7 @@ import type { CodeEditorTableFocusRequest } from '@/lib/code-editor-table-naviga
 import { serializeDiagramDefinitionExportContent } from '@/lib/diagram-definition-export';
 import { findPreviewTableNodeForFocus } from '@/lib/diagram-table-focus';
 import { useExportDiagram } from '@/hooks/useExportDiagram';
+import { useDiagramPreviewPositionActions } from '@/collaboration/channel/diagram/use-diagram-preview-position-actions';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { ERDEdge, TableNode } from '@/types/erd';
 import ErdRelationEdge from './ErdRelationEdge';
@@ -39,6 +41,11 @@ import {
   TABLE_HEADER_ZOOM_CHANGE_EPSILON,
   TABLE_HEADER_ZOOM_COMPENSATION_DELAY_MS,
 } from './tableHeaderZoom';
+import { ConnectedColumnIdsProvider } from './ConnectedColumnIdsContext';
+import {
+  CompactTableRenderingProvider,
+  resolveCompactTableRenderingMode,
+} from './CompactTableRenderingContext';
 
 /** preview 캔버스에서 MiniMap을 숨길 노드 수 임계치 */
 const PREVIEW_MINIMAP_NODE_LIMIT = 80;
@@ -54,10 +61,7 @@ const previewEdgeTypes: EdgeTypes = {
  * @param key 번역 키
  * @returns 문자열 메시지
  */
-function translatePreviewMessage(
-  t: TFunction,
-  key: string,
-): string {
+function translatePreviewMessage(t: TFunction, key: string): string {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return String(t(key as any));
 }
@@ -120,6 +124,8 @@ interface PreviewCanvasProps {
   positionOverrides: DiagramPreviewPositionRecord;
   /** code 모드 로컬 preview 위치 override 변경 핸들러 */
   onPositionOverridesChange: (next: DiagramPreviewPositionRecord) => void;
+  /** preview 위치 편집 가능 여부 */
+  canEdit?: boolean;
   /** 사전 관리 진입 허용 여부 */
   canOpenDictionary: boolean;
   /** 사전 관리 열기 핸들러 */
@@ -145,6 +151,8 @@ interface PreviewCanvasToolbarProps {
   onResetLayout: () => void;
   /** preview 그래프가 있는지 여부 */
   hasGraph: boolean;
+  /** preview 편집 가능 여부 */
+  canEdit: boolean;
   /** 사전 관리 진입 허용 여부 */
   canOpenDictionary: boolean;
   /** 사전 관리 열기 핸들러 */
@@ -180,6 +188,7 @@ function PreviewCanvasToolbar({
   diagramName,
   onResetLayout,
   hasGraph,
+  canEdit,
   canOpenDictionary,
   onOpenDictionary,
   onExportTableDefinition,
@@ -190,7 +199,8 @@ function PreviewCanvasToolbar({
   indexDefinitionExporting = false,
 }: PreviewCanvasToolbarProps) {
   const { t } = useTranslation();
-  const { exportPng, exportJpg, exportSvg, exportPdf, exportProgress } = useExportDiagram(diagramName);
+  const { exportPng, exportJpg, exportSvg, exportPdf, exportProgress } =
+    useExportDiagram(diagramName);
   const isExportBusy =
     exportProgress.isExporting ||
     tableDefinitionExporting ||
@@ -207,7 +217,7 @@ function PreviewCanvasToolbar({
             onClick={onResetLayout}
             className="gap-1.5"
             aria-label={t('erd.toolbar.autoLayout')}
-            disabled={!hasGraph}
+            disabled={!hasGraph || !canEdit}
           >
             <LayoutGrid className="h-4 w-4" />
             {t('erd.toolbar.autoLayout')}
@@ -242,17 +252,26 @@ function PreviewCanvasToolbar({
                 <>
                   <DropdownMenuSeparator />
                   {onExportTableDefinition && (
-                    <DropdownMenuItem onClick={onExportTableDefinition} disabled={isExportBusy || !hasGraph}>
+                    <DropdownMenuItem
+                      onClick={onExportTableDefinition}
+                      disabled={isExportBusy || !hasGraph}
+                    >
                       {t('erd.toolbar.tableDefinitionExport')}
                     </DropdownMenuItem>
                   )}
                   {onExportColumnDefinition && (
-                    <DropdownMenuItem onClick={onExportColumnDefinition} disabled={isExportBusy || !hasGraph}>
+                    <DropdownMenuItem
+                      onClick={onExportColumnDefinition}
+                      disabled={isExportBusy || !hasGraph}
+                    >
                       {t('erd.toolbar.columnDefinitionExport')}
                     </DropdownMenuItem>
                   )}
                   {onExportIndexDefinition && (
-                    <DropdownMenuItem onClick={onExportIndexDefinition} disabled={isExportBusy || !hasGraph}>
+                    <DropdownMenuItem
+                      onClick={onExportIndexDefinition}
+                      disabled={isExportBusy || !hasGraph}
+                    >
                       {t('erd.toolbar.indexDefinitionExport')}
                     </DropdownMenuItem>
                   )}
@@ -312,7 +331,7 @@ function buildPreviewFallbackNodes(nodes: readonly TableNode[]): DslPreviewNode[
     .map((node) => ({
       ...node,
       type: 'previewTable',
-      height: node.height ?? (52 + node.data.columns.length * 30),
+      height: node.height ?? 52 + node.data.columns.length * 30,
     }));
 }
 
@@ -333,6 +352,7 @@ export default function PreviewCanvas({
   tableFocusRequest,
   positionOverrides,
   onPositionOverridesChange,
+  canEdit = true,
   canOpenDictionary,
   onOpenDictionary,
   onExportTableDefinition,
@@ -343,6 +363,7 @@ export default function PreviewCanvas({
   indexDefinitionExporting = false,
 }: PreviewCanvasProps) {
   const { t } = useTranslation();
+  const previewPositionActions = useDiagramPreviewPositionActions();
   const { persistedNodes, persistedEdges } = useCanvasStore(
     useShallow((state) => ({
       persistedNodes: state.nodes as TableNode[],
@@ -373,6 +394,16 @@ export default function PreviewCanvas({
     isUsingPersistedFallback,
   );
   const [displayNodes, setDisplayNodes] = useState<DslPreviewNode[]>([]);
+  const lastViewportZoomRef = useRef(0.4);
+  const [compactTableRenderingMode, setCompactTableRenderingMode] = useState(() =>
+    resolveCompactTableRenderingMode(displayNodes.length, lastViewportZoomRef.current),
+  );
+
+  useEffect(() => {
+    setCompactTableRenderingMode(
+      resolveCompactTableRenderingMode(displayNodes.length, lastViewportZoomRef.current),
+    );
+  }, [displayNodes.length]);
   const displayNodesRef = useRef<DslPreviewNode[]>([]);
   const positionOverridesRef = useRef<DiagramPreviewPositionRecord>(positionOverrides);
   const reactFlowInstanceRef = useRef<ReactFlowInstance<DslPreviewNode, ERDEdge> | null>(null);
@@ -509,21 +540,23 @@ export default function PreviewCanvas({
    * @param node 드래그가 끝난 preview 노드
    * @returns 없음
    */
-  const commitPreviewNodePosition = useCallback((node: DslPreviewNode) => {
-    const canvasState = useCanvasStore.getState();
-    const nextOverrides = { ...positionOverridesRef.current };
-    const syncedPreviewNodeIds = canvasState.applyPreviewPositionChangesToPersisted(
-      [node],
-      { [node.id]: node.position },
-    );
-    if (syncedPreviewNodeIds.length > 0) {
-      delete nextOverrides[node.id];
-    } else {
-      nextOverrides[node.id] = node.position;
-    }
-    positionOverridesRef.current = nextOverrides;
-    onPositionOverridesChange(nextOverrides);
-  }, [onPositionOverridesChange]);
+  const commitPreviewNodePosition = useCallback(
+    (node: DslPreviewNode) => {
+      const nextOverrides = { ...positionOverridesRef.current };
+      const syncedToPersisted = previewPositionActions.syncMatchedPreviewNodePosition(
+        node,
+        persistedNodes,
+      );
+      if (syncedToPersisted) {
+        delete nextOverrides[node.id];
+      } else {
+        nextOverrides[node.id] = node.position;
+      }
+      positionOverridesRef.current = nextOverrides;
+      onPositionOverridesChange(nextOverrides);
+    },
+    [onPositionOverridesChange, persistedNodes, previewPositionActions],
+  );
 
   /**
    * preview 노드 위치 변경을 화면 상태에 반영한다.
@@ -531,22 +564,25 @@ export default function PreviewCanvas({
    * @param changes React Flow 노드 변경 목록
    * @returns 없음
    */
-  const handleNodesChange = useCallback((changes: NodeChange<DslPreviewNode>[]) => {
-    const nextNodes = applyNodeChanges(changes, displayNodesRef.current);
-    displayNodesRef.current = nextNodes;
-    setDisplayNodes(nextNodes);
+  const handleNodesChange = useCallback(
+    (changes: NodeChange<DslPreviewNode>[]) => {
+      const nextNodes = applyNodeChanges(changes, displayNodesRef.current);
+      displayNodesRef.current = nextNodes;
+      setDisplayNodes(nextNodes);
 
-    for (const change of changes) {
-      if (change.type !== 'position' || change.dragging !== false) {
-        continue;
+      for (const change of changes) {
+        if (change.type !== 'position' || change.dragging !== false) {
+          continue;
+        }
+        const committedNode = nextNodes.find((candidate) => candidate.id === change.id);
+        if (!committedNode) {
+          continue;
+        }
+        commitPreviewNodePosition(committedNode);
       }
-      const committedNode = nextNodes.find((candidate) => candidate.id === change.id);
-      if (!committedNode) {
-        continue;
-      }
-      commitPreviewNodePosition(committedNode);
-    }
-  }, [commitPreviewNodePosition]);
+    },
+    [commitPreviewNodePosition],
+  );
 
   /**
    * 사용자가 조정한 로컬 preview 위치를 기본 배치로 되돌린다.
@@ -620,73 +656,86 @@ export default function PreviewCanvas({
 
   return (
     <div ref={canvasRef} className="h-full w-full bg-background relative">
-        <PreviewCanvasToolbar
-          diagramName={diagramName}
-          onResetLayout={handleResetLayout}
-          hasGraph={hasGraph}
-          canOpenDictionary={canOpenDictionary}
-          onOpenDictionary={onOpenDictionary}
-          onExportTableDefinition={handleExportTableDefinition}
-          onExportColumnDefinition={handleExportColumnDefinition}
-          onExportIndexDefinition={handleExportIndexDefinition}
-          tableDefinitionExporting={tableDefinitionExporting}
-          columnDefinitionExporting={columnDefinitionExporting}
-          indexDefinitionExporting={indexDefinitionExporting}
-        />
+      <PreviewCanvasToolbar
+        diagramName={diagramName}
+        onResetLayout={handleResetLayout}
+        hasGraph={hasGraph}
+        canEdit={canEdit}
+        canOpenDictionary={canOpenDictionary}
+        onOpenDictionary={onOpenDictionary}
+        onExportTableDefinition={handleExportTableDefinition}
+        onExportColumnDefinition={handleExportColumnDefinition}
+        onExportIndexDefinition={handleExportIndexDefinition}
+        tableDefinitionExporting={tableDefinitionExporting}
+        columnDefinitionExporting={columnDefinitionExporting}
+        indexDefinitionExporting={indexDefinitionExporting}
+      />
 
       {hasGraph ? (
-        <ReactFlow
-          nodes={displayNodes}
-          edges={effectiveGraph!.edges}
-          onInit={(instance) => {
-            reactFlowInstanceRef.current = instance;
-            applyZoomTextCompensation(instance.getZoom());
-          }}
-          onMoveEnd={(_event, viewport) => {
-            const autoFitMovePending = autoFitViewportMovePendingRef.current;
-            autoFitViewportMovePendingRef.current = false;
-            if (!autoFitMovePending) {
-              manualViewportInteractionRef.current = true;
-            }
-            const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
-            if (
-              lastAppliedZoom != null &&
-              Math.abs(viewport.zoom - lastAppliedZoom) <= TABLE_HEADER_ZOOM_CHANGE_EPSILON
-            ) {
-              return;
-            }
-            scheduleZoomTextCompensation(viewport.zoom);
-          }}
-          onNodesChange={handleNodesChange}
-          nodeTypes={previewCanvasNodeTypes}
-          edgeTypes={previewEdgeTypes}
-          deleteKeyCode={null}
-          panActivationKeyCode={null}
-          nodesDraggable
-          nodesConnectable={false}
-          elementsSelectable={false}
-          nodesFocusable={false}
-          edgesFocusable={false}
-          panOnDrag
-          zoomOnScroll
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
-          minZoom={0.2}
-          maxZoom={1.5}
-          proOptions={{ hideAttribution: true }}
-          className="bg-background"
-        >
-          <Background
-            variant={BackgroundVariant.Dots}
-            gap={16}
-            size={1}
-            color="hsl(var(--muted-foreground) / 0.18)"
-          />
-          <Controls showInteractive={false} />
-          {displayNodes.length <= PREVIEW_MINIMAP_NODE_LIMIT && (
-            <MiniMap pannable zoomable />
-          )}
-        </ReactFlow>
+        <TooltipProvider delayDuration={300}>
+          <CompactTableRenderingProvider mode={compactTableRenderingMode}>
+          <ConnectedColumnIdsProvider edges={effectiveGraph!.edges}>
+            <ReactFlow
+              nodes={displayNodes}
+              edges={effectiveGraph!.edges}
+              onInit={(instance) => {
+                reactFlowInstanceRef.current = instance;
+                lastViewportZoomRef.current = instance.getZoom();
+                setCompactTableRenderingMode(
+                  resolveCompactTableRenderingMode(displayNodes.length, lastViewportZoomRef.current),
+                );
+                applyZoomTextCompensation(instance.getZoom());
+              }}
+              onMoveEnd={(_event, viewport) => {
+                lastViewportZoomRef.current = viewport.zoom;
+                setCompactTableRenderingMode(
+                  resolveCompactTableRenderingMode(displayNodes.length, viewport.zoom),
+                );
+                const autoFitMovePending = autoFitViewportMovePendingRef.current;
+                autoFitViewportMovePendingRef.current = false;
+                if (!autoFitMovePending) {
+                  manualViewportInteractionRef.current = true;
+                }
+                const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
+                if (
+                  lastAppliedZoom != null &&
+                  Math.abs(viewport.zoom - lastAppliedZoom) <= TABLE_HEADER_ZOOM_CHANGE_EPSILON
+                ) {
+                  return;
+                }
+                scheduleZoomTextCompensation(viewport.zoom);
+              }}
+              onNodesChange={handleNodesChange}
+              nodeTypes={previewCanvasNodeTypes}
+              edgeTypes={previewEdgeTypes}
+              deleteKeyCode={null}
+              panActivationKeyCode={null}
+              nodesDraggable={canEdit}
+              nodesConnectable={false}
+              elementsSelectable={false}
+              nodesFocusable={false}
+              edgesFocusable={false}
+              panOnDrag
+              zoomOnScroll
+              fitView
+              fitViewOptions={{ padding: 0.2 }}
+              minZoom={0.2}
+              maxZoom={1.5}
+              proOptions={{ hideAttribution: true }}
+              className="bg-background"
+            >
+              <Background
+                variant={BackgroundVariant.Dots}
+                gap={16}
+                size={1}
+                color="hsl(var(--muted-foreground) / 0.18)"
+              />
+              <Controls showInteractive={false} />
+              {displayNodes.length <= PREVIEW_MINIMAP_NODE_LIMIT && <MiniMap pannable zoomable />}
+            </ReactFlow>
+          </ConnectedColumnIdsProvider>
+          </CompactTableRenderingProvider>
+        </TooltipProvider>
       ) : (
         <div className="h-full w-full bg-background" />
       )}

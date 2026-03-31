@@ -9,6 +9,5 @@ import io.swagger.v3.oas.annotations.media.Schema;
  */
 @Schema(description = "Y.Doc 스냅샷 영속 결과")
 public record PersistYdocSnapshotResponse(
-    @Schema(description = "persisted snapshot 저장 성공 여부")
-    boolean persisted
+    @Schema(description = "persisted snapshot 저장 성공 여부") boolean persisted
 ) {}

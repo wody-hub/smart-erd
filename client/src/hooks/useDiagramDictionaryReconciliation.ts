@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react';
+import type { PreviewSyncStatus } from '@/collaboration/core/collaboration-preview-sync-status';
+import { useDiagramDictionaryReconciliationActions } from '@/collaboration/channel/diagram/use-diagram-dictionary-reconciliation-actions';
+import { useDiagramErdNodesSnapshot } from '@/collaboration/channel/diagram/use-diagram-erd-read-snapshot';
 import { useErdDictionary } from '@/components/erd/ErdDictionaryContext';
-import { getTablesMap } from '@/collaboration/yjsBridge';
 import { buildDiagramDictionaryReconciliationPlan } from '@/lib/diagram-dictionary-reconciliation';
-import useCanvasStore from '@/stores/erd/useCanvasStore';
 
 interface UseDiagramDictionaryReconciliationParams {
   diagramId: string;
+  isPreviewMode: boolean;
+  previewSyncStatus: PreviewSyncStatus;
 }
 
 /**
@@ -19,6 +22,8 @@ interface UseDiagramDictionaryReconciliationParams {
  */
 export function useDiagramDictionaryReconciliation({
   diagramId,
+  isPreviewMode,
+  previewSyncStatus,
 }: UseDiagramDictionaryReconciliationParams): void {
   const {
     setId,
@@ -28,26 +33,23 @@ export function useDiagramDictionaryReconciliation({
     findDomainById,
     resolveLogicalName,
   } = useErdDictionary();
-  const nodes = useCanvasStore((state) => state.nodes);
-  const ydoc = useCanvasStore((state) => state.ydoc);
-  const applyDictionaryReconciliation = useCanvasStore(
-    (state) => state.applyDictionaryReconciliation,
-  );
+  const diagramErdNodesSnapshot = useDiagramErdNodesSnapshot();
+  const dictionaryReconciliationActions = useDiagramDictionaryReconciliationActions();
   const appliedRevisionRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (
-      !ydoc ||
       !setId ||
       !isDictionaryReady ||
-      nodes.length === 0 ||
-      getTablesMap(ydoc).size === 0
+      isPreviewMode ||
+      previewSyncStatus === 'syncing' ||
+      diagramErdNodesSnapshot.currentNodes.length === 0
     ) {
       return;
     }
 
     const revisionKey = `${diagramId}:${dictionaryRevision}`;
-    const plan = buildDiagramDictionaryReconciliationPlan(nodes, {
+    const plan = buildDiagramDictionaryReconciliationPlan(diagramErdNodesSnapshot.currentNodes, {
       findTermById,
       findDomainById,
       resolveLogicalName,
@@ -62,18 +64,25 @@ export function useDiagramDictionaryReconciliation({
       return;
     }
 
-    applyDictionaryReconciliation(plan);
-    appliedRevisionRef.current = revisionKey;
+    const result = dictionaryReconciliationActions.reconcile(plan, {
+      origin: {
+        source: 'system',
+      },
+    });
+    if (result === 'applied') {
+      appliedRevisionRef.current = revisionKey;
+    }
   }, [
-    applyDictionaryReconciliation,
+    dictionaryReconciliationActions,
     dictionaryRevision,
+    diagramErdNodesSnapshot.currentNodes,
     diagramId,
     findDomainById,
     findTermById,
+    isPreviewMode,
     isDictionaryReady,
-    nodes,
+    previewSyncStatus,
     resolveLogicalName,
     setId,
-    ydoc,
   ]);
 }

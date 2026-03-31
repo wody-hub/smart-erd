@@ -9,6 +9,5 @@ import org.springframework.lang.NonNull;
  * <p>legacy client peer-left 호환 제거 시 함께 삭제한다.</p>
  */
 public interface DiagramLegacyPresencePort {
-
     void broadcastPeerLeftLegacy(@NonNull Long diagramId, @NonNull DiagramSessionRef senderSessionRef, String loginId);
 }

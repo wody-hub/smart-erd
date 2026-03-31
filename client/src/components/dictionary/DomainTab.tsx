@@ -317,9 +317,7 @@ export default function DomainTab({ canEdit = true, setId }: DomainTabProps) {
                   }
                   tabIndex={canEdit ? 0 : undefined}
                 >
-                  <TableCell className="whitespace-nowrap">
-                    {domain.domainGroup ?? ''}
-                  </TableCell>
+                  <TableCell className="whitespace-nowrap">{domain.domainGroup ?? ''}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {domain.domainClassification ?? ''}
                   </TableCell>

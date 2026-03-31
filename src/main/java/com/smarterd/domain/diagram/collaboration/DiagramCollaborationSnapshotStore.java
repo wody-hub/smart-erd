@@ -46,7 +46,8 @@ public class DiagramCollaborationSnapshotStore implements CollaborationSnapshotS
         return snapshotService.replaceSnapshotWithClientState(
             resourceKeyFactory.parseDiagramId(resourceKey),
             command.expectedContentRevision(),
-            command.fullStateUpdate()
+            command.fullStateUpdate(),
+            command.persistOnlyIfMissing()
         );
     }
 }

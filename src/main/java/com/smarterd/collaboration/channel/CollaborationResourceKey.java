@@ -9,8 +9,4 @@ package com.smarterd.collaboration.channel;
  * @param channelType 협업 채널 타입
  * @param resourceId  채널 내부 리소스 식별자
  */
-public record CollaborationResourceKey(
-    String channelType,
-    String resourceId
-) {
-}
+public record CollaborationResourceKey(String channelType, String resourceId) {}

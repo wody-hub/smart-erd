@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { useErdDictionary } from '@/components/erd/ErdDictionaryContext';
 import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
+import type { Domain } from '@/types/dictionary';
+import type { Column } from '@/types/erd';
 
 /** 컬럼 유효성 검사 상태 */
 export type ValidationStatus =
@@ -73,28 +75,136 @@ export interface ColumnWarning {
   actualType?: string;
 }
 
+export interface ColumnRenderMeta {
+  normalizedLogicalName: string;
+  hasDuplicateLogicalName: boolean;
+  warning: ColumnWarning;
+  domain: Domain | undefined;
+}
+
+export function countDuplicateLogicalNameColumns(columns: Column[]): number {
+  const counts = new Map<string, number>();
+  for (const column of columns) {
+    const key = column.logicalName?.trim();
+    if (!key) {
+      continue;
+    }
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  let duplicateLogicalNameColumnCount = 0;
+  for (const column of columns) {
+    const normalizedLogicalName = column.logicalName?.trim();
+    if (!normalizedLogicalName) {
+      continue;
+    }
+    if ((counts.get(normalizedLogicalName) ?? 0) > 1) {
+      duplicateLogicalNameColumnCount += 1;
+    }
+  }
+
+  return duplicateLogicalNameColumnCount;
+}
+
+export function buildColumnRenderMeta(
+  columns: Column[],
+  options: {
+    resolveLogicalName: (logicalName: string) => LogicalNameResolution;
+    findTermById: (id: number) => { physicalName: string; domainId: number | null } | undefined;
+    findDomainById: (id: number) => Domain | undefined;
+  },
+  metaColumns: Column[] = columns,
+): {
+  renderMetaById: Map<string, ColumnRenderMeta>;
+  duplicateLogicalNameColumnCount: number;
+} {
+  const counts = new Map<string, number>();
+  for (const column of columns) {
+    const key = column.logicalName?.trim();
+    if (!key) {
+      continue;
+    }
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  const duplicatedLogicalNames = new Set(
+    Array.from(counts.entries())
+      .filter(([, count]) => count > 1)
+      .map(([logicalName]) => logicalName),
+  );
+
+  const resolutionCache = new Map<string, LogicalNameResolution | null>();
+  const domainCache = new Map<number, Domain | undefined>();
+  const renderMetaById = new Map<string, ColumnRenderMeta>();
+  let duplicateLogicalNameColumnCount = 0;
+
+  for (const column of metaColumns) {
+    const normalizedLogicalName = column.logicalName?.trim() ?? '';
+    const hasDuplicateLogicalName =
+      normalizedLogicalName.length > 0 && duplicatedLogicalNames.has(normalizedLogicalName);
+
+    if (hasDuplicateLogicalName) {
+      duplicateLogicalNameColumnCount += 1;
+    }
+
+    let resolved: LogicalNameResolution | null = null;
+    if (normalizedLogicalName.length > 0) {
+      if (!resolutionCache.has(normalizedLogicalName)) {
+        resolutionCache.set(
+          normalizedLogicalName,
+          options.resolveLogicalName(normalizedLogicalName),
+        );
+      }
+      resolved = resolutionCache.get(normalizedLogicalName) ?? null;
+    }
+
+    const resolvedDomainId = column.domainId ?? resolved?.domainId ?? null;
+    let domain: Domain | undefined;
+    if (resolvedDomainId != null) {
+      if (!domainCache.has(resolvedDomainId)) {
+        domainCache.set(resolvedDomainId, options.findDomainById(resolvedDomainId));
+      }
+      domain = domainCache.get(resolvedDomainId);
+    }
+
+    renderMetaById.set(column.id, {
+      normalizedLogicalName,
+      hasDuplicateLogicalName,
+      warning: getColumnWarningFromResolution(
+        column,
+        resolved,
+        options.findTermById,
+        options.findDomainById,
+      ),
+      domain,
+    });
+  }
+
+  return { renderMetaById, duplicateLogicalNameColumnCount };
+}
+
 /**
- * 개별 컬럼의 사전 유효성 경고를 계산하는 순수 함수.
+ * 미리 계산된 논리명 해석 결과를 기반으로 컬럼 경고를 계산한다.
  *
- * TableNode(인라인 경고)와 useColumnValidation(패널 집계) 양쪽에서 공통으로 사용한다.
+ * TableNode처럼 같은 렌더 경로에서 logical name resolution을 재사용해야 하는 경우에 쓴다.
  *
  * @param col        컬럼 데이터
+ * @param resolved   미리 계산한 논리명 해석 결과
  * @param findTerm   Term 조회 함수
  * @param findDomain Domain 조회 함수
  * @returns 경고 결과 (status가 null이면 문제 없음)
  */
-export function getColumnWarning(
+export function getColumnWarningFromResolution(
   col: { logicalName?: string; name: string; type: string; termId?: number },
+  resolved: LogicalNameResolution | null | undefined,
   findTerm: (id: number) => { physicalName: string; domainId: number | null } | undefined,
   findDomain: (id: number) => { physicalType: string } | undefined,
-  resolveLogicalName?: (logicalName: string) => LogicalNameResolution,
 ): ColumnWarning {
   const logicalName = col.logicalName?.trim();
   if (!logicalName) {
     return { status: null };
   }
 
-  const resolved = resolveLogicalName?.(logicalName);
   if (resolved) {
     if (resolved.isRegisteredTerm) {
       if (col.name !== resolved.physicalName) {
@@ -141,6 +251,27 @@ export function getColumnWarning(
   }
 
   return { status: null };
+}
+
+/**
+ * 개별 컬럼의 사전 유효성 경고를 계산하는 순수 함수.
+ *
+ * TableNode(인라인 경고)와 useColumnValidation(패널 집계) 양쪽에서 공통으로 사용한다.
+ *
+ * @param col        컬럼 데이터
+ * @param findTerm   Term 조회 함수
+ * @param findDomain Domain 조회 함수
+ * @returns 경고 결과 (status가 null이면 문제 없음)
+ */
+export function getColumnWarning(
+  col: { logicalName?: string; name: string; type: string; termId?: number },
+  findTerm: (id: number) => { physicalName: string; domainId: number | null } | undefined,
+  findDomain: (id: number) => { physicalType: string } | undefined,
+  resolveLogicalName?: (logicalName: string) => LogicalNameResolution,
+): ColumnWarning {
+  const logicalName = col.logicalName?.trim();
+  const resolved = logicalName && resolveLogicalName ? resolveLogicalName(logicalName) : undefined;
+  return getColumnWarningFromResolution(col, resolved, findTerm, findDomain);
 }
 
 /**

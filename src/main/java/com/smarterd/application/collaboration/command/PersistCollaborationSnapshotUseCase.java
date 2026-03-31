@@ -22,10 +22,7 @@ public class PersistCollaborationSnapshotUseCase {
      * @param command     snapshot 저장 커맨드
      * @return 저장 성공 여부
      */
-    public boolean persistSnapshot(
-        CollaborationResourceKey resourceKey,
-        CollaborationSnapshotSaveCommand command
-    ) {
+    public boolean persistSnapshot(CollaborationResourceKey resourceKey, CollaborationSnapshotSaveCommand command) {
         final var runtimeSupport = collaborationRuntimeSupportRegistry.getRequired(resourceKey);
         return runtimeSupport.snapshotStore().save(resourceKey, command);
     }

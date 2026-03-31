@@ -20,6 +20,14 @@ export const CODE_SHARED_DRAFT_SYNC_IDLE_MS = 200;
  */
 export const CODE_SHARED_DRAFT_SERVER_PERSIST_IDLE_MS = 1500;
 
+/**
+ * code 모드 shared draft의 첫 서버 영속화 대기 시간 (ms)
+ *
+ * 아직 서버에 한 번도 올라가지 않은 fresh draft는 close-time keepalive 실패에 더 취약하므로
+ * 첫 checkpoint는 일반 debounce보다 더 빠르게 올린다.
+ */
+export const CODE_SHARED_DRAFT_INITIAL_SERVER_PERSIST_IDLE_MS = 250;
+
 /** code 모드 remote shared draft bootstrap 대기 시간 (ms) */
 export const CODE_SHARED_DRAFT_BOOTSTRAP_WAIT_MS = 300;
 

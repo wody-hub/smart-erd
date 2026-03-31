@@ -67,9 +67,7 @@ public class DiagramCollaborationResourceKeyFactory implements CollaborationReso
      */
     public Long parseDiagramId(CollaborationResourceKey resourceKey) {
         if (!channelType().equals(resourceKey.channelType())) {
-            throw new IllegalArgumentException(
-                "다이어그램 채널에 맞지 않는 채널 타입: " + resourceKey.channelType()
-            );
+            throw new IllegalArgumentException("다이어그램 채널에 맞지 않는 채널 타입: " + resourceKey.channelType());
         }
         return Long.parseLong(resourceKey.resourceId());
     }

@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import type {
   AwarenessState,
+  ConnectionIssueKind,
   ConnectionStatus,
+  DocumentChangeSummary,
   PresenceMode,
   PresenceParticipant,
   PresencePeerJoinedPayload,
@@ -29,6 +31,8 @@ export interface LocalEdgeWaypointDrag {
 interface CollaborationState {
   /** WebSocket 연결 상태 */
   connectionStatus: ConnectionStatus;
+  /** 최근 연결 끊김 사유 */
+  connectionIssue: ConnectionIssueKind | null;
   /** Presence 모드 */
   presenceMode: PresenceMode;
   /** 최근 room epoch */
@@ -45,9 +49,13 @@ interface CollaborationState {
   remoteEdgeAwareness: Map<number, AwarenessState>;
   /** 로컬 edge waypoint 드래그 세션 */
   localEdgeDrag: LocalEdgeWaypointDrag | null;
+  /** 마지막 문서 변경 요약 */
+  lastDocumentChange: DocumentChangeSummary | null;
 
   /** 연결 상태를 설정한다. */
   setConnectionStatus: (status: ConnectionStatus) => void;
+  /** 연결 끊김 사유를 설정한다. */
+  setConnectionIssue: (issue: ConnectionIssueKind | null) => void;
   /** Presence 모드를 설정한다. */
   setPresenceMode: (mode: PresenceMode) => void;
   /** 현재 사용자 userId를 설정한다. */
@@ -71,6 +79,8 @@ interface CollaborationState {
   updateLocalEdgeDragPreview: (waypoints: Waypoint[], routePoints?: Waypoint[]) => void;
   /** 로컬 edge drag 세션을 종료한다. */
   clearLocalEdgeDrag: () => void;
+  /** 마지막 문서 변경 요약을 반영한다. */
+  applyDocumentChange: (summary: DocumentChangeSummary) => void;
 
   /** 모든 협업 상태를 초기화한다. */
   reset: () => void;
@@ -88,8 +98,7 @@ function areWaypointsEqual(left?: Waypoint[] | null, right?: Waypoint[] | null):
     return false;
   }
   return left.every(
-    (waypoint, index) =>
-      waypoint.x === right[index]?.x && waypoint.y === right[index]?.y,
+    (waypoint, index) => waypoint.x === right[index]?.x && waypoint.y === right[index]?.y,
   );
 }
 
@@ -128,7 +137,10 @@ function areCursorAwarenessEqual(
   );
 }
 
-function areEdgeAwarenessEqual(left?: AwarenessState | null, right?: AwarenessState | null): boolean {
+function areEdgeAwarenessEqual(
+  left?: AwarenessState | null,
+  right?: AwarenessState | null,
+): boolean {
   if (!left && !right) {
     return true;
   }
@@ -197,6 +209,7 @@ function removeByIdentity(
  */
 const useCollaborationStore = create<CollaborationState>((set, get) => ({
   connectionStatus: 'disconnected',
+  connectionIssue: null,
   presenceMode: 'active',
   lastRoomEpoch: null,
   lastPresenceVersion: 0,
@@ -205,8 +218,11 @@ const useCollaborationStore = create<CollaborationState>((set, get) => ({
   remoteCursors: new Map(),
   remoteEdgeAwareness: new Map(),
   localEdgeDrag: null,
+  lastDocumentChange: null,
 
   setConnectionStatus: (status) => set({ connectionStatus: status }),
+
+  setConnectionIssue: (issue) => set({ connectionIssue: issue }),
 
   setPresenceMode: (mode) => set({ presenceMode: mode }),
   setSelfUserId: (userId) =>
@@ -402,9 +418,12 @@ const useCollaborationStore = create<CollaborationState>((set, get) => ({
 
   clearLocalEdgeDrag: () => set({ localEdgeDrag: null }),
 
+  applyDocumentChange: (summary) => set({ lastDocumentChange: summary }),
+
   reset: () =>
     set({
       connectionStatus: 'disconnected',
+      connectionIssue: null,
       presenceMode: 'active',
       lastRoomEpoch: null,
       lastPresenceVersion: 0,
@@ -413,6 +432,7 @@ const useCollaborationStore = create<CollaborationState>((set, get) => ({
       remoteCursors: new Map(),
       remoteEdgeAwareness: new Map(),
       localEdgeDrag: null,
+      lastDocumentChange: null,
     }),
 }));
 

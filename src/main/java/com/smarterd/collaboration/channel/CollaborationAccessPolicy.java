@@ -10,7 +10,6 @@ import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
  */
 @FunctionalInterface
 public interface CollaborationAccessPolicy {
-
     /**
      * 세션이 특정 채널 리소스 계약과 호환되는지 검사한다.
      *

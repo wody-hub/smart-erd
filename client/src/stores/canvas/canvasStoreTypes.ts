@@ -38,6 +38,16 @@ export interface PositionQueueCtx {
   pending: Map<string, { x: number; y: number }>;
 }
 
+export type ProjectionSyncTarget = 'nodes' | 'edges' | 'groups';
+
+export interface ProjectionSyncRequest {
+  forceFull?: boolean;
+  targets?: ProjectionSyncTarget[];
+  nodeIds?: string[];
+  edgeIds?: string[];
+  groupIds?: string[];
+}
+
 /**
  * 렌더링과 무관한 스토어 내부 상태.
  *
@@ -48,11 +58,16 @@ export interface PositionQueueCtx {
  */
 export interface InternalState {
   tablesObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null;
-  edgesObserver: (() => void) | null;
-  groupsObserver: (() => void) | null;
+  edgesObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null;
+  groupsObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null;
   undoManager: CanvasUndoManager | null;
   isNodeDragging: boolean;
-  hasDeferredTableSync: boolean;
+  hasDeferredProjectionSync: boolean;
+  deferredProjectionForceFull: boolean;
+  deferredProjectionTargets: Set<ProjectionSyncTarget>;
+  deferredProjectionNodeIds: Set<string>;
+  deferredProjectionEdgeIds: Set<string>;
+  deferredProjectionGroupIds: Set<string>;
   tablePositionQueue: PositionQueueCtx;
 }
 
@@ -168,6 +183,7 @@ export interface CanvasState {
   internal: InternalState;
   initYDoc: (ydoc: Y.Doc) => void;
   destroyYDoc: () => void;
+  syncFromYDoc: (request?: ProjectionSyncRequest) => void;
   /** API JSON을 Y.Doc을 거치지 않고 Zustand에 직접 주입한다 (프리뷰 전용). */
   loadPreview: (json: string) => void;
 }

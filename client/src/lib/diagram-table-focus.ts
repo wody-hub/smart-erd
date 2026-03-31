@@ -15,7 +15,10 @@ export function findPersistedTableNodeForFocus(
   request: CodeEditorTableFocusRequest,
 ): TableNode | null {
   return (
-    nodes.find((node) => node.type === 'table' && buildTableLockKeyFromNodeData(node.data) === request.tableKey) ??
+    nodes.find(
+      (node) =>
+        node.type === 'table' && buildTableLockKeyFromNodeData(node.data) === request.tableKey,
+    ) ??
     nodes.find((node) => node.type === 'table' && node.data.label === request.physicalName) ??
     nodes.find(
       (node) =>
@@ -42,8 +45,7 @@ export function findPreviewTableNodeForFocus(
     nodes.find((node) => node.data.label === request.physicalName) ??
     nodes.find(
       (node) =>
-        !!request.logicalName &&
-        (node.data.logicalTableName?.trim() ?? '') === request.logicalName,
+        !!request.logicalName && (node.data.logicalTableName?.trim() ?? '') === request.logicalName,
     ) ??
     null
   );

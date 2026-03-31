@@ -30,7 +30,7 @@ class PersistCollaborationSnapshotUseCaseTest {
     void persistDiagramSnapshot_delegatesToPluginSnapshotStore() {
         final var useCase = new PersistCollaborationSnapshotUseCase(collaborationRuntimeSupportRegistry);
         final var expectedKey = new CollaborationResourceKey("diagram", "42");
-        final var command = new CollaborationSnapshotSaveCommand("17", new byte[] { 0x01 });
+        final var command = new CollaborationSnapshotSaveCommand("17", new byte[] { 0x01 }, false);
 
         when(collaborationRuntimeSupportRegistry.getRequired(expectedKey)).thenReturn(collaborationRuntimeSupport);
         when(collaborationRuntimeSupport.snapshotStore()).thenReturn(collaborationSnapshotStore);

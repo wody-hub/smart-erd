@@ -35,15 +35,12 @@ export interface ResolveRemoteEditLocksOptions {
   selfLoginId?: string | null;
 }
 
-function isSelfAwareness(
-  state: AwarenessState,
-  options?: ResolveRemoteEditLocksOptions,
-): boolean {
+function isSelfAwareness(state: AwarenessState, options?: ResolveRemoteEditLocksOptions): boolean {
   const userId = state.user?.userId ?? null;
   const loginId = state.user?.loginId ?? '';
   return Boolean(
     (options?.selfUserId && userId === options.selfUserId) ||
-      (options?.selfLoginId && loginId === options.selfLoginId),
+    (options?.selfLoginId && loginId === options.selfLoginId),
   );
 }
 

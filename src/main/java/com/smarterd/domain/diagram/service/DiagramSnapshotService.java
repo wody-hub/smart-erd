@@ -117,9 +117,8 @@ public class DiagramSnapshotService implements SmartLifecycle {
      * @return Y.Doc 스냅샷 바이트 배열, 없으면 빈 배열
      */
     public byte[] loadSnapshot(Long diagramId) {
-        return snapshotCache.computeIfAbsent(
-            diagramId,
-            (id) -> diagramRepository.findYdocSnapshotById(id).orElse(new byte[0])
+        return snapshotCache.computeIfAbsent(diagramId, (id) ->
+            diagramRepository.findYdocSnapshotById(id).orElse(new byte[0])
         );
     }
 
@@ -203,13 +202,15 @@ public class DiagramSnapshotService implements SmartLifecycle {
      * @param diagramId               다이어그램 ID
      * @param expectedContentRevision 클라이언트가 기준으로 삼은 contentRevision
      * @param fullStateUpdate         클라이언트가 보낸 현재 Y.Doc 전체 상태 update
+     * @param persistOnlyIfMissing    true면 기존 persisted snapshot이 없을 때만 저장한다.
      * @return 저장 성공 여부
      */
     @Transactional
     public boolean replaceSnapshotWithClientState(
         Long diagramId,
         String expectedContentRevision,
-        byte[] fullStateUpdate
+        byte[] fullStateUpdate,
+        boolean persistOnlyIfMissing
     ) {
         if (fullStateUpdate == null || fullStateUpdate.length == 0) {
             return false;
@@ -223,13 +224,15 @@ public class DiagramSnapshotService implements SmartLifecycle {
         if (!String.valueOf(contentRevision).equals(expectedContentRevision)) {
             throw new ConflictException(MessageCode.ERROR_BUSINESS_DIAGRAM_SNAPSHOT_STALE.code());
         }
+        if (persistOnlyIfMissing) {
+            final var existingSnapshot = diagramRepository.findYdocSnapshotById(diagramId).orElse(new byte[0]);
+            if (existingSnapshot.length > 0) {
+                return false;
+            }
+        }
 
         final var snapshot = YjsUpdateFormat.encode(List.of(fullStateUpdate));
-        final var updated = diagramRepository.updateYdocSnapshotAndRevisionById(
-            diagramId,
-            snapshot,
-            contentRevision
-        );
+        final var updated = diagramRepository.updateYdocSnapshotAndRevisionById(diagramId, snapshot, contentRevision);
         if (updated == 0) {
             log.warn("클라이언트 snapshot 저장 실패: UPDATE 실패 (id={})", diagramId);
             return false;
@@ -284,8 +287,8 @@ public class DiagramSnapshotService implements SmartLifecycle {
      */
     private void runAfterCommit(Runnable task) {
         if (
-            TransactionSynchronizationManager.isSynchronizationActive()
-                && TransactionSynchronizationManager.isActualTransactionActive()
+            TransactionSynchronizationManager.isSynchronizationActive() &&
+            TransactionSynchronizationManager.isActualTransactionActive()
         ) {
             TransactionSynchronizationManager.registerSynchronization(
                 new TransactionSynchronization() {

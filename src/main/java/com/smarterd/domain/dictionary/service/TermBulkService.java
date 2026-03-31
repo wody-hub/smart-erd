@@ -373,13 +373,7 @@ public class TermBulkService extends AbstractBulkService<TermBulkService.TermUpl
     ) {
         final var team = verifyTeamAccess(loginId, teamId);
         final var dictionarySet = dictionarySetService.findByTeamAndId(team, setId);
-        final var session = consumeValidationSession(
-            loginId,
-            teamId,
-            setId,
-            validationToken,
-            ValidationSession.class
-        );
+        final var session = consumeValidationSession(loginId, teamId, setId, validationToken, ValidationSession.class);
         final var excludedRows = new HashSet<>(excludedRowNumbers);
         final var candidateRows = session
             .validRows()

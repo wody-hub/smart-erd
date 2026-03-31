@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, Pencil, Trash2, Star } from 'lucide-react';
+import { Plus, Pencil, Trash2, Star, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -23,6 +23,7 @@ import { queryKeys } from '@/constants/query-keys';
 import {
   createDictionarySet,
   deleteDictionarySet,
+  downloadAllDictionary,
   fetchDictionarySets,
   setDefaultDictionarySet,
   updateDictionarySet,
@@ -134,6 +135,13 @@ export default function DictionaryWorkspace({
       toast.error(getErrorMessage(err, t('dictionary.set.toast.defaultUpdateFailed'))),
   });
 
+  /** 전체 사전 일괄 엑셀 다운로드 뮤테이션 */
+  const downloadAllMutation = useMutation({
+    mutationFn: () => downloadAllDictionary(teamId, selectedSetId),
+    onSuccess: () => toast.success(t('dictionary.export.allDownloaded')),
+    onError: (err) => toast.error(getErrorMessage(err, t('dictionary.export.allFailed'))),
+  });
+
   const selectedSet: DictionarySet | undefined = dictionarySets.find(
     (set) => String(set.id) === selectedSetId,
   );
@@ -204,6 +212,17 @@ export default function DictionaryWorkspace({
               </Button>
             </>
           )}
+
+          <Button
+            variant="outline"
+            onClick={() => downloadAllMutation.mutate()}
+            disabled={downloadAllMutation.isPending || !selectedSetId}
+          >
+            <Download className="h-4 w-4 mr-1" />
+            {downloadAllMutation.isPending
+              ? t('dictionary.export.allExporting')
+              : t('dictionary.export.allButton')}
+          </Button>
         </div>
       )}
 

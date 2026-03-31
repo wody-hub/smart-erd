@@ -101,7 +101,7 @@ function appendPoint(
   insertIndex: number,
 ) {
   const last = points[points.length - 1];
-  if (!last || (last.x !== point.x || last.y !== point.y)) {
+  if (!last || last.x !== point.x || last.y !== point.y) {
     if (last) {
       segments.push({
         start: last,
@@ -446,7 +446,10 @@ export function buildRoundedOrthogonalSvgPath(points: EdgePoint[], radius = 12):
       outgoingLength > 0 &&
       (incomingDx === 0 || incomingDy === 0) &&
       (outgoingDx === 0 || outgoingDy === 0) &&
-      !(Math.sign(incomingDx) === Math.sign(outgoingDx) && Math.sign(incomingDy) === Math.sign(outgoingDy));
+      !(
+        Math.sign(incomingDx) === Math.sign(outgoingDx) &&
+        Math.sign(incomingDy) === Math.sign(outgoingDy)
+      );
 
     if (!isCorner) {
       path += ` L ${current.x},${current.y}`;

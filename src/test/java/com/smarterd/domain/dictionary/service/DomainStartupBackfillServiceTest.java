@@ -82,19 +82,8 @@ class DomainStartupBackfillServiceTest {
     }
 
     private DictionarySet createDictionarySet(String name) {
-        final var owner = User.builder()
-            .loginId("riskzero")
-            .password("hashed")
-            .name("Risk Zero")
-            .build();
-        final var team = Team.builder()
-            .name("core-team")
-            .owner(owner)
-            .build();
-        return DictionarySet.builder()
-            .name(name)
-            .team(team)
-            .isDefault(false)
-            .build();
+        final var owner = User.builder().loginId("riskzero").password("hashed").name("Risk Zero").build();
+        final var team = Team.builder().name("core-team").owner(owner).build();
+        return DictionarySet.builder().name(name).team(team).isDefault(false).build();
     }
 }

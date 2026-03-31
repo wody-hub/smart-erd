@@ -122,4 +122,62 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
         final var hasSnapshot = Boolean.TRUE.equals(result.get(hasSnapshotExpr));
         return Optional.of(new DiagramWithSnapshotFlag(found, hasSnapshot));
     }
+
+    @Override
+    public Optional<DiagramBootstrapProjection> findBootstrapByProjectAndId(Project project, Long diagramId) {
+        final BooleanExpression hasSnapshotExpr = diagram.ydocSnapshot.isNotNull();
+        final BooleanExpression artifactAvailableExpr = diagram.content.isNotNull().and(diagram.content.isNotEmpty());
+
+        final Tuple result = queryFactory
+            .select(diagram.contentRevision, diagram.snapshotRevision, hasSnapshotExpr, artifactAvailableExpr)
+            .from(diagram)
+            .where(diagram.project.eq(project).and(diagram.id.eq(diagramId)).and(diagram.deletedAt.isNull()))
+            .fetchOne();
+        if (result == null) {
+            return Optional.empty();
+        }
+
+        final Long contentRevision = result.get(diagram.contentRevision);
+        if (contentRevision == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(
+            new DiagramBootstrapProjection(
+                contentRevision,
+                result.get(diagram.snapshotRevision),
+                Boolean.TRUE.equals(result.get(hasSnapshotExpr)),
+                Boolean.TRUE.equals(result.get(artifactAvailableExpr))
+            )
+        );
+    }
+
+    @Override
+    public Optional<DiagramBootstrapProjection> findBootstrapById(Long diagramId) {
+        final BooleanExpression hasSnapshotExpr = diagram.ydocSnapshot.isNotNull();
+        final BooleanExpression artifactAvailableExpr = diagram.content.isNotNull().and(diagram.content.isNotEmpty());
+
+        final Tuple result = queryFactory
+            .select(diagram.contentRevision, diagram.snapshotRevision, hasSnapshotExpr, artifactAvailableExpr)
+            .from(diagram)
+            .where(diagram.id.eq(diagramId).and(diagram.deletedAt.isNull()))
+            .fetchOne();
+        if (result == null) {
+            return Optional.empty();
+        }
+
+        final Long contentRevision = result.get(diagram.contentRevision);
+        if (contentRevision == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(
+            new DiagramBootstrapProjection(
+                contentRevision,
+                result.get(diagram.snapshotRevision),
+                Boolean.TRUE.equals(result.get(hasSnapshotExpr)),
+                Boolean.TRUE.equals(result.get(artifactAvailableExpr))
+            )
+        );
+    }
 }

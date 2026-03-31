@@ -189,12 +189,22 @@ export function useErdDictionaryData(teamId: string | undefined, setId: string |
   );
 
   const resolveLogicalName = useCallback(
-    (query: string): LogicalNameResolution =>
-      resolveLogicalNameFromDictionary(query, {
-        termByName: termByNameMap,
-        domainById: domainMap,
-        wordMatchIndex,
-      }),
+    (() => {
+      const resolutionCache = new Map<string, LogicalNameResolution>();
+      return (query: string): LogicalNameResolution => {
+        const cached = resolutionCache.get(query);
+        if (cached) {
+          return cached;
+        }
+        const resolved = resolveLogicalNameFromDictionary(query, {
+          termByName: termByNameMap,
+          domainById: domainMap,
+          wordMatchIndex,
+        });
+        resolutionCache.set(query, resolved);
+        return resolved;
+      };
+    })(),
     [termByNameMap, domainMap, wordMatchIndex],
   );
 

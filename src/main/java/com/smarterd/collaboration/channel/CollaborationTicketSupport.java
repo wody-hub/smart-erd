@@ -4,7 +4,6 @@ package com.smarterd.collaboration.channel;
  * 채널 ticket 발급/검증 정책 묶음.
  */
 public interface CollaborationTicketSupport {
-
     /**
      * 지원하는 채널 타입을 반환한다.
      *

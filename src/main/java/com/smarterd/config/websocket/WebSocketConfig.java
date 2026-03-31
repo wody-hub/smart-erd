@@ -1,7 +1,7 @@
 package com.smarterd.config.websocket;
 
-import com.smarterd.config.security.CorsConfig;
 import com.smarterd.collaboration.channel.CollaborationWebSocketBinding;
+import com.smarterd.config.security.CorsConfig;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +45,10 @@ public class WebSocketConfig implements WebSocketConfigurer {
             nonNullRegistry
                 .addHandler(
                     Objects.requireNonNull(binding.webSocketHandler(), "webSocketHandler must not be null"),
-                    Objects.requireNonNull(binding.websocketHandlerPattern(), "websocketHandlerPattern must not be null")
+                    Objects.requireNonNull(
+                        binding.websocketHandlerPattern(),
+                        "websocketHandlerPattern must not be null"
+                    )
                 )
                 .addInterceptors(
                     Objects.requireNonNull(binding.handshakeInterceptor(), "handshakeInterceptor must not be null")

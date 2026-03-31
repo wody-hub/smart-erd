@@ -1,4 +1,5 @@
 import type { Waypoint } from './erd.js';
+import type { ScopeLockMode } from '@/collaboration/core/contracts/document-read-executor';
 
 /** 원격 edge waypoint preview payload */
 export interface EdgeWaypointPreview {
@@ -66,6 +67,12 @@ export interface YjsProviderOptions {
  */
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
 
+/** WebSocket 연결 끊김의 사용자 노출용 원인 */
+export type ConnectionIssueKind =
+  | 'connection-limit-exceeded'
+  | 'room-capacity-exceeded'
+  | 'policy-violation';
+
 /** Presence 모드. */
 export type PresenceMode = 'active' | 'degraded';
 
@@ -125,4 +132,20 @@ export interface PresencePeerLeftPayload {
   presenceVersion: number;
   /** 완전 퇴장 사용자 ID */
   userId: string;
+}
+
+/** 문서 변경 요약 read model. */
+export interface DocumentChangeSummary {
+  /** 현재 문서 revision */
+  revision: string;
+  /** 변경 원천 */
+  origin: 'local' | 'remote' | 'bootstrap' | 'system';
+  /** 영향 범위 요약 */
+  affectedScopes: Array<{
+    kind: string;
+    id: string;
+    mode: ScopeLockMode;
+  }>;
+  /** 마지막 갱신 시각 */
+  changedAt: number;
 }

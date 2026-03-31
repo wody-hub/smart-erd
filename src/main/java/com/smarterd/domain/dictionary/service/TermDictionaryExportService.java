@@ -14,11 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class TermDictionaryExportService {
 
-    private static final String SHEET_NAME = "용어 사전";
-    private static final String TITLE = "용어 사전";
-    private static final java.util.List<String> HEADERS = java.util.List.of("논리명", "물리명", "도메인", "설명");
-    private static final int[] COLUMN_WIDTHS = { 28 * 256, 28 * 256, 24 * 256, 48 * 256 };
-
     private final TermService termService;
 
     /**
@@ -31,18 +26,14 @@ public class TermDictionaryExportService {
      */
     public ExcelData generateTermDictionary(String loginId, Long teamId, Long setId) {
         final var exportResult = termService.getTermsForExport(loginId, teamId, setId);
-        final var template = DictionaryWorkbookExportSupport.createTemplate(SHEET_NAME, TITLE, HEADERS, COLUMN_WIDTHS);
-        final var sheet = template.sheet();
-        final var bodyStyle = template.bodyStyle();
+        final var template = DictionaryWorkbookExportSupport.createTemplate(
+            DictionaryWorkbookExportSupport.TERM_SHEET_NAME,
+            DictionaryWorkbookExportSupport.TERM_TITLE,
+            DictionaryWorkbookExportSupport.TERM_HEADERS,
+            DictionaryWorkbookExportSupport.TERM_COLUMN_WIDTHS
+        );
 
-        for (var rowIndex = 0; rowIndex < exportResult.terms().size(); rowIndex++) {
-            final var rowData = exportResult.terms().get(rowIndex);
-            final var row = sheet.createRow(rowIndex + 2);
-            DictionaryWorkbookExportSupport.writeCell(row, 0, AppStringUtils.defaultIfBlank(rowData.logicalName(), ""), bodyStyle);
-            DictionaryWorkbookExportSupport.writeCell(row, 1, AppStringUtils.defaultIfBlank(rowData.physicalName(), ""), bodyStyle);
-            DictionaryWorkbookExportSupport.writeCell(row, 2, AppStringUtils.defaultIfBlank(rowData.domainLogicalName(), ""), bodyStyle);
-            DictionaryWorkbookExportSupport.writeCell(row, 3, AppStringUtils.defaultIfBlank(rowData.description(), ""), bodyStyle);
-        }
+        DictionaryWorkbookExportSupport.writeTermRows(template.sheet(), template.bodyStyle(), exportResult.terms());
 
         return new ExcelData(
             template.workbook(),

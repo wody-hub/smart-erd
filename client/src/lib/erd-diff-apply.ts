@@ -1,10 +1,6 @@
 import * as Y from 'yjs';
-import type {
-  EdgeHandleMode,
-  EdgeHandleSide,
-  EdgeRoutingType,
-  Waypoint,
-} from '../types/erd.js';
+import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
+import type { EdgeHandleMode, EdgeHandleSide, EdgeRoutingType, Waypoint } from '../types/erd.js';
 import type { DiffPlan, DiffParsedColumn, DiffRelationType } from './erd-diff-plan.js';
 import {
   createWaypointsYArray,
@@ -128,7 +124,7 @@ export function applyDiffToYDoc(doc: Y.Doc, plan: DiffPlan, origin?: unknown): A
       context.groupsMap,
       context.tablesMap,
     );
-  }, origin);
+  }, origin ?? CANVAS_HISTORY_ORIGIN.SYSTEM_CODE_SYNC);
 
   const { appliedOperations, skippedOperations, droppedByPolicy, droppedByMissing } =
     context.counters;
@@ -427,7 +423,8 @@ function applyEdgeAdds(context: DiffApplyContext): void {
       childTable: edgeDiff.next.childTable,
       childColumn: edgeDiff.next.childColumn,
     });
-    const nextRoutingType = carriedPresentation?.routingType ?? edgeDiff.routingType ?? 'smoothstep';
+    const nextRoutingType =
+      carriedPresentation?.routingType ?? edgeDiff.routingType ?? 'smoothstep';
     const preservedWaypoints =
       resolvePreservedWaypoints({
         routingType: nextRoutingType,
@@ -453,10 +450,7 @@ function applyEdgeAdds(context: DiffApplyContext): void {
       resolution.sourceSide,
       resolution.targetSide,
     );
-    context.edgesMap.set(
-      edgeId,
-      edgeYMap,
-    );
+    context.edgesMap.set(edgeId, edgeYMap);
     syncLegacyWaypointsInEdgeYMap(edgeYMap);
     context.counters.appliedOperations += 1;
   }
@@ -518,10 +512,8 @@ function computeNextTablePosition(tablesMap: Y.Map<Y.Map<unknown>>): { x: number
     const topLevelX = tableYMap.get('positionX');
     const topLevelY = tableYMap.get('positionY');
     const rawPosition = tableYMap.get('position');
-    const x =
-      typeof topLevelX === 'number' ? topLevelX : readLegacyPositionAxis(rawPosition, 'x');
-    const y =
-      typeof topLevelY === 'number' ? topLevelY : readLegacyPositionAxis(rawPosition, 'y');
+    const x = typeof topLevelX === 'number' ? topLevelX : readLegacyPositionAxis(rawPosition, 'x');
+    const y = typeof topLevelY === 'number' ? topLevelY : readLegacyPositionAxis(rawPosition, 'y');
     if (typeof x === 'number' && x > maxX) {
       maxX = x;
       if (typeof y === 'number') {
@@ -578,8 +570,8 @@ function buildTableNodeLike(
         100,
     },
     data: {
-      handleLayout: (tableYMap.get('handleLayout') as 'split' | 'left' | 'right' | undefined) ??
-        'split',
+      handleLayout:
+        (tableYMap.get('handleLayout') as 'split' | 'left' | 'right' | undefined) ?? 'split',
     },
   };
 }

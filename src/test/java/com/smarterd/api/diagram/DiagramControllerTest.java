@@ -7,14 +7,14 @@ import static org.mockito.Mockito.when;
 import com.smarterd.api.diagram.dto.ExportDiagramWorkbookRequest;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotRequest;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
+import com.smarterd.application.diagram.command.PersistDiagramSnapshotUseCase;
+import com.smarterd.application.diagram.command.SaveDiagramUseCase;
 import com.smarterd.domain.diagram.service.DiagramColumnDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramIndexDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService;
-import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
+import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
 import com.smarterd.utils.excel.ExcelData;
-import com.smarterd.application.diagram.command.PersistDiagramSnapshotUseCase;
-import com.smarterd.application.diagram.command.SaveDiagramUseCase;
 import java.time.Instant;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
@@ -57,10 +57,17 @@ class DiagramControllerTest {
         );
         final var jwt = jwt("tester");
         final var request = new SaveDiagramRequest("{\"nodes\":[]}", new byte[] { 0x01, 0x02 });
-        final var result = new SaveDiagramResult(17L, true, 17L, Instant.parse("2026-03-23T12:00:00Z"), Instant.parse("2026-03-23T12:00:01Z"));
+        final var result = new SaveDiagramResult(
+            17L,
+            true,
+            17L,
+            Instant.parse("2026-03-23T12:00:00Z"),
+            Instant.parse("2026-03-23T12:00:01Z")
+        );
 
-        when(saveDiagramUseCase.execute("tester", 1L, 10L, 100L, request.content(), request.ydocSnapshot()))
-            .thenReturn(result);
+        when(saveDiagramUseCase.execute("tester", 1L, 10L, 100L, request.content(), request.ydocSnapshot())).thenReturn(
+            result
+        );
 
         final var response = controller.saveDiagram(jwt, 1L, 10L, 100L, request);
 
@@ -82,17 +89,34 @@ class DiagramControllerTest {
             diagramIndexDefinitionExportService
         );
         final var jwt = jwt("tester");
-        final var request = new PersistYdocSnapshotRequest("17", new byte[] { 0x11 });
+        final var request = new PersistYdocSnapshotRequest("17", new byte[] { 0x11 }, false);
 
-        when(persistDiagramSnapshotUseCase.execute("tester", 1L, 10L, 100L, "17", request.ydocSnapshot()))
-            .thenReturn(false);
+        when(
+            persistDiagramSnapshotUseCase.execute(
+                "tester",
+                1L,
+                10L,
+                100L,
+                "17",
+                request.ydocSnapshot(),
+                request.persistOnlyIfMissing()
+            )
+        ).thenReturn(false);
 
         final var response = controller.persistYdocSnapshot(jwt, 1L, 10L, 100L, request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().persisted()).isFalse();
-        verify(persistDiagramSnapshotUseCase).execute("tester", 1L, 10L, 100L, "17", request.ydocSnapshot());
+        verify(persistDiagramSnapshotUseCase).execute(
+            "tester",
+            1L,
+            10L,
+            100L,
+            "17",
+            request.ydocSnapshot(),
+            request.persistOnlyIfMissing()
+        );
     }
 
     @Test
@@ -111,17 +135,18 @@ class DiagramControllerTest {
         final var response = new MockHttpServletResponse();
         final var request = new ExportDiagramWorkbookRequest("{\"nodes\":[]}");
 
-        when(diagramTableDefinitionExportService.generateTableDefinition("tester", 1L, 10L, 100L, request.content()))
-            .thenReturn(new ExcelData(workbook, "diagram-table-definition"));
+        when(
+            diagramTableDefinitionExportService.generateTableDefinition("tester", 1L, 10L, 100L, request.content())
+        ).thenReturn(new ExcelData(workbook, "diagram-table-definition"));
 
         controller.downloadTableDefinition(jwt, 1L, 10L, 100L, request, response);
 
         assertThat(response.getStatus()).isEqualTo(200);
-        assertThat(response.getContentType())
-            .isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        assertThat(response.getContentType()).isEqualTo(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
         assertThat(response.getHeader("Content-Disposition")).contains("diagram-table-definition.xlsx");
-        verify(diagramTableDefinitionExportService)
-            .generateTableDefinition("tester", 1L, 10L, 100L, request.content());
+        verify(diagramTableDefinitionExportService).generateTableDefinition("tester", 1L, 10L, 100L, request.content());
     }
 
     @Test
@@ -140,17 +165,24 @@ class DiagramControllerTest {
         final var response = new MockHttpServletResponse();
         final var request = new ExportDiagramWorkbookRequest("{\"nodes\":[]}");
 
-        when(diagramColumnDefinitionExportService.generateColumnDefinition("tester", 1L, 10L, 100L, request.content()))
-            .thenReturn(new ExcelData(workbook, "diagram-column-definition"));
+        when(
+            diagramColumnDefinitionExportService.generateColumnDefinition("tester", 1L, 10L, 100L, request.content())
+        ).thenReturn(new ExcelData(workbook, "diagram-column-definition"));
 
         controller.downloadColumnDefinition(jwt, 1L, 10L, 100L, request, response);
 
         assertThat(response.getStatus()).isEqualTo(200);
-        assertThat(response.getContentType())
-            .isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        assertThat(response.getContentType()).isEqualTo(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
         assertThat(response.getHeader("Content-Disposition")).contains("diagram-column-definition.xlsx");
-        verify(diagramColumnDefinitionExportService)
-            .generateColumnDefinition("tester", 1L, 10L, 100L, request.content());
+        verify(diagramColumnDefinitionExportService).generateColumnDefinition(
+            "tester",
+            1L,
+            10L,
+            100L,
+            request.content()
+        );
     }
 
     @Test
@@ -169,23 +201,21 @@ class DiagramControllerTest {
         final var response = new MockHttpServletResponse();
         final var request = new ExportDiagramWorkbookRequest("{\"nodes\":[]}");
 
-        when(diagramIndexDefinitionExportService.generateIndexDefinition("tester", 1L, 10L, 100L, request.content()))
-            .thenReturn(new ExcelData(workbook, "diagram-index-definition"));
+        when(
+            diagramIndexDefinitionExportService.generateIndexDefinition("tester", 1L, 10L, 100L, request.content())
+        ).thenReturn(new ExcelData(workbook, "diagram-index-definition"));
 
         controller.downloadIndexDefinition(jwt, 1L, 10L, 100L, request, response);
 
         assertThat(response.getStatus()).isEqualTo(200);
-        assertThat(response.getContentType())
-            .isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        assertThat(response.getContentType()).isEqualTo(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
         assertThat(response.getHeader("Content-Disposition")).contains("diagram-index-definition.xlsx");
-        verify(diagramIndexDefinitionExportService)
-            .generateIndexDefinition("tester", 1L, 10L, 100L, request.content());
+        verify(diagramIndexDefinitionExportService).generateIndexDefinition("tester", 1L, 10L, 100L, request.content());
     }
 
     private Jwt jwt(String subject) {
-        return Jwt.withTokenValue("token")
-            .header("alg", "none")
-            .subject(subject)
-            .build();
+        return Jwt.withTokenValue("token").header("alg", "none").subject(subject).build();
     }
 }

@@ -323,9 +323,7 @@ function resolvePreviewEdgePresentationSourceMap(
         Array.isArray(parsed) &&
         parsed.every(
           (waypoint) =>
-            waypoint &&
-            typeof waypoint.x === 'number' &&
-            typeof waypoint.y === 'number',
+            waypoint && typeof waypoint.x === 'number' && typeof waypoint.y === 'number',
         )
       ) {
         waypoints = parsed;
@@ -697,8 +695,9 @@ export function buildPreviewGraphFromDslParsedSchema(
   draftPositions: DiagramPreviewPositionRecord = {},
 ): DslPreviewGraph {
   const sourceMaps = resolvePreviewLayoutSourceMaps(previewLayoutSourceEntries);
-  const edgePresentationByRelationKey =
-    resolvePreviewEdgePresentationSourceMap(previewEdgePresentationEntries);
+  const edgePresentationByRelationKey = resolvePreviewEdgePresentationSourceMap(
+    previewEdgePresentationEntries,
+  );
   const baseNodes = buildPreviewNodes(parsedSchema.tables, parsedSchema.relations, sourceMaps);
   const persistedNodeIds = new Set(
     parsedSchema.tables
@@ -735,8 +734,9 @@ export function refreshPreviewGraphFromPersistedSources(
   previewEdgePresentationEntries: readonly string[] = [],
 ): DslPreviewGraph {
   const sourceMaps = resolvePreviewLayoutSourceMaps(previewLayoutSourceEntries);
-  const edgePresentationByRelationKey =
-    resolvePreviewEdgePresentationSourceMap(previewEdgePresentationEntries);
+  const edgePresentationByRelationKey = resolvePreviewEdgePresentationSourceMap(
+    previewEdgePresentationEntries,
+  );
 
   let nodesChanged = false;
   const nextNodes = graph.nodes.map((node) => {

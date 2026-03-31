@@ -44,9 +44,7 @@ function isEmptySelection(selection: DslCopySelectionRange): boolean {
  * @param selections 선택 범위 목록
  * @returns 정렬된 선택 범위 목록
  */
-function sortSelections(
-  selections: readonly DslCopySelectionRange[],
-): DslCopySelectionRange[] {
+function sortSelections(selections: readonly DslCopySelectionRange[]): DslCopySelectionRange[] {
   return [...selections].sort((left, right) => {
     if (left.startLineNumber !== right.startLineNumber) {
       return left.startLineNumber - right.startLineNumber;
@@ -89,10 +87,7 @@ function buildFullDocumentSelection(lines: readonly string[]): DslCopySelectionR
  * @param selection 선택 범위
  * @returns 포함 여부
  */
-function isHintInSelection(
-  hint: DslPhysicalNameHint,
-  selection: DslCopySelectionRange,
-): boolean {
+function isHintInSelection(hint: DslPhysicalNameHint, selection: DslCopySelectionRange): boolean {
   if (hint.line < selection.startLineNumber || hint.line > selection.endLineNumber) {
     return false;
   }

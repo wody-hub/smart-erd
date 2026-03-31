@@ -89,6 +89,10 @@ export function getApiBaseUrl(): string {
  */
 export function getWsBaseUrl(): string {
   if (!isElectron()) {
+    const directWsBaseUrl = import.meta.env.VITE_WS_DIRECT_BASE_URL;
+    if (directWsBaseUrl) {
+      return directWsBaseUrl.replace(/\/$/, '');
+    }
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${protocol}//${window.location.host}`;
   }

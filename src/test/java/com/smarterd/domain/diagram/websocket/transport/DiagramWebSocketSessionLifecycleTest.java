@@ -12,6 +12,7 @@ import com.smarterd.application.diagram.model.DiagramPresenceSnapshotPayload;
 import com.smarterd.application.diagram.model.DiagramSessionJoinCompletion;
 import com.smarterd.application.diagram.model.DiagramSessionLeaveCompletion;
 import com.smarterd.application.diagram.port.DiagramSessionRef;
+import com.smarterd.domain.diagram.websocket.model.JoinRejectionReason;
 import com.smarterd.domain.diagram.websocket.model.JoinResult;
 import com.smarterd.domain.diagram.websocket.model.LeaveResult;
 import com.smarterd.domain.diagram.websocket.session.DiagramWebSocketSessionInfo;
@@ -39,20 +40,13 @@ class DiagramWebSocketSessionLifecycleTest {
         final var session = mock(WebSocketSession.class);
         final var info = sessionInfo();
 
-        when(
-            diagramSessionTransportUseCase.join(
-                session,
-                info.diagramId(),
-                info.userId(),
-                info.userName()
-            )
-        ).thenReturn(
-            new JoinResult(false, null, null, 0L)
+        when(diagramSessionTransportUseCase.join(session, info.diagramId(), info.userId(), info.userName())).thenReturn(
+            new JoinResult(false, JoinRejectionReason.CONNECTION_LIMIT_EXCEEDED, null, null, 0L)
         );
 
         lifecycle.establish(session, info);
 
-        verify(session).close(CloseStatus.POLICY_VIOLATION);
+        verify(session).close(new CloseStatus(4408, "connection-limit-exceeded"));
         verify(diagramSessionTransportUseCase).join(session, info.diagramId(), info.userId(), info.userName());
         verifyNoMoreInteractions(completeJoinUseCase);
         verifyNoMoreInteractions(completeLeaveUseCase);
@@ -74,17 +68,12 @@ class DiagramWebSocketSessionLifecycleTest {
         );
         final var session = mock(WebSocketSession.class);
         final var info = sessionInfo();
-        final var joinResult = new JoinResult(true, null, null, 0L);
+        final var joinResult = new JoinResult(true, null, null, null, 0L);
         when(session.getId()).thenReturn("session-1");
 
-        when(
-            diagramSessionTransportUseCase.join(
-                session,
-                info.diagramId(),
-                info.userId(),
-                info.userName()
-            )
-        ).thenReturn(joinResult);
+        when(diagramSessionTransportUseCase.join(session, info.diagramId(), info.userId(), info.userName())).thenReturn(
+            joinResult
+        );
 
         lifecycle.establish(session, info);
 
@@ -185,7 +174,11 @@ class DiagramWebSocketSessionLifecycleTest {
             info.diagramId(),
             new DiagramSessionLeaveCompletion(false, new byte[0], "epoch-1", "user-1", 3L)
         );
-        verify(legacyPresencePort).broadcastPeerLeftLegacy(info.diagramId(), new DiagramSessionRef("session-1"), info.loginId());
+        verify(legacyPresencePort).broadcastPeerLeftLegacy(
+            info.diagramId(),
+            new DiagramSessionRef("session-1"),
+            info.loginId()
+        );
         verifyNoMoreInteractions(completeJoinUseCase);
     }
 

@@ -28,8 +28,6 @@ public class LoadCollaborationHandoffUseCase {
      */
     public CollaborationHandoffResult loadHandoffSnapshot(CollaborationResourceKey resourceKey) {
         final var runtimeSupport = collaborationRuntimeSupportRegistry.getRequired(resourceKey);
-        return runtimeSupport
-            .handoffPolicy()
-            .buildHandoffSnapshot(resourceKey, runtimeSupport.snapshotStore());
+        return runtimeSupport.handoffPolicy().buildHandoffSnapshot(resourceKey, runtimeSupport.snapshotStore());
     }
 }
