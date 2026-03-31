@@ -126,7 +126,7 @@ export default function CanvasToolbar({
 
   return (
     <Panel position="top-center">
-      <div className="surface-operational flex gap-1 rounded-lg p-1">
+      <div className="surface-operational flex max-w-[calc(100vw-1rem)] gap-1 overflow-x-auto rounded-lg p-1 whitespace-nowrap md:max-w-none md:overflow-visible [&>*]:shrink-0">
         {canEdit && (
           <Button
             variant="ghost"

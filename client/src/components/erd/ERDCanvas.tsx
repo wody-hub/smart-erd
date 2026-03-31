@@ -853,7 +853,7 @@ function ERDCanvas({
 
   return (
     <div
-      className="w-full h-full"
+      className="h-full min-h-0 w-full min-w-0"
       ref={canvasRef}
       role={isGroupView ? 'region' : undefined}
       aria-label={

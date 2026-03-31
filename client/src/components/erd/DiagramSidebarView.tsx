@@ -93,7 +93,7 @@ function DiagramSidebarView({
   return (
     <aside
       id="diagram-sidebar"
-      className="flex h-full w-full shrink-0 flex-col border-r border-border/75 bg-card/95 px-3 py-3"
+      className="flex h-full w-full shrink-0 flex-col border-r border-border/75 bg-card/95 px-3 py-3 max-md:border-b max-md:border-r-0"
     >
       <div className="flex-1 overflow-auto">
         <div className="flex items-center justify-between mb-3">

@@ -30,6 +30,7 @@ import { isTextInputLikeTarget } from '@/constants/canvas-history';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useRecentProjectContext } from '@/hooks/useRecentProjectContext';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { useSidebarResize, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH } from '@/hooks/useSidebarResize';
@@ -37,6 +38,7 @@ import { useDiagramDictionaryReconciliation } from '@/hooks/useDiagramDictionary
 import { useDiagramSharedSchemaDraft } from '@/collaboration/channel/diagram/use-diagram-shared-schema-draft';
 import { useDiagramDocumentSession } from '@/collaboration/channel/diagram/use-diagram-document-session';
 import { createDiagramWorkModeCapabilities } from '@/lib/diagram-work-mode';
+import { cn } from '@/lib/utils';
 import type { ERDEdge, TableNode } from '@/types/erd';
 import type { DictionaryWorkspaceRouteState } from '@/types/workspace';
 import { useDiagramPageControls } from './use-diagram-page-controls';
@@ -112,6 +114,7 @@ export default function DiagramPage() {
     tableDefinitionExporting,
     validationOpen,
   } = useDiagramPageControls({ diagramId, projectId, t, teamId });
+  const isMobileEditorLayout = useMediaQuery('(max-width: 767px)');
   const workModeCapabilities = useMemo(
     () => createDiagramWorkModeCapabilities(workMode),
     [workMode],
@@ -414,11 +417,21 @@ export default function DiagramPage() {
                       )}
                     </div>
                   )}
-                  <div className="flex flex-1 overflow-hidden bg-background">
+                  <div
+                    className={cn(
+                      'flex flex-1 min-h-0 bg-background',
+                      isMobileEditorLayout
+                        ? 'flex-col overflow-x-hidden overflow-y-auto'
+                        : 'overflow-hidden',
+                    )}
+                  >
                     <div
                       ref={sidebarContainerRef}
-                      className="h-full shrink-0"
-                      style={{ width: sidebarWidth }}
+                      className={cn(
+                        'shrink-0',
+                        isMobileEditorLayout ? 'max-h-[18rem] w-full' : 'h-full',
+                      )}
+                      style={isMobileEditorLayout ? undefined : { width: sidebarWidth }}
                     >
                       {leftPanel === 'sidebar' ? (
                         <DiagramSidebar
@@ -472,24 +485,31 @@ export default function DiagramPage() {
                         </Suspense>
                       )}
                     </div>
-                    <div
-                      ref={sidebarResizeHandleRef}
-                      className="group flex w-3 shrink-0 cursor-col-resize items-stretch justify-center bg-secondary/30 transition-colors hover:bg-secondary/65 active:bg-secondary/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                      onPointerDown={handleSidebarResizeStart}
-                      onKeyDown={handleSidebarResizeKeyDown}
-                      role="separator"
-                      aria-orientation="vertical"
-                      aria-controls="diagram-sidebar"
-                      aria-label={t('erd.sidebar.resize')}
-                      aria-valuemin={SIDEBAR_MIN_WIDTH}
-                      aria-valuemax={SIDEBAR_MAX_WIDTH}
-                      aria-valuenow={sidebarWidth}
-                      title={t('erd.sidebar.resize')}
-                      tabIndex={0}
+                    {!isMobileEditorLayout && (
+                      <div
+                        ref={sidebarResizeHandleRef}
+                        className="group flex w-3 shrink-0 cursor-col-resize items-stretch justify-center bg-secondary/30 transition-colors hover:bg-secondary/65 active:bg-secondary/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                        onPointerDown={handleSidebarResizeStart}
+                        onKeyDown={handleSidebarResizeKeyDown}
+                        role="separator"
+                        aria-orientation="vertical"
+                        aria-controls="diagram-sidebar"
+                        aria-label={t('erd.sidebar.resize')}
+                        aria-valuemin={SIDEBAR_MIN_WIDTH}
+                        aria-valuemax={SIDEBAR_MAX_WIDTH}
+                        aria-valuenow={sidebarWidth}
+                        title={t('erd.sidebar.resize')}
+                        tabIndex={0}
+                      >
+                        <div className="h-full w-px bg-border/80 transition-colors group-hover:bg-primary/80 group-active:bg-primary" />
+                      </div>
+                    )}
+                    <main
+                      className={cn(
+                        'relative flex-1 min-h-0 min-w-0 bg-card/20',
+                        isMobileEditorLayout && 'min-h-[56vh]',
+                      )}
                     >
-                      <div className="h-full w-px bg-border/80 transition-colors group-hover:bg-primary/80 group-active:bg-primary" />
-                    </div>
-                    <main className="relative flex-1 bg-card/20">
                       {showPreviewCanvas ? (
                         <PreviewCanvas
                           previewState={dslPreviewState}

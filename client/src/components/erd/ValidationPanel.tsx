@@ -124,7 +124,7 @@ export default function ValidationPanel({ onClose }: ValidationPanelProps) {
   const progressPercent = totalCount > 0 ? Math.round((matchedCount / totalCount) * 100) : 0;
 
   return (
-    <aside className="flex h-full w-80 flex-col border-l border-border/75 bg-card/95">
+    <aside className="flex h-full w-80 shrink-0 flex-col border-l border-border/75 bg-card/95 max-md:h-[18rem] max-md:w-full max-md:border-l-0 max-md:border-t">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
         <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-secondary">

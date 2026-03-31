@@ -20,7 +20,7 @@ export default function WorkspaceHeaderShell({
   rightSlot,
 }: WorkspaceHeaderShellProps) {
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-header-muted/20 bg-header/95 px-4 text-header-foreground backdrop-blur lg:px-5">
+    <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-header-muted/20 bg-header/95 px-4 py-2 text-header-foreground backdrop-blur max-md:flex-wrap max-md:items-start lg:px-5">
       <div className="min-w-0 flex flex-1 items-center gap-3">
         <div className="min-w-0 flex items-center gap-3">
           <h1
@@ -47,7 +47,9 @@ export default function WorkspaceHeaderShell({
         </div>
       )}
 
-      <div className="ml-auto flex items-center gap-3">{rightSlot}</div>
+      <div className="ml-auto flex items-center gap-3 max-md:w-full max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto max-md:pb-1">
+        {rightSlot}
+      </div>
     </header>
   );
 }
