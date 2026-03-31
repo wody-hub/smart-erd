@@ -1,9 +1,12 @@
 import { lazy, Suspense, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useShallow } from 'zustand/react/shallow';
+import { fetchProject } from '@/api/projectApi';
+import { fetchTeam } from '@/api/teamApi';
 import DiagramCollaboratorsBar from '@/components/erd/DiagramCollaboratorsBar';
 import { DiagramCodeNavigationProvider } from '@/components/erd/DiagramCodeNavigationContext';
 import DiagramWorkModeSwitcher from '@/components/erd/DiagramWorkModeSwitcher';
@@ -25,6 +28,7 @@ import { DocumentMutationSessionProvider } from '@/collaboration/core/session/do
 import type { PreviewSyncStatus } from '@/collaboration/core/collaboration-preview-sync-status';
 import { isTextInputLikeTarget } from '@/constants/canvas-history';
 import { KEYBINDINGS } from '@/constants/keybindings';
+import { queryKeys } from '@/constants/query-keys';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { useSidebarResize, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH } from '@/hooks/useSidebarResize';
 import { useDiagramDictionaryReconciliation } from '@/hooks/useDiagramDictionaryReconciliation';
@@ -72,6 +76,16 @@ export default function DiagramPage() {
   }>();
 
   const { t } = useTranslation();
+  const { data: team } = useQuery({
+    queryKey: queryKeys.teams.detail(teamId!),
+    queryFn: () => fetchTeam(teamId!),
+    enabled: !!teamId,
+  });
+  const { data: project } = useQuery({
+    queryKey: queryKeys.projects.detail(teamId!, projectId!),
+    queryFn: () => fetchProject(teamId!, projectId!),
+    enabled: !!teamId && !!projectId,
+  });
 
   const { workMode, handleWorkModeChange } = useDiagramWorkModeState({
     teamId,
@@ -259,7 +273,14 @@ export default function DiagramPage() {
   if (isError) {
     return (
       <div className="h-screen flex flex-col">
-        <Header />
+        <Header
+          workspaceContext={{
+            team: team ? { id: teamId!, name: team.name } : undefined,
+            project: project ? { id: projectId!, name: project.name } : undefined,
+            section: 'documents',
+            documentType: 'erd',
+          }}
+        />
         <div className="flex-1 flex items-center justify-center">
           <p className="text-destructive">{t('diagram.edit.loadError')}</p>
         </div>
@@ -270,7 +291,14 @@ export default function DiagramPage() {
   if (isLoading) {
     return (
       <div className="h-screen flex flex-col">
-        <Header />
+        <Header
+          workspaceContext={{
+            team: team ? { id: teamId!, name: team.name } : undefined,
+            project: project ? { id: projectId!, name: project.name } : undefined,
+            section: 'documents',
+            documentType: 'erd',
+          }}
+        />
         <div className="flex-1 flex items-center justify-center">
           <Spinner text={t('diagram.edit.loadingDiagram')} />
         </div>
@@ -303,6 +331,17 @@ export default function DiagramPage() {
               <ErdPermissionProvider canEdit={workModeRuntimeState.effectiveCanvasCanEdit}>
                 <div className="h-screen flex flex-col">
                   <Header
+                    workspaceContext={{
+                      team: team ? { id: teamId!, name: team.name } : undefined,
+                      project: project ? { id: projectId!, name: project.name } : undefined,
+                      section: 'documents',
+                      documentType: 'erd',
+                      document: {
+                        id: diagramId!,
+                        name: diagramName,
+                        type: 'erd',
+                      },
+                    }}
                     diagramName={diagramName}
                     onSave={workModeRuntimeState.canPersistDiagramSave ? handleSave : undefined}
                     saving={isDiagramSavePending}

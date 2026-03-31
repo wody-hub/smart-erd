@@ -33,3 +33,4 @@ config:
       componentsDictionary: "client/src/components/dictionary/**"
       componentsLayout: "client/src/components/layout/**"
       componentsErd: "client/src/components/erd/**"
+      componentsWorkspace: "client/src/components/workspace/**"

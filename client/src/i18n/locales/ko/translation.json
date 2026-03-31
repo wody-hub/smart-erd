@@ -29,6 +29,76 @@
       "enterName": "생성할 리소스 이름을 입력하세요."
     }
   },
+  "workspace": {
+    "section": {
+      "teams": "팀",
+      "projects": "프로젝트",
+      "documents": "문서",
+      "dictionary": "사전",
+      "members": "멤버",
+      "settings": "설정"
+    },
+    "teams": {
+      "description": "작업할 팀 워크스페이스를 고르고 프로젝트와 문서 흐름으로 들어갑니다.",
+      "emptyTitle": "아직 팀이 없습니다",
+      "openWorkspace": "워크스페이스 열기"
+    },
+    "documentType": {
+      "erd": "ERD",
+      "markdown": "Markdown",
+      "screenSpec": "화면기획"
+    },
+    "documents": {
+      "title": "문서",
+      "description": "이 프로젝트의 문서를 관리하고 바로 편집으로 들어가세요.",
+      "empty": "이 프로젝트에는 아직 문서가 없습니다. 첫 번째 ERD 문서를 만들어보세요.",
+      "documentCount": "문서 {{count}}개",
+      "typeScopeHint": "현재는 구현된 문서 타입인 ERD만 이 허브에 표시합니다.",
+      "dictionaryContextHint": "새 문서를 만들기 전에 연결할 사전 컨텍스트를 선택하세요."
+    },
+    "projects": {
+      "description": "프로젝트를 선택해 문서 작업 공간으로 들어가세요. 사전, 멤버, 설정은 팀 유틸리티로 분리합니다.",
+      "projectCount": "프로젝트 {{count}}개",
+      "openProject": "문서 열기",
+      "emptyTitle": "아직 프로젝트가 없습니다"
+    },
+    "dictionary": {
+      "description": "ERD와 앞으로 추가될 문서 타입이 공통으로 쓰는 용어, 도메인, 단어 자산을 관리합니다.",
+      "teamContext": "{{name}} 팀의 공통 사전 자산을 관리하는 공간입니다.",
+      "setManagementTitle": "사전 세트 관리",
+      "setManagementDescription": "문서에서 참조할 기본 사전 세트를 고르고, 이름 변경·기본 세트 지정·삭제를 여기서 처리합니다.",
+      "setManagementHint": "아래 탭에서는 현재 선택된 세트의 단어, 용어, 도메인을 편집합니다.",
+      "emptySetTitle": "아직 사전 세트가 없습니다"
+    },
+    "meta": {
+      "updatedAt": "수정일: {{date}}",
+      "dictionaryContext": "연결 사전: {{name}}",
+      "teamContext": "팀: {{name}}"
+    },
+    "action": {
+      "newErdDocument": "새 ERD 문서",
+      "newMarkdownDocument": "새 Markdown 문서",
+      "newScreenSpecDocument": "새 화면기획 문서",
+      "openDocument": "{{name}} 문서 열기",
+      "documentActions": "문서 작업",
+      "renameDocument": "문서 이름 변경",
+      "deleteDocument": "문서 삭제",
+      "projectActions": "프로젝트 작업",
+      "createErdDocumentTitle": "새 ERD 문서 만들기",
+      "erdDocumentNameLabel": "ERD 문서 이름",
+      "erdDocumentNamePlaceholder": "ERD 문서 이름을 입력하세요",
+      "deleteErdDocumentTitle": "ERD 문서 삭제",
+      "deleteErdDocumentDescription": "이 ERD 문서를 정말 삭제하시겠습니까?"
+    },
+    "status": {
+      "loadFailedTitle": "작업 영역을 불러오지 못했습니다",
+      "teamsLoadFailed": "워크스페이스 목록을 다시 불러와 주세요.",
+      "projectsLoadFailed": "팀 컨텍스트는 유지한 채 프로젝트 목록을 다시 불러올 수 있습니다.",
+      "documentsLoadFailed": "프로젝트 컨텍스트는 유지한 채 문서 허브를 다시 불러올 수 있습니다.",
+      "dictionaryLoadFailed": "팀 컨텍스트는 유지한 채 사전 자산 작업 영역을 다시 불러올 수 있습니다.",
+      "retry": "다시 시도"
+    }
+  },
   "auth": {
     "login": {
       "title": "Smart ERD",
@@ -153,23 +223,23 @@
   },
   "diagram": {
     "list": {
-      "title": "다이어그램",
+      "title": "ERD 문서",
       "backToProjects": "프로젝트 목록으로",
-      "newButton": "새 다이어그램",
-      "createButton": "다이어그램 만들기",
-      "empty": "아직 다이어그램이 없습니다. 첫 번째 다이어그램을 만드세요.",
+      "newButton": "새 ERD 문서",
+      "createButton": "ERD 문서 만들기",
+      "empty": "아직 ERD 문서가 없습니다. 첫 번째 ERD 문서를 만들어보세요.",
       "updatedAt": "수정일: {{date}}",
       "selectDictionarySet": "사전 세트 선택",
       "selectDictionaryContext": "사전 컨텍스트 선택"
     },
     "create": {
-      "dialogTitle": "새 다이어그램 만들기",
-      "inputLabel": "다이어그램 이름",
-      "placeholder": "다이어그램 이름을 입력하세요"
+      "dialogTitle": "새 ERD 문서 만들기",
+      "inputLabel": "ERD 문서 이름",
+      "placeholder": "ERD 문서 이름을 입력하세요"
     },
     "delete": {
-      "dialogTitle": "다이어그램 삭제",
-      "dialogDescription": "이 다이어그램을 정말 삭제하시겠습니까?"
+      "dialogTitle": "ERD 문서 삭제",
+      "dialogDescription": "이 ERD 문서를 정말 삭제하시겠습니까?"
     },
     "edit": {
       "loadError": "다이어그램을 불러오는 데 실패했습니다. 나중에 다시 시도해 주세요.",
@@ -210,23 +280,23 @@
       "sharedDraftConflict": "저장된 공유 초안 기준 ERD가 변경되었습니다. 새로고침 후 다시 적용하세요."
     },
     "toast": {
-      "created": "다이어그램이 생성되었습니다",
-      "createFailed": "다이어그램 생성에 실패했습니다",
-      "deleted": "다이어그램이 삭제되었습니다",
-      "deleteFailed": "다이어그램 삭제에 실패했습니다",
-      "renamed": "다이어그램 이름이 변경되었습니다",
-      "renameFailed": "다이어그램 이름 변경에 실패했습니다",
-      "dictionarySetUpdated": "다이어그램 사전 세트가 변경되었습니다",
-      "dictionarySetUpdateFailed": "다이어그램 사전 세트 변경에 실패했습니다",
-      "dictionaryContextUpdated": "다이어그램 사전 컨텍스트가 변경되었습니다",
-      "dictionaryContextUpdateFailed": "다이어그램 사전 컨텍스트 변경에 실패했습니다",
+      "created": "ERD 문서가 생성되었습니다",
+      "createFailed": "ERD 문서 생성에 실패했습니다",
+      "deleted": "ERD 문서가 삭제되었습니다",
+      "deleteFailed": "ERD 문서 삭제에 실패했습니다",
+      "renamed": "ERD 문서 이름이 변경되었습니다",
+      "renameFailed": "ERD 문서 이름 변경에 실패했습니다",
+      "dictionarySetUpdated": "ERD 문서 사전 세트가 변경되었습니다",
+      "dictionarySetUpdateFailed": "ERD 문서 사전 세트 변경에 실패했습니다",
+      "dictionaryContextUpdated": "ERD 문서 사전 컨텍스트가 변경되었습니다",
+      "dictionaryContextUpdateFailed": "ERD 문서 사전 컨텍스트 변경에 실패했습니다",
       "backupSynced": "백업 동기화 완료",
       "noChanges": "변경 사항 없음",
       "backupFailed": "백업 동기화에 실패했습니다"
     },
     "aria": {
-      "renameDiagram": "다이어그램 {{name}} 이름 변경",
-      "deleteDiagram": "다이어그램 {{name}} 삭제"
+      "renameDiagram": "ERD 문서 {{name}} 이름 변경",
+      "deleteDiagram": "ERD 문서 {{name}} 삭제"
     }
   },
   "erd": {
@@ -791,6 +861,7 @@
   "dictionary": {
     "title": "데이터 사전",
     "backToProjects": "프로젝트 목록으로",
+    "backToRecentProject": "이전 프로젝트로 돌아가기",
     "tabs": {
       "words": "단어 사전",
       "domains": "도메인 사전",

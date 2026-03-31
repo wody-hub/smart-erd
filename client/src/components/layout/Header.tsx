@@ -1,15 +1,21 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Save, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import useAuthStore from '@/stores/useAuthStore';
 import { ROUTES } from '@/constants/routes';
 import { isElectron } from '@/lib/platform';
 import LanguageSwitcher from './LanguageSwitcher';
 import type { ConnectionStatus } from '@/types/collaboration';
+import type { WorkspaceContext } from '@/types/workspace';
+import WorkspaceHeaderShell from './WorkspaceHeaderShell';
+import WorkspaceBreadcrumb from './WorkspaceBreadcrumb';
+import EditorHeaderAccessory from './EditorHeaderAccessory';
 
 /** Header 컴포넌트의 props. */
 interface HeaderProps {
+  /** 현재 workspace 컨텍스트 */
+  workspaceContext?: WorkspaceContext;
   /** 현재 다이어그램 이름 (다이어그램 편집 화면에서만 전달) */
   diagramName?: string;
   /** 백업 버튼 클릭 핸들러 */
@@ -40,6 +46,7 @@ interface HeaderProps {
  * @param props.canEdit          편집 가능 여부 (VIEWER일 때 false)
  */
 export default function Header({
+  workspaceContext,
   diagramName,
   onSave,
   saving,
@@ -53,6 +60,7 @@ export default function Header({
   const name = useAuthStore((s) => s.name);
   const logout = useAuthStore((s) => s.logout);
   const isAuthenticated = useAuthStore((s) => !!s.accessToken);
+  const headerTitle = diagramName ?? workspaceContext?.document?.name;
 
   /** 로그아웃 처리 후 로그인 페이지로 이동한다. */
   const handleLogout = () => {
@@ -61,76 +69,48 @@ export default function Header({
   };
 
   return (
-    <header className="h-12 bg-header text-header-foreground flex items-center px-4 shrink-0">
-      <h1 className="text-lg font-bold cursor-pointer" onClick={() => navigate(ROUTES.TEAMS)}>
-        {t('common.appName')}
-      </h1>
-
-      {diagramName && (
-        <div className="ml-4 flex items-center gap-2">
-          <span className="text-sm text-header-muted">/</span>
-          <span className="text-sm font-medium">{diagramName}</span>
-          {connectionStatus && (
-            <span
-              className={`inline-block h-2 w-2 rounded-full ${
-                connectionStatus === 'connected'
-                  ? 'bg-erd-status-connected'
-                  : connectionStatus === 'connecting'
-                    ? 'bg-erd-status-connecting animate-pulse'
-                    : 'bg-erd-status-disconnected'
-              }`}
-              title={t(`collaboration.status.${connectionStatus}`)}
-              aria-label={t(`collaboration.status.${connectionStatus}`)}
-            />
-          )}
-          {onSave && canEdit && (
+    <WorkspaceHeaderShell
+      onAppClick={() => navigate(ROUTES.TEAMS)}
+      appName={t('common.appName')}
+      breadcrumb={<WorkspaceBreadcrumb context={workspaceContext} />}
+      title={headerTitle}
+      rightSlot={
+        <>
+          <EditorHeaderAccessory
+            onSave={onSave}
+            saving={saving}
+            connectionStatus={connectionStatus}
+            canEdit={canEdit}
+            readOnlyMessage={readOnlyMessage}
+            accessory={diagramAccessory}
+          />
+          <LanguageSwitcher />
+          {isElectron() && (
             <Button
               variant="ghost"
-              size="sm"
-              onClick={onSave}
-              disabled={saving}
-              className="text-header-muted hover:text-header-foreground hover:bg-header/80 ml-1"
-            >
-              <Save className="h-4 w-4 mr-1" />
-              {saving ? t('common.button.backingUp') : t('common.button.backup')}
-            </Button>
-          )}
-          {!canEdit && (
-            <span className="text-xs text-header-muted ml-2">
-              {readOnlyMessage ?? t('permission.viewerReadonly')}
-            </span>
-          )}
-        </div>
-      )}
-
-      <div className="ml-auto flex items-center gap-3">
-        {diagramAccessory}
-        <LanguageSwitcher />
-        {isElectron() && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(ROUTES.SETTINGS)}
-            className="text-header-muted hover:text-header-foreground hover:bg-header/80"
-            aria-label={t('settings.aria.settings')}
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-        )}
-        {isAuthenticated && (
-          <>
-            <span className="text-sm text-header-muted">{name}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
+              size="icon"
+              onClick={() => navigate(ROUTES.SETTINGS)}
               className="text-header-muted hover:text-header-foreground hover:bg-header/80"
+              aria-label={t('settings.aria.settings')}
             >
-              {t('auth.logout')}
+              <Settings className="h-4 w-4" />
             </Button>
-          </>
-        )}
-      </div>
-    </header>
+          )}
+          {isAuthenticated && (
+            <>
+              <span className="hidden text-sm text-header-muted sm:inline">{name}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="text-header-muted hover:text-header-foreground hover:bg-header/80"
+              >
+                {t('auth.logout')}
+              </Button>
+            </>
+          )}
+        </>
+      }
+    />
   );
 }

@@ -1,7 +1,16 @@
-import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, ArrowLeft, UserPlus, Trash2, BookOpen, Settings } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  AlertTriangle,
+  Plus,
+  FolderOpen,
+  ArrowLeft,
+  UserPlus,
+  Trash2,
+  BookOpen,
+  Settings,
+  MoreHorizontal,
+} from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import Header from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -12,14 +21,21 @@ import MembersDialog from '@/components/team/MembersDialog';
 import TeamSettingsDialog from '@/components/team/TeamSettingsDialog';
 import ProjectSettingsDialog from '@/components/project/ProjectSettingsDialog';
 import { fetchTeam } from '@/api/teamApi';
-import { fetchProjects, createProject, deleteProject } from '@/api/projectApi';
+import { fetchProjects } from '@/api/projectApi';
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
-import { getErrorMessage } from '@/lib/api-error';
+import { useRecentProjectContext } from '@/hooks/useRecentProjectContext';
 import { useTeamRole } from '@/hooks/useTeamRole';
-import { toast } from 'sonner';
+import ProjectWorkspaceHero from '@/components/workspace/ProjectWorkspaceHero';
+import WorkspaceEmptyState from '@/components/workspace/WorkspaceEmptyState';
+import { useProjectWorkspaceActions } from '@/hooks/useProjectWorkspaceActions';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import Spinner from '@/components/ui/spinner';
-import type { Project } from '@/types/project';
 
 /**
  * 프로젝트 목록 페이지.
@@ -30,21 +46,25 @@ import type { Project } from '@/types/project';
 export default function ProjectsPage() {
   const { teamId } = useParams<{ teamId: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
-
-  /** 프로젝트 생성 다이얼로그 열림 상태 */
-  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
-  /** 멤버 관리 다이얼로그 열림 상태 */
-  const [membersDialogOpen, setMembersDialogOpen] = useState(false);
-  /** 삭제 확인 대상 프로젝트 ID (null이면 다이얼로그 닫힘) */
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
-  /** 팀 설정 다이얼로그 열림 상태 */
-  const [teamSettingsOpen, setTeamSettingsOpen] = useState(false);
-  /** 프로젝트 설정 대상 (null이면 다이얼로그 닫힘) */
-  const [projectSettingsTarget, setProjectSettingsTarget] = useState<Project | null>(null);
-
+  const { clearRecentProjectContext } = useRecentProjectContext(teamId);
   const { isAdmin, canEdit } = useTeamRole(teamId);
+  const {
+    projectDialogOpen,
+    setProjectDialogOpen,
+    membersDialogOpen,
+    setMembersDialogOpen,
+    deleteTarget,
+    setDeleteTarget,
+    teamSettingsOpen,
+    setTeamSettingsOpen,
+    projectSettingsTarget,
+    setProjectSettingsTarget,
+    createProject,
+    confirmDeleteProject,
+    deleteProjectPending,
+    handleMembersChanged,
+  } = useProjectWorkspaceActions(teamId);
 
   const { data: team } = useQuery({
     queryKey: queryKeys.teams.detail(teamId!),
@@ -52,144 +72,172 @@ export default function ProjectsPage() {
     enabled: !!teamId,
   });
 
-  const { data: projects = [], isLoading } = useQuery({
+  const projectsQuery = useQuery({
     queryKey: queryKeys.projects.byTeam(teamId!),
     queryFn: () => fetchProjects(teamId!),
     enabled: !!teamId,
   });
-
-  const createProjectMutation = useMutation({
-    mutationFn: (name: string) => createProject(teamId!, name),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.projects.byTeam(teamId!) });
-      toast.success(t('project.toast.created'));
-    },
-    onError: (err) => toast.error(getErrorMessage(err, t('project.toast.createFailed'))),
-  });
-
-  const deleteProjectMutation = useMutation({
-    mutationFn: (projectId: number) => deleteProject(teamId!, projectId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.projects.byTeam(teamId!) });
-      setDeleteTarget(null);
-      toast.success(t('project.toast.deleted'));
-    },
-    onError: (err) => toast.error(getErrorMessage(err, t('project.toast.deleteFailed'))),
-  });
+  const { data: projects = [], isLoading, isError } = projectsQuery;
 
   return (
     <div className="h-screen flex flex-col">
-      <Header />
+      <Header
+        workspaceContext={{
+          team: team ? { id: teamId!, name: team.name } : undefined,
+          section: 'projects',
+        }}
+      />
       <main className="flex-1 overflow-auto bg-muted p-6">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate(ROUTES.TEAMS)}>
             <ArrowLeft className="h-4 w-4 mr-1" />
             {t('project.list.backToTeams')}
           </Button>
 
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold">{team?.name ?? t('common.loading')}</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                {team?.memberCount != null &&
-                  t('team.list.memberCount', { count: team.memberCount })}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => navigate(ROUTES.DICTIONARY(teamId!))}>
-                <BookOpen className="h-4 w-4 mr-2" />
-                {t('project.list.dictionaryButton')}
-              </Button>
-              <Button variant="outline" onClick={() => setMembersDialogOpen(true)}>
-                <UserPlus className="h-4 w-4 mr-2" />
-                {t('project.list.membersButton')}
-              </Button>
-              {isAdmin && (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setTeamSettingsOpen(true)}
-                  aria-label={t('team.aria.settings')}
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              )}
-              {canEdit && (
+          <ProjectWorkspaceHero
+            eyebrow={t('workspace.section.projects')}
+            title={team?.name ?? t('common.loading')}
+            description={t('workspace.projects.description')}
+            meta={
+              <>
+                {team?.memberCount != null && (
+                  <span>{t('team.list.memberCount', { count: team.memberCount })}</span>
+                )}
+                <span>{t('workspace.projects.projectCount', { count: projects.length })}</span>
+              </>
+            }
+            primaryAction={
+              canEdit ? (
                 <Button onClick={() => setProjectDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   {t('project.list.newButton')}
                 </Button>
-              )}
-            </div>
-          </div>
+              ) : undefined
+            }
+            utilityActions={
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    clearRecentProjectContext();
+                    navigate(ROUTES.DICTIONARY(teamId!));
+                  }}
+                >
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  {t('project.list.dictionaryButton')}
+                </Button>
+                <Button variant="outline" onClick={() => setMembersDialogOpen(true)}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  {t('project.list.membersButton')}
+                </Button>
+                {isAdmin && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setTeamSettingsOpen(true)}
+                    aria-label={t('team.aria.settings')}
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    {t('workspace.section.settings')}
+                  </Button>
+                )}
+              </>
+            }
+          />
 
           {isLoading ? (
             <Spinner text={t('common.loading')} />
-          ) : projects.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">{t('project.list.empty')}</p>
-                {canEdit && (
-                  <Button onClick={() => setProjectDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t('project.list.createButton')}
+          ) : isError ? (
+            <div className="mt-6">
+              <WorkspaceEmptyState
+                icon={<AlertTriangle className="h-10 w-10" />}
+                title={t('workspace.status.loadFailedTitle')}
+                description={t('workspace.status.projectsLoadFailed')}
+                tone="error"
+                role="alert"
+                action={
+                  <Button variant="outline" onClick={() => void projectsQuery.refetch()}>
+                    {t('workspace.status.retry')}
                   </Button>
-                )}
-              </CardContent>
-            </Card>
+                }
+              />
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="mt-6">
+              <WorkspaceEmptyState
+                icon={<FolderOpen className="h-10 w-10" />}
+                title={t('workspace.projects.emptyTitle')}
+                description={t('project.list.empty')}
+                action={
+                  canEdit ? (
+                    <Button onClick={() => setProjectDialogOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t('project.list.createButton')}
+                    </Button>
+                  ) : undefined
+                }
+              />
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {projects.map((project) => (
                 <Card
                   key={project.id}
-                  className="cursor-pointer hover:shadow-md transition-shadow group"
+                  className="group cursor-pointer border-border/70 transition-all hover:border-foreground/20 hover:shadow-sm"
                   onClick={() => navigate(ROUTES.DIAGRAMS(teamId!, project.id))}
                 >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{project.name}</CardTitle>
+                  <CardHeader className="space-y-3 pb-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <CardTitle className="truncate text-lg">{project.name}</CardTitle>
+                        <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                          {project.description || t('project.list.noDescription')}
+                        </p>
+                      </div>
                       {canEdit && (
-                        <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setProjectSettingsTarget(project);
-                            }}
-                            aria-label={t('project.aria.settingsProject', { name: project.name })}
-                          >
-                            <Settings className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteTarget(project.id);
-                            }}
-                            aria-label={t('project.aria.deleteProject', { name: project.name })}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={t('workspace.action.projectActions')}
+                            >
+                              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onSelect={() => setProjectSettingsTarget(project)}
+                            >
+                              <Settings className="mr-2 h-4 w-4" />
+                              {t('project.settings.title')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => setDeleteTarget(project.id)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              {t('common.button.delete')}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-xs text-muted-foreground mb-1">
-                      {project.description || t('project.list.noDescription')}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {t('project.list.createdAt', {
-                        date: new Date(project.createdAt).toLocaleDateString(
-                          i18n.resolvedLanguage ?? i18n.language,
-                        ),
-                      })}
-                    </p>
+                    <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                      <span>
+                        {t('project.list.createdAt', {
+                          date: new Date(project.createdAt).toLocaleDateString(
+                            i18n.resolvedLanguage ?? i18n.language,
+                          ),
+                        })}
+                      </span>
+                      <span className="font-medium text-foreground/80">
+                        {t('workspace.projects.openProject')}
+                      </span>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -204,7 +252,7 @@ export default function ProjectsPage() {
         title={t('project.create.dialogTitle')}
         inputLabel={t('project.create.inputLabel')}
         placeholder={t('project.create.placeholder')}
-        onCreate={(name) => createProjectMutation.mutateAsync(name)}
+        onCreate={createProject}
       />
 
       <MembersDialog
@@ -212,9 +260,7 @@ export default function ProjectsPage() {
         onOpenChange={setMembersDialogOpen}
         teamId={teamId!}
         isAdmin={isAdmin}
-        onMembersChanged={() => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.teams.detail(teamId!) });
-        }}
+        onMembersChanged={handleMembersChanged}
       />
 
       <ConfirmDialog
@@ -224,10 +270,8 @@ export default function ProjectsPage() {
         }}
         title={t('project.delete.dialogTitle')}
         description={t('project.delete.dialogDescription')}
-        onConfirm={() => {
-          if (deleteTarget !== null) deleteProjectMutation.mutate(deleteTarget);
-        }}
-        loading={deleteProjectMutation.isPending}
+        onConfirm={confirmDeleteProject}
+        loading={deleteProjectPending}
       />
 
       {team && (

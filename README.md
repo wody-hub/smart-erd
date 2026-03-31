@@ -762,6 +762,7 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 | `components/auth/`       | 인증 관련 컴포넌트 (ProtectedRoute)                                                          |
 | `components/erd/`        | ERD 도메인 전용 컴포넌트                                                                     |
 | `components/layout/`     | 페이지 구조용 공통 컴포넌트. ERD 전용 상태/협업/UI 책임 금지                                 |
+| `components/workspace/`  | 문서 플랫폼 쉘/허브용 공통 컴포넌트. 도메인 API 호출 없이 표시 모델과 슬롯 조합만 담당       |
 | `pages/`                 | 도메인별 서브디렉토리(`auth/`, `team/`, `project/`, `dictionary/`, `diagram/`)로 페이지 관리 |
 | `stores/`                | Zustand 클라이언트 상태 관리 (`use` prefix)                                                  |
 | `stores/erd/`            | ERD 전용 Zustand 진입 경로. ERD 화면/훅/컴포넌트는 이 경로를 우선 사용                       |
@@ -770,6 +771,7 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 
 - ERD는 사전 "관리 기능"이 아니라 사전 "조회 데이터 계약"만 소비한다.
 - `components/layout/`는 공통 프레임 역할만 수행하고, `useCanvasStore`, `useCollaborationStore`, `react-flow`, Yjs에 직접 의존하지 않는다.
+- `components/workspace/`는 workspace shell, hero, row, empty state 같은 상위 UX 조립만 담당한다. 도메인별 query/mutation은 page 또는 hook 계층에 둔다.
 - ERD 전용 UI는 `components/erd/` 아래에 둔다. 협업 바, 다이어그램 사이드바, 캔버스 보조 UI도 여기에 포함한다.
 - ERD 관련 페이지/훅/컴포넌트는 상태 접근 시 `stores/erd/*` 경로를 우선 사용한다.
 - `components/dictionary/`와 `pages/dictionary/`의 사전 생성/수정/삭제 절차를 ERD 내부에 직접 import하지 않는다.

@@ -405,6 +405,10 @@ export function createCanvasSyncActions(
       const groupsMap = getGroupsMap(ydoc);
       const internal = get().internal;
 
+      ydoc.transact(() => {
+        normalizeEdgeHandlesInYDoc({ doc: ydoc });
+      }, CANVAS_HISTORY_ORIGIN.SYSTEM_FALLBACK);
+
       set({
         nodes: yTablesMapToNodes(tablesMap),
         edges: yEdgesMapToEdges(edgesMap),

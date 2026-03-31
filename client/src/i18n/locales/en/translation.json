@@ -29,6 +29,76 @@
       "enterName": "Enter a name for the resource you want to create."
     }
   },
+  "workspace": {
+    "section": {
+      "teams": "Teams",
+      "projects": "Projects",
+      "documents": "Documents",
+      "dictionary": "Dictionary",
+      "members": "Members",
+      "settings": "Settings"
+    },
+    "teams": {
+      "description": "Choose the team workspace you want to work in, then move into projects and documents.",
+      "emptyTitle": "No teams yet",
+      "openWorkspace": "Open workspace"
+    },
+    "documentType": {
+      "erd": "ERD",
+      "markdown": "Markdown",
+      "screenSpec": "Screen Spec"
+    },
+    "documents": {
+      "title": "Documents",
+      "description": "Manage this project's documents and jump straight into editing.",
+      "empty": "No documents in this project yet. Create your first ERD document.",
+      "documentCount": "{{count}} documents",
+      "typeScopeHint": "Only the implemented document type, ERD, is shown in this hub for now.",
+      "dictionaryContextHint": "Pick the dictionary context to attach before creating a new document."
+    },
+    "projects": {
+      "description": "Pick a project to enter its document workspace. Keep dictionary, members, and settings as team-level utilities.",
+      "projectCount": "{{count}} projects",
+      "openProject": "Open documents",
+      "emptyTitle": "No projects yet"
+    },
+    "dictionary": {
+      "description": "Manage the shared word, term, and domain assets used across ERD and future document types.",
+      "teamContext": "This is the shared dictionary asset hub for team {{name}}.",
+      "setManagementTitle": "Dictionary set management",
+      "setManagementDescription": "Choose the default dictionary set used by documents, then rename it, mark it as default, or delete it here.",
+      "setManagementHint": "Use the tabs below to edit words, terms, and domains in the selected set.",
+      "emptySetTitle": "No dictionary sets yet"
+    },
+    "meta": {
+      "updatedAt": "Updated: {{date}}",
+      "dictionaryContext": "Dictionary: {{name}}",
+      "teamContext": "Team: {{name}}"
+    },
+    "action": {
+      "newErdDocument": "New ERD document",
+      "newMarkdownDocument": "New Markdown document",
+      "newScreenSpecDocument": "New Screen Spec document",
+      "openDocument": "Open document {{name}}",
+      "documentActions": "Document actions",
+      "renameDocument": "Rename document",
+      "deleteDocument": "Delete document",
+      "projectActions": "Project actions",
+      "createErdDocumentTitle": "Create new ERD document",
+      "erdDocumentNameLabel": "ERD document name",
+      "erdDocumentNamePlaceholder": "Enter the ERD document name",
+      "deleteErdDocumentTitle": "Delete ERD document",
+      "deleteErdDocumentDescription": "Are you sure you want to delete this ERD document?"
+    },
+    "status": {
+      "loadFailedTitle": "We couldn't load this workspace",
+      "teamsLoadFailed": "Retry loading the workspace list.",
+      "projectsLoadFailed": "You can retry the project list while keeping the current team context.",
+      "documentsLoadFailed": "You can retry the document hub while keeping the current project context.",
+      "dictionaryLoadFailed": "You can retry the dictionary asset workspace while keeping the current team context.",
+      "retry": "Retry"
+    }
+  },
   "auth": {
     "login": {
       "title": "Smart ERD",
@@ -154,23 +224,23 @@
   },
   "diagram": {
     "list": {
-      "title": "Diagrams",
+      "title": "ERD documents",
       "backToProjects": "Back to Projects",
-      "newButton": "New Diagram",
-      "createButton": "Create Diagram",
-      "empty": "No diagrams yet. Create your first diagram.",
+      "newButton": "New ERD document",
+      "createButton": "Create ERD document",
+      "empty": "No ERD documents yet. Create your first ERD document.",
       "updatedAt": "Updated: {{date}}",
       "selectDictionarySet": "Select dictionary set",
       "selectDictionaryContext": "Select dictionary context"
     },
     "create": {
-      "dialogTitle": "Create New Diagram",
-      "inputLabel": "Diagram Name",
-      "placeholder": "Enter diagram name"
+      "dialogTitle": "Create new ERD document",
+      "inputLabel": "ERD document name",
+      "placeholder": "Enter the ERD document name"
     },
     "delete": {
-      "dialogTitle": "Delete Diagram",
-      "dialogDescription": "Are you sure you want to delete this diagram?"
+      "dialogTitle": "Delete ERD document",
+      "dialogDescription": "Are you sure you want to delete this ERD document?"
     },
     "edit": {
       "loadError": "Failed to load diagram. Please try again later.",
@@ -211,23 +281,23 @@
       "sharedDraftConflict": "The persisted ERD changed since this shared draft started. Refresh before applying it again."
     },
     "toast": {
-      "created": "Diagram created",
-      "createFailed": "Failed to create diagram",
-      "deleted": "Diagram deleted",
-      "deleteFailed": "Failed to delete diagram",
-      "renamed": "Diagram renamed",
-      "renameFailed": "Failed to rename diagram",
-      "dictionarySetUpdated": "Diagram dictionary set updated",
-      "dictionarySetUpdateFailed": "Failed to update diagram dictionary set",
-      "dictionaryContextUpdated": "Diagram dictionary context updated",
-      "dictionaryContextUpdateFailed": "Failed to update diagram dictionary context",
+      "created": "ERD document created",
+      "createFailed": "Failed to create the ERD document",
+      "deleted": "ERD document deleted",
+      "deleteFailed": "Failed to delete the ERD document",
+      "renamed": "ERD document renamed",
+      "renameFailed": "Failed to rename the ERD document",
+      "dictionarySetUpdated": "ERD document dictionary set updated",
+      "dictionarySetUpdateFailed": "Failed to update the ERD document dictionary set",
+      "dictionaryContextUpdated": "ERD document dictionary context updated",
+      "dictionaryContextUpdateFailed": "Failed to update the ERD document dictionary context",
       "backupSynced": "Backup synced",
       "noChanges": "No changes to backup",
       "backupFailed": "Failed to sync backup"
     },
     "aria": {
-      "renameDiagram": "Rename diagram {{name}}",
-      "deleteDiagram": "Delete diagram {{name}}"
+      "renameDiagram": "Rename ERD document {{name}}",
+      "deleteDiagram": "Delete ERD document {{name}}"
     }
   },
   "erd": {
@@ -792,6 +862,7 @@
   "dictionary": {
     "title": "Data Dictionary",
     "backToProjects": "Back to Projects",
+    "backToRecentProject": "Back to Previous Project",
     "tabs": {
       "words": "Words",
       "domains": "Domains",
