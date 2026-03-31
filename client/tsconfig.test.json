@@ -29,6 +29,7 @@
     "src/lib/erd-diff-plan.ts",
     "src/lib/word-composition.ts",
     "src/lib/logical-name-resolution.ts",
+    "src/lib/export/export-pdf.ts",
     "src/lib/handle-id.ts",
     "src/lib/diagram-definition-export.ts",
     "src/lib/edge-handles.ts",
