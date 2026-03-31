@@ -307,6 +307,7 @@
     "codeEditor": {
       "placeholder": "-- SQL DDL을 입력하세요...\n-- 예시:\n-- CREATE TABLE users (\n--   id SERIAL PRIMARY KEY,\n--   name VARCHAR(100) NOT NULL\n-- );",
       "applyButton": "ERD에 적용",
+      "applyOnlyButton": "ERD만 반영",
       "applying": "적용 중...",
       "confirmTitle": "ERD 교체",
       "confirmDescription": "DDL을 적용하면 기존의 모든 테이블과 관계가 교체됩니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?",

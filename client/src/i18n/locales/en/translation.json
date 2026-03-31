@@ -308,6 +308,7 @@
     "codeEditor": {
       "placeholder": "-- Enter SQL DDL here...\n-- Example:\n-- CREATE TABLE users (\n--   id SERIAL PRIMARY KEY,\n--   name VARCHAR(100) NOT NULL\n-- );",
       "applyButton": "Apply to ERD",
+      "applyOnlyButton": "Apply only",
       "applying": "Applying...",
       "confirmTitle": "Replace ERD",
       "confirmDescription": "Applying DDL will replace all existing tables and relationships. This action cannot be undone. Do you want to continue?",

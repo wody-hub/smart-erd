@@ -2375,9 +2375,10 @@ export default function DslCodeEditorPanel({
 
       {/* 파싱 결과 프리뷰 + Apply/Refresh 버튼 */}
         <CodeEditorFooter
-        onApply={handleApplyWithSyncReset}
-        canApply={canApplyWithDraftState}
-        executeApply={executeApplyWithSyncReset}
+          onApply={handleApplyWithSyncReset}
+          applyButtonLabel={persistDraft ? t('erd.codeEditor.applyOnlyButton') : undefined}
+          canApply={canApplyWithDraftState}
+          executeApply={executeApplyWithSyncReset}
         confirmOpen={confirmOpen}
         setConfirmOpen={setConfirmOpen}
         confirmDescription={confirmDescription}
@@ -2391,6 +2392,7 @@ export default function DslCodeEditorPanel({
         refreshConfirmTitle={refreshConfirmCopy.title}
         refreshConfirmDescription={refreshConfirmCopy.description}
         onFinalize={persistDraft ? handleFinalize : undefined}
+        prioritizeFinalizeAction={persistDraft}
         finalizeButtonLabel={persistDraft ? finalizeButtonLabel : undefined}
         canFinalize={canFinalize}
         finalizing={finalizing}

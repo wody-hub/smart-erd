@@ -10,6 +10,8 @@ import ConfirmDialog from '@/components/ui/confirm-dialog';
 interface CodeEditorFooterProps {
   /** Apply 버튼 클릭 핸들러 */
   onApply: () => void;
+  /** Apply 버튼 라벨 */
+  applyButtonLabel?: string;
   /** Apply 버튼 활성화 여부 */
   canApply: boolean;
   /** Apply 확인 다이얼로그 실행 함수 */
@@ -42,6 +44,8 @@ interface CodeEditorFooterProps {
   refreshConfirmDescription?: string;
   /** code 모드 최종 저장 버튼 클릭 핸들러 */
   onFinalize?: () => void;
+  /** code 모드에서 저장 버튼을 주 액션으로 올릴지 여부 */
+  prioritizeFinalizeAction?: boolean;
   /** code 모드 최종 저장 버튼 라벨 */
   finalizeButtonLabel?: string;
   /** code 모드 최종 저장 버튼 활성화 여부 */
@@ -68,6 +72,7 @@ interface CodeEditorFooterProps {
  */
 const CodeEditorFooter = memo(function CodeEditorFooter({
   onApply,
+  applyButtonLabel,
   canApply,
   executeApply,
   confirmOpen,
@@ -84,6 +89,7 @@ const CodeEditorFooter = memo(function CodeEditorFooter({
   refreshConfirmTitle,
   refreshConfirmDescription,
   onFinalize,
+  prioritizeFinalizeAction = false,
   finalizeButtonLabel,
   canFinalize = false,
   finalizing = false,
@@ -92,6 +98,32 @@ const CodeEditorFooter = memo(function CodeEditorFooter({
   children,
 }: CodeEditorFooterProps) {
   const { t } = useTranslation();
+  const applyButton = (
+    <Button
+      className={onFinalize && prioritizeFinalizeAction ? 'gap-1.5' : 'flex-1 gap-1.5'}
+      variant={onFinalize && prioritizeFinalizeAction ? 'outline' : 'default'}
+      size="sm"
+      onClick={onApply}
+      disabled={!canApply}
+    >
+      <Play className="h-3.5 w-3.5" />
+      {applyButtonLabel ?? t('erd.codeEditor.applyButton')}
+    </Button>
+  );
+  const finalizeButton = onFinalize ? (
+    <Button
+      variant={prioritizeFinalizeAction ? 'default' : 'outline'}
+      className={prioritizeFinalizeAction ? 'flex-1 gap-1.5' : 'gap-1.5'}
+      size="sm"
+      onClick={onFinalize}
+      disabled={!canFinalize || finalizing}
+    >
+      <Save className="h-3.5 w-3.5" />
+      {finalizing
+        ? t('erd.codeEditor.finalizeSavingButton')
+        : (finalizeButtonLabel ?? t('erd.codeEditor.finalizeSaveButton'))}
+    </Button>
+  ) : null;
 
   return (
     <>
@@ -101,24 +133,8 @@ const CodeEditorFooter = memo(function CodeEditorFooter({
 
         {/* Apply + Refresh 버튼 */}
         <div className="flex gap-1.5">
-          <Button className="flex-1 gap-1.5" size="sm" onClick={onApply} disabled={!canApply}>
-            <Play className="h-3.5 w-3.5" />
-            {t('erd.codeEditor.applyButton')}
-          </Button>
-          {onFinalize && (
-            <Button
-              variant="outline"
-              className="gap-1.5"
-              size="sm"
-              onClick={onFinalize}
-              disabled={!canFinalize || finalizing}
-            >
-              <Save className="h-3.5 w-3.5" />
-              {finalizing
-                ? t('erd.codeEditor.finalizeSavingButton')
-                : (finalizeButtonLabel ?? t('erd.codeEditor.finalizeSaveButton'))}
-            </Button>
-          )}
+          {prioritizeFinalizeAction ? finalizeButton : applyButton}
+          {prioritizeFinalizeAction ? applyButton : finalizeButton}
           {onFormat && (
             <Button
               variant="outline"
