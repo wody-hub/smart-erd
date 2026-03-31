@@ -41,6 +41,7 @@
     "teams": {
       "description": "작업할 팀 워크스페이스를 고르고 프로젝트와 문서 흐름으로 들어갑니다.",
       "emptyTitle": "아직 팀이 없습니다",
+      "teamCount": "팀 {{count}}개",
       "openWorkspace": "워크스페이스 열기"
     },
     "documentType": {
@@ -272,6 +273,7 @@
       "code": "코드 위주",
       "erd": "ERD 전용",
       "codeInfo": "코드 위주 모드에서는 캔버스가 DSL 기준 미리보기 ERD를 읽기 전용으로 보여줍니다. 변경 사항은 'ERD 적용'을 눌러야 반영됩니다.",
+      "codeInfoCompact": "코드 위주 미리보기",
       "codeDslOnly": "1차는 DSL 탭만 지원",
       "codePreviewParsing": "DSL 미리보기를 생성하고 있습니다.",
       "codePreviewBlocked": "DSL 오류를 해결하면 미리보기 ERD를 표시합니다.",
@@ -340,8 +342,8 @@
       "validateActive": "유효성 검사 (활성)",
       "ddlExport": "SQL DDL",
       "ddlImport": "DDL 가져오기",
-      "dictionary": "사전 관리",
-      "dictionaryActive": "사전 관리 (활성)",
+      "dictionaryContext": "사전 컨텍스트",
+      "dictionaryContextActive": "사전 컨텍스트 (활성)",
       "codeEditor": "코드",
       "codeEditorActive": "코드 에디터 닫기"
     },
@@ -583,6 +585,8 @@
     },
     "color": {
       "default": "기본",
+      "supporting": "보조",
+      "attention": "강조",
       "red": "빨강",
       "orange": "주황",
       "amber": "노랑",

@@ -41,6 +41,7 @@
     "teams": {
       "description": "Choose the team workspace you want to work in, then move into projects and documents.",
       "emptyTitle": "No teams yet",
+      "teamCount": "{{count}} teams",
       "openWorkspace": "Open workspace"
     },
     "documentType": {
@@ -273,6 +274,7 @@
       "code": "Code-first",
       "erd": "ERD-only",
       "codeInfo": "In code-first mode, the canvas shows a read-only ERD preview generated from the DSL. Changes are reflected only after you click 'Apply to ERD'.",
+      "codeInfoCompact": "Code-first preview",
       "codeDslOnly": "Phase 1 supports the DSL tab only",
       "codePreviewParsing": "Building the DSL preview ERD.",
       "codePreviewBlocked": "Fix the DSL errors to show the preview ERD.",
@@ -341,8 +343,8 @@
       "validateActive": "Validate (active)",
       "ddlExport": "SQL DDL",
       "ddlImport": "DDL Import",
-      "dictionary": "Dictionary",
-      "dictionaryActive": "Dictionary (active)",
+      "dictionaryContext": "Dictionary Context",
+      "dictionaryContextActive": "Dictionary Context (active)",
       "codeEditor": "Code",
       "codeEditorActive": "Close code editor"
     },
@@ -584,6 +586,8 @@
     },
     "color": {
       "default": "Default",
+      "supporting": "Supporting",
+      "attention": "Attention",
       "red": "Red",
       "orange": "Orange",
       "amber": "Amber",

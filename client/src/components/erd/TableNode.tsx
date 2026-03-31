@@ -194,8 +194,8 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
       data-table-name={label}
       data-table-logical-name={logicalTableName ?? ''}
       className={cn(
-        'bg-card border border-border rounded shadow-md w-max min-w-[420px]',
-        isHighlighted && 'ring-2 ring-primary shadow-lg',
+        'surface-data w-max min-w-[420px] rounded shadow-operational',
+        isHighlighted && 'ring-2 ring-primary shadow-editorial',
       )}
     >
         {/* Table header */}

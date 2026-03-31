@@ -124,14 +124,16 @@ export default function ValidationPanel({ onClose }: ValidationPanelProps) {
   const progressPercent = totalCount > 0 ? Math.round((matchedCount / totalCount) * 100) : 0;
 
   return (
-    <aside className="w-72 border-l border-border bg-card flex flex-col h-full">
+    <aside className="flex h-full w-80 flex-col border-l border-border/75 bg-card/95">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <h3 className="text-sm font-semibold">{t('erd.validation.panelTitle')}</h3>
+      <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-secondary">
+          {t('erd.validation.panelTitle')}
+        </h3>
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6"
+          className="h-8 w-8"
           onClick={onClose}
           aria-label={t('common.button.close')}
         >
@@ -140,13 +142,13 @@ export default function ValidationPanel({ onClose }: ValidationPanelProps) {
       </div>
 
       {/* Summary */}
-      <div className="px-3 py-2 border-b border-border">
-        <div className="text-xs text-muted-foreground mb-1">
+      <div className="border-b border-border/70 px-4 py-4">
+        <div className="mb-2 text-xs uppercase tracking-[0.12em] text-muted-foreground">
           {t('erd.validation.summary', { matched: matchedCount, total: totalCount })}
         </div>
-        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+        <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/70">
           <div
-            className="h-full bg-erd-validation-matched rounded-full transition-all"
+            className="h-full rounded-full bg-erd-validation-matched transition-all"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -155,11 +157,11 @@ export default function ValidationPanel({ onClose }: ValidationPanelProps) {
       {/* Body */}
       <div className="flex-1 overflow-y-auto">
         {!hasDictionary ? (
-          <div className="p-4 text-xs text-muted-foreground text-center">
+          <div className="p-5 text-center text-xs text-muted-foreground">
             {t('erd.validation.emptyDictionary')}
           </div>
         ) : totalCount > 0 && matchedCount === totalCount ? (
-          <div className="p-4 text-xs text-erd-validation-matched text-center">
+          <div className="p-5 text-center text-xs font-medium text-erd-validation-matched">
             {t('erd.validation.allMatched')}
           </div>
         ) : (
@@ -177,8 +179,8 @@ export default function ValidationPanel({ onClose }: ValidationPanelProps) {
                 <CollapsibleTrigger asChild>
                   <button
                     className={cn(
-                      'w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-accent cursor-pointer text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                      hasIssues && 'font-medium',
+                      'flex w-full cursor-pointer items-center gap-2 border-b border-border/50 px-4 py-2.5 text-left text-xs transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/30',
+                      hasIssues && 'font-medium text-foreground',
                     )}
                   >
                     {isOpen ? (
@@ -193,7 +195,7 @@ export default function ValidationPanel({ onClose }: ValidationPanelProps) {
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <div className="pl-2 border-l-2 border-border ml-4 mb-1">
+                  <div className="mb-2 ml-5 border-l border-border/70 pl-3">
                     {table.columns.map((col) => (
                       <ColumnRow key={col.colId} result={col} />
                     ))}

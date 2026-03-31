@@ -32,8 +32,8 @@ interface DocumentHubRowProps {
 
 const STATUS_TONE_STYLES = {
   neutral: 'text-muted-foreground',
-  success: 'text-emerald-700',
-  warning: 'text-amber-700',
+  success: 'text-erd-validation-matched',
+  warning: 'text-erd-validation-mismatch',
 } as const;
 
 export default function DocumentHubRow({
@@ -55,7 +55,7 @@ export default function DocumentHubRow({
     : null;
 
   return (
-    <div className="group rounded-xl border bg-background transition-colors hover:border-foreground/20">
+    <div className="surface-operational group rounded-xl transition-all hover:-translate-y-0.5 hover:border-primary/20">
       <div className="flex flex-col gap-3 px-4 py-4 lg:flex-row lg:items-center lg:gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -99,14 +99,14 @@ export default function DocumentHubRow({
                 className="min-w-0 text-left"
                 aria-label={t('workspace.action.openDocument', { name: item.name })}
               >
-                <span className="block truncate text-base font-semibold text-foreground transition-colors group-hover:text-primary">
+                <span className="block truncate text-[1.02rem] font-semibold tracking-[-0.02em] text-foreground transition-colors group-hover:text-primary">
                   {item.name}
                 </span>
               </button>
             )}
           </div>
 
-          <div className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-1">
+          <div className="mt-3 flex flex-col gap-1 text-sm text-muted-foreground md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-1">
             <span>{updatedAtLabel}</span>
             {dictionaryContextLabel && <span>{dictionaryContextLabel}</span>}
             {item.statusLabel && (

@@ -118,8 +118,8 @@ export default function DiagramsPage() {
           documentType: 'erd',
         }}
       />
-      <main className="flex-1 overflow-auto bg-muted p-6">
-        <div className="max-w-4xl mx-auto">
+      <main className="workspace-shell flex-1 overflow-auto p-6">
+        <div className="workspace-container max-w-5xl">
           <Button
             variant="ghost"
             size="sm"
@@ -134,6 +134,7 @@ export default function DiagramsPage() {
             eyebrow={t(documentTitleToken.key)}
             title={project?.name ?? t('common.loading')}
             description={project?.description || t('workspace.documents.description')}
+            tone="documents"
             meta={
               <>
                 {team && <span>{t('workspace.meta.teamContext', { name: team.name })}</span>}
@@ -149,24 +150,29 @@ export default function DiagramsPage() {
               ) : undefined
             }
             utilityActions={
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    recordRecentProjectContext(projectId!);
-                    navigate(ROUTES.DICTIONARY(teamId!));
-                  }}
-                >
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  {t('project.list.dictionaryButton')}
-                </Button>
+              <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      recordRecentProjectContext(projectId!);
+                      navigate(ROUTES.DICTIONARY(teamId!));
+                    }}
+                  >
+                    <BookOpen className="mr-2 h-4 w-4 text-brand-secondary" />
+                    {t('project.list.dictionaryButton')}
+                  </Button>
+                </div>
                 {canEdit && (
-                  <div className="flex min-w-[280px] flex-1 items-center gap-2">
+                  <div className="workspace-labeled-control w-full lg:max-w-sm">
+                    <span className="workspace-control-label">
+                      {t('diagram.list.selectDictionaryContext')}
+                    </span>
                     <Select
                       value={createDictionaryContextId}
                       onValueChange={setCreateDictionaryContextId}
                     >
-                      <SelectTrigger className="w-full bg-background">
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder={t('diagram.list.selectDictionaryContext')} />
                       </SelectTrigger>
                       <SelectContent>
@@ -177,24 +183,24 @@ export default function DiagramsPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <span className="hidden text-xs text-muted-foreground xl:inline">
+                    <p className="workspace-control-help">
                       {t('workspace.documents.dictionaryContextHint')}
-                    </span>
+                    </p>
                   </div>
                 )}
-              </>
+              </div>
             }
           />
 
-          <div className="mt-6 rounded-xl border border-border/70 bg-background/80 px-4 py-3">
+          <div className="surface-operational mt-6 rounded-xl px-4 py-3">
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-3">
                 <DocumentTypeBadge documentType="erd" />
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-ink-secondary">
                   {t('workspace.documents.typeScopeHint')}
                 </p>
               </div>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
                 {t('workspace.documents.documentCount', { count: diagrams.length })}
               </span>
             </div>
@@ -256,7 +262,7 @@ export default function DiagramsPage() {
                             updateDictionaryContext(diagram.id, Number(value))
                           }
                         >
-                          <SelectTrigger className="h-9">
+                          <SelectTrigger className="h-9 min-w-[220px]">
                             <SelectValue placeholder={t('diagram.list.selectDictionaryContext')} />
                           </SelectTrigger>
                           <SelectContent>

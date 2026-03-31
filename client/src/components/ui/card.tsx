@@ -10,7 +10,10 @@ function Card({
   return (
     <div
       ref={ref}
-      className={cn('rounded-lg border bg-card text-card-foreground shadow-sm', className)}
+      className={cn(
+        'rounded-lg border border-border/85 bg-card/95 text-card-foreground shadow-operational backdrop-blur-[1px]',
+        className,
+      )}
       {...props}
     />
   );
@@ -32,7 +35,7 @@ function CardTitle({
   return (
     <div
       ref={ref}
-      className={cn('text-2xl font-semibold leading-none tracking-tight', className)}
+      className={cn('text-2xl font-semibold leading-none tracking-[-0.025em]', className)}
       {...props}
     />
   );

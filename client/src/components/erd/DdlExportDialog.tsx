@@ -98,7 +98,7 @@ export default function DdlExportDialog({ open, onOpenChange, diagramName }: Ddl
             <div className="space-y-1">
               <Label>{t('erd.ddlExport.dbmsLabel')}</Label>
               <Select value={dbms} onValueChange={(v) => setDbms(v as DbmsType)}>
-                <SelectTrigger className="w-[200px]" aria-label={t('erd.ddlExport.dbmsLabel')}>
+                <SelectTrigger className="h-9 w-[220px]" aria-label={t('erd.ddlExport.dbmsLabel')}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

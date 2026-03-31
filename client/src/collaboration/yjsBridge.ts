@@ -1,5 +1,6 @@
 import * as Y from 'yjs';
 import { type Edge, type Node } from '@xyflow/react';
+import { normalizeTableHeaderColor } from '../lib/table-colors.js';
 import type {
   Column,
   EdgeHandleMode,
@@ -148,7 +149,9 @@ export function yTableYMapToNode(tableId: string, tableYMap: Y.Map<unknown>): No
       label: (tableYMap.get('label') as string) ?? 'Untitled',
       logicalTableName: (tableYMap.get('logicalTableName') as string) ?? undefined,
       tableTermId: (tableYMap.get('tableTermId') as number) ?? undefined,
-      headerColor: (tableYMap.get('headerColor') as TableHeaderColor) ?? undefined,
+      headerColor: normalizeTableHeaderColor(
+        (tableYMap.get('headerColor') as TableHeaderColor) ?? undefined,
+      ),
       handleLayout: (tableYMap.get('handleLayout') as TableHandleLayout) ?? undefined,
       columns,
     },
@@ -224,7 +227,7 @@ export function yGroupYMapToTableGroup(groupId: string, groupYMap: Y.Map<unknown
   return {
     id: groupId,
     label: (groupYMap.get('label') as string) ?? 'Group',
-    color: (groupYMap.get('color') as TableHeaderColor) ?? undefined,
+    color: normalizeTableHeaderColor((groupYMap.get('color') as TableHeaderColor) ?? undefined),
     tableIds,
   };
 }

@@ -1085,6 +1085,8 @@ export class ErdDocumentMutationApplier {
 
   private readGroupColor(value: unknown): TableHeaderColor | 'default' | null {
     return value === 'default' ||
+      value === 'supporting' ||
+      value === 'attention' ||
       value === 'red' ||
       value === 'orange' ||
       value === 'amber' ||

@@ -10,9 +10,9 @@ interface DocumentTypeBadgeProps {
 }
 
 const DOCUMENT_TYPE_BADGE_STYLES: Record<WorkspaceDocumentType, string> = {
-  erd: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  markdown: 'border-sky-200 bg-sky-50 text-sky-700',
-  'screen-spec': 'border-amber-200 bg-amber-50 text-amber-700',
+  erd: 'border-brand-warm/30 bg-brand-warm/12 text-brand-warm',
+  markdown: 'border-primary/20 bg-primary/10 text-primary',
+  'screen-spec': 'border-brand-secondary/24 bg-brand-secondary/12 text-brand-secondary',
 };
 
 export default function DocumentTypeBadge({
@@ -26,7 +26,7 @@ export default function DocumentTypeBadge({
     <Badge
       variant="outline"
       className={cn(
-        'rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em]',
+        'rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]',
         DOCUMENT_TYPE_BADGE_STYLES[documentType],
         className,
       )}

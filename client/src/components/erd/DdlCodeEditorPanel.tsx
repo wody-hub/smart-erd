@@ -641,7 +641,7 @@ function SqlDdlEditor({
           {t('erd.ddlImport.dbmsLabel')}
         </Label>
         <Select value={dbms} onValueChange={(v) => handleDbmsChange(v as DbmsType)}>
-          <SelectTrigger className="h-8 text-xs" aria-label={t('erd.ddlImport.dbmsLabel')}>
+          <SelectTrigger className="h-9 text-sm" aria-label={t('erd.ddlImport.dbmsLabel')}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

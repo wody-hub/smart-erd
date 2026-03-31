@@ -39,10 +39,10 @@ export default function WorkspaceBreadcrumb({ context }: WorkspaceBreadcrumbProp
 
   return (
     <>
-      <div className="hidden min-w-0 items-center gap-2 text-sm text-header-muted md:flex">
+      <div className="hidden min-w-0 items-center gap-2 text-[13px] text-header-muted md:flex">
         {renderItems(items)}
       </div>
-      <div className="min-w-0 flex items-center gap-2 text-sm text-header-muted md:hidden">
+      <div className="min-w-0 flex items-center gap-2 text-[13px] text-header-muted md:hidden">
         {renderItems(mobileItems)}
       </div>
     </>

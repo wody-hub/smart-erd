@@ -38,6 +38,14 @@ export interface WorkspaceContext {
   documentType?: WorkspaceDocumentType;
 }
 
+/** Dictionary 페이지 이동 시 넘기는 route state 계약. */
+export interface DictionaryWorkspaceRouteState {
+  /** 편집기에서 고정할 사전 세트 ID */
+  fixedSetId?: string;
+  /** 편집기에서 고정할 사전 세트 라벨 */
+  fixedSetLabel?: string | null;
+}
+
 /** 문서 허브 목록에서 쓰는 상태 톤. */
 export type WorkspaceDocumentStatusTone = 'neutral' | 'success' | 'warning';
 

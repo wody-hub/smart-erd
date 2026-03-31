@@ -92,7 +92,7 @@ export default function DdlImportDialog({ open, onOpenChange }: DdlImportDialogP
         <div className="space-y-1">
           <Label>{t('erd.ddlImport.dbmsLabel')}</Label>
           <Select value={dbms} onValueChange={(v) => handleDbmsChange(v as DbmsType)}>
-            <SelectTrigger className="w-[200px]" aria-label={t('erd.ddlImport.dbmsLabel')}>
+            <SelectTrigger className="h-9 w-[220px]" aria-label={t('erd.ddlImport.dbmsLabel')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

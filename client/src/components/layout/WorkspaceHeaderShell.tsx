@@ -20,10 +20,13 @@ export default function WorkspaceHeaderShell({
   rightSlot,
 }: WorkspaceHeaderShellProps) {
   return (
-    <header className="h-12 bg-header text-header-foreground flex items-center gap-4 px-4 shrink-0">
-      <div className="min-w-0 flex flex-1 items-center gap-4">
-        <div className="min-w-0 flex items-center gap-4">
-          <h1 className="text-lg font-bold cursor-pointer whitespace-nowrap" onClick={onAppClick}>
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-header-muted/20 bg-header/95 px-4 text-header-foreground backdrop-blur lg:px-5">
+      <div className="min-w-0 flex flex-1 items-center gap-3">
+        <div className="min-w-0 flex items-center gap-3">
+          <h1
+            className="cursor-pointer whitespace-nowrap font-display text-[1.05rem] font-semibold tracking-[-0.03em]"
+            onClick={onAppClick}
+          >
             {appName}
           </h1>
           {breadcrumb}
@@ -31,7 +34,7 @@ export default function WorkspaceHeaderShell({
 
         {title && (
           <div className="min-w-0 flex-1 md:hidden">
-            <span className="block truncate text-xs font-medium text-header-foreground/90">
+            <span className="block truncate text-xs font-medium tracking-[-0.01em] text-header-foreground/90">
               {title}
             </span>
           </div>
@@ -40,7 +43,7 @@ export default function WorkspaceHeaderShell({
 
       {title && (
         <div className="hidden min-w-0 flex-1 justify-center md:flex">
-          <span className="truncate text-sm font-medium">{title}</span>
+          <span className="truncate text-sm font-medium tracking-[-0.01em]">{title}</span>
         </div>
       )}
 

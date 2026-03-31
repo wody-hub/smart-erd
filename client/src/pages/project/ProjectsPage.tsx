@@ -87,8 +87,8 @@ export default function ProjectsPage() {
           section: 'projects',
         }}
       />
-      <main className="flex-1 overflow-auto bg-muted p-6">
-        <div className="max-w-5xl mx-auto">
+      <main className="workspace-shell flex-1 overflow-auto p-6">
+        <div className="workspace-container">
           <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate(ROUTES.TEAMS)}>
             <ArrowLeft className="h-4 w-4 mr-1" />
             {t('project.list.backToTeams')}
@@ -98,6 +98,7 @@ export default function ProjectsPage() {
             eyebrow={t('workspace.section.projects')}
             title={team?.name ?? t('common.loading')}
             description={t('workspace.projects.description')}
+            tone="projects"
             meta={
               <>
                 {team?.memberCount != null && (
@@ -123,11 +124,11 @@ export default function ProjectsPage() {
                     navigate(ROUTES.DICTIONARY(teamId!));
                   }}
                 >
-                  <BookOpen className="h-4 w-4 mr-2" />
+                  <BookOpen className="mr-2 h-4 w-4 text-brand-secondary" />
                   {t('project.list.dictionaryButton')}
                 </Button>
                 <Button variant="outline" onClick={() => setMembersDialogOpen(true)}>
-                  <UserPlus className="h-4 w-4 mr-2" />
+                  <UserPlus className="mr-2 h-4 w-4 text-primary" />
                   {t('project.list.membersButton')}
                 </Button>
                 {isAdmin && (
@@ -182,14 +183,17 @@ export default function ProjectsPage() {
               {projects.map((project) => (
                 <Card
                   key={project.id}
-                  className="group cursor-pointer border-border/70 transition-all hover:border-foreground/20 hover:shadow-sm"
+                  className="workspace-grid-card group cursor-pointer"
                   onClick={() => navigate(ROUTES.DIAGRAMS(teamId!, project.id))}
                 >
-                  <CardHeader className="space-y-3 pb-2">
+                  <CardHeader className="space-y-4 pb-2">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <CardTitle className="truncate text-lg">{project.name}</CardTitle>
-                        <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                        <p className="workspace-kicker">{t('workspace.section.projects')}</p>
+                        <CardTitle className="mt-3 truncate font-display text-[1.72rem] tracking-[-0.03em]">
+                          {project.name}
+                        </CardTitle>
+                        <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted-foreground">
                           {project.description || t('project.list.noDescription')}
                         </p>
                       </div>
@@ -226,15 +230,15 @@ export default function ProjectsPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                      <span>
+                    <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-4 text-xs uppercase tracking-[0.12em] text-ink-secondary">
+                      <span className="truncate">
                         {t('project.list.createdAt', {
                           date: new Date(project.createdAt).toLocaleDateString(
                             i18n.resolvedLanguage ?? i18n.language,
                           ),
                         })}
                       </span>
-                      <span className="font-medium text-foreground/80">
+                      <span className="font-medium text-foreground transition-colors group-hover:text-primary">
                         {t('workspace.projects.openProject')}
                       </span>
                     </div>

@@ -227,47 +227,50 @@ export default function DictionaryWorkspace({
   return (
     <div className={cn(isFixedDialogMode && 'flex min-h-0 flex-1 flex-col')}>
       {fixedSetId ? (
-        <div className="mb-4 rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+        <div className="surface-operational mb-4 rounded-xl px-4 py-3 text-sm text-ink-secondary">
           {t('diagram.edit.dictionaryContext', { name: fixedSetLabel ?? selectedSet?.name ?? '-' })}
         </div>
       ) : (
-        <Card className="mb-6 border-border/70">
+        <Card className="surface-operational mb-6 overflow-hidden border-brand-secondary/15 shadow-none">
           <CardHeader className="pb-4">
             <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-secondary">
                   {t('workspace.section.dictionary')}
                 </p>
-                <CardTitle className="mt-3 text-xl">
+                <CardTitle className="mt-3 text-[1.3rem] font-semibold tracking-[-0.02em]">
                   {t('workspace.dictionary.setManagementTitle')}
                 </CardTitle>
-                <CardDescription className="mt-3 max-w-2xl leading-6">
+                <CardDescription className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">
                   {t('workspace.dictionary.setManagementDescription')}
                 </CardDescription>
               </div>
               <div className="w-full xl:max-w-sm">
-                <Select value={selectedSetId} onValueChange={setSelectedSetId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={t('dictionary.set.placeholder')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dictionarySets.map((set) => (
-                      <SelectItem key={set.id} value={String(set.id)}>
-                        {set.name}
-                        {set.isDefault ? ` (${t('dictionary.set.defaultBadge')})` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="workspace-labeled-control min-w-0 bg-background/72 p-3.5">
+                  <span className="workspace-control-label">{t('dictionary.set.placeholder')}</span>
+                  <Select value={selectedSetId} onValueChange={setSelectedSetId}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={t('dictionary.set.placeholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dictionarySets.map((set) => (
+                        <SelectItem key={set.id} value={String(set.id)}>
+                          {set.name}
+                          {set.isDefault ? ` (${t('dictionary.set.defaultBadge')})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-wrap items-center gap-2 border-t border-border/70 pt-4">
+          <CardContent className="border-t border-border/65 bg-brand-secondary/5 pt-4">
+            <div className="flex flex-wrap items-center gap-2">
               {canEdit && (
                 <>
                   <Button variant="outline" onClick={() => setCreateDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-1" />
+                    <Plus className="mr-1 h-4 w-4 text-primary" />
                     {t('dictionary.set.newButton')}
                   </Button>
                   <Button
@@ -275,7 +278,7 @@ export default function DictionaryWorkspace({
                     onClick={() => setRenameDialogOpen(true)}
                     disabled={!selectedSet || renameSetMutation.isPending}
                   >
-                    <Pencil className="h-4 w-4 mr-1" />
+                    <Pencil className="mr-1 h-4 w-4 text-brand-secondary" />
                     {t('dictionary.set.renameButton')}
                   </Button>
                   <Button
@@ -283,7 +286,7 @@ export default function DictionaryWorkspace({
                     onClick={handleSetDefault}
                     disabled={!selectedSet || selectedSet.isDefault || setDefaultMutation.isPending}
                   >
-                    <Star className="h-4 w-4 mr-1" />
+                    <Star className="mr-1 h-4 w-4 text-brand-warm" />
                     {t('dictionary.set.setDefaultButton')}
                   </Button>
                   <Button
@@ -291,7 +294,7 @@ export default function DictionaryWorkspace({
                     onClick={() => setDeleteDialogOpen(true)}
                     disabled={!selectedSet || deleteSetMutation.isPending}
                   >
-                    <Trash2 className="h-4 w-4 mr-1" />
+                    <Trash2 className="mr-1 h-4 w-4 text-destructive" />
                     {t('dictionary.set.deleteButton')}
                   </Button>
                 </>
@@ -302,20 +305,22 @@ export default function DictionaryWorkspace({
                 onClick={() => downloadAllMutation.mutate()}
                 disabled={downloadAllMutation.isPending || !selectedSetId}
               >
-                <Download className="h-4 w-4 mr-1" />
+                <Download className="mr-1 h-4 w-4 text-primary" />
                 {downloadAllMutation.isPending
                   ? t('dictionary.export.allExporting')
                   : t('dictionary.export.allButton')}
               </Button>
             </div>
-            <p className="mt-4 text-xs leading-5 text-muted-foreground">
-              {t('workspace.dictionary.setManagementHint')}
-            </p>
           </CardContent>
         </Card>
       )}
 
-      <Card className={cn('border-border/70', isFixedDialogMode && 'flex min-h-0 flex-1 flex-col')}>
+      <Card
+        className={cn(
+          'surface-operational overflow-hidden border-border/85',
+          isFixedDialogMode && 'flex min-h-0 flex-1 flex-col',
+        )}
+      >
         {dictionaryTabs}
       </Card>
 

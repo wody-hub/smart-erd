@@ -1,18 +1,19 @@
 import { useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Header from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import DictionaryWorkspace from '@/components/dictionary/DictionaryWorkspace';
+import ProjectWorkspaceHero from '@/components/workspace/ProjectWorkspaceHero';
 import { fetchProjects } from '@/api/projectApi';
 import { fetchTeam } from '@/api/teamApi';
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
 import { useRecentProjectContext } from '@/hooks/useRecentProjectContext';
 import { useTeamRole } from '@/hooks/useTeamRole';
+import type { DictionaryWorkspaceRouteState } from '@/types/workspace';
 
 /**
  * 데이터 사전 페이지.
@@ -22,9 +23,11 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 export default function DictionaryPage() {
   const { teamId } = useParams<{ teamId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
   const { canEdit } = useTeamRole(teamId);
   const { recentProjectContext, clearRecentProjectContext } = useRecentProjectContext(teamId);
+  const dictionaryRouteState = location.state as DictionaryWorkspaceRouteState | undefined;
 
   const { data: team } = useQuery({
     queryKey: queryKeys.teams.detail(teamId!),
@@ -65,36 +68,33 @@ export default function DictionaryPage() {
           section: 'dictionary',
         }}
       />
-      <main className="flex-1 overflow-auto bg-muted p-6">
-        <div className="mx-auto w-full max-w-[1400px]">
-          <Card className="mb-6 border-border/70 bg-gradient-to-br from-background via-background to-muted/50">
-            <CardContent className="flex flex-col gap-5 p-6 md:p-8">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    {t('workspace.section.dictionary')}
-                  </p>
-                  <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground">
-                    {t('dictionary.title')}
-                  </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-                    {t('workspace.dictionary.description')}
-                  </p>
-                  {team && (
-                    <p className="mt-4 text-sm text-muted-foreground">
-                      {t('workspace.dictionary.teamContext', { name: team.name })}
-                    </p>
-                  )}
-                </div>
-                <Button variant="outline" onClick={() => navigate(backTarget)}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  {backLabel}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+      <main className="workspace-shell flex-1 overflow-auto p-6">
+        <div className="workspace-container">
+          <ProjectWorkspaceHero
+            eyebrow={t('workspace.section.dictionary')}
+            title={t('dictionary.title')}
+            description={t('workspace.dictionary.description')}
+            tone="dictionary"
+            meta={
+              team ? <span>{t('workspace.dictionary.teamContext', { name: team.name })}</span> : undefined
+            }
+            className="mb-6"
+            primaryAction={
+              <Button variant="outline" onClick={() => navigate(backTarget)}>
+                <ArrowLeft className="mr-2 h-4 w-4 text-brand-secondary" />
+                {backLabel}
+              </Button>
+            }
+          />
 
-          {teamId && <DictionaryWorkspace teamId={teamId} canEdit={canEdit} />}
+          {teamId && (
+            <DictionaryWorkspace
+              teamId={teamId}
+              canEdit={canEdit}
+              fixedSetId={dictionaryRouteState?.fixedSetId}
+              fixedSetLabel={dictionaryRouteState?.fixedSetLabel}
+            />
+          )}
         </div>
       </main>
     </div>

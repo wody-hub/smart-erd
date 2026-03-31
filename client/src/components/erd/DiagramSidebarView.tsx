@@ -93,11 +93,11 @@ function DiagramSidebarView({
   return (
     <aside
       id="diagram-sidebar"
-      className="h-full w-full bg-muted border-r border-border p-4 shrink-0 flex flex-col"
+      className="flex h-full w-full shrink-0 flex-col border-r border-border/75 bg-card/95 px-3 py-3"
     >
       <div className="flex-1 overflow-auto">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             {t('erd.sidebar.tables')}
           </h2>
           {canEdit && (
@@ -114,7 +114,7 @@ function DiagramSidebarView({
           )}
         </div>
 
-        <div className="space-y-0.5">
+        <div className="space-y-1">
           {tableEntries.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               {activeGroup ? t('erd.group.noTables') : t('erd.sidebar.noTables')}
@@ -138,7 +138,7 @@ function DiagramSidebarView({
         </div>
 
         <div className="flex items-center justify-between mb-3 mt-5">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             {t('erd.sidebar.groups')}
           </h2>
           {canEdit && (
@@ -156,8 +156,11 @@ function DiagramSidebarView({
         </div>
 
         {activeGroupId && activeGroup && (
-          <div className="mb-3 px-3 py-2 rounded-md bg-muted flex items-center gap-2" role="status">
-            <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div
+            className="mb-3 flex items-center gap-2 rounded-lg border border-border/70 bg-secondary/35 px-3 py-2"
+            role="status"
+          >
+            <Layers className="h-4 w-4 shrink-0 text-primary" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{activeGroup.label}</p>
               <p className="text-xs text-muted-foreground">{t('erd.group.readonly')}</p>
@@ -165,7 +168,7 @@ function DiagramSidebarView({
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 shrink-0"
+              className="h-7 w-7 shrink-0"
               onClick={onBackToAll}
               aria-label={t('erd.group.aria.backToAll')}
             >
