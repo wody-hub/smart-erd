@@ -29,8 +29,9 @@
 
 1. **파싱 실패 시 원본 보존**
    - `markdown.ts:parseMarkdownBuffer()` — YAML 파싱 실패 시 `{}`로 대체하는 대신 원본 frontmatter 텍스트를 보존
-   - `frontmatterRaw: string | null` 필드 추가하여 파싱 실패 시에도 원본 유지
-   - 직렬화 시 파싱 실패 상태면 원본 텍스트를 그대로 출력
+   - 기존 `ParsedMarkdownBuffer.frontmatterText: string | null` 필드를 활용하여 파싱 실패 시에도 원본 유지 (신규 필드 추가 불필요)
+   - `frontmatterValid: boolean` 플래그를 추가하여 파싱 성공/실패를 명시적으로 구분
+   - 직렬화 시 파싱 실패 상태면 `frontmatterText` 원본을 그대로 출력
 
 2. **DraftState 연동**
    - dirty-invalid 상태에서 frontmatter 파싱 실패 시 Y.Doc에 커밋하지 않음 (기존 DraftState 계약 활용)
@@ -62,7 +63,9 @@
 
 **목표:** 전체 문서 교체(delete-all/insert-all)를 섹션 단위 증분 업데이트로 전환
 
-**선행 조건:** Phase 6 완료, Section Index Projector 안정화
+**선행 조건:**
+- Phase 6 완료 (frontmatter 보존 로직이 증분 적용의 전제)
+- `diff-match-patch` 패키지 설치 (`npm install diff-match-patch @types/diff-match-patch --cache /tmp/npm-cache-smarterd`)
 
 ### 구현 범위
 
@@ -99,10 +102,11 @@
 
 | 구분 | 수정/신규 파일 | 추가 라인 |
 |------|--------------|----------|
-| Section Index | `markdown-scope-resolver.ts`, `markdown-projector.ts` | ~120줄 |
-| 증분 적용 | `markdown-yjs-document-adapter.ts`, `markdown-document-mutation-applier.ts` | ~150줄 |
-| Scope 확장 | BE `MarkdownScopeResolver.java` | ~40줄 |
-| Remote-pending | `RemotePendingBanner.tsx` | ~30줄 |
+| 패키지 | `diff-match-patch`, `@types/diff-match-patch` 설치 | — |
+| Section Index | `markdown-scope-resolver.ts`, `markdown-projector.ts` (신규) | ~120줄 |
+| 증분 적용 | `markdown-yjs-document-adapter.ts`, `markdown-document-mutation-applier.ts` (수정) | ~150줄 |
+| Scope 확장 | BE `MarkdownScopeResolver.java` (신규) | ~40줄 |
+| Remote-pending | `RemotePendingBanner.tsx` (수정) | ~30줄 |
 | 테스트 | 단위 + E2E | ~200줄 |
 
 ---
@@ -152,16 +156,18 @@
 
 **목표:** 대용량 문서에서 타이핑 지연 없이 실시간 프리뷰 제공
 
-**선행 조건:** Phase 7 완료 (증분 파싱 인프라 공유)
+**선행 조건:**
+- 없음 (비동기 Worker 이전은 독립 구현 가능)
+- Phase 7 완료 권장 (증분 프리뷰 구현 시 section index 필요)
 
 ### 구현 범위
 
-1. **비동기 프리뷰 파이프라인**
+1. **비동기 프리뷰 파이프라인** (Phase 7 없이 독립 구현 가능)
    - `marked.parse` + `DOMPurify.sanitize`를 Web Worker로 이전
    - 메인 스레드는 편집에만 집중, 프리뷰는 Worker 결과를 비동기 수신
    - 300ms debounce 적용 (DraftState debounce와 동일)
 
-2. **증분 프리뷰 (선택적)**
+2. **증분 프리뷰** (Phase 7 section index 필요)
    - Phase 7의 section index를 활용하여 변경된 section만 재렌더링
    - 나머지 section은 캐시된 HTML 유지
    - section 경계 변경 시 전체 재렌더링 fallback
@@ -193,12 +199,14 @@
 [Phase 1~5: 1차 구현 완료] ✅
         │
         ├── Phase 6: Frontmatter 안전성 ─────────────────── 독립
-        │
-        ├── Phase 7: 증분 동기화 ──────── Phase 6 선행 필요
         │       │
-        │       └── Phase 9: 프리뷰 최적화 ── Phase 7 선행 권장
+        │       └── Phase 7: 증분 동기화 ──────── Phase 6 선행 필요
+        │               │
+        │               └── Phase 9-B: 증분 프리뷰 ── Phase 7 선행 필요
         │
-        └── Phase 8: 허브 목록 최적화 ───────────────────── 독립
+        ├── Phase 8: 허브 목록 최적화 ───────────────────── 독립
+        │
+        └── Phase 9-A: 비동기 Worker 프리뷰 ─────────────── 독립
 ```
 
 ## Phase 우선순위 및 일정
@@ -206,18 +214,19 @@
 | Phase | 내용 | 우선순위 | 예상 기간 | 선행 |
 |-------|------|----------|----------|------|
 | **6** | Frontmatter 안전성 강화 | P1 (데이터 무결성) | 2~3일 | 없음 |
-| **7** | 증분 동기화 (Section-Update) | P1 (협업 품질) | 1~2주 | Phase 6 |
+| **7** | 증분 동기화 (Section-Update) | P1 (협업 품질) | 1~2주 | Phase 6, `diff-match-patch` 설치 |
 | **8** | 허브 목록 성능 최적화 | P2 (성능) | 2~3일 | 없음 |
-| **9** | 프리뷰 렌더링 최적화 | P3 (UX) | 3~5일 | Phase 7 권장 |
+| **9** | 프리뷰 렌더링 최적화 | P3 (UX) | 3~5일 | 비동기 Worker: 없음 / 증분 프리뷰: Phase 7 |
 
 ### 권장 실행 순서
 
 ```text
-Phase 6 (2~3일)  →  Phase 7 (1~2주)  →  Phase 9 (3~5일)
+Phase 6 (2~3일)  →  Phase 7 (1~2주)  →  Phase 9-B 증분 프리뷰 (2~3일)
 Phase 8 (2~3일)  ─── 독립 병렬 가능
+Phase 9-A 비동기 Worker (2~3일) ─── 독립 병렬 가능
 ```
 
-Phase 6과 Phase 8은 서로 독립이므로 병렬 진행 가능. Phase 7은 가장 규모가 크고 협업 품질에 직접 영향하므로 Phase 6 바로 다음에 진행한다.
+Phase 6, 8, 9-A는 서로 독립이므로 병렬 진행 가능. Phase 7은 가장 규모가 크고 협업 품질에 직접 영향하므로 Phase 6 바로 다음에 진행한다. Phase 9-A(Worker 이전)는 Phase 7 없이도 즉시 시작 가능하다.
 
 ---
 
