@@ -122,3 +122,45 @@ test('findAffectedSection: section 끝에 위치한 빈 변경은 해당 section
   const result = findAffectedSection(boundaries, 11, 11);
   assert.equal(result, 'b');
 });
+
+// --- fenced code block 내 heading 오탐 방지 ---
+
+test('computeSectionBoundaries: fenced code block 내 # 은 heading 이 아니다', () => {
+  const body = '# Real\n\n```\n# Not a heading\n```\n\n# Another';
+  const result = computeSectionBoundaries(body);
+  assert.equal(result.length, 2);
+  assert.equal(result[0]!.id, 'real');
+  assert.equal(result[1]!.id, 'another');
+});
+
+test('computeSectionBoundaries: tildes fenced code block 내 # 무시', () => {
+  const body = '~~~\n# Ignored\n~~~\n\n# Visible';
+  const result = computeSectionBoundaries(body);
+  // code fence 앞에 heading 이 없으므로 root + visible 2개 섹션
+  assert.equal(result.length, 2);
+  assert.equal(result[0]!.id, 'root');
+  assert.equal(result[1]!.id, 'visible');
+});
+
+test('computeSectionBoundaries: unclosed fenced code block 은 나머지 전체를 code block 으로 처리', () => {
+  const body = '# Before\n\n```\n# Inside unclosed';
+  const result = computeSectionBoundaries(body);
+  assert.equal(result.length, 1);
+  assert.equal(result[0]!.id, 'before');
+});
+
+test('computeSectionBoundaries: info string 이 있는 fenced code block 내 # 무시', () => {
+  const body = '# Real\n\n```js\n# comment in JS\n```\n\n# End';
+  const result = computeSectionBoundaries(body);
+  assert.equal(result.length, 2);
+  assert.equal(result[0]!.id, 'real');
+  assert.equal(result[1]!.id, 'end');
+});
+
+test('computeSectionBoundaries: 4+ backtick 중첩 fenced code block 은 outer 만 인식', () => {
+  const body = '# Top\n\n````\n```\n# Inner\n```\n````\n\n# Bottom';
+  const result = computeSectionBoundaries(body);
+  assert.equal(result.length, 2);
+  assert.equal(result[0]!.id, 'top');
+  assert.equal(result[1]!.id, 'bottom');
+});

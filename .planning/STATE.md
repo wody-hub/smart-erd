@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-04-02T13:30:43.522Z"
+stopped_at: Completed 01-06-PLAN.md
+last_updated: "2026-04-02T14:29:06Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 8
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 ## Current Position
 
-Phase: 1
-Plan: 5 of 7
-Status: Executing gap closure plans
+Phase: 2
+Plan: Not started
+Status: Phase complete — ready for verification
 Last activity: 2026-04-02
 
 Progress: [░░░░░░░░░░] 0%
@@ -56,7 +56,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P01 | 3min | 2 tasks | 6 files |
 | Phase 01 P03 | 7min | 3 tasks | 7 files |
 | Phase 01 P04 | 5min | 2 tasks | 5 files |
-| Phase 01 P05 | 5min | 2 tasks | 4 files |
+| Phase 01 P06 | 4min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -74,8 +74,8 @@ Recent decisions affecting current work:
 - [Phase 01]: diff-match-patch cursor 기반 Y.Text 증분 적용: DIFF_EQUAL/DELETE/INSERT -> cursor offset 매핑
 - [Phase 01]: buildSectionCommands 2단계 전략: section ID 순서 비교 + section별 내용 비교
 - [Phase 01]: section별 requestId Map으로 Pitfall 4(stale 응답 덮어쓰기) 방어
-- [Phase 01 P05]: applySectionUpdate sectionId 기반 경계 재계산 — 동시 편집 offset 밀림 방지
-- [Phase 01 P05]: Yjs CRDT 자동 병합 특성상 RemotePendingBanner accept/reject은 배너 닫기로 구현
+- [Phase 01-06]: HEADING_PATTERN regex 변경 대신 fenced code range 사전 계산 + heading 필터링 전략
+- [Phase 01-06]: SectionPreviewCache updateSectionOrder 에서 stale entry 자동 GC
 
 ### Pending Todos
 
@@ -89,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-02T13:26:33.718Z
-Stopped at: Completed 01-05-PLAN.md
+Last session: 2026-04-02T14:29:06Z
+Stopped at: Completed 01-06-PLAN.md
 Resume file: None
