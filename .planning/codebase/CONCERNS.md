@@ -150,16 +150,15 @@
 ## Test Coverage Gaps
 
 **프론트엔드 컴포넌트/페이지 테스트 부재:**
-- What's not tested: React 컴포넌트 렌더링 테스트, 페이지 통합 테스트가 없음. 기존 30개 단위 테스트는 모두 순수 로직(파서, diff, 상태 머신 등) 대상.
-- Files: `client/test/unit/*.test.ts` (30개), `client/test/e2e/` (E2E만 존재)
+- What's not tested: React 컴포넌트 렌더링 테스트, 페이지 통합 테스트가 없음. 기존 49개 단위 테스트는 모두 순수 로직(파서, diff, 상태 머신 등) 대상.
+- Files: `client/test/unit/*.test.ts` (49개), `client/e2e/` (E2E)
 - Risk: UI 렌더링 버그, 이벤트 핸들러 연결 오류가 런타임까지 발견되지 않음.
 - Priority: Medium — E2E 테스트가 일부 커버하지만, 컴포넌트 단위 테스트로 빠른 피드백 루프 확보 권장.
 
-**마크다운 백엔드 통합 테스트 부재:**
-- What's not tested: `MarkdownTemplateServiceTest` 단위 테스트만 존재. 마크다운 문서 생성, export, pluginId 유효성 검증의 Controller/Service 통합 테스트 없음.
-- Files: `src/test/java/com/smarterd/domain/diagram/` (마크다운 관련 테스트 미포함)
-- Risk: API 엔드포인트 동작, DTO 검증, 에러 응답 형식 등이 검증되지 않음.
-- Priority: High — 잔여 작업 T2로 이미 식별됨.
+**마크다운 백엔드 통합 테스트 — 기본 커버리지 확보 (PR #5에서 추가):**
+- 추가된 테스트: export MvcTest 3개(정상/빈format/잘못된format), export ControllerTest 1개, createDiagram 서비스 테스트 7개(ERD/Markdown 정상+에러 분기)
+- 잔여 갭: Controller 레벨 createDiagram MVC 테스트, markdown 문서 저장/재열기 통합 테스트
+- Priority: Medium — 기본 커버리지는 확보됨, 추가 통합 테스트는 선택적.
 
 **협업 엣지 케이스 검증 부족:**
 - What's not tested: 네트워크 끊김 후 재연결, 동시 편집 중 브라우저 강제 종료, remote-pending 상태 3가지 선택 후 정합성.

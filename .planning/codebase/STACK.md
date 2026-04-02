@@ -116,7 +116,7 @@
 - `.prettierrc.json` - Prettier (Java tabWidth 4/printWidth 120, TS tabWidth 2/printWidth 100)
 
 **DB Migration:**
-- Flyway 마이그레이션: `src/main/resources/db/migration/V*.sql` (11개 파일)
+- Flyway 마이그레이션: `src/main/resources/db/migration/V*.sql` (12개 파일)
 - `ddl-auto: update` 병행 사용
 
 ## Platform Requirements

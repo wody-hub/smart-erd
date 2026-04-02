@@ -115,7 +115,7 @@ client/test/unit/
 └── ... (총 49개)
 ```
 
-### Frontend E2E Tests (23개 테스트 파일)
+### Frontend E2E Tests (20개 spec 파일 + 3개 헬퍼 파일)
 
 **Location:** `client/e2e/`
 
