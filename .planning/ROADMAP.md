@@ -31,13 +31,16 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. 두 사용자가 서로 다른 Section을 동시 편집할 때 각자의 변경이 충돌 없이 상대방에게 반영된다
   2. 한 Section을 수정하면 해당 Section의 프리뷰만 재렌더링되고 나머지 Section은 변경되지 않는다
   3. 단일 사용자 편집에서 기존 전체 동기화 대비 네트워크 전송량이 줄어든다
-**Plans**: 4 plans
+**Plans**: 7 plans
 
 Plans:
 - [x] 01-01-PLAN.md — diff-match-patch 설치 + SectionBoundary 순수 함수 라이브러리 (TDD)
 - [x] 01-02-PLAN.md — BE MarkdownScopeResolver + MarkdownCollaborationPlugin
 - [x] 01-03-PLAN.md — FE 증분 동기화 핵심 경로 (applyIncrementalTextUpdate + buildSectionCommands + MutationApplier 교체)
 - [x] 01-04-PLAN.md — Section HTML 캐시 + useMarkdownSectionPreview + MarkdownDocumentPage 교체
+- [ ] 01-05-PLAN.md — [gap closure] 절대 offset 재계산 + RemotePendingBanner 배선
+- [ ] 01-06-PLAN.md — [gap closure] fenced code block 오탐 방지 + SectionPreviewCache GC
+- [ ] 01-07-PLAN.md — [gap closure] BE MarkdownScopeResolver payload 검증 강화
 
 ### Phase 2: 테마 선택
 **Goal**: 사용자가 Paper/Graphite/Midnight 3가지 테마 중 하나를 선택하면 앱 전역(ERD 캔버스, 마크다운 에디터, Dialog, Monaco)에 일관되게 적용되고 새로고침 후에도 유지된다
@@ -128,7 +131,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 마크다운 증분 동기화 | 0/4 | Not started | - |
+| 1. 마크다운 증분 동기화 | 4/7 | Gap closure | - |
 | 2. 테마 선택 | 0/? | Not started | - |
 | 3. 화면기획 플러그인 | 0/? | Not started | - |
 | 4. 사업 개요 | 0/? | Not started | - |
