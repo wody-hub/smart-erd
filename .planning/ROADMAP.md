@@ -38,7 +38,7 @@ Plans:
 - [x] 01-02-PLAN.md — BE MarkdownScopeResolver + MarkdownCollaborationPlugin
 - [x] 01-03-PLAN.md — FE 증분 동기화 핵심 경로 (applyIncrementalTextUpdate + buildSectionCommands + MutationApplier 교체)
 - [x] 01-04-PLAN.md — Section HTML 캐시 + useMarkdownSectionPreview + MarkdownDocumentPage 교체
-- [ ] 01-05-PLAN.md — [gap closure] 절대 offset 재계산 + RemotePendingBanner 배선
+- [x] 01-05-PLAN.md — [gap closure] 절대 offset 재계산 + RemotePendingBanner 배선
 - [ ] 01-06-PLAN.md — [gap closure] fenced code block 오탐 방지 + SectionPreviewCache GC
 - [ ] 01-07-PLAN.md — [gap closure] BE MarkdownScopeResolver payload 검증 강화
 
