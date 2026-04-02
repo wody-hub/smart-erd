@@ -173,7 +173,8 @@
       "saving": "저장 중...",
       "unsaved": "저장되지 않은 변경 사항",
       "saved": "저장됨",
-      "savedAt": "{{time}} 저장"
+      "savedAt": "{{time}} 저장",
+      "frontmatterInvalid": "Frontmatter YAML 구문 오류"
     }
   },
   "auth": {

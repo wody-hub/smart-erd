@@ -173,7 +173,8 @@
       "saving": "Saving...",
       "unsaved": "Unsaved changes",
       "saved": "Saved",
-      "savedAt": "Saved at {{time}}"
+      "savedAt": "Saved at {{time}}",
+      "frontmatterInvalid": "Frontmatter YAML syntax error"
     }
   },
   "auth": {

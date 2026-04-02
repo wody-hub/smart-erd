@@ -1,5 +1,4 @@
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 
 /** markdown 상태 strip props. */
@@ -12,6 +11,8 @@ interface MarkdownStatusStripProps {
   savePending: boolean;
   /** 마지막 저장 시각 */
   lastSavedAt: string | null;
+  /** frontmatter YAML 파싱 유효 여부 */
+  frontmatterValid?: boolean;
 }
 
 /**
@@ -25,11 +26,20 @@ export default function MarkdownStatusStrip({
   dirty,
   savePending,
   lastSavedAt,
+  frontmatterValid = true,
 }: MarkdownStatusStripProps) {
   const { t } = useTranslation();
 
   return (
     <div className="surface-operational flex flex-wrap items-center gap-2 rounded-2xl px-4 py-3">
+      {!frontmatterValid && (
+        <Badge
+          variant="outline"
+          className="border-destructive/30 bg-destructive/10 text-destructive"
+        >
+          {t('markdown.status.frontmatterInvalid')}
+        </Badge>
+      )}
       {templateLabel && (
         <Badge variant="outline" className="border-primary/20 bg-primary/8 text-primary">
           {templateLabel}
@@ -37,9 +47,9 @@ export default function MarkdownStatusStrip({
       )}
       <Badge
         variant="outline"
-        className={cn(
-          dirty ? 'border-brand-warm/30 bg-brand-warm/10 text-brand-warm' : 'border-border/80 text-ink-secondary',
-        )}
+        className={
+          dirty ? 'border-brand-warm/30 bg-brand-warm/10 text-brand-warm' : 'border-border/80 text-ink-secondary'
+        }
       >
         {savePending
           ? t('markdown.status.saving')
