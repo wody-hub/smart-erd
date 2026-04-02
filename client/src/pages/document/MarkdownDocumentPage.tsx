@@ -18,7 +18,8 @@ import { useDocumentPageHost } from '@/collaboration/core/session/use-document-p
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { exportMarkdownBuffer, parseMarkdownBuffer, renderMarkdownPreview } from '@/lib/markdown';
+import { useMarkdownPreview } from '@/hooks/useMarkdownPreview';
+import { exportMarkdownBuffer, parseMarkdownBuffer } from '@/lib/markdown';
 import type { DocumentExportFormat } from '@/types/document';
 import { useMarkdownDocumentSession } from '@/pages/document/use-markdown-document-session';
 import '@/lib/monaco-setup';
@@ -96,7 +97,7 @@ export default function MarkdownDocumentPage() {
     documentBootstrap,
   });
   const parsedBuffer = useMemo(() => parseMarkdownBuffer(buffer), [buffer]);
-  const previewHtml = useMemo(() => renderMarkdownPreview(parsedBuffer.body), [parsedBuffer.body]);
+  const previewHtml = useMarkdownPreview(parsedBuffer.body);
 
   const handleBack = () => navigate(ROUTES.DIAGRAMS(resolvedTeamId, resolvedProjectId));
 
