@@ -20,21 +20,71 @@ export interface SectionBoundary {
 /** heading 정규식 — 줄 시작에서 1~6 개의 # + 공백 + 텍스트 */
 const HEADING_PATTERN = /^(#{1,6})\s+(.+)$/gm;
 
+/** fenced code block 시작/종료 정규식 — backtick(```) 또는 tilde(~~~) 3개 이상 */
+const FENCE_PATTERN = /^(`{3,}|~{3,})(.*)$/gm;
+
+/**
+ * fenced code block(``` 또는 ~~~) 영역의 [start, end) 범위 배열을 계산한다.
+ * 닫히지 않은 fenced code block 은 body 끝까지 code block 으로 처리한다.
+ *
+ * @param body markdown 본문
+ * @returns fenced code block 범위 배열
+ */
+function findFencedCodeRanges(body: string): Array<{ start: number; end: number }> {
+  const ranges: Array<{ start: number; end: number }> = [];
+  let openFence: { char: string; length: number; start: number } | null = null;
+
+  let match: RegExpExecArray | null;
+  // eslint-disable-next-line no-cond-assign
+  while ((match = FENCE_PATTERN.exec(body)) !== null) {
+    const marker = match[1]!;
+    const rest = match[2]!;
+
+    if (!openFence) {
+      // 새 fenced code block 열기
+      openFence = { char: marker[0]!, length: marker.length, start: match.index };
+    } else if (
+      marker[0] === openFence.char &&
+      marker.length >= openFence.length &&
+      rest.trim() === '' // closing fence 는 info string 이 없다
+    ) {
+      // fenced code block 닫기
+      ranges.push({ start: openFence.start, end: match.index + match[0]!.length });
+      openFence = null;
+    }
+    // else: 다른 종류 fence 또는 짧은 fence — 무시 (outer 만 인식)
+  }
+
+  // unclosed fence: 나머지 전체를 code block 으로 처리
+  if (openFence) {
+    ranges.push({ start: openFence.start, end: body.length });
+  }
+
+  return ranges;
+}
+
 /**
  * markdown body 에서 section 경계 배열을 계산한다.
  * heading 이전 영역은 id='root', level=0 으로 처리한다.
+ * fenced code block 내 # 문자는 heading 으로 인식하지 않는다.
  *
  * @param body markdown 본문 (frontmatter 제외, \r\n 은 \n 으로 정규화된 상태)
  * @returns section 경계 배열 (순서 보장)
  */
 export function computeSectionBoundaries(body: string): SectionBoundary[] {
+  const fencedRanges = findFencedCodeRanges(body);
   const headings: Array<{ offset: number; level: number; text: string }> = [];
 
   let match: RegExpExecArray | null;
   // eslint-disable-next-line no-cond-assign
   while ((match = HEADING_PATTERN.exec(body)) !== null) {
+    const offset = match.index;
+    const insideFence = fencedRanges.some((r) => offset >= r.start && offset < r.end);
+    if (insideFence) {
+      continue;
+    }
     headings.push({
-      offset: match.index,
+      offset,
       level: match[1]!.length,
       text: match[2]!.trim(),
     });

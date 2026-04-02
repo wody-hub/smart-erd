@@ -136,8 +136,10 @@ test('computeSectionBoundaries: fenced code block 내 # 은 heading 이 아니�
 test('computeSectionBoundaries: tildes fenced code block 내 # 무시', () => {
   const body = '~~~\n# Ignored\n~~~\n\n# Visible';
   const result = computeSectionBoundaries(body);
-  assert.equal(result.length, 1);
-  assert.equal(result[0]!.id, 'visible');
+  // code fence 앞에 heading 이 없으므로 root + visible 2개 섹션
+  assert.equal(result.length, 2);
+  assert.equal(result[0]!.id, 'root');
+  assert.equal(result[1]!.id, 'visible');
 });
 
 test('computeSectionBoundaries: unclosed fenced code block 은 나머지 전체를 code block 으로 처리', () => {
