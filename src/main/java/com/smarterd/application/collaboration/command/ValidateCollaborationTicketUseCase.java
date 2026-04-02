@@ -6,6 +6,7 @@ import com.smarterd.collaboration.channel.CollaborationTicketSupportRegistry;
 import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class ValidateCollaborationTicketUseCase {
 
     private final CollaborationTicketSupportRegistry collaborationTicketSupportRegistry;
@@ -37,6 +39,7 @@ public class ValidateCollaborationTicketUseCase {
         final var runtimeSupport = collaborationRuntimeSupportRegistry.getRequired(requestedResourceKey);
         final var sessionOpt = ticketSupport.ticketAuthenticator().validateAndConsume(ticket, protocolVersion);
         if (sessionOpt.isEmpty()) {
+            log.debug("WebSocket ticket 검증 실패: ticket consumed/expired (resourceKey={})", requestedResourceKey);
             return Optional.empty();
         }
 
@@ -44,10 +47,16 @@ public class ValidateCollaborationTicketUseCase {
         try {
             runtimeSupport.accessPolicy().validateAccess(session);
         } catch (IllegalArgumentException e) {
+            log.warn("WebSocket 접근 정책 검증 실패: resourceKey={}, reason={}", requestedResourceKey, e.getMessage());
             return Optional.empty();
         }
 
         if (!requestedResourceKey.equals(session.resourceKey())) {
+            log.warn(
+                "WebSocket resource key 불일치: requested={}, session={}",
+                requestedResourceKey,
+                session.resourceKey()
+            );
             return Optional.empty();
         }
 
