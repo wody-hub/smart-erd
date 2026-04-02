@@ -37,6 +37,12 @@ export function useMarkdownSectionPreview(body: string): string {
   const [html, setHtml] = useState(() => renderMarkdownPreview(body));
   const workerRef = useRef<Worker | null>(null);
   const workerFailedRef = useRef(false);
+  /** Worker 모듈 로드 완료 여부 (type: 'module' Worker는 비동기 로드) */
+  const workerReadyRef = useRef(false);
+  /** Worker ready 전 대기 중인 요청 큐 */
+  const pendingQueueRef = useRef<Array<{ id: number; sectionId: string; sectionText: string }>>(
+    [],
+  );
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cacheRef = useRef(new SectionPreviewCache());
   const prevBodyRef = useRef<string>('');
@@ -56,8 +62,18 @@ export function useMarkdownSectionPreview(body: string): string {
       );
       worker.addEventListener(
         'message',
-        (event: MessageEvent<SectionPreviewResponse | FullPreviewResponse>) => {
+        (event: MessageEvent<SectionPreviewResponse | FullPreviewResponse | { type: 'ready' }>) => {
           const data = event.data;
+          // Worker 모듈 로드 완료 신호 처리
+          if ('type' in data && data.type === 'ready') {
+            workerReadyRef.current = true;
+            // 대기 중인 요청 전송
+            for (const req of pendingQueueRef.current) {
+              worker.postMessage(req);
+            }
+            pendingQueueRef.current = [];
+            return;
+          }
           if ('sectionId' in data) {
             // section 단위 응답: requestId가 최신인지 검증
             const expectedId = requestIdMapRef.current.get(data.sectionId);
@@ -149,7 +165,18 @@ export function useMarkdownSectionPreview(body: string): string {
     for (const section of sectionsToRender) {
       const id = ++requestIdCounterRef.current;
       requestIdMapRef.current.set(section.id, id);
-      worker.postMessage({ id, sectionId: section.id, sectionText: section.text });
+      const msg = { id, sectionId: section.id, sectionText: section.text };
+      if (workerReadyRef.current) {
+        worker.postMessage(msg);
+      } else {
+        // Worker 모듈 로드 미완료 — 큐에 저장하고 메인 스레드 fallback 즉시 반영
+        pendingQueueRef.current.push(msg);
+        cacheRef.current.setHtml(section.id, renderMarkdownPreview(section.text));
+      }
+    }
+    // Worker 미준비 시 메인 스레드 fallback 결과를 즉시 반영
+    if (!workerReadyRef.current && sectionsToRender.length > 0) {
+      setHtml(cacheRef.current.buildFullHtml());
     }
   }, []);
 

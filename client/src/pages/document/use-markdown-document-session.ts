@@ -78,6 +78,8 @@ export function useMarkdownDocumentSession({
   const loadedContentRef = useRef('');
   /** 이전 body 텍스트 — section-aware 커맨드 발행용 (render 유발 방지를 위해 ref 사용) */
   const prevBodyRef = useRef<string>('');
+  /** collaborationReady의 ref 미러 — useEffect 클로저 내에서 최신 값 참조용 */
+  const collaborationReadyRef = useRef(false);
   /** 현재 편집 중인 section ID (마지막 section-update 커맨드 기준) */
   const [activeSectionId, setActiveSectionId] = useState<string | undefined>(undefined);
   /** 원격 pending mutation 정보 */
@@ -141,7 +143,8 @@ export function useMarkdownDocumentSession({
       setBuffer(serialized);
 
       // 원격 변경 감지 시 remoteMutation 설정 (D-07/D-08 배너 연동)
-      if (event.origin.source === 'remote') {
+      // 초기 sync (Y.Doc handoff)의 remote event는 무시 — collaborationReady 이전의 remote는 초기 데이터 로드
+      if (event.origin.source === 'remote' && collaborationReadyRef.current) {
         const scope = event.affectedScopes[0];
         const sectionId = scope?.id !== 'root' ? scope?.id : undefined;
         setRemoteMutation({
@@ -235,6 +238,7 @@ export function useMarkdownDocumentSession({
     prevBodyRef.current = parseMarkdownBuffer(seedBuffer).body.replace(/\r\n/g, '\n');
     setBuffer(seedBuffer);
     setCollaborationReady(true);
+    collaborationReadyRef.current = true;
     void persistDiagramYdocSnapshot(
       teamId,
       projectId,
@@ -288,6 +292,7 @@ export function useMarkdownDocumentSession({
     setCollaborationError(false);
     if (alreadyHydrated) {
       setCollaborationReady(true);
+    collaborationReadyRef.current = true;
     } else if (snapshotAvailableRef.current) {
       setCollaborationReady(false);
     }
@@ -304,6 +309,7 @@ export function useMarkdownDocumentSession({
       }
       setCollaborationError(false);
       setCollaborationReady(true);
+    collaborationReadyRef.current = true;
       const syncedBuffer = readSerializedBuffer();
       prevBodyRef.current = parseMarkdownBuffer(syncedBuffer).body.replace(/\r\n/g, '\n');
       setBuffer(syncedBuffer);

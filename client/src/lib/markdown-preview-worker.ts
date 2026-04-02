@@ -71,6 +71,10 @@ function renderAndSanitize(text: string): string {
   });
 }
 
+// Worker 모듈 로드 완료 신호 — type: 'module' Worker는 비동기 로드이므로
+// 메인 스레드가 이 신호를 받기 전까지는 postMessage가 유실될 수 있다.
+self.postMessage({ type: 'ready' });
+
 self.addEventListener('message', (event: MessageEvent<FullPreviewRequest | SectionPreviewRequest>) => {
   const data = event.data;
   if ('sectionId' in data) {
