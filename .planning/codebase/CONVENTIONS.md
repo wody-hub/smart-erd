@@ -131,6 +131,7 @@ cd client && npm run lint     # ESLint + verify-function-docs
 | `EntityNotFoundException` | 404 | 엔티티 조회 실패 |
 | `DomainAccessDeniedException` | 403 | 권한 부족 (미소속, 비ADMIN) |
 | `DuplicateException` / `ConflictException` | 409 | 중복 리소스 |
+| `TooManyRequestsException` | 429 | 요청 횟수 초과 (로그인 속도 제한 등) |
 | `BusinessException` | 400 | 비즈니스 규칙 위반 |
 
 - Base class: `com.smarterd.domain.common.exception.LocalizedException`

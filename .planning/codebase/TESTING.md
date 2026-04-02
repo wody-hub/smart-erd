@@ -353,7 +353,7 @@ node scripts/verify-function-docs.mjs --all         # 전체 파일 검증
 | Backend Unit | JUnit 5 + Mockito | 55 | `src/test/java/com/smarterd/` | `./gradlew test` |
 | Backend Integration | Testcontainers | (위에 포함) | `src/test/java/com/smarterd/` | `./gradlew test` |
 | Frontend Unit | Node.js test runner | 49 | `client/test/unit/` | `npm run test:unit` |
-| Frontend E2E | Playwright | 23 | `client/e2e/` | `npm run test:e2e` |
+| Frontend E2E | Playwright | 23 (20 spec + 3 helper) | `client/e2e/` | `npm run test:e2e` |
 | Performance | Custom script | - | `client/scripts/perf/` | `npm run perf:erd:apply` |
 
 ---

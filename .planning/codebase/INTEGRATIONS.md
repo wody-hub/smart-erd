@@ -155,6 +155,29 @@
 - 번역 파일: `client/src/i18n/locales/{en,ko}/translation.json`
 - Axios 인터셉터에서 `Accept-Language` 헤더 자동 첨부
 
+## E2E 테스트 환경변수
+
+| 변수 | 설명 | 기본값 |
+|------|------|--------|
+| `SMART_ERD_E2E_LOGIN` | Playwright E2E 로그인 ID | 없음 |
+| `SMART_ERD_E2E_PASSWORD` | Playwright E2E 비밀번호 | 없음 |
+| `SMART_ERD_E2E_BASE_URL` | Playwright 대상 프런트 주소 | `http://localhost:4502` |
+| `SMART_ERD_E2E_API_URL` | Playwright 대상 API 주소 | `http://localhost:9502/api` |
+| `SMART_ERD_E2E_TEAM_ID` | 고정 smoke/recovery 대상 팀 ID | 자동 탐색 |
+| `SMART_ERD_E2E_PROJECT_ID` | 고정 smoke/recovery 대상 프로젝트 ID | 자동 탐색 |
+| `SMART_ERD_E2E_DIAGRAM_ID` | 고정 smoke/recovery 대상 다이어그램 ID | 자동 탐색 |
+| `SMART_ERD_E2E_BACKEND_PORT` | recovery 테스트 백엔드 포트 | `9502` |
+| `SMART_ERD_E2E_BACKEND_RESTART_CMD` | recovery 테스트 백엔드 재기동 명령 | 포트 기준 기본값 |
+| `SMART_ERD_E2E_BOOT_LOG_PATH` | recovery 재기동 로그 경로 | `/tmp/smart-erd-e2e-recovery-backend.log` |
+| `SMART_ERD_E2E_BROWSER_CHANNEL` | Playwright 브라우저 채널 | Playwright 기본 Chromium |
+
+## 추가 환경변수
+
+| 변수 | 설명 | 기본값 |
+|------|------|--------|
+| `VITE_ENABLE_DIAGRAM_API_PREVIEW` | 다이어그램 API preview 활성화 | `true` |
+| `SMART_ERD_SHUTDOWN_PHASE_TIMEOUT` | Spring graceful shutdown phase timeout | `20s` |
+
 ---
 
-*Integration audit: 2026-04-02*
+*Integration audit: 2026-04-02 (updated)*
