@@ -22,7 +22,8 @@ export class SectionPreviewCache {
 
   /**
    * section 순서를 갱신한다.
-   * 순서가 변경되면 true를 반환한다.
+   * 순서가 변경되면 true를 반환하고, 더 이상 존재하지 않는 section의
+   * HTML 캐시를 자동 정리(GC)한다.
    *
    * @param newOrder 새 section ID 배열
    * @returns 순서 변경 여부
@@ -33,6 +34,13 @@ export class SectionPreviewCache {
       newOrder.some((id, i) => id !== this.sectionOrder[i]);
     if (changed) {
       this.sectionOrder = [...newOrder];
+      // GC: 현재 문서에 없는 section ID의 stale 캐시 정리
+      const activeIds = new Set(newOrder);
+      for (const cachedId of this.htmlCache.keys()) {
+        if (!activeIds.has(cachedId)) {
+          this.htmlCache.delete(cachedId);
+        }
+      }
     }
     return changed;
   }
