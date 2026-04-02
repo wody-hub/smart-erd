@@ -630,3 +630,392 @@ annotationProcessor 'org.projectlombok:lombok'
 // QueryDSL (after)
 annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
 ```
+
+<!-- GSD:project-start source:PROJECT.md -->
+## Project
+
+**Smart-ERD: SI 프로젝트 관리 플랫폼**
+
+SI 프로젝트의 전체 생명주기를 관리하는 실시간 협업 플랫폼. 팀 > 프로젝트 체계 아래에서 사업 개요, 인력 투입, WBS, 마일스톤, 화면설계서, ERD, 기술 문서, 비용 관리, 일일/주간/월간 보고서를 통합 관리한다.
+
+현재는 ERD 다이어그램 설계와 마크다운 기반 문서 편집을 시범 구현한 상태이며, 이 두 기능이 플랫폼의 실시간 협업 코어(Yjs + WebSocket)와 문서 플러그인 아키텍처를 검증하는 역할을 한다.
+
+**Core Value:** SI 프로젝트에서 발생하는 모든 산출물과 관리 활동을 **하나의 실시간 협업 플랫폼**에서 일관된 체계로 관리할 수 있어야 한다.
+
+### Constraints
+
+- **1인 개발:** 모든 설계/구현/테스트를 혼자 수행 — 페이즈 단위로 점진적 확장 필수
+- **Tech stack 고정:** Spring Boot + React + PostgreSQL + Yjs — 현재 스택 유지
+- **코어 수정 제로 원칙:** 새 플러그인은 기존 협업 코어 계약만으로 동작해야 함
+- **Electron 호환:** 웹/데스크톱 동시 지원 유지
+<!-- GSD:project-end -->
+
+<!-- GSD:stack-start source:codebase/STACK.md -->
+## Technology Stack
+
+## Languages
+- Java 25 - 백엔드 (Spring Boot), `build.gradle` toolchain `languageVersion = JavaLanguageVersion.of(25)`
+- TypeScript ~5.6.2 - 프론트엔드 (React), `client/package.json`
+- SQL - Flyway 마이그레이션 (`src/main/resources/db/migration/V*.sql`), QueryDSL 쿼리
+- CSS - Tailwind CSS 기반 스타일링 (`client/src/index.css`)
+## Runtime
+- JVM (Java 25) - Spring Boot 백엔드
+- Node.js - Vite 개발 서버 및 빌드
+- Electron 40.x - 데스크톱 앱 배포 (Mac/Win)
+- Gradle 9.4.0 (wrapper) - 백엔드 빌드, `gradle/wrapper/gradle-wrapper.properties`
+- npm - 프론트엔드 패키지 관리, `client/package.json` (`"type": "module"`)
+- Lockfile: `gradle.lockfile` 미사용, `package-lock.json` 존재
+## Frameworks
+- Spring Boot 3.5.11 - 백엔드 프레임워크, `build.gradle` plugin
+- Spring Security 6.x - 인증/인가 (OAuth2 Resource Server JWT)
+- Spring Data JPA - ORM/데이터 액세스
+- React 19.2.x - 프론트엔드 UI 프레임워크
+- Vite 6.x - 프론트엔드 빌드/개발 서버, `client/vite.config.ts`
+- JUnit 5 (JUnit Platform) - 백엔드 단위/통합 테스트
+- Spring Boot Test + Spring Security Test - 백엔드 테스트 지원
+- Testcontainers (PostgreSQL) - 테스트용 DB 격리
+- Playwright 1.58.x - E2E 테스트, `client/playwright.config.*`
+- Node.js built-in test runner - 프론트엔드 유닛 테스트 (`node --test`)
+- Gradle 9.4.0 - 백엔드 빌드 (`./gradlew build`)
+- Vite 6.x - 프론트엔드 빌드 (`tsc -b && vite build`)
+- electron-vite 5.x - Electron 빌드 (`electron-vite build`)
+- electron-builder 26.x - 데스크톱 패키징 (DMG/NSIS), `client/electron-builder.yml`
+## Key Dependencies
+- `spring-boot-starter-web` - REST API 서버
+- `spring-boot-starter-websocket` - Yjs 실시간 협업 WebSocket
+- `spring-boot-starter-data-jpa` - JPA/Hibernate ORM
+- `spring-boot-starter-oauth2-resource-server` - JWT 인증 (HMAC-SHA256)
+- `spring-boot-starter-validation` - Bean Validation (Jakarta)
+- `spring-boot-starter-data-redis` - WebSocket 티켓 저장소 (선택적, 기본 in-memory)
+- `querydsl-jpa:5.1.0:jakarta` - 타입 안전 동적 쿼리
+- `blaze-persistence-core-api-jakarta:1.6.17` - 고급 JPA 쿼리 빌더
+- `postgresql` - PostgreSQL JDBC 드라이버
+- `springdoc-openapi-starter-webmvc-ui:2.8.6` - Swagger UI/OpenAPI 문서
+- `p6spy-spring-boot-starter:1.12.1` - SQL 로깅 (바인딩 파라미터 포함)
+- `poi-ooxml:5.4.1` - Excel import/export
+- `commons-lang3:3.17.0` / `commons-collections4:4.4` - Apache Commons 유틸리티
+- `lombok` - 보일러플레이트 코드 제거
+- `spring-boot-testcontainers` + `testcontainers:postgresql` - 테스트 DB 격리
+- `@xyflow/react:^12.0.0` - ERD 캔버스 (React Flow)
+- `zustand:^5.0.0` - 클라이언트 상태 관리
+- `@tanstack/react-query:^5.90.20` - 서버 상태 관리 (캐싱, 무효화)
+- `axios:^1.7.0` - HTTP 클라이언트
+- `yjs:^13.6.29` - CRDT 실시간 협업
+- `react-router-dom:^7.13.0` - SPA 라우팅
+- `@radix-ui/*` (dialog, dropdown-menu, select, tabs 등) - shadcn/ui 기반 프리미티브
+- `lucide-react:^0.563.0` - 아이콘
+- `tailwind-merge:^3.4.0` + `clsx:^2.1.1` - CSS 클래스 유틸리티
+- `class-variance-authority:^0.7.1` - 컴포넌트 variant 관리
+- `tailwindcss-animate:^1.0.7` - 애니메이션
+- `sonner:^2.0.7` - 토스트 알림
+- `cmdk:^1.1.1` - 커맨드 팔레트
+- `@monaco-editor/react:^4.6.0` + `monaco-editor:^0.55.1` - 코드 에디터 (DSL/DDL)
+- `dagre:^0.8.5` - ERD 자동 레이아웃 (방향 그래프)
+- `node-sql-parser:^5.4.0` - SQL DDL 파싱 (PostgreSQL/MySQL/MSSQL)
+- `html-to-image:^1.11.13` + `jspdf:^4.1.0` - ERD 이미지/PDF 내보내기
+- `dompurify:^3.2.7` - HTML 새니타이징
+- `marked:^14.0.0` - Markdown 렌더링
+- `js-yaml:^4.1.1` - YAML 파싱
+- `@dnd-kit/core:^6.3.1` + `@dnd-kit/sortable:^10.0.0` - 드래그 앤 드롭
+- `react-hotkeys-hook:^5.2.4` - 키보드 단축키
+- `i18next:^25.8.4` + `react-i18next:^16.5.4` - 다국어 (ko/en)
+- `electron-store:^11.0.2` - Electron 로컬 저장소
+## Configuration
+- 백엔드: `application.yml` (`smart-erd.*` 네임스페이스), 환경변수 오버라이드
+- 프론트엔드: `.env.frontend-dev`, `.env.frontend-local`, `.env.frontend-test` (Vite 모드별)
+- `.envrc` 파일 존재 (direnv 사용)
+- 주요 환경변수: `SMART_ERD_JWT_SECRET`, `SERVER_PORT`, `SMART_ERD_CORS_ORIGINS`, `SMART_ERD_DB_*`, `VITE_*`
+- `build.gradle` - Gradle 빌드 설정 (annotation processor 순서: Lombok -> QueryDSL)
+- `client/vite.config.ts` - Vite 빌드 (수동 chunk splitting, `@/` alias, proxy 설정)
+- `client/electron.vite.config.ts` - Electron 빌드
+- `client/electron-builder.yml` - 데스크톱 패키징 (Mac DMG universal, Win NSIS/portable)
+- `client/tsconfig.app.json` - TypeScript 설정 (`@/*` 경로 별칭)
+- `.prettierrc.json` - Prettier (Java tabWidth 4/printWidth 120, TS tabWidth 2/printWidth 100)
+- Flyway 마이그레이션: `src/main/resources/db/migration/V*.sql` (12개 파일)
+- `ddl-auto: update` 병행 사용
+## Platform Requirements
+- Java 25 JDK
+- Node.js (ESM 지원 버전)
+- Docker Desktop 실행 필수 (PostgreSQL 17 컨테이너)
+- npm 캐시 이슈: `--cache /tmp/npm-cache-smarterd` 사용 권장
+- JVM (Java 25)
+- PostgreSQL 17
+- Redis 7 (선택적, WebSocket 티켓/벌크 검증 저장소)
+- Electron 데스크톱 앱: macOS (universal), Windows (x64)
+<!-- GSD:stack-end -->
+
+<!-- GSD:conventions-start source:CONVENTIONS.md -->
+## Conventions
+
+## Naming Conventions
+### Backend (Java)
+- PascalCase: `DiagramService`, `TeamController`, `EntityNotFoundException`
+- Suffix 규칙: Service (`DiagramService`), Controller (`TeamController`), Repository (`DiagramRepository`), UseCase (`SaveDiagramUseCase`)
+- Custom Repository: `XxxRepositoryCustom` (인터페이스) + `XxxRepositoryCustomImpl` (구현체)
+- DTO: Java `record` 타입 사용 (`TeamMemberId`, request/response DTO)
+- camelCase: `findByIdWithOwner()`, `validateAndConsume()`
+- 조회: `find*`, `fetch*`, `get*`
+- 변경: `save*`, `create*`, `update*`, `delete*`, `change*`
+- 검증: `validate*`, `check*`
+- `var` / `final var` 사용 (타입이 RHS에서 명확한 경우)
+- `final var` = 재할당 없는 변수, `var` = 재할당 있는 변수
+- 예: `final var user = findUserByLoginId(loginId);`
+- Base package: `com.smarterd`
+- `api/` = HTTP interface layer (Controller + DTO only)
+- `domain/` = 비즈니스 로직 (Entity + Repository + Service)
+- `config/` = 설정 클래스
+- `application/` = UseCase 클래스
+### Frontend (TypeScript/React)
+- Components: PascalCase (`TableNode.tsx`, `ProtectedRoute.tsx`)
+- Hooks: camelCase `use` prefix (`useInlineEdit.ts`, `useFkConnectMode.ts`)
+- API modules: camelCase + `Api` suffix (`teamApi.ts`, `diagramApi.ts`)
+- Stores: camelCase `use` prefix + `Store` suffix (`useAuthStore.ts`, `useCanvasStore.ts`)
+- Types: camelCase domain name (`team.ts`, `diagram.ts`)
+- Constants: camelCase (`query-keys.ts`, `keybindings.ts`)
+- Test files (unit): kebab-case (`erd-diff-apply.test.ts`)
+- Test files (E2E): kebab-case + `.spec.ts` (`diagram-loading.spec.ts`)
+- camelCase: `fetchTeams()`, `createTeam()`, `handleSave()`
+- API 함수: `fetch*`, `create*`, `update*`, `delete*` prefix
+- 이벤트 핸들러: `handle*` prefix
+- 상수 객체: camelCase (`queryKeys`, `KEYBINDINGS`, `STORAGE_KEYS`, `ROUTES`)
+- State: camelCase (`deleteTarget`, `isLoading`)
+- PascalCase: `Team`, `TeamMember`, `TableNodeData`, `DiffPlan`
+## Code Style
+### Formatting (Prettier)
+- Config: `.prettierrc.json` (루트)
+- Plugin: `prettier-plugin-java` (Java + TypeScript 통합 포맷팅)
+- `tabWidth: 4`, `printWidth: 120`
+- `tabWidth: 2`, `printWidth: 100`, `singleQuote: true`
+- `semi: true`, `trailingComma: "all"`, `bracketSpacing: true`
+- `arrowParens: "always"`, `endOfLine: "lf"`
+### Linting (ESLint)
+- Config: `client/eslint.config.js`
+- 기반: `@eslint/js` recommended + `typescript-eslint` recommended + `eslint-config-prettier`
+- Plugins: `react-hooks`, `react-refresh`, `prettier`
+- Key rules:
+### SonarQube
+- Config: `sonar-project.properties`
+- S1611 (lambda parentheses) 전역 무시 (Prettier 우선)
+- null 반환 대신 빈 컬렉션/빈 배열 반환
+- 사용하지 않는 변수/import 제거
+- 예외를 무시하지 않고 적절히 처리 또는 로깅
+## Import Rules
+### Backend (Java)
+- **와일드카드 임포트 (`.*`) 금지** --- 모든 import는 명시적
+- static import는 Q클래스에 사용: `import static com.smarterd.domain.xxx.entity.QXxx.xxx;`
+- Prettier가 save 시 자동 정렬, VS Code `organizeImports`가 미사용 import 제거
+### Frontend (TypeScript)
+- `@/` alias 사용 필수: `@/components/ui/button`, `@/lib/utils`
+- ESM only (`"type": "module"`) --- `require()` 금지
+## Error Handling
+### Backend Exception Hierarchy
+| Exception | HTTP Status | 용도 |
+|-----------|-------------|------|
+| `EntityNotFoundException` | 404 | 엔티티 조회 실패 |
+| `DomainAccessDeniedException` | 403 | 권한 부족 (미소속, 비ADMIN) |
+| `DuplicateException` / `ConflictException` | 409 | 중복 리소스 |
+| `TooManyRequestsException` | 429 | 요청 횟수 초과 (로그인 속도 제한 등) |
+| `BusinessException` | 400 | 비즈니스 규칙 위반 |
+- Base class: `com.smarterd.domain.common.exception.LocalizedException`
+- Handler: `com.smarterd.api.common.GlobalExceptionHandler`
+### Backend Error Response Format
+- `Accept-Language` 헤더에 따라 다국어 메시지 반환
+- `MessageSource` + `Locale`로 해석
+### Frontend Error Handling
+- `onError`에서 `toast.error(getErrorMessage(err, t('key')))` 패턴 통일
+- `getErrorMessage()` 유틸: `client/src/lib/api-error.ts`
+- 인라인 에러 표시 금지 --- 항상 `toast.error()` 사용
+## Transaction Pattern (Backend)
+- 클래스 레벨: `@Transactional(readOnly = true)` --- 기본 읽기 전용
+- 메서드 레벨: `@Transactional` --- 쓰기 작업에만 override
+- JPA Dirty Checking 활용: setter로 상태 변경, delete+save 금지
+## Null Safety (Backend)
+- 루트 `package-info.java`에 `@NonNullApi` 선언 (`com.smarterd`)
+- 하위 패키지 전체 non-null by default
+- null 허용 시 `@Nullable` 명시
+- `@SuppressWarnings("null")` --- `src/main/` 금지, `src/test/`에서만 허용
+- SonarQube null 경고 시 `Objects.requireNonNull(...)` 가드 추가
+## Documentation (JSDoc/Javadoc)
+### Backend (Javadoc)
+- 모든 Service, UseCase, Entity 클래스에 클래스 레벨 Javadoc
+- `@param`, `@returns` 사용
+- 필드에 `/** 설명 */` single-line 주석
+### Frontend (JSDoc)
+- **모든 함수/컴포넌트/인터페이스에 JSDoc 필수**
+- 함수: multi-line JSDoc + `@param` + `@returns`
+- Interface 필드: single-line `/** 설명 */`
+- State 변수 (`useState`): single-line `/** 설명 */`
+- 상수: top-level `/** 설명 */` + 각 필드 설명
+- shadcn/ui 컴포넌트 (`components/ui/`): auto-generated, JSDoc 불요
+## i18n (Internationalization)
+### Backend
+- `Spring MessageSource` 기반
+- 번들 위치: `src/main/resources/i18n/messages.properties` (en), `messages_ko.properties` (ko)
+- `AcceptHeaderLocaleResolver`로 `Accept-Language` 헤더에서 locale 해석
+- 예외 message code: `"error.not-found.user"` 형식
+- Bean Validation: `@NotBlank(message = "{validation.not-blank.login-id}")`
+### Frontend
+- `react-i18next` (`i18next` + `LanguageDetector`)
+- 설정: `client/src/i18n/index.ts`
+- 번역 파일: `client/src/i18n/locales/{en,ko}/translation.json` (~200 keys each)
+- Key convention: `{domain}.{screen}.{usage}`
+- **하드코딩 문자열 금지** --- 항상 `t('key')` 사용
+- `useTranslation()` 위치: `useQueryClient` 다음 (Page Component Code Ordering 규칙)
+- Type augmentation: `client/src/i18n/i18next.d.ts` (번역 키 자동 완성)
+- Axios 인터셉터가 모든 요청에 `Accept-Language: i18n.language` 헤더 자동 첨부
+## Page Component Code Ordering (Frontend)
+| 순번 | 그룹 | 예시 |
+|------|------|------|
+| 1 | URL 파라미터 | `useParams` |
+| 2 | 라우터 훅 | `useNavigate` |
+| 3 | Query Client | `useQueryClient` |
+| 3.5 | 다국어 | `useTranslation` |
+| 4 | 로컬 상태 | `useState` |
+| 5 | 스토어 셀렉터 | `useCanvasStore`, `useAuthStore` |
+| 6 | 파생값/상수 | computed values |
+| 7 | 쿼리 | `useQuery` |
+| 8 | 뮤테이션 | `useMutation` |
+| 9 | 이벤트 핸들러 | `handleSave` |
+| 10 | 사이드 이펙트 | `useEffect` |
+| 11 | 조건부 리턴 | loading/error early return |
+| 12 | JSX | `return (...)` |
+## Magic String 금지 (Frontend)
+| 카테고리 | 상수 | 파일 |
+|----------|------|------|
+| localStorage keys | `STORAGE_KEYS.*` | `client/src/constants/storage.ts` |
+| Route paths | `ROUTES.*` | `client/src/constants/routes.ts` |
+| Query cache keys | `queryKeys.*` | `client/src/constants/query-keys.ts` |
+| Keyboard shortcuts | `KEYBINDINGS.*` | `client/src/constants/keybindings.ts` |
+## Styling (Frontend)
+- CSS Variable 기반 디자인 토큰 체계
+- `index.css` (:root / .dark) -> `tailwind.config.js` -> 시맨틱 클래스
+- **하드코딩 색상 (`bg-gray-*`, `text-blue-*`, `#hex`) 금지**
+- shadcn/ui 토큰: `bg-background`, `bg-card`, `text-foreground`, `text-muted-foreground` 등
+- ERD 전용 토큰: `bg-erd-table-header`, `text-erd-pk`, `text-erd-fk` 등
+- 새 색상 추가: `index.css` CSS Variable -> `tailwind.config.js` 매핑 -> 시맨틱 클래스
+## Accessibility (Frontend)
+- 아이콘 전용 버튼: `aria-label` 필수
+- 토글 버튼: `aria-label`에 대상 컨텍스트 포함
+- form 요소: `<label>` 연결 불가 시 `aria-label` 추가
+## Data Fetching (Frontend)
+- 서버 상태: React Query (`useQuery` / `useMutation`) 필수
+- 수동 `useEffect` + `useState(loading)` 패턴 금지
+- Mutation 후: `invalidateQueries`로 캐시 무효화
+- 페이지에서 `axiosInstance` 직접 호출 금지 --- `api/` 모듈 함수 경유
+## QueryDSL Custom Repository Pattern (Backend)
+- Impl 클래스에 `@Repository`/`@Component` 붙이지 않음
+- `JPAQueryFactory`는 `@RequiredArgsConstructor`로 생성자 주입
+- Q클래스는 static import
+- Spring Data 파생 쿼리 메서드는 QueryDSL로 전환하지 않음
+<!-- GSD:conventions-end -->
+
+<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+## Architecture
+
+## Pattern Overview
+- Backend: 4-layer architecture (API / Application / Collaboration / Domain)
+- Frontend: Feature-based SPA with Zustand (client state) + React Query (server state) + Yjs (CRDT collaboration)
+- Real-time: Raw WebSocket + Yjs binary protocol, plugin 기반 채널 확장 구조
+- 문서 타입 플러그인 시스템: ERD와 Markdown 두 가지 문서 플러그인이 동일한 협업 프레임워크 위에서 동작
+## Layers
+- Purpose: HTTP 인터페이스 (Controller + DTO). 비즈니스 로직 없음
+- Location: `src/main/java/com/smarterd/api/`
+- Contains: Controller, Request/Response DTO (Java record), Validator
+- Depends on: `domain/` 서비스, `application/` 유스케이스
+- Used by: 프론트엔드 HTTP 클라이언트
+- 도메인별 하위 패키지: `auth/`, `diagram/`, `dictionary/`, `project/`, `team/`
+- DTO는 `dto/` 하위 디렉토리에 record 타입으로 정의
+- Purpose: 유스케이스 조율 (Cross-domain orchestration). 여러 도메인 서비스를 조합하는 복합 비즈니스 로직
+- Location: `src/main/java/com/smarterd/application/`
+- Contains: UseCase 클래스, Port 인터페이스, Model (payload/result record)
+- Depends on: `domain/` 서비스, `collaboration/` 인프라
+- Used by: `api/` Controller, WebSocket handler
+- 하위 패키지: `collaboration/command/`, `collaboration/query/`, `diagram/command/`, `diagram/model/`, `diagram/port/`
+- 예시: `SaveDiagramAuthoritativeContentUseCase`, `IssueDiagramCollaborationTicketUseCase`
+- Purpose: 도메인 무관 실시간 협업 인프라 프레임워크 (채널, 세션, 스냅샷, 문서 엔진)
+- Location: `src/main/java/com/smarterd/collaboration/`
+- Contains: 채널 플러그인 인터페이스, 세션 관리, 스냅샷 저장소, 문서 엔진 추상화
+- Depends on: 없음 (독립 모듈)
+- Used by: `domain/diagram/collaboration/` (다이어그램 채널 구현), `application/` (유스케이스)
+- 핵심 추상화: `CollaborationChannelPlugin`, `CollaborationWebSocketBinding`, `SharedDocumentEngine`, `CollaborationSnapshotStore`
+- 하위 패키지: `channel/` (채널 등록/인증/바인딩), `document/` (문서 엔진), `handoff/` (핸드오프), `metadata/`, `persistence/`, `plugin/` (플러그인 레지스트리), `session/`, `snapshot/`
+- Purpose: 엔티티, 리포지토리, 도메인 서비스. 핵심 비즈니스 규칙
+- Location: `src/main/java/com/smarterd/domain/`
+- Contains: JPA Entity, Spring Data Repository (+ QueryDSL Custom), Service
+- Depends on: `collaboration/` (diagram 도메인의 협업 구현체만)
+- Used by: `api/`, `application/`
+- 하위 패키지: `common/`, `user/`, `team/`, `project/`, `diagram/`, `dictionary/`, `markdown/`
+- Purpose: Spring 설정 빈, 보안, WebSocket, 스케줄러
+- Location: `src/main/java/com/smarterd/config/`
+- Contains: `@Configuration` 클래스, `@ConfigurationProperties`, Scheduler
+- 하위 패키지: `dictionary/`, `i18n/`, `openapi/`, `persistence/`, `scheduler/`, `security/`, `support/`, `websocket/`
+## Data Flow
+- **Server State:** React Query (`@tanstack/react-query`) — API 데이터 캐싱, 자동 갱신, mutation + invalidation
+- **Client State:** Zustand — `useAuthStore` (인증 토큰), `useCanvasStore` (ERD 노드/엣지 React Flow 상태), `useCollaborationStore` (협업 세션 상태)
+- **CRDT State:** Yjs `Y.Doc` — 실시간 협업 문서 동기화, WebSocket 경유 update 전파
+## Key Abstractions
+- Purpose: 도메인별 실시간 협업 채널을 프레임워크에 등록하는 확장점
+- Interface: `CollaborationChannelPlugin` (`collaboration/channel/`)
+- Implementation: `DiagramCollaborationChannelPlugin` (`domain/diagram/collaboration/`)
+- Pattern: Strategy + Registry — `CollaborationChannelRegistry`가 모든 채널 플러그인을 수집하고 채널 타입으로 라우팅
+- 관련 support 인터페이스: `CollaborationTicketSupport`, `CollaborationRuntimeSupport`, `CollaborationWebSocketBinding`
+- Purpose: ERD / Markdown 등 문서 타입별 협업 로직을 분리
+- Core contracts: `client/src/collaboration/core/contracts/` (document-bootstrap, document-plugin, shared-document-engine 등)
+- ERD plugin: `client/src/collaboration/plugins/erd/`
+- Markdown plugin: `client/src/collaboration/plugins/markdown/`
+- Registry: `client/src/collaboration/registry/` (document-plugin-registry, shared-document-engine-registry)
+- Pattern: Plugin Registry — `DocumentEditorRoute`가 pluginId로 ERD/Markdown 페이지를 분기
+- Purpose: 단일 유스케이스를 캡슐화하는 서비스 클래스
+- Location: `src/main/java/com/smarterd/application/`
+- Pattern: Command/Query 분리 — `command/` (상태 변경), `query/` (조회)
+- 예시: `SaveDiagramAuthoritativeContentUseCase`, `IssueCollaborationTicketUseCase`, `LoadCollaborationHandoffUseCase`
+- Port 인터페이스: `DiagramPresencePort`, `DiagramRealtimeSessionPort` (DIP 적용)
+- Purpose: 타입 안전한 복합 쿼리
+- Pattern: `XxxRepository extends JpaRepository, XxxRepositoryCustom` → `XxxRepositoryCustomImpl`
+- 예시: `DiagramRepositoryCustomImpl`, `TeamRepositoryCustomImpl`, `TeamMemberRepositoryCustomImpl`, `RefreshTokenRepositoryCustomImpl`, `TermRepositoryCustomImpl`
+- Purpose: 메시지 타입별 처리 로직 분리
+- Location: `src/main/java/com/smarterd/domain/diagram/websocket/relay/handler/`
+- Handlers: `YjsUpdateMessageHandler`, `AwarenessMessageHandler`, `SyncRelayMessageHandler`, `CompactedSnapshotMessageHandler`, `PresenceSnapshotRequestMessageHandler`, `SnapshotRequestMessageHandler`
+- Dispatcher: `DiagramWebSocketMessageDispatcher`
+## Entry Points
+- Location: `src/main/java/com/smarterd/SmartErdApplication.java`
+- Triggers: `./bootRun-dev.sh`, `./gradlew bootRun`
+- Responsibilities: Spring Boot 자동 구성, JPA Auditing, Scheduling 활성화
+- Location: `client/src/main.tsx` → `client/src/App.tsx`
+- Triggers: `npm run dev`
+- Responsibilities: React root 생성, QueryClientProvider, Router, 라우트 정의, ProtectedRoute 가드
+- Location: `src/main/java/com/smarterd/domain/diagram/websocket/transport/DiagramWebSocketHandler.java`
+- Triggers: WebSocket 연결 (`/ws/diagram/{diagramId}`)
+- Responsibilities: 바이너리 메시지 수신 → 타입별 핸들러 디스패치 → Room 릴레이
+- Location: `client/src/pages/document/DocumentEditorRoute.tsx`
+- Triggers: `/teams/:teamId/projects/:projectId/diagrams/:diagramId` 라우트
+- Responsibilities: pluginId 기반 ERD/Markdown 문서 편집기 분기
+## Error Handling
+- `LocalizedException` 기반 예외 계층: `EntityNotFoundException`(404), `DomainAccessDeniedException`(403), `DuplicateException`(409), `BusinessException`(400), `ConflictException`(409), `TooManyRequestsException`(429)
+- 모든 예외는 `messageCode + messageArgs` 패턴으로 생성 → `GlobalExceptionHandler`에서 `MessageSource` + `Locale`로 해석
+- Location: `src/main/java/com/smarterd/domain/common/exception/`, `src/main/java/com/smarterd/api/common/GlobalExceptionHandler.java`
+- `getErrorMessage(err, fallback)` (`client/src/lib/api-error.ts`): 서버 에러 메시지 추출
+- `toast.error(getErrorMessage(err, t('key')))`: 모든 mutation `onError` 핸들러에서 사용
+- 401 응답 → Axios 인터셉터에서 Refresh Token 갱신 시도 (큐 패턴) → 실패 시 로그인 리다이렉트
+## Cross-Cutting Concerns
+<!-- GSD:architecture-end -->
+
+<!-- GSD:workflow-start source:GSD defaults -->
+## GSD Workflow Enforcement
+
+Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+
+Use these entry points:
+- `/gsd:quick` for small fixes, doc updates, and ad-hoc tasks
+- `/gsd:debug` for investigation and bug fixing
+- `/gsd:execute-phase` for planned phase work
+
+Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+<!-- GSD:workflow-end -->
+
+<!-- GSD:profile-start -->
+## Developer Profile
+
+> Profile not yet configured. Run `/gsd:profile-user` to generate your developer profile.
+> This section is managed by `generate-claude-profile` -- do not edit manually.
+<!-- GSD:profile-end -->
