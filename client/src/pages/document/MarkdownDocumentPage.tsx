@@ -256,6 +256,7 @@ export default function MarkdownDocumentPage() {
               isMobile={isMobile}
               infoDrawerOpen={infoDrawerOpen}
               onInfoDrawerOpenChange={setInfoDrawerOpen}
+              frontmatterValid={parsedBuffer.frontmatterValid}
             />
           </div>
         </main>

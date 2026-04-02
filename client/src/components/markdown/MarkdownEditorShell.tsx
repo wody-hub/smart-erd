@@ -43,6 +43,8 @@ interface MarkdownEditorShellProps {
   infoDrawerOpen: boolean;
   /** 모바일 info drawer 오픈 상태 변경 핸들러 */
   onInfoDrawerOpenChange: (open: boolean) => void;
+  /** frontmatter YAML 파싱 유효 여부 */
+  frontmatterValid?: boolean;
 }
 
 /**
@@ -69,6 +71,7 @@ export default function MarkdownEditorShell({
   isMobile,
   infoDrawerOpen,
   onInfoDrawerOpenChange,
+  frontmatterValid = true,
 }: MarkdownEditorShellProps) {
   const { t } = useTranslation();
   const showEditorPane = isMobile ? mode === 'write' : mode !== 'preview';
@@ -83,6 +86,7 @@ export default function MarkdownEditorShell({
           dirty={dirty}
           savePending={savePending}
           lastSavedAt={lastSavedAt}
+          frontmatterValid={frontmatterValid}
         />
         <MarkdownToolbar
           mode={mode}

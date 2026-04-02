@@ -27,20 +27,27 @@ export function parseMarkdownBuffer(buffer: string): ParsedMarkdownBuffer {
     ? normalized.slice(frontmatterMatch[0].length).replace(/^\n/, '')
     : normalized;
   let loadedFrontmatter: unknown = {};
+  let frontmatterValid = true;
   if (frontmatterText) {
     try {
       loadedFrontmatter = load(frontmatterText);
     } catch {
       loadedFrontmatter = {};
+      frontmatterValid = false;
     }
   }
   const frontmatter =
     loadedFrontmatter && typeof loadedFrontmatter === 'object' && !Array.isArray(loadedFrontmatter)
       ? normalizeMarkdownFrontmatter(loadedFrontmatter as Record<string, unknown>)
       : {};
+  if (frontmatterText && frontmatterValid && !loadedFrontmatter) {
+    // YAML이 null로 평가된 경우 (예: "---\nnull\n---") — 빈 매핑 "{}" 은 valid
+    frontmatterValid = false;
+  }
 
   return {
     frontmatterText,
+    frontmatterValid,
     frontmatter,
     body,
     templateKey: normalizeTemplateKey(frontmatter.template),

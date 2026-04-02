@@ -15,6 +15,8 @@ export interface MarkdownHeadingItem {
 export interface ParsedMarkdownBuffer {
   /** raw frontmatter text */
   frontmatterText: string | null;
+  /** frontmatter YAML 파싱 성공 여부 (false면 frontmatter는 빈 객체, frontmatterText에 원본 보존) */
+  frontmatterValid: boolean;
   /** parsed frontmatter object */
   frontmatter: Record<string, unknown>;
   /** markdown body without frontmatter */

@@ -312,7 +312,10 @@ export function useMarkdownDocumentSession({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const contentToPersist = sharedDocumentEngine ? readSerializedBuffer() : buffer;
+      // editor buffer를 content artifact로 직접 사용한다.
+      // frontmatter가 YAML invalid 상태일 때 Y.Doc serialization은 이전 frontmatter를 복원하므로,
+      // 사용자 편집 내용을 보존하기 위해 항상 editor buffer를 우선한다.
+      const contentToPersist = buffer;
       const latestCheckpoint = documentCheckpointReader?.getLatestCheckpoint() ?? null;
       return {
         contentToPersist,

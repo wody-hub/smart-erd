@@ -52,19 +52,22 @@ export class MarkdownYjsDocumentAdapter
     const normalizedFrontmatter = parsedBuffer.frontmatter;
     const normalizedBody = parsedBuffer.body.replace(/\r\n/g, '\n');
     doc.transact(() => {
-      const frontmatterMap = this.getFrontmatterMap(doc);
-      const existingFrontmatterKeys = Array.from(frontmatterMap.keys());
-      for (const key of existingFrontmatterKeys) {
-        if (!(key in normalizedFrontmatter)) {
-          frontmatterMap.delete(key);
+      // frontmatter YAML 파싱 실패 시 기존 Y.Map 값을 보존하고 body만 업데이트한다.
+      if (parsedBuffer.frontmatterValid) {
+        const frontmatterMap = this.getFrontmatterMap(doc);
+        const existingFrontmatterKeys = Array.from(frontmatterMap.keys());
+        for (const key of existingFrontmatterKeys) {
+          if (!(key in normalizedFrontmatter)) {
+            frontmatterMap.delete(key);
+          }
         }
-      }
-      for (const [key, value] of Object.entries(normalizedFrontmatter)) {
-        if (value === undefined) {
-          frontmatterMap.delete(key);
-          continue;
+        for (const [key, value] of Object.entries(normalizedFrontmatter)) {
+          if (value === undefined) {
+            frontmatterMap.delete(key);
+            continue;
+          }
+          frontmatterMap.set(key, normalizeCollaborativeValue(value));
         }
-        frontmatterMap.set(key, normalizeCollaborativeValue(value));
       }
 
       const bodyText = this.getBodyText(doc);
@@ -78,11 +81,13 @@ export class MarkdownYjsDocumentAdapter
         }
       }
 
-      const metadataMap = this.getMetadataMap(doc);
-      if (parsedBuffer.templateKey) {
-        metadataMap.set('templateKey', parsedBuffer.templateKey);
-      } else {
-        metadataMap.delete('templateKey');
+      if (parsedBuffer.frontmatterValid) {
+        const metadataMap = this.getMetadataMap(doc);
+        if (parsedBuffer.templateKey) {
+          metadataMap.set('templateKey', parsedBuffer.templateKey);
+        } else {
+          metadataMap.delete('templateKey');
+        }
       }
     }, origin);
   }
