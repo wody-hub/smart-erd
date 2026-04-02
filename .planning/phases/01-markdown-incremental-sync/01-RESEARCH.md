@@ -1,6 +1,6 @@
 # Phase 1: 마크다운 증분 동기화 - Research
 
-**Researched:** 2026-04-02
+**Researched:** 2026-04-02 (re-research)
 **Domain:** Yjs Y.Text CRDT + diff-match-patch 증분 적용, Section Index Projector, 증분 프리뷰 렌더링
 **Confidence:** HIGH
 
@@ -37,8 +37,8 @@
 
 | ID | Description | Research Support |
 |----|-------------|------------------|
-| DOC-01 | 마크다운 에디터에서 두 사용자가 다른 Section을 동시 편집할 때 Section 단위 증분 동기화가 동작한다 | diff-match-patch로 변경 Section 식별, `markdown:section-update` 커맨드로 scope 분리, MarkdownScopeResolver(BE 신규)가 `section/{id}` scope 처리 |
-| DOC-02 | 마크다운 에디터에서 변경된 Section만 프리뷰가 재렌더링된다 (증분 프리뷰) | Section HTML 캐시 Map + Worker per-section 렌더링, sectionIndex로 변경 section 식별 |
+| DOC-01 | 마크다운 에디터에서 두 사용자가 다른 Section을 동시 편집할 때 Section 단위 증분 동기화가 동작한다 | diff-match-patch로 변경 offset 계산 → section 식별 → `markdown:section-update` 커맨드 발행 → `applyIncrementalTextUpdate()`로 Y.Text 범위 한정 업데이트. BE: `MarkdownCollaborationPlugin.java` 신규(ScopeResolver 포함) |
+| DOC-02 | 마크다운 에디터에서 변경된 Section만 프리뷰가 재렌더링된다 (증분 프리뷰) | `useMarkdownPreview` → `useMarkdownSectionPreview`로 확장. section ID → HTML 캐시 Map. Worker 프로토콜에 `sectionId` 추가 |
 </phase_requirements>
 
 ---
@@ -47,11 +47,11 @@
 
 이 Phase는 마크다운 에디터의 동기화 방식을 **전체 문서 교체(delete-all/insert-all)**에서 **Section 단위 증분 업데이트**로 전환하고, 프리뷰 렌더링도 **변경된 Section만 재렌더링**하는 방식으로 개선한다.
 
-현재 구현에서 `setEditorBuffer(nextBuffer)` 호출 시 `markdown:body-replace` 커맨드 하나만 발행하며, `MarkdownYjsDocumentAdapter.replaceBuffer()`가 항상 전체 Y.Text를 delete→insert로 교체한다. 이는 동시 편집 시 CRDT 병합 품질을 저하시키고 불필요한 네트워크 전송을 유발한다.
+실제 코드 분석에서 확인된 현재 상태: `setEditorBuffer(nextBuffer)` → `documentMutationSession.emitCommand({ key: 'markdown:body-replace', payload: { buffer: nextBuffer } })` → `MarkdownDocumentMutationApplier.applyBufferReplace()` → `MarkdownYjsDocumentAdapter.replaceBuffer()` → Y.Text 전체 delete→insert 순으로 동작한다. `markdown:section-update` 케이스는 `apply()` switch에 이미 존재하지만 `applyBufferReplace(mutation)`으로 위임되며, **payload.buffer 필드로 전체 버퍼를 받는 구조**이다 — 증분 payload(`sectionId`, `sectionText`, `startOffset`, `endOffset`)로 교체가 이 Phase의 핵심 수정이다.
 
-증분 동기화의 핵심 흐름은 다음과 같다. (1) 에디터 변경 시 diff-match-patch로 변경 범위가 속한 section을 식별한다. (2) 단일 section 내 변경이면 `markdown:section-update` 커맨드를 발행하고, 해당 section의 offset 범위만 Y.Text에 적용한다. (3) heading 추가/삭제 등 section 경계를 넘는 변경은 `markdown:body-replace` fallback을 유지한다. (4) 프리뷰는 Section HTML 캐시 Map을 유지하며, 변경된 section ID만 Worker에 재파싱 요청한다.
+추가 발견 사항: (1) `RemotePendingBanner.tsx` 파일은 존재하지 않는다 — 마크다운 에디터의 remote-pending UI가 미구현 상태이며 이 Phase에서 신규 구현이 필요하다. (2) BE에는 `ScopeResolver` 인터페이스만 존재하고 `implements ScopeResolver`인 구체 구현체가 없다 — `MarkdownCollaborationPlugin.java`(신규)에서 `ScopeResolver`를 함께 구현해야 한다. (3) FE `MarkdownScopeResolver`는 `markdown-document-plugin.ts`에 이미 구현되어 있어 수정만 필요하다.
 
-**Primary recommendation:** diff-match-patch를 사용하여 변경 offset을 계산하고, `sectionIndex`(heading offset 배열)로 해당 section을 식별하여 `markdown:section-update` 커맨드로 범위 한정 Y.Text 업데이트를 적용한다. Section 구조 변경 시에는 전체 재동기화 fallback을 사용한다.
+**Primary recommendation:** diff-match-patch로 변경 offset을 계산하고 `computeSectionBoundaries()`로 영향 section을 식별하여 `markdown:section-update` 커맨드를 발행한다. `MarkdownDocumentMutationApplier`에서 해당 케이스를 증분 Y.Text 적용으로 교체하고, 프리뷰는 `useMarkdownPreview` 훅을 section-aware 방식으로 확장한다.
 
 ---
 
@@ -61,10 +61,10 @@
 
 | Library | Version | Purpose | Why Standard |
 |---------|---------|---------|--------------|
-| `diff-match-patch` | 1.0.5 | 텍스트 diff 계산 (변경 offset 추출) | Google 제작, 안정적 텍스트 diff. 설계 문서에서 명시적으로 지정 |
-| `@types/diff-match-patch` | 1.0.36 | TypeScript 타입 정의 | diff-match-patch의 공식 타입 패키지 |
+| `diff-match-patch` | 1.0.5 | 텍스트 diff 계산 (변경 offset 추출) | 설계 문서에서 명시 선택. Y.Text.delete/insert 연산과 자연스럽게 대응 |
+| `@types/diff-match-patch` | 1.0.36 | TypeScript 타입 정의 | diff-match-patch 공식 타입 패키지 |
 | `yjs` | 13.6.29 (현재 설치) | Y.Text CRDT + Y.Doc.transact | 이미 설치 및 사용 중 |
-| `marked` | 14.0.0 (현재 설치) | Section HTML 렌더링 (Worker 내부) | 이미 설치 및 사용 중. Worker에서 재사용 |
+| `marked` | 14.0.0 (현재 설치) | Section HTML 렌더링 (Worker 내부) | 이미 Worker(`markdown-preview-worker.ts`)에서 사용 중 |
 
 ### Supporting
 
@@ -76,67 +76,111 @@
 
 | Instead of | Could Use | Tradeoff |
 |------------|-----------|----------|
-| diff-match-patch | fast-diff, jsdiff | diff-match-patch가 Y.Text.applyDelta() 와 연산 단위(retain/delete/insert)가 자연스럽게 대응됨. 설계 문서에서 명시적 선택 |
-| Section HTML 캐시 Map | 전체 재렌더링 | 캐시가 메모리 사용하지만 DOC-02 요구사항을 충족하는 유일한 방법 |
+| diff-match-patch | fast-diff, jsdiff | diff-match-patch가 설계 문서에서 명시적으로 선택됨. DIFF_EQUAL/DELETE/INSERT 연산이 Y.Text cursor 기반 delete/insert와 1:1 대응 |
+| Section HTML 캐시 Map | 전체 재렌더링 | DOC-02 요구사항을 충족하는 유일한 방법 |
 
 **Installation (현재 미설치):**
 ```bash
-npm install diff-match-patch @types/diff-match-patch --cache /tmp/npm-cache-smarterd
+cd client && npm install diff-match-patch @types/diff-match-patch --cache /tmp/npm-cache-smarterd
 ```
 
-**Version verification:**
-- `diff-match-patch`: npm registry 최신 1.0.5 (2023년, 안정 버전)
-- `@types/diff-match-patch`: 1.0.36
+**Version verification (npm registry 확인):**
+- `diff-match-patch`: 1.0.5 (확인됨)
+- `@types/diff-match-patch`: 1.0.36 (확인됨)
 
 ---
 
 ## Architecture Patterns
 
-### 현재 코드베이스 이해 (CRITICAL)
+### 현재 코드베이스 상태 (CRITICAL — 코드 직접 분석)
 
-현재 `setEditorBuffer(nextBuffer)` → `documentMutationSession.emitCommand({ key: 'markdown:body-replace', payload: { buffer: nextBuffer } })` → `MarkdownDocumentMutationApplier.applyBufferReplace()` → `MarkdownYjsDocumentAdapter.replaceBuffer()` 순으로 전체 교체가 발생한다.
+**FE mutation 경로 (확인된 실제 코드):**
+```
+setEditorBuffer(nextBuffer)
+  → emitCommand({ key: 'markdown:body-replace', payload: { buffer: nextBuffer } })
+  → MarkdownDocumentMutationApplier.apply()
+      case 'markdown:body-replace': applyBufferReplace(mutation)  ← buffer 필드
+      case 'markdown:section-update': applyBufferReplace(mutation) ← 현재: 전체 교체와 동일!
+  → MarkdownYjsDocumentAdapter.replaceBuffer(doc, buffer, key)
+      → Y.Text 전체 delete(0, len) + insert(0, nextBody)
+```
 
-`replaceBuffer()`는 Y.Text의 currentBody와 normalizedBody가 다를 경우 항상 `bodyText.delete(0, currentBody.length)` + `bodyText.insert(0, normalizedBody)`를 수행한다. 이것이 교체 대상이다.
+**중요: 현재 `markdown:section-update` case는 `payload.buffer` (전체 버퍼 문자열)를 기대한다.** 증분 동기화로 전환하면 payload 구조가 `{ sectionId, sectionText, startOffset, endOffset }`으로 바뀐다.
 
-현재 `extractHeadingItems(body)` 함수는 `parseMarkdownBuffer()`에서 이미 heading offset-independent한 ID(`heading-{index}-{slug}`)를 계산하고 있다. 단, 이 ID는 index 기반이라 heading 추가/삭제 시 모든 이후 section의 ID가 변경된다. Section ID 안정성 전략이 필요하다.
+**FE ScopeResolver 상태 (확인됨):**
+`markdown-document-plugin.ts`의 `MarkdownScopeResolver` 클래스에 `markdown:section-update` case가 이미 구현되어 있다. `sectionId`를 payload에서 추출하여 `{ kind: 'section', id: sectionId, mode: 'exclusive' }` scope를 반환한다.
 
-`MarkdownDocumentReadContextFactory`의 `listRelated(doc, 'sections')`도 이미 `parseMarkdownBuffer()`의 headings를 사용하고 있어, section 인식 인프라가 부분적으로 존재한다.
+**BE ScopeResolver 상태 (확인됨):**
+`ScopeResolver.java` 인터페이스만 존재하고 `implements ScopeResolver`인 구체 구현체가 없다. `BaseCollaborationPlugin` 인터페이스의 `scopeResolver()` 메서드도 구현체가 없다. `MarkdownCollaborationPlugin.java` 신규 생성이 필요하다.
 
-`MarkdownDocumentMutationApplier`에서 `markdown:section-update`는 이미 `case`로 선언되어 있으나, 현재는 `applyBufferReplace(mutation)`으로 위임되어 전체 교체와 동일하게 동작한다. 이 케이스를 증분 적용으로 교체하는 것이 핵심 수정이다.
+**RemotePendingBanner 상태 (확인됨):**
+`RemotePendingBanner.tsx` 파일이 존재하지 않는다. `DraftState` 계약(`draft-state.ts`)과 `remote-pending` 상태 전이는 정의되어 있으나, 마크다운 에디터에는 해당 UI가 없다. `DslCodeEditorPanel.tsx`의 remote-pending 처리는 ERD DSL 전용이다.
+
+**Worker 프리뷰 상태 (확인됨):**
+`useMarkdownPreview(body: string): string` 훅이 `client/src/hooks/useMarkdownPreview.ts`에 구현되어 있다. 단일 `requestIdRef`로 최신 요청만 처리한다. `markdown-preview-worker.ts`는 `{ id, body }` 요청 → `{ id, html }` 응답 프로토콜이다.
+
+**heading ID 현황 (확인됨):**
+`extractHeadingItems(body)`가 `heading-{index}-{slug}` 패턴으로 ID를 생성한다. `slugify()` 함수는 `lib/markdown.ts`에 이미 존재하며 한글 지원(`가-힣`)을 포함한다.
+
+**`MarkdownDocumentReadContextFactory.listRelated()` (확인됨):**
+`relation === 'sections'` 시 `parseMarkdownBuffer().headings`를 사용하여 `{ kind: 'section', id: heading.id }` 배열을 반환한다. 현재 index 기반 ID를 사용하므로 Section Index 안정화 후 함께 갱신해야 한다.
 
 ### Recommended Project Structure (신규 파일)
 
 ```
 client/src/
 ├── lib/
-│   └── markdown-section-index.ts    # Section offset 계산 (순수 함수)
+│   └── markdown-section-index.ts          # Section offset 계산 (순수 함수)
+├── hooks/
+│   └── useMarkdownSectionPreview.ts        # Section HTML 캐시 기반 증분 프리뷰 훅
 ├── collaboration/
 │   └── plugins/markdown/
-│       └── markdown-section-projector.ts  # sectionIndex Y.Map 관리
+│       └── markdown-section-projector.ts  # buildCommands 로직 (section-update vs body-replace 결정)
 └── test/unit/
     ├── markdown-section-index.test.ts     # Section offset 단위 테스트
-    └── markdown-section-update.test.ts    # 증분 Y.Text 적용 단위 테스트
+    ├── markdown-section-update.test.ts    # 증분 Y.Text 적용 단위 테스트
+    └── markdown-section-preview.test.ts  # Section HTML 캐시 단위 테스트
 
-src/main/java/com/smarterd/
-└── collaboration/
-    └── plugin/
-        └── markdown/
-            └── MarkdownScopeResolver.java  # BE section scope 해석
+client/src/components/markdown/
+└── MarkdownRemotePendingBanner.tsx        # remote-pending 3버튼 UI (신규)
+
+src/main/java/com/smarterd/domain/diagram/collaboration/
+└── MarkdownCollaborationPlugin.java       # BE markdown plugin (ScopeResolver 포함)
 ```
 
-### Pattern 1: Section Index 계산
+### 수정 대상 파일 (기존)
 
-**What:** heading 줄 번호/문자 offset → section 경계 배열 계산
-**When to use:** 에디터 변경 발생 시 어떤 section에 속하는지 판별할 때
+```
+client/src/
+├── pages/document/
+│   ├── use-markdown-document-session.ts   # setEditorBuffer: section-update 커맨드 발행 로직 추가
+│   └── MarkdownDocumentPage.tsx           # useMarkdownSectionPreview 연결
+├── collaboration/plugins/markdown/
+│   ├── markdown-document-mutation-applier.ts  # section-update case: 증분 적용으로 교체
+│   └── markdown-document-plugin.ts            # MarkdownScopeResolver: 이미 구현, 수정 불필요
+├── collaboration/yjs/
+│   └── markdown-yjs-document-adapter.ts       # applySectionUpdate() 메서드 추가
+├── collaboration/plugins/markdown/query/
+│   └── markdown-document-read-context-factory.ts  # listRelated sections: slug ID로 갱신
+├── lib/
+│   └── markdown.ts                        # extractHeadingItems: slug ID로 변경
+└── hooks/
+    └── useMarkdownPreview.ts              # (기존 유지, useMarkdownSectionPreview는 별도 파일)
+```
+
+### Pattern 1: Section Boundary 계산
+
+**What:** markdown body에서 heading 위치를 기준으로 section 경계(startOffset, endOffset) 배열 계산
+**When to use:** `setEditorBuffer()` 호출 시 어떤 section이 변경됐는지 판별
 
 ```typescript
-// Source: 설계 문서 02-편집-모델.md + 기존 extractHeadingItems 패턴
+// Source: 설계 문서 02-편집-모델.md, 기존 extractHeadingItems 패턴 (lib/markdown.ts)
 export interface SectionBoundary {
   /** heading offset (body 내 character offset) */
   startOffset: number;
   /** 다음 section 시작 offset (마지막 section은 body.length) */
   endOffset: number;
-  /** 안정적 section ID — slug 기반, 충돌 시 -1/-2 접미사 */
+  /** slug 기반 안정적 section ID (충돌 시 -1/-2 접미사) */
   id: string;
   /** heading level (1~6) */
   level: number;
@@ -148,13 +192,13 @@ export interface SectionBoundary {
  * markdown body에서 section 경계 배열을 계산한다.
  * heading 이전 영역은 id='root'로 처리한다.
  *
- * @param body markdown 본문 (frontmatter 제외)
+ * @param body markdown 본문 (frontmatter 제외, \r\n 정규화 후)
  * @returns section 경계 배열 (순서 보장)
  */
 export function computeSectionBoundaries(body: string): SectionBoundary[] { ... }
 
 /**
- * 변경된 offset이 속하는 section ID를 반환한다.
+ * 변경된 offset 범위가 속하는 section ID를 반환한다.
  *
  * @param boundaries computeSectionBoundaries 결과
  * @param changeStart 변경 시작 offset
@@ -168,33 +212,37 @@ export function findAffectedSection(
 ): string | null { ... }
 ```
 
-### Pattern 2: diff-match-patch를 Y.Text.applyDelta()로 변환
+**Section ID 안정성 전략:** `slugify(headingText)` 기반 ID 사용. 동일 slug가 여러 번 등장하면 `-1`, `-2` 접미사 추가. `slugify()`는 이미 `lib/markdown.ts`에 구현되어 있으므로 재사용한다.
 
-**What:** 텍스트 diff 결과를 Y.Text 부분 업데이트 연산으로 변환
-**When to use:** section 범위 내 Y.Text 증분 적용
+### Pattern 2: diff-match-patch → Y.Text 증분 적용
+
+**What:** 이전/현재 section 텍스트 diff를 계산하여 Y.Text 범위 한정 업데이트
+**When to use:** `MarkdownDocumentMutationApplier.applySectionUpdate()` 내부
 
 ```typescript
 // Source: 설계 문서 03-플러그인-통합.md "markdown:body-replace의 Y.Text 최적화"
 import { diff_match_patch, DIFF_EQUAL, DIFF_INSERT, DIFF_DELETE } from 'diff-match-patch';
+import * as Y from 'yjs';
 
 /**
- * 이전/현재 텍스트 diff를 Y.Text 연산(Delta)으로 변환하여 적용한다.
- * section offset 범위 내에서만 동작한다.
+ * 이전/현재 텍스트 diff를 Y.Text 연산으로 변환하여 적용한다.
+ * 반드시 Y.Doc.transact() 내부에서 호출해야 한다.
  *
  * @param yText 대상 Y.Text
- * @param prevText 이전 텍스트
+ * @param prevText 이전 텍스트 (Y.Text 현재 값의 해당 section 범위)
  * @param nextText 변경된 텍스트
  */
 export function applyIncrementalTextUpdate(
   yText: Y.Text,
   prevText: string,
   nextText: string,
+  baseOffset: number,
 ): void {
   const dmp = new diff_match_patch();
   const diffs = dmp.diff_main(prevText, nextText);
   dmp.diff_cleanupSemantic(diffs);
 
-  let cursor = 0;
+  let cursor = baseOffset;
   for (const [op, text] of diffs) {
     if (op === DIFF_EQUAL) {
       cursor += text.length;
@@ -209,19 +257,87 @@ export function applyIncrementalTextUpdate(
 }
 ```
 
-### Pattern 3: Section HTML 캐시 (증분 프리뷰)
+**Y.Doc.transact() 보장:** `MarkdownYjsDocumentAdapter`에 `applySectionUpdate(doc, sectionId, sectionText, startOffset, endOffset, origin)` 메서드를 추가하고, 내부에서 `doc.transact(() => { applyIncrementalTextUpdate(...) }, origin)`으로 감싼다.
+
+### Pattern 3: section-update 커맨드 발행 (FE)
+
+**What:** 편집 변경이 단일 section 내에 있으면 `markdown:section-update`, 경계를 넘으면 `markdown:body-replace` 발행
+**When to use:** `use-markdown-document-session.ts`의 `setEditorBuffer()` 개선
+
+```typescript
+// Source: 설계 문서 02-편집-모델.md buildCommands 2단계 전략
+// 신규 payload 구조 (이전 payload.buffer와 다름)
+{
+  pluginId: 'markdown',
+  key: 'markdown:section-update',
+  payload: {
+    sectionId: 'api-설계',        // section scope ID
+    sectionText: '## API 설계\n\n수정된 내용',
+    startOffset: 120,              // body 내 section 시작 offset
+    endOffset: 280,                // body 내 section 종료 offset
+  },
+}
+```
+
+**buildCommands 로직 (markdown-section-projector.ts 신규):**
+1. `prevBody`와 `nextBody`를 diff-match-patch로 비교하여 변경 offset 범위 추출
+2. `computeSectionBoundaries(nextBody)` 호출
+3. `findAffectedSection(boundaries, changeStart, changeEnd)` 호출
+4. 단일 section → `markdown:section-update` 커맨드 반환
+5. section 경계 초과, heading 추가/삭제 감지 → `markdown:body-replace` fallback
+
+### Pattern 4: MarkdownDocumentMutationApplier 수정
+
+**What:** `markdown:section-update` case를 증분 적용 메서드로 교체
+**When to use:** `markdown-document-mutation-applier.ts` 수정
+
+```typescript
+// Source: client/src/collaboration/plugins/markdown/markdown-document-mutation-applier.ts
+// 현재 상태:
+case 'markdown:section-update':
+  return this.toApplyResult(this.applyBufferReplace(mutation)); // ← 전체 교체, payload.buffer 사용
+
+// 수정 후:
+case 'markdown:section-update':
+  return this.toApplyResult(this.applySectionUpdate(mutation)); // ← 증분 적용, 신규 payload 구조
+
+private applySectionUpdate(mutation: DocumentMutation): boolean {
+  const sectionId = typeof mutation.payload?.sectionId === 'string' ? mutation.payload.sectionId : null;
+  const sectionText = typeof mutation.payload?.sectionText === 'string' ? mutation.payload.sectionText : null;
+  const startOffset = typeof mutation.payload?.startOffset === 'number' ? mutation.payload.startOffset : null;
+  const endOffset = typeof mutation.payload?.endOffset === 'number' ? mutation.payload.endOffset : null;
+  if (sectionId == null || sectionText == null || startOffset == null || endOffset == null) {
+    return false;
+  }
+  this.documentAdapter.applySectionUpdate(
+    this.engine.getDocument(),
+    sectionId, sectionText, startOffset, endOffset,
+    mutation.key,
+  );
+  return true;
+}
+```
+
+### Pattern 5: Section HTML 캐시 (증분 프리뷰)
 
 **What:** section ID → HTML 캐시 Map, 변경된 section만 Worker 재요청
-**When to use:** `useMarkdownPreview` 훅 확장
+**When to use:** `useMarkdownSectionPreview` 훅 (신규) + `MarkdownDocumentPage` 연결
 
 ```typescript
 // Source: 설계 문서 08-후속-phase-로드맵.md Phase 9-B + 기존 useMarkdownPreview.ts 패턴
+// 기존 Worker 프로토콜 { id, body } → 확장: { id, sectionId, body }
+// Worker 응답 프로토콜 { id, html } → 확장: { id, sectionId, html }
 
-interface SectionPreviewCache {
-  /** section ID → sanitized HTML */
-  htmlCache: Map<string, string>;
-  /** 현재 section 순서 (순서 변경 감지용) */
-  sectionOrder: string[];
+interface SectionPreviewRequest {
+  id: number;
+  sectionId: string;
+  body: string;
+}
+
+interface SectionPreviewResponse {
+  id: number;
+  sectionId: string;
+  html: string;
 }
 
 /**
@@ -230,55 +346,86 @@ interface SectionPreviewCache {
  *
  * @param body markdown 본문
  * @param changedSectionIds 이번 변경에서 영향받은 section ID 집합
+ * @param boundaries 현재 section 경계 배열
  * @returns 전체 프리뷰 HTML (section 순서대로 조합)
  */
 export function useMarkdownSectionPreview(
   body: string,
-  changedSectionIds: Set<string>,
+  changedSectionIds: ReadonlySet<string>,
+  boundaries: SectionBoundary[],
 ): string { ... }
 ```
 
-### Pattern 4: MarkdownScopeResolver (백엔드 신규)
+**section별 requestId Map:** 기존 `requestIdRef.current` (단일 숫자)를 `requestIdMap: Map<string, number>`으로 교체하여, 응답의 `sectionId + id`가 현재 최신 요청과 일치하는 경우에만 캐시를 갱신한다.
 
-**What:** `markdown:section-update` 커맨드의 `section/{id}` scope 해석
-**When to use:** BE에서 커맨드 처리 시 scope lock 결정
+### Pattern 6: MarkdownCollaborationPlugin (BE 신규)
+
+**What:** BE에서 markdown 플러그인 ScopeResolver 구현
+**When to use:** `MarkdownCollaborationPlugin.java` 신규 생성
 
 ```java
 // Source: 설계 문서 03-플러그인-통합.md ScopeResolver 섹션
-package com.smarterd.collaboration.plugin.markdown;
+// 참조: DiagramCollaborationChannelPlugin.java 패턴
+package com.smarterd.domain.diagram.collaboration;
 
+import com.smarterd.collaboration.plugin.BaseCollaborationPlugin;
+import com.smarterd.collaboration.plugin.DomainValidationHook;
+import com.smarterd.collaboration.plugin.ScopeLockMode;
 import com.smarterd.collaboration.plugin.ScopeRef;
 import com.smarterd.collaboration.plugin.ScopeResolver;
-import com.smarterd.collaboration.plugin.ScopeLockMode;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
+import org.springframework.stereotype.Component;
 
 /**
- * markdown document command를 section/document scope로 해석한다.
+ * markdown 문서 collaboration plugin.
+ * section 단위 scope lock을 해석한다.
  */
-public class MarkdownScopeResolver implements ScopeResolver {
+@Component
+public class MarkdownCollaborationPlugin implements BaseCollaborationPlugin {
 
-    private static final String SECTION_UPDATE_KEY = "markdown:section-update";
-    private static final String BODY_REPLACE_KEY = "markdown:body-replace";
-    private static final String FRONTMATTER_UPDATE_KEY = "markdown:frontmatter-update";
+    public static final String PLUGIN_ID = "markdown";
 
     @Override
     @NonNull
-    public Collection<ScopeRef> resolve(@NonNull String commandKey, @Nullable Map<String, ?> payload) {
-        return switch (commandKey) {
-            case SECTION_UPDATE_KEY -> {
+    public String pluginId() {
+        return PLUGIN_ID;
+    }
+
+    @Override
+    public int schemaVersion() {
+        return 1;
+    }
+
+    @Override
+    @NonNull
+    public Set<String> supportedEngineIds() {
+        return Set.of("yjs");
+    }
+
+    @Override
+    @NonNull
+    public ScopeResolver scopeResolver() {
+        return (commandKey, payload) -> switch (commandKey) {
+            case "markdown:section-update" -> {
                 final var sectionId = payload != null ? payload.get("sectionId") : null;
                 if (!(sectionId instanceof String sid) || sid.isBlank()) {
                     yield List.of(rootScope());
                 }
                 yield List.of(new ScopeRef("section", sid, ScopeLockMode.EXCLUSIVE));
             }
-            case BODY_REPLACE_KEY, FRONTMATTER_UPDATE_KEY -> List.of(rootScope());
             default -> List.of(rootScope());
         };
+    }
+
+    @Override
+    @NonNull
+    public DomainValidationHook validationHook() {
+        return (commandKey, payload) -> {};
     }
 
     private static ScopeRef rootScope() {
@@ -287,13 +434,36 @@ public class MarkdownScopeResolver implements ScopeResolver {
 }
 ```
 
+### Pattern 7: MarkdownRemotePendingBanner (신규)
+
+**What:** 마크다운 에디터의 remote-pending 상태 UX (D-07/D-08 구현)
+**When to use:** `MarkdownDocumentPage.tsx`에서 remote-pending 상태 시 표시
+
+remote-pending 상태는 현재 마크다운 에디터에 미구현이다. `DraftState.reconcileState === 'remote-pending'`가 되는 시점에 표시할 배너 컴포넌트를 신규 구현해야 한다.
+
+D-07: 원격 변경이 **다른 section**이면 자동 수락 (배너 없음)
+D-08: 원격 변경이 **같은 section**이면 3버튼 UI (수락/유지+리베이스/나중에)
+
+```typescript
+// Source: 설계 문서 02-편집-모델.md remote-pending 3버튼 UI
+// MarkdownRemotePendingBanner.tsx props
+interface MarkdownRemotePendingBannerProps {
+  /** 충돌 중인 section ID (null이면 문서 전체 충돌) */
+  conflictSectionId: string | null;
+  onAcceptRemote: () => void;
+  onKeepLocalAndRebase: () => void;
+  onCompareLater: () => void;
+}
+```
+
 ### Anti-Patterns to Avoid
 
-- **전체 재계산 후 전체 교체:** section이 변경되지 않았는데도 전체 Y.Text를 delete→insert하는 기존 패턴은 이 Phase에서 제거 대상이다. 단, heading 추가/삭제 등 구조 변경 시에는 fallback으로 유지한다.
-- **Section ID에 index 사용:** `heading-{index}-{slug}` 패턴은 heading 추가 시 모든 이후 section ID가 변경된다. slug 기반 ID + 충돌 해소 접미사로 안정성을 확보해야 한다.
-- **캐시 무효화 누락:** section 경계가 변경될 때 (heading 추가/삭제/이동) 전체 캐시를 무효화하지 않으면 stale HTML이 표시된다.
-- **Worker에서 전체 body 재파싱:** 증분 프리뷰의 목적을 무력화한다. section 텍스트만 Worker에 전달해야 한다.
-- **코어 수정:** `DocumentStore`, `ChangeBus`, `DocumentStore`, `CollaborationRuntime` 등 코어 모듈을 수정하는 것은 "코어 수정 제로" 원칙 위반이다.
+- **전체 재계산 후 전체 교체:** heading 추가/삭제 등 구조 변경을 제외한 모든 section 편집에 `markdown:body-replace` fallback을 사용하면 이 Phase의 목적을 달성하지 못한다. 단일 section 내 변경은 반드시 `markdown:section-update`를 사용한다.
+- **Section ID에 index 사용:** `heading-{index}-{slug}` 패턴은 heading 추가 시 모든 이후 section ID가 shift된다. slug 전용 ID로 교체한다.
+- **applyIncrementalTextUpdate를 transact 외부에서 호출:** Y.Text.delete/insert 중간 상태가 원격에 전파된다. 반드시 `doc.transact()` 내부에서 호출한다.
+- **Worker에 전체 body 전달:** 기존 `{ id, body }` 프로토콜을 그대로 사용하면 section 단위 캐시 갱신이 불가능하다. `{ id, sectionId, body }` 형태로 section body만 전달한다.
+- **코어 수정:** `DocumentStore`, `ChangeBus`, `CollaborationRuntime` 등 코어 모듈은 수정하지 않는다. 플러그인 계약(ScopeResolver, MutationApplier) 레이어에서만 변경한다.
+- **RemotePendingBanner 없이 remote-pending 상태 방치:** 마크다운 에디터에 remote-pending UI가 없으면 사용자는 충돌이 발생했는지 알 수 없다.
 
 ---
 
@@ -301,12 +471,12 @@ public class MarkdownScopeResolver implements ScopeResolver {
 
 | Problem | Don't Build | Use Instead | Why |
 |---------|-------------|-------------|-----|
-| 텍스트 diff 계산 | 직접 LCS/diff 구현 | `diff-match-patch` | Google 제작, edge case 처리 완성도, Y.Text.applyDelta와 자연스럽게 매핑 |
-| Y.Text 증분 적용 | delete(0, all) + insert(0, all) | diff-match-patch diff → 범위 delete/insert | CRDT 이점 보존, 동시 편집 병합 품질 유지 |
-| Section HTML 렌더링 | 새 렌더러 구현 | 기존 `marked` + `DOMPurify` (Worker 내부 재사용) | 이미 Worker에 완성된 파이프라인 존재 |
-| section ID 생성 | 자체 UUID | slug 기반 ID (`slugify(headingText)` + 충돌 -1/-2) | 사람이 읽을 수 있고, heading 텍스트 변경 시만 ID 변경됨 |
+| 텍스트 diff 계산 | 직접 LCS/diff 구현 | `diff-match-patch` | Google 제작, edge case 처리 완성도, delete/insert cursor 방식이 Y.Text와 1:1 대응 |
+| Y.Text 증분 적용 | delete(0,all) + insert(0,all) | diff-match-patch diff → 범위 delete/insert | CRDT 이점 보존 (문자 단위 병합 유지) |
+| Section HTML 렌더링 | 새 렌더러 구현 | 기존 `marked` + `DOMPurify` (`markdown-preview-worker.ts`) | Worker에 완성된 파이프라인 존재, 프로토콜 확장만 필요 |
+| section ID 생성 | UUID | slug 기반 ID (`slugify()` 재사용 + 충돌 접미사) | 사람이 읽을 수 있고, 이미 `lib/markdown.ts`에 `slugify()` 구현됨 |
 
-**Key insight:** Y.Text의 CRDT는 문자 단위 병합을 자동으로 처리한다. 핵심 과제는 "어떤 section이 변경됐는가"를 정확히 식별하고, Y.Text의 올바른 offset 범위에만 적용하는 것이다. diff-match-patch가 이 계산을 대신한다.
+**Key insight:** Y.Text의 CRDT는 문자 단위 병합을 자동으로 처리한다. 이 Phase의 핵심은 "어떤 section이 변경됐는가"를 정확히 식별하고, Y.Text의 올바른 offset 범위에만 적용하는 것이다. diff-match-patch가 이 계산을 담당한다.
 
 ---
 
@@ -314,52 +484,65 @@ public class MarkdownScopeResolver implements ScopeResolver {
 
 ### Pitfall 1: Section ID 불안정성
 
-**What goes wrong:** heading 추가/삭제 시 index 기반 section ID가 모두 shift되어 Wrong section에 커맨드가 적용된다.
-**Why it happens:** 현재 `extractHeadingItems()`의 `heading-{index}-{slug}` 패턴은 index를 포함한다.
-**How to avoid:** `computeSectionBoundaries()`에서 slug 기반 ID를 사용하고, 같은 slug가 여러 번 등장할 때만 `-1`, `-2` 접미사를 추가한다. Section 구조 변경(heading 추가/삭제) 감지 시 `markdown:body-replace` fallback을 사용한다.
+**What goes wrong:** heading 추가/삭제 시 index 기반 ID(`heading-{index}-{slug}`)가 모두 shift되어 잘못된 section에 커맨드가 적용된다.
+**Why it happens:** 현재 `extractHeadingItems()`의 `heading-{index}-{slug}` 패턴은 index를 포함한다. `MarkdownDocumentReadContextFactory.listRelated()`도 같은 ID를 사용한다.
+**How to avoid:** `computeSectionBoundaries()`에서 `slugify(headingText)` 기반 ID를 사용하고, 동일 slug 충돌 시에만 `-1`, `-2` 접미사를 추가한다. `lib/markdown.ts`의 `extractHeadingItems()`도 일관성을 위해 동일 방식으로 변경한다.
 **Warning signs:** 다른 section 편집 내용이 엉뚱한 section에 반영되는 경우.
 
-### Pitfall 2: Heading 추가/삭제 시 section 경계 오판
+### Pitfall 2: section-update payload 필드명 혼동
 
-**What goes wrong:** 사용자가 새 heading `## 새 섹션`을 추가하면 그 이후 모든 section의 startOffset이 변경된다. sectionIndex가 갱신되기 전에 커맨드가 발행되면 Wrong offset에 적용된다.
-**Why it happens:** section 경계 계산이 실시간으로 되지 않고, 이전 sectionIndex 스냅샷을 참조하는 경우.
-**How to avoid:** `findAffectedSection()` 호출 전에 반드시 현재 draft 텍스트를 기준으로 `computeSectionBoundaries()`를 재계산한다. Heading 추가/삭제 감지 로직에서는 즉시 `markdown:body-replace` fallback으로 전환한다.
-**Warning signs:** 변경 적용 후 문서 구조가 깨지는 경우.
+**What goes wrong:** 기존 `applyBufferReplace()`는 `mutation.payload?.buffer` (전체 버퍼 문자열)를 사용한다. 신규 `applySectionUpdate()`는 `{ sectionId, sectionText, startOffset, endOffset }` 구조를 사용한다. 두 경로를 혼동하면 null 체크 실패로 `applied: false`가 반환된다.
+**Why it happens:** 기존 `markdown:section-update` case가 `applyBufferReplace(mutation)`으로 위임되어 있어 payload 구조가 `body-replace`와 동일했다.
+**How to avoid:** `applySectionUpdate()`는 `payload.buffer` 필드를 절대 참조하지 않는다. `payload.sectionId`, `payload.sectionText`, `payload.startOffset`, `payload.endOffset`만 사용한다.
+**Warning signs:** `apply()` 결과가 항상 `{ applied: false }`로 반환되는 경우.
 
 ### Pitfall 3: Y.Text transact 외부에서 부분 적용
 
-**What goes wrong:** `Y.Text.delete()` + `Y.Text.insert()`를 transact 없이 순차 호출하면 중간 상태가 원격에 전파된다.
+**What goes wrong:** `applyIncrementalTextUpdate()`를 `transact()` 없이 순차 호출하면 중간 상태(delete 후 insert 전)가 원격에 전파된다.
 **Why it happens:** 기존 `replaceBuffer()`는 `doc.transact(() => { ... }, origin)`으로 감싸져 있지만, 신규 증분 적용 경로에서 transact를 누락하기 쉽다.
-**How to avoid:** `applyIncrementalTextUpdate()`는 항상 `Y.Doc.transact()` 내부에서 호출되어야 한다. `MarkdownYjsDocumentAdapter`에서 transact를 보장한다.
-**Warning signs:** 원격 클라이언트에서 부분 적용 상태가 보이는 경우.
+**How to avoid:** `MarkdownYjsDocumentAdapter.applySectionUpdate()`에서 `doc.transact()` 보장. `applyIncrementalTextUpdate()`는 transact 내부에서만 호출되도록 설계한다.
+**Warning signs:** 원격 클라이언트에서 부분 적용 상태가 순간 보이는 경우.
 
-### Pitfall 4: Worker section 요청과 캐시 순서 불일치
+### Pitfall 4: Heading 추가/삭제 시 section 경계 오판
 
-**What goes wrong:** 여러 section이 빠르게 연속 변경되면 Worker 응답 순서가 요청 순서와 다를 수 있다. 이전 응답이 최신 응답을 덮어쓸 수 있다.
-**Why it happens:** Web Worker는 비동기이고, 기존 `useMarkdownPreview`의 `requestIdRef.current` 패턴은 단일 요청만 처리한다.
-**How to avoid:** section별 requestId를 Map으로 관리하고, 응답의 sectionId + requestId가 현재 최신 요청과 일치하는 경우에만 캐시를 갱신한다.
-**Warning signs:** 프리뷰가 깜빡이거나 이전 내용으로 되돌아가는 경우.
+**What goes wrong:** 새 heading `## 새 섹션`을 추가하면 이후 모든 section의 startOffset이 변경된다. `computeSectionBoundaries()`가 이전 상태를 참조하면 wrong offset에 적용된다.
+**Why it happens:** `buildCommands(prevBody, nextBody)`에서 `prevBoundaries`와 `nextBoundaries`를 혼용하는 경우.
+**How to avoid:** `markdown-section-projector.ts`의 `buildCommands()`에서 heading 개수 변화를 먼저 감지한다. heading 추가/삭제가 있으면 즉시 `markdown:body-replace` fallback을 반환한다. `findAffectedSection()`은 항상 `nextBoundaries` 기준으로 호출한다.
+**Warning signs:** heading 추가 후 문서 구조가 어긋나는 경우.
 
-### Pitfall 5: remote-pending 배너의 section-aware 판단 오류
+### Pitfall 5: Worker 응답 순서 불일치 (section 캐시)
 
-**What goes wrong:** 원격 변경이 다른 section에 있음에도 3버튼 배너가 표시되어 사용자를 불필요하게 방해한다.
-**Why it happens:** D-07(다른 section 자동 수락) 로직을 구현하지 않고 기존 remote-pending 전체 문서 비교로 처리하는 경우.
-**How to avoid:** 원격 변경 수신 시 변경된 section ID와 현재 사용자가 편집 중인 section ID를 비교한다. 다른 section이면 자동 수락, 같은 section이면 3버튼 UI를 표시한다.
-**Warning signs:** 다른 section 편집 시 항상 remote-pending 배너가 표시되는 경우.
+**What goes wrong:** 여러 section이 빠르게 연속 변경되면 Worker 응답 순서가 요청 순서와 다를 수 있다. 이전 응답이 최신 응답을 덮어쓴다.
+**Why it happens:** 기존 `useMarkdownPreview`의 `requestIdRef.current`는 단일 숫자로 전체 문서의 최신 요청만 추적한다. section별로 독립 추적하지 않는다.
+**How to avoid:** `useMarkdownSectionPreview`에서 `requestIdMap: Map<string, number>`를 사용하여 section별 최신 requestId를 추적한다. `sectionId + id`가 현재 맵의 값과 일치하는 응답만 캐시에 반영한다.
+**Warning signs:** 프리뷰가 깜빡이거나 이전 section 내용으로 되돌아가는 경우.
+
+### Pitfall 6: remote-pending UI 미구현으로 UX 손상
+
+**What goes wrong:** 마크다운 에디터에 `MarkdownRemotePendingBanner`가 없으면 `DraftState.reconcileState === 'remote-pending'` 상태에서 사용자는 다른 사람이 같은 section을 수정했다는 것을 알 수 없다.
+**Why it happens:** `RemotePendingBanner.tsx`가 존재하지 않고, ERD의 remote-pending 처리는 `DslCodeEditorPanel.tsx` 내부에 밀결합되어 있어 마크다운에서 재사용할 수 없다.
+**How to avoid:** `MarkdownRemotePendingBanner.tsx`를 신규 구현하고 `MarkdownDocumentPage.tsx`에서 remote-pending 상태 감지 시 표시한다. D-07(다른 section → 자동 수락)도 이 컴포넌트 마운트 전 단계에서 처리한다.
+**Warning signs:** 두 사용자가 같은 section을 동시 편집할 때 한 명의 변경이 조용히 사라지는 경우.
 
 ---
 
 ## Code Examples
 
-### 기존 동기화 경로 (교체 대상)
+### 현재 전체 교체 경로 (교체 대상 코드)
 
 ```typescript
-// Source: client/src/pages/document/use-markdown-document-session.ts
-// 현재: 모든 편집에서 markdown:body-replace 발행 → 전체 Y.Text 교체
+// Source: client/src/pages/document/use-markdown-document-session.ts (line 372-392)
+// 현재: 모든 편집에서 markdown:body-replace + payload.buffer 발행
 const setEditorBuffer = useCallback(
   (nextBuffer: string) => {
+    if (!documentMutationSession?.enabled || !collaborationReady) {
+      return;
+    }
     documentMutationSession.emitCommand(
-      { key: 'markdown:body-replace', payload: { buffer: nextBuffer } },
+      {
+        key: 'markdown:body-replace',
+        payload: { buffer: nextBuffer },
+      },
       { origin: { source: 'local' } },
     );
   },
@@ -367,11 +550,10 @@ const setEditorBuffer = useCallback(
 );
 ```
 
-### 기존 replaceBuffer (증분 교체 대상 부분)
+### 현재 replaceBuffer (Y.Text 전체 교체 — 수정 대상 부분)
 
 ```typescript
-// Source: client/src/collaboration/yjs/markdown-yjs-document-adapter.ts
-// 현재: body가 다르면 항상 전체 delete + insert
+// Source: client/src/collaboration/yjs/markdown-yjs-document-adapter.ts (line 73-83)
 const bodyText = this.getBodyText(doc);
 const currentBody = bodyText.toString();
 if (currentBody !== normalizedBody) {
@@ -382,38 +564,38 @@ if (currentBody !== normalizedBody) {
     bodyText.insert(0, normalizedBody);      // 전체 삽입
   }
 }
+// → 증분 메서드 applySectionUpdate(doc, sectionId, sectionText, startOffset, endOffset, origin) 추가
 ```
 
-### Section-Update 적용 경로 (신규)
+### 현재 mutation applier section-update case (수정 대상)
 
 ```typescript
-// Source: 설계 문서 03-플러그인-통합.md MarkdownMutationPolicy
-// markdown:section-update 커맨드 payload 구조
-{
-  pluginId: 'markdown',
-  key: 'markdown:section-update',
-  payload: {
-    sectionId: 'api-설계',     // section scope ID
-    sectionText: '## API 설계\n\n수정된 내용',  // 변경된 section 전체 텍스트
-    startOffset: 120,           // body 내 section 시작 offset
-    endOffset: 280,             // body 내 section 종료 offset
-  },
-}
-```
-
-### MarkdownDocumentMutationApplier 수정 방향
-
-```typescript
-// Source: client/src/collaboration/plugins/markdown/markdown-document-mutation-applier.ts
-// 현재 section-update case는 applyBufferReplace()로 위임 (전체 교체와 동일)
-// 수정: offset 기반 증분 적용으로 교체
+// Source: client/src/collaboration/plugins/markdown/markdown-document-mutation-applier.ts (line 22-23)
 case 'markdown:section-update':
-  return this.toApplyResult(this.applySectionUpdate(mutation));  // 신규 메서드
+  return this.toApplyResult(this.applyBufferReplace(mutation));  // ← payload.buffer 기대, 전체 교체
+// 수정 후: applySectionUpdate(mutation) 호출, payload.sectionId/sectionText/startOffset/endOffset 기대
+```
 
-private applySectionUpdate(mutation: DocumentMutation): boolean {
-  const { sectionId, sectionText, startOffset, endOffset } = mutation.payload ?? {};
-  // ... 검증 후 applyIncrementalTextUpdate 호출
-}
+### 기존 Worker 프로토콜 (확장 대상)
+
+```typescript
+// Source: client/src/lib/markdown-preview-worker.ts (line 37-49)
+// 현재: { id, body } 요청 → { id, html } 응답 (전체 문서 렌더링)
+self.addEventListener('message', (event: MessageEvent<PreviewRequest>) => {
+  const { id, body } = event.data;
+  const rawHtml = marked.parse(body, { async: false }) as string;
+  const html = DOMPurify.sanitize(rawHtml, { ... });
+  self.postMessage({ id, html });
+});
+// 확장: { id, sectionId, body } 요청 → { id, sectionId, html } 응답으로 변경
+```
+
+### BE MarkdownCollaborationPlugin 등록 패턴
+
+```java
+// Source: 설계 문서 03-플러그인-통합.md, DiagramCollaborationChannelPlugin.java 패턴
+// @Component 선언으로 Spring이 CollaborationPluginRegistry에 자동 등록한다.
+// (CollaborationPluginRegistry 구현이 Spring Bean List를 주입받는 방식이면 추가 설정 불필요)
 ```
 
 ---
@@ -426,24 +608,26 @@ private applySectionUpdate(mutation: DocumentMutation): boolean {
 | 전체 HTML 재렌더링 | Section HTML 캐시 Map | 이 Phase | 변경된 section만 Worker 재요청 |
 | `document/root` 단일 scope | `section/{id}` scope 활성화 | 이 Phase | 다른 section 편집 사용자 간 scope 분리 |
 | heading index 기반 ID | slug 기반 안정적 ID | 이 Phase | heading 추가/삭제 시 기존 section ID 보존 |
+| remote-pending UI 없음 (마크다운) | MarkdownRemotePendingBanner 신규 구현 | 이 Phase | D-07/D-08 충족 |
+| Worker `{ id, body }` 프로토콜 | `{ id, sectionId, body }` 확장 | 이 Phase | section 단위 캐시 가능 |
 
-**Deprecated/outdated:**
-- `applyBufferReplace()` 내 `markdown:section-update` 위임: 이 Phase에서 독립적 증분 적용 메서드로 교체
-- `heading-{index}-{slug}` ID 생성: Section Index Projector에서 slug 전용 ID로 교체
+**Deprecated/outdated after this Phase:**
+- `applyBufferReplace()` 내 `markdown:section-update` 위임 → `applySectionUpdate()` 독립 구현으로 교체
+- `heading-{index}-{slug}` ID 생성 패턴 → slug 전용 ID로 교체 (extractHeadingItems, computeSectionBoundaries 일관)
 
 ---
 
 ## Open Questions
 
-1. **Section ID와 heading text 변경 시 처리**
-   - What we know: slug 기반 ID를 사용하면 heading 텍스트 변경 시 section ID가 변경된다.
-   - What's unclear: 같은 section을 편집하는 두 사용자 중 한 명이 heading 텍스트를 수정하면 다른 사용자의 sectionId가 invalid해진다.
-   - Recommendation: heading 텍스트 변경 시 `markdown:body-replace` fallback을 사용한다. Section-update는 heading 아래 body 내용 변경에만 적용한다.
+1. **`CollaborationPluginRegistry` 자동 수집 방식 확인 필요**
+   - What we know: `CollaborationPluginRegistry`는 인터페이스로 정의됨. 구현체를 찾지 못했음.
+   - What's unclear: Spring `@Component` 자동 등록 방식인지, 명시적 `@Bean` 등록 방식인지.
+   - Recommendation: Wave 0에서 `CollaborationPluginRegistry` 구현체를 확인하고 `MarkdownCollaborationPlugin` 등록 방식을 결정한다.
 
-2. **`useMarkdownPreview` 시그니처 확장 방식**
-   - What we know: 현재 `useMarkdownPreview(body: string): string` 시그니처는 전체 body를 받아 전체 HTML을 반환한다.
-   - What's unclear: 증분 프리뷰를 위해 `changedSectionIds`를 외부에서 전달받아야 하는데, 이 정보의 출처(에디터 변경 감지 vs sectionIndex 비교)를 어디서 계산할지 결정이 필요하다.
-   - Recommendation: `MarkdownDocumentPage`에서 이전/현재 sectionBoundaries를 비교하여 changedSectionIds를 계산하고 새 훅 `useMarkdownSectionPreview`에 전달한다. 기존 `useMarkdownPreview`는 하위 호환으로 유지한다.
+2. **DraftState와 remote-pending 상태 전이 연결**
+   - What we know: `DraftState.reconcileState === 'remote-pending'`는 코어에 정의됨. 마크다운 에디터는 현재 이 상태를 활용하지 않는다.
+   - What's unclear: `subscribeDocumentChanges` 콜백에서 원격 변경을 감지하여 DraftState를 `remote-pending`으로 전이하는 로직이 마크다운 채널에 없다. `use-markdown-document-runtime.ts` + `collaboration-session-machine.ts` 조합 확인 필요.
+   - Recommendation: Wave 0 또는 Wave 1에서 현재 마크다운 원격 변경 감지 경로를 추적하고, remote-pending 전이를 어디서 구현할지 결정한다.
 
 ---
 
@@ -453,12 +637,16 @@ private applySectionUpdate(mutation: DocumentMutation): boolean {
 |------------|------------|-----------|---------|----------|
 | Node.js | 단위 테스트 (`node:test`) | ✓ | 20.15.1 | — |
 | npm | 패키지 설치 | ✓ | 10.7.0 | — |
-| diff-match-patch | 증분 diff 계산 | ✗ (미설치) | — | 설치 필요: `npm install diff-match-patch @types/diff-match-patch --cache /tmp/npm-cache-smarterd` |
+| diff-match-patch | 증분 diff 계산 | ✗ (미설치) | — | 설치 필요 |
 | yjs | Y.Text CRDT | ✓ | 13.6.29 | — |
 | marked | Section HTML 렌더링 (Worker) | ✓ | 14.0.0 | — |
+| dompurify | HTML sanitize (Worker) | ✓ | 3.2.7 | — |
 
 **Missing dependencies with no fallback:**
-- `diff-match-patch`: Wave 0에서 설치 필요. 증분 Y.Text 적용의 핵심 의존성.
+- `diff-match-patch`, `@types/diff-match-patch`: Wave 0에서 설치 필요. 증분 Y.Text 적용의 핵심 의존성.
+  ```bash
+  cd client && npm install diff-match-patch @types/diff-match-patch --cache /tmp/npm-cache-smarterd
+  ```
 
 ---
 
@@ -477,11 +665,13 @@ private applySectionUpdate(mutation: DocumentMutation): boolean {
 
 | Req ID | Behavior | Test Type | Automated Command | File Exists? |
 |--------|----------|-----------|-------------------|-------------|
-| DOC-01 | Section 경계 계산 정확성 | unit | `npm run test:unit` (markdown-section-index.test.ts) | ❌ Wave 0 |
+| DOC-01 | Section 경계 계산 정확성 (root, heading 전후, 마지막 section) | unit | `npm run test:unit` (markdown-section-index.test.ts) | ❌ Wave 0 |
+| DOC-01 | slug 기반 section ID 안정성 (heading 추가/삭제 시 기존 ID 보존) | unit | `npm run test:unit` (markdown-section-index.test.ts) | ❌ Wave 0 |
 | DOC-01 | 단일 section 변경 → section-update 커맨드 발행 | unit | `npm run test:unit` (markdown-section-update.test.ts) | ❌ Wave 0 |
 | DOC-01 | heading 추가/삭제 시 body-replace fallback | unit | `npm run test:unit` (markdown-section-update.test.ts) | ❌ Wave 0 |
-| DOC-01 | diff-match-patch → Y.Text 증분 적용 정확성 | unit | `npm run test:unit` (markdown-section-update.test.ts) | ❌ Wave 0 |
-| DOC-02 | 변경 section만 캐시 무효화 (나머지 캐시 보존) | unit | `npm run test:unit` (markdown-section-preview.test.ts) | ❌ Wave 0 |
+| DOC-01 | diff-match-patch → Y.Text 증분 적용 정확성 (transact 포함) | unit | `npm run test:unit` (markdown-section-update.test.ts) | ❌ Wave 0 |
+| DOC-02 | 변경 section만 캐시 무효화, 나머지 캐시 보존 | unit | `npm run test:unit` (markdown-section-preview.test.ts) | ❌ Wave 0 |
+| DOC-02 | section 경계 변경 시 전체 캐시 무효화 | unit | `npm run test:unit` (markdown-section-preview.test.ts) | ❌ Wave 0 |
 
 ### Sampling Rate
 
@@ -491,9 +681,10 @@ private applySectionUpdate(mutation: DocumentMutation): boolean {
 
 ### Wave 0 Gaps
 
-- [ ] `client/test/unit/markdown-section-index.test.ts` — REQ DOC-01: Section 경계 계산
-- [ ] `client/test/unit/markdown-section-update.test.ts` — REQ DOC-01: 증분 Y.Text 적용
-- [ ] `client/test/unit/markdown-section-preview.test.ts` — REQ DOC-02: Section HTML 캐시
+- [ ] `client/test/unit/markdown-section-index.test.ts` — DOC-01: Section 경계 계산, slug ID 안정성
+- [ ] `client/test/unit/markdown-section-update.test.ts` — DOC-01: buildCommands 전략, 증분 Y.Text 적용
+- [ ] `client/test/unit/markdown-section-preview.test.ts` — DOC-02: Section HTML 캐시 무효화 로직
+- [ ] `diff-match-patch` 패키지 설치: `npm install diff-match-patch @types/diff-match-patch --cache /tmp/npm-cache-smarterd`
 
 ---
 
@@ -501,26 +692,31 @@ private applySectionUpdate(mutation: DocumentMutation): boolean {
 
 ### Primary (HIGH confidence)
 
-- `plan/2026-03-26-마크다운-에디터-플러그인-설계/08-후속-phase-로드맵.md` — Phase 7 + Phase 9-B 구현 범위 (설계 원본)
-- `plan/2026-03-26-마크다운-에디터-플러그인-설계/02-편집-모델.md` — buildCommands 전략, section-update 커맨드 정의
-- `plan/2026-03-26-마크다운-에디터-플러그인-설계/03-플러그인-통합.md` — ScopeResolver, MutationPolicy, MarkdownMutationPolicy Y.Text 최적화
-- `client/src/collaboration/yjs/markdown-yjs-document-adapter.ts` — 현재 Y.Text 교체 구현
-- `client/src/collaboration/plugins/markdown/markdown-document-mutation-applier.ts` — 현재 mutation 적용 경로
-- `client/src/hooks/useMarkdownPreview.ts` — Phase 9-A Worker 파이프라인 (확장 기반)
-- `client/src/pages/document/use-markdown-document-session.ts` — body-replace 발행 경로
+- `plan/2026-03-26-마크다운-에디터-플러그인-설계/08-후속-phase-로드맵.md` — Phase 7 + Phase 9-B 구현 범위 (설계 원본), 직접 읽음
+- `plan/2026-03-26-마크다운-에디터-플러그인-설계/02-편집-모델.md` — buildCommands 전략, section-update 커맨드 정의, 직접 읽음
+- `plan/2026-03-26-마크다운-에디터-플러그인-설계/03-플러그인-통합.md` — ScopeResolver, MutationPolicy, 직접 읽음
+- `client/src/collaboration/yjs/markdown-yjs-document-adapter.ts` — 현재 Y.Text 전체 교체 구현 (replaceBuffer), 직접 읽음
+- `client/src/collaboration/plugins/markdown/markdown-document-mutation-applier.ts` — section-update case가 applyBufferReplace로 위임됨 확인, 직접 읽음
+- `client/src/collaboration/plugins/markdown/markdown-document-plugin.ts` — FE MarkdownScopeResolver 이미 구현됨 확인, 직접 읽음
+- `client/src/hooks/useMarkdownPreview.ts` — 현재 Worker 파이프라인 (단일 requestIdRef), 직접 읽음
+- `client/src/lib/markdown-preview-worker.ts` — Worker 현재 프로토콜 `{ id, body }`, 직접 읽음
+- `client/src/pages/document/use-markdown-document-session.ts` — body-replace 발행 경로 + payload.buffer 구조, 직접 읽음
+- `client/src/pages/document/MarkdownDocumentPage.tsx` — remote-pending UI 부재 확인, 직접 읽음
+- `client/src/lib/markdown.ts` — extractHeadingItems index 기반 ID, slugify() 존재 확인, 직접 읽음
+- `src/main/java/com/smarterd/collaboration/plugin/ScopeResolver.java` — BE 인터페이스, 구현체 없음 확인, 직접 읽음
 
 ### Secondary (MEDIUM confidence)
 
-- npm registry: `diff-match-patch@1.0.5`, `@types/diff-match-patch@1.0.36` — 버전 확인
+- npm registry: `diff-match-patch@1.0.5`, `@types/diff-match-patch@1.0.36` — `npm view` 명령으로 직접 확인
 
 ---
 
 ## Metadata
 
 **Confidence breakdown:**
-- Standard stack: HIGH — diff-match-patch는 설계 문서에서 명시 선택, npm registry로 버전 확인
-- Architecture: HIGH — 기존 코드베이스를 직접 분석하여 수정 대상 파악
-- Pitfalls: HIGH — 기존 Yjs 사용 패턴 + 설계 문서의 구현 주의사항 기반
+- Standard stack: HIGH — diff-match-patch는 설계 문서 명시, npm registry 확인, 기존 패키지 모두 설치 확인
+- Architecture: HIGH — 실제 코드 파일 전체 분석 (이전 research보다 개선: payload 구조 불일치, RemotePendingBanner 미존재, BE ScopeResolver 미구현 확인)
+- Pitfalls: HIGH — 실제 코드에서 payload 필드명 혼동, slug/index ID 불일치 등 구체적 위험 식별
 
 **Research date:** 2026-04-02
-**Valid until:** 2026-05-02 (diff-match-patch API 안정적, 설계 문서 고정)
+**Valid until:** 2026-05-02 (diff-match-patch API 안정, 설계 문서 고정)
