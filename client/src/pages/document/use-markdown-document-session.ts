@@ -10,6 +10,7 @@ import type { DocumentMutationSession } from '@/collaboration/core/session/docum
 import { queryKeys } from '@/constants/query-keys';
 import { parseMarkdownBuffer } from '@/lib/markdown';
 import { buildSectionCommands } from '@/collaboration/plugins/markdown/markdown-section-projector';
+import type { RemoteMutationInfo } from '@/components/collaboration/RemotePendingBanner';
 import type { DiagramDetail } from '@/types/diagram';
 import type { DocumentBootstrapPayload } from '@/types/document';
 
@@ -32,6 +33,14 @@ interface UseMarkdownDocumentSessionResult {
   handleSave: () => void;
   retryCollaborationSetup: () => void;
   documentMutationSession: DocumentMutationSession | null;
+  /** 현재 편집 중인 section ID (마지막 section-update 커맨드 기준) */
+  activeSectionId: string | undefined;
+  /** 원격 pending mutation 정보 (null이면 배너 미표시) */
+  remoteMutation: RemoteMutationInfo | null;
+  /** 원격 pending mutation 수락 콜백 */
+  onAcceptRemote: () => void;
+  /** 원격 pending mutation 거절 콜백 */
+  onRejectRemote: () => void;
 }
 
 /**
@@ -69,6 +78,10 @@ export function useMarkdownDocumentSession({
   const loadedContentRef = useRef('');
   /** 이전 body 텍스트 — section-aware 커맨드 발행용 (render 유발 방지를 위해 ref 사용) */
   const prevBodyRef = useRef<string>('');
+  /** 현재 편집 중인 section ID (마지막 section-update 커맨드 기준) */
+  const [activeSectionId, setActiveSectionId] = useState<string | undefined>(undefined);
+  /** 원격 pending mutation 정보 */
+  const [remoteMutation, setRemoteMutation] = useState<RemoteMutationInfo | null>(null);
 
   const bootstrapQueryKey = useMemo(
     () => queryKeys.diagrams.bootstrap(teamId, projectId, diagramId),
@@ -122,10 +135,20 @@ export function useMarkdownDocumentSession({
     if (!subscribeDocumentChanges) {
       return;
     }
-    return subscribeDocumentChanges(() => {
+    return subscribeDocumentChanges((event) => {
       const serialized = readSerializedBuffer();
       prevBodyRef.current = parseMarkdownBuffer(serialized).body.replace(/\r\n/g, '\n');
       setBuffer(serialized);
+
+      // 원격 변경 감지 시 remoteMutation 설정 (D-07/D-08 배너 연동)
+      if (event.origin.source === 'remote') {
+        const scope = event.affectedScopes[0];
+        const sectionId = scope?.id !== 'root' ? scope?.id : undefined;
+        setRemoteMutation({
+          key: sectionId ? 'markdown:section-update' : 'markdown:body-replace',
+          payload: sectionId ? { sectionId } : undefined,
+        });
+      }
     });
   }, [readSerializedBuffer, subscribeDocumentChanges]);
 
@@ -388,6 +411,14 @@ export function useMarkdownDocumentSession({
       const commands = buildSectionCommands(prevBody, nextBody, nextBuffer);
       prevBodyRef.current = nextBody;
 
+      // activeSectionId 추적: 마지막 section-update 커맨드의 sectionId
+      const lastCommand = commands[commands.length - 1];
+      if (lastCommand?.key === 'markdown:section-update') {
+        setActiveSectionId(lastCommand.payload.sectionId);
+      } else if (lastCommand?.key === 'markdown:body-replace') {
+        setActiveSectionId(undefined);
+      }
+
       for (const command of commands) {
         documentMutationSession.emitCommand(command, {
           origin: {
@@ -398,6 +429,16 @@ export function useMarkdownDocumentSession({
     },
     [collaborationReady, documentMutationSession],
   );
+
+  /** 원격 pending mutation 수락 — Yjs가 이미 자동 병합하므로 배너 닫기만 수행 */
+  const onAcceptRemote = useCallback(() => {
+    setRemoteMutation(null);
+  }, []);
+
+  /** 원격 pending mutation 거절 — Yjs CRDT 특성상 undo 불가, 배너 닫기만 수행 */
+  const onRejectRemote = useCallback(() => {
+    setRemoteMutation(null);
+  }, []);
 
   const retryCollaborationSetup = useCallback(() => {
     setCollaborationError(false);
@@ -415,6 +456,10 @@ export function useMarkdownDocumentSession({
     handleSave: () => saveMutation.mutate(),
     retryCollaborationSetup,
     documentMutationSession,
+    activeSectionId,
+    remoteMutation,
+    onAcceptRemote,
+    onRejectRemote,
   };
 }
 

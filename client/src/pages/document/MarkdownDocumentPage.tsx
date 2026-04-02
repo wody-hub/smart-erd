@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { fetchDiagram, fetchDiagramBootstrap } from '@/api/diagramApi';
 import { fetchProject } from '@/api/projectApi';
 import { fetchTeam } from '@/api/teamApi';
+import { RemotePendingBanner } from '@/components/collaboration/RemotePendingBanner';
 import MarkdownEditorShell from '@/components/markdown/MarkdownEditorShell';
 import Header from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -89,6 +90,10 @@ export default function MarkdownDocumentPage() {
     handleSave,
     retryCollaborationSetup,
     documentMutationSession,
+    activeSectionId,
+    remoteMutation,
+    onAcceptRemote,
+    onRejectRemote,
   } = useMarkdownDocumentSession({
     teamId: resolvedTeamId,
     projectId: resolvedProjectId,
@@ -224,6 +229,13 @@ export default function MarkdownDocumentPage() {
               <ArrowLeft className="mr-1 h-4 w-4" />
               {t('workspace.action.backToDocuments')}
             </Button>
+            <RemotePendingBanner
+              remoteMutation={remoteMutation}
+              onAccept={onAcceptRemote}
+              onReject={onRejectRemote}
+              activeSectionId={activeSectionId}
+              className="mb-2"
+            />
             <MarkdownEditorShell
               headings={parsedBuffer.headings}
               previewHtml={previewHtml}
