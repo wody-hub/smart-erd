@@ -27,6 +27,9 @@ public class MarkdownScopeResolver implements ScopeResolver {
      * <p>section-update의 경우 payload의 sectionId를 section scope로 해석하고,
      * 그 외 command(body-replace, frontmatter-update, unknown)는 document/root scope로 해석한다.</p>
      *
+     * <p>sectionId가 null이거나 빈 문자열이면 document root scope로 fallback한다.</p>
+     * <p>startOffset/endOffset이 음수이거나 역전(start &gt; end)이면 document root scope로 fallback한다.</p>
+     *
      * @param commandKey command key (예: "markdown:section-update")
      * @param payload    command payload (sectionId 포함 가능, null 허용)
      * @return affected scope 목록
@@ -36,9 +39,20 @@ public class MarkdownScopeResolver implements ScopeResolver {
     public Collection<ScopeRef> resolve(@NonNull String commandKey, @Nullable Map<String, ?> payload) {
         return switch (commandKey) {
             case SECTION_UPDATE_KEY -> {
-                final var sectionId = payload != null ? payload.get("sectionId") : null;
+                if (payload == null) {
+                    yield List.of(rootScope());
+                }
+                final var sectionId = payload.get("sectionId");
                 if (!(sectionId instanceof String sid) || sid.isBlank()) {
                     yield List.of(rootScope());
+                }
+                // offset 검증: 음수 또는 역전된 offset은 document root scope로 fallback
+                final var startOffset = payload.get("startOffset");
+                final var endOffset = payload.get("endOffset");
+                if (startOffset instanceof Number start && endOffset instanceof Number end) {
+                    if (start.longValue() < 0 || end.longValue() < 0 || start.longValue() > end.longValue()) {
+                        yield List.of(rootScope());
+                    }
                 }
                 yield List.of(new ScopeRef("section", sid, ScopeLockMode.EXCLUSIVE));
             }
