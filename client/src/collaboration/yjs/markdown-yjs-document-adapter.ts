@@ -1,6 +1,7 @@
 import { diff_match_patch, DIFF_EQUAL, DIFF_INSERT, DIFF_DELETE } from 'diff-match-patch';
 import * as Y from 'yjs';
 import { parseMarkdownBuffer, serializeMarkdownBuffer } from '@/lib/markdown';
+import { computeSectionBoundaries } from '@/lib/markdown-section-index';
 import type { MarkdownCollaborationBootstrap } from '@/collaboration/channel/document/markdown-collaboration-bootstrap';
 import type { YjsDocumentAdapter } from './yjs-document-adapter.js';
 
@@ -157,24 +158,33 @@ export class MarkdownYjsDocumentAdapter
   /**
    * markdown:section-update 커맨드를 증분 Y.Text 적용으로 처리한다.
    *
-   * diff-match-patch로 현재 section과 변경된 section의 diff를 계산하고,
-   * Y.Doc.transact 내부에서 body Y.Text에 startOffset 기준 증분 연산을 적용한다.
+   * sectionId로 현재 Y.Text body에서 section 경계를 재계산한 뒤,
+   * diff-match-patch로 현재 section과 변경된 section의 diff를 계산하고
+   * Y.Doc.transact 내부에서 증분 연산을 적용한다.
+   *
+   * 동시 편집 시 앞 section 길이가 변경되어도 sectionId 기반 경계 재계산으로
+   * 올바른 offset에 diff가 적용된다.
    *
    * @param doc          대상 Y.Doc
+   * @param sectionId    대상 section의 안정적 ID (slug 기반)
    * @param sectionText  변경된 section 전체 텍스트
-   * @param startOffset  body 내 section 시작 offset
-   * @param endOffset    body 내 section 종료 offset
    * @param origin       Yjs transaction origin
    */
   applySectionUpdate(
     doc: Y.Doc,
+    sectionId: string,
     sectionText: string,
-    startOffset: number,
-    endOffset: number,
     origin: unknown,
   ): void {
     const bodyText = this.getBodyText(doc);
-    const currentSection = bodyText.toString().slice(startOffset, endOffset);
+    const currentBody = bodyText.toString();
+    const boundaries = computeSectionBoundaries(currentBody);
+    const target = boundaries.find((b) => b.id === sectionId);
+    if (!target) {
+      return;
+    }
+
+    const currentSection = currentBody.slice(target.startOffset, target.endOffset);
     if (currentSection === sectionText) {
       return;
     }
@@ -184,7 +194,7 @@ export class MarkdownYjsDocumentAdapter
     dmp.diff_cleanupSemantic(diffs);
 
     doc.transact(() => {
-      let cursor = startOffset;
+      let cursor = target.startOffset;
       for (const [op, text] of diffs) {
         if (op === DIFF_EQUAL) {
           cursor += text.length;

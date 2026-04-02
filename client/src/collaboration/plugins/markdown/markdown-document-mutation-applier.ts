@@ -47,17 +47,14 @@ export class MarkdownDocumentMutationApplier {
     const payload = mutation.payload;
     if (
       typeof payload?.sectionId !== 'string' ||
-      typeof payload?.sectionText !== 'string' ||
-      typeof payload?.startOffset !== 'number' ||
-      typeof payload?.endOffset !== 'number'
+      typeof payload?.sectionText !== 'string'
     ) {
       return false;
     }
     this.documentAdapter.applySectionUpdate(
       this.engine.getDocument(),
+      payload.sectionId as string,
       payload.sectionText as string,
-      payload.startOffset as number,
-      payload.endOffset as number,
       mutation.key,
     );
     return true;
