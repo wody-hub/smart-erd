@@ -9,6 +9,7 @@ import { useMarkdownRuntimeBootstrap } from '@/collaboration/channel/document/us
 import type { DocumentMutationSession } from '@/collaboration/core/session/document-mutation-session';
 import { queryKeys } from '@/constants/query-keys';
 import { parseMarkdownBuffer } from '@/lib/markdown';
+import { buildSectionCommands } from '@/collaboration/plugins/markdown/markdown-section-projector';
 import type { DiagramDetail } from '@/types/diagram';
 import type { DocumentBootstrapPayload } from '@/types/document';
 
@@ -66,6 +67,8 @@ export function useMarkdownDocumentSession({
   const snapshotAvailableRef = useRef(false);
   /** 서버 기준 최신 직렬화 buffer */
   const loadedContentRef = useRef('');
+  /** 이전 body 텍스트 — section-aware 커맨드 발행용 (render 유발 방지를 위해 ref 사용) */
+  const prevBodyRef = useRef<string>('');
 
   const bootstrapQueryKey = useMemo(
     () => queryKeys.diagrams.bootstrap(teamId, projectId, diagramId),
@@ -120,7 +123,9 @@ export function useMarkdownDocumentSession({
       return;
     }
     return subscribeDocumentChanges(() => {
-      setBuffer(readSerializedBuffer());
+      const serialized = readSerializedBuffer();
+      prevBodyRef.current = parseMarkdownBuffer(serialized).body.replace(/\r\n/g, '\n');
+      setBuffer(serialized);
     });
   }, [readSerializedBuffer, subscribeDocumentChanges]);
 
@@ -203,7 +208,9 @@ export function useMarkdownDocumentSession({
     seededSetupSignatureRef.current = seedSignature;
     const doc = sharedDocumentEngine.getDocument();
     documentAdapter.applyBootstrapToDoc(doc, collaborationBootstrap, 'bootstrap');
-    setBuffer(readSerializedBuffer());
+    const seedBuffer = readSerializedBuffer();
+    prevBodyRef.current = parseMarkdownBuffer(seedBuffer).body.replace(/\r\n/g, '\n');
+    setBuffer(seedBuffer);
     setCollaborationReady(true);
     void persistDiagramYdocSnapshot(
       teamId,
@@ -274,7 +281,9 @@ export function useMarkdownDocumentSession({
       }
       setCollaborationError(false);
       setCollaborationReady(true);
-      setBuffer(readSerializedBuffer());
+      const syncedBuffer = readSerializedBuffer();
+      prevBodyRef.current = parseMarkdownBuffer(syncedBuffer).body.replace(/\r\n/g, '\n');
+      setBuffer(syncedBuffer);
     };
 
     provider.onConnectionStatusChange = (status) => {
@@ -374,19 +383,18 @@ export function useMarkdownDocumentSession({
       if (!documentMutationSession?.enabled || !collaborationReady) {
         return;
       }
-      documentMutationSession.emitCommand(
-        {
-          key: 'markdown:body-replace',
-          payload: {
-            buffer: nextBuffer,
-          },
-        },
-        {
+      const prevBody = prevBodyRef.current;
+      const nextBody = parseMarkdownBuffer(nextBuffer).body.replace(/\r\n/g, '\n');
+      const commands = buildSectionCommands(prevBody, nextBody, nextBuffer);
+      prevBodyRef.current = nextBody;
+
+      for (const command of commands) {
+        documentMutationSession.emitCommand(command, {
           origin: {
             source: 'local',
           },
-        },
-      );
+        });
+      }
     },
     [collaborationReady, documentMutationSession],
   );
