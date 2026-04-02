@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-04-02T13:06:00.453Z"
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-04-02T13:07:16.049Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 01 (markdown-incremental-sync) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-04-02
 
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 01-markdown-incremental-sync P02 | 2min | 1 tasks | 3 files |
+| Phase 01 P01 | 3min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,7 @@ Recent decisions affecting current work:
 - Phase 6(간트): 직접 Canvas 구현 금지, `@svar-ui/react-gantt` MIT 라이브러리 사용 결정
 - Phase 5/6: WBS 날짜 컬럼은 `DATE` 타입 사용 — 간트 타임존 버그 방지
 - [Phase 01-markdown-incremental-sync]: DomainValidationHook은 별도 빈 없이 no-op lambda로 구현 (markdown 플러그인)
+- [Phase 01]: slug 기반 section ID 채택 — heading-{index}-{slug} 대신 slugify(text) + 충돌 접미사로 안정성 확보
 
 ### Pending Todos
 
@@ -79,6 +81,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-02T13:06:00.450Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-04-02T13:07:16.047Z
+Stopped at: Completed 01-01-PLAN.md
 Resume file: None

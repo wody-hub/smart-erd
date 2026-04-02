@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — diff-match-patch 설치 + SectionBoundary 순수 함수 라이브러리 (TDD)
+- [x] 01-01-PLAN.md — diff-match-patch 설치 + SectionBoundary 순수 함수 라이브러리 (TDD)
 - [x] 01-02-PLAN.md — BE MarkdownScopeResolver + MarkdownCollaborationPlugin
 - [ ] 01-03-PLAN.md — FE 증분 동기화 핵심 경로 (applyIncrementalTextUpdate + buildSectionCommands + MutationApplier 교체)
 - [ ] 01-04-PLAN.md — Section HTML 캐시 + useMarkdownSectionPreview + MarkdownDocumentPage 교체
