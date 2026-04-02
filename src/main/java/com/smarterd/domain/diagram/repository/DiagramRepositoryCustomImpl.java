@@ -9,6 +9,7 @@ import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.project.entity.Project;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 
@@ -181,5 +182,39 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
                 Boolean.TRUE.equals(result.get(artifactAvailableExpr))
             )
         );
+    }
+
+    @Override
+    public List<DiagramSummaryProjection> findSummariesByProject(Project project) {
+        return queryFactory
+            .select(
+                diagram.id,
+                diagram.name,
+                diagram.pluginId,
+                diagram.dictionarySet.id,
+                diagram.dictionarySet.name,
+                diagram.templateKey,
+                diagram.summaryText,
+                diagram.createdAt,
+                diagram.updatedAt
+            )
+            .from(diagram)
+            .leftJoin(diagram.dictionarySet)
+            .where(diagram.project.eq(project), diagram.deletedAt.isNull())
+            .orderBy(diagram.updatedAt.desc())
+            .fetch()
+            .stream()
+            .map((row) -> new DiagramSummaryProjection(
+                row.get(diagram.id),
+                row.get(diagram.name),
+                row.get(diagram.pluginId),
+                row.get(diagram.dictionarySet.id),
+                row.get(diagram.dictionarySet.name),
+                row.get(diagram.templateKey),
+                row.get(diagram.summaryText),
+                row.get(diagram.createdAt),
+                row.get(diagram.updatedAt)
+            ))
+            .toList();
     }
 }

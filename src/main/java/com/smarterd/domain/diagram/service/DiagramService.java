@@ -13,7 +13,6 @@ import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.service.DictionarySetService;
 import com.smarterd.domain.markdown.service.MarkdownDocumentDescriptorService;
-import com.smarterd.domain.markdown.service.MarkdownTemplateDescriptor;
 import com.smarterd.domain.markdown.service.MarkdownTemplateService;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.service.ProjectService;
@@ -111,6 +110,10 @@ public class DiagramService {
             .content(initialContent)
             .dictionarySet(dictionarySet)
             .build();
+        if (resolvedPluginId == DiagramPluginId.MARKDOWN && initialContent != null) {
+            final var descriptor = markdownDocumentDescriptorService.describe(initialContent);
+            diagram.updateSummary(descriptor.templateKey(), descriptor.summaryText());
+        }
         diagramRepository.save(Objects.requireNonNull(diagram));
 
         return toDiagramSummaryResult(diagram, project.getId());
@@ -129,9 +132,21 @@ public class DiagramService {
         final var pid = project.getId();
 
         return diagramRepository
-            .findByProjectAndDeletedAtIsNull(project)
+            .findSummariesByProject(project)
             .stream()
-            .map((diagram) -> toDiagramSummaryResult(diagram, pid))
+            .map((projection) -> new DiagramSummaryResult(
+                projection.id(),
+                projection.name(),
+                projection.pluginId(),
+                pid,
+                projection.dictionarySetId(),
+                projection.dictionarySetName(),
+                projection.templateKey(),
+                markdownTemplateService.resolveTemplateLabel(projection.templateKey()),
+                projection.summaryText(),
+                projection.createdAt(),
+                projection.updatedAt()
+            ))
             .toList();
     }
 
@@ -352,7 +367,6 @@ public class DiagramService {
      */
     private DiagramSummaryResult toDiagramSummaryResult(Diagram diagram, Long projectId) {
         final var dictionarySet = diagram.getDictionarySet();
-        final var markdownDescriptor = describeMarkdown(diagram);
         return new DiagramSummaryResult(
             diagram.getId(),
             diagram.getName(),
@@ -360,9 +374,9 @@ public class DiagramService {
             projectId,
             dictionarySet != null ? dictionarySet.getId() : null,
             dictionarySet != null ? dictionarySet.getName() : null,
-            markdownDescriptor.templateKey(),
-            markdownDescriptor.templateLabel(),
-            markdownDescriptor.summaryText(),
+            diagram.getTemplateKey(),
+            markdownTemplateService.resolveTemplateLabel(diagram.getTemplateKey()),
+            diagram.getSummaryText(),
             diagram.getCreatedAt(),
             diagram.getUpdatedAt()
         );
@@ -378,7 +392,6 @@ public class DiagramService {
      */
     private DiagramDetailResult toDiagramDetailResult(Diagram diagram, Long projectId, boolean hasYdocSnapshot) {
         final var dictionarySet = diagram.getDictionarySet();
-        final var markdownDescriptor = describeMarkdown(diagram);
         return new DiagramDetailResult(
             diagram.getId(),
             diagram.getName(),
@@ -386,9 +399,9 @@ public class DiagramService {
             projectId,
             dictionarySet != null ? dictionarySet.getId() : null,
             dictionarySet != null ? dictionarySet.getName() : null,
-            markdownDescriptor.templateKey(),
-            markdownDescriptor.templateLabel(),
-            markdownDescriptor.summaryText(),
+            diagram.getTemplateKey(),
+            markdownTemplateService.resolveTemplateLabel(diagram.getTemplateKey()),
+            diagram.getSummaryText(),
             diagram.getContent(),
             hasYdocSnapshot,
             diagram.getContentRevision(),
@@ -541,10 +554,4 @@ public class DiagramService {
         return null;
     }
 
-    private MarkdownTemplateDescriptor describeMarkdown(Diagram diagram) {
-        if (!diagram.isMarkdownDocument()) {
-            return new MarkdownTemplateDescriptor(null, null, null);
-        }
-        return markdownDocumentDescriptorService.describe(diagram.getContent());
-    }
 }

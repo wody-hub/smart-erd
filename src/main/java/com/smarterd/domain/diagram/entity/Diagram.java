@@ -80,6 +80,14 @@ public class Diagram extends BaseAuditEntity {
     @Column(name = "snapshot_updated_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
     private Instant snapshotUpdatedAt;
 
+    /** markdown 템플릿 키 (ERD 문서는 null) */
+    @Column(name = "template_key", length = 64)
+    private String templateKey;
+
+    /** markdown 본문 요약 텍스트 (ERD 문서는 null) */
+    @Column(name = "summary_text", length = 200)
+    private String summaryText;
+
     /** 논리 삭제 시각 */
     @Column(name = "deleted_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
     private Instant deletedAt;
@@ -124,6 +132,17 @@ public class Diagram extends BaseAuditEntity {
 
     public boolean isMarkdownDocument() {
         return DiagramPluginId.MARKDOWN.value().equals(getPluginId());
+    }
+
+    /**
+     * markdown 문서 허브 요약 정보를 갱신한다.
+     *
+     * @param templateKey 템플릿 키
+     * @param summaryText 본문 요약 텍스트
+     */
+    public void updateSummary(String templateKey, String summaryText) {
+        this.templateKey = templateKey;
+        this.summaryText = summaryText;
     }
 
     /**
