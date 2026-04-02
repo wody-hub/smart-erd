@@ -79,6 +79,12 @@ None
 - Gap closure plan 07 완료, MarkdownScopeResolver가 악의적/잘못된 payload를 안전하게 방어
 - 추가 gap closure plan (05, 06)과 독립적으로 완료 가능
 
+## Self-Check: PASSED
+
+- FOUND: src/main/java/com/smarterd/domain/diagram/collaboration/MarkdownScopeResolver.java
+- FOUND: .planning/phases/01-markdown-incremental-sync/01-07-SUMMARY.md
+- FOUND: da730f6
+
 ---
 *Phase: 01-markdown-incremental-sync*
 *Completed: 2026-04-02*
