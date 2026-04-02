@@ -7,7 +7,7 @@
 
 ### 현재 진행 중 — 문서/에디터 완성
 
-- [ ] **DOC-01**: 마크다운 에디터에서 두 사용자가 다른 Section을 동시 편집할 때 Section 단위 증분 동기화가 동작한다
+- [x] **DOC-01**: 마크다운 에디터에서 두 사용자가 다른 Section을 동시 편집할 때 Section 단위 증분 동기화가 동작한다
 - [ ] **DOC-02**: 마크다운 에디터에서 변경된 Section만 프리뷰가 재렌더링된다 (증분 프리뷰)
 - [ ] **THEME-01**: 사용자가 헤더에서 Paper/Graphite/Midnight 테마를 선택할 수 있다
 - [ ] **THEME-02**: 선택한 테마가 앱 전역(ERD, 마크다운, Dialog, Monaco)에 일관되게 적용된다
@@ -110,7 +110,7 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DOC-01 | Phase 1 | Pending |
+| DOC-01 | Phase 1 | Complete |
 | DOC-02 | Phase 1 | Pending |
 | THEME-01 | Phase 2 | Pending |
 | THEME-02 | Phase 2 | Pending |
