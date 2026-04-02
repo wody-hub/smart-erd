@@ -1,6 +1,5 @@
 import { useMemo, useRef } from 'react';
 import type { DiagramDetail } from '@/types/diagram';
-import type { DocumentBootstrapPayload } from '@/collaboration/core/contracts/document-bootstrap';
 import type { DocumentSnapshotCodec } from '@/collaboration/core/contracts/document-snapshot-codec';
 import { YjsSharedDocumentEngine } from '@/collaboration/core/engines/yjs-shared-document-engine';
 import { PassthroughDocumentSnapshotCodec } from '@/collaboration/core/persistence/passthrough-document-snapshot-codec';
@@ -19,6 +18,7 @@ import {
   ERD_DOCUMENT_PLUGIN_ID,
   createErdDocumentPlugin,
 } from '@/collaboration/plugins/erd/erd-document-plugin';
+import type { DocumentBootstrapPayload } from '@/types/document';
 import type { DiagramCollaborationBootstrap } from './diagram-collaboration-bootstrap.js';
 import { DiagramCollaborationPreviewPolicy } from './diagram-collaboration-preview-policy.js';
 import { DiagramCollaborationTransport } from './diagram-collaboration-transport.js';

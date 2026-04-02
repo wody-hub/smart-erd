@@ -20,6 +20,9 @@ export const queryKeys = {
   projects: {
     /** 팀별 프로젝트 목록 */
     byTeam: (teamId: string) => ['teams', teamId, 'projects'] as const,
+    /** 프로젝트 상세 */
+    detail: (teamId: string, projectId: string) =>
+      ['teams', teamId, 'projects', projectId] as const,
   },
   /** 데이터 사전 관련 쿼리 키 */
   dictionary: {

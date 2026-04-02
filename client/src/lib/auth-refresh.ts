@@ -100,6 +100,22 @@ function isJwtExpired(token: string): boolean {
 }
 
 /**
+ * 현재 저장된 Access Token을 동기적으로 사용할 수 있는지 확인한다.
+ *
+ * refresh 요청 없이 토큰 존재 여부와 만료 여부만 판단한다.
+ *
+ * @param fallbackToken localStorage에 없을 때 사용할 후보 토큰
+ * @returns 즉시 사용 가능한 Access Token 존재 여부
+ */
+export function hasUsableAccessTokenSync(fallbackToken?: string): boolean {
+  const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN) ?? fallbackToken;
+  if (!token) {
+    return false;
+  }
+  return !isJwtExpired(token);
+}
+
+/**
  * Refresh Token으로 Access Token을 갱신한다.
  *
  * 여러 호출이 동시에 들어오면 단일 HTTP 요청만 수행한다.
@@ -144,11 +160,7 @@ export async function refreshAccessToken(): Promise<string> {
  */
 export async function resolveUsableAccessToken(fallbackToken?: string): Promise<string | null> {
   const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN) ?? fallbackToken;
-  if (!token) {
-    return null;
-  }
-
-  if (!isJwtExpired(token)) {
+  if (token && !isJwtExpired(token)) {
     return token;
   }
 

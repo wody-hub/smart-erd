@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users } from 'lucide-react';
+import { AlertTriangle, Plus, Users } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import Header from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CreateResourceDialog from '@/components/ui/create-resource-dialog';
+import WorkspaceEmptyState from '@/components/workspace/WorkspaceEmptyState';
+import ProjectWorkspaceHero from '@/components/workspace/ProjectWorkspaceHero';
 import { fetchTeams, createTeam } from '@/api/teamApi';
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
@@ -27,10 +29,11 @@ export default function TeamsPage() {
   /** 팀 생성 다이얼로그 열림 상태 */
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const { data: teams = [], isLoading } = useQuery({
+  const teamsQuery = useQuery({
     queryKey: queryKeys.teams.all,
     queryFn: fetchTeams,
   });
+  const { data: teams = [], isLoading, isError } = teamsQuery;
 
   const createTeamMutation = useMutation({
     mutationFn: (name: string) => createTeam(name),
@@ -43,49 +46,91 @@ export default function TeamsPage() {
 
   return (
     <div className="h-screen flex flex-col">
-      <Header />
-      <main className="flex-1 overflow-auto bg-muted p-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">{t('team.list.title')}</h2>
-            <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              {t('team.list.newButton')}
-            </Button>
-          </div>
+      <Header workspaceContext={{ section: 'teams' }} />
+      <main className="workspace-shell flex-1 overflow-auto p-6">
+        <div className="workspace-container">
+          <ProjectWorkspaceHero
+            eyebrow={t('workspace.section.teams')}
+            title={t('team.list.title')}
+            description={t('workspace.teams.description')}
+            tone="teams"
+            meta={<span>{t('workspace.teams.teamCount', { count: teams.length })}</span>}
+            primaryAction={
+              <Button onClick={() => setDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                {t('team.list.newButton')}
+              </Button>
+            }
+          />
 
           {isLoading ? (
             <Spinner text={t('common.loading')} />
+          ) : isError ? (
+            <div className="mt-6">
+              <WorkspaceEmptyState
+                icon={<AlertTriangle className="h-10 w-10" />}
+                title={t('workspace.status.loadFailedTitle')}
+                description={t('workspace.status.teamsLoadFailed')}
+                tone="error"
+                role="alert"
+                action={
+                  <Button variant="outline" onClick={() => void teamsQuery.refetch()}>
+                    {t('workspace.status.retry')}
+                  </Button>
+                }
+              />
+            </div>
           ) : teams.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Users className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">{t('team.list.empty')}</p>
-                <Button onClick={() => setDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t('team.list.createButton')}
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="mt-6">
+              <WorkspaceEmptyState
+                icon={<Users className="h-10 w-10" />}
+                title={t('workspace.teams.emptyTitle')}
+                description={t('team.list.empty')}
+                action={
+                  <Button onClick={() => setDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    {t('team.list.createButton')}
+                  </Button>
+                }
+              />
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {teams.map((team) => (
                 <Card
                   key={team.id}
-                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  className="workspace-grid-card group cursor-pointer"
                   onClick={() => navigate(ROUTES.PROJECTS(team.id))}
                 >
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">{team.name}</CardTitle>
+                  <CardHeader className="space-y-4 pb-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-secondary/12 text-brand-secondary">
+                        <Users className="h-5 w-5" />
+                      </span>
+                      <span className="workspace-kicker">{t('workspace.section.teams')}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <CardTitle className="truncate font-sans text-[1.66rem] tracking-[-0.035em]">
+                        {team.name}
+                      </CardTitle>
+                    </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Users className="h-4 w-4" />
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-ink-secondary">
+                      <Users className="h-4 w-4 text-brand-secondary" />
                       <span>{t('team.list.memberCount', { count: team.memberCount })}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-sm text-muted-foreground">
                       {t('team.list.owner', { name: team.ownerName })}
                     </p>
+                    <div className="flex items-center justify-between border-t border-border/70 pt-4">
+                      <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                        {t('workspace.section.teams')}
+                      </span>
+                      <p className="text-sm font-medium text-foreground transition-colors group-hover:text-primary">
+                        {t('workspace.teams.openWorkspace')}
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
               ))}

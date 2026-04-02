@@ -70,6 +70,9 @@ export default function ProjectSettingsDialog({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.byTeam(teamId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.projects.detail(teamId, String(project.id)),
+      });
       toast.success(t('project.toast.updated'));
       onOpenChange(false);
     },

@@ -26,7 +26,7 @@ export default function LanguageSwitcher() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-header-muted hover:text-header-foreground hover:bg-header/80"
+          className="header-icon-button h-8 w-8"
           aria-label={t('common.aria.language')}
         >
           <Languages className="h-4 w-4" />

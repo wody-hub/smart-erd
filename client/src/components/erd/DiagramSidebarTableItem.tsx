@@ -53,7 +53,7 @@ export default function DiagramSidebarTableItem({
 
   if (editing) {
     return (
-      <div className="flex items-center gap-1 px-2 py-1">
+      <div className="surface-data flex items-center gap-1 rounded-lg px-2 py-1.5">
         <Input
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -89,18 +89,18 @@ export default function DiagramSidebarTableItem({
 
   return (
     <div
-      className="group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer text-foreground hover:bg-accent hover:text-accent-foreground focus-within:bg-accent focus-within:text-accent-foreground"
+      className="group flex cursor-pointer items-center justify-between rounded-lg border border-transparent px-2.5 py-2 text-foreground transition-colors hover:border-border/70 hover:bg-secondary/35 focus-within:border-border/70 focus-within:bg-secondary/35"
       onClick={onClick}
     >
-      <span className="text-sm truncate flex-1" title={rowLabel}>
+      <span className="flex-1 truncate text-sm" title={rowLabel}>
         {rowLabel}
       </span>
       {canEdit && (
-        <div className="flex opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+        <div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            className="h-6 w-6 text-muted-foreground hover:text-brand-secondary"
             onClick={(e) => {
               e.stopPropagation();
               startEdit(label);

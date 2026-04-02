@@ -1,6 +1,5 @@
 import { useEffect, useMemo } from 'react';
 import type { DiagramDetail } from '@/types/diagram';
-import type { DocumentBootstrapPayload } from '@/collaboration/core/contracts/document-bootstrap';
 import type { DocumentCheckpointReader } from '@/collaboration/core/contracts/document-checkpoint';
 import type {
   DocumentChangeEvent,
@@ -24,6 +23,7 @@ import { ErdDocumentReadContextFactory } from '@/collaboration/plugins/erd/query
 import { collectErdAffectedScopes } from '@/collaboration/plugins/erd/erd-yjs-update-scope-collector';
 import type { YjsSharedDocumentEngine } from '@/collaboration/core/engines/yjs-shared-document-engine';
 import type { DocumentSnapshotCodec } from '@/collaboration/core/contracts/document-snapshot-codec';
+import type { DocumentBootstrapPayload } from '@/types/document';
 import type { DiagramCollaborationStoreBridge } from './diagram-collaboration-store-bridge.js';
 
 interface UseDiagramDocumentRuntimeParams {

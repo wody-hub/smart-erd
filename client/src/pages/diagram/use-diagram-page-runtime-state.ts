@@ -61,7 +61,6 @@ type UseDiagramPageRuntimeStateParams = {
   collaborationSetupErrorKind: string | null;
   diagram: DiagramSummary | undefined;
   diagramId: string | undefined;
-  dictionaryDialogOpen: boolean;
   groups: GroupSummary[];
   isLoading: boolean;
   isPreviewMode: boolean;
@@ -70,7 +69,6 @@ type UseDiagramPageRuntimeStateParams = {
   persistedNodes: TableNode[];
   previewSyncStatus: PreviewSyncStatus;
   projectId: string | undefined;
-  setDictionaryDialogOpen: (open: boolean) => void;
   setLeftPanel: (panel: 'sidebar' | 'code') => void;
   sharedSchemaDraft: SharedSchemaDraftSnapshot | null;
   storeHasRenderableGraph: boolean;
@@ -85,7 +83,7 @@ type UseDiagramPageRuntimeStateResult = {
   activeGroupId: string | null;
   activeGroup: GroupSummary | null;
   activeGroupTableIds: Set<string> | null;
-  canOpenDictionary: boolean;
+  canOpenDictionaryContext: boolean;
   captureCodeEditorPreviewState: boolean;
   codeDraftPersistEnabled: boolean;
   delayCodeDraftHydration: boolean;
@@ -98,12 +96,10 @@ type UseDiagramPageRuntimeStateResult = {
   handleDslPreviewStateChange: (nextState: DslPreviewCanvasState | null) => void;
   handleNavigateToCodeFromDiagram: (request: CodeEditorTableRevealRequest) => void;
   handleNavigateToTableFromEditor: (request: CodeEditorTableFocusRequest) => void;
-  handleOpenDictionary: (() => void) | undefined;
   handleSharedSchemaDraftPositionsChange: (nextPositions: DiagramPreviewPositionRecord) => void;
   handleToggleCodeEditor: (() => void) | undefined;
   handleViewGroup: (groupId: string) => void;
   previewReadOnlyMessage: string | undefined;
-  renderDictionaryDialog: boolean;
   sharedDraftOverlayGraph: ReturnType<typeof buildPreviewDraftOverlayGraph> | null;
   sharedDraftOverlaySuppressed: boolean;
   showOverlay: boolean;
@@ -119,7 +115,6 @@ export function useDiagramPageRuntimeState({
   collaborationSetupErrorKind,
   diagram,
   diagramId,
-  dictionaryDialogOpen,
   groups,
   isLoading,
   isPreviewMode,
@@ -128,7 +123,6 @@ export function useDiagramPageRuntimeState({
   persistedNodes,
   previewSyncStatus,
   projectId,
-  setDictionaryDialogOpen,
   setLeftPanel,
   sharedSchemaDraft,
   storeHasRenderableGraph,
@@ -173,7 +167,6 @@ export function useDiagramPageRuntimeState({
     codeDraftPersistEnabled && !!diagram?.hasYdocSnapshot && isPreviewMode;
   const showPreviewCanvas = workModeCapabilities.canvasSource === 'preview';
   const captureCodeEditorPreviewState = showPreviewCanvas;
-  const renderDictionaryDialog = !!dictionaryContextSetId;
   const hasSharedDraftContent = hasSharedSchemaDraftContent(sharedSchemaDraft);
   const persistedColumnCount = useMemo(
     () => persistedNodes.reduce((sum, node) => sum + node.data.columns.length, 0),
@@ -237,14 +230,8 @@ export function useDiagramPageRuntimeState({
   const previewReadOnlyMessage = isPreviewMode
     ? t('diagram.previewSync.headerReadonly')
     : undefined;
-  const canOpenDictionary =
+  const canOpenDictionaryContext =
     !!dictionaryContextSetId && workModeRuntimeState.canOpenDictionaryManagement;
-  const handleOpenDictionary = useMemo(() => {
-    if (!canOpenDictionary) {
-      return undefined;
-    }
-    return () => setDictionaryDialogOpen(true);
-  }, [canOpenDictionary, setDictionaryDialogOpen]);
 
   const handleToggleCodeEditor = useMemo(() => {
     if (!workModeRuntimeState.canToggleCodeEditor || !toggleCodeEditorPanel) {
@@ -330,16 +317,6 @@ export function useDiagramPageRuntimeState({
   }, [leftPanel, setLeftPanel, workModeCapabilities.forcedLeftPanel]);
 
   useEffect(() => {
-    if (!workModeRuntimeState.canOpenDictionaryManagement && dictionaryDialogOpen) {
-      setDictionaryDialogOpen(false);
-    }
-  }, [
-    dictionaryDialogOpen,
-    setDictionaryDialogOpen,
-    workModeRuntimeState.canOpenDictionaryManagement,
-  ]);
-
-  useEffect(() => {
     if (workModeCapabilities.canvasSource !== 'preview') {
       setDslPreviewState(null);
     }
@@ -398,7 +375,7 @@ export function useDiagramPageRuntimeState({
     activeGroupId,
     activeGroup,
     activeGroupTableIds,
-    canOpenDictionary,
+    canOpenDictionaryContext,
     captureCodeEditorPreviewState,
     codeDraftPersistEnabled,
     delayCodeDraftHydration,
@@ -411,12 +388,10 @@ export function useDiagramPageRuntimeState({
     handleDslPreviewStateChange,
     handleNavigateToCodeFromDiagram,
     handleNavigateToTableFromEditor,
-    handleOpenDictionary,
     handleSharedSchemaDraftPositionsChange,
     handleToggleCodeEditor,
     handleViewGroup,
     previewReadOnlyMessage,
-    renderDictionaryDialog,
     sharedDraftOverlayGraph,
     sharedDraftOverlaySuppressed,
     showOverlay,

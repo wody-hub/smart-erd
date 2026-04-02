@@ -57,13 +57,13 @@ export default function DiagramSidebarGroupItem({
     <Collapsible open={open} onOpenChange={setOpen}>
       <div
         className={cn(
-          'group flex items-center justify-between px-2 py-1.5 rounded',
-          isActive && 'bg-accent text-accent-foreground',
-          !isActive && 'hover:bg-accent hover:text-accent-foreground',
+          'group flex items-center justify-between rounded-lg border px-2.5 py-2 transition-colors',
+          isActive && 'border-brand-secondary/25 bg-brand-secondary/10 text-foreground',
+          !isActive && 'border-transparent hover:border-border/70 hover:bg-secondary/35',
         )}
       >
         {editing ? (
-          <div className="flex items-center gap-1 flex-1 min-w-0">
+          <div className="flex min-w-0 flex-1 items-center gap-1">
             <Input
               value={value}
               onChange={(e) => setValue(e.target.value)}
@@ -98,7 +98,7 @@ export default function DiagramSidebarGroupItem({
           <>
             <CollapsibleTrigger asChild>
               <button
-                className="flex items-center gap-1 flex-1 min-w-0 text-sm cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1"
                 aria-label={t('erd.sidebar.aria.toggleGroup', { name: group.label })}
               >
                 {open ? (
@@ -107,15 +107,15 @@ export default function DiagramSidebarGroupItem({
                   <ChevronRight className="h-3 w-3 shrink-0" />
                 )}
                 <span className="truncate">{group.label}</span>
-                <span className="text-xs text-muted-foreground ml-1">({tableIds.length})</span>
+                <span className="ml-1 text-xs text-muted-foreground">({tableIds.length})</span>
               </button>
             </CollapsibleTrigger>
 
-            <div className="flex opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
+            <div className="flex shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                className="h-6 w-6 text-muted-foreground hover:text-primary"
                 onClick={() => onViewGroup?.(group.id)}
                 disabled={tableIds.length === 0}
                 aria-label={
@@ -131,7 +131,7 @@ export default function DiagramSidebarGroupItem({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    className="h-6 w-6 text-muted-foreground hover:text-brand-secondary"
                     onClick={(e) => {
                       e.stopPropagation();
                       startEdit(group.label);
@@ -160,7 +160,7 @@ export default function DiagramSidebarGroupItem({
       </div>
 
       <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
-        <div className="pl-6 space-y-0.5 py-1">
+        <div className="ml-3 border-l border-border/70 pl-4 pt-2">
           {tableIds.length === 0 ? (
             <p className="text-xs text-muted-foreground">{t('erd.group.noTables')}</p>
           ) : (
@@ -169,7 +169,7 @@ export default function DiagramSidebarGroupItem({
               return (
                 <div
                   key={tableId}
-                  className="flex items-center justify-between text-xs py-0.5 text-foreground"
+                  className="flex items-center justify-between py-1 text-xs text-foreground"
                 >
                   <span className="truncate flex-1" title={tableName}>
                     {tableName}
@@ -196,7 +196,7 @@ export default function DiagramSidebarGroupItem({
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 text-xs w-full justify-start text-muted-foreground hover:text-foreground"
+              className="mt-2 h-7 w-full justify-start text-xs text-muted-foreground hover:text-brand-secondary"
               onClick={onOpenTableSelect}
               aria-label={t('erd.group.aria.addTableToGroup', { name: group.label })}
             >

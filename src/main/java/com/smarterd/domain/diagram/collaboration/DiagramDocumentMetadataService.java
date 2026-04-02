@@ -4,11 +4,13 @@ import com.smarterd.collaboration.metadata.DocumentMetadata;
 import com.smarterd.collaboration.metadata.DocumentMetadataService;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.domain.diagram.entity.DiagramPluginId;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.team.entity.TeamMember;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import java.util.LinkedHashSet;
+import lombok.RequiredArgsConstructor;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,21 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class DiagramDocumentMetadataService implements DocumentMetadataService {
 
     private final DiagramRepository diagramRepository;
     private final AuthService authService;
     private final TeamService teamService;
-
-    public DiagramDocumentMetadataService(
-        DiagramRepository diagramRepository,
-        AuthService authService,
-        TeamService teamService
-    ) {
-        this.diagramRepository = diagramRepository;
-        this.authService = authService;
-        this.teamService = teamService;
-    }
 
     @Override
     @NonNull
@@ -52,7 +45,7 @@ public class DiagramDocumentMetadataService implements DocumentMetadataService {
 
         return new DocumentMetadata(
             documentId,
-            DiagramCollaborationDocumentDefaults.PLUGIN_ID,
+            diagram.getPluginId(),
             DiagramCollaborationDocumentDefaults.ENGINE_ID,
             team.getOwner().getLoginId(),
             memberIds

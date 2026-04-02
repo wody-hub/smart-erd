@@ -11,11 +11,14 @@ import {
 import type { Domain } from '@/types/dictionary';
 import type { TermSelectResult } from './ColumnAutocomplete';
 import { cn } from '@/lib/utils';
-import { buildColumnHandleId } from '@/lib/handle-id';
+import { buildColumnHandleId, buildLegacyColumnHandleId } from '@/lib/handle-id';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import ColumnAutocomplete from './ColumnAutocomplete';
 import DomainSelectPopover from './DomainSelectPopover';
 import { getColumnHandlePlacements } from './columnHandleLayout';
+
+const LEGACY_HANDLE_CLASSNAME =
+  '!w-2 !h-2 !opacity-0 !pointer-events-none !border-0 !bg-transparent';
 
 /** EditableColumnRow 컴포넌트 props */
 export interface EditableColumnRowProps {
@@ -93,6 +96,18 @@ export default function EditableColumnRow({
   const targetHandlePlacements = getColumnHandlePlacements(handleLayout, 'target');
   const sourceHandlePlacements = getColumnHandlePlacements(handleLayout, 'source');
   const shouldRenderHandles = connected || fkMode;
+  const legacyTargetPlacement =
+    shouldRenderHandles
+      ? targetHandlePlacements.find((placement) => placement.side === 'left') ??
+        targetHandlePlacements[0] ??
+        null
+      : null;
+  const legacySourcePlacement =
+    shouldRenderHandles
+      ? sourceHandlePlacements.find((placement) => placement.side === 'right') ??
+        sourceHandlePlacements[0] ??
+        null
+      : null;
 
   return (
     <div
@@ -105,6 +120,16 @@ export default function EditableColumnRow({
         className="flex items-center gap-1.5"
         style={{ paddingLeft: canEdit ? '12px' : undefined }}
       >
+        {shouldRenderHandles && legacyTargetPlacement && (
+          <Handle
+            key={buildLegacyColumnHandleId(nodeId, col.id, 'target')}
+            type="target"
+            position={legacyTargetPlacement.position}
+            id={buildLegacyColumnHandleId(nodeId, col.id, 'target')}
+            className={LEGACY_HANDLE_CLASSNAME}
+            style={legacyTargetPlacement.style}
+          />
+        )}
         {shouldRenderHandles &&
           targetHandlePlacements.map((placement) => (
             <Handle
@@ -315,6 +340,16 @@ export default function EditableColumnRow({
           </button>
         )}
 
+        {shouldRenderHandles && legacySourcePlacement && (
+          <Handle
+            key={buildLegacyColumnHandleId(nodeId, col.id, 'source')}
+            type="source"
+            position={legacySourcePlacement.position}
+            id={buildLegacyColumnHandleId(nodeId, col.id, 'source')}
+            className={LEGACY_HANDLE_CLASSNAME}
+            style={legacySourcePlacement.style}
+          />
+        )}
         {shouldRenderHandles &&
           sourceHandlePlacements.map((placement) => (
             <Handle

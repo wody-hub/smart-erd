@@ -12,6 +12,14 @@ export function buildColumnHandleId(
   return `${nodeId}-${colId}-${handleType}-${side}`;
 }
 
+export function buildLegacyColumnHandleId(
+  nodeId: string,
+  colId: string,
+  handleType: ColumnHandleType,
+): string {
+  return `${nodeId}-${colId}-${handleType}`;
+}
+
 export function extractColId(handleId: string, nodeId: string): string {
   return handleId.replace(`${nodeId}-`, '').replace(HANDLE_SUFFIX_RE, '');
 }

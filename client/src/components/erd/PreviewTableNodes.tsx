@@ -62,7 +62,7 @@ function PreviewTableNodeFrame({
       data-table-node-kind={ghost ? 'ghost' : 'preview'}
       data-table-name={node.data.label}
       data-table-logical-name={node.data.logicalTableName ?? ''}
-      className="w-max min-w-[420px] rounded border border-border bg-card shadow-md"
+      className="surface-data w-max min-w-[420px] rounded shadow-operational"
       style={ghost ? { opacity: 0, pointerEvents: 'none' } : undefined}
     >
       <TableNodeHeader

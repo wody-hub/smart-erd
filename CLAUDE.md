@@ -10,6 +10,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - 브라우저 QA, 배포 확인, 리뷰, 조사 워크플로우가 필요하면 gstack 계열 스킬을 우선 사용한다.
 
+## Design System
+
+- 시각/UI 작업 전에는 항상 `DESIGN.md`를 먼저 읽는다.
+- 폰트, 색상, 간격, 표면 처리, 헤더/카드/버튼 언어는 `DESIGN.md`를 기준으로 판단한다.
+- 명시적 사용자 승인 없이 `DESIGN.md`에서 벗어나는 새 시각 방향을 도입하지 않는다.
+- QA/리뷰 시 `DESIGN.md`와 어긋나는 UI는 버그 또는 편차로 보고한다.
+- 프리뷰/목업 산출물이 있으면 `DESIGN.md`와 토큰을 동일하게 유지한다. 충돌 시 `DESIGN.md`를 정본으로 본다.
+
 ## Build & Run Commands
 
 ### Backend (Spring Boot)

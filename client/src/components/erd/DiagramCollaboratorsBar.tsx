@@ -91,7 +91,7 @@ export default function DiagramCollaboratorsBar() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex h-9 items-center gap-2 rounded-xl border border-header-muted/40 px-2.5 hover:bg-header/80 transition-colors"
+          className="header-chip-button flex h-8 items-center gap-2 rounded-full px-2.5 transition-colors"
           aria-label={t('collaboration.participants.title', { count: participants.length })}
           title={t('collaboration.participants.title', { count: participants.length })}
         >
@@ -107,7 +107,7 @@ export default function DiagramCollaboratorsBar() {
               return (
                 <span
                   key={participant.userId}
-                  className="h-6 w-6 rounded-full border border-header bg-header flex items-center justify-center text-xs font-medium text-erd-cursor-foreground shrink-0"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-header bg-header text-xs font-medium text-erd-cursor-foreground"
                   style={{ backgroundColor: getPresenceColor(participant.userId) }}
                   aria-label={label}
                   title={label}
@@ -117,7 +117,7 @@ export default function DiagramCollaboratorsBar() {
               );
             })}
           </div>
-          <span className="min-w-4 text-base leading-none font-semibold text-header-foreground tabular-nums">
+          <span className="min-w-4 font-mono text-sm leading-none font-semibold text-header-foreground tabular-nums">
             {participants.length}
           </span>
           <ChevronDown className="h-4 w-4 text-header-muted" />

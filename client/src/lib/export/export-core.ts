@@ -6,14 +6,6 @@ const MAX_CANVAS_DIMENSION = 16384;
 const TARGET_PIXEL_RATIO = 2;
 /** Blob URL 정리 지연 시간(ms) */
 const OBJECT_URL_REVOKE_DELAY_MS = 1000;
-/** 대형 다이어그램 PDF 타일 폭(px) */
-export const PDF_TILE_WIDTH = 6000;
-/** 대형 다이어그램 PDF 타일 높이(px) */
-export const PDF_TILE_HEIGHT = 4000;
-/** 단일 페이지 PDF를 유지하기 위한 최소 렌더 배율 */
-const PDF_SINGLE_PAGE_MIN_PIXEL_RATIO = 1.25;
-/** 단일 페이지 PDF 렌더에 허용할 최대 캔버스 면적(px^2) */
-const PDF_SINGLE_PAGE_MAX_AREA = 67_000_000;
 /** 디자인 토큰 기반 export 배경색 fallback */
 const EXPORT_BACKGROUND_FALLBACK = 'hsl(0 0% 100%)';
 
@@ -60,26 +52,6 @@ export const getSafePixelRatio = (width: number, height: number): number => {
 /** 캔버스 제한으로 인해 품질 하향이 필요한지 확인한다. */
 export const isCanvasLimited = (width: number, height: number) =>
   getSafePixelRatio(width, height) < 1;
-
-/**
- * 현재 크기를 단일 페이지 PDF로 처리할 수 있는 안전한 픽셀 비율을 반환한다.
- *
- * 너무 큰 경우 null을 반환해 타일 PDF 경로로 보낸다.
- */
-export const getSinglePagePdfPixelRatio = (width: number, height: number): number | null => {
-  const pixelRatio = getSafePixelRatio(width, height);
-  const scaledWidth = Math.ceil(width * pixelRatio);
-  const scaledHeight = Math.ceil(height * pixelRatio);
-
-  if (pixelRatio < PDF_SINGLE_PAGE_MIN_PIXEL_RATIO) {
-    return null;
-  }
-  if (scaledWidth * scaledHeight > PDF_SINGLE_PAGE_MAX_AREA) {
-    return null;
-  }
-
-  return pixelRatio;
-};
 
 /**
  * URL을 파일로 다운로드한다.

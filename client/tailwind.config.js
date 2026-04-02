@@ -15,6 +15,20 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        brand: {
+          secondary: "hsl(var(--brand-secondary))",
+          "secondary-foreground": "hsl(var(--brand-secondary-foreground))",
+          warm: "hsl(var(--accent-warm))",
+          "warm-foreground": "hsl(var(--accent-warm-foreground))",
+        },
+        surface: {
+          muted: "hsl(var(--surface-muted))",
+          strong: "hsl(var(--surface-strong))",
+        },
+        ink: {
+          secondary: "hsl(var(--foreground-secondary))",
+          muted: "hsl(var(--muted-foreground))",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -94,6 +108,16 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      boxShadow: {
+        editorial: "var(--shadow-soft)",
+        "editorial-strong": "var(--shadow-strong)",
+        operational: "var(--shadow-operational)",
+      },
+      fontFamily: {
+        sans: ['"Pretendard"', '"Noto Sans KR"', "sans-serif"],
+        display: ['"Noto Serif KR"', "serif"],
+        mono: ['"IBM Plex Mono"', "monospace"],
       },
       fontSize: {
         "2xs": ["10px", "14px"],

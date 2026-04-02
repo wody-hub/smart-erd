@@ -129,7 +129,7 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
         final BooleanExpression artifactAvailableExpr = diagram.content.isNotNull().and(diagram.content.isNotEmpty());
 
         final Tuple result = queryFactory
-            .select(diagram.contentRevision, diagram.snapshotRevision, hasSnapshotExpr, artifactAvailableExpr)
+            .select(diagram.pluginId, diagram.contentRevision, diagram.snapshotRevision, hasSnapshotExpr, artifactAvailableExpr)
             .from(diagram)
             .where(diagram.project.eq(project).and(diagram.id.eq(diagramId)).and(diagram.deletedAt.isNull()))
             .fetchOne();
@@ -144,6 +144,7 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
 
         return Optional.of(
             new DiagramBootstrapProjection(
+                result.get(diagram.pluginId),
                 contentRevision,
                 result.get(diagram.snapshotRevision),
                 Boolean.TRUE.equals(result.get(hasSnapshotExpr)),
@@ -158,7 +159,7 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
         final BooleanExpression artifactAvailableExpr = diagram.content.isNotNull().and(diagram.content.isNotEmpty());
 
         final Tuple result = queryFactory
-            .select(diagram.contentRevision, diagram.snapshotRevision, hasSnapshotExpr, artifactAvailableExpr)
+            .select(diagram.pluginId, diagram.contentRevision, diagram.snapshotRevision, hasSnapshotExpr, artifactAvailableExpr)
             .from(diagram)
             .where(diagram.id.eq(diagramId).and(diagram.deletedAt.isNull()))
             .fetchOne();
@@ -173,6 +174,7 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
 
         return Optional.of(
             new DiagramBootstrapProjection(
+                result.get(diagram.pluginId),
                 contentRevision,
                 result.get(diagram.snapshotRevision),
                 Boolean.TRUE.equals(result.get(hasSnapshotExpr)),

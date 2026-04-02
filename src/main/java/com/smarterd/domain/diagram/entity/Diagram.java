@@ -14,6 +14,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -41,6 +42,10 @@ public class Diagram extends BaseAuditEntity {
     /** 다이어그램 이름 (최대 100자) */
     @Column(nullable = false, length = 100)
     private String name;
+
+    /** 문서 플러그인 ID */
+    @Column(name = "plugin_id", length = 32, columnDefinition = "VARCHAR(32) DEFAULT 'erd'")
+    private String pluginId = DiagramPluginId.ERD.value();
 
     /** 소속 프로젝트 */
     @ManyToOne(fetch = FetchType.LAZY)
@@ -92,8 +97,9 @@ public class Diagram extends BaseAuditEntity {
      * @param dictionarySet 적용 사전 세트
      */
     @Builder
-    public Diagram(String name, Project project, String content, DictionarySet dictionarySet) {
+    public Diagram(String name, String pluginId, Project project, String content, DictionarySet dictionarySet) {
         this.name = name;
+        this.pluginId = Objects.requireNonNullElse(pluginId, DiagramPluginId.ERD.value());
         this.project = project;
         this.content = content;
         this.dictionarySet = dictionarySet;
@@ -110,6 +116,14 @@ public class Diagram extends BaseAuditEntity {
 
     public void changeDictionarySet(DictionarySet dictionarySet) {
         this.dictionarySet = dictionarySet;
+    }
+
+    public String getPluginId() {
+        return Objects.requireNonNullElse(pluginId, DiagramPluginId.ERD.value());
+    }
+
+    public boolean isMarkdownDocument() {
+        return DiagramPluginId.MARKDOWN.value().equals(getPluginId());
     }
 
     /**

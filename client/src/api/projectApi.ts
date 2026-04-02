@@ -13,6 +13,18 @@ export async function fetchProjects(teamId: string): Promise<Project[]> {
 }
 
 /**
+ * 프로젝트 상세를 조회한다.
+ *
+ * @param teamId 팀 ID
+ * @param projectId 프로젝트 ID
+ * @returns 프로젝트 상세
+ */
+export async function fetchProject(teamId: string, projectId: string): Promise<Project> {
+  const res = await axiosInstance.get<Project>(`/teams/${teamId}/projects/${projectId}`);
+  return res.data;
+}
+
+/**
  * 새 프로젝트를 생성한다.
  *
  * @param teamId 프로젝트를 생성할 팀 ID

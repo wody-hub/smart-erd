@@ -10,7 +10,7 @@ function Table({
   ref?: React.Ref<HTMLTableElement>;
 }) {
   return (
-    <div className="relative w-full overflow-auto">
+    <div className="relative w-full overflow-auto rounded-lg border border-border/75 bg-card/70">
       <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
   );
@@ -46,7 +46,7 @@ function TableFooter({
   return (
     <tfoot
       ref={ref}
-      className={cn('border-t bg-muted/50 font-medium [&>tr]:last:border-b-0', className)}
+      className={cn('border-t border-border/70 bg-secondary/40 font-medium [&>tr]:last:border-b-0', className)}
       {...props}
     />
   );
@@ -63,7 +63,7 @@ function TableRow({
     <tr
       ref={ref}
       className={cn(
-        'border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted',
+        'border-b border-border/70 transition-colors hover:bg-secondary/35 data-[state=selected]:bg-secondary/55',
         className,
       )}
       {...props}
@@ -82,7 +82,7 @@ function TableHead({
     <th
       ref={ref}
       className={cn(
-        'h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0',
+        'h-12 bg-secondary/32 px-4 text-left align-middle text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground [&:has([role=checkbox])]:pr-0',
         className,
       )}
       {...props}
@@ -100,7 +100,7 @@ function TableCell({
   return (
     <td
       ref={ref}
-      className={cn('p-4 align-middle [&:has([role=checkbox])]:pr-0', className)}
+      className={cn('p-4 align-middle text-foreground [&:has([role=checkbox])]:pr-0', className)}
       {...props}
     />
   );

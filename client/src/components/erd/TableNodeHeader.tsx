@@ -3,7 +3,7 @@ import { ArrowLeftRight, FileCode2, Palette } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { useInlineEdit } from '@/hooks/useInlineEdit';
 import { KEYS } from '@/constants/keybindings';
-import { TABLE_COLORS } from '@/lib/table-colors';
+import { TABLE_COLORS, normalizeTableHeaderColor } from '@/lib/table-colors';
 import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
 import type { TableHandleLayout, TableHeaderColor } from '@/types/erd';
 import type { TermSelectResult } from './ColumnAutocomplete';
@@ -76,7 +76,8 @@ export default function TableNodeHeader({
   const { t } = useTranslation();
 
   /** 헤더 색상 설정 */
-  const colorConfig = TABLE_COLORS[headerColor ?? 'default'];
+  const normalizedHeaderColor = normalizeTableHeaderColor(headerColor);
+  const colorConfig = TABLE_COLORS[normalizedHeaderColor];
 
   const { editing, value, setValue, startEdit, confirmEdit, cancelEdit } = useInlineEdit(onRename);
 
@@ -118,7 +119,7 @@ export default function TableNodeHeader({
                 </PopoverTrigger>
                 <PopoverContent side="bottom" align="start" className="w-auto p-2">
                   <TableColorPicker
-                    currentColor={headerColor ?? 'default'}
+                    currentColor={normalizedHeaderColor}
                     onSelect={onColorChange}
                   />
                 </PopoverContent>

@@ -1,22 +1,21 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, FileText, ArrowLeft, Trash2, Pencil, Check, X } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { AlertTriangle, ArrowLeft, BookOpen, FileText, Plus } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import Header from '@/components/layout/Header';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import CreateResourceDialog from '@/components/ui/create-resource-dialog';
-import ConfirmDialog from '@/components/ui/confirm-dialog';
-import {
-  fetchDiagrams,
-  createDiagram,
-  deleteDiagram,
-  renameDiagram,
-  updateDiagramDictionaryContext,
-} from '@/api/diagramApi';
+import { fetchDiagrams } from '@/api/diagramApi';
 import { fetchDictionarySets } from '@/api/dictionarySetApi';
+import { fetchProject } from '@/api/projectApi';
+import { fetchTeam } from '@/api/teamApi';
+import DocumentHubRow from '@/components/workspace/DocumentHubRow';
+import DocumentTypeBadge from '@/components/workspace/DocumentTypeBadge';
+import CreateDocumentDialog from '@/components/workspace/CreateDocumentDialog';
+import ProjectWorkspaceHero from '@/components/workspace/ProjectWorkspaceHero';
+import WorkspaceEmptyState from '@/components/workspace/WorkspaceEmptyState';
+import ConfirmDialog from '@/components/ui/confirm-dialog';
+import Header from '@/components/layout/Header';
+import Spinner from '@/components/ui/spinner';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -24,284 +23,209 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { DiagramSummary } from '@/types/diagram';
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
-import { getErrorMessage } from '@/lib/api-error';
+import { useDiagramDocumentHubActions } from '@/hooks/useDiagramDocumentHubActions';
+import { useRecentProjectContext } from '@/hooks/useRecentProjectContext';
 import { useTeamRole } from '@/hooks/useTeamRole';
-import { toast } from 'sonner';
-import Spinner from '@/components/ui/spinner';
+import { getWorkspaceDocumentsTitleLabel } from '@/lib/workspace-labels';
+import type { DocumentListItem } from '@/types/workspace';
 
 /**
- * 다이어그램 목록 페이지.
+ * 문서 허브 페이지.
  *
- * 선택된 프로젝트의 다이어그램 목록, 생성, 삭제, 이름 변경 기능을 제공한다.
- * 역할에 따라 생성/삭제/이름 변경 버튼을 조건부 렌더링한다.
+ * ERD와 Markdown 문서를 같은 프로젝트 허브에서 관리한다.
  */
 export default function DiagramsPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
-
-  /** 다이어그램 생성 다이얼로그 열림 상태 */
-  const [dialogOpen, setDialogOpen] = useState(false);
-  /** 삭제 확인 대상 다이어그램 ID (null이면 다이얼로그 닫힘) */
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
-  /** 이름 변경 중인 다이어그램 ID (null이면 편집 모드 아님) */
-  const [renamingId, setRenamingId] = useState<number | null>(null);
-  /** 이름 변경 입력값 */
-  const [renameValue, setRenameValue] = useState('');
-  /** 생성 시 사용할 다이어그램 사전 컨텍스트 ID */
-  const [createDictionaryContextId, setCreateDictionaryContextId] = useState('');
-
+  const { recordRecentProjectContext } = useRecentProjectContext(teamId);
   const { canEdit } = useTeamRole(teamId);
 
-  const diagramsQueryKey = queryKeys.diagrams.byProject(teamId!, projectId!);
-
+  const { data: team } = useQuery({
+    queryKey: queryKeys.teams.detail(teamId!),
+    queryFn: () => fetchTeam(teamId!),
+    enabled: !!teamId,
+  });
+  const { data: project } = useQuery({
+    queryKey: queryKeys.projects.detail(teamId!, projectId!),
+    queryFn: () => fetchProject(teamId!, projectId!),
+    enabled: !!teamId && !!projectId,
+  });
   const { data: dictionarySets = [] } = useQuery({
     queryKey: queryKeys.dictionary.sets(teamId!),
     queryFn: () => fetchDictionarySets(teamId!),
     enabled: !!teamId,
   });
-
-  useEffect(() => {
-    if (dictionarySets.length === 0) {
-      setCreateDictionaryContextId('');
-      return;
-    }
-    const defaultSet = dictionarySets.find((set) => set.isDefault);
-    setCreateDictionaryContextId((prev) => {
-      if (prev && dictionarySets.some((set) => String(set.id) === prev)) {
-        return prev;
-      }
-      return String(defaultSet?.id ?? dictionarySets[0]!.id);
-    });
-  }, [dictionarySets]);
-
-  const { data: diagrams = [], isLoading } = useQuery({
-    queryKey: diagramsQueryKey,
+  const diagramsQuery = useQuery({
+    queryKey: queryKeys.diagrams.byProject(teamId!, projectId!),
     queryFn: () => fetchDiagrams(teamId!, projectId!),
     enabled: !!teamId && !!projectId,
   });
+  const { data: diagrams = [], isLoading, isError } = diagramsQuery;
 
-  const createMutation = useMutation({
-    mutationFn: (name: string) =>
-      createDiagram(teamId!, projectId!, name, Number(createDictionaryContextId)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
-      toast.success(t('diagram.toast.created'));
-    },
-    onError: (err) => toast.error(getErrorMessage(err, t('diagram.toast.createFailed'))),
+  const {
+    dialogOpen,
+    setDialogOpen,
+    deleteTarget,
+    setDeleteTarget,
+    renamingId,
+    renameValue,
+    setRenameValue,
+    startRename,
+    confirmRename,
+    cancelRename,
+    createDocument,
+    confirmDeleteDocument,
+    updateDictionaryContext,
+    deleteDocumentPending,
+  } = useDiagramDocumentHubActions({
+    teamId,
+    projectId,
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (diagramId: number) => deleteDiagram(teamId!, projectId!, String(diagramId)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
-      setDeleteTarget(null);
-      toast.success(t('diagram.toast.deleted'));
-    },
-    onError: (err) => toast.error(getErrorMessage(err, t('diagram.toast.deleteFailed'))),
-  });
-
-  const renameMutation = useMutation({
-    mutationFn: ({ id, name }: { id: number; name: string }) =>
-      renameDiagram(teamId!, projectId!, String(id), name),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
-      setRenamingId(null);
-      toast.success(t('diagram.toast.renamed'));
-    },
-    onError: (err) => toast.error(getErrorMessage(err, t('diagram.toast.renameFailed'))),
-  });
-
-  const updateDiagramSetMutation = useMutation({
-    mutationFn: ({ diagramId, dictionarySetId }: { diagramId: number; dictionarySetId: number }) =>
-      updateDiagramDictionaryContext(teamId!, projectId!, String(diagramId), dictionarySetId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: diagramsQueryKey });
-      toast.success(t('diagram.toast.dictionaryContextUpdated'));
-    },
-    onError: (err) =>
-      toast.error(getErrorMessage(err, t('diagram.toast.dictionaryContextUpdateFailed'))),
-  });
-
-  /** 다이어그램 이름 변경을 시작한다. @param diagram 대상 다이어그램 @param e 마우스 이벤트 (전파 차단용) */
-  const startRename = (diagram: DiagramSummary, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setRenamingId(diagram.id);
-    setRenameValue(diagram.name);
-  };
-
-  /** 다이어그램 이름 변경을 확정한다. @param e 마우스 이벤트 (전파 차단용) */
-  const confirmRename = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (renamingId === null || !renameValue.trim()) return;
-    renameMutation.mutate({ id: renamingId, name: renameValue.trim() });
-  };
-
-  /** 다이어그램 이름 변경을 취소한다. @param e 마우스 이벤트 (전파 차단용) */
-  const cancelRename = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setRenamingId(null);
-  };
+  const documentTitleToken = getWorkspaceDocumentsTitleLabel();
+  const documentItems = useMemo<DocumentListItem[]>(
+    () =>
+      diagrams.map((diagram) => ({
+        id: diagram.id,
+        name: diagram.name,
+        type: diagram.pluginId,
+        updatedAt: diagram.updatedAt,
+        dictionaryContextName: diagram.pluginId === 'erd' ? diagram.dictionarySetName : null,
+        templateLabel: diagram.templateLabel,
+        summaryText: diagram.summaryText,
+      })),
+    [diagrams],
+  );
 
   return (
-    <div className="h-screen flex flex-col">
-      <Header />
-      <main className="flex-1 overflow-auto bg-muted p-6">
-        <div className="max-w-4xl mx-auto">
+    <div className="flex h-screen flex-col">
+      <Header
+        workspaceContext={{
+          team: team ? { id: teamId!, name: team.name } : undefined,
+          project: project ? { id: projectId!, name: project.name } : undefined,
+          section: 'documents',
+        }}
+      />
+      <main className="workspace-shell flex-1 overflow-auto p-6">
+        <div className="workspace-container max-w-5xl">
           <Button
             variant="ghost"
             size="sm"
             className="mb-4"
             onClick={() => navigate(ROUTES.PROJECTS(teamId!))}
           >
-            <ArrowLeft className="h-4 w-4 mr-1" />
+            <ArrowLeft className="mr-1 h-4 w-4" />
             {t('diagram.list.backToProjects')}
           </Button>
 
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">{t('diagram.list.title')}</h2>
-            {canEdit && (
-              <div className="flex items-center gap-2">
-                <Select
-                  value={createDictionaryContextId}
-                  onValueChange={setCreateDictionaryContextId}
-                >
-                  <SelectTrigger className="w-[220px]">
-                    <SelectValue placeholder={t('diagram.list.selectDictionaryContext')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dictionarySets.map((set) => (
-                      <SelectItem key={set.id} value={String(set.id)}>
-                        {set.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={() => setDialogOpen(true)} disabled={!createDictionaryContextId}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t('diagram.list.newButton')}
+          <ProjectWorkspaceHero
+            eyebrow={t(documentTitleToken.key)}
+            title={project?.name ?? t('common.loading')}
+            description={project?.description || t('workspace.documents.description')}
+            tone="documents"
+            meta={
+              <>
+                {team && <span>{t('workspace.meta.teamContext', { name: team.name })}</span>}
+                <span>{t('workspace.documents.documentCount', { count: diagrams.length })}</span>
+              </>
+            }
+            primaryAction={
+              canEdit ? (
+                <Button onClick={() => setDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('workspace.action.newDocument')}
                 </Button>
+              ) : undefined
+            }
+            utilityActions={
+              <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      recordRecentProjectContext(projectId!);
+                      navigate(ROUTES.DICTIONARY(teamId!));
+                    }}
+                  >
+                    <BookOpen className="mr-2 h-4 w-4 text-brand-secondary" />
+                    {t('project.list.dictionaryButton')}
+                  </Button>
+                </div>
+                <p className="max-w-md text-sm leading-6 text-muted-foreground">
+                  {t('workspace.documents.multiTypeHint')}
+                </p>
               </div>
-            )}
+            }
+          />
+
+          <div className="surface-operational mt-6 rounded-xl px-4 py-3">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-3">
+                <DocumentTypeBadge documentType="erd" />
+                <DocumentTypeBadge documentType="markdown" />
+                <p className="text-sm text-ink-secondary">
+                  {t('workspace.documents.typeScopeHint')}
+                </p>
+              </div>
+              <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                {t('workspace.documents.documentCount', { count: diagrams.length })}
+              </span>
+            </div>
           </div>
 
           {isLoading ? (
             <Spinner text={t('common.loading')} />
-          ) : diagrams.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">{t('diagram.list.empty')}</p>
-                {canEdit && (
-                  <Button onClick={() => setDialogOpen(true)} disabled={!createDictionaryContextId}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t('diagram.list.createButton')}
+          ) : isError ? (
+            <div className="mt-6">
+              <WorkspaceEmptyState
+                icon={<AlertTriangle className="h-10 w-10" />}
+                title={t('workspace.status.loadFailedTitle')}
+                description={t('workspace.status.documentsLoadFailed')}
+                tone="error"
+                role="alert"
+                action={
+                  <Button variant="outline" onClick={() => void diagramsQuery.refetch()}>
+                    {t('workspace.status.retry')}
                   </Button>
-                )}
-              </CardContent>
-            </Card>
+                }
+              />
+            </div>
+          ) : diagrams.length === 0 ? (
+            <div className="mt-6">
+              <WorkspaceEmptyState
+                icon={<FileText className="h-10 w-10" />}
+                title={t('workspace.documents.title')}
+                description={t('workspace.documents.empty')}
+                action={
+                  canEdit ? (
+                    <Button onClick={() => setDialogOpen(true)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      {t('workspace.action.newDocument')}
+                    </Button>
+                  ) : undefined
+                }
+              />
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {diagrams.map((diagram) => (
-                <Card
+            <div className="mt-6 space-y-3">
+              {diagrams.map((diagram, index) => (
+                <DocumentHubRow
                   key={diagram.id}
-                  className="cursor-pointer hover:shadow-md transition-shadow group"
-                  onClick={() => navigate(ROUTES.DIAGRAM(teamId!, projectId!, diagram.id))}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      {renamingId === diagram.id ? (
-                        <div
-                          className="flex items-center gap-1 flex-1 mr-2"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Input
-                            value={renameValue}
-                            onChange={(e) => setRenameValue(e.target.value)}
-                            className="h-7 text-sm"
-                            autoFocus
-                            aria-label={t('diagram.aria.renameDiagram', { name: diagram.name })}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter')
-                                confirmRename(e as unknown as React.MouseEvent);
-                              if (e.key === 'Escape')
-                                cancelRename(e as unknown as React.MouseEvent);
-                            }}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={confirmRename}
-                            aria-label={t('common.aria.confirmRename')}
-                          >
-                            <Check className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={cancelRename}
-                            aria-label={t('common.aria.cancelRename')}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <CardTitle className="text-lg">{diagram.name}</CardTitle>
-                          {canEdit && (
-                            <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={(e) => startRename(diagram, e)}
-                                aria-label={t('diagram.aria.renameDiagram', {
-                                  name: diagram.name,
-                                })}
-                              >
-                                <Pencil className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteTarget(diagram.id);
-                                }}
-                                aria-label={t('diagram.aria.deleteDiagram', {
-                                  name: diagram.name,
-                                })}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {canEdit && dictionarySets.length > 0 && (
-                      <div className="mb-2" onClick={(e) => e.stopPropagation()}>
+                  item={documentItems[index]!}
+                  locale={i18n.resolvedLanguage ?? i18n.language}
+                  onOpen={() => navigate(ROUTES.DIAGRAM(teamId!, projectId!, diagram.id))}
+                  canEdit={canEdit}
+                  contextControl={
+                    canEdit && diagram.pluginId === 'erd' && dictionarySets.length > 0 ? (
+                      <div onClick={(event) => event.stopPropagation()}>
                         <Select
-                          value={
-                            diagram.dictionarySetId != null ? String(diagram.dictionarySetId) : ''
-                          }
-                          onValueChange={(value) =>
-                            updateDiagramSetMutation.mutate({
-                              diagramId: diagram.id,
-                              dictionarySetId: Number(value),
-                            })
-                          }
+                          value={diagram.dictionarySetId != null ? String(diagram.dictionarySetId) : ''}
+                          onValueChange={(value) => updateDictionaryContext(diagram.id, Number(value))}
                         >
-                          <SelectTrigger className="h-8">
+                          <SelectTrigger className="h-9 min-w-[220px]">
                             <SelectValue placeholder={t('diagram.list.selectDictionaryContext')} />
                           </SelectTrigger>
                           <SelectContent>
@@ -313,42 +237,45 @@ export default function DiagramsPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      {t('diagram.list.updatedAt', {
-                        date: new Date(diagram.updatedAt).toLocaleDateString(
-                          i18n.resolvedLanguage ?? i18n.language,
-                        ),
-                      })}
-                    </p>
-                  </CardContent>
-                </Card>
+                    ) : undefined
+                  }
+                  renameState={
+                    renamingId === diagram.id
+                      ? {
+                          value: renameValue,
+                          onValueChange: setRenameValue,
+                          onConfirm: confirmRename,
+                          onCancel: cancelRename,
+                        }
+                      : undefined
+                  }
+                  onStartRename={canEdit ? () => startRename(diagram) : undefined}
+                  onDelete={canEdit ? () => setDeleteTarget(diagram.id) : undefined}
+                />
               ))}
             </div>
           )}
         </div>
       </main>
 
-      <CreateResourceDialog
+      <CreateDocumentDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        title={t('diagram.create.dialogTitle')}
-        inputLabel={t('diagram.create.inputLabel')}
-        placeholder={t('diagram.create.placeholder')}
-        onCreate={(name) => createMutation.mutateAsync(name)}
+        dictionarySets={dictionarySets}
+        onCreate={createDocument}
       />
 
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
+          if (!open) {
+            setDeleteTarget(null);
+          }
         }}
-        title={t('diagram.delete.dialogTitle')}
-        description={t('diagram.delete.dialogDescription')}
-        onConfirm={() => {
-          if (deleteTarget !== null) deleteMutation.mutate(deleteTarget);
-        }}
-        loading={deleteMutation.isPending}
+        title={t('workspace.action.deleteErdDocumentTitle')}
+        description={t('workspace.action.deleteErdDocumentDescription')}
+        onConfirm={confirmDeleteDocument}
+        loading={deleteDocumentPending}
       />
     </div>
   );

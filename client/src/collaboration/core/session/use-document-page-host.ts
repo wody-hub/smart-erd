@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useQuery, type QueryKey } from '@tanstack/react-query';
-import type { DocumentBootstrapPayload } from '@/collaboration/core/contracts/document-bootstrap';
+import type { DocumentBootstrapPayload } from '@/types/document';
 
 interface UseDocumentPageHostOptions<TDetail> {
   bootstrapQueryKey: QueryKey;

@@ -13,7 +13,7 @@ const SignupPage = lazy(() => import('./pages/auth/SignupPage'));
 const TeamsPage = lazy(() => import('./pages/team/TeamsPage'));
 const ProjectsPage = lazy(() => import('./pages/project/ProjectsPage'));
 const DiagramsPage = lazy(() => import('./pages/diagram/DiagramsPage'));
-const DiagramPage = lazy(() => import('./pages/diagram/DiagramPage'));
+const DocumentEditorRoute = lazy(() => import('./pages/document/DocumentEditorRoute'));
 const DictionaryPage = lazy(() => import('./pages/dictionary/DictionaryPage'));
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
 
@@ -96,7 +96,7 @@ export default function App() {
                 path={ROUTES.DIAGRAM_PATTERN}
                 element={
                   <ProtectedRoute>
-                    <DiagramPage />
+                    <DocumentEditorRoute />
                   </ProtectedRoute>
                 }
               />

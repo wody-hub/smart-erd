@@ -2,7 +2,7 @@ import axiosInstance from './axiosInstance';
 import { STORAGE_KEYS } from '@/constants/storage';
 import { downloadBlob } from '@/lib/download';
 import { getApiBaseUrl } from '@/lib/platform';
-import type { DocumentBootstrapPayload } from '@/collaboration/core/contracts/document-bootstrap';
+import type { CreateProjectDocumentInput, DocumentBootstrapPayload } from '@/types/document';
 import type {
   DiagramSummary,
   DiagramDetail,
@@ -88,18 +88,19 @@ export async function fetchDiagramBootstrap(
  *
  * @param teamId    팀 ID
  * @param projectId 프로젝트 ID
- * @param name      다이어그램 이름
+ * @param input     생성할 문서 입력값
  * @returns 생성된 다이어그램
  */
 export async function createDiagram(
   teamId: string,
   projectId: string,
-  name: string,
-  dictionarySetId: number,
+  input: CreateProjectDocumentInput,
 ): Promise<DiagramSummary> {
   const res = await axiosInstance.post(`/teams/${teamId}/projects/${projectId}/diagrams`, {
-    name,
-    dictionarySetId,
+    name: input.name,
+    pluginId: input.pluginId,
+    dictionarySetId: input.dictionarySetId ?? null,
+    templateKey: input.templateKey ?? null,
   });
   return res.data;
 }

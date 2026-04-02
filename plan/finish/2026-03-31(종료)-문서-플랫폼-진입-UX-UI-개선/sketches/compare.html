@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>문서 플랫폼 진입 UX/UI 시안 비교</title>
+    <style>
+      :root {
+        --bg: #f5f2ea;
+        --panel: #fffdf8;
+        --ink: #1f1f1b;
+        --muted: #6b675f;
+        --line: #dbd3c4;
+        --accent-a: #274c3b;
+        --accent-b: #0f4c81;
+        --accent-c: #222b36;
+        --chip: #efe8da;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Pretendard", "Noto Sans KR", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, #f9f6ef 0, #f5f2ea 35%, #f0ebdf 100%);
+      }
+      .page {
+        max-width: 1480px;
+        margin: 0 auto;
+        padding: 28px 24px 40px;
+      }
+      .topbar {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 24px;
+      }
+      .title h1 {
+        margin: 0;
+        font-size: 34px;
+        line-height: 1.05;
+        letter-spacing: -0.04em;
+      }
+      .title p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      .meta {
+        color: var(--muted);
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .board {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 20px;
+      }
+      .variant {
+        background: rgba(255,255,255,0.5);
+        border: 1px solid rgba(120,110,95,0.18);
+        border-radius: 24px;
+        padding: 18px;
+        backdrop-filter: blur(6px);
+      }
+      .variant h2 {
+        margin: 0 0 6px;
+        font-size: 22px;
+        letter-spacing: -0.03em;
+      }
+      .variant p {
+        margin: 0 0 14px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+      .artboard {
+        aspect-ratio: 3 / 4;
+        background: var(--panel);
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        box-shadow: 0 20px 40px rgba(40, 38, 33, 0.08);
+      }
+      .shell {
+        height: 100%;
+        display: grid;
+        grid-template-rows: 72px 1fr;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 18px;
+        border-bottom: 1px solid var(--line);
+      }
+      .brand {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .brand strong {
+        font-size: 15px;
+        letter-spacing: -0.02em;
+      }
+      .crumb {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .header-right {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .chip {
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: var(--chip);
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .status {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: #3ca366;
+      }
+      .body {
+        padding: 18px;
+        display: grid;
+        gap: 16px;
+      }
+      .hero {
+        border-radius: 18px;
+        padding: 18px;
+        color: #f7f5ef;
+      }
+      .hero h3 {
+        margin: 0 0 8px;
+        font-size: 26px;
+        letter-spacing: -0.04em;
+      }
+      .hero p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.45;
+        color: rgba(247,245,239,0.78);
+      }
+      .cta-row {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .btn {
+        border-radius: 999px;
+        padding: 9px 14px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid transparent;
+      }
+      .btn-primary { background: #f7f5ef; color: #1d1d18; }
+      .btn-secondary { background: transparent; color: #f7f5ef; border-color: rgba(247,245,239,0.25); }
+      .section-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .cards {
+        display: grid;
+        gap: 10px;
+      }
+      .project-card {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px;
+        background: #fffdfa;
+      }
+      .project-card strong {
+        display: block;
+        font-size: 15px;
+        margin-bottom: 6px;
+      }
+      .project-card span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      .list {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        overflow: hidden;
+        background: #fffdfa;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1.25fr 1fr auto;
+        gap: 8px;
+        align-items: center;
+        padding: 12px 14px;
+        border-bottom: 1px solid #ebe4d7;
+        font-size: 12px;
+      }
+      .row:last-child { border-bottom: 0; }
+      .row strong {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 7px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .muted { color: var(--muted); }
+      .right-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #d49b36;
+      }
+      .utility {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .tool {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        background: #f9f5ee;
+        font-size: 12px;
+      }
+      .tool strong {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 13px;
+      }
+      .a .hero { background: linear-gradient(145deg, #284f3d, #3b7259); }
+      .a .badge { background: #e8f0eb; color: #274c3b; }
+      .b .hero { background: linear-gradient(145deg, #0f4c81, #226ca7); }
+      .b .badge { background: #e7f0f8; color: #0f4c81; }
+      .c .hero { background: linear-gradient(145deg, #1e2731, #333d49); }
+      .c .badge { background: #edf0f4; color: #222b36; }
+      .notes {
+        margin-top: 10px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: rgba(247, 243, 234, 0.85);
+        border: 1px dashed rgba(120,110,95,0.24);
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      @media (max-width: 1180px) {
+        .board { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="topbar">
+        <div class="title">
+          <h1>문서 플랫폼 진입 UX/UI 시안 비교</h1>
+          <p>Projects는 카드형, Documents는 리스트형이라는 원칙 위에서 3가지 시각 방향을 비교한다.</p>
+        </div>
+        <div class="meta">Smart ERD, Workspace Entry Shell, 2026-03-31</div>
+      </div>
+
+      <div class="board">
+        <section class="variant a">
+          <h2>Variant A, Editorial Workspace</h2>
+          <p>문서성, 여백, 신뢰감을 우선한다. 팀과 프로젝트 맥락을 차분하게 읽게 만드는 방향.</p>
+          <div class="artboard">
+            <div class="shell">
+              <div class="header">
+                <div class="brand">
+                  <strong>Smart ERD</strong>
+                  <div class="crumb">Team A / Projects</div>
+                </div>
+                <div class="header-right">
+                  <div class="chip">Dictionary</div>
+                  <div class="chip">Members</div>
+                  <div class="status"></div>
+                </div>
+              </div>
+              <div class="body">
+                <div class="hero">
+                  <h3>문서 작업을 위한 팀 워크스페이스</h3>
+                  <p>ERD, 앞으로 들어올 Markdown, Screen Spec까지 같은 제품 쉘 안에서 자연스럽게 이어지는 팀 홈.</p>
+                  <div class="cta-row">
+                    <div class="btn btn-primary">새 프로젝트</div>
+                    <div class="btn btn-secondary">팀 자산 보기</div>
+                  </div>
+                </div>
+                <div class="section-title">
+                  <span>Projects</span>
+                  <span>최근 수정 순</span>
+                </div>
+                <div class="cards">
+                  <div class="project-card">
+                    <strong>고객 데이터 플랫폼</strong>
+                    <span>ERD 6개, 최근 수정 12분 전, 팀이 가장 자주 여는 핵심 작업 공간.</span>
+                  </div>
+                  <div class="project-card">
+                    <strong>주문 관리 리뉴얼</strong>
+                    <span>ERD 3개, 연결 사전 2세트, 설계와 문서화가 함께 자라는 프로젝트.</span>
+                  </div>
+                </div>
+                <div class="notes">추천 톤: 상위는 calm workspace, 하위 문서 허브는 dense list로 연결.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="variant b">
+          <h2>Variant B, Operational Dashboard</h2>
+          <p>최근 수정, 협업 상태, 빠른 액션을 좀 더 강하게 드러낸다. 팀 운영 감각이 있는 방향.</p>
+          <div class="artboard">
+            <div class="shell">
+              <div class="header">
+                <div class="brand">
+                  <strong>Smart ERD</strong>
+                  <div class="crumb">Team A / Project B / Documents</div>
+                </div>
+                <div class="header-right">
+                  <div class="chip">3 active</div>
+                  <div class="chip">2 alerts</div>
+                  <div class="status"></div>
+                </div>
+              </div>
+              <div class="body">
+                <div class="hero">
+                  <h3>Project Documents</h3>
+                  <p>최근 수정, 협업 상태, 연결 자산을 빠르게 훑고 바로 새 ERD를 만들 수 있는 문서 허브.</p>
+                  <div class="cta-row">
+                    <div class="btn btn-primary">새 ERD 문서</div>
+                    <div class="btn btn-secondary">사전 열기</div>
+                  </div>
+                </div>
+                <div class="utility">
+                  <div class="tool"><strong>최근 변경</strong>문서 4개 업데이트</div>
+                  <div class="tool"><strong>협업 상태</strong>2명이 편집 중</div>
+                  <div class="tool"><strong>사전 연결</strong>세트 3개 사용 중</div>
+                </div>
+                <div class="list">
+                  <div class="row">
+                    <strong><span class="badge">ERD</span> 고객 코어 모델</strong>
+                    <span class="muted">3분 전 · 협업 중</span>
+                    <span class="right-dot"></span>
+                  </div>
+                  <div class="row">
+                    <strong><span class="badge">ERD</span> 결제 정산 구조</strong>
+                    <span class="muted">19분 전 · 사전 연결</span>
+                    <span class="right-dot"></span>
+                  </div>
+                  <div class="row">
+                    <strong><span class="badge">ERD</span> 배치 이력 모델</strong>
+                    <span class="muted">어제 · 편집 가능</span>
+                    <span class="right-dot"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="variant c">
+          <h2>Variant C, Minimal Productivity Shell</h2>
+          <p>크롬을 줄이고 생산성 도구처럼 보이게 한다. 리스트와 컨텍스트가 가장 단단한 방향.</p>
+          <div class="artboard">
+            <div class="shell">
+              <div class="header">
+                <div class="brand">
+                  <strong>Smart ERD</strong>
+                  <div class="crumb">Team A / Project B / Documents</div>
+                </div>
+                <div class="header-right">
+                  <div class="chip">Search</div>
+                  <div class="status"></div>
+                </div>
+              </div>
+              <div class="body">
+                <div class="hero">
+                  <h3>문서 허브</h3>
+                  <p>프로젝트 안의 모든 문서를 빠르게 열고, 비교하고, 상태를 파악하는 데 집중한 shell.</p>
+                  <div class="cta-row">
+                    <div class="btn btn-primary">새 ERD 문서</div>
+                    <div class="btn btn-secondary">Dictionary</div>
+                  </div>
+                </div>
+                <div class="section-title">
+                  <span>최근 수정 순</span>
+                  <span>ERD only</span>
+                </div>
+                <div class="list">
+                  <div class="row">
+                    <strong><span class="badge">ERD</span> 고객 코어 모델</strong>
+                    <span class="muted">3분 전 · sync ready</span>
+                    <span class="right-dot"></span>
+                  </div>
+                  <div class="row">
+                    <strong><span class="badge">ERD</span> 결제 정산 구조</strong>
+                    <span class="muted">19분 전 · dictionary linked</span>
+                    <span class="right-dot"></span>
+                  </div>
+                  <div class="row">
+                    <strong><span class="badge">ERD</span> 배치 이력 모델</strong>
+                    <span class="muted">어제 · 2명 편집</span>
+                    <span class="right-dot"></span>
+                  </div>
+                  <div class="row">
+                    <strong><span class="badge">ERD</span> 로그 적재 파이프라인</strong>
+                    <span class="muted">3일 전 · review needed</span>
+                    <span class="right-dot"></span>
+                  </div>
+                </div>
+                <div class="notes">추천 포인트: 문서는 dense list, 프로젝트는 별도 페이지에서 카드형으로 유지하는 분리 원칙이 가장 깔끔하다.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>
