@@ -37,7 +37,7 @@ Plans:
 - [x] 01-01-PLAN.md — diff-match-patch 설치 + SectionBoundary 순수 함수 라이브러리 (TDD)
 - [x] 01-02-PLAN.md — BE MarkdownScopeResolver + MarkdownCollaborationPlugin
 - [x] 01-03-PLAN.md — FE 증분 동기화 핵심 경로 (applyIncrementalTextUpdate + buildSectionCommands + MutationApplier 교체)
-- [ ] 01-04-PLAN.md — Section HTML 캐시 + useMarkdownSectionPreview + MarkdownDocumentPage 교체
+- [x] 01-04-PLAN.md — Section HTML 캐시 + useMarkdownSectionPreview + MarkdownDocumentPage 교체
 
 ### Phase 2: 테마 선택
 **Goal**: 사용자가 Paper/Graphite/Midnight 3가지 테마 중 하나를 선택하면 앱 전역(ERD 캔버스, 마크다운 에디터, Dialog, Monaco)에 일관되게 적용되고 새로고침 후에도 유지된다
