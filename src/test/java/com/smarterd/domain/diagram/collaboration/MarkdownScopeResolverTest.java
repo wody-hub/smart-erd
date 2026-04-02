@@ -20,48 +20,42 @@ class MarkdownScopeResolverTest {
     void sectionUpdate_shouldResolveSectionScope() {
         final var result = resolver.resolve("markdown:section-update", Map.of("sectionId", "api-\uC124\uACC4"));
 
-        assertThat(result)
-            .containsExactly(new ScopeRef("section", "api-\uC124\uACC4", ScopeLockMode.EXCLUSIVE));
+        assertThat(result).containsExactly(new ScopeRef("section", "api-\uC124\uACC4", ScopeLockMode.EXCLUSIVE));
     }
 
     @Test
     void sectionUpdate_withEmptySectionId_shouldFallbackToRootScope() {
         final var result = resolver.resolve("markdown:section-update", Map.of("sectionId", ""));
 
-        assertThat(result)
-            .containsExactly(new ScopeRef("document", "root", ScopeLockMode.EXCLUSIVE));
+        assertThat(result).containsExactly(new ScopeRef("document", "root", ScopeLockMode.EXCLUSIVE));
     }
 
     @Test
     void sectionUpdate_withNullPayload_shouldFallbackToRootScope() {
         final var result = resolver.resolve("markdown:section-update", null);
 
-        assertThat(result)
-            .containsExactly(new ScopeRef("document", "root", ScopeLockMode.EXCLUSIVE));
+        assertThat(result).containsExactly(new ScopeRef("document", "root", ScopeLockMode.EXCLUSIVE));
     }
 
     @Test
     void bodyReplace_shouldResolveDocumentRootScope() {
         final var result = resolver.resolve("markdown:body-replace", Map.of());
 
-        assertThat(result)
-            .containsExactly(new ScopeRef("document", "root", ScopeLockMode.EXCLUSIVE));
+        assertThat(result).containsExactly(new ScopeRef("document", "root", ScopeLockMode.EXCLUSIVE));
     }
 
     @Test
     void frontmatterUpdate_shouldResolveDocumentRootScope() {
         final var result = resolver.resolve("markdown:frontmatter-update", Map.of());
 
-        assertThat(result)
-            .containsExactly(new ScopeRef("document", "root", ScopeLockMode.EXCLUSIVE));
+        assertThat(result).containsExactly(new ScopeRef("document", "root", ScopeLockMode.EXCLUSIVE));
     }
 
     @Test
     void unknownCommand_shouldFallbackToDocumentRootScope() {
         final var result = resolver.resolve("unknown:command", Map.of());
 
-        assertThat(result)
-            .containsExactly(new ScopeRef("document", "root", ScopeLockMode.EXCLUSIVE));
+        assertThat(result).containsExactly(new ScopeRef("document", "root", ScopeLockMode.EXCLUSIVE));
     }
 
     @Test
