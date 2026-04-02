@@ -4,6 +4,7 @@ import com.smarterd.api.diagram.dto.CreateDiagramRequest;
 import com.smarterd.api.diagram.dto.DiagramBootstrapResponse;
 import com.smarterd.api.diagram.dto.DiagramDetailResponse;
 import com.smarterd.api.diagram.dto.DiagramResponse;
+import com.smarterd.api.diagram.dto.ExportDocumentRequest;
 import com.smarterd.api.diagram.dto.ExportDiagramWorkbookRequest;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotRequest;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotResponse;
@@ -23,6 +24,7 @@ import com.smarterd.domain.diagram.service.DiagramService.DiagramSummaryResult;
 import com.smarterd.domain.diagram.service.DiagramService.DictionarySetChangeResult;
 import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
 import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
+import com.smarterd.domain.markdown.service.MarkdownExportService;
 import com.smarterd.utils.ExcelUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -78,6 +80,9 @@ public class DiagramController {
     /** 다이어그램 인덱스 정의서 엑셀 export 서비스 */
     private final DiagramIndexDefinitionExportService diagramIndexDefinitionExportService;
 
+    /** markdown export 서비스 */
+    private final MarkdownExportService markdownExportService;
+
     /**
      * 다이어그램을 생성한다.
      *
@@ -106,7 +111,9 @@ public class DiagramController {
             teamId,
             projectId,
             request.name(),
-            request.dictionarySetId()
+            request.pluginId(),
+            request.dictionarySetId(),
+            request.templateKey()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(toDiagramResponse(result));
     }
@@ -379,6 +386,36 @@ public class DiagramController {
     }
 
     /**
+     * 문서를 markdown 원문 포맷으로 export 한다.
+     *
+     * @param jwt 인증 JWT
+     * @param teamId 팀 ID
+     * @param projectId 프로젝트 ID
+     * @param diagramId 문서 ID
+     * @param request export 요청
+     * @param response HTTP 응답
+     * @throws java.io.IOException 응답 스트림 쓰기 실패
+     */
+    @Operation(summary = "문서 export", description = "markdown 문서를 원문 md 파일로 export 한다.")
+    @ApiResponse(responseCode = "200", description = "export 성공")
+    @PostMapping("/{diagramId}/exports")
+    public void exportDocument(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Parameter(description = "다이어그램 ID") @PathVariable Long diagramId,
+        @Valid @RequestBody ExportDocumentRequest request,
+        HttpServletResponse response
+    ) throws java.io.IOException {
+        final var diagram = diagramService.loadReadableDiagram(jwt.getSubject(), teamId, projectId, diagramId);
+        final var exportResult = markdownExportService.export(diagram, request.format());
+        response.setContentType(exportResult.contentType());
+        final var encodedName = java.net.URLEncoder.encode(exportResult.fileName(), java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
+        response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + encodedName);
+        response.getOutputStream().write(exportResult.body());
+    }
+
+    /**
      * 다이어그램 이름을 변경한다.
      *
      * @param jwt        인증된 JWT 토큰
@@ -422,6 +459,7 @@ public class DiagramController {
         description = "사전 세트 변경 성공",
         content = @Content(schema = @Schema(implementation = UpdateDiagramDictionarySetResponse.class))
     )
+    @ApiResponse(responseCode = "403", description = "VIEWER 권한으로 변경 불가", content = @Content)
     @PatchMapping("/{diagramId}/dictionary-set")
     public ResponseEntity<UpdateDiagramDictionarySetResponse> updateDictionarySet(
         @AuthenticationPrincipal Jwt jwt,
@@ -479,9 +517,13 @@ public class DiagramController {
         return new DiagramResponse(
             result.id(),
             result.name(),
+            result.pluginId(),
             result.projectId(),
             result.dictionarySetId(),
             result.dictionarySetName(),
+            result.templateKey(),
+            result.templateLabel(),
+            result.summaryText(),
             result.createdAt(),
             result.updatedAt()
         );
@@ -497,9 +539,13 @@ public class DiagramController {
         return new DiagramDetailResponse(
             result.id(),
             result.name(),
+            result.pluginId(),
             result.projectId(),
             result.dictionarySetId(),
             result.dictionarySetName(),
+            result.templateKey(),
+            result.templateLabel(),
+            result.summaryText(),
             result.content(),
             result.hasYdocSnapshot(),
             String.valueOf(result.contentRevision()),

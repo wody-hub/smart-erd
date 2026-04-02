@@ -24,6 +24,11 @@ function createDomain(id: number, logicalName: string, physicalType: string): Do
   return {
     id,
     logicalName,
+    domainGroup: null,
+    domainClassification: null,
+    dataType: null,
+    dataLength: null,
+    dataScale: null,
     physicalType,
     description: null,
     teamId: 1,

@@ -20,6 +20,7 @@ import com.smarterd.domain.diagram.service.DiagramIndexDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService;
 import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
 import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
+import com.smarterd.domain.markdown.service.MarkdownExportService;
 import com.smarterd.utils.excel.ExcelData;
 import java.time.Instant;
 import java.util.Base64;
@@ -63,6 +64,9 @@ class DiagramControllerMvcTest {
     @Mock
     private DiagramIndexDefinitionExportService diagramIndexDefinitionExportService;
 
+    @Mock
+    private MarkdownExportService markdownExportService;
+
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
@@ -74,7 +78,8 @@ class DiagramControllerMvcTest {
             persistDiagramSnapshotUseCase,
             diagramTableDefinitionExportService,
             diagramColumnDefinitionExportService,
-            diagramIndexDefinitionExportService
+            diagramIndexDefinitionExportService,
+            markdownExportService
         );
         this.mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .setCustomArgumentResolvers(new TestJwtArgumentResolver())
@@ -303,6 +308,65 @@ class DiagramControllerMvcTest {
             eq(100L),
             eq("{\"nodes\":[]}")
         );
+    }
+
+    @Test
+    void exportDocument_returnsMarkdownAttachment() throws Exception {
+        final var diagram = org.mockito.Mockito.mock(com.smarterd.domain.diagram.entity.Diagram.class);
+        when(diagramService.loadReadableDiagram("tester", 1L, 10L, 100L)).thenReturn(diagram);
+        when(markdownExportService.export(diagram, "md")).thenReturn(
+            new MarkdownExportService.MarkdownExportResult("text/markdown; charset=UTF-8", "document.md", "# Hello".getBytes())
+        );
+
+        mockMvc
+            .perform(
+                post("/api/teams/1/projects/10/diagrams/100/exports")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(java.util.Map.of("format", "md")))
+            )
+            .andExpect(status().isOk())
+            .andExpect(
+                header().string(
+                    "Content-Disposition",
+                    org.hamcrest.Matchers.containsString("document.md")
+                )
+            );
+
+        verify(markdownExportService).export(diagram, "md");
+    }
+
+    @Test
+    void exportDocument_rejectsEmptyFormat() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/teams/1/projects/10/diagrams/100/exports")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(java.util.Map.of("format", "")))
+            )
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void exportDocument_rejectsInvalidFormat() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/teams/1/projects/10/diagrams/100/exports")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(java.util.Map.of("format", "pdf")))
+            )
+            .andExpect(status().isBadRequest());
     }
 
     private Jwt jwt(String subject) {

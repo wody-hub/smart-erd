@@ -110,7 +110,7 @@ export default function TeamsPage() {
                       <span className="workspace-kicker">{t('workspace.section.teams')}</span>
                     </div>
                     <div className="min-w-0">
-                      <CardTitle className="truncate font-display text-[1.7rem] tracking-[-0.03em]">
+                      <CardTitle className="truncate font-sans text-[1.66rem] tracking-[-0.035em]">
                         {team.name}
                       </CardTitle>
                     </div>

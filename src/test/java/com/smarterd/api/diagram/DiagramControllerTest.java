@@ -14,6 +14,7 @@ import com.smarterd.domain.diagram.service.DiagramIndexDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService;
 import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
 import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
+import com.smarterd.domain.markdown.service.MarkdownExportService;
 import com.smarterd.utils.excel.ExcelData;
 import java.time.Instant;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -45,6 +46,9 @@ class DiagramControllerTest {
     @Mock
     private DiagramIndexDefinitionExportService diagramIndexDefinitionExportService;
 
+    @Mock
+    private MarkdownExportService markdownExportService;
+
     @Test
     void saveDiagram_returnsOkResponseWithLatestSaveState() {
         final var controller = new DiagramController(
@@ -53,7 +57,8 @@ class DiagramControllerTest {
             persistDiagramSnapshotUseCase,
             diagramTableDefinitionExportService,
             diagramColumnDefinitionExportService,
-            diagramIndexDefinitionExportService
+            diagramIndexDefinitionExportService,
+            markdownExportService
         );
         final var jwt = jwt("tester");
         final var request = new SaveDiagramRequest("{\"nodes\":[]}", new byte[] { 0x01, 0x02 });
@@ -86,7 +91,8 @@ class DiagramControllerTest {
             persistDiagramSnapshotUseCase,
             diagramTableDefinitionExportService,
             diagramColumnDefinitionExportService,
-            diagramIndexDefinitionExportService
+            diagramIndexDefinitionExportService,
+            markdownExportService
         );
         final var jwt = jwt("tester");
         final var request = new PersistYdocSnapshotRequest("17", new byte[] { 0x11 }, false);
@@ -127,7 +133,8 @@ class DiagramControllerTest {
             persistDiagramSnapshotUseCase,
             diagramTableDefinitionExportService,
             diagramColumnDefinitionExportService,
-            diagramIndexDefinitionExportService
+            diagramIndexDefinitionExportService,
+            markdownExportService
         );
         final var jwt = jwt("tester");
         final var workbook = new XSSFWorkbook();
@@ -157,7 +164,8 @@ class DiagramControllerTest {
             persistDiagramSnapshotUseCase,
             diagramTableDefinitionExportService,
             diagramColumnDefinitionExportService,
-            diagramIndexDefinitionExportService
+            diagramIndexDefinitionExportService,
+            markdownExportService
         );
         final var jwt = jwt("tester");
         final var workbook = new XSSFWorkbook();
@@ -193,7 +201,8 @@ class DiagramControllerTest {
             persistDiagramSnapshotUseCase,
             diagramTableDefinitionExportService,
             diagramColumnDefinitionExportService,
-            diagramIndexDefinitionExportService
+            diagramIndexDefinitionExportService,
+            markdownExportService
         );
         final var jwt = jwt("tester");
         final var workbook = new XSSFWorkbook();
@@ -213,6 +222,37 @@ class DiagramControllerTest {
         );
         assertThat(response.getHeader("Content-Disposition")).contains("diagram-index-definition.xlsx");
         verify(diagramIndexDefinitionExportService).generateIndexDefinition("tester", 1L, 10L, 100L, request.content());
+    }
+
+    @Test
+    void exportDocument_streamsMarkdownResponse() throws Exception {
+        final var controller = new DiagramController(
+            diagramService,
+            saveDiagramUseCase,
+            persistDiagramSnapshotUseCase,
+            diagramTableDefinitionExportService,
+            diagramColumnDefinitionExportService,
+            diagramIndexDefinitionExportService,
+            markdownExportService
+        );
+        final var jwt = jwt("tester");
+        final var diagram = org.mockito.Mockito.mock(com.smarterd.domain.diagram.entity.Diagram.class);
+        final var response = new MockHttpServletResponse();
+        final var request = new com.smarterd.api.diagram.dto.ExportDocumentRequest("md");
+
+        when(diagramService.loadReadableDiagram("tester", 1L, 10L, 100L)).thenReturn(diagram);
+        when(markdownExportService.export(diagram, "md")).thenReturn(
+            new MarkdownExportService.MarkdownExportResult("text/markdown; charset=UTF-8", "test-doc.md", "# Hello".getBytes())
+        );
+
+        controller.exportDocument(jwt, 1L, 10L, 100L, request, response);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getContentType()).isEqualTo("text/markdown; charset=UTF-8");
+        assertThat(response.getHeader("Content-Disposition")).contains("test-doc.md");
+        assertThat(response.getContentAsString()).isEqualTo("# Hello");
+        verify(diagramService).loadReadableDiagram("tester", 1L, 10L, 100L);
+        verify(markdownExportService).export(diagram, "md");
     }
 
     private Jwt jwt(String subject) {

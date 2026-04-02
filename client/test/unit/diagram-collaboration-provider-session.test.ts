@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { YjsSharedDocumentEngine } from '../../src/collaboration/core/engines/yjs-shared-document-engine.js';
 import { DiagramCollaborationProviderSession } from '../../src/collaboration/channel/diagram/diagram-collaboration-testable.js';
 
 test('DiagramCollaborationProviderSession cleans up when provider lifecycle setup fails', async () => {
@@ -20,6 +21,12 @@ test('DiagramCollaborationProviderSession cleans up when provider lifecycle setu
       hasYdocSnapshot: false,
       content: 'table users',
       contentRevision: '0',
+    },
+    sharedDocumentEngine: new YjsSharedDocumentEngine(),
+    snapshotCodec: {
+      snapshotFormatVersion: 1,
+      decodeToSnapshot: (persisted) => persisted,
+      encodeForPersistence: (snapshot) => snapshot,
     },
     diagramId: 'diagram-1',
     teamId: 'team-1',

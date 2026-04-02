@@ -54,7 +54,8 @@
       "description": "이 프로젝트의 문서를 관리하고 바로 편집으로 들어가세요.",
       "empty": "이 프로젝트에는 아직 문서가 없습니다. 첫 번째 ERD 문서를 만들어보세요.",
       "documentCount": "문서 {{count}}개",
-      "typeScopeHint": "현재는 구현된 문서 타입인 ERD만 이 허브에 표시합니다.",
+      "typeScopeHint": "ERD와 Markdown 문서를 같은 허브에서 생성하고 편집할 수 있습니다.",
+      "multiTypeHint": "이 허브에서 ERD와 Markdown 문서를 함께 관리합니다. 생성 시 문서 유형과 필요한 초기 설정을 고릅니다.",
       "dictionaryContextHint": "새 문서를 만들기 전에 연결할 사전 컨텍스트를 선택하세요."
     },
     "projects": {
@@ -74,13 +75,16 @@
     "meta": {
       "updatedAt": "수정일: {{date}}",
       "dictionaryContext": "연결 사전: {{name}}",
-      "teamContext": "팀: {{name}}"
+      "teamContext": "팀: {{name}}",
+      "templateContext": "템플릿: {{name}}"
     },
     "action": {
+      "newDocument": "새 문서",
       "newErdDocument": "새 ERD 문서",
       "newMarkdownDocument": "새 Markdown 문서",
       "newScreenSpecDocument": "새 화면기획 문서",
       "openDocument": "{{name}} 문서 열기",
+      "backToDocuments": "문서 허브로",
       "documentActions": "문서 작업",
       "renameDocument": "문서 이름 변경",
       "deleteDocument": "문서 삭제",
@@ -91,13 +95,85 @@
       "deleteErdDocumentTitle": "ERD 문서 삭제",
       "deleteErdDocumentDescription": "이 ERD 문서를 정말 삭제하시겠습니까?"
     },
+    "createDocument": {
+      "description": "문서 유형을 고르고 기본 설정을 입력해 새 문서를 만듭니다.",
+      "eyebrow": "문서 생성",
+      "stepType": "1단계 · 문서 유형 선택",
+      "stepSetup": "2단계 · 문서 초기 설정",
+      "stepTypeDescription": "이번에 만들 문서의 작업 방식을 먼저 고르세요.",
+      "stepSetupDescription": "이름과 시작 설정을 확인한 뒤 바로 편집으로 들어갑니다.",
+      "pluginSectionTitle": "문서 유형",
+      "pluginSectionHint": "ERD는 캔버스 작업, Markdown은 기술 문서 작성에 맞춰 시작합니다.",
+      "nameLabel": "문서 이름",
+      "namePlaceholder": "문서 이름을 입력하세요",
+      "nameHint": "문서 허브와 편집기 상단에 표시되는 이름입니다.",
+      "templateLabel": "Markdown 템플릿",
+      "templateHint": "문서 골격과 기본 frontmatter를 함께 넣어 시작합니다.",
+      "dictionaryHint": "ERD 문서에 연결할 기본 사전 컨텍스트를 선택합니다.",
+      "erdRequiresDictionary": "ERD 문서를 만들려면 먼저 프로젝트에 사전 컨텍스트 세트를 준비해야 합니다.",
+      "selected": "선택됨",
+      "previewTitle": "생성 미리보기",
+      "previewNameLabel": "문서 이름",
+      "previewPendingName": "이름을 입력하면 여기에 반영됩니다.",
+      "previewTemplateLabel": "템플릿",
+      "previewDictionaryLabel": "사전 컨텍스트",
+      "includesTitle": "포함 내용",
+      "previewMarkdownLine1": "frontmatter와 섹션 구조가 함께 생성됩니다.",
+      "previewMarkdownLine2": "쓰기, Outline, 미리보기 흐름으로 바로 편집할 수 있습니다.",
+      "previewMarkdownLine3": "MD와 HTML로 바로 내보낼 수 있습니다.",
+      "previewErdLine1": "사전 컨텍스트가 연결된 ERD 캔버스로 시작합니다.",
+      "previewErdLine2": "테이블, 관계, 코드 동기화 작업으로 바로 이어집니다.",
+      "previewErdLine3": "문서 허브에서 사전과 함께 관리됩니다.",
+      "erdDescription": "사전 컨텍스트를 연결해 ERD 캔버스 문서를 만듭니다.",
+      "markdownDescription": "템플릿을 고른 뒤 기술 문서나 회의록을 작성합니다."
+    },
     "status": {
       "loadFailedTitle": "작업 영역을 불러오지 못했습니다",
       "teamsLoadFailed": "워크스페이스 목록을 다시 불러와 주세요.",
       "projectsLoadFailed": "팀 컨텍스트는 유지한 채 프로젝트 목록을 다시 불러올 수 있습니다.",
       "documentsLoadFailed": "프로젝트 컨텍스트는 유지한 채 문서 허브를 다시 불러올 수 있습니다.",
+      "documentUnsupported": "이 문서는 현재 지원하지 않는 플러그인 타입이라 열 수 없습니다.",
       "dictionaryLoadFailed": "팀 컨텍스트는 유지한 채 사전 자산 작업 영역을 다시 불러올 수 있습니다.",
       "retry": "다시 시도"
+    }
+  },
+  "markdown": {
+    "outline": {
+      "title": "Outline",
+      "empty": "본문에 제목을 추가하면 여기에서 섹션 구조를 볼 수 있습니다."
+    },
+    "preview": {
+      "title": "Preview"
+    },
+    "info": {
+      "title": "문서 정보",
+      "description": "frontmatter와 템플릿 정보를 확인합니다.",
+      "template": "템플릿",
+      "empty": "frontmatter가 아직 없습니다."
+    },
+    "mode": {
+      "write": "쓰기",
+      "outline": "Outline",
+      "split": "분할",
+      "preview": "미리보기"
+    },
+    "toolbar": {
+      "export": "내보내기"
+    },
+    "toast": {
+      "created": "Markdown 문서가 생성되었습니다",
+      "createFailed": "Markdown 문서 생성에 실패했습니다",
+      "saved": "Markdown 문서를 저장했습니다",
+      "saveFailed": "Markdown 문서 저장에 실패했습니다",
+      "exported": "문서를 내보냈습니다",
+      "exportFailed": "문서 내보내기에 실패했습니다"
+    },
+    "status": {
+      "loadFailed": "Markdown 문서를 불러오지 못했습니다. 다시 시도해 주세요.",
+      "saving": "저장 중...",
+      "unsaved": "저장되지 않은 변경 사항",
+      "saved": "저장됨",
+      "savedAt": "{{time}} 저장"
     }
   },
   "auth": {

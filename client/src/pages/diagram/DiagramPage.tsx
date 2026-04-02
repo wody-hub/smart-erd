@@ -83,6 +83,9 @@ export default function DiagramPage() {
 
   const { t } = useTranslation();
   const { recordRecentProjectContext } = useRecentProjectContext(teamId);
+  const { canEdit } = useTeamRole(teamId);
+  const isMobileEditorLayout = useMediaQuery('(max-width: 767px)');
+
   const { data: team } = useQuery({
     queryKey: queryKeys.teams.detail(teamId!),
     queryFn: () => fetchTeam(teamId!),
@@ -99,7 +102,10 @@ export default function DiagramPage() {
     projectId,
     diagramId,
   });
-  const { canEdit } = useTeamRole(teamId);
+  const workModeCapabilities = useMemo(
+    () => createDiagramWorkModeCapabilities(workMode),
+    [workMode],
+  );
   const {
     columnDefinitionExporting,
     handleExportColumnDefinition,
@@ -114,11 +120,6 @@ export default function DiagramPage() {
     tableDefinitionExporting,
     validationOpen,
   } = useDiagramPageControls({ diagramId, projectId, t, teamId });
-  const isMobileEditorLayout = useMediaQuery('(max-width: 767px)');
-  const workModeCapabilities = useMemo(
-    () => createDiagramWorkModeCapabilities(workMode),
-    [workMode],
-  );
   const {
     sidebarWidth,
     isSidebarResizing,

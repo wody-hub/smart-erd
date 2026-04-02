@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -10,13 +10,12 @@ import {
 } from '@/api/diagramApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
-import type { DictionarySet } from '@/types/dictionary';
+import type { CreateProjectDocumentInput } from '@/types/document';
 import type { DiagramSummary } from '@/types/diagram';
 
 interface UseDiagramDocumentHubActionsOptions {
   teamId?: string;
   projectId?: string;
-  dictionarySets: DictionarySet[];
 }
 
 interface DiagramDocumentHubActionsResult {
@@ -27,12 +26,10 @@ interface DiagramDocumentHubActionsResult {
   renamingId: number | null;
   renameValue: string;
   setRenameValue: (value: string) => void;
-  createDictionaryContextId: string;
-  setCreateDictionaryContextId: (value: string) => void;
   startRename: (diagram: DiagramSummary) => void;
   confirmRename: () => void;
   cancelRename: () => void;
-  createDocument: (name: string) => Promise<unknown>;
+  createDocument: (input: CreateProjectDocumentInput) => Promise<unknown>;
   confirmDeleteDocument: () => void;
   updateDictionaryContext: (diagramId: number, dictionarySetId: number) => void;
   deleteDocumentPending: boolean;
@@ -43,7 +40,6 @@ interface DiagramDocumentHubActionsResult {
 export function useDiagramDocumentHubActions({
   teamId,
   projectId,
-  dictionarySets,
 }: UseDiagramDocumentHubActionsOptions): DiagramDocumentHubActionsResult {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -51,21 +47,6 @@ export function useDiagramDocumentHubActions({
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [createDictionaryContextId, setCreateDictionaryContextId] = useState('');
-
-  useEffect(() => {
-    if (dictionarySets.length === 0) {
-      setCreateDictionaryContextId('');
-      return;
-    }
-    const defaultSet = dictionarySets.find((set) => set.isDefault);
-    setCreateDictionaryContextId((prev) => {
-      if (prev && dictionarySets.some((set) => String(set.id) === prev)) {
-        return prev;
-      }
-      return String(defaultSet?.id ?? dictionarySets[0]!.id);
-    });
-  }, [dictionarySets]);
 
   const invalidateDocuments = useCallback(() => {
     if (!teamId || !projectId) {
@@ -75,13 +56,22 @@ export function useDiagramDocumentHubActions({
   }, [projectId, queryClient, teamId]);
 
   const createMutation = useMutation({
-    mutationFn: (name: string) =>
-      createDiagram(teamId!, projectId!, name, Number(createDictionaryContextId)),
-    onSuccess: () => {
+    mutationFn: (input: CreateProjectDocumentInput) => createDiagram(teamId!, projectId!, input),
+    onSuccess: (diagram) => {
       invalidateDocuments();
-      toast.success(t('diagram.toast.created'));
+      toast.success(
+        diagram.pluginId === 'markdown' ? t('markdown.toast.created') : t('diagram.toast.created'),
+      );
     },
-    onError: (err) => toast.error(getErrorMessage(err, t('diagram.toast.createFailed'))),
+    onError: (err, variables) =>
+      toast.error(
+        getErrorMessage(
+          err,
+          variables.pluginId === 'markdown'
+            ? t('markdown.toast.createFailed')
+            : t('diagram.toast.createFailed'),
+        ),
+      ),
   });
 
   const deleteMutation = useMutation({
@@ -154,8 +144,6 @@ export function useDiagramDocumentHubActions({
     renamingId,
     renameValue,
     setRenameValue,
-    createDictionaryContextId,
-    setCreateDictionaryContextId,
     startRename,
     confirmRename,
     cancelRename,

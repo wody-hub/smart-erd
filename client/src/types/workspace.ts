@@ -61,6 +61,10 @@ export interface DocumentListItem {
   updatedAt: string;
   /** 연결된 사전 컨텍스트 이름 */
   dictionaryContextName?: string | null;
+  /** markdown 템플릿 라벨 */
+  templateLabel?: string | null;
+  /** markdown/문서 요약 */
+  summaryText?: string | null;
   /** 보조 상태 문구 */
   statusLabel?: string;
   /** 보조 상태 톤 */

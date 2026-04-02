@@ -24,8 +24,16 @@ export default function WorkspaceHeaderShell({
       <div className="min-w-0 flex flex-1 items-center gap-3">
         <div className="min-w-0 flex items-center gap-3">
           <h1
-            className="cursor-pointer whitespace-nowrap font-display text-[1.05rem] font-semibold tracking-[-0.03em]"
+            className="cursor-pointer whitespace-nowrap font-sans text-[1.02rem] font-semibold tracking-[-0.03em]"
+            role="button"
+            tabIndex={0}
             onClick={onAppClick}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onAppClick();
+              }
+            }}
           >
             {appName}
           </h1>

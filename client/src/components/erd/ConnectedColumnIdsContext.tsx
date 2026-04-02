@@ -27,17 +27,14 @@ function buildConnectedColumnContext(edges: EdgeHandleLike[]): ConnectedColumnCo
   const idsByNode = new Map<string, Set<string>>();
   const directionsByNode = new Map<string, Map<string, ColumnConnectionDirections>>();
 
-  const ensureDirection = (
-    nodeId: string,
-    columnId: string,
-  ): ColumnConnectionDirections => {
-    const nodeDirections = directionsByNode.get(nodeId) ?? new Map<string, ColumnConnectionDirections>();
+  const ensureDirection = (nodeId: string, columnId: string): ColumnConnectionDirections => {
+    const nodeDirections =
+      directionsByNode.get(nodeId) ?? new Map<string, ColumnConnectionDirections>();
     directionsByNode.set(nodeId, nodeDirections);
-    const current =
-      nodeDirections.get(columnId) ?? {
-        source: false,
-        target: false,
-      };
+    const current = nodeDirections.get(columnId) ?? {
+      source: false,
+      target: false,
+    };
     nodeDirections.set(columnId, current);
     return current;
   };

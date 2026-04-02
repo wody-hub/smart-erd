@@ -54,7 +54,8 @@
       "description": "Manage this project's documents and jump straight into editing.",
       "empty": "No documents in this project yet. Create your first ERD document.",
       "documentCount": "{{count}} documents",
-      "typeScopeHint": "Only the implemented document type, ERD, is shown in this hub for now.",
+      "typeScopeHint": "ERD and Markdown documents can coexist in this hub.",
+      "multiTypeHint": "Manage ERD and Markdown documents together here. Creation asks for the right type-specific setup up front.",
       "dictionaryContextHint": "Pick the dictionary context to attach before creating a new document."
     },
     "projects": {
@@ -74,13 +75,16 @@
     "meta": {
       "updatedAt": "Updated: {{date}}",
       "dictionaryContext": "Dictionary: {{name}}",
-      "teamContext": "Team: {{name}}"
+      "teamContext": "Team: {{name}}",
+      "templateContext": "Template: {{name}}"
     },
     "action": {
+      "newDocument": "New document",
       "newErdDocument": "New ERD document",
       "newMarkdownDocument": "New Markdown document",
       "newScreenSpecDocument": "New Screen Spec document",
       "openDocument": "Open document {{name}}",
+      "backToDocuments": "Back to Documents",
       "documentActions": "Document actions",
       "renameDocument": "Rename document",
       "deleteDocument": "Delete document",
@@ -91,13 +95,85 @@
       "deleteErdDocumentTitle": "Delete ERD document",
       "deleteErdDocumentDescription": "Are you sure you want to delete this ERD document?"
     },
+    "createDocument": {
+      "description": "Choose the document type and provide the minimum setup to create it.",
+      "eyebrow": "Document setup",
+      "stepType": "Step 1 · Choose a document type",
+      "stepSetup": "Step 2 · Confirm the starting setup",
+      "stepTypeDescription": "Start by choosing how this document should work.",
+      "stepSetupDescription": "Confirm the name and starting setup, then jump straight into editing.",
+      "pluginSectionTitle": "Document type",
+      "pluginSectionHint": "ERD starts from a canvas workflow, Markdown starts from a writing workflow.",
+      "nameLabel": "Document name",
+      "namePlaceholder": "Enter a document name",
+      "nameHint": "This name appears in the document hub and the editor header.",
+      "templateLabel": "Markdown template",
+      "templateHint": "Start with a document structure and default frontmatter already in place.",
+      "dictionaryHint": "Choose the default dictionary context attached to the ERD document.",
+      "erdRequiresDictionary": "Create at least one dictionary context in this project before starting an ERD document.",
+      "selected": "Selected",
+      "previewTitle": "Creation preview",
+      "previewNameLabel": "Document name",
+      "previewPendingName": "The name will appear here once you enter it.",
+      "previewTemplateLabel": "Template",
+      "previewDictionaryLabel": "Dictionary context",
+      "includesTitle": "Includes",
+      "previewMarkdownLine1": "Frontmatter and the initial section structure are created together.",
+      "previewMarkdownLine2": "You can start editing immediately with Write, Outline, and Preview flows.",
+      "previewMarkdownLine3": "The document is ready to export as MD or HTML.",
+      "previewErdLine1": "You start from an ERD canvas with the dictionary context attached.",
+      "previewErdLine2": "Tables, relations, and code sync work are ready from the first screen.",
+      "previewErdLine3": "The document stays managed alongside the dictionary in the hub.",
+      "erdDescription": "Create an ERD canvas document with a dictionary context attached.",
+      "markdownDescription": "Start a technical note, meeting note, or release note from a template."
+    },
     "status": {
       "loadFailedTitle": "We couldn't load this workspace",
       "teamsLoadFailed": "Retry loading the workspace list.",
       "projectsLoadFailed": "You can retry the project list while keeping the current team context.",
       "documentsLoadFailed": "You can retry the document hub while keeping the current project context.",
+      "documentUnsupported": "This document uses a plugin type that the current editor does not support.",
       "dictionaryLoadFailed": "You can retry the dictionary asset workspace while keeping the current team context.",
       "retry": "Retry"
+    }
+  },
+  "markdown": {
+    "outline": {
+      "title": "Outline",
+      "empty": "Add headings to the body to see the section structure here."
+    },
+    "preview": {
+      "title": "Preview"
+    },
+    "info": {
+      "title": "Document info",
+      "description": "Inspect frontmatter and template details.",
+      "template": "Template",
+      "empty": "No frontmatter yet."
+    },
+    "mode": {
+      "write": "Write",
+      "outline": "Outline",
+      "split": "Split",
+      "preview": "Preview"
+    },
+    "toolbar": {
+      "export": "Export"
+    },
+    "toast": {
+      "created": "Markdown document created",
+      "createFailed": "Failed to create the markdown document",
+      "saved": "Markdown document saved",
+      "saveFailed": "Failed to save markdown document",
+      "exported": "Document exported",
+      "exportFailed": "Failed to export document"
+    },
+    "status": {
+      "loadFailed": "We couldn't load the markdown document. Try again.",
+      "saving": "Saving...",
+      "unsaved": "Unsaved changes",
+      "saved": "Saved",
+      "savedAt": "Saved at {{time}}"
     }
   },
   "auth": {

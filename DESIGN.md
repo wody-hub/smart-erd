@@ -13,13 +13,14 @@
 - **Reference sites:** Research was skipped for this pass. Direction is based on the current product flow, existing screens, and the gap between the cleaned-up IA and the still-generic visual layer.
 
 ## Typography
-- **Display/Hero:** `Noto Serif KR` — use for page titles, section hero headlines, and moments where the product needs editorial weight. This is where the “document platform” identity shows up.
-- **Body:** `IBM Plex Sans KR` — use for paragraphs, labels, tabs, and dense UI text. It reads technical without feeling cold.
-- **UI/Labels:** `IBM Plex Sans KR` — same family as body for consistency. Weight changes do the work, not font changes.
-- **Data/Tables:** `IBM Plex Sans KR` with `font-variant-numeric: tabular-nums;` — readable for mixed Korean and English data, less jarring than switching full tables to mono.
+- **Display/Hero:** `Noto Serif KR` — reserve this for large workspace heroes and a few editorial mastheads only. Do not use it for dialogs, cards, compact headers, or dense operational UI.
+- **Body:** `Pretendard` — use for paragraphs, labels, tabs, dialogs, cards, and dense UI text. It feels more current and product-native while still reading cleanly in Korean.
+- **UI/Labels:** `Pretendard` — keep the interface on one sans family so controls feel modern and consistent.
+- **Data/Tables:** `Pretendard` with `font-variant-numeric: tabular-nums;` — readable for mixed Korean and English data without the stiffness of IBM Plex Sans KR in UI-heavy layouts.
 - **Code:** `IBM Plex Mono` — use only for DDL, code, IDs, and machine-facing fields.
-- **Loading:** Google Fonts
-  - `https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@500;600;700&display=swap`
+- **Loading:** Google Fonts + CDN-backed variable font
+  - `https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@500;600;700&display=swap`
+  - `Pretendard Variable` via `@font-face`
 - **Scale:**
   - Display XL: `3.75rem / 60px`, `line-height: 1.02`, hero only
   - Display L: `3rem / 48px`, page mastheads

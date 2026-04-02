@@ -1,9 +1,9 @@
-import type { DocumentBootstrapPayload } from '@/collaboration/core/contracts/document-bootstrap';
 import type { DocumentSnapshotCodec } from '@/collaboration/core/contracts/document-snapshot-codec';
 import type { SharedDocumentEngine } from '@/collaboration/core/contracts/shared-document-engine';
 import type { RegisteredDocumentPlugin } from '@/collaboration/core/contracts/document-plugin';
 import type { DocumentPluginRegistry } from '@/collaboration/registry/document-plugin-registry';
 import type { SharedDocumentEngineRegistry } from '@/collaboration/registry/shared-document-engine-registry';
+import type { DocumentBootstrapPayload } from '@/types/document';
 
 export interface ResolvedDocumentSessionBootstrap {
   bootstrap: DocumentBootstrapPayload;

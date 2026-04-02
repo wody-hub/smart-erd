@@ -10,17 +10,32 @@ const HERO_TONE_CLASSES = {
 
 type ProjectWorkspaceHeroTone = keyof typeof HERO_TONE_CLASSES;
 
+/** 프로젝트 워크스페이스 히어로 카드 props. */
 interface ProjectWorkspaceHeroProps {
+  /** 상단 레이블 (팀명 등) */
   eyebrow: string;
+  /** 제목 */
   title: string;
+  /** 설명 */
   description: string;
+  /** 메타 정보 슬롯 */
   meta?: React.ReactNode;
+  /** 주 액션 버튼 슬롯 */
   primaryAction?: React.ReactNode;
+  /** 유틸리티 액션 슬롯 */
   utilityActions?: React.ReactNode;
+  /** 색조 */
   tone?: ProjectWorkspaceHeroTone;
+  /** 추가 CSS 클래스 */
   className?: string;
 }
 
+/**
+ * 프로젝트 워크스페이스 히어로 카드를 렌더링한다.
+ *
+ * @param props 히어로 카드 props
+ * @returns 히어로 카드 JSX
+ */
 export default function ProjectWorkspaceHero({
   eyebrow,
   title,

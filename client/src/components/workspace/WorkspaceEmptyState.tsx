@@ -1,15 +1,28 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
+/** 워크스페이스 빈 상태 컴포넌트 props. */
 interface WorkspaceEmptyStateProps {
+  /** 중앙 아이콘 */
   icon: React.ReactNode;
+  /** 제목 */
   title: string;
+  /** 설명 텍스트 */
   description?: string;
+  /** 액션 버튼 슬롯 */
   action?: React.ReactNode;
+  /** 색조 (기본/에러) */
   tone?: 'default' | 'error';
+  /** ARIA role */
   role?: 'status' | 'alert';
 }
 
+/**
+ * 워크스페이스 빈 상태 안내를 렌더링한다.
+ *
+ * @param props 빈 상태 props
+ * @returns 빈 상태 카드 JSX
+ */
 export default function WorkspaceEmptyState({
   icon,
   title,
@@ -34,7 +47,7 @@ export default function WorkspaceEmptyState({
         >
           {icon}
         </div>
-        <h3 className="font-display text-[1.8rem] font-semibold tracking-[-0.03em] text-foreground">
+        <h3 className="font-sans text-[1.7rem] font-semibold tracking-[-0.035em] text-foreground">
           {title}
         </h3>
         {description && (

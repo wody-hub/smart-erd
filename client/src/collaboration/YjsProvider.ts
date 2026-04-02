@@ -87,6 +87,9 @@ export class YjsProvider {
   /** 연결 상태 변경 콜백 */
   onConnectionStatusChange: ((status: ConnectionStatus) => void) | null = null;
 
+  /** 초기 sync 완료 여부 변경 콜백 */
+  onSyncStateChange: ((synced: boolean) => void) | null = null;
+
   /** 연결 거부/종료 사유 콜백 */
   onConnectionIssueDetected: ((issue: ConnectionIssueKind | null) => void) | null = null;
 
@@ -329,7 +332,7 @@ export class YjsProvider {
 
       this.ws.onclose = (event) => {
         this.ws = null;
-        this.synced = false;
+        this.emitSyncState(false);
         this.clearPresenceBootstrapTimer();
         const connectionIssue = this.intentionalClose
           ? null
@@ -381,7 +384,7 @@ export class YjsProvider {
           return;
         }
         if (messageType === WS_MSG_TYPE.SYNC_STEP2) {
-          this.synced = true;
+          this.emitSyncState(true);
         }
         break;
       }
@@ -713,7 +716,7 @@ export class YjsProvider {
       this.ws.close();
       this.ws = null;
     }
-    this.synced = false;
+    this.emitSyncState(false);
     this.clearPresenceBootstrapTimer();
     this.emitConnectionStatus('disconnected');
     this.scheduleReconnect();
@@ -763,6 +766,19 @@ export class YjsProvider {
    */
   private emitConnectionStatus(status: ConnectionStatus): void {
     this.onConnectionStatusChange?.(status);
+  }
+
+  /**
+   * sync 상태 변경을 콜백으로 알린다.
+   *
+   * @param synced sync 완료 여부
+   */
+  private emitSyncState(synced: boolean): void {
+    if (this.synced === synced) {
+      return;
+    }
+    this.synced = synced;
+    this.onSyncStateChange?.(synced);
   }
 
   /**

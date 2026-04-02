@@ -1,0 +1,34 @@
+{
+  "allowedTags": [
+    "a",
+    "blockquote",
+    "br",
+    "code",
+    "em",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hr",
+    "input",
+    "li",
+    "ol",
+    "p",
+    "pre",
+    "strong",
+    "table",
+    "tbody",
+    "td",
+    "th",
+    "thead",
+    "tr",
+    "ul"
+  ],
+  "allowedAttributes": {
+    "a": ["href", "target", "rel"],
+    "code": ["class"],
+    "input": ["type", "checked", "disabled"]
+  }
+}

@@ -190,7 +190,7 @@ export default function ProjectsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="workspace-kicker">{t('workspace.section.projects')}</p>
-                        <CardTitle className="mt-3 truncate font-display text-[1.72rem] tracking-[-0.03em]">
+                        <CardTitle className="mt-3 truncate font-sans text-[1.68rem] tracking-[-0.035em]">
                           {project.name}
                         </CardTitle>
                         <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted-foreground">

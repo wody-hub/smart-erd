@@ -3,7 +3,6 @@ import * as Y from 'yjs';
 import type { DocumentCheckpointReader } from '@/collaboration/core/contracts/document-checkpoint';
 import type { DocumentSnapshotCodec } from '@/collaboration/core/contracts/document-snapshot-codec';
 import { useCollaborationSession } from '@/collaboration/core/use-collaboration-session';
-import type { DocumentBootstrapPayload } from '@/collaboration/core/contracts/document-bootstrap';
 import type { DocumentMutationSession } from '@/collaboration/core/session/document-mutation-session';
 import {
   toPreviewSyncStatus,
@@ -12,6 +11,7 @@ import {
 import { YjsSharedDocumentEngine } from '@/collaboration/core/engines/yjs-shared-document-engine';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { DiagramDetail } from '@/types/diagram';
+import type { DocumentBootstrapPayload } from '@/types/document';
 import type { DiagramCollaborationBootstrap } from './diagram-collaboration-bootstrap.js';
 import { useDiagramCollaborationStoreBridge } from './use-diagram-collaboration-store-bridge.js';
 import type { DiagramCollaborationStoreBridge } from './diagram-collaboration-store-bridge.js';

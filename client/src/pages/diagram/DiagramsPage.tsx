@@ -1,16 +1,21 @@
 import { useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { AlertTriangle, Plus, FileText, ArrowLeft, BookOpen } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { AlertTriangle, ArrowLeft, BookOpen, FileText, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import Header from '@/components/layout/Header';
-import { Button } from '@/components/ui/button';
-import CreateResourceDialog from '@/components/ui/create-resource-dialog';
-import ConfirmDialog from '@/components/ui/confirm-dialog';
 import { fetchDiagrams } from '@/api/diagramApi';
 import { fetchDictionarySets } from '@/api/dictionarySetApi';
 import { fetchProject } from '@/api/projectApi';
 import { fetchTeam } from '@/api/teamApi';
+import DocumentHubRow from '@/components/workspace/DocumentHubRow';
+import DocumentTypeBadge from '@/components/workspace/DocumentTypeBadge';
+import CreateDocumentDialog from '@/components/workspace/CreateDocumentDialog';
+import ProjectWorkspaceHero from '@/components/workspace/ProjectWorkspaceHero';
+import WorkspaceEmptyState from '@/components/workspace/WorkspaceEmptyState';
+import ConfirmDialog from '@/components/ui/confirm-dialog';
+import Header from '@/components/layout/Header';
+import Spinner from '@/components/ui/spinner';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -23,22 +28,13 @@ import { ROUTES } from '@/constants/routes';
 import { useDiagramDocumentHubActions } from '@/hooks/useDiagramDocumentHubActions';
 import { useRecentProjectContext } from '@/hooks/useRecentProjectContext';
 import { useTeamRole } from '@/hooks/useTeamRole';
-import ProjectWorkspaceHero from '@/components/workspace/ProjectWorkspaceHero';
-import WorkspaceEmptyState from '@/components/workspace/WorkspaceEmptyState';
-import DocumentHubRow from '@/components/workspace/DocumentHubRow';
-import DocumentTypeBadge from '@/components/workspace/DocumentTypeBadge';
-import {
-  getWorkspaceDocumentsTitleLabel,
-  getWorkspaceNewDocumentLabel,
-} from '@/lib/workspace-labels';
-import Spinner from '@/components/ui/spinner';
+import { getWorkspaceDocumentsTitleLabel } from '@/lib/workspace-labels';
 import type { DocumentListItem } from '@/types/workspace';
 
 /**
- * 다이어그램 목록 페이지.
+ * 문서 허브 페이지.
  *
- * 선택된 프로젝트의 다이어그램 목록, 생성, 삭제, 이름 변경 기능을 제공한다.
- * 역할에 따라 생성/삭제/이름 변경 버튼을 조건부 렌더링한다.
+ * ERD와 Markdown 문서를 같은 프로젝트 허브에서 관리한다.
  */
 export default function DiagramsPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
@@ -57,12 +53,18 @@ export default function DiagramsPage() {
     queryFn: () => fetchProject(teamId!, projectId!),
     enabled: !!teamId && !!projectId,
   });
-  const diagramsQueryKey = queryKeys.diagrams.byProject(teamId!, projectId!);
   const { data: dictionarySets = [] } = useQuery({
     queryKey: queryKeys.dictionary.sets(teamId!),
     queryFn: () => fetchDictionarySets(teamId!),
     enabled: !!teamId,
   });
+  const diagramsQuery = useQuery({
+    queryKey: queryKeys.diagrams.byProject(teamId!, projectId!),
+    queryFn: () => fetchDiagrams(teamId!, projectId!),
+    enabled: !!teamId && !!projectId,
+  });
+  const { data: diagrams = [], isLoading, isError } = diagramsQuery;
+
   const {
     dialogOpen,
     setDialogOpen,
@@ -71,8 +73,6 @@ export default function DiagramsPage() {
     renamingId,
     renameValue,
     setRenameValue,
-    createDictionaryContextId,
-    setCreateDictionaryContextId,
     startRename,
     confirmRename,
     cancelRename,
@@ -83,39 +83,30 @@ export default function DiagramsPage() {
   } = useDiagramDocumentHubActions({
     teamId,
     projectId,
-    dictionarySets,
   });
-
-  const diagramsQuery = useQuery({
-    queryKey: diagramsQueryKey,
-    queryFn: () => fetchDiagrams(teamId!, projectId!),
-    enabled: !!teamId && !!projectId,
-  });
-  const { data: diagrams = [], isLoading, isError } = diagramsQuery;
 
   const documentTitleToken = getWorkspaceDocumentsTitleLabel();
-  const newErdDocumentLabelToken = getWorkspaceNewDocumentLabel('erd');
-
   const documentItems = useMemo<DocumentListItem[]>(
     () =>
       diagrams.map((diagram) => ({
         id: diagram.id,
         name: diagram.name,
-        type: 'erd',
+        type: diagram.pluginId,
         updatedAt: diagram.updatedAt,
-        dictionaryContextName: diagram.dictionarySetName,
+        dictionaryContextName: diagram.pluginId === 'erd' ? diagram.dictionarySetName : null,
+        templateLabel: diagram.templateLabel,
+        summaryText: diagram.summaryText,
       })),
     [diagrams],
   );
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="flex h-screen flex-col">
       <Header
         workspaceContext={{
           team: team ? { id: teamId!, name: team.name } : undefined,
           project: project ? { id: projectId!, name: project.name } : undefined,
           section: 'documents',
-          documentType: 'erd',
         }}
       />
       <main className="workspace-shell flex-1 overflow-auto p-6">
@@ -126,7 +117,7 @@ export default function DiagramsPage() {
             className="mb-4"
             onClick={() => navigate(ROUTES.PROJECTS(teamId!))}
           >
-            <ArrowLeft className="h-4 w-4 mr-1" />
+            <ArrowLeft className="mr-1 h-4 w-4" />
             {t('diagram.list.backToProjects')}
           </Button>
 
@@ -143,9 +134,9 @@ export default function DiagramsPage() {
             }
             primaryAction={
               canEdit ? (
-                <Button onClick={() => setDialogOpen(true)} disabled={!createDictionaryContextId}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t(newErdDocumentLabelToken.key, newErdDocumentLabelToken.values)}
+                <Button onClick={() => setDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('workspace.action.newDocument')}
                 </Button>
               ) : undefined
             }
@@ -163,31 +154,9 @@ export default function DiagramsPage() {
                     {t('project.list.dictionaryButton')}
                   </Button>
                 </div>
-                {canEdit && (
-                  <div className="workspace-labeled-control w-full lg:max-w-sm">
-                    <span className="workspace-control-label">
-                      {t('diagram.list.selectDictionaryContext')}
-                    </span>
-                    <Select
-                      value={createDictionaryContextId}
-                      onValueChange={setCreateDictionaryContextId}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder={t('diagram.list.selectDictionaryContext')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {dictionarySets.map((set) => (
-                          <SelectItem key={set.id} value={String(set.id)}>
-                            {set.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="workspace-control-help">
-                      {t('workspace.documents.dictionaryContextHint')}
-                    </p>
-                  </div>
-                )}
+                <p className="max-w-md text-sm leading-6 text-muted-foreground">
+                  {t('workspace.documents.multiTypeHint')}
+                </p>
               </div>
             }
           />
@@ -196,6 +165,7 @@ export default function DiagramsPage() {
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-3">
                 <DocumentTypeBadge documentType="erd" />
+                <DocumentTypeBadge documentType="markdown" />
                 <p className="text-sm text-ink-secondary">
                   {t('workspace.documents.typeScopeHint')}
                 </p>
@@ -231,12 +201,9 @@ export default function DiagramsPage() {
                 description={t('workspace.documents.empty')}
                 action={
                   canEdit ? (
-                    <Button
-                      onClick={() => setDialogOpen(true)}
-                      disabled={!createDictionaryContextId}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      {t(newErdDocumentLabelToken.key, newErdDocumentLabelToken.values)}
+                    <Button onClick={() => setDialogOpen(true)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      {t('workspace.action.newDocument')}
                     </Button>
                   ) : undefined
                 }
@@ -252,15 +219,11 @@ export default function DiagramsPage() {
                   onOpen={() => navigate(ROUTES.DIAGRAM(teamId!, projectId!, diagram.id))}
                   canEdit={canEdit}
                   contextControl={
-                    canEdit && dictionarySets.length > 0 ? (
-                      <div onClick={(e) => e.stopPropagation()}>
+                    canEdit && diagram.pluginId === 'erd' && dictionarySets.length > 0 ? (
+                      <div onClick={(event) => event.stopPropagation()}>
                         <Select
-                          value={
-                            diagram.dictionarySetId != null ? String(diagram.dictionarySetId) : ''
-                          }
-                          onValueChange={(value) =>
-                            updateDictionaryContext(diagram.id, Number(value))
-                          }
+                          value={diagram.dictionarySetId != null ? String(diagram.dictionarySetId) : ''}
+                          onValueChange={(value) => updateDictionaryContext(diagram.id, Number(value))}
                         >
                           <SelectTrigger className="h-9 min-w-[220px]">
                             <SelectValue placeholder={t('diagram.list.selectDictionaryContext')} />
@@ -295,19 +258,19 @@ export default function DiagramsPage() {
         </div>
       </main>
 
-      <CreateResourceDialog
+      <CreateDocumentDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        title={t('workspace.action.createErdDocumentTitle')}
-        inputLabel={t('workspace.action.erdDocumentNameLabel')}
-        placeholder={t('workspace.action.erdDocumentNamePlaceholder')}
+        dictionarySets={dictionarySets}
         onCreate={createDocument}
       />
 
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
+          if (!open) {
+            setDeleteTarget(null);
+          }
         }}
         title={t('workspace.action.deleteErdDocumentTitle')}
         description={t('workspace.action.deleteErdDocumentDescription')}

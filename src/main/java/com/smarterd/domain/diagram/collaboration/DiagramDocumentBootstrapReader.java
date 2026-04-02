@@ -5,6 +5,7 @@ import com.smarterd.collaboration.persistence.DocumentBootstrapReader;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,13 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class DiagramDocumentBootstrapReader implements DocumentBootstrapReader {
 
     private final DiagramRepository diagramRepository;
-
-    public DiagramDocumentBootstrapReader(DiagramRepository diagramRepository) {
-        this.diagramRepository = diagramRepository;
-    }
 
     @Override
     @NonNull
@@ -28,14 +26,15 @@ public class DiagramDocumentBootstrapReader implements DocumentBootstrapReader {
         final var projection = diagramRepository
             .findBootstrapById(documentId)
             .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_DIAGRAM.code(), documentId));
+        final var defaults = DiagramCollaborationDocumentDefaults.resolve(projection.pluginId());
         final long revision = projection.snapshotRevision() != null
             ? projection.snapshotRevision()
             : projection.contentRevision();
 
         return new DocumentBootstrapHeader(
-            DiagramCollaborationDocumentDefaults.PLUGIN_SCHEMA_VERSION,
-            DiagramCollaborationDocumentDefaults.SNAPSHOT_FORMAT_VERSION,
-            projection.artifactAvailable() ? DiagramCollaborationDocumentDefaults.ARTIFACT_VERSION : null,
+            defaults.pluginSchemaVersion(),
+            defaults.snapshotFormatVersion(),
+            projection.artifactAvailable() ? defaults.artifactVersion() : null,
             revision,
             projection.hasYdocSnapshot(),
             projection.artifactAvailable()

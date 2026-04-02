@@ -1,15 +1,25 @@
+import type { DocumentPluginId } from '@/types/document';
+
 /** 다이어그램 목록 조회 시 반환되는 요약 정보. */
 export interface DiagramSummary {
   /** 다이어그램 고유 ID */
   id: number;
   /** 다이어그램 이름 */
   name: string;
+  /** 문서 플러그인 ID */
+  pluginId: DocumentPluginId;
   /** 소속 프로젝트 ID */
   projectId: number;
   /** 다이어그램에 연결된 사전 컨텍스트 세트 ID */
   dictionarySetId: number | null;
   /** 다이어그램에 연결된 사전 컨텍스트 세트 이름 */
   dictionarySetName: string | null;
+  /** markdown 템플릿 키 */
+  templateKey: string | null;
+  /** markdown 템플릿 라벨 */
+  templateLabel: string | null;
+  /** markdown 요약 */
+  summaryText: string | null;
   /** 생성 일시 (ISO 8601) */
   createdAt: string;
   /** 최종 수정 일시 (ISO 8601) */

@@ -115,7 +115,7 @@ export default {
         operational: "var(--shadow-operational)",
       },
       fontFamily: {
-        sans: ['"IBM Plex Sans KR"', "sans-serif"],
+        sans: ['"Pretendard"', '"Noto Sans KR"', "sans-serif"],
         display: ['"Noto Serif KR"', "serif"],
         mono: ['"IBM Plex Mono"', "monospace"],
       },

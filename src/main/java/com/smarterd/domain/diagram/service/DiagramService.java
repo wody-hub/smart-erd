@@ -4,11 +4,17 @@ import com.smarterd.collaboration.metadata.DocumentMetadataService;
 import com.smarterd.collaboration.persistence.DocumentBootstrapReader;
 import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
+import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
+import com.smarterd.domain.diagram.entity.DiagramPluginId;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
+import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.service.DictionarySetService;
+import com.smarterd.domain.markdown.service.MarkdownDocumentDescriptorService;
+import com.smarterd.domain.markdown.service.MarkdownTemplateDescriptor;
+import com.smarterd.domain.markdown.service.MarkdownTemplateService;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.service.ProjectService;
 import com.smarterd.domain.team.service.TeamService;
@@ -62,6 +68,12 @@ public class DiagramService {
     /** bootstrap header 조회 포트 */
     private final DocumentBootstrapReader documentBootstrapReader;
 
+    /** markdown 템플릿 서비스 */
+    private final MarkdownTemplateService markdownTemplateService;
+
+    /** markdown 문서 허브 요약 서비스 */
+    private final MarkdownDocumentDescriptorService markdownDocumentDescriptorService;
+
     /**
      * 다이어그램을 생성한다.
      *
@@ -78,12 +90,27 @@ public class DiagramService {
         Long teamId,
         Long projectId,
         String name,
-        Long dictionarySetId
+        String pluginId,
+        Long dictionarySetId,
+        String templateKey
     ) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
-        final var dictionarySet = dictionarySetService.findByTeamAndId(project.getTeam(), dictionarySetId);
+        final var resolvedPluginId = DiagramPluginId.from(pluginId);
+        if (resolvedPluginId != DiagramPluginId.MARKDOWN && templateKey != null) {
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_MARKDOWN_TEMPLATE_INVALID.code());
+        }
+        final var dictionarySet = resolveDictionarySet(project, resolvedPluginId, dictionarySetId);
+        final var initialContent = resolvedPluginId == DiagramPluginId.MARKDOWN
+            ? markdownTemplateService.buildInitialContent(name, templateKey)
+            : null;
 
-        final var diagram = Diagram.builder().name(name).project(project).dictionarySet(dictionarySet).build();
+        final var diagram = Diagram.builder()
+            .name(name)
+            .pluginId(resolvedPluginId.value())
+            .project(project)
+            .content(initialContent)
+            .dictionarySet(dictionarySet)
+            .build();
         diagramRepository.save(Objects.requireNonNull(diagram));
 
         return toDiagramSummaryResult(diagram, project.getId());
@@ -198,6 +225,9 @@ public class DiagramService {
     ) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
+        if (diagram.isMarkdownDocument()) {
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
+        }
 
         if (roomManager.getSessionCount(diagramId) > 0) {
             throw new ConflictException(MessageCode.ERROR_BUSINESS_DIAGRAM_DICTIONARY_SET_CHANGE_WHILE_EDITING.code());
@@ -322,12 +352,17 @@ public class DiagramService {
      */
     private DiagramSummaryResult toDiagramSummaryResult(Diagram diagram, Long projectId) {
         final var dictionarySet = diagram.getDictionarySet();
+        final var markdownDescriptor = describeMarkdown(diagram);
         return new DiagramSummaryResult(
             diagram.getId(),
             diagram.getName(),
+            diagram.getPluginId(),
             projectId,
             dictionarySet != null ? dictionarySet.getId() : null,
             dictionarySet != null ? dictionarySet.getName() : null,
+            markdownDescriptor.templateKey(),
+            markdownDescriptor.templateLabel(),
+            markdownDescriptor.summaryText(),
             diagram.getCreatedAt(),
             diagram.getUpdatedAt()
         );
@@ -343,12 +378,17 @@ public class DiagramService {
      */
     private DiagramDetailResult toDiagramDetailResult(Diagram diagram, Long projectId, boolean hasYdocSnapshot) {
         final var dictionarySet = diagram.getDictionarySet();
+        final var markdownDescriptor = describeMarkdown(diagram);
         return new DiagramDetailResult(
             diagram.getId(),
             diagram.getName(),
+            diagram.getPluginId(),
             projectId,
             dictionarySet != null ? dictionarySet.getId() : null,
             dictionarySet != null ? dictionarySet.getName() : null,
+            markdownDescriptor.templateKey(),
+            markdownDescriptor.templateLabel(),
+            markdownDescriptor.summaryText(),
             diagram.getContent(),
             hasYdocSnapshot,
             diagram.getContentRevision(),
@@ -389,9 +429,13 @@ public class DiagramService {
     public record DiagramSummaryResult(
         Long id,
         String name,
+        String pluginId,
         Long projectId,
         Long dictionarySetId,
         String dictionarySetName,
+        String templateKey,
+        String templateLabel,
+        String summaryText,
         Instant createdAt,
         Instant updatedAt
     ) {}
@@ -415,9 +459,13 @@ public class DiagramService {
     public record DiagramDetailResult(
         Long id,
         String name,
+        String pluginId,
         Long projectId,
         Long dictionarySetId,
         String dictionarySetName,
+        String templateKey,
+        String templateLabel,
+        String summaryText,
         String content,
         boolean hasYdocSnapshot,
         long contentRevision,
@@ -475,4 +523,28 @@ public class DiagramService {
         int invalidatedTermBindingCount,
         int invalidatedDomainBindingCount
     ) {}
+
+    private DictionarySet resolveDictionarySet(
+        Project project,
+        DiagramPluginId pluginId,
+        Long dictionarySetId
+    ) {
+        if (pluginId == DiagramPluginId.ERD) {
+            if (dictionarySetId == null) {
+                throw new BusinessException(MessageCode.ERROR_BUSINESS_ERD_DICTIONARY_CONTEXT_REQUIRED.code());
+            }
+            return dictionarySetService.findByTeamAndId(project.getTeam(), dictionarySetId);
+        }
+        if (dictionarySetId != null) {
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
+        }
+        return null;
+    }
+
+    private MarkdownTemplateDescriptor describeMarkdown(Diagram diagram) {
+        if (!diagram.isMarkdownDocument()) {
+            return new MarkdownTemplateDescriptor(null, null, null);
+        }
+        return markdownDocumentDescriptorService.describe(diagram.getContent());
+    }
 }
