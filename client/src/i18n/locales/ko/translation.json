@@ -1249,5 +1249,14 @@
   "language": {
     "ko": "한국어",
     "en": "English"
+  },
+  "theme": {
+    "paper": "Paper",
+    "graphite": "Graphite",
+    "midnight": "Midnight",
+    "current": "현재 테마",
+    "aria": {
+      "switchTheme": "테마 전환"
+    }
   }
 }
