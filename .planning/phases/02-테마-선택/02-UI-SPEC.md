@@ -175,12 +175,20 @@ DESIGN.md 참조 -- 이 페이즈에서 변경 없음.
 
 ### Midnight (Deep Navy) -- 현재 `.dark` 값 기반
 
-현재 `index.css`의 `.dark` 선택자에 정의된 모든 토큰을 `.theme-midnight`로 이전한다. 변경사항 없이 그대로 사용하되 선택자만 변경:
+현재 `index.css`의 `.dark` 선택자에 정의된 semantic color / ERD / validation / composition / cursor 토큰을 `.theme-midnight`로 이전한다. 선택자만 바꾸고 의미상 값은 유지한다:
 
 - 기존: `.dark { --background: 223.6 52.4% 8.2%; ... }`
 - 변경: `.theme-midnight { --background: 223.6 52.4% 8.2%; ... }`
 
-모든 값은 현재 `.dark` 블록의 값과 동일.
+단, shadow/utilities는 Graphite와 Midnight 모두 동일한 dark-surface override를 사용한다:
+
+- `--shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.24)`
+- `--shadow-strong: 0 20px 48px rgba(0, 0, 0, 0.48)`
+- `--shadow-operational: 0 8px 18px rgba(0, 0, 0, 0.20)`
+- `--shadow-primary: 0 12px 24px hsl(var(--primary) / 0.32)`
+- `--shadow-primary-hover: 0 16px 30px hsl(var(--primary) / 0.40)`
+- `--shadow-destructive: 0 12px 24px hsl(var(--destructive) / 0.28)`
+- `--shadow-field-inset: inset 0 1px 0 hsl(var(--field-highlight))`
 
 ### Accent Reserved For (모든 테마 공통)
 
@@ -226,16 +234,18 @@ Header.tsx > `.header-utility-group` 내부, `LanguageSwitcher` 왼쪽
 ### 구현
 - 아이콘 버튼: `Palette` (lucide-react) 또는 `Sun`/`Moon`/`Monitor` 3개 대신 단일 `Palette` 아이콘
 - 클릭 시 shadcn DropdownMenu 표시
+- 내부 구현은 `DropdownMenuLabel` + `DropdownMenuRadioGroup` + `DropdownMenuRadioItem` 조합을 사용
 - 드롭다운 아이템 3개: Paper / Graphite / Midnight
-- 현재 선택된 테마에 `font-bold` + 체크마크 아이콘 표시
+- 현재 선택된 테마에 기존 radio indicator + 강조 스타일 표시
+- shared `client/src/components/ui/dropdown-menu.tsx` primitive는 수정하지 않음
 - `aria-label`: `t('theme.aria.switchTheme')`
 
 ### 드롭다운 아이템 레이아웃
 
-```
-[o] Paper         -- 원형 색상 스와치 + 텍스트 + 체크(선택됨)
-[ ] Graphite
-[ ] Midnight
+``` 
+(●) Paper         -- 원형 색상 스와치 + 텍스트 + radio indicator(선택됨)
+( ) Graphite
+( ) Midnight
 ```
 
 색상 스와치: 12px 원형, 각 테마의 `--background` 색상 표시
@@ -281,7 +291,8 @@ interface ThemeState {
 
 | Element | ko | en |
 |---------|----|----|
-| Theme switcher aria-label | `theme.aria.switchTheme` = "테마 변경" | "Switch theme" |
+| Theme switcher aria-label | `theme.aria.switchTheme` = "테마 전환" | "Switch theme" |
+| Theme menu label | `theme.current` = "현재 테마" | "Current theme" |
 | Paper label | `theme.paper` = "Paper" | "Paper" |
 | Graphite label | `theme.graphite` = "Graphite" | "Graphite" |
 | Midnight label | `theme.midnight` = "Midnight" | "Midnight" |
@@ -318,7 +329,7 @@ interface ThemeState {
   }
 
   .theme-midnight {
-    /* 현재 .dark 값을 이동 */
+    /* 현재 .dark semantic 토큰 + explicit dark shadow override */
   }
 }
 ```
@@ -331,7 +342,7 @@ interface ThemeState {
 
 ### 기존 `.dark` 셀렉터 마이그레이션
 
-`.dark` 셀렉터의 CSS Variable 정의를 `.theme-midnight`로 이동한다. `.dark` 셀렉터 자체는 빈 상태로 유지하거나 제거한다. Tailwind `dark:` 유틸리티 클래스가 코드베이스에서 사용되는 경우, `.dark` 클래스가 `<html>`에 여전히 추가되므로 기존 `dark:` 접두사도 정상 동작한다.
+`.dark` 셀렉터의 CSS Variable 정의는 `.theme-midnight`로 이동하고, Graphite/Midnight 모두 `<html>`에 `.dark` compatibility class를 함께 추가한다. `.dark` 셀렉터 자체는 빈 상태로 유지하거나 제거한다. Tailwind `dark:` 유틸리티 클래스가 코드베이스에서 사용되는 경우에도 기존 `dark:` 접두사는 계속 정상 동작한다.
 
 ---
 
