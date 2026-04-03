@@ -9,7 +9,7 @@
 
 - [x] **DOC-01**: 마크다운 에디터에서 두 사용자가 다른 Section을 동시 편집할 때 Section 단위 증분 동기화가 동작한다
 - [x] **DOC-02**: 마크다운 에디터에서 변경된 Section만 프리뷰가 재렌더링된다 (증분 프리뷰)
-- [ ] **THEME-01**: 사용자가 헤더에서 Paper/Graphite/Midnight 테마를 선택할 수 있다
+- [x] **THEME-01**: 사용자가 헤더에서 Paper/Graphite/Midnight 테마를 선택할 수 있다
 - [x] **THEME-02**: 선택한 테마가 앱 전역(ERD, 마크다운, Dialog, Monaco)에 일관되게 적용된다
 - [x] **THEME-03**: 새로고침 후에도 선택한 테마가 유지된다
 - [ ] **SPEC-01**: 화면기획 플러그인에서 마스터 컴포넌트를 정의하고 여러 화면에 인스턴스로 배치할 수 있다
@@ -112,7 +112,7 @@
 |-------------|-------|--------|
 | DOC-01 | Phase 1 | Complete |
 | DOC-02 | Phase 1 | Complete |
-| THEME-01 | Phase 2 | Pending |
+| THEME-01 | Phase 2 | Complete |
 | THEME-02 | Phase 2 | Complete |
 | THEME-03 | Phase 2 | Complete |
 | SPEC-01 | Phase 3 | Pending |

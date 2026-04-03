@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-04-03T06:09:09.736Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-04-03T06:15:01.359Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 02 (테마-선택) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-03
 
@@ -58,6 +58,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P04 | 5min | 2 tasks | 5 files |
 | Phase 01 P07 | 1min | 1 tasks | 1 files |
 | Phase 02-테마-선택 P01 | 3min | 1 tasks | 6 files |
+| Phase 02-테마-선택 P03 | 3min | 1 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,7 @@ Recent decisions affecting current work:
 - [Phase 01]: instanceof Number + longValue() 패턴으로 offset 타입 안전 검증
 - [Phase 02-테마-선택]: .dark는 Tailwind dark: variant 호환 bit로만 취급, token source는 theme-* class 사용
 - [Phase 02-테마-선택]: useDarkMode를 MutationObserver에서 useThemeStore 셀렉터 어댑터로 교체
+- [Phase 02-테마-선택]: ThemeSwitcher를 LanguageSwitcher 왼쪽에 배치하여 utility group 내 일관된 순서 유지
 
 ### Pending Todos
 
@@ -91,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03T06:09:09.734Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-04-03T06:15:01.356Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None
