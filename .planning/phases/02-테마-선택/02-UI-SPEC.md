@@ -57,34 +57,13 @@ created: 2026-04-03
 
 ## Spacing Scale
 
-DESIGN.md 기존 스케일 유지 (테마 전환은 색상/표면만 변경, 간격은 불변):
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| 2xs | 2px | Micro adjustments |
-| xs | 4px | Icon gaps, inline padding |
-| sm | 8px | Compact element spacing |
-| md | 16px | Default element spacing |
-| lg | 24px | Section padding |
-| xl | 32px | Layout gaps |
-| 2xl | 48px | Major section breaks |
-| 3xl | 64px | Page-level spacing |
-| 4xl | 96px | Hero areas |
-
-Exceptions: none
+DESIGN.md 참조 -- 이 페이즈에서 변경 없음.
 
 ---
 
 ## Typography
 
-DESIGN.md 기존 타이포그래피 유지 (테마 전환으로 변경하지 않음):
-
-| Role | Size | Weight | Line Height |
-|------|------|--------|-------------|
-| Body M | 15px (0.9375rem) | 400 | 1.5 |
-| Body S / Label | 13px (0.8125rem) | 500 | 1.4 |
-| H3 / Heading | 22px (1.375rem) | 600 | 1.2 |
-| Display | 36px (2.25rem) | 700 | 1.1 |
+DESIGN.md 참조 -- 이 페이즈에서 변경 없음.
 
 ---
 
