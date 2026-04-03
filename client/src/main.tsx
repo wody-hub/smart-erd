@@ -12,6 +12,8 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import './i18n';
 import { isElectron, initServerUrl } from '@/lib/platform';
+import { STORAGE_KEYS } from '@/constants/storage';
+import { resolveStoredTheme, applyThemeClass } from '@/lib/theme';
 import App from './App';
 
 /**
@@ -19,6 +21,12 @@ import App from './App';
  * electronAPI가 없는 경우 localStorage를 fallback으로 사용한다.
  */
 async function bootstrap() {
+  // Theme bootstrap: React mount 전에 class를 적용하여 flash를 방지한다
+  if (document.documentElement) {
+    const initialTheme = resolveStoredTheme(localStorage.getItem(STORAGE_KEYS.THEME));
+    applyThemeClass(document.documentElement, initialTheme);
+  }
+
   if (isElectron()) {
     const api = window.electronAPI;
     if (api) {
