@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import useAuthStore from '@/stores/useAuthStore';
 import { ROUTES } from '@/constants/routes';
 import { isElectron } from '@/lib/platform';
+import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSwitcher from './LanguageSwitcher';
 import type { WorkspaceContext } from '@/types/workspace';
 import WorkspaceHeaderShell from './WorkspaceHeaderShell';
@@ -50,6 +51,7 @@ export default function Header({ workspaceContext, title, rightSlot }: HeaderPro
         <div className="header-utility-rail">
           {rightSlot}
           <div className="header-utility-group">
+            <ThemeSwitcher />
             <LanguageSwitcher />
             {isElectron() && (
               <Button
