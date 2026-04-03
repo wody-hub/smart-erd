@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-04-03T06:15:01.359Z"
+status: verifying
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-04-03T06:17:10.168Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 10
-  completed_plans: 9
+  completed_plans: 10
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 Phase: 02 (테마-선택) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-03
 
 Progress: [░░░░░░░░░░] 0%
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P07 | 1min | 1 tasks | 1 files |
 | Phase 02-테마-선택 P01 | 3min | 1 tasks | 6 files |
 | Phase 02-테마-선택 P03 | 3min | 1 tasks | 7 files |
+| Phase 02-테마-선택 P02 | 5min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,7 @@ Recent decisions affecting current work:
 - [Phase 02-테마-선택]: .dark는 Tailwind dark: variant 호환 bit로만 취급, token source는 theme-* class 사용
 - [Phase 02-테마-선택]: useDarkMode를 MutationObserver에서 useThemeStore 셀렉터 어댑터로 교체
 - [Phase 02-테마-선택]: ThemeSwitcher를 LanguageSwitcher 왼쪽에 배치하여 utility group 내 일관된 순서 유지
+- [Phase 02-테마-선택]: 3-theme CSS variable rollout: Paper/Graphite/Midnight independent token sets, .dark demoted to compatibility bit
 
 ### Pending Todos
 
@@ -93,6 +95,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03T06:15:01.356Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-04-03T06:17:10.166Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
