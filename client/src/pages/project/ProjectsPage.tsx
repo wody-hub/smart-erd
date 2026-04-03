@@ -211,9 +211,7 @@ export default function ProjectsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onSelect={() => setProjectSettingsTarget(project)}
-                            >
+                            <DropdownMenuItem onSelect={() => setProjectSettingsTarget(project)}>
                               <Settings className="mr-2 h-4 w-4" />
                               {t('project.settings.title')}
                             </DropdownMenuItem>

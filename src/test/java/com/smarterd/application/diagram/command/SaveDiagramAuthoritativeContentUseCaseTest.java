@@ -24,7 +24,10 @@ class SaveDiagramAuthoritativeContentUseCaseTest {
 
     @Test
     void execute_updatesContentAndSchedulesRealtimeReconcile() {
-        final var useCase = new SaveDiagramAuthoritativeContentUseCase(diagramSnapshotService, markdownDocumentDescriptorService);
+        final var useCase = new SaveDiagramAuthoritativeContentUseCase(
+            diagramSnapshotService,
+            markdownDocumentDescriptorService
+        );
         final var diagram = Diagram.builder()
             .name("D")
             .project(Project.builder().name("P").build())

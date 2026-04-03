@@ -674,66 +674,69 @@ export default function PreviewCanvas({
       {hasGraph ? (
         <TooltipProvider delayDuration={300}>
           <CompactTableRenderingProvider mode={compactTableRenderingMode}>
-          <ConnectedColumnIdsProvider edges={effectiveGraph!.edges}>
-            <ReactFlow
-              nodes={displayNodes}
-              edges={effectiveGraph!.edges}
-              onInit={(instance) => {
-                reactFlowInstanceRef.current = instance;
-                lastViewportZoomRef.current = instance.getZoom();
-                setCompactTableRenderingMode(
-                  resolveCompactTableRenderingMode(displayNodes.length, lastViewportZoomRef.current),
-                );
-                applyZoomTextCompensation(instance.getZoom());
-              }}
-              onMoveEnd={(_event, viewport) => {
-                lastViewportZoomRef.current = viewport.zoom;
-                setCompactTableRenderingMode(
-                  resolveCompactTableRenderingMode(displayNodes.length, viewport.zoom),
-                );
-                const autoFitMovePending = autoFitViewportMovePendingRef.current;
-                autoFitViewportMovePendingRef.current = false;
-                if (!autoFitMovePending) {
-                  manualViewportInteractionRef.current = true;
-                }
-                const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
-                if (
-                  lastAppliedZoom != null &&
-                  Math.abs(viewport.zoom - lastAppliedZoom) <= TABLE_HEADER_ZOOM_CHANGE_EPSILON
-                ) {
-                  return;
-                }
-                scheduleZoomTextCompensation(viewport.zoom);
-              }}
-              onNodesChange={handleNodesChange}
-              nodeTypes={previewCanvasNodeTypes}
-              edgeTypes={previewEdgeTypes}
-              deleteKeyCode={null}
-              panActivationKeyCode={null}
-              nodesDraggable={canEdit}
-              nodesConnectable={false}
-              elementsSelectable={false}
-              nodesFocusable={false}
-              edgesFocusable={false}
-              panOnDrag
-              zoomOnScroll
-              fitView
-              fitViewOptions={{ padding: 0.2 }}
-              minZoom={0.2}
-              maxZoom={1.5}
-              proOptions={{ hideAttribution: true }}
-              className="bg-background"
-            >
-              <Background
-                variant={BackgroundVariant.Dots}
-                gap={16}
-                size={1}
-                color="hsl(var(--muted-foreground) / 0.18)"
-              />
-              <Controls showInteractive={false} />
-              {displayNodes.length <= PREVIEW_MINIMAP_NODE_LIMIT && <MiniMap pannable zoomable />}
-            </ReactFlow>
-          </ConnectedColumnIdsProvider>
+            <ConnectedColumnIdsProvider edges={effectiveGraph!.edges}>
+              <ReactFlow
+                nodes={displayNodes}
+                edges={effectiveGraph!.edges}
+                onInit={(instance) => {
+                  reactFlowInstanceRef.current = instance;
+                  lastViewportZoomRef.current = instance.getZoom();
+                  setCompactTableRenderingMode(
+                    resolveCompactTableRenderingMode(
+                      displayNodes.length,
+                      lastViewportZoomRef.current,
+                    ),
+                  );
+                  applyZoomTextCompensation(instance.getZoom());
+                }}
+                onMoveEnd={(_event, viewport) => {
+                  lastViewportZoomRef.current = viewport.zoom;
+                  setCompactTableRenderingMode(
+                    resolveCompactTableRenderingMode(displayNodes.length, viewport.zoom),
+                  );
+                  const autoFitMovePending = autoFitViewportMovePendingRef.current;
+                  autoFitViewportMovePendingRef.current = false;
+                  if (!autoFitMovePending) {
+                    manualViewportInteractionRef.current = true;
+                  }
+                  const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
+                  if (
+                    lastAppliedZoom != null &&
+                    Math.abs(viewport.zoom - lastAppliedZoom) <= TABLE_HEADER_ZOOM_CHANGE_EPSILON
+                  ) {
+                    return;
+                  }
+                  scheduleZoomTextCompensation(viewport.zoom);
+                }}
+                onNodesChange={handleNodesChange}
+                nodeTypes={previewCanvasNodeTypes}
+                edgeTypes={previewEdgeTypes}
+                deleteKeyCode={null}
+                panActivationKeyCode={null}
+                nodesDraggable={canEdit}
+                nodesConnectable={false}
+                elementsSelectable={false}
+                nodesFocusable={false}
+                edgesFocusable={false}
+                panOnDrag
+                zoomOnScroll
+                fitView
+                fitViewOptions={{ padding: 0.2 }}
+                minZoom={0.2}
+                maxZoom={1.5}
+                proOptions={{ hideAttribution: true }}
+                className="bg-background"
+              >
+                <Background
+                  variant={BackgroundVariant.Dots}
+                  gap={16}
+                  size={1}
+                  color="hsl(var(--muted-foreground) / 0.18)"
+                />
+                <Controls showInteractive={false} />
+                {displayNodes.length <= PREVIEW_MINIMAP_NODE_LIMIT && <MiniMap pannable zoomable />}
+              </ReactFlow>
+            </ConnectedColumnIdsProvider>
           </CompactTableRenderingProvider>
         </TooltipProvider>
       ) : (

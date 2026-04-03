@@ -97,12 +97,14 @@ export default function CreateDocumentDialog({
   }, [dictionarySets]);
   const hasDictionaryContext = Boolean(defaultDictionarySetId);
   const selectedOption = pluginId
-    ? DOCUMENT_TYPE_OPTIONS.find((option) => option.pluginId === pluginId) ?? null
+    ? (DOCUMENT_TYPE_OPTIONS.find((option) => option.pluginId === pluginId) ?? null)
     : null;
-  const selectedTemplate = MARKDOWN_TEMPLATE_OPTIONS.find((template) => template.key === templateKey) ?? null;
+  const selectedTemplate =
+    MARKDOWN_TEMPLATE_OPTIONS.find((template) => template.key === templateKey) ?? null;
   const previewLines = pluginId ? DOCUMENT_PREVIEW_LINES[pluginId] : [];
   const selectedDictionaryName =
-    dictionarySets.find((set) => String(set.id) === (dictionarySetId || defaultDictionarySetId))?.name ?? null;
+    dictionarySets.find((set) => String(set.id) === (dictionarySetId || defaultDictionarySetId))
+      ?.name ?? null;
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -188,54 +190,55 @@ export default function CreateDocumentDialog({
                 </p>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-              {DOCUMENT_TYPE_OPTIONS.map((option) => {
-                const Icon = option.icon;
-                const selected = pluginId === option.pluginId;
-                const disabled = option.pluginId === 'erd' && !hasDictionaryContext;
-                return (
-                  <button
-                    key={option.pluginId}
-                    type="button"
-                    disabled={disabled}
-                    className={cn(
-                      'surface-operational relative flex min-h-[190px] items-start gap-4 rounded-3xl px-5 py-5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/20',
-                      disabled && 'cursor-not-allowed opacity-60 hover:translate-y-0 hover:border-border',
-                      selected &&
-                        'border-primary/35 bg-primary/8 shadow-editorial ring-1 ring-primary/18',
-                    )}
-                    onClick={() => {
-                      if (disabled) {
-                        return;
-                      }
-                      setPluginId(option.pluginId);
-                    }}
-                  >
-                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0 flex-1 space-y-2">
-                      <span className="block text-base font-semibold tracking-[-0.02em] text-foreground">
-                        {t(option.titleKey)}
+                {DOCUMENT_TYPE_OPTIONS.map((option) => {
+                  const Icon = option.icon;
+                  const selected = pluginId === option.pluginId;
+                  const disabled = option.pluginId === 'erd' && !hasDictionaryContext;
+                  return (
+                    <button
+                      key={option.pluginId}
+                      type="button"
+                      disabled={disabled}
+                      className={cn(
+                        'surface-operational relative flex min-h-[190px] items-start gap-4 rounded-3xl px-5 py-5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/20',
+                        disabled &&
+                          'cursor-not-allowed opacity-60 hover:translate-y-0 hover:border-border',
+                        selected &&
+                          'border-primary/35 bg-primary/8 shadow-editorial ring-1 ring-primary/18',
+                      )}
+                      onClick={() => {
+                        if (disabled) {
+                          return;
+                        }
+                        setPluginId(option.pluginId);
+                      }}
+                    >
+                      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                        <Icon className="h-5 w-5" />
                       </span>
-                      <span className="block text-sm leading-6 text-muted-foreground">
-                        {t(option.descriptionKey)}
+                      <span className="min-w-0 flex-1 space-y-2">
+                        <span className="block text-base font-semibold tracking-[-0.02em] text-foreground">
+                          {t(option.titleKey)}
+                        </span>
+                        <span className="block text-sm leading-6 text-muted-foreground">
+                          {t(option.descriptionKey)}
+                        </span>
+                        {disabled && (
+                          <span className="mt-2 flex items-center gap-2 text-sm font-medium text-brand-warm">
+                            <AlertTriangle className="h-4 w-4" />
+                            {t('workspace.createDocument.erdRequiresDictionary')}
+                          </span>
+                        )}
                       </span>
-                      {disabled && (
-                        <span className="mt-2 flex items-center gap-2 text-sm font-medium text-brand-warm">
-                          <AlertTriangle className="h-4 w-4" />
-                          {t('workspace.createDocument.erdRequiresDictionary')}
+                      {selected && (
+                        <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full border border-primary/25 bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {t('workspace.createDocument.selected')}
                         </span>
                       )}
-                    </span>
-                    {selected && (
-                      <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full border border-primary/25 bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        {t('workspace.createDocument.selected')}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="flex items-center justify-between border-t border-border/70 bg-card px-6 py-4 sm:px-8">
@@ -281,7 +284,10 @@ export default function CreateDocumentDialog({
                           value={dictionarySetId || defaultDictionarySetId}
                           onValueChange={setDictionarySetId}
                         >
-                          <SelectTrigger id="document-dictionary" className="h-12 w-full rounded-xl">
+                          <SelectTrigger
+                            id="document-dictionary"
+                            className="h-12 w-full rounded-xl"
+                          >
                             <SelectValue placeholder={t('diagram.list.selectDictionaryContext')} />
                           </SelectTrigger>
                           <SelectContent>
@@ -406,7 +412,9 @@ export default function CreateDocumentDialog({
               </Button>
               <Button
                 type="submit"
-                disabled={submitting || !name.trim() || (pluginId === 'erd' && !hasDictionaryContext)}
+                disabled={
+                  submitting || !name.trim() || (pluginId === 'erd' && !hasDictionaryContext)
+                }
               >
                 {submitting ? t('common.button.creating') : t('common.button.create')}
               </Button>

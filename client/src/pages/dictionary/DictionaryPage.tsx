@@ -76,7 +76,9 @@ export default function DictionaryPage() {
             description={t('workspace.dictionary.description')}
             tone="dictionary"
             meta={
-              team ? <span>{t('workspace.dictionary.teamContext', { name: team.name })}</span> : undefined
+              team ? (
+                <span>{t('workspace.dictionary.teamContext', { name: team.name })}</span>
+              ) : undefined
             }
             className="mb-6"
             primaryAction={

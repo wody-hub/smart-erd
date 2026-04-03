@@ -247,9 +247,7 @@ export function resolveDiagramWorkModeRuntimeState({
     effectiveCodeCanEdit,
     canPersistDiagramSave: persistedEditingAllowed && capabilities.showPersistedSave,
     showPreviewSyncBanner:
-      capabilities.showPreviewSyncBanner &&
-      collaborationEditingAllowed &&
-      isPersistedPreviewMode,
+      capabilities.showPreviewSyncBanner && collaborationEditingAllowed && isPersistedPreviewMode,
     showCodeModeInfoBanner: mode === 'code',
     canToggleCodeEditor:
       persistedEditingAllowed &&

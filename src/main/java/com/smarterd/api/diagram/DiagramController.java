@@ -4,8 +4,8 @@ import com.smarterd.api.diagram.dto.CreateDiagramRequest;
 import com.smarterd.api.diagram.dto.DiagramBootstrapResponse;
 import com.smarterd.api.diagram.dto.DiagramDetailResponse;
 import com.smarterd.api.diagram.dto.DiagramResponse;
-import com.smarterd.api.diagram.dto.ExportDocumentRequest;
 import com.smarterd.api.diagram.dto.ExportDiagramWorkbookRequest;
+import com.smarterd.api.diagram.dto.ExportDocumentRequest;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotRequest;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotResponse;
 import com.smarterd.api.diagram.dto.RenameDiagramRequest;
@@ -410,7 +410,10 @@ public class DiagramController {
         final var diagram = diagramService.loadReadableDiagram(jwt.getSubject(), teamId, projectId, diagramId);
         final var exportResult = markdownExportService.export(diagram, request.format());
         response.setContentType(exportResult.contentType());
-        final var encodedName = java.net.URLEncoder.encode(exportResult.fileName(), java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
+        final var encodedName = java.net.URLEncoder.encode(
+            exportResult.fileName(),
+            java.nio.charset.StandardCharsets.UTF_8
+        ).replace("+", "%20");
         response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + encodedName);
         response.getOutputStream().write(exportResult.body());
     }

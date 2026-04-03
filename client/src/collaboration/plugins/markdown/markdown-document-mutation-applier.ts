@@ -45,10 +45,7 @@ export class MarkdownDocumentMutationApplier {
 
   private applySectionUpdate(mutation: DocumentMutation): boolean {
     const payload = mutation.payload;
-    if (
-      typeof payload?.sectionId !== 'string' ||
-      typeof payload?.sectionText !== 'string'
-    ) {
+    if (typeof payload?.sectionId !== 'string' || typeof payload?.sectionText !== 'string') {
       return false;
     }
     this.documentAdapter.applySectionUpdate(

@@ -26,9 +26,7 @@ public record CreateDiagramRequest(
     @Pattern(regexp = "erd|markdown", message = "{validation.pattern.plugin-id}")
     String pluginId,
 
-    @Schema(description = "사전 세트 ID", example = "1")
-    @Nullable
-    Long dictionarySetId,
+    @Schema(description = "사전 세트 ID", example = "1") @Nullable Long dictionarySetId,
 
     @Schema(description = "markdown 템플릿 키", example = "technical-spec")
     @Nullable

@@ -1,4 +1,1 @@
-export type {
-  DocumentBootstrapHeader,
-  DocumentBootstrapPayload,
-} from '@/types/document';
+export type { DocumentBootstrapHeader, DocumentBootstrapPayload } from '@/types/document';

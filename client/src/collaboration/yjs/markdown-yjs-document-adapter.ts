@@ -14,9 +14,7 @@ const METADATA_KEY = 'metadata';
 /**
  * markdown bootstrap/buffer와 Y.Doc 간 변환을 담당한다.
  */
-export class MarkdownYjsDocumentAdapter
-  implements YjsDocumentAdapter<MarkdownCollaborationBootstrap>
-{
+export class MarkdownYjsDocumentAdapter implements YjsDocumentAdapter<MarkdownCollaborationBootstrap> {
   /**
    * bootstrap content를 canonical markdown shared state로 반영한다.
    *
@@ -170,12 +168,7 @@ export class MarkdownYjsDocumentAdapter
    * @param sectionText  변경된 section 전체 텍스트
    * @param origin       Yjs transaction origin
    */
-  applySectionUpdate(
-    doc: Y.Doc,
-    sectionId: string,
-    sectionText: string,
-    origin: unknown,
-  ): void {
+  applySectionUpdate(doc: Y.Doc, sectionId: string, sectionText: string, origin: unknown): void {
     const bodyText = this.getBodyText(doc);
     const currentBody = bodyText.toString();
     const boundaries = computeSectionBoundaries(currentBody);

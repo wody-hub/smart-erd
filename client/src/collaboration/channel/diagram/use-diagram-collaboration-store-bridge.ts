@@ -5,7 +5,9 @@ import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import type { DiagramCollaborationStoreBridge } from './diagram-collaboration-store-bridge.js';
 
-function collectProjectionTargets(request?: ProjectionRefreshRequest): Set<'nodes' | 'edges' | 'groups'> {
+function collectProjectionTargets(
+  request?: ProjectionRefreshRequest,
+): Set<'nodes' | 'edges' | 'groups'> {
   const targets = new Set<'nodes' | 'edges' | 'groups'>(request?.targets ?? []);
   if ((request?.nodeIds?.length ?? 0) > 0) {
     targets.add('nodes');

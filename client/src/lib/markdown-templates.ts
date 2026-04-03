@@ -35,7 +35,9 @@ export const MARKDOWN_TEMPLATE_OPTIONS: MarkdownTemplateOption[] = [
  * @param templateKey 템플릿 키
  * @returns 표시 라벨, 없으면 null
  */
-export function resolveMarkdownTemplateLabel(templateKey: string | null | undefined): string | null {
+export function resolveMarkdownTemplateLabel(
+  templateKey: string | null | undefined,
+): string | null {
   if (!templateKey) {
     return null;
   }

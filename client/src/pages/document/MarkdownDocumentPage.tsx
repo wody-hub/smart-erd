@@ -64,21 +64,25 @@ export default function MarkdownDocumentPage() {
     queryFn: () => fetchProject(resolvedTeamId, resolvedProjectId),
     enabled: Boolean(resolvedTeamId) && Boolean(resolvedProjectId),
   });
-  const {
-    documentBootstrap,
-    documentDetail,
-    isLoading,
-    isError,
-    retryDocumentSetup,
-  } = useDocumentPageHost({
-    bootstrapQueryKey: queryKeys.diagrams.bootstrap(resolvedTeamId, resolvedProjectId, resolvedDiagramId),
-    bootstrapQueryFn: () => fetchDiagramBootstrap(resolvedTeamId, resolvedProjectId, resolvedDiagramId),
-    detailQueryKey: queryKeys.diagrams.detail(resolvedTeamId, resolvedProjectId, resolvedDiagramId),
-    detailQueryFn: () => fetchDiagram(resolvedTeamId, resolvedProjectId, resolvedDiagramId),
-    expectedPluginId: MARKDOWN_PLUGIN_ID,
-    expectedEngineId: MARKDOWN_ENGINE_ID,
-    enabled: Boolean(resolvedTeamId) && Boolean(resolvedProjectId) && Boolean(resolvedDiagramId),
-  });
+  const { documentBootstrap, documentDetail, isLoading, isError, retryDocumentSetup } =
+    useDocumentPageHost({
+      bootstrapQueryKey: queryKeys.diagrams.bootstrap(
+        resolvedTeamId,
+        resolvedProjectId,
+        resolvedDiagramId,
+      ),
+      bootstrapQueryFn: () =>
+        fetchDiagramBootstrap(resolvedTeamId, resolvedProjectId, resolvedDiagramId),
+      detailQueryKey: queryKeys.diagrams.detail(
+        resolvedTeamId,
+        resolvedProjectId,
+        resolvedDiagramId,
+      ),
+      detailQueryFn: () => fetchDiagram(resolvedTeamId, resolvedProjectId, resolvedDiagramId),
+      expectedPluginId: MARKDOWN_PLUGIN_ID,
+      expectedEngineId: MARKDOWN_ENGINE_ID,
+      enabled: Boolean(resolvedTeamId) && Boolean(resolvedProjectId) && Boolean(resolvedDiagramId),
+    });
   const {
     buffer,
     setEditorBuffer,
@@ -220,12 +224,7 @@ export default function MarkdownDocumentPage() {
         />
         <main className="workspace-shell flex-1 overflow-auto p-6">
           <div className="workspace-container max-w-[1480px]">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mb-4"
-              onClick={handleBack}
-            >
+            <Button variant="ghost" size="sm" className="mb-4" onClick={handleBack}>
               <ArrowLeft className="mr-1 h-4 w-4" />
               {t('workspace.action.backToDocuments')}
             </Button>

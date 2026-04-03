@@ -23,7 +23,8 @@ export default function DiagramSyncStatusBanner({
   const { t } = useTranslation();
   const isDisconnected = connectionStatus === 'disconnected';
   const isAuthoritativeBootstrapBlocked = setupErrorKind === 'authoritative-bootstrap-required';
-  const shouldShowRetry = (isAuthoritativeBootstrapBlocked || connectionIssue !== null) && !!onRetry;
+  const shouldShowRetry =
+    (isAuthoritativeBootstrapBlocked || connectionIssue !== null) && !!onRetry;
 
   const description = isAuthoritativeBootstrapBlocked
     ? t('erd.collabSync.overlay.failed')

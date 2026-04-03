@@ -130,7 +130,13 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
         final BooleanExpression artifactAvailableExpr = diagram.content.isNotNull().and(diagram.content.isNotEmpty());
 
         final Tuple result = queryFactory
-            .select(diagram.pluginId, diagram.contentRevision, diagram.snapshotRevision, hasSnapshotExpr, artifactAvailableExpr)
+            .select(
+                diagram.pluginId,
+                diagram.contentRevision,
+                diagram.snapshotRevision,
+                hasSnapshotExpr,
+                artifactAvailableExpr
+            )
             .from(diagram)
             .where(diagram.project.eq(project).and(diagram.id.eq(diagramId)).and(diagram.deletedAt.isNull()))
             .fetchOne();
@@ -160,7 +166,13 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
         final BooleanExpression artifactAvailableExpr = diagram.content.isNotNull().and(diagram.content.isNotEmpty());
 
         final Tuple result = queryFactory
-            .select(diagram.pluginId, diagram.contentRevision, diagram.snapshotRevision, hasSnapshotExpr, artifactAvailableExpr)
+            .select(
+                diagram.pluginId,
+                diagram.contentRevision,
+                diagram.snapshotRevision,
+                hasSnapshotExpr,
+                artifactAvailableExpr
+            )
             .from(diagram)
             .where(diagram.id.eq(diagramId).and(diagram.deletedAt.isNull()))
             .fetchOne();
@@ -204,17 +216,19 @@ public class DiagramRepositoryCustomImpl implements DiagramRepositoryCustom {
             .orderBy(diagram.updatedAt.desc())
             .fetch()
             .stream()
-            .map((row) -> new DiagramSummaryProjection(
-                row.get(diagram.id),
-                row.get(diagram.name),
-                row.get(diagram.pluginId),
-                row.get(diagram.dictionarySet.id),
-                row.get(diagram.dictionarySet.name),
-                row.get(diagram.templateKey),
-                row.get(diagram.summaryText),
-                row.get(diagram.createdAt),
-                row.get(diagram.updatedAt)
-            ))
+            .map((row) ->
+                new DiagramSummaryProjection(
+                    row.get(diagram.id),
+                    row.get(diagram.name),
+                    row.get(diagram.pluginId),
+                    row.get(diagram.dictionarySet.id),
+                    row.get(diagram.dictionarySet.name),
+                    row.get(diagram.templateKey),
+                    row.get(diagram.summaryText),
+                    row.get(diagram.createdAt),
+                    row.get(diagram.updatedAt)
+                )
+            )
             .toList();
     }
 }

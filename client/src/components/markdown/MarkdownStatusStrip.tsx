@@ -48,7 +48,9 @@ export default function MarkdownStatusStrip({
       <Badge
         variant="outline"
         className={
-          dirty ? 'border-brand-warm/30 bg-brand-warm/10 text-brand-warm' : 'border-border/80 text-ink-secondary'
+          dirty
+            ? 'border-brand-warm/30 bg-brand-warm/10 text-brand-warm'
+            : 'border-border/80 text-ink-secondary'
         }
       >
         {savePending

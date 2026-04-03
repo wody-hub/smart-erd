@@ -49,21 +49,21 @@ export function useDiagramCollaborationSession(
     documentCheckpointReader,
   } = useDiagramCollaborationRuntime(diagram, documentBootstrap, setupAttempt);
   const { providerRef, isPreviewMode, setupErrorKind } = useDiagramCollaborationProvider({
-      collaborationBootstrap,
-      sharedDocumentEngine,
-      snapshotCodec,
-      diagramId,
-      teamId,
-      projectId,
-      initYDoc,
-      destroyYDoc,
-      beforeDestroyYDoc,
-      resetCollaboration: storeBridge.resetCollaboration,
-      resetRuntimeState,
-      createProviderLifecycle,
-      onSetupFailed: handleProviderSetupFailed,
-      setupAttempt,
-    });
+    collaborationBootstrap,
+    sharedDocumentEngine,
+    snapshotCodec,
+    diagramId,
+    teamId,
+    projectId,
+    initYDoc,
+    destroyYDoc,
+    beforeDestroyYDoc,
+    resetCollaboration: storeBridge.resetCollaboration,
+    resetRuntimeState,
+    createProviderLifecycle,
+    onSetupFailed: handleProviderSetupFailed,
+    setupAttempt,
+  });
 
   useSnapshotCompaction(providerRef, diagramId);
 

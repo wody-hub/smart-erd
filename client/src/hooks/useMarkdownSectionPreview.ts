@@ -40,9 +40,7 @@ export function useMarkdownSectionPreview(body: string): string {
   /** Worker 모듈 로드 완료 여부 (type: 'module' Worker는 비동기 로드) */
   const workerReadyRef = useRef(false);
   /** Worker ready 전 대기 중인 요청 큐 */
-  const pendingQueueRef = useRef<Array<{ id: number; sectionId: string; sectionText: string }>>(
-    [],
-  );
+  const pendingQueueRef = useRef<Array<{ id: number; sectionId: string; sectionText: string }>>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cacheRef = useRef(new SectionPreviewCache());
   const prevBodyRef = useRef<string>('');
@@ -56,10 +54,9 @@ export function useMarkdownSectionPreview(body: string): string {
       return;
     }
     try {
-      const worker = new Worker(
-        new URL('../lib/markdown-preview-worker.ts', import.meta.url),
-        { type: 'module' },
-      );
+      const worker = new Worker(new URL('../lib/markdown-preview-worker.ts', import.meta.url), {
+        type: 'module',
+      });
       worker.addEventListener(
         'message',
         (event: MessageEvent<SectionPreviewResponse | FullPreviewResponse | { type: 'ready' }>) => {
@@ -82,7 +79,7 @@ export function useMarkdownSectionPreview(body: string): string {
             }
             cacheRef.current.setHtml(data.sectionId, data.html);
             setHtml(cacheRef.current.buildFullHtml());
-          } else {
+          } else if ('html' in data) {
             // 전체 body 응답 (fallback 시) — 직접 반영
             setHtml(data.html);
           }

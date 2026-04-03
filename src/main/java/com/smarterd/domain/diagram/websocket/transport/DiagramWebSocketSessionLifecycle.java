@@ -44,13 +44,8 @@ public class DiagramWebSocketSessionLifecycle {
             try {
                 final var rejectionReason = joinResult.rejectionReason();
                 final var closeCode =
-                    rejectionReason != null
-                        ? rejectionReason.closeCode()
-                        : CloseStatus.POLICY_VIOLATION.getCode();
-                final var closeReason =
-                    rejectionReason != null
-                        ? rejectionReason.closeReason()
-                        : "policy-violation";
+                    rejectionReason != null ? rejectionReason.closeCode() : CloseStatus.POLICY_VIOLATION.getCode();
+                final var closeReason = rejectionReason != null ? rejectionReason.closeReason() : "policy-violation";
                 log.warn(
                     "WebSocket room join 거부 후 세션 종료 (session={}, diagramId={}, userId={}, code={}, reason={})",
                     session.getId(),

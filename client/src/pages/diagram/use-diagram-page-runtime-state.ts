@@ -18,9 +18,7 @@ import {
   hasSharedSchemaDraftContent,
   type SharedSchemaDraftSnapshot,
 } from '@/lib/shared-schema-draft';
-import {
-  resolveDiagramWorkModeRuntimeState,
-} from '@/lib/diagram-work-mode';
+import { resolveDiagramWorkModeRuntimeState } from '@/lib/diagram-work-mode';
 import type { DiagramWorkModeCapabilities } from '@/lib/diagram-work-mode';
 import { buildPreviewDraftOverlayGraph } from '@/lib/preview-draft-merge';
 import { buildParseResultFromSharedSchemaDraft } from '@/lib/shared-schema-draft';

@@ -2,9 +2,9 @@ package com.smarterd.domain.diagram.service;
 
 import com.smarterd.collaboration.metadata.DocumentMetadataService;
 import com.smarterd.collaboration.persistence.DocumentBootstrapReader;
+import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
-import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.entity.DiagramPluginId;
@@ -99,9 +99,10 @@ public class DiagramService {
             throw new BusinessException(MessageCode.ERROR_BUSINESS_MARKDOWN_TEMPLATE_INVALID.code());
         }
         final var dictionarySet = resolveDictionarySet(project, resolvedPluginId, dictionarySetId);
-        final var initialContent = resolvedPluginId == DiagramPluginId.MARKDOWN
-            ? markdownTemplateService.buildInitialContent(name, templateKey)
-            : null;
+        final var initialContent =
+            resolvedPluginId == DiagramPluginId.MARKDOWN
+                ? markdownTemplateService.buildInitialContent(name, templateKey)
+                : null;
 
         final var diagram = Diagram.builder()
             .name(name)
@@ -134,19 +135,21 @@ public class DiagramService {
         return diagramRepository
             .findSummariesByProject(project)
             .stream()
-            .map((projection) -> new DiagramSummaryResult(
-                projection.id(),
-                projection.name(),
-                projection.pluginId(),
-                pid,
-                projection.dictionarySetId(),
-                projection.dictionarySetName(),
-                projection.templateKey(),
-                markdownTemplateService.resolveTemplateLabel(projection.templateKey()),
-                projection.summaryText(),
-                projection.createdAt(),
-                projection.updatedAt()
-            ))
+            .map((projection) ->
+                new DiagramSummaryResult(
+                    projection.id(),
+                    projection.name(),
+                    projection.pluginId(),
+                    pid,
+                    projection.dictionarySetId(),
+                    projection.dictionarySetName(),
+                    projection.templateKey(),
+                    markdownTemplateService.resolveTemplateLabel(projection.templateKey()),
+                    projection.summaryText(),
+                    projection.createdAt(),
+                    projection.updatedAt()
+                )
+            )
             .toList();
     }
 
@@ -537,11 +540,7 @@ public class DiagramService {
         int invalidatedDomainBindingCount
     ) {}
 
-    private DictionarySet resolveDictionarySet(
-        Project project,
-        DiagramPluginId pluginId,
-        Long dictionarySetId
-    ) {
+    private DictionarySet resolveDictionarySet(Project project, DiagramPluginId pluginId, Long dictionarySetId) {
         if (pluginId == DiagramPluginId.ERD) {
             if (dictionarySetId == null) {
                 throw new BusinessException(MessageCode.ERROR_BUSINESS_ERD_DICTIONARY_CONTEXT_REQUIRED.code());
@@ -553,5 +552,4 @@ public class DiagramService {
         }
         return null;
     }
-
 }

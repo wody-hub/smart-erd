@@ -26,11 +26,7 @@ interface HeaderProps {
  * 공통 workspace 헤더 shell 위에서 앱명, breadcrumb, 공용 유틸을 조합한다.
  * 도메인 전용 액세서리는 page 또는 도메인 컴포넌트에서 rightSlot으로 전달한다.
  */
-export default function Header({
-  workspaceContext,
-  title,
-  rightSlot,
-}: HeaderProps) {
+export default function Header({ workspaceContext, title, rightSlot }: HeaderProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const name = useAuthStore((s) => s.name);

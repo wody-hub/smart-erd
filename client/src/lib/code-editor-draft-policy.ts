@@ -8,10 +8,7 @@ interface CodeEditorUnsavedChangesOptions {
 }
 
 export type CodeEditorApplyBlockReason = 'remote-pending' | 'stale-draft';
-export type CodeEditorFinalizeBlockReason =
-  | 'remote-pending'
-  | 'invalid-draft'
-  | 'stale-draft';
+export type CodeEditorFinalizeBlockReason = 'remote-pending' | 'invalid-draft' | 'stale-draft';
 
 interface CodeEditorBlockOptions {
   draftState: DraftState;

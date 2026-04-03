@@ -31,9 +31,7 @@ export default function DiagramWorkModeSwitcher({
 
   return (
     <div className="header-utility-group">
-      <span className="header-utility-label hidden lg:inline">
-        {t('diagram.workMode.label')}
-      </span>
+      <span className="header-utility-label hidden lg:inline">{t('diagram.workMode.label')}</span>
       <Select value={mode} onValueChange={(value) => onModeChange(value as DiagramWorkMode)}>
         <SelectTrigger
           className="header-control-trigger h-8 w-[154px] rounded-full px-3 text-xs font-semibold"

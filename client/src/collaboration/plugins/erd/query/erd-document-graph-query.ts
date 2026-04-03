@@ -121,11 +121,7 @@ function readTableNodes(context: DocumentReadContext): TableNode[] {
       .filter((props): props is Record<string, unknown> => !!props)
       .map(toColumn);
 
-    return toTableNode(
-      tableRef.id,
-      (tableEntity?.props ?? {}) as Record<string, unknown>,
-      columns,
-    );
+    return toTableNode(tableRef.id, (tableEntity?.props ?? {}) as Record<string, unknown>, columns);
   });
 }
 

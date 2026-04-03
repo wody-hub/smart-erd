@@ -83,7 +83,10 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       ref={ref}
-      className={cn('font-sans text-[1.6rem] font-semibold leading-none tracking-[-0.035em]', className)}
+      className={cn(
+        'font-sans text-[1.6rem] font-semibold leading-none tracking-[-0.035em]',
+        className,
+      )}
       {...props}
     />
   );

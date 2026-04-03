@@ -222,8 +222,12 @@ export default function DiagramsPage() {
                     canEdit && diagram.pluginId === 'erd' && dictionarySets.length > 0 ? (
                       <div onClick={(event) => event.stopPropagation()}>
                         <Select
-                          value={diagram.dictionarySetId != null ? String(diagram.dictionarySetId) : ''}
-                          onValueChange={(value) => updateDictionaryContext(diagram.id, Number(value))}
+                          value={
+                            diagram.dictionarySetId != null ? String(diagram.dictionarySetId) : ''
+                          }
+                          onValueChange={(value) =>
+                            updateDictionaryContext(diagram.id, Number(value))
+                          }
                         >
                           <SelectTrigger className="h-9 min-w-[220px]">
                             <SelectValue placeholder={t('diagram.list.selectDictionaryContext')} />

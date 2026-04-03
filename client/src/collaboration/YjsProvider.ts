@@ -189,7 +189,10 @@ export class YjsProvider {
     if (this.socketCreationInFlight) {
       return;
     }
-    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)
+    ) {
       return;
     }
     this.intentionalClose = false;
@@ -252,7 +255,10 @@ export class YjsProvider {
     if (this.socketCreationInFlight) {
       return;
     }
-    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)
+    ) {
       return;
     }
     this.socketCreationInFlight = true;
@@ -274,7 +280,10 @@ export class YjsProvider {
       if (this.destroyed || this.intentionalClose) {
         return;
       }
-      if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+      if (
+        this.ws &&
+        (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)
+      ) {
         return;
       }
 

@@ -64,11 +64,7 @@ export default function MarkdownToolbar({
         {isMobile ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                aria-label={t('markdown.toolbar.export')}
-              >
+              <Button variant="outline" size="sm" aria-label={t('markdown.toolbar.export')}>
                 <MoreHorizontal className="mr-2 h-4 w-4" />
                 {t('markdown.toolbar.export')}
               </Button>

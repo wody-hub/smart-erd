@@ -177,7 +177,8 @@ export function useMarkdownDocumentSession({
     const persistedFrontmatter = parseMarkdownBuffer(documentDetail.content ?? '').frontmatter;
     const currentFrontmatter = documentAdapter.readFrontmatter(sharedDocumentEngine.getDocument());
     const currentHasMalformedPlaceholder = hasMalformedFrontmatterPlaceholder(currentFrontmatter);
-    const persistedHasMalformedPlaceholder = hasMalformedFrontmatterPlaceholder(persistedFrontmatter);
+    const persistedHasMalformedPlaceholder =
+      hasMalformedFrontmatterPlaceholder(persistedFrontmatter);
     if (!currentHasMalformedPlaceholder || persistedHasMalformedPlaceholder) {
       return;
     }
@@ -292,7 +293,7 @@ export function useMarkdownDocumentSession({
     setCollaborationError(false);
     if (alreadyHydrated) {
       setCollaborationReady(true);
-    collaborationReadyRef.current = true;
+      collaborationReadyRef.current = true;
     } else if (snapshotAvailableRef.current) {
       setCollaborationReady(false);
     }
@@ -309,7 +310,7 @@ export function useMarkdownDocumentSession({
       }
       setCollaborationError(false);
       setCollaborationReady(true);
-    collaborationReadyRef.current = true;
+      collaborationReadyRef.current = true;
       const syncedBuffer = readSerializedBuffer();
       prevBodyRef.current = parseMarkdownBuffer(syncedBuffer).body.replace(/\r\n/g, '\n');
       setBuffer(syncedBuffer);
@@ -346,7 +347,15 @@ export function useMarkdownDocumentSession({
       provider.onSyncStateChange = null;
       provider.destroy();
     };
-  }, [diagramId, projectId, readSerializedBuffer, sharedDocumentEngine, snapshotCodec, teamId, setupAttempt]);
+  }, [
+    diagramId,
+    projectId,
+    readSerializedBuffer,
+    sharedDocumentEngine,
+    snapshotCodec,
+    teamId,
+    setupAttempt,
+  ]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {

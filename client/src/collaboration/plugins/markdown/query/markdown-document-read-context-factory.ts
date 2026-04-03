@@ -107,9 +107,9 @@ class MarkdownDocumentReadContext implements DocumentReadContext {
   }
 
   private readSection(sectionId: string): DocumentEntity | null {
-    const section = parseMarkdownBuffer(this.documentAdapter.serializeBuffer(this.doc)).headings.find(
-      (heading) => heading.id === sectionId,
-    );
+    const section = parseMarkdownBuffer(
+      this.documentAdapter.serializeBuffer(this.doc),
+    ).headings.find((heading) => heading.id === sectionId);
     if (!section) {
       return null;
     }

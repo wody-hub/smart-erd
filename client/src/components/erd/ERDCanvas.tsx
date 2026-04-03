@@ -866,137 +866,146 @@ function ERDCanvas({
         <ErdFkModeProvider value={fkMode}>
           <RemoteEditLocksProvider value={tableLockContextValue}>
             <EdgeEditingProvider value={edgeEditingContextValue}>
-            <CompactTableRenderingProvider mode={compactTableRenderingMode}>
-            <ConnectedColumnIdsProvider edges={displayEdges}>
-              <ReactFlow
-                nodes={displayNodes}
-                edges={styledEdges}
-                onNodesChange={effectiveCanEdit ? onNodesChange : undefined}
-                onEdgesChange={effectiveCanEdit ? onEdgesChange : undefined}
-                onConnect={effectiveCanEdit ? handleDragConnect : undefined}
-                onNodeClick={handleNodeClick}
-                onNodeDragStart={effectiveCanEdit ? () => setIsDraggingNode(true) : undefined}
-                onNodeDragStop={
-                  effectiveCanEdit
-                    ? (_event, node) => {
-                        setIsDraggingNode(false);
-                        requestAnimationFrame(() => {
-                          const latestNode =
-                            (reactFlowInstance.getNode(node.id) as Node<TableNodeData> | undefined) ??
-                            node;
-                          const storeNode = useCanvasStore
-                            .getState()
-                            .nodes.find((candidate) => candidate.id === node.id) as
-                            | Node<TableNodeData>
-                            | undefined;
-                          const resolvedPosition = isFiniteCanvasPosition(latestNode.position)
-                            ? latestNode.position
-                            : isFiniteCanvasPosition(node.position)
-                              ? node.position
-                              : isFiniteCanvasPosition(storeNode?.position)
-                                ? storeNode.position
-                                : null;
-                          if (!resolvedPosition) {
-                            return;
+              <CompactTableRenderingProvider mode={compactTableRenderingMode}>
+                <ConnectedColumnIdsProvider edges={displayEdges}>
+                  <ReactFlow
+                    nodes={displayNodes}
+                    edges={styledEdges}
+                    onNodesChange={effectiveCanEdit ? onNodesChange : undefined}
+                    onEdgesChange={effectiveCanEdit ? onEdgesChange : undefined}
+                    onConnect={effectiveCanEdit ? handleDragConnect : undefined}
+                    onNodeClick={handleNodeClick}
+                    onNodeDragStart={effectiveCanEdit ? () => setIsDraggingNode(true) : undefined}
+                    onNodeDragStop={
+                      effectiveCanEdit
+                        ? (_event, node) => {
+                            setIsDraggingNode(false);
+                            requestAnimationFrame(() => {
+                              const latestNode =
+                                (reactFlowInstance.getNode(node.id) as
+                                  | Node<TableNodeData>
+                                  | undefined) ?? node;
+                              const storeNode = useCanvasStore
+                                .getState()
+                                .nodes.find((candidate) => candidate.id === node.id) as
+                                | Node<TableNodeData>
+                                | undefined;
+                              const resolvedPosition = isFiniteCanvasPosition(latestNode.position)
+                                ? latestNode.position
+                                : isFiniteCanvasPosition(node.position)
+                                  ? node.position
+                                  : isFiniteCanvasPosition(storeNode?.position)
+                                    ? storeNode.position
+                                    : null;
+                              if (!resolvedPosition) {
+                                return;
+                              }
+                              const normalizedNode =
+                                latestNode.position.x === resolvedPosition.x &&
+                                latestNode.position.y === resolvedPosition.y
+                                  ? latestNode
+                                  : { ...latestNode, position: resolvedPosition };
+                              dragActions.commitTableDrag(
+                                latestNode.id,
+                                resolvedPosition,
+                                normalizedNode,
+                              );
+                            });
                           }
-                          const normalizedNode =
-                            latestNode.position.x === resolvedPosition.x &&
-                            latestNode.position.y === resolvedPosition.y
-                              ? latestNode
-                              : { ...latestNode, position: resolvedPosition };
-                          dragActions.commitTableDrag(latestNode.id, resolvedPosition, normalizedNode);
-                        });
+                        : undefined
+                    }
+                    onEdgeClick={handleEdgeClick}
+                    onEdgeContextMenu={effectiveCanEdit ? handleEdgeContextMenu : undefined}
+                    onPaneClick={handlePaneClick}
+                    onInit={(instance) => {
+                      lastViewportZoomRef.current = instance.getZoom();
+                      setCompactTableRenderingMode(
+                        resolveCompactTableRenderingMode(
+                          displayNodes.length,
+                          lastViewportZoomRef.current,
+                        ),
+                      );
+                      applyZoomTextCompensation(instance.getZoom());
+                    }}
+                    onMoveEnd={(_event, viewport) => {
+                      lastViewportZoomRef.current = viewport.zoom;
+                      setCompactTableRenderingMode(
+                        resolveCompactTableRenderingMode(displayNodes.length, viewport.zoom),
+                      );
+                      const autoFitMovePending = autoFitViewportMovePendingRef.current;
+                      autoFitViewportMovePendingRef.current = false;
+                      if (!autoFitMovePending) {
+                        manualViewportInteractionRef.current = true;
                       }
-                    : undefined
-                }
-                onEdgeClick={handleEdgeClick}
-                onEdgeContextMenu={effectiveCanEdit ? handleEdgeContextMenu : undefined}
-                onPaneClick={handlePaneClick}
-                onInit={(instance) => {
-                  lastViewportZoomRef.current = instance.getZoom();
-                  setCompactTableRenderingMode(
-                    resolveCompactTableRenderingMode(displayNodes.length, lastViewportZoomRef.current),
-                  );
-                  applyZoomTextCompensation(instance.getZoom());
-                }}
-                onMoveEnd={(_event, viewport) => {
-                  lastViewportZoomRef.current = viewport.zoom;
-                  setCompactTableRenderingMode(
-                    resolveCompactTableRenderingMode(displayNodes.length, viewport.zoom),
-                  );
-                  const autoFitMovePending = autoFitViewportMovePendingRef.current;
-                  autoFitViewportMovePendingRef.current = false;
-                  if (!autoFitMovePending) {
-                    manualViewportInteractionRef.current = true;
-                  }
-                  const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
-                  if (
-                    lastAppliedZoom != null &&
-                    Math.abs(viewport.zoom - lastAppliedZoom) <= TABLE_HEADER_ZOOM_CHANGE_EPSILON
-                  ) {
-                    return;
-                  }
-                  scheduleZoomTextCompensation(viewport.zoom);
-                }}
-                nodeTypes={nodeTypes}
-                edgeTypes={edgeTypes}
-                deleteKeyCode={null}
-                panActivationKeyCode={null}
-                nodesDraggable={effectiveCanEdit}
-                nodesConnectable={effectiveCanEdit}
-                elementsSelectable={effectiveCanEdit}
-                snapToGrid
-                snapGrid={[16, 16]}
-                defaultEdgeOptions={{
-                  type: 'erdRelation',
-                }}
-                fitView
-                className={cn(fkMode && 'cursor-crosshair')}
-              >
-                {showPerformanceOverlays && (
-                  <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-                )}
-                {showPerformanceOverlays && <Controls />}
-                {showMiniMap && (
-                  <MiniMap
-                    nodeStrokeColor="hsl(var(--muted-foreground))"
-                    nodeColor="hsl(var(--card))"
-                    nodeBorderRadius={4}
-                  />
-                )}
-                <CanvasToolbar
-                  fkMode={fkMode}
-                  onToggleFkMode={toggleFkMode}
-                  onAutoLayout={handleAutoLayout}
-                  onExportPng={exportPng}
-                  onExportJpg={exportJpg}
-                  onExportSvg={exportSvg}
-                  onExportPdf={exportPdf}
-                  onExportTableDefinition={handleExportTableDefinition}
-                  onExportColumnDefinition={handleExportColumnDefinition}
-                  onExportIndexDefinition={handleExportIndexDefinition}
-                  onExportDdl={() => setDdlDialogOpen(true)}
-                  onImportDdl={() => setDdlImportOpen(true)}
-                  codeEditorActive={codeEditorActive}
-                  onToggleCodeEditor={onToggleCodeEditor}
-                  validationOpen={validationOpen}
-                  onToggleValidation={onToggleValidation}
-                  onOpenDictionaryContext={onOpenDictionaryContext}
-                  canUndo={effectiveCanEdit && canUndo}
-                  canRedo={effectiveCanEdit && canRedo}
-                  onUndo={undo}
-                  onRedo={redo}
-                  canEdit={effectiveCanEdit}
-                  isExporting={
-                    exportProgress.isExporting ||
-                    tableDefinitionExporting ||
-                    columnDefinitionExporting ||
-                    indexDefinitionExporting
-                  }
-                />
-              </ReactFlow>
-            </ConnectedColumnIdsProvider>
-            </CompactTableRenderingProvider>
+                      const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
+                      if (
+                        lastAppliedZoom != null &&
+                        Math.abs(viewport.zoom - lastAppliedZoom) <=
+                          TABLE_HEADER_ZOOM_CHANGE_EPSILON
+                      ) {
+                        return;
+                      }
+                      scheduleZoomTextCompensation(viewport.zoom);
+                    }}
+                    nodeTypes={nodeTypes}
+                    edgeTypes={edgeTypes}
+                    deleteKeyCode={null}
+                    panActivationKeyCode={null}
+                    nodesDraggable={effectiveCanEdit}
+                    nodesConnectable={effectiveCanEdit}
+                    elementsSelectable={effectiveCanEdit}
+                    snapToGrid
+                    snapGrid={[16, 16]}
+                    defaultEdgeOptions={{
+                      type: 'erdRelation',
+                    }}
+                    fitView
+                    className={cn(fkMode && 'cursor-crosshair')}
+                  >
+                    {showPerformanceOverlays && (
+                      <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+                    )}
+                    {showPerformanceOverlays && <Controls />}
+                    {showMiniMap && (
+                      <MiniMap
+                        nodeStrokeColor="hsl(var(--muted-foreground))"
+                        nodeColor="hsl(var(--card))"
+                        nodeBorderRadius={4}
+                      />
+                    )}
+                    <CanvasToolbar
+                      fkMode={fkMode}
+                      onToggleFkMode={toggleFkMode}
+                      onAutoLayout={handleAutoLayout}
+                      onExportPng={exportPng}
+                      onExportJpg={exportJpg}
+                      onExportSvg={exportSvg}
+                      onExportPdf={exportPdf}
+                      onExportTableDefinition={handleExportTableDefinition}
+                      onExportColumnDefinition={handleExportColumnDefinition}
+                      onExportIndexDefinition={handleExportIndexDefinition}
+                      onExportDdl={() => setDdlDialogOpen(true)}
+                      onImportDdl={() => setDdlImportOpen(true)}
+                      codeEditorActive={codeEditorActive}
+                      onToggleCodeEditor={onToggleCodeEditor}
+                      validationOpen={validationOpen}
+                      onToggleValidation={onToggleValidation}
+                      onOpenDictionaryContext={onOpenDictionaryContext}
+                      canUndo={effectiveCanEdit && canUndo}
+                      canRedo={effectiveCanEdit && canRedo}
+                      onUndo={undo}
+                      onRedo={redo}
+                      canEdit={effectiveCanEdit}
+                      isExporting={
+                        exportProgress.isExporting ||
+                        tableDefinitionExporting ||
+                        columnDefinitionExporting ||
+                        indexDefinitionExporting
+                      }
+                    />
+                  </ReactFlow>
+                </ConnectedColumnIdsProvider>
+              </CompactTableRenderingProvider>
             </EdgeEditingProvider>
           </RemoteEditLocksProvider>
         </ErdFkModeProvider>

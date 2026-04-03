@@ -1,10 +1,5 @@
 import { CSS } from '@dnd-kit/utilities';
-import {
-  DndContext,
-  closestCenter,
-  type DragEndEvent,
-  type SensorDescriptor,
-} from '@dnd-kit/core';
+import { DndContext, closestCenter, type DragEndEvent, type SensorDescriptor } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { GripVertical } from 'lucide-react';
 import type { TFunction } from 'i18next';
@@ -101,7 +96,10 @@ export function TableNodeEditableRows({
 }: TableNodeEditableRowsProps) {
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-      <SortableContext items={columns.map((column) => column.id)} strategy={verticalListSortingStrategy}>
+      <SortableContext
+        items={columns.map((column) => column.id)}
+        strategy={verticalListSortingStrategy}
+      >
         <div className="divide-y divide-border">
           {columns.map((column) => {
             const renderMeta = renderMetaById.get(column.id);
@@ -195,7 +193,9 @@ export function TableNodeStaticRows({
             }
             validationWarningText={
               renderMeta.warning.status
-                ? validationWarningTextByStatus[renderMeta.warning.status as WarningValidationStatus]
+                ? validationWarningTextByStatus[
+                    renderMeta.warning.status as WarningValidationStatus
+                  ]
                 : undefined
             }
             hasDuplicateLogicalName={renderMeta.hasDuplicateLogicalName}
@@ -219,8 +219,8 @@ export function TableNodeStaticRows({
           />
         );
       })}
-      {hiddenUnconnectedColumnCount > 0 && (
-        onExpandHiddenColumns ? (
+      {hiddenUnconnectedColumnCount > 0 &&
+        (onExpandHiddenColumns ? (
           <button
             type="button"
             className="w-full px-3 py-1 text-left text-2xs text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -235,8 +235,7 @@ export function TableNodeStaticRows({
           <div className="px-3 py-1 text-2xs text-muted-foreground">
             {t('erd.tableNode.hiddenColumnSummary', { count: hiddenUnconnectedColumnCount })}
           </div>
-        )
-      )}
+        ))}
     </div>
   );
 }

@@ -8,8 +8,31 @@ marked.setOptions({
 
 const SANITIZE_POLICY = {
   allowedTags: [
-    'a', 'blockquote', 'br', 'code', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'hr', 'input', 'li', 'ol', 'p', 'pre', 'strong', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'ul',
+    'a',
+    'blockquote',
+    'br',
+    'code',
+    'em',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'hr',
+    'input',
+    'li',
+    'ol',
+    'p',
+    'pre',
+    'strong',
+    'table',
+    'tbody',
+    'td',
+    'th',
+    'thead',
+    'tr',
+    'ul',
   ],
   allowedAttributes: {
     a: ['href', 'target', 'rel'],
@@ -64,9 +87,7 @@ function renderAndSanitize(text: string): string {
   const rawHtml = marked.parse(text, { async: false }) as string;
   return DOMPurify.sanitize(rawHtml, {
     ALLOWED_TAGS: [...SANITIZE_POLICY.allowedTags],
-    ALLOWED_ATTR: Array.from(
-      new Set(Object.values(SANITIZE_POLICY.allowedAttributes).flat()),
-    ),
+    ALLOWED_ATTR: Array.from(new Set(Object.values(SANITIZE_POLICY.allowedAttributes).flat())),
     ADD_ATTR: ['target', 'rel'],
   });
 }
@@ -75,17 +96,20 @@ function renderAndSanitize(text: string): string {
 // 메인 스레드가 이 신호를 받기 전까지는 postMessage가 유실될 수 있다.
 self.postMessage({ type: 'ready' });
 
-self.addEventListener('message', (event: MessageEvent<FullPreviewRequest | SectionPreviewRequest>) => {
-  const data = event.data;
-  if ('sectionId' in data) {
-    // section 단위 렌더링
-    const html = renderAndSanitize(data.sectionText);
-    const response: SectionPreviewResponse = { id: data.id, sectionId: data.sectionId, html };
-    self.postMessage(response);
-  } else {
-    // 전체 body 렌더링 (기존 호환)
-    const html = renderAndSanitize(data.body);
-    const response: FullPreviewResponse = { id: data.id, html };
-    self.postMessage(response);
-  }
-});
+self.addEventListener(
+  'message',
+  (event: MessageEvent<FullPreviewRequest | SectionPreviewRequest>) => {
+    const data = event.data;
+    if ('sectionId' in data) {
+      // section 단위 렌더링
+      const html = renderAndSanitize(data.sectionText);
+      const response: SectionPreviewResponse = { id: data.id, sectionId: data.sectionId, html };
+      self.postMessage(response);
+    } else {
+      // 전체 body 렌더링 (기존 호환)
+      const html = renderAndSanitize(data.body);
+      const response: FullPreviewResponse = { id: data.id, html };
+      self.postMessage(response);
+    }
+  },
+);

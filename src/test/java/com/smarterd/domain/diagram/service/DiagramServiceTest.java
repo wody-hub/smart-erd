@@ -232,9 +232,7 @@ class DiagramServiceTest {
             Optional.of(diagram)
         );
 
-        assertThatThrownBy(() ->
-            diagramService.updateDiagramDictionarySet(loginId, teamId, projectId, diagramId, 300L)
-        )
+        assertThatThrownBy(() -> diagramService.updateDiagramDictionarySet(loginId, teamId, projectId, diagramId, 300L))
             .isInstanceOf(BusinessException.class)
             .hasMessage(MessageCode.ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
         verify(roomManager, never()).getSessionCount(diagramId);
@@ -293,11 +291,22 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(1L)).thenReturn(team);
         when(projectService.findProjectById(10L)).thenReturn(project);
-        when(markdownTemplateService.buildInitialContent("API Doc", "technical-spec")).thenReturn("---\ntemplate: technical-spec\n---\n# API Doc");
-        when(markdownDocumentDescriptorService.describe(org.mockito.ArgumentMatchers.anyString()))
-            .thenReturn(new MarkdownTemplateDescriptor("technical-spec", "기술 설계 문서", "API Doc"));
+        when(markdownTemplateService.buildInitialContent("API Doc", "technical-spec")).thenReturn(
+            "---\ntemplate: technical-spec\n---\n# API Doc"
+        );
+        when(markdownDocumentDescriptorService.describe(org.mockito.ArgumentMatchers.anyString())).thenReturn(
+            new MarkdownTemplateDescriptor("technical-spec", "기술 설계 문서", "API Doc")
+        );
 
-        final var result = diagramService.createDiagram(loginId, 1L, 10L, "API Doc", "markdown", null, "technical-spec");
+        final var result = diagramService.createDiagram(
+            loginId,
+            1L,
+            10L,
+            "API Doc",
+            "markdown",
+            null,
+            "technical-spec"
+        );
 
         assertThat(result.name()).isEqualTo("API Doc");
         assertThat(result.pluginId()).isEqualTo(DiagramPluginId.MARKDOWN.value());
