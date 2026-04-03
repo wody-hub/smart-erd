@@ -1,91 +1,94 @@
 ---
 phase: 02
+review_round: 2
+reviewed_commit: 0a99613
 reviewers: [claude, gemini]
-reviewed_at: 2026-04-03T03:17:52Z
+reviewed_at: 2026-04-03T04:40:35Z
 plans_reviewed: [02-01-PLAN.md, 02-02-PLAN.md, 02-03-PLAN.md]
 note: Gemini completed with non-fatal stderr warnings while loading local ~/.gemini agents
 ---
 
-# Cross-AI Plan Review — Phase 02
+# Cross-AI Plan Review — Phase 02 (Second Pass)
 
 ## Claude Review
 
-Claude review concluded that the phase architecture is sound and the wave split is appropriate: Plan 01 establishes the helper/store/bootstrap contract, and Plans 02-03 can execute in parallel after that foundation is in place.
+Claude judged the revised phase plan to be internally consistent and materially improved over the first round. It explicitly considered the prior `.dark` alignment problem resolved by treating `.dark` as a compatibility bit while moving token authority to `.theme-*` selectors.
 
 ### Key Findings
 
-1. **MEDIUM**: Plan 01 says `applyThemeClass` should not touch `.dark`, while UI-SPEC expects Graphite and Midnight to also toggle `.dark` for Tailwind `dark:` compatibility. Plan 02 then removes the `.dark` selector entirely. These three statements are not aligned.
-2. **HIGH**: Plan 02 needs a stricter token rollout checklist. Graphite introduces or redefines a large set of tokens, and missing even one token can cause partial regressions that build verification will not catch.
-3. **MEDIUM**: Body gradient behavior is not explicit enough after the selector migration away from `.dark`. The plan should say whether gradients are fully token-driven or require per-theme overrides.
-4. **MEDIUM**: The acceptance grep for `.dark` removal is fragile. The proposed pattern may miss the actual selector layout in `client/src/index.css`.
-5. **LOW**: Plan 03 should clarify theme label localization direction and whether `i18next.d.ts` needs updating for typed keys.
+1. **MEDIUM**: Plan 02 still leaves dark-theme shadow token values underspecified. The plan now requires shadow parity and review, but it does not lock down concrete dark-theme values, so an executor could preserve weak Paper-oriented shadows on dark surfaces.
+2. **MEDIUM**: Plan 02 should explicitly say that the new `.theme-graphite body` and `.theme-midnight body` selectors belong in the same `@layer base` placement as the existing `body` rule.
+3. **LOW**: Plan 02's visual spot-check should explicitly mention prominent component-level gradients such as `workspace-shell` or key surface-display cards.
+4. **LOW**: Plan 03's swatch colors are intentionally hardcoded for preview purposes, but that exception should stay documented so it is not mistaken for general color-token drift.
 
-### Claude Suggestions
+### Claude Strengths
 
-- Make `applyThemeClass` toggle `.dark` for `graphite` and `midnight` so Plan 01, Plan 02, and UI-SPEC agree.
-- Add DOM-level tests for class application, not just pure helper tests.
-- Turn Graphite/Midnight token rollout into an exhaustive checklist including composition, cursor, shadow, and ERD-specific tokens.
-- Add a manual visual verification step because build-only checks are insufficient for token-heavy CSS changes.
-- Consider using a radio-group style pattern for ThemeSwitcher state semantics.
+- Plan 01 cleanly separates helper, store, bootstrap, and compatibility adapter responsibilities.
+- Plan 01 now has concrete DOM class test requirements around `.dark` compatibility behavior.
+- Plan 02 now has an explicit token inventory parity step, which materially reduces hidden fallback regressions.
+- Plan 03 uses `DropdownMenuRadioGroup` semantics and keeps curated theme labels consistent across locales.
 
 ### Claude Risk Assessment
 
 **Overall Risk: LOW-MEDIUM**
 
-The architecture is solid, but Plan 02 has omission risk because visual regressions can hide inside incomplete token migration.
+The remaining risk is mostly visual/design-quality risk inside Plan 02, not functional architecture risk.
 
 ---
 
 ## Gemini Review
 
-Gemini review also assessed the overall plan as strong, especially the staged migration path from theme foundation to token rollout to user-facing controls. It specifically praised the compatibility strategy around `useDarkMode()` and the pre-render bootstrap in `main.tsx`.
+Gemini also assessed the revised plans as highly executable and called out the revised `.dark` strategy as the key architectural correction from the previous round.
 
 ### Key Findings
 
-1. **MEDIUM**: Gemini independently flagged the same `.dark` class inconsistency across UI-SPEC and Plan 01.
-2. **LOW**: The CSS selector structure should stay explicit enough that theme overrides reliably beat defaults.
-3. **LOW**: `resolveStoredTheme` fallback behavior is correct in principle, but runtime handling should remain defensive around invalid `localStorage` values.
-4. **LOW**: Graphite rollout should explicitly verify ERD-specific tokens and contrast-sensitive dark theme values.
+1. **MEDIUM**: Graphite/Midnight shadow and overlay depth still deserve careful visual verification during Plan 02 execution.
+2. **LOW**: Theme swatch colors are hardcoded by design; acceptable, but still a maintenance point if theme identity colors change later.
+3. **LOW**: Zustand persistence details are acceptable as written, but remain a store-level integration point rather than a helper-level unit test target.
 
-### Gemini Suggestions
+### Gemini Strengths
 
-- Add `.dark` toggling inside Plan 01's DOM application logic for backward compatibility with Tailwind and shadcn-style dark selectors.
-- Keep store hydration and bootstrap logic anchored to the same helper contract so theme resolution cannot drift.
-- During Plan 02, validate that ERD tokens preserve contrast under Graphite and Midnight, not just general UI surfaces.
+- `useDarkMode()` is now a low-blast-radius compatibility adapter for Monaco consumers.
+- The pre-render bootstrap in `main.tsx` remains the correct way to avoid refresh flash.
+- The selector hierarchy is now strict enough that `.theme-*` is clearly authoritative.
+- DOM verification for `applyThemeClass()` is now concrete and testable.
 
 ### Gemini Risk Assessment
 
 **Overall Risk: LOW**
 
-Gemini considered the work frontend-local, isolated from backend risk, and easy to roll back if the theme state or CSS application misbehaves.
+Gemini considers the phase ready to execute, with only visual-quality watchpoints remaining.
 
 ---
 
 ## Consensus Summary
 
-Both reviewers agree that the phase is fundamentally ready, but it should not move straight into execution without tightening a few plan details first.
+This second-pass review is substantially cleaner than the first. The first-round blockers around `.dark` alignment, token authority, and theme switcher semantics are now treated as resolved.
 
-### Consensus Verdict
+### Agreed Strengths
 
-**Proceed with targeted plan revisions before execution.**
+1. `.dark` handling is now conceptually correct: compatibility bit only, not token authority.
+2. Plan 01 is ready and well-scoped, with strong helper/bootstrap/test separation.
+3. Plan 02 is much safer because token inventory parity is now explicit.
+4. Plan 03 is more semantically sound with radio-group selection and stable branded theme labels.
 
-### Required Revisions Before `$gsd-execute-phase 2`
+### Agreed Remaining Concerns
 
-1. Align `.dark` handling across Plan 01, Plan 02, and UI-SPEC. The safest direction is to keep `.theme-*` as the primary source of truth while also toggling `.dark` for dark themes.
-2. Expand Plan 02 into an explicit token checklist covering all theme tables, including ERD, composition, cursor, overlay, and shadow tokens.
-3. Clarify whether body gradient behavior is fully token-driven or needs theme-specific overrides.
-4. Fix the `.dark` removal verification command so it matches the real selector format in `client/src/index.css`.
-5. Add manual visual spot-check requirements to the plan, because `npm run build` alone will not catch incomplete token migration.
+1. **Primary remaining issue:** Plan 02 should be slightly tighter around dark-theme shadow behavior so execution does not preserve weak Paper-style shadows on dark surfaces.
+2. Theme-specific `body` gradient selectors should stay explicitly aligned with the existing CSS layer placement.
+3. Visual spot-checks should call out one or two representative component surfaces in addition to header/body/ERD.
 
-### Recommended Cleanups
+### Prior Review Resolution Status
 
-1. Clarify whether theme names stay as `Paper / Graphite / Midnight` in translations or become Korean labels.
-2. Confirm whether `client/src/i18n/i18next.d.ts` needs key augmentation for `theme.*`.
-3. Add a small DOM-oriented test for theme class application in addition to helper unit tests.
+| Prior concern | Current status |
+|---------------|----------------|
+| `.dark` token source vs compatibility confusion | Resolved |
+| Graphite token inventory incompleteness | Resolved at plan level |
+| Body gradient specificity ambiguity | Mostly resolved |
+| Theme switcher semantics too weak | Resolved |
 
-### Net Assessment
+### Net Verdict
 
-- **Architecture:** strong
-- **Execution risk:** manageable
-- **Primary failure mode:** incomplete CSS token migration
-- **Best next step:** regenerate the phase plan with review feedback applied
+**Proceed.**
+
+The phase is ready for execution. If you want one last polish before `$gsd-execute-phase 2`, the only worthwhile tweak is to tighten Plan 02 around shadow token guidance and CSS layer placement.
