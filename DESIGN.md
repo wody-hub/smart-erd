@@ -235,7 +235,38 @@
 - Do not make every corner fully rounded just because Tailwind makes it easy.
 - Do not let empty space become dead space. Large blank areas need composition, tint, or hierarchy.
 
+## Theme Architecture
+
+Smart ERD ships 3 curated themes. Each theme is a complete CSS variable token set applied via a class selector on `document.documentElement`.
+
+| Theme | Class | Tone | Monaco Mapping | Dark Variant |
+|-------|-------|------|----------------|--------------|
+| Paper | `.theme-paper` (default) | Warm cream/ivory — the editorial baseline | `vs` | No |
+| Graphite | `.theme-graphite` | Cool gray/slate — reduced visual fatigue for long sessions | `vs-dark` | Yes |
+| Midnight | `.theme-midnight` | Deep navy/cobalt — the midnight shell from the original dark mode | `vs-dark` | Yes |
+
+### Token Ownership
+
+- **Paper** uses the existing `:root` warm editorial palette documented above. `:root` and `.theme-paper` share the same token set.
+- **Graphite** is a purpose-built cool-gray dark theme. Primary accent `#5B8DEF` (220 80% 62%), background `#272C33` (220 14% 18%). All tokens are independently defined — no inheritance from Paper.
+- **Midnight** inherits the original `.dark` palette (deep navy `#0A1020`, primary `#5B84FF`). Semantic, ERD, validation, composition, and cursor tokens carry over unchanged. Shadow tokens use a shared dark-surface override.
+
+### CSS Variable Hierarchy
+
+```
+:root, .theme-paper     → Paper token set (warm cream baseline)
+.theme-graphite          → Graphite token set (cool gray, independent)
+.theme-midnight          → Midnight token set (navy dark, ex-.dark)
+```
+
+The legacy `.dark` class is retained as a Tailwind `dark:` variant compatibility bit. It is **not** a token source — all token switching is done exclusively through `.theme-*` classes. Graphite and Midnight both add `.dark` alongside their theme class to keep `dark:` prefix utilities working.
+
+### Shadow Override
+
+Graphite and Midnight share the same dark-surface shadow values (deeper opacity than Paper) to maintain consistent depth perception on dark backgrounds.
+
 ## Decisions Log
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-03-31 | Initial design system created | The workspace IA was cleaned up, but the visual system was still generic. This document locks the product into a warmer, more editorial, more memorable direction without sacrificing ERD tool clarity. |
+| 2026-04-03 | 3-theme system (Paper/Graphite/Midnight) adopted | Curated themes replace binary light/dark toggle. `.dark` demoted to compatibility bit. |
