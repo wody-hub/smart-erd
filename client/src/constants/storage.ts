@@ -24,4 +24,6 @@ export const STORAGE_KEYS = {
   ERD_DIFF_APPLY_FORCE_MODE: 'smart-erd-diff-apply-force-mode',
   /** Internal rollout 로컬 opt-in 토글 */
   ERD_DIFF_APPLY_INTERNAL_OPT_IN: 'smart-erd-diff-apply-internal-opt-in',
+  /** 테마 설정 (paper | graphite | midnight) */
+  THEME: 'smart-erd-theme',
 } as const;
