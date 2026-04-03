@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 2 UI-SPEC approved
-last_updated: "2026-04-03T02:04:49.506Z"
+status: executing
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-04-03T06:09:09.736Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 10
+  completed_plans: 8
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** SI 프로젝트에서 발생하는 모든 산출물과 관리 활동을 하나의 실시간 협업 플랫폼에서 일관된 체계로 관리
-**Current focus:** Phase 01 — markdown-incremental-sync
+**Current focus:** Phase 02 — 테마-선택
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 02 (테마-선택) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-04-03
 
 Progress: [░░░░░░░░░░] 0%
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P03 | 7min | 3 tasks | 7 files |
 | Phase 01 P04 | 5min | 2 tasks | 5 files |
 | Phase 01 P07 | 1min | 1 tasks | 1 files |
+| Phase 02-테마-선택 P01 | 3min | 1 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,8 @@ Recent decisions affecting current work:
 - [Phase 01]: buildSectionCommands 2단계 전략: section ID 순서 비교 + section별 내용 비교
 - [Phase 01]: section별 requestId Map으로 Pitfall 4(stale 응답 덮어쓰기) 방어
 - [Phase 01]: instanceof Number + longValue() 패턴으로 offset 타입 안전 검증
+- [Phase 02-테마-선택]: .dark는 Tailwind dark: variant 호환 bit로만 취급, token source는 theme-* class 사용
+- [Phase 02-테마-선택]: useDarkMode를 MutationObserver에서 useThemeStore 셀렉터 어댑터로 교체
 
 ### Pending Todos
 
@@ -88,6 +91,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03T02:04:49.504Z
-Stopped at: Phase 2 UI-SPEC approved
-Resume file: .planning/phases/02-테마-선택/02-UI-SPEC.md
+Last session: 2026-04-03T06:09:09.734Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None
