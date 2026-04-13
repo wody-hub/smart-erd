@@ -5,6 +5,14 @@ import type {
 } from '@/collaboration/core/contracts/document-read-executor';
 import type { YjsSharedDocumentEngine } from '@/collaboration/core/engines/yjs-shared-document-engine';
 import {
+  createMasterDraft,
+  ensureNestedMap,
+  readScreenFromYMap,
+  removeStringFromArray,
+  resolveMasterLabel,
+  sanitizeMasterDimension,
+} from './screen-spec-yjs-helpers';
+import {
   clampInstanceRect,
   createInstanceYMap,
   createInstanceMasterSnapshot,
@@ -16,9 +24,7 @@ import {
   readScreenDesignDocument,
   resolveLibraryItemById,
   type ScreenDesignLibraryCategoryId,
-  type ScreenDesignMasterDefinition,
   type ScreenDesignMasterTier,
-  type ScreenDesignScreen,
 } from '@/pages/screendesign/screen-design-document';
 import { resolveScreenDesignFramePreset } from '@/pages/screendesign/screen-design-frame-presets';
 import type {
@@ -392,7 +398,11 @@ export class ScreenSpecDocumentMutationApplier {
     }
 
     return this.withTransaction(mutation.key, (maps, doc) => {
-      const screen = readScreenRecord(screenId, maps.screens.get(screenId));
+      const fallbackPreset = resolveScreenDesignFramePreset('desktop');
+      const screen = readScreenFromYMap(screenId, maps.screens.get(screenId), {
+        fallbackWidth: fallbackPreset.width,
+        fallbackHeight: fallbackPreset.height,
+      });
       const layerYArray = maps.layers.get(screenId);
       if (!screen || !(layerYArray instanceof Y.Array)) {
         return null;
@@ -482,7 +492,11 @@ export class ScreenSpecDocumentMutationApplier {
         return null;
       }
 
-      const screen = readScreenRecord(screenId, maps.screens.get(screenId));
+      const fallbackPreset = resolveScreenDesignFramePreset('desktop');
+      const screen = readScreenFromYMap(screenId, maps.screens.get(screenId), {
+        fallbackWidth: fallbackPreset.width,
+        fallbackHeight: fallbackPreset.height,
+      });
       if (!screen) {
         return null;
       }
@@ -699,61 +713,6 @@ function readRootMaps(doc: Y.Doc): ScreenSpecRootMaps {
 }
 
 /**
- * screen Y.Map을 plain screen 레코드로 읽는다.
- *
- * @param screenId 읽을 screen id
- * @param screenYMap 원본 screen Y.Map
- * @returns plain screen 레코드 또는 null
- */
-function readScreenRecord(
-  screenId: string,
-  screenYMap: Y.Map<unknown> | undefined,
-): ScreenDesignScreen | null {
-  if (!(screenYMap instanceof Y.Map)) {
-    return null;
-  }
-  const fallbackPreset = resolveScreenDesignFramePreset('desktop');
-  return {
-    id: screenId,
-    name: readString(screenYMap.get('name')) ?? screenId,
-    width: readPositiveNumber(screenYMap.get('width')) ?? fallbackPreset.width,
-    height: readPositiveNumber(screenYMap.get('height')) ?? fallbackPreset.height,
-  };
-}
-
-/**
- * Y.Array에서 특정 문자열 항목을 한 번 제거한다.
- *
- * @param yArray 수정할 Y.Array
- * @param value 제거할 문자열 값
- * @returns 없음
- */
-function removeStringFromArray(yArray: Y.Array<string>, value: string): void {
-  const current = yArray.toArray();
-  const index = current.indexOf(value);
-  if (index >= 0) {
-    yArray.delete(index, 1);
-  }
-}
-
-/**
- * parent map에 key 이름의 nested Y.Map이 있도록 보장한다.
- *
- * @param parent 상위 Y.Map
- * @param key 보장할 nested map key
- * @returns 보장된 nested Y.Map
- */
-function ensureNestedMap(parent: Y.Map<unknown>, key: string): Y.Map<unknown> {
-  const current = parent.get(key);
-  if (current instanceof Y.Map) {
-    return current;
-  }
-  const nextMap = new Y.Map<unknown>();
-  parent.set(key, nextMap);
-  return nextMap;
-}
-
-/**
  * 문서 스냅샷에서 instance id에 해당하는 instance를 찾는다.
  *
  * @param snapshot 현재 화면기획 문서 스냅샷
@@ -770,20 +729,6 @@ function findInstanceSnapshot(
 }
 
 /**
- * master snapshot에서 표시 라벨을 해상한다.
- *
- * @param masterSnapshot 표시 라벨을 읽을 master snapshot
- * @param fallbackMasterId fallback master id
- * @returns 표시용 master 라벨
- */
-function resolveMasterLabel(
-  masterSnapshot: ReturnType<typeof createInstanceMasterSnapshot>,
-  fallbackMasterId: string,
-): string {
-  return masterSnapshot.label ?? fallbackMasterId;
-}
-
-/**
  * 객체가 특정 own/in 상속 프로퍼티를 가지는지 검사한다.
  *
  * @param value 검사할 값
@@ -792,40 +737,6 @@ function resolveMasterLabel(
  */
 function hasOwn(value: unknown, key: string): boolean {
   return typeof value === 'object' && value !== null && key in value;
-}
-
-/**
- * 새 custom master에 사용할 기본 draft를 만든다.
- *
- * @param name master 이름
- * @param categoryId master 카테고리
- * @param tier master tier
- * @returns 기본 master draft
- */
-function createMasterDraft(
-  name: string,
-  categoryId: ScreenDesignLibraryCategoryId,
-  tier: ScreenDesignMasterTier,
-): ScreenDesignMasterDefinition {
-  return {
-    name,
-    categoryId,
-    tier,
-    width: tier === 'block' ? 960 : 360,
-    height: tier === 'block' ? 160 : 240,
-    renderKind: 'generic',
-    preset: false,
-  };
-}
-
-/**
- * master 크기 값을 최소값 이상 정수로 보정한다.
- *
- * @param value 보정할 크기 값
- * @returns 보정된 크기 값
- */
-function sanitizeMasterDimension(value: number): number {
-  return Math.max(48, Math.round(value));
 }
 
 /**
