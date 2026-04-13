@@ -96,7 +96,7 @@ public class DiagramService {
     ) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var resolvedPluginId = DiagramPluginId.from(pluginId);
-        if (resolvedPluginId != DiagramPluginId.MARKDOWN && templateKey != null) {
+        if (!resolvedPluginId.supportsTemplates() && templateKey != null) {
             throw new BusinessException(MessageCode.ERROR_BUSINESS_MARKDOWN_TEMPLATE_INVALID.code());
         }
         final var dictionarySet = resolveDictionarySet(project, resolvedPluginId, dictionarySetId);
@@ -244,8 +244,9 @@ public class DiagramService {
     ) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
-        if (diagram.isMarkdownDocument()) {
-            throw new BusinessException(MessageCode.ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
+        final var resolvedPluginId = DiagramPluginId.from(diagram.getPluginId());
+        if (!resolvedPluginId.requiresDictionaryContext()) {
+            throw new BusinessException(resolvedPluginId.getDictionaryContextNotAllowedMessage().code());
         }
 
         if (roomManager.getSessionCount(diagramId) > 0) {
@@ -441,14 +442,14 @@ public class DiagramService {
      * @return 검증된 사전 세트, markdown 문서면 null
      */
     private DictionarySet resolveDictionarySet(Project project, DiagramPluginId pluginId, Long dictionarySetId) {
-        if (pluginId == DiagramPluginId.ERD) {
+        if (pluginId.requiresDictionaryContext()) {
             if (dictionarySetId == null) {
                 throw new BusinessException(MessageCode.ERROR_BUSINESS_ERD_DICTIONARY_CONTEXT_REQUIRED.code());
             }
             return dictionarySetService.findByTeamAndId(project.getTeam(), dictionarySetId);
         }
         if (dictionarySetId != null) {
-            throw new BusinessException(MessageCode.ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
+            throw new BusinessException(pluginId.getDictionaryContextNotAllowedMessage().code());
         }
         return null;
     }

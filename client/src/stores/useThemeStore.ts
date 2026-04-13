@@ -8,12 +8,7 @@
  */
 import { create } from 'zustand';
 import { STORAGE_KEYS } from '@/constants/storage';
-import {
-  type ThemeName,
-  resolveStoredTheme,
-  isDarkTheme,
-  applyThemeClass,
-} from '@/lib/theme';
+import { type ThemeName, resolveStoredTheme, isDarkTheme, applyThemeClass } from '@/lib/theme';
 
 /** 테마 스토어 상태 인터페이스 */
 interface ThemeState {

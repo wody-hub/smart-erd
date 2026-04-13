@@ -35,6 +35,8 @@ import type { DocumentListItem } from '@/types/workspace';
  * 문서 허브 페이지.
  *
  * ERD와 Markdown 문서를 같은 프로젝트 허브에서 관리한다.
+ *
+ * @returns 프로젝트 문서 허브 JSX
  */
 export default function DiagramsPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
@@ -166,6 +168,7 @@ export default function DiagramsPage() {
               <div className="flex items-center gap-3">
                 <DocumentTypeBadge documentType="erd" />
                 <DocumentTypeBadge documentType="markdown" />
+                <DocumentTypeBadge documentType="screen-spec" />
                 <p className="text-sm text-ink-secondary">
                   {t('workspace.documents.typeScopeHint')}
                 </p>

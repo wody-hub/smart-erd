@@ -1,5 +1,12 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, FilePenLine, FileText, Network } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FilePenLine,
+  FileText,
+  LayoutTemplate,
+  Network,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,10 +46,14 @@ interface CreateDocumentDialogProps {
 const DOCUMENT_TYPE_OPTIONS: Array<{
   pluginId: DocumentPluginId;
   icon: typeof Network;
-  titleKey: 'workspace.documentType.erd' | 'workspace.documentType.markdown';
+  titleKey:
+    | 'workspace.documentType.erd'
+    | 'workspace.documentType.markdown'
+    | 'workspace.documentType.screenSpec';
   descriptionKey:
     | 'workspace.createDocument.erdDescription'
-    | 'workspace.createDocument.markdownDescription';
+    | 'workspace.createDocument.markdownDescription'
+    | 'workspace.createDocument.screenSpecDescription';
 }> = [
   {
     pluginId: 'erd',
@@ -56,6 +67,12 @@ const DOCUMENT_TYPE_OPTIONS: Array<{
     titleKey: 'workspace.documentType.markdown',
     descriptionKey: 'workspace.createDocument.markdownDescription',
   },
+  {
+    pluginId: 'screen-spec',
+    icon: LayoutTemplate,
+    titleKey: 'workspace.documentType.screenSpec',
+    descriptionKey: 'workspace.createDocument.screenSpecDescription',
+  },
 ];
 
 const DOCUMENT_PREVIEW_LINES = {
@@ -68,6 +85,11 @@ const DOCUMENT_PREVIEW_LINES = {
     'workspace.createDocument.previewMarkdownLine1',
     'workspace.createDocument.previewMarkdownLine2',
     'workspace.createDocument.previewMarkdownLine3',
+  ],
+  'screen-spec': [
+    'workspace.createDocument.previewScreenSpecLine1',
+    'workspace.createDocument.previewScreenSpecLine2',
+    'workspace.createDocument.previewScreenSpecLine3',
   ],
 } as const;
 
@@ -106,6 +128,12 @@ export default function CreateDocumentDialog({
     dictionarySets.find((set) => String(set.id) === (dictionarySetId || defaultDictionarySetId))
       ?.name ?? null;
 
+  /**
+   * 다이얼로그 open 상태 변경 시 내부 step/form 상태를 초기화한다.
+   *
+   * @param nextOpen 다음 open 상태
+   * @returns 없음
+   */
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setStep(1);
@@ -117,6 +145,11 @@ export default function CreateDocumentDialog({
     onOpenChange(nextOpen);
   };
 
+  /**
+   * 선택된 문서 타입 기준으로 2단계 설정 화면으로 이동한다.
+   *
+   * @returns 없음
+   */
   const handleContinue = () => {
     if (!pluginId) {
       return;
@@ -130,6 +163,12 @@ export default function CreateDocumentDialog({
     setStep(2);
   };
 
+  /**
+   * 현재 폼 입력으로 새 문서 생성을 제출한다.
+   *
+   * @param event 폼 submit 이벤트
+   * @returns 없음
+   */
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!pluginId || !name.trim()) {
@@ -189,7 +228,7 @@ export default function CreateDocumentDialog({
                   {t('workspace.createDocument.pluginSectionHint')}
                 </p>
               </div>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 lg:grid-cols-3">
                 {DOCUMENT_TYPE_OPTIONS.map((option) => {
                   const Icon = option.icon;
                   const selected = pluginId === option.pluginId;
@@ -308,7 +347,7 @@ export default function CreateDocumentDialog({
                       </div>
                     )}
                   </div>
-                ) : (
+                ) : pluginId === 'markdown' ? (
                   <div className="space-y-3">
                     <div>
                       <Label>{t('workspace.createDocument.templateLabel')}</Label>
@@ -345,6 +384,13 @@ export default function CreateDocumentDialog({
                       ))}
                     </div>
                   </div>
+                ) : (
+                  <div className="space-y-3 rounded-2xl border border-border/70 bg-muted/35 px-4 py-4">
+                    <Label>{t('screenSpec.canvas.title')}</Label>
+                    <p className="text-sm leading-6 text-ink-secondary">
+                      {t('workspace.createDocument.screenSpecSetupHint')}
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -358,7 +404,9 @@ export default function CreateDocumentDialog({
                 <p className="mt-2 text-sm leading-6 text-ink-secondary">
                   {pluginId === 'markdown'
                     ? selectedTemplate?.description
-                    : t('workspace.createDocument.erdDescription')}
+                    : pluginId === 'screen-spec'
+                      ? t('workspace.createDocument.screenSpecDescription')
+                      : t('workspace.createDocument.erdDescription')}
                 </p>
                 <div className="mt-5 space-y-3 rounded-2xl border border-border/75 bg-card px-4 py-4">
                   <div className="flex items-start justify-between gap-4">
@@ -378,12 +426,16 @@ export default function CreateDocumentDialog({
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       {pluginId === 'markdown'
                         ? t('workspace.createDocument.previewTemplateLabel')
-                        : t('workspace.createDocument.previewDictionaryLabel')}
+                        : pluginId === 'screen-spec'
+                          ? t('workspace.createDocument.previewCanvasLabel')
+                          : t('workspace.createDocument.previewDictionaryLabel')}
                     </p>
                     <p className="mt-1 text-sm font-medium text-foreground">
                       {pluginId === 'markdown'
                         ? (selectedTemplate?.label ?? '—')
-                        : (selectedDictionaryName ?? '—')}
+                        : pluginId === 'screen-spec'
+                          ? t('workspace.createDocument.previewCanvasBlank')
+                          : (selectedDictionaryName ?? '—')}
                     </p>
                   </div>
                 </div>

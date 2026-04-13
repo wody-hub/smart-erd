@@ -14,11 +14,7 @@ export type ThemeName = 'paper' | 'graphite' | 'midnight';
 export const DEFAULT_THEME: ThemeName = 'paper';
 
 /** 유효한 테마 이름 집합 */
-const VALID_THEMES: ReadonlySet<string> = new Set<ThemeName>([
-  'paper',
-  'graphite',
-  'midnight',
-]);
+const VALID_THEMES: ReadonlySet<string> = new Set<ThemeName>(['paper', 'graphite', 'midnight']);
 
 /** 테마별 CSS class 이름 */
 const THEME_CLASSES: readonly string[] = [

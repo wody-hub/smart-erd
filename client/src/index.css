@@ -110,6 +110,33 @@
     --composition-warning-border: 40.9 70.5% 69.4%;
     --composition-warning-foreground: 40.4 100% 21.6%;
     --composition-warning-muted: 39.2 74.7% 31%;
+
+    --screen-spec-frame-fill: 38 100% 99%;
+    --screen-spec-frame-stroke: 38 18% 80%;
+    --screen-spec-frame-shadow: 214 20% 88%;
+    --screen-spec-safe-area: 216 22% 83%;
+    --screen-spec-canvas-background: 214 31% 95%;
+    --screen-spec-grid: 213 23% 89%;
+    --screen-spec-surface-fill: 0 0% 100%;
+    --screen-spec-surface-stroke: 215 28% 85%;
+    --screen-spec-accent-primary: 216 28% 91%;
+    --screen-spec-accent-secondary: 38 24% 90%;
+    --screen-spec-accent-tertiary: 213 27% 92%;
+    --screen-spec-accent-quaternary: 36 38% 89%;
+    --screen-spec-accent-ink: 214 12% 41%;
+    --screen-spec-accent-muted: 217 9% 54%;
+    --screen-spec-selection: 226 100% 57.1%;
+    --screen-spec-orphan: 37.5 82.1% 39.4%;
+    --screen-spec-anchor-fill: 0 0% 100%;
+    --screen-spec-shadow-color: 220 10% 12% / 0.08;
+
+    --screen-spec-category-layout: 213 27% 84%;
+    --screen-spec-category-table: 213 97% 87%;
+    --screen-spec-category-form: 232 97% 89%;
+    --screen-spec-category-input: 141 79% 85%;
+    --screen-spec-category-feedback: 48 97% 77%;
+    --screen-spec-category-button: 326 88% 90%;
+    --screen-spec-category-default: 212 24% 89%;
   }
 
   .theme-graphite {
@@ -199,6 +226,33 @@
     --composition-warning-border: 38 40% 30%;
     --composition-warning-foreground: 40 68% 82%;
     --composition-warning-muted: 38 48% 62%;
+
+    --screen-spec-frame-fill: 220 14% 26%;
+    --screen-spec-frame-stroke: 220 10% 34%;
+    --screen-spec-frame-shadow: 220 14% 12%;
+    --screen-spec-safe-area: 220 8% 44%;
+    --screen-spec-canvas-background: 220 16% 15%;
+    --screen-spec-grid: 220 12% 24%;
+    --screen-spec-surface-fill: 220 14% 22%;
+    --screen-spec-surface-stroke: 220 10% 34%;
+    --screen-spec-accent-primary: 220 12% 30%;
+    --screen-spec-accent-secondary: 168 18% 28%;
+    --screen-spec-accent-tertiary: 38 18% 28%;
+    --screen-spec-accent-quaternary: 220 14% 36%;
+    --screen-spec-accent-ink: 220 15% 94%;
+    --screen-spec-accent-muted: 220 8% 62%;
+    --screen-spec-selection: 220 80% 62%;
+    --screen-spec-orphan: 38 58% 54%;
+    --screen-spec-anchor-fill: 220 15% 94%;
+    --screen-spec-shadow-color: 0 0% 0% / 0.24;
+
+    --screen-spec-category-layout: 213 18% 38%;
+    --screen-spec-category-table: 213 40% 42%;
+    --screen-spec-category-form: 232 34% 46%;
+    --screen-spec-category-input: 141 32% 38%;
+    --screen-spec-category-feedback: 48 42% 42%;
+    --screen-spec-category-button: 326 36% 46%;
+    --screen-spec-category-default: 212 16% 40%;
   }
 
   .theme-midnight {
@@ -238,6 +292,33 @@
     --shadow-field-inset: inset 0 1px 0 hsl(var(--field-highlight));
     --field-highlight: 222.4 100% 96.7% / 0.1;
     --overlay-scrim: 223.6 52.4% 8.2% / 0.68;
+
+    --screen-spec-frame-fill: 221 36% 14%;
+    --screen-spec-frame-stroke: 218 24% 30%;
+    --screen-spec-frame-shadow: 223 30% 10%;
+    --screen-spec-safe-area: 218 22% 42%;
+    --screen-spec-canvas-background: 223 42% 10%;
+    --screen-spec-grid: 220 26% 18%;
+    --screen-spec-surface-fill: 221.5 43.3% 11.8%;
+    --screen-spec-surface-stroke: 218.5 29.8% 25.7%;
+    --screen-spec-accent-primary: 223 34% 18%;
+    --screen-spec-accent-secondary: 167 26% 24%;
+    --screen-spec-accent-tertiary: 38 28% 24%;
+    --screen-spec-accent-quaternary: 219 28% 28%;
+    --screen-spec-accent-ink: 222.4 100% 96.7%;
+    --screen-spec-accent-muted: 218.6 28.6% 80.8%;
+    --screen-spec-selection: 225 100% 67.8%;
+    --screen-spec-orphan: 38 64.1% 57.5%;
+    --screen-spec-anchor-fill: 222.4 100% 96.7%;
+    --screen-spec-shadow-color: 0 0% 0% / 0.28;
+
+    --screen-spec-category-layout: 213 22% 34%;
+    --screen-spec-category-table: 213 46% 38%;
+    --screen-spec-category-form: 232 38% 42%;
+    --screen-spec-category-input: 141 36% 34%;
+    --screen-spec-category-feedback: 48 46% 38%;
+    --screen-spec-category-button: 326 40% 42%;
+    --screen-spec-category-default: 212 18% 36%;
 
     --header-bg: 223.6 52.4% 8.2%;
     --header-foreground: 222.4 100% 96.7%;

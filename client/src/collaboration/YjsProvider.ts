@@ -16,6 +16,13 @@ import type {
 /** snapshot 재요청 rate limit (분당 최대 횟수) */
 const MAX_SNAPSHOT_REQUESTS_PER_MINUTE = 6;
 
+/**
+ * WebSocket 종료 코드와 reason을 사용자 노출용 연결 이슈로 매핑한다.
+ *
+ * @param code WebSocket close code
+ * @param reason WebSocket close reason
+ * @returns 알려진 연결 이슈면 해당 kind, 아니면 null
+ */
 function mapCloseEventToConnectionIssue(code: number, reason: string): ConnectionIssueKind | null {
   if (code === 4408) {
     return 'connection-limit-exceeded';
@@ -35,10 +42,22 @@ function mapCloseEventToConnectionIssue(code: number, reason: string): Connectio
   return 'policy-violation';
 }
 
+/**
+ * 주어진 Yjs update origin을 원격으로 브로드캐스트해야 하는지 판별한다.
+ *
+ * @param origin Yjs transaction origin
+ * @returns 브로드캐스트 대상이면 true
+ */
 function shouldSendLocalUpdate(origin: unknown): boolean {
   return !(origin === 'remote' || origin === 'bootstrap');
 }
 
+/**
+ * 소켓 연결 전 발생한 로컬 상태를 연결 직후 다시 밀어야 하는지 판별한다.
+ *
+ * @param origin Yjs transaction origin
+ * @returns pending push로 보관해야 하면 true
+ */
 function shouldQueuePendingLocalStatePush(origin: unknown): boolean {
   return !(
     origin === 'remote' ||
@@ -144,6 +163,9 @@ export class YjsProvider {
   /** 현재 presence 모드 */
   private presenceMode: PresenceMode = 'active';
 
+  /** initial sync 재시도 타이머 */
+  private syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
   /**
    * YjsProvider를 생성한다.
    *
@@ -209,6 +231,7 @@ export class YjsProvider {
     this.doc.off('update', this.updateHandler);
     this.clearReconnectTimer();
     this.clearPresenceBootstrapTimer();
+    this.clearSyncRetryTimer();
 
     try {
       // WS 닫기 전 Awareness null 전송 (정상 종료 시 고스트 커서 방지)
@@ -247,6 +270,8 @@ export class YjsProvider {
 
   /**
    * WebSocket 인스턴스를 생성하고 이벤트를 바인딩한다.
+   *
+   * @returns 없음
    */
   private async createWebSocket(): Promise<void> {
     if (this.destroyed || this.intentionalClose) {
@@ -315,6 +340,7 @@ export class YjsProvider {
           return;
         }
         this.clearReconnectTimer();
+        this.clearSyncRetryTimer();
         this.reconnectDelay = WS_RECONNECT.INITIAL_DELAY;
         this.lastRoomEpoch = null;
         this.lastPresenceVersion = 0;
@@ -330,6 +356,7 @@ export class YjsProvider {
 
         this.requestSnapshot();
         this.requestSync();
+        this.scheduleSyncRetry();
         this.flushPendingLocalState();
       };
 
@@ -343,6 +370,7 @@ export class YjsProvider {
         this.ws = null;
         this.emitSyncState(false);
         this.clearPresenceBootstrapTimer();
+        this.clearSyncRetryTimer();
         const connectionIssue = this.intentionalClose
           ? null
           : mapCloseEventToConnectionIssue(event.code, event.reason);
@@ -394,6 +422,7 @@ export class YjsProvider {
         }
         if (messageType === WS_MSG_TYPE.SYNC_STEP2) {
           this.emitSyncState(true);
+          this.clearSyncRetryTimer();
         }
         break;
       }
@@ -460,6 +489,40 @@ export class YjsProvider {
     // Awareness 상태도 전송
     if (this.localAwareness) {
       this.sendAwareness();
+    }
+  }
+
+  /**
+   * sync 완료 전까지 state vector 요청을 재전송한다.
+   *
+   * 첫 입장 사용자는 빈 room에 SYNC_STEP1을 보내도 응답을 받을 peer가 없으므로,
+   * 뒤늦게 다른 peer가 참가했을 때도 handoff를 완료할 수 있도록 재시도를 유지한다.
+   */
+  private scheduleSyncRetry(): void {
+    if (this.synced || this.destroyed || this.intentionalClose) {
+      return;
+    }
+    this.clearSyncRetryTimer();
+    this.syncRetryTimer = setTimeout(() => {
+      this.syncRetryTimer = null;
+      if (this.synced || this.destroyed || this.intentionalClose) {
+        return;
+      }
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      this.requestSync();
+      this.scheduleSyncRetry();
+    }, 1500);
+  }
+
+  /**
+   * sync 재시도 타이머를 해제한다.
+   */
+  private clearSyncRetryTimer(): void {
+    if (this.syncRetryTimer) {
+      clearTimeout(this.syncRetryTimer);
+      this.syncRetryTimer = null;
     }
   }
 
@@ -604,6 +667,8 @@ export class YjsProvider {
 
   /**
    * Presence snapshot 메시지를 처리한다.
+   *
+   * @param payload Presence snapshot 바이너리 payload
    */
   private handlePresenceSnapshot(payload: Uint8Array): void {
     try {
@@ -626,6 +691,8 @@ export class YjsProvider {
 
   /**
    * Presence peer joined 메시지를 처리한다.
+   *
+   * @param payload Presence peer joined 바이너리 payload
    */
   private handlePresencePeerJoined(payload: Uint8Array): void {
     try {
@@ -656,6 +723,8 @@ export class YjsProvider {
 
   /**
    * Presence peer left 메시지를 처리한다.
+   *
+   * @param payload Presence peer left 바이너리 payload
    */
   private handlePresencePeerLeft(payload: Uint8Array): void {
     try {

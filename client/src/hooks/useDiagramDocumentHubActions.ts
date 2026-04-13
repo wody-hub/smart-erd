@@ -10,7 +10,7 @@ import {
 } from '@/api/diagramApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
-import type { CreateProjectDocumentInput } from '@/types/document';
+import { SCREEN_SPEC_DOCUMENT_PLUGIN_ID, type CreateProjectDocumentInput } from '@/types/document';
 import type { DiagramSummary } from '@/types/diagram';
 
 interface UseDiagramDocumentHubActionsOptions {
@@ -36,7 +36,12 @@ interface DiagramDocumentHubActionsResult {
   updateDictionaryContextPending: boolean;
 }
 
-/** DiagramsPage의 문서 허브 액션과 UI 상태를 모은다. */
+/**
+ * DiagramsPage의 문서 허브 액션과 UI 상태를 모은다.
+ *
+ * @param options 팀/프로젝트 스코프 옵션
+ * @returns 문서 허브 액션과 UI 상태
+ */
 export function useDiagramDocumentHubActions({
   teamId,
   projectId,
@@ -59,19 +64,10 @@ export function useDiagramDocumentHubActions({
     mutationFn: (input: CreateProjectDocumentInput) => createDiagram(teamId!, projectId!, input),
     onSuccess: (diagram) => {
       invalidateDocuments();
-      toast.success(
-        diagram.pluginId === 'markdown' ? t('markdown.toast.created') : t('diagram.toast.created'),
-      );
+      toast.success(resolveCreatedToast(diagram.pluginId));
     },
     onError: (err, variables) =>
-      toast.error(
-        getErrorMessage(
-          err,
-          variables.pluginId === 'markdown'
-            ? t('markdown.toast.createFailed')
-            : t('diagram.toast.createFailed'),
-        ),
-      ),
+      toast.error(getErrorMessage(err, resolveCreateFailedToast(variables.pluginId))),
   });
 
   const deleteMutation = useMutation({
@@ -135,6 +131,38 @@ export function useDiagramDocumentHubActions({
     },
     [updateDiagramSetMutation],
   );
+
+  /**
+   * 문서 생성 성공 toast 메시지를 플러그인 타입별로 고른다.
+   *
+   * @param pluginId 생성된 문서 플러그인 id
+   * @returns 노출할 toast 메시지
+   */
+  function resolveCreatedToast(pluginId: CreateProjectDocumentInput['pluginId']) {
+    if (pluginId === 'markdown') {
+      return t('markdown.toast.created');
+    }
+    if (pluginId === SCREEN_SPEC_DOCUMENT_PLUGIN_ID) {
+      return t('screenSpec.toast.created');
+    }
+    return t('diagram.toast.created');
+  }
+
+  /**
+   * 문서 생성 실패 toast 메시지를 플러그인 타입별로 고른다.
+   *
+   * @param pluginId 생성 요청 문서 플러그인 id
+   * @returns 노출할 실패 toast 메시지
+   */
+  function resolveCreateFailedToast(pluginId: CreateProjectDocumentInput['pluginId']) {
+    if (pluginId === 'markdown') {
+      return t('markdown.toast.createFailed');
+    }
+    if (pluginId === SCREEN_SPEC_DOCUMENT_PLUGIN_ID) {
+      return t('screenSpec.toast.createFailed');
+    }
+    return t('diagram.toast.createFailed');
+  }
 
   return {
     dialogOpen,

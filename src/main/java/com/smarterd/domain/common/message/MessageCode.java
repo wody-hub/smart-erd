@@ -54,6 +54,9 @@ public enum MessageCode {
     ERROR_BUSINESS_DOCUMENT_EXPORT_FORMAT_UNSUPPORTED("error.business.document-export-format-unsupported"),
     ERROR_BUSINESS_ERD_DICTIONARY_CONTEXT_REQUIRED("error.business.erd-dictionary-context-required"),
     ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED("error.business.markdown-dictionary-context-not-allowed"),
+    ERROR_BUSINESS_SCREEN_SPEC_DICTIONARY_CONTEXT_NOT_ALLOWED(
+        "error.business.screen-spec-dictionary-context-not-allowed"
+    ),
     ERROR_BUSINESS_MARKDOWN_TEMPLATE_INVALID("error.business.markdown-template-invalid"),
     ERROR_BUSINESS_DICTIONARY_SET_DEFAULT_DELETE_FORBIDDEN("error.business.dictionary-set-default-delete-forbidden"),
     ERROR_BUSINESS_PROJECT_TEAM_MISMATCH("error.business.project-team-mismatch"),
