@@ -1,7 +1,7 @@
 import * as Y from 'yjs';
 import type { ScreenDesignCollaborationBootstrap } from '@/collaboration/channel/document/screen-design-collaboration-bootstrap';
 import type { YjsDocumentAdapter } from './yjs-document-adapter';
-import { ensureScreenDesignDocumentStructure } from '@/pages/screendesign/screen-design-document';
+import { applyScreenDesignContentToDoc } from '@/pages/screendesign/screen-design-document';
 
 /**
  * 화면기획 기본 shared document shape를 보장한다.
@@ -17,10 +17,10 @@ export class ScreenSpecYjsDocumentAdapter implements YjsDocumentAdapter<ScreenDe
    */
   applyBootstrapToDoc(
     doc: Y.Doc,
-    _bootstrap: ScreenDesignCollaborationBootstrap,
+    bootstrap: ScreenDesignCollaborationBootstrap,
     origin: unknown,
   ): void {
-    ensureScreenDesignDocumentStructure(doc, origin);
+    applyScreenDesignContentToDoc(doc, bootstrap.content, origin);
   }
 
   /**

@@ -250,12 +250,7 @@ class DiagramServiceTest {
         final var team = createTeam(teamId, user);
         final var project = createProject(projectId, team);
         final var diagram = Objects.requireNonNull(
-            Diagram.builder()
-                .name("Screen Spec")
-                .pluginId("screen-spec")
-                .project(project)
-                .content(null)
-                .build()
+            Diagram.builder().name("Screen Spec").pluginId("screen-spec").project(project).content(null).build()
         );
         ReflectionTestUtils.setField(diagram, "id", diagramId);
 
@@ -376,15 +371,7 @@ class DiagramServiceTest {
         when(teamService.findTeamById(1L)).thenReturn(team);
         when(projectService.findProjectById(10L)).thenReturn(project);
 
-        final var result = diagramService.createDiagram(
-            loginId,
-            1L,
-            10L,
-            "Screen Flow",
-            "screen-spec",
-            null,
-            null
-        );
+        final var result = diagramService.createDiagram(loginId, 1L, 10L, "Screen Flow", "screen-spec", null, null);
 
         assertThat(result.name()).isEqualTo("Screen Flow");
         assertThat(result.pluginId()).isEqualTo(DiagramPluginId.SCREEN_SPEC.value());
@@ -403,15 +390,7 @@ class DiagramServiceTest {
         when(teamService.findTeamById(1L)).thenReturn(team);
         when(projectService.findProjectById(10L)).thenReturn(project);
 
-        final var result = diagramService.createDiagram(
-            loginId,
-            1L,
-            10L,
-            "Wireframe",
-            "screendesign",
-            null,
-            null
-        );
+        final var result = diagramService.createDiagram(loginId, 1L, 10L, "Wireframe", "screendesign", null, null);
 
         assertThat(result.pluginId()).isEqualTo(DiagramPluginId.SCREEN_SPEC.value());
     }

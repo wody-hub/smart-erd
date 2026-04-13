@@ -9,7 +9,12 @@ const INSTANCES_KEY = 'instances';
 const LAYERS_KEY = 'layers';
 const MASTERS_KEY = 'masters';
 
-type AnyYType = Y.AbstractType<any>;
+interface ParentAwareYType {
+  parent: unknown;
+  _item?: {
+    parentSub?: unknown;
+  } | null;
+}
 
 /**
  * shared document update에서 화면기획 affected scope 목록을 추출한다.
@@ -58,7 +63,7 @@ export function collectScreenSpecAffectedScopesFromTransaction(
   const affectedScopes = new Map<string, ScopeRef>();
 
   for (const [type, subs] of transaction.changed) {
-    const changedType = type as AnyYType;
+    const changedType = type as ParentAwareYType;
 
     if (isSameType(changedType, screens)) {
       for (const key of readChangedSubKeys(subs)) {
@@ -149,7 +154,7 @@ function readChangedSubKeys(subs: Set<unknown>): string[] {
  * @param type parentSub를 읽을 Yjs type
  * @returns 유효한 parentSub 문자열 또는 null
  */
-function readParentSub(type: AnyYType): string | null {
+function readParentSub(type: Pick<ParentAwareYType, '_item'>): string | null {
   return typeof type._item?.parentSub === 'string' && type._item.parentSub.length > 0
     ? type._item.parentSub
     : null;

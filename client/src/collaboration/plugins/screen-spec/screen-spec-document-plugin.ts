@@ -12,15 +12,16 @@ import { YJS_SHARED_DOCUMENT_ENGINE_ID } from '@/collaboration/core/engines/yjs-
 import { ScreenSpecMutationPolicy } from './screen-spec-mutation-policy';
 import { ScreenSpecProjector } from './screen-spec-projector';
 import { ScreenSpecScopeResolver } from './screen-spec-scope-resolver';
-import type {
-  ScreenDesignLibraryCategoryId,
-  ScreenDesignMasterTier,
+import {
+  SCREEN_DESIGN_DOCUMENT_SCHEMA_VERSION,
+  type ScreenDesignLibraryCategoryId,
+  type ScreenDesignMasterTier,
 } from '@/pages/screendesign/screen-design-document';
 
 export const SCREEN_SPEC_DOCUMENT_PLUGIN_ID = 'screen-spec';
 export const SCREEN_SPEC_DOCUMENT_ENGINE_ID = YJS_SHARED_DOCUMENT_ENGINE_ID;
 
-const SCREEN_SPEC_PLUGIN_SCHEMA_VERSION = 1;
+const SCREEN_SPEC_PLUGIN_SCHEMA_VERSION = SCREEN_DESIGN_DOCUMENT_SCHEMA_VERSION;
 
 export type ScreenSpecScreenMoveDirection = 'up' | 'down';
 export type ScreenSpecLayerMoveDirection = 'forward' | 'backward' | 'front' | 'back';
@@ -365,6 +366,15 @@ export function isScreenSpecCanvasInputAdapter(
 }
 
 /**
+ * 화면기획 캔버스 command adapter를 생성한다.
+ *
+ * @returns 화면기획 캔버스 command adapter
+ */
+export function createScreenSpecCanvasInputAdapter(): ScreenSpecCanvasInputAdapter {
+  return new ScreenSpecCanvasInputAdapterImpl();
+}
+
+/**
  * 화면기획 문서 플러그인 골격.
  */
 export class ScreenSpecDocumentPlugin implements BaseDocumentPlugin {
@@ -381,7 +391,7 @@ export class ScreenSpecDocumentPlugin implements BaseDocumentPlugin {
   createInputAdapters(context: PluginContext): InputAdapters {
     void context;
     return {
-      canvas: new ScreenSpecCanvasInputAdapterImpl(),
+      canvas: createScreenSpecCanvasInputAdapter(),
       form: {
         kind: 'form',
       },

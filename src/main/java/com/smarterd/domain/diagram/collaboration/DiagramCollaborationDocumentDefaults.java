@@ -8,7 +8,7 @@ import com.smarterd.domain.diagram.entity.DiagramPluginId;
 public final class DiagramCollaborationDocumentDefaults {
 
     public static final String ENGINE_ID = "yjs";
-    public static final int PLUGIN_SCHEMA_VERSION = 1;
+    public static final int DEFAULT_PLUGIN_SCHEMA_VERSION = 1;
     public static final int SNAPSHOT_FORMAT_VERSION = 1;
     public static final Integer ARTIFACT_VERSION = 1;
 
@@ -19,10 +19,18 @@ public final class DiagramCollaborationDocumentDefaults {
         return new CollaborationDocumentDefaults(
             resolved.value(),
             ENGINE_ID,
-            PLUGIN_SCHEMA_VERSION,
+            resolvePluginSchemaVersion(resolved),
             SNAPSHOT_FORMAT_VERSION,
             ARTIFACT_VERSION
         );
+    }
+
+    private static int resolvePluginSchemaVersion(DiagramPluginId pluginId) {
+        return switch (pluginId) {
+            case SCREEN_SPEC -> ScreenSpecCollaborationPlugin.SCHEMA_VERSION;
+            case MARKDOWN -> MarkdownCollaborationPlugin.SCHEMA_VERSION;
+            case ERD -> DEFAULT_PLUGIN_SCHEMA_VERSION;
+        };
     }
 
     public record CollaborationDocumentDefaults(

@@ -37,9 +37,7 @@ public class ScreenSpecScopeResolver implements ScopeResolver {
         }
 
         if ("master:update".equals(commandKey) || "master:delete".equals(commandKey)) {
-            return masterId == null
-                ? List.of()
-                : List.of(new ScopeRef("master", masterId, ScopeLockMode.EXCLUSIVE));
+            return masterId == null ? List.of() : List.of(new ScopeRef("master", masterId, ScopeLockMode.EXCLUSIVE));
         }
 
         if (
@@ -49,18 +47,22 @@ public class ScreenSpecScopeResolver implements ScopeResolver {
             "screen:move".equals(commandKey) ||
             "screen:delete".equals(commandKey)
         ) {
-            return screenId == null
-                ? List.of()
-                : List.of(new ScopeRef("screen", screenId, ScopeLockMode.EXCLUSIVE));
+            return screenId == null ? List.of() : List.of(new ScopeRef("screen", screenId, ScopeLockMode.EXCLUSIVE));
         }
 
-        if ("instance:add".equals(commandKey) || "instance:update".equals(commandKey) || "instance:delete".equals(commandKey)) {
+        if (
+            "instance:add".equals(commandKey) ||
+            "instance:update".equals(commandKey) ||
+            "instance:delete".equals(commandKey)
+        ) {
             return Stream.of(
                 screenId == null ? null : new ScopeRef("screen", screenId, ScopeLockMode.SHARED),
                 screenId == null ? null : new ScopeRef("layer", screenId, ScopeLockMode.SHARED),
                 instanceId == null ? null : new ScopeRef("instance", instanceId, ScopeLockMode.EXCLUSIVE),
                 masterId == null ? null : new ScopeRef("master", masterId, ScopeLockMode.SHARED)
-            ).filter(Objects::nonNull).toList();
+            )
+                .filter(Objects::nonNull)
+                .toList();
         }
 
         if ("layer:move".equals(commandKey)) {
@@ -68,7 +70,9 @@ public class ScreenSpecScopeResolver implements ScopeResolver {
                 screenId == null ? null : new ScopeRef("screen", screenId, ScopeLockMode.SHARED),
                 screenId == null ? null : new ScopeRef("layer", screenId, ScopeLockMode.EXCLUSIVE),
                 instanceId == null ? null : new ScopeRef("instance", instanceId, ScopeLockMode.SHARED)
-            ).filter(Objects::nonNull).toList();
+            )
+                .filter(Objects::nonNull)
+                .toList();
         }
 
         return List.of();

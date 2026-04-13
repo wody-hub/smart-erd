@@ -118,7 +118,9 @@ class ValidateCollaborationTicketUseCaseTest {
         when(collaborationTicketAuthenticator.validateAndConsume("ticket-1", 2)).thenReturn(Optional.of(session));
         org.mockito.Mockito.doThrow(
             new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_DIAGRAM_CHANNEL_TYPE.code())
-        ).when(collaborationAccessPolicy).validateAccess(session);
+        )
+            .when(collaborationAccessPolicy)
+            .validateAccess(session);
 
         assertThat(useCase.validateAndConsume("ticket-1", resourceKey, 2)).isEmpty();
         verify(collaborationAccessPolicy).validateAccess(session);

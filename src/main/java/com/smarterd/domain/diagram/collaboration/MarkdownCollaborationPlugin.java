@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 public class MarkdownCollaborationPlugin implements BaseCollaborationPlugin {
 
     private static final String PLUGIN_ID = "markdown";
-    private static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 1;
     private static final Set<String> SUPPORTED_ENGINE_IDS = Set.of("yjs");
 
     private final MarkdownScopeResolver scopeResolver;

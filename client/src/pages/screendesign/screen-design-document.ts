@@ -7,7 +7,8 @@ import { convertCssColorToHex } from './screen-design-canvas-palette';
 
 const ROOT_KEY = 'screenSpec';
 const SCHEMA_VERSION_KEY = 'schemaVersion';
-const SCHEMA_VERSION = 4;
+export const SCREEN_DESIGN_DOCUMENT_SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = SCREEN_DESIGN_DOCUMENT_SCHEMA_VERSION;
 const LIBRARY_SEED_VERSION_KEY = 'librarySeedVersion';
 const LIBRARY_SEED_VERSION = 1;
 const SCREENS_KEY = 'screens';
@@ -66,6 +67,41 @@ export const SCREEN_DESIGN_INITIAL_SCREEN_ID = 'screen-initial';
 export type ScreenDesignLibraryCategoryId = (typeof BUILT_IN_LIBRARY_CATEGORY_IDS)[number];
 export type ScreenDesignMasterTier = 'block' | 'widget';
 export type ScreenDesignMasterRenderKind = (typeof BUILT_IN_RENDER_KINDS)[number];
+
+/** CSS variable 이름 → category 매핑 */
+const SCREEN_SPEC_CATEGORY_TOKENS: Record<ScreenDesignLibraryCategoryId | 'default', string> = {
+  layout: '--screen-spec-category-layout',
+  table: '--screen-spec-category-table',
+  form: '--screen-spec-category-form',
+  input: '--screen-spec-category-input',
+  feedback: '--screen-spec-category-feedback',
+  button: '--screen-spec-category-button',
+  default: '--screen-spec-category-default',
+};
+
+/** import-safe category accent fallback HSL */
+const SCREEN_SPEC_CATEGORY_FALLBACK_HSL: Record<ScreenDesignLibraryCategoryId | 'default', string> =
+  {
+    layout: '213 27% 84%',
+    table: '213 97% 87%',
+    form: '232 97% 89%',
+    input: '141 79% 85%',
+    feedback: '48 97% 77%',
+    button: '326 88% 90%',
+    default: '212 24% 89%',
+  };
+
+/** non-DOM runtime fallback hex */
+const SCREEN_SPEC_CATEGORY_FALLBACK_HEX: Record<ScreenDesignLibraryCategoryId | 'default', string> =
+  {
+    layout: '#cbd5e1',
+    table: '#bedbfe',
+    form: '#c8cffe',
+    input: '#bbf7d0',
+    feedback: '#fde68b',
+    button: '#fccfe8',
+    default: '#dce3ea',
+  };
 
 export interface ScreenDesignScreen {
   id: string;
@@ -444,17 +480,6 @@ export const EMPTY_SCREEN_DESIGN_DOCUMENT: ScreenDesignDocumentSnapshot = {
   mastersAvailable: false,
 };
 
-/** CSS variable 이름 → category 매핑 */
-const SCREEN_SPEC_CATEGORY_TOKENS: Record<ScreenDesignLibraryCategoryId | 'default', string> = {
-  layout: '--screen-spec-category-layout',
-  table: '--screen-spec-category-table',
-  form: '--screen-spec-category-form',
-  input: '--screen-spec-category-input',
-  feedback: '--screen-spec-category-feedback',
-  button: '--screen-spec-category-button',
-  default: '--screen-spec-category-default',
-};
-
 export const FALLBACK_SCREEN_DESIGN_LIBRARY: ScreenDesignLibraryItem[] = BUILT_IN_LIBRARY_SEEDS.map(
   ({ id, ...seed }) => {
     const category = resolveScreenDesignLibraryCategory(seed.categoryId);
@@ -596,6 +621,128 @@ export function ensureScreenDesignDocumentStructure(
       normalizeScreenOrderYArray(screensMap, screenOrder);
     }
   }, origin);
+}
+
+interface PersistedScreenDesignSeed {
+  screens: ScreenDesignScreen[];
+  screenOrder: string[];
+  masters: Array<{
+    id: string;
+    name?: string;
+    labelKey?: string;
+    categoryId: ScreenDesignLibraryCategoryId;
+    tier: ScreenDesignMasterTier;
+    width: number;
+    height: number;
+    renderKind: ScreenDesignMasterRenderKind;
+    accentColor?: string | null;
+    preset?: boolean;
+  }>;
+  instances: Array<
+    ScreenDesignInstanceSeed & {
+      legacyWidth?: number;
+      legacyHeight?: number;
+    }
+  >;
+  layersByScreenId: Record<string, string[]>;
+}
+
+/**
+ * persisted screen-spec content fallback을 현재 Y.Doc 구조로 복원한다.
+ *
+ * @param doc 대상 Y.Doc
+ * @param content persisted JSON content
+ * @param origin bootstrap transaction origin
+ */
+export function applyScreenDesignContentToDoc(
+  doc: Y.Doc,
+  content: string | null | undefined,
+  origin: unknown = 'screen-spec-bootstrap',
+): void {
+  const persistedSeed = parsePersistedScreenDesignContent(content);
+  if (!persistedSeed) {
+    ensureScreenDesignDocumentStructure(doc, origin);
+    return;
+  }
+
+  doc.transact(() => {
+    const root = doc.getMap(ROOT_KEY);
+    const screensMap = new Y.Map<Y.Map<unknown>>();
+    const screenOrder = new Y.Array<string>();
+    const instancesMap = new Y.Map<Y.Map<unknown>>();
+    const layersMap = new Y.Map<Y.Array<string>>();
+    const mastersMap = new Y.Map<Y.Map<unknown>>();
+
+    root.set(SCHEMA_VERSION_KEY, 0);
+    root.set(LIBRARY_SEED_VERSION_KEY, 0);
+    root.set(SCREENS_KEY, screensMap);
+    root.set(SCREEN_ORDER_KEY, screenOrder);
+    root.set(INSTANCES_KEY, instancesMap);
+    root.set(LAYERS_KEY, layersMap);
+    root.set(MASTERS_KEY, mastersMap);
+
+    persistedSeed.screens.forEach((screen) => {
+      screensMap.set(
+        screen.id,
+        createScreenYMap(screen.id, {
+          name: screen.name,
+          width: screen.width,
+          height: screen.height,
+        }),
+      );
+      layersMap.set(screen.id, new Y.Array<string>());
+    });
+
+    if (persistedSeed.screenOrder.length > 0) {
+      screenOrder.insert(0, persistedSeed.screenOrder);
+    }
+
+    persistedSeed.masters.forEach((master) => {
+      mastersMap.set(
+        master.id,
+        createMasterYMap(master.id, {
+          name: master.name,
+          labelKey: master.labelKey,
+          categoryId: master.categoryId,
+          tier: master.tier,
+          width: master.width,
+          height: master.height,
+          renderKind: master.renderKind,
+          accentColor: master.accentColor,
+          preset: master.preset,
+        }),
+      );
+    });
+
+    persistedSeed.instances.forEach((instance) => {
+      const instanceYMap = createInstanceYMap({
+        id: instance.id,
+        screenId: instance.screenId,
+        masterId: instance.masterId,
+        x: instance.x,
+        y: instance.y,
+        overrides: instance.overrides,
+        masterSnapshot: instance.masterSnapshot,
+      });
+      if (instance.legacyWidth !== undefined) {
+        instanceYMap.set('width', instance.legacyWidth);
+      }
+      if (instance.legacyHeight !== undefined) {
+        instanceYMap.set('height', instance.legacyHeight);
+      }
+      instancesMap.set(instance.id, instanceYMap);
+    });
+
+    Object.entries(persistedSeed.layersByScreenId).forEach(([screenId, instanceIds]) => {
+      const layerYArray = layersMap.get(screenId);
+      if (!(layerYArray instanceof Y.Array) || instanceIds.length === 0) {
+        return;
+      }
+      layerYArray.insert(0, instanceIds);
+    });
+  }, origin);
+
+  ensureScreenDesignDocumentStructure(doc, origin);
 }
 
 /**
@@ -1404,6 +1551,435 @@ function readRenderKind(value: unknown): ScreenDesignMasterRenderKind | null {
     : null;
 }
 
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parsePersistedScreenDesignContent(
+  content: string | null | undefined,
+): PersistedScreenDesignSeed | null {
+  if (typeof content !== 'string' || content.trim().length === 0) {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return null;
+  }
+
+  if (!isJsonRecord(parsed)) {
+    return null;
+  }
+
+  const candidate = isJsonRecord(parsed.screenSpec) ? parsed.screenSpec : parsed;
+  if (
+    ![
+      'screens',
+      'screenOrder',
+      'instancesByScreenId',
+      'instances',
+      'layers',
+      'libraryItems',
+      'mastersById',
+      'masters',
+    ].some((key) => key in candidate)
+  ) {
+    return null;
+  }
+
+  const screenMap = new Map<string, ScreenDesignScreen>();
+  readPersistedScreens(candidate.screens).forEach((screen) => {
+    screenMap.set(screen.id, screen);
+  });
+
+  const explicitScreenOrder = normalizeStringArray(candidate.screenOrder);
+  const masters = readPersistedMasters(candidate);
+  const bucketInstances = readPersistedInstanceBuckets(candidate.instancesByScreenId);
+  const collectionInstances = readPersistedInstanceCollection(candidate.instances);
+  const instancesById = new Map<string, PersistedScreenDesignSeed['instances'][number]>();
+
+  [...bucketInstances.instances, ...collectionInstances.instances].forEach((instance) => {
+    if (!instancesById.has(instance.id)) {
+      instancesById.set(instance.id, instance);
+    }
+  });
+
+  const explicitLayers = readPersistedLayers(candidate.layers);
+  const mergedLayerIds = new Set<string>([
+    ...Object.keys(explicitLayers),
+    ...Object.keys(bucketInstances.layersByScreenId),
+    ...Object.keys(collectionInstances.layersByScreenId),
+  ]);
+  const fallbackPreset = resolveScreenDesignFramePreset(DEFAULT_SCREEN_DESIGN_FRAME_PRESET_ID);
+
+  mergedLayerIds.forEach((screenId) => {
+    if (!screenMap.has(screenId)) {
+      screenMap.set(screenId, {
+        id: screenId,
+        name: screenId,
+        width: fallbackPreset.width,
+        height: fallbackPreset.height,
+      });
+    }
+  });
+
+  instancesById.forEach((instance) => {
+    if (!screenMap.has(instance.screenId)) {
+      screenMap.set(instance.screenId, {
+        id: instance.screenId,
+        name: instance.screenId,
+        width: fallbackPreset.width,
+        height: fallbackPreset.height,
+      });
+    }
+  });
+
+  const screenIds = dedupeOrderedStrings([
+    ...explicitScreenOrder,
+    ...Array.from(screenMap.keys()),
+    ...mergedLayerIds,
+  ]);
+  const layersByScreenId = Object.fromEntries(
+    screenIds.map((screenId) => [
+      screenId,
+      mergeExplicitAndDerivedIds(
+        explicitLayers[screenId] ?? [],
+        bucketInstances.layersByScreenId[screenId] ?? [],
+        collectionInstances.layersByScreenId[screenId] ?? [],
+      ),
+    ]),
+  );
+
+  return {
+    screens: screenIds
+      .map((screenId) => screenMap.get(screenId))
+      .filter((screen): screen is ScreenDesignScreen => screen !== undefined),
+    screenOrder: screenIds,
+    masters,
+    instances: Array.from(instancesById.values()),
+    layersByScreenId,
+  };
+}
+
+function readPersistedScreens(value: unknown): ScreenDesignScreen[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry, index) =>
+        isJsonRecord(entry) ? readPersistedScreen(entry, `screen-${index + 1}`) : null,
+      )
+      .filter((screen): screen is ScreenDesignScreen => screen !== null);
+  }
+  if (isJsonRecord(value)) {
+    return Object.entries(value)
+      .map(([screenId, entry]) =>
+        isJsonRecord(entry) ? readPersistedScreen(entry, screenId) : null,
+      )
+      .filter((screen): screen is ScreenDesignScreen => screen !== null);
+  }
+  return [];
+}
+
+function readPersistedScreen(
+  value: Record<string, unknown>,
+  fallbackId: string,
+): ScreenDesignScreen | null {
+  const screenId = readString(value.id) ?? fallbackId;
+  if (!screenId) {
+    return null;
+  }
+  const fallbackPreset = resolveScreenDesignFramePreset(DEFAULT_SCREEN_DESIGN_FRAME_PRESET_ID);
+  return {
+    id: screenId,
+    name: readString(value.name) ?? screenId,
+    width: readPositiveNumber(value.width) ?? fallbackPreset.width,
+    height: readPositiveNumber(value.height) ?? fallbackPreset.height,
+  };
+}
+
+function readPersistedMasters(
+  candidate: Record<string, unknown>,
+): PersistedScreenDesignSeed['masters'] {
+  const masterMap = new Map<string, PersistedScreenDesignSeed['masters'][number]>();
+  const sources = [candidate.libraryItems, candidate.mastersById, candidate.masters];
+
+  sources.forEach((source) => {
+    if (Array.isArray(source)) {
+      source.forEach((entry, index) => {
+        if (!isJsonRecord(entry)) {
+          return;
+        }
+        const master = readPersistedMaster(entry, `master-${index + 1}`);
+        if (master) {
+          masterMap.set(master.id, master);
+        }
+      });
+      return;
+    }
+    if (!isJsonRecord(source)) {
+      return;
+    }
+    Object.entries(source).forEach(([masterId, entry]) => {
+      if (!isJsonRecord(entry)) {
+        return;
+      }
+      const master = readPersistedMaster(entry, masterId);
+      if (master) {
+        masterMap.set(master.id, master);
+      }
+    });
+  });
+
+  return Array.from(masterMap.values());
+}
+
+function readPersistedMaster(
+  value: Record<string, unknown>,
+  fallbackId: string,
+): PersistedScreenDesignSeed['masters'][number] | null {
+  const masterId = readString(value.id) ?? fallbackId;
+  if (!masterId) {
+    return null;
+  }
+  const categoryId = readCategoryId(value.categoryId ?? value.category) ?? 'layout';
+  const label = readString(value.label) ?? readString(value.name);
+  return {
+    id: masterId,
+    name: label ?? undefined,
+    labelKey: label ? undefined : (readString(value.labelKey) ?? undefined),
+    categoryId,
+    tier: readTier(value.tier),
+    width: readPositiveNumber(value.width) ?? 280,
+    height: readPositiveNumber(value.height) ?? 180,
+    renderKind: readRenderKind(value.renderKind) ?? 'generic',
+    accentColor: normalizeScreenDesignColor(value.accentColor),
+    preset: readBoolean(value.preset) ?? false,
+  };
+}
+
+function readPersistedInstanceBuckets(value: unknown): {
+  instances: PersistedScreenDesignSeed['instances'];
+  layersByScreenId: Record<string, string[]>;
+} {
+  if (!isJsonRecord(value)) {
+    return {
+      instances: [],
+      layersByScreenId: {},
+    };
+  }
+
+  const instances: PersistedScreenDesignSeed['instances'] = [];
+  const layersByScreenId: Record<string, string[]> = {};
+
+  Object.entries(value).forEach(([screenId, bucket]) => {
+    if (!Array.isArray(bucket)) {
+      return;
+    }
+    const layerIds: string[] = [];
+    bucket.forEach((entry) => {
+      if (!isJsonRecord(entry)) {
+        return;
+      }
+      const instance = readPersistedInstance(entry, screenId);
+      if (!instance) {
+        return;
+      }
+      instances.push(instance);
+      layerIds.push(instance.id);
+    });
+    layersByScreenId[screenId] = dedupeOrderedStrings(layerIds);
+  });
+
+  return {
+    instances,
+    layersByScreenId,
+  };
+}
+
+function readPersistedInstanceCollection(value: unknown): {
+  instances: PersistedScreenDesignSeed['instances'];
+  layersByScreenId: Record<string, string[]>;
+} {
+  const instances: PersistedScreenDesignSeed['instances'] = [];
+  const layersByScreenId: Record<string, string[]> = {};
+
+  const pushInstance = (entry: Record<string, unknown>, fallbackId: string) => {
+    const instance = readPersistedInstance(entry, null, fallbackId);
+    if (!instance) {
+      return;
+    }
+    instances.push(instance);
+    const currentIds = layersByScreenId[instance.screenId] ?? [];
+    currentIds.push(instance.id);
+    layersByScreenId[instance.screenId] = currentIds;
+  };
+
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => {
+      if (isJsonRecord(entry)) {
+        pushInstance(entry, `instance-${index + 1}`);
+      }
+    });
+    return {
+      instances,
+      layersByScreenId: Object.fromEntries(
+        Object.entries(layersByScreenId).map(([screenId, instanceIds]) => [
+          screenId,
+          dedupeOrderedStrings(instanceIds),
+        ]),
+      ),
+    };
+  }
+
+  if (isJsonRecord(value)) {
+    Object.entries(value).forEach(([instanceId, entry]) => {
+      if (isJsonRecord(entry)) {
+        pushInstance(entry, instanceId);
+      }
+    });
+  }
+
+  return {
+    instances,
+    layersByScreenId: Object.fromEntries(
+      Object.entries(layersByScreenId).map(([screenId, instanceIds]) => [
+        screenId,
+        dedupeOrderedStrings(instanceIds),
+      ]),
+    ),
+  };
+}
+
+function readPersistedInstance(
+  value: Record<string, unknown>,
+  fallbackScreenId: string | null,
+  fallbackId = 'instance-restored',
+): PersistedScreenDesignSeed['instances'][number] | null {
+  const instanceId = readString(value.id) ?? fallbackId;
+  const screenId = readString(value.screenId) ?? fallbackScreenId;
+  const masterId = readString(value.masterId);
+  if (!instanceId || !screenId || !masterId) {
+    return null;
+  }
+
+  const overrideSource = isJsonRecord(value.overrides) ? value.overrides : null;
+  const overrideState = isJsonRecord(value.overrideState) ? value.overrideState : null;
+  const hasOverrideMetadata = overrideSource !== null || overrideState !== null;
+  const labelOverride =
+    readString(overrideSource?.label) ??
+    (overrideState?.label === true ? (readString(value.label) ?? undefined) : undefined);
+  const accentOverride =
+    normalizeScreenDesignColor(overrideSource?.accentColor) ??
+    (overrideState?.accentColor === true
+      ? (normalizeScreenDesignColor(value.accentColor) ?? undefined)
+      : undefined);
+  const widthOverride =
+    readPositiveNumber(overrideSource?.width) ??
+    (overrideState?.width === true ? (readPositiveNumber(value.width) ?? undefined) : undefined);
+  const heightOverride =
+    readPositiveNumber(overrideSource?.height) ??
+    (overrideState?.height === true ? (readPositiveNumber(value.height) ?? undefined) : undefined);
+  const overrides = {
+    ...(labelOverride ? { label: labelOverride } : {}),
+    ...(accentOverride ? { accentColor: accentOverride } : {}),
+    ...(typeof widthOverride === 'number' ? { width: widthOverride } : {}),
+    ...(typeof heightOverride === 'number' ? { height: heightOverride } : {}),
+  };
+  const legacyWidth =
+    hasOverrideMetadata || widthOverride !== undefined
+      ? undefined
+      : readPositiveNumber(value.width);
+  const legacyHeight =
+    hasOverrideMetadata || heightOverride !== undefined
+      ? undefined
+      : readPositiveNumber(value.height);
+
+  return {
+    id: instanceId,
+    screenId,
+    masterId,
+    x: readNumber(value.x) ?? SCREEN_DESIGN_DOCUMENT_PADDING,
+    y: readNumber(value.y) ?? SCREEN_DESIGN_DOCUMENT_PADDING,
+    overrides: Object.keys(overrides).length > 0 ? overrides : undefined,
+    masterSnapshot: readPersistedInstanceMasterSnapshot(value.masterSnapshot),
+    legacyWidth: legacyWidth ?? undefined,
+    legacyHeight: legacyHeight ?? undefined,
+  };
+}
+
+function readPersistedInstanceMasterSnapshot(
+  value: unknown,
+): ScreenDesignInstanceMasterSnapshot | null {
+  if (!isJsonRecord(value)) {
+    return null;
+  }
+  const categoryId = readCategoryId(value.categoryId ?? value.category) ?? 'layout';
+  return {
+    label: readString(value.label) ?? undefined,
+    labelKey: readString(value.labelKey) ?? undefined,
+    categoryId,
+    tier: readTier(value.tier),
+    width: readPositiveNumber(value.width) ?? 240,
+    height: readPositiveNumber(value.height) ?? 180,
+    renderKind: readRenderKind(value.renderKind) ?? 'generic',
+    accentColor: normalizeScreenDesignColor(value.accentColor),
+    preset: readBoolean(value.preset) ?? false,
+  };
+}
+
+function readPersistedLayers(value: unknown): Record<string, string[]> {
+  if (Array.isArray(value)) {
+    return Object.fromEntries(
+      value.flatMap((entry) => {
+        if (!isJsonRecord(entry)) {
+          return [];
+        }
+        const screenId = readString(entry.screenId) ?? readString(entry.id);
+        if (!screenId) {
+          return [];
+        }
+        return [[screenId, normalizeStringArray(entry.instanceIds)]];
+      }),
+    );
+  }
+  if (isJsonRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([screenId, instanceIds]) => [
+        screenId,
+        normalizeStringArray(instanceIds),
+      ]),
+    );
+  }
+  return {};
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return dedupeOrderedStrings(
+    value.map((entry) => readString(entry)).filter((entry): entry is string => entry !== null),
+  );
+}
+
+function dedupeOrderedStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  values.forEach((value) => {
+    if (seen.has(value)) {
+      return;
+    }
+    seen.add(value);
+    ordered.push(value);
+  });
+  return ordered;
+}
+
+function mergeExplicitAndDerivedIds(...sources: string[][]): string[] {
+  return dedupeOrderedStrings(sources.flat());
+}
+
 /**
  * 저장값에서 비어 있지 않은 문자열을 읽는다.
  *
@@ -1443,18 +2019,24 @@ function resolveScreenDesignAccentColor(
   if (normalized) {
     return normalized;
   }
-  if (typeof document === 'undefined') {
-    return '#d6dbe3';
-  }
   const tokenName = SCREEN_SPEC_CATEGORY_TOKENS[categoryId] ?? SCREEN_SPEC_CATEGORY_TOKENS.default;
-  const styles = getComputedStyle(document.documentElement);
-  const hsl = styles.getPropertyValue(tokenName).trim();
-  if (hsl) {
-    return convertCssColorToHex(`hsl(${hsl})`);
+  if (
+    typeof document !== 'undefined' &&
+    typeof getComputedStyle === 'function' &&
+    document.documentElement
+  ) {
+    const styles = getComputedStyle(document.documentElement);
+    const hsl = styles.getPropertyValue(tokenName).trim();
+    if (hsl) {
+      return convertCssColorToHex(`hsl(${hsl})`);
+    }
+    const fallbackHsl =
+      styles.getPropertyValue(SCREEN_SPEC_CATEGORY_TOKENS.default).trim() ||
+      SCREEN_SPEC_CATEGORY_FALLBACK_HSL.default;
+    return convertCssColorToHex(`hsl(${fallbackHsl})`);
   }
-  const fallback =
-    styles.getPropertyValue(SCREEN_SPEC_CATEGORY_TOKENS.default).trim() || '212 24% 89%';
-  return convertCssColorToHex(`hsl(${fallback})`);
+
+  return SCREEN_SPEC_CATEGORY_FALLBACK_HEX[categoryId];
 }
 
 /**

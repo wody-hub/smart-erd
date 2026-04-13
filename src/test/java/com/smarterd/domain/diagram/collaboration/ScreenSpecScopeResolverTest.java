@@ -90,6 +90,7 @@ class ScreenSpecScopeResolverTest {
         final var plugin = new ScreenSpecCollaborationPlugin();
 
         assertThat(plugin.pluginId()).isEqualTo("screen-spec");
+        assertThat(plugin.schemaVersion()).isEqualTo(ScreenSpecCollaborationPlugin.SCHEMA_VERSION);
         assertThat(plugin.supportedEngineIds()).containsExactly("yjs");
     }
 }
