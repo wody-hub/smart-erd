@@ -444,6 +444,17 @@ export const EMPTY_SCREEN_DESIGN_DOCUMENT: ScreenDesignDocumentSnapshot = {
   mastersAvailable: false,
 };
 
+/** CSS variable 이름 → category 매핑 */
+const SCREEN_SPEC_CATEGORY_TOKENS: Record<ScreenDesignLibraryCategoryId | 'default', string> = {
+  layout: '--screen-spec-category-layout',
+  table: '--screen-spec-category-table',
+  form: '--screen-spec-category-form',
+  input: '--screen-spec-category-input',
+  feedback: '--screen-spec-category-feedback',
+  button: '--screen-spec-category-button',
+  default: '--screen-spec-category-default',
+};
+
 export const FALLBACK_SCREEN_DESIGN_LIBRARY: ScreenDesignLibraryItem[] = BUILT_IN_LIBRARY_SEEDS.map(
   ({ id, ...seed }) => {
     const category = resolveScreenDesignLibraryCategory(seed.categoryId);
@@ -1417,17 +1428,6 @@ export function normalizeScreenDesignColor(value: unknown): string | null {
   return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : null;
 }
 
-/** CSS variable 이름 → category 매핑 */
-const SCREEN_SPEC_CATEGORY_TOKENS: Record<ScreenDesignLibraryCategoryId | 'default', string> = {
-  layout: '--screen-spec-category-layout',
-  table: '--screen-spec-category-table',
-  form: '--screen-spec-category-form',
-  input: '--screen-spec-category-input',
-  feedback: '--screen-spec-category-feedback',
-  button: '--screen-spec-category-button',
-  default: '--screen-spec-category-default',
-};
-
 /**
  * category별 기본 accent color를 CSS variable 토큰에서 해석하여 hex로 반환한다.
  *
@@ -1442,6 +1442,9 @@ function resolveScreenDesignAccentColor(
   const normalized = normalizeScreenDesignColor(value);
   if (normalized) {
     return normalized;
+  }
+  if (typeof document === 'undefined') {
+    return '#d6dbe3';
   }
   const tokenName = SCREEN_SPEC_CATEGORY_TOKENS[categoryId] ?? SCREEN_SPEC_CATEGORY_TOKENS.default;
   const styles = getComputedStyle(document.documentElement);
