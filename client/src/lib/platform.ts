@@ -1,4 +1,5 @@
 import { ROUTES } from '@/constants/routes';
+import { STORAGE_KEYS } from '@/constants/storage';
 
 /** 모듈 스코프 캐시 — bootstrap() 완료 후에만 유효한 값을 가진다 */
 let cachedServerUrl = '';
@@ -39,6 +40,7 @@ export function initServerUrl(url: string): void {
  * @param deps.clearCache  React Query 캐시 전면 삭제 (queryClient.clear)
  * @param deps.clearAuth   인증 상태 초기화 (localStorage 토큰 + Zustand 상태)
  * @param deps.logoutFromServer  이전 서버에 logout API 호출 (실패 시 무시)
+ * @returns 서버 URL 저장과 상태 초기화 완료 Promise
  */
 export async function updateServerUrl(
   url: string,
@@ -55,7 +57,7 @@ export async function updateServerUrl(
   if (api) {
     await api.setServerUrl(url);
   } else {
-    localStorage.setItem('smart-erd-server-url', url);
+    localStorage.setItem(STORAGE_KEYS.SERVER_URL, url);
   }
   cachedServerUrl = url;
   deps.clearCache();

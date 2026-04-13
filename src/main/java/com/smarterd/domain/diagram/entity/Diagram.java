@@ -122,14 +122,29 @@ public class Diagram extends BaseAuditEntity {
         this.name = name;
     }
 
+    /**
+     * 다이어그램에 적용된 사전 세트를 변경한다.
+     *
+     * @param dictionarySet 변경할 사전 세트
+     */
     public void changeDictionarySet(DictionarySet dictionarySet) {
         this.dictionarySet = dictionarySet;
     }
 
+    /**
+     * 문서 플러그인 ID를 반환한다. null이면 기본값 {@code "erd"}를 반환한다.
+     *
+     * @return 문서 플러그인 ID
+     */
     public String getPluginId() {
         return Objects.requireNonNullElse(pluginId, DiagramPluginId.ERD.value());
     }
 
+    /**
+     * 이 다이어그램이 마크다운 문서인지 여부를 반환한다.
+     *
+     * @return 마크다운 문서이면 {@code true}
+     */
     public boolean isMarkdownDocument() {
         return DiagramPluginId.MARKDOWN.value().equals(getPluginId());
     }

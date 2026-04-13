@@ -126,6 +126,7 @@ public class WsTicketService {
      * @param ticket 검증할 ticket 문자열
      * @return 검증 성공 시 세션 정보, 실패 시 empty
      */
+    @Transactional
     public Optional<AuthenticatedSession> validateAndConsume(String ticket) {
         final var result = wsTicketStore
             .consume(ticket)

@@ -1224,6 +1224,12 @@
       "title": "접속자 {{count}}명",
       "online": "접속 중",
       "me": "나"
+    },
+    "remotePending": {
+      "message": "원격 변경 대기 중",
+      "accept": "수락",
+      "reject": "거절",
+      "merge": "병합"
     }
   },
   "permission": {

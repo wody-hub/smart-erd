@@ -330,8 +330,7 @@ function extractJavaParamNames(paramsRaw) {
     return [];
   }
 
-  return paramsRaw
-    .split(',')
+  return splitJavaParams(paramsRaw)
     .map((part) => part.trim())
     .filter((part) => part.length > 0)
     .map((part) =>
@@ -346,6 +345,34 @@ function extractJavaParamNames(paramsRaw) {
       return tokens[tokens.length - 1]?.trim() ?? '';
     })
     .filter((name) => name.length > 0);
+}
+
+function splitJavaParams(paramsRaw) {
+  const parts = [];
+  let current = '';
+  let genericDepth = 0;
+
+  for (const char of paramsRaw) {
+    if (char === '<') {
+      genericDepth += 1;
+    } else if (char === '>') {
+      genericDepth = Math.max(0, genericDepth - 1);
+    }
+
+    if (char === ',' && genericDepth === 0) {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current.trim().length > 0) {
+    parts.push(current);
+  }
+
+  return parts;
 }
 
 function extractJavaReturnType(beforeParen, methodName) {

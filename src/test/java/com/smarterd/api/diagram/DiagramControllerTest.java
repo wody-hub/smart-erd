@@ -12,7 +12,7 @@ import com.smarterd.application.diagram.command.SaveDiagramUseCase;
 import com.smarterd.domain.diagram.service.DiagramColumnDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramIndexDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService;
-import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
+import com.smarterd.domain.diagram.service.SaveDiagramResult;
 import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
 import com.smarterd.domain.markdown.service.MarkdownExportService;
 import com.smarterd.utils.excel.ExcelData;

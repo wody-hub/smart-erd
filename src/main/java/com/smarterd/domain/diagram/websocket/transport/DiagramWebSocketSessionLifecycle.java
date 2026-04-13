@@ -22,9 +22,16 @@ import org.springframework.web.socket.WebSocketSession;
 @Slf4j
 public class DiagramWebSocketSessionLifecycle {
 
+    /** 다이어그램 세션 입장/퇴장 transport 유스케이스 */
     private final DiagramSessionTransportUseCase diagramSessionTransportUseCase;
+
+    /** 다이어그램 세션 입장 완료 유스케이스 */
     private final CompleteDiagramSessionJoinUseCase completeDiagramSessionJoinUseCase;
+
+    /** 다이어그램 세션 퇴장 완료 유스케이스 */
     private final CompleteDiagramSessionLeaveUseCase completeDiagramSessionLeaveUseCase;
+
+    /** 레거시 presence 브로드캐스트 포트 */
     private final DiagramLegacyPresencePort diagramLegacyPresencePort;
 
     /**

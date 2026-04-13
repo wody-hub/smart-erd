@@ -9,6 +9,8 @@ public enum MessageCode {
     ERROR_ACCESS_DENIED_NOT_ADMIN("error.access-denied.not-admin"),
     ERROR_ACCESS_DENIED_NOT_MEMBER("error.access-denied.not-member"),
     ERROR_ACCESS_DENIED_VIEWER_READONLY("error.access-denied.viewer-readonly"),
+    ERROR_ACCESS_DENIED_DIAGRAM_CHANNEL_TYPE("error.access-denied.diagram-channel-type"),
+    ERROR_ACCESS_DENIED_DIAGRAM_RESOURCE_ID("error.access-denied.diagram-resource-id"),
     ERROR_BULK_CONCURRENT_DUPLICATE("error.bulk.concurrent-duplicate"),
     ERROR_BULK_EMPTY_FILE("error.bulk.empty-file"),
     ERROR_BULK_MISSING_COLUMNS("error.bulk.missing-columns"),
@@ -87,10 +89,20 @@ public enum MessageCode {
         this.code = code;
     }
 
+    /**
+     * 메시지 코드 문자열을 반환한다.
+     *
+     * @return i18n lookup용 코드 문자열
+     */
     public String code() {
         return code;
     }
 
+    /**
+     * 메시지 코드를 문자열로 반환한다.
+     *
+     * @return 메시지 코드 문자열
+     */
     @Override
     public String toString() {
         return code;

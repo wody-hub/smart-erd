@@ -80,18 +80,18 @@ export function RemotePendingBanner({
     >
       <AlertTriangle className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       <span className="flex-1 text-muted-foreground">
-        {t('collaboration.remotePending.message', 'Remote changes pending')}
+        {t('collaboration.remotePending.message')}
       </span>
       <div className="flex gap-1">
         <Button variant="outline" size="sm" onClick={onAccept}>
-          {t('collaboration.remotePending.accept', 'Accept')}
+          {t('collaboration.remotePending.accept')}
         </Button>
         <Button variant="outline" size="sm" onClick={onReject}>
-          {t('collaboration.remotePending.reject', 'Reject')}
+          {t('collaboration.remotePending.reject')}
         </Button>
         {onMerge && (
           <Button variant="outline" size="sm" onClick={onMerge}>
-            {t('collaboration.remotePending.merge', 'Merge')}
+            {t('collaboration.remotePending.merge')}
           </Button>
         )}
       </div>

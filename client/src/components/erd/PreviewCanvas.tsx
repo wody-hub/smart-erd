@@ -734,7 +734,13 @@ export default function PreviewCanvas({
                   color="hsl(var(--muted-foreground) / 0.18)"
                 />
                 <Controls showInteractive={false} />
-                {displayNodes.length <= PREVIEW_MINIMAP_NODE_LIMIT && <MiniMap pannable zoomable />}
+                {displayNodes.length <= PREVIEW_MINIMAP_NODE_LIMIT && (
+                  <MiniMap
+                    pannable
+                    zoomable
+                    style={{ backgroundColor: 'hsl(var(--background))' }}
+                  />
+                )}
               </ReactFlow>
             </ConnectedColumnIdsProvider>
           </CompactTableRenderingProvider>

@@ -1,6 +1,7 @@
 package com.smarterd.domain.diagram.websocket.session;
 
 import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
+import com.smarterd.domain.common.exception.DomainAccessDeniedException;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationResourceKeyFactory;
 import com.smarterd.domain.diagram.collaboration.DiagramCollaborationSessionMetadataPolicy;
 import org.springframework.lang.Nullable;
@@ -53,7 +54,7 @@ public class DiagramWebSocketSessionResolver {
                     info.expiresAt(),
                     info.protocolVersion()
                 );
-            } catch (IllegalArgumentException e) {
+            } catch (DomainAccessDeniedException e) {
                 return null;
             }
         }

@@ -4,6 +4,7 @@ import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.message.MessageCode;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -83,6 +84,13 @@ public class MarkdownTemplateService {
         return TEMPLATE_LABELS.get(templateKey);
     }
 
+    /**
+     * 기술 스펙 템플릿으로 초기 마크다운 콘텐츠를 생성한다.
+     *
+     * @param documentName 문서 이름
+     * @param templateKey  템플릿 키
+     * @return 직렬화된 마크다운 문자열
+     */
     private String buildTechnicalSpec(String documentName, String templateKey) {
         final var frontmatter = new LinkedHashMap<String, Object>();
         frontmatter.put("title", documentName);
@@ -90,7 +98,7 @@ public class MarkdownTemplateService {
         frontmatter.put("status", "draft");
         frontmatter.put("owner", "unassigned");
         frontmatter.put("date", LocalDate.now().toString());
-        frontmatter.put("tags", java.util.List.of("spec"));
+        frontmatter.put("tags", List.of("spec"));
         return (
             serialize(frontmatter) +
             "# " +
@@ -107,13 +115,20 @@ public class MarkdownTemplateService {
         );
     }
 
+    /**
+     * 회의록 템플릿으로 초기 마크다운 콘텐츠를 생성한다.
+     *
+     * @param documentName 문서 이름
+     * @param templateKey  템플릿 키
+     * @return 직렬화된 마크다운 문자열
+     */
     private String buildMeetingNotes(String documentName, String templateKey) {
         final var frontmatter = new LinkedHashMap<String, Object>();
         frontmatter.put("title", documentName);
         frontmatter.put("template", templateKey);
         frontmatter.put("status", "draft");
         frontmatter.put("date", LocalDate.now().toString());
-        frontmatter.put("tags", java.util.List.of("meeting"));
+        frontmatter.put("tags", List.of("meeting"));
         return (
             serialize(frontmatter) +
             "# " +
@@ -132,13 +147,20 @@ public class MarkdownTemplateService {
         );
     }
 
+    /**
+     * 릴리스 노트 템플릿으로 초기 마크다운 콘텐츠를 생성한다.
+     *
+     * @param documentName 문서 이름
+     * @param templateKey  템플릿 키
+     * @return 직렬화된 마크다운 문자열
+     */
     private String buildReleaseNote(String documentName, String templateKey) {
         final var frontmatter = new LinkedHashMap<String, Object>();
         frontmatter.put("title", documentName);
         frontmatter.put("template", templateKey);
         frontmatter.put("status", "draft");
         frontmatter.put("date", LocalDate.now().toString());
-        frontmatter.put("tags", java.util.List.of("release"));
+        frontmatter.put("tags", List.of("release"));
         return (
             serialize(frontmatter) +
             "# " +
@@ -153,6 +175,12 @@ public class MarkdownTemplateService {
         );
     }
 
+    /**
+     * frontmatter 맵을 YAML 형식으로 직렬화하여 마크다운 프론트매터 블록을 생성한다.
+     *
+     * @param frontmatter 직렬화할 프론트매터 키-값 맵
+     * @return {@code ---} 구분자로 감싼 YAML 프론트매터 문자열
+     */
     private String serialize(Map<String, Object> frontmatter) {
         return "---\n" + yaml.dump(frontmatter).trim() + "\n---\n\n";
     }

@@ -18,7 +18,6 @@ import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.service.ProjectService;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -80,7 +79,9 @@ public class DiagramService {
      * @param teamId    팀 ID
      * @param projectId 프로젝트 ID
      * @param name      다이어그램 이름
+     * @param pluginId 생성할 문서 플러그인 ID
      * @param dictionarySetId 사전 세트 ID
+     * @param templateKey markdown 초기 템플릿 키
      * @return 생성된 다이어그램 요약 결과
      */
     @Transactional
@@ -432,114 +433,13 @@ public class DiagramService {
     }
 
     /**
-     * 다이어그램 목록/이름변경 응답용 서비스 결과.
+     * 플러그인 종류에 맞는 사전 세트를 검증하고 반환한다.
      *
-     * @param id                다이어그램 ID
-     * @param name              다이어그램 이름
-     * @param projectId         소속 프로젝트 ID
-     * @param dictionarySetId   사전 세트 ID
-     * @param dictionarySetName 사전 세트 이름
-     * @param createdAt         생성 시각
-     * @param updatedAt         수정 시각
+     * @param project 프로젝트 엔티티
+     * @param pluginId 문서 플러그인 ID
+     * @param dictionarySetId 요청 사전 세트 ID
+     * @return 검증된 사전 세트, markdown 문서면 null
      */
-    public record DiagramSummaryResult(
-        Long id,
-        String name,
-        String pluginId,
-        Long projectId,
-        Long dictionarySetId,
-        String dictionarySetName,
-        String templateKey,
-        String templateLabel,
-        String summaryText,
-        Instant createdAt,
-        Instant updatedAt
-    ) {}
-
-    /**
-     * 다이어그램 상세 응답용 서비스 결과.
-     *
-     * @param id                다이어그램 ID
-     * @param name              다이어그램 이름
-     * @param projectId         소속 프로젝트 ID
-     * @param dictionarySetId   사전 세트 ID
-     * @param dictionarySetName 사전 세트 이름
-     * @param content           직렬화된 React Flow JSON
-     * @param hasYdocSnapshot   Y.Doc 스냅샷 존재 여부
-     * @param contentRevision   content 리비전
-     * @param snapshotRevision  snapshot 리비전
-     * @param snapshotUpdatedAt snapshot 저장 시각
-     * @param createdAt         생성 시각
-     * @param updatedAt         수정 시각
-     */
-    public record DiagramDetailResult(
-        Long id,
-        String name,
-        String pluginId,
-        Long projectId,
-        Long dictionarySetId,
-        String dictionarySetName,
-        String templateKey,
-        String templateLabel,
-        String summaryText,
-        String content,
-        boolean hasYdocSnapshot,
-        long contentRevision,
-        Long snapshotRevision,
-        Instant snapshotUpdatedAt,
-        Instant createdAt,
-        Instant updatedAt
-    ) {}
-
-    /**
-     * 다이어그램 bootstrap 응답용 서비스 결과.
-     *
-     * @param contentRevision content 리비전
-     * @param snapshotRevision snapshot 리비전
-     * @param hasYdocSnapshot Y.Doc 스냅샷 존재 여부
-     * @param artifactAvailable content fallback artifact 존재 여부
-     */
-    public record DiagramBootstrapResult(
-        String pluginId,
-        String engineId,
-        int pluginSchemaVersion,
-        int snapshotFormatVersion,
-        Integer artifactVersion,
-        long revision,
-        boolean snapshotAvailable,
-        boolean artifactAvailable
-    ) {}
-
-    /**
-     * 다이어그램 저장 응답용 서비스 결과.
-     *
-     * @param contentRevision   최신 content 리비전
-     * @param hasYdocSnapshot   Y.Doc 스냅샷 존재 여부
-     * @param snapshotRevision  snapshot 리비전
-     * @param snapshotUpdatedAt snapshot 저장 시각
-     * @param updatedAt         최종 수정 시각
-     */
-    public record SaveDiagramResult(
-        long contentRevision,
-        boolean hasYdocSnapshot,
-        Long snapshotRevision,
-        Instant snapshotUpdatedAt,
-        Instant updatedAt
-    ) {}
-
-    /**
-     * 다이어그램 사전 세트 변경 결과.
-     *
-     * @param dictionarySetId              변경된 사전 세트 ID
-     * @param invalidatedTermBindingCount  무효화된 term 바인딩 수
-     * @param invalidatedDomainBindingCount 무효화된 domain 바인딩 수
-     */
-    public record DictionarySetChangeResult(
-        Long dictionarySetId,
-        int invalidatedTermBindingCount,
-        int invalidatedDomainBindingCount
-    ) {}
-
     private DictionarySet resolveDictionarySet(Project project, DiagramPluginId pluginId, Long dictionarySetId) {
         if (pluginId == DiagramPluginId.ERD) {
             if (dictionarySetId == null) {

@@ -26,4 +26,6 @@ export const STORAGE_KEYS = {
   ERD_DIFF_APPLY_INTERNAL_OPT_IN: 'smart-erd-diff-apply-internal-opt-in',
   /** 테마 설정 (paper | graphite | midnight) */
   THEME: 'smart-erd-theme',
+  /** Electron 전용 서버 URL */
+  SERVER_URL: 'smart-erd-server-url',
 } as const;

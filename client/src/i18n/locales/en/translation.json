@@ -1225,6 +1225,12 @@
       "title": "Collaborators {{count}}",
       "online": "Online",
       "me": "Me"
+    },
+    "remotePending": {
+      "message": "Remote changes pending",
+      "accept": "Accept",
+      "reject": "Reject",
+      "merge": "Merge"
     }
   },
   "permission": {

@@ -8,12 +8,14 @@ import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * authoritative diagram content 저장과 realtime 상태 정렬을 조율하는 유스케이스.
  */
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class SaveDiagramAuthoritativeContentUseCase {
 
     private final DiagramSnapshotService diagramSnapshotService;
@@ -29,6 +31,7 @@ public class SaveDiagramAuthoritativeContentUseCase {
      * @param content       authoritative content JSON
      * @param ydocSnapshot  저장 시점 전체 Y.Doc 상태 update
      */
+    @Transactional
     public void execute(Diagram diagram, String content, byte[] ydocSnapshot) {
         Objects.requireNonNull(diagram);
         diagram.updateContent(content);
