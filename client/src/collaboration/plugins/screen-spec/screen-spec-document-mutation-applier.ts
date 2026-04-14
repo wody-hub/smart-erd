@@ -4,6 +4,7 @@ import type {
   DocumentMutationApplyResult,
 } from '@/collaboration/core/contracts/document-read-executor';
 import type { YjsSharedDocumentEngine } from '@/collaboration/core/engines/yjs-shared-document-engine';
+import { readNumber, readPositiveNumber, readString } from '@/lib/yjs-read-utils';
 import {
   createMasterDraft,
   ensureNestedMap,
@@ -31,15 +32,25 @@ import type {
   ScreenSpecLayerMoveDirection,
   ScreenSpecScreenMoveDirection,
 } from './screen-spec-document-plugin';
+import {
+  SCREEN_SPEC_ROOT_KEY,
+  SCREEN_SPEC_SCREENS_KEY,
+  SCREEN_SPEC_SCREEN_ORDER_KEY,
+  SCREEN_SPEC_INSTANCES_KEY,
+  SCREEN_SPEC_LAYERS_KEY,
+  SCREEN_SPEC_MASTERS_KEY,
+  SCREEN_SPEC_INSTANCE_OVERRIDES_KEY,
+  SCREEN_SPEC_INSTANCE_MASTER_SNAPSHOT_KEY,
+} from '@/constants/screen-design';
 
-const ROOT_KEY = 'screenSpec';
-const SCREENS_KEY = 'screens';
-const SCREEN_ORDER_KEY = 'screenOrder';
-const INSTANCES_KEY = 'instances';
-const LAYERS_KEY = 'layers';
-const MASTERS_KEY = 'masters';
-const INSTANCE_OVERRIDES_KEY = 'overrides';
-const INSTANCE_MASTER_SNAPSHOT_KEY = 'masterSnapshot';
+const ROOT_KEY = SCREEN_SPEC_ROOT_KEY;
+const SCREENS_KEY = SCREEN_SPEC_SCREENS_KEY;
+const SCREEN_ORDER_KEY = SCREEN_SPEC_SCREEN_ORDER_KEY;
+const INSTANCES_KEY = SCREEN_SPEC_INSTANCES_KEY;
+const LAYERS_KEY = SCREEN_SPEC_LAYERS_KEY;
+const MASTERS_KEY = SCREEN_SPEC_MASTERS_KEY;
+const INSTANCE_OVERRIDES_KEY = SCREEN_SPEC_INSTANCE_OVERRIDES_KEY;
+const INSTANCE_MASTER_SNAPSHOT_KEY = SCREEN_SPEC_INSTANCE_MASTER_SNAPSHOT_KEY;
 
 interface ScreenSpecRootMaps {
   screens: Y.Map<Y.Map<unknown>>;
@@ -501,12 +512,27 @@ export class ScreenSpecDocumentMutationApplier {
         return null;
       }
 
+      const masterChanged = nextMasterId !== currentInstance.masterId;
       const desiredWidth = hasOwn(payload, 'width')
         ? (readPositiveNumber(payload?.width) ?? nextMasterSnapshot.width)
-        : currentInstance.width;
+        : masterChanged && !currentInstance.overrideState.width
+          ? nextMasterSnapshot.width
+          : currentInstance.width;
       const desiredHeight = hasOwn(payload, 'height')
         ? (readPositiveNumber(payload?.height) ?? nextMasterSnapshot.height)
-        : currentInstance.height;
+        : masterChanged && !currentInstance.overrideState.height
+          ? nextMasterSnapshot.height
+          : currentInstance.height;
+      const desiredLabel = hasOwn(payload, 'label')
+        ? readString(payload?.label)
+        : currentInstance.overrideState.label
+          ? currentInstance.label
+          : null;
+      const desiredAccentColor = hasOwn(payload, 'accentColor')
+        ? normalizeScreenDesignColor(payload?.accentColor)
+        : currentInstance.overrideState.accentColor
+          ? normalizeScreenDesignColor(currentInstance.accentColor)
+          : null;
 
       const rect = clampInstanceRect(
         {
@@ -526,42 +552,19 @@ export class ScreenSpecDocumentMutationApplier {
         createInstanceMasterSnapshotYMap(nextMasterSnapshot),
       );
 
-      const overrides = ensureNestedMap(instanceYMap, INSTANCE_OVERRIDES_KEY);
-      if (hasOwn(payload, 'width')) {
-        if (rect.width === nextMasterSnapshot.width) {
-          overrides.delete('width');
-        } else {
-          overrides.set('width', rect.width);
-        }
-        instanceYMap.delete('width');
-      }
-      if (hasOwn(payload, 'height')) {
-        if (rect.height === nextMasterSnapshot.height) {
-          overrides.delete('height');
-        } else {
-          overrides.set('height', rect.height);
-        }
-        instanceYMap.delete('height');
-      }
-      if (hasOwn(payload, 'label')) {
-        const label = readString(payload?.label);
-        if (!label || label === resolveMasterLabel(nextMasterSnapshot, nextMasterId)) {
-          overrides.delete('label');
-        } else {
-          overrides.set('label', label);
-        }
-      }
-      if (hasOwn(payload, 'accentColor')) {
-        const accentColor = normalizeScreenDesignColor(payload?.accentColor);
-        if (
-          !accentColor ||
-          accentColor === normalizeScreenDesignColor(nextMasterSnapshot.accentColor)
-        ) {
-          overrides.delete('accentColor');
-        } else {
-          overrides.set('accentColor', accentColor);
-        }
-      }
+      applyInstanceOverrides({
+        instanceYMap,
+        syncWidth: hasOwn(payload, 'width') || masterChanged,
+        syncHeight: hasOwn(payload, 'height') || masterChanged,
+        syncLabel: hasOwn(payload, 'label') || masterChanged,
+        syncAccentColor: hasOwn(payload, 'accentColor') || masterChanged,
+        width: rect.width,
+        height: rect.height,
+        label: desiredLabel,
+        accentColor: desiredAccentColor,
+        masterSnapshot: nextMasterSnapshot,
+        masterId: nextMasterId,
+      });
       return true;
     });
   }
@@ -740,34 +743,74 @@ function hasOwn(value: unknown, key: string): boolean {
 }
 
 /**
- * 저장값에서 비어 있지 않은 문자열을 읽는다.
+ * 인스턴스의 override 필드를 마스터 스냅샷 기준으로 병합한다.
  *
- * @param value 해석할 저장값
- * @returns trim된 문자열 또는 null
- */
-function readString(value: unknown): string | null {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
- * 저장값에서 유한한 숫자를 읽는다.
+ * 마스터 기본값과 동일하면 override를 제거하고, 다르면 override에 기록한다.
  *
- * @param value 해석할 저장값
- * @returns 유효한 숫자 또는 null
+ * @param params override 동기화 파라미터
  */
-function readNumber(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-/**
- * 저장값에서 양수 정수를 읽는다.
- *
- * @param value 해석할 저장값
- * @returns 양수 정수 또는 null
- */
-function readPositiveNumber(value: unknown): number | null {
-  const parsed = readNumber(value);
-  return parsed !== null && parsed > 0 ? Math.round(parsed) : null;
+function applyInstanceOverrides(params: {
+  instanceYMap: Y.Map<unknown>;
+  syncWidth: boolean;
+  syncHeight: boolean;
+  syncLabel: boolean;
+  syncAccentColor: boolean;
+  width: number;
+  height: number;
+  label: string | null;
+  accentColor: string | null;
+  masterSnapshot: {
+    label?: string;
+    width: number;
+    height: number;
+    accentColor?: string | null;
+  };
+  masterId: string;
+}): void {
+  const {
+    instanceYMap,
+    syncWidth,
+    syncHeight,
+    syncLabel,
+    syncAccentColor,
+    width,
+    height,
+    label,
+    accentColor,
+    masterSnapshot,
+    masterId,
+  } = params;
+  const overrides = ensureNestedMap(instanceYMap, INSTANCE_OVERRIDES_KEY);
+  if (syncWidth) {
+    if (width === masterSnapshot.width) {
+      overrides.delete('width');
+    } else {
+      overrides.set('width', width);
+    }
+    instanceYMap.delete('width');
+  }
+  if (syncHeight) {
+    if (height === masterSnapshot.height) {
+      overrides.delete('height');
+    } else {
+      overrides.set('height', height);
+    }
+    instanceYMap.delete('height');
+  }
+  if (syncLabel) {
+    if (!label || label === resolveMasterLabel(masterSnapshot, masterId)) {
+      overrides.delete('label');
+    } else {
+      overrides.set('label', label);
+    }
+  }
+  if (syncAccentColor) {
+    if (!accentColor || accentColor === normalizeScreenDesignColor(masterSnapshot.accentColor)) {
+      overrides.delete('accentColor');
+    } else {
+      overrides.set('accentColor', accentColor);
+    }
+  }
 }
 
 /**

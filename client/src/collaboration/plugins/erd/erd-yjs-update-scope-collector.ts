@@ -3,6 +3,7 @@ import type { ScopeRef } from '@/collaboration/core/contracts/document-read-exec
 import type { SharedDocumentEngineUpdate } from '@/collaboration/core/contracts/shared-document-engine';
 import type { YjsSharedDocumentEngine } from '@/collaboration/core/engines/yjs-shared-document-engine';
 import { getEdgesMap, getGroupsMap, getTablesMap } from '@/collaboration/yjsBridge';
+import { readString } from '@/lib/yjs-read-utils';
 import { buildErdColumnEntityId } from './erd-column-entity-id';
 
 type AnyYType = Y.AbstractType<any>;
@@ -130,10 +131,6 @@ function readParentSub(type: AnyYType): string | null {
 
 function isSameType(left: unknown, right: unknown): boolean {
   return left === right;
-}
-
-function readString(value: unknown): string | null {
-  return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 function addAffectedScope(

@@ -1,6 +1,7 @@
 import type { DocumentCommand } from '@/collaboration/core/contracts/document-plugin';
 import type { ScopeRef } from '@/collaboration/core/contracts/document-read-executor';
 import type { ScopeResolver } from '@/collaboration/core/contracts/document-plugin';
+import { readString } from '@/lib/yjs-read-utils';
 
 const MASTERS_SCOPE: ScopeRef = {
   kind: 'masters',
@@ -19,9 +20,9 @@ export class ScreenSpecScopeResolver implements ScopeResolver {
    * @returns lock/runtime 갱신에 사용할 affected scope 목록
    */
   resolve(command: DocumentCommand): ScopeRef[] {
-    const masterId = this.readString(command.payload?.masterId);
-    const screenId = this.readString(command.payload?.screenId);
-    const instanceId = this.readString(command.payload?.instanceId);
+    const masterId = readString(command.payload?.masterId);
+    const screenId = readString(command.payload?.screenId);
+    const instanceId = readString(command.payload?.instanceId);
 
     if (command.key === 'master:add') {
       return [MASTERS_SCOPE];
@@ -127,15 +128,5 @@ export class ScreenSpecScopeResolver implements ScopeResolver {
     }
 
     return [];
-  }
-
-  /**
-   * payload의 임의 값을 비어 있지 않은 문자열로 정규화한다.
-   *
-   * @param value command payload에 들어온 raw 값
-   * @returns trim된 문자열, 없으면 null
-   */
-  private readString(value: unknown): string | null {
-    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
   }
 }

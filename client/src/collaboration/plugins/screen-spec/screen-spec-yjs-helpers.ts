@@ -1,4 +1,10 @@
 import * as Y from 'yjs';
+import {
+  SCREEN_SPEC_MASTER_BLOCK_DEFAULT_HEIGHT,
+  SCREEN_SPEC_MASTER_BLOCK_DEFAULT_WIDTH,
+  SCREEN_SPEC_MASTER_ELEMENT_DEFAULT_HEIGHT,
+  SCREEN_SPEC_MASTER_ELEMENT_DEFAULT_WIDTH,
+} from '@/constants/screen-design';
 import type {
   ScreenDesignLibraryCategoryId,
   ScreenDesignMasterDefinition,
@@ -104,8 +110,14 @@ export function createMasterDraft(
     name,
     categoryId,
     tier,
-    width: tier === 'block' ? 960 : 360,
-    height: tier === 'block' ? 160 : 240,
+    width:
+      tier === 'block'
+        ? SCREEN_SPEC_MASTER_BLOCK_DEFAULT_WIDTH
+        : SCREEN_SPEC_MASTER_ELEMENT_DEFAULT_WIDTH,
+    height:
+      tier === 'block'
+        ? SCREEN_SPEC_MASTER_BLOCK_DEFAULT_HEIGHT
+        : SCREEN_SPEC_MASTER_ELEMENT_DEFAULT_HEIGHT,
     renderKind: 'generic',
     preset: false,
   };

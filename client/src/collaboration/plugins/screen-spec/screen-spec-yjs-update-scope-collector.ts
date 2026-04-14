@@ -2,12 +2,19 @@ import * as Y from 'yjs';
 import type { ScopeRef } from '@/collaboration/core/contracts/document-read-executor';
 import type { SharedDocumentEngineUpdate } from '@/collaboration/core/contracts/shared-document-engine';
 import type { YjsSharedDocumentEngine } from '@/collaboration/core/engines/yjs-shared-document-engine';
+import {
+  SCREEN_SPEC_ROOT_KEY,
+  SCREEN_SPEC_SCREENS_KEY,
+  SCREEN_SPEC_INSTANCES_KEY,
+  SCREEN_SPEC_LAYERS_KEY,
+  SCREEN_SPEC_MASTERS_KEY,
+} from '@/constants/screen-design';
 
-const ROOT_KEY = 'screenSpec';
-const SCREENS_KEY = 'screens';
-const INSTANCES_KEY = 'instances';
-const LAYERS_KEY = 'layers';
-const MASTERS_KEY = 'masters';
+const ROOT_KEY = SCREEN_SPEC_ROOT_KEY;
+const SCREENS_KEY = SCREEN_SPEC_SCREENS_KEY;
+const INSTANCES_KEY = SCREEN_SPEC_INSTANCES_KEY;
+const LAYERS_KEY = SCREEN_SPEC_LAYERS_KEY;
+const MASTERS_KEY = SCREEN_SPEC_MASTERS_KEY;
 
 interface ParentAwareYType {
   parent: unknown;
