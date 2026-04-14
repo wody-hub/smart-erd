@@ -53,6 +53,7 @@ public enum MessageCode {
     ERROR_BUSINESS_DOCUMENT_PLUGIN_UNSUPPORTED("error.business.document-plugin-unsupported"),
     ERROR_BUSINESS_DOCUMENT_EXPORT_FORMAT_UNSUPPORTED("error.business.document-export-format-unsupported"),
     ERROR_BUSINESS_ERD_DICTIONARY_CONTEXT_REQUIRED("error.business.erd-dictionary-context-required"),
+    ERROR_BUSINESS_INVALID_PROJECT_PERIOD("error.business.invalid-project-period"),
     ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED("error.business.markdown-dictionary-context-not-allowed"),
     ERROR_BUSINESS_SCREEN_SPEC_DICTIONARY_CONTEXT_NOT_ALLOWED(
         "error.business.screen-spec-dictionary-context-not-allowed"

@@ -504,6 +504,41 @@
       "settingsProject": "프로젝트 {{name}} 설정"
     }
   },
+  "businessOverview": {
+    "tab": {
+      "title": "사업 개요"
+    },
+    "documentsTab": "문서",
+    "field": {
+      "clientCompany": "발주사",
+      "contractorCompany": "수주사",
+      "contractAmount": "계약 금액",
+      "projectStartDate": "프로젝트 시작일",
+      "projectEndDate": "프로젝트 종료일",
+      "projectScope": "프로젝트 범위",
+      "empty": "미등록"
+    },
+    "save": {
+      "success": "사업 개요가 저장되었습니다",
+      "failed": "사업 개요 저장에 실패했습니다"
+    },
+    "summary": {
+      "memberCount": "참여 인원",
+      "documentCount": "문서 수",
+      "progressRate": "진행률",
+      "notAvailable": "-"
+    },
+    "emptyTitle": "사업 개요가 아직 등록되지 않았습니다",
+    "emptyDescription": "프로젝트의 발주사, 일정, 예산 등 핵심 정보를 등록하세요.",
+    "emptyCta": "사업 개요 등록하기",
+    "editButton": "편집",
+    "editAriaLabel": "사업 개요 편집",
+    "validation": {
+      "dateOrder": "종료일은 시작일 이후여야 합니다",
+      "datePair": "시작일과 종료일은 함께 입력하거나 함께 비워야 합니다",
+      "invalidAmount": "계약 금액은 올바른 숫자여야 합니다"
+    }
+  },
   "diagram": {
     "list": {
       "title": "ERD 문서",

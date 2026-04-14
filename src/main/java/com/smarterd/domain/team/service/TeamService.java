@@ -243,6 +243,16 @@ public class TeamService {
     }
 
     /**
+     * 팀의 멤버 수를 조회한다.
+     *
+     * @param team 팀 엔티티
+     * @return 멤버 수
+     */
+    public long countMembers(Team team) {
+        return teamMemberRepository.countByTeam(team);
+    }
+
+    /**
      * 팀 이름을 변경한다. (ADMIN 전용)
      *
      * @param loginId 요청 사용자의 로그인 ID

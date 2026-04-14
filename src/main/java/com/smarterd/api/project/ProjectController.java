@@ -1,9 +1,12 @@
 package com.smarterd.api.project;
 
+import com.smarterd.api.project.dto.BusinessOverviewResponse;
 import com.smarterd.api.project.dto.CreateProjectRequest;
 import com.smarterd.api.project.dto.ProjectResponse;
+import com.smarterd.api.project.dto.UpdateBusinessOverviewRequest;
 import com.smarterd.api.project.dto.UpdateProjectRequest;
 import com.smarterd.domain.project.service.ProjectService;
+import com.smarterd.domain.project.service.ProjectService.BusinessOverviewResult;
 import com.smarterd.domain.project.service.ProjectService.ProjectResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,6 +23,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -162,6 +166,74 @@ public class ProjectController {
     }
 
     /**
+     * 프로젝트 사업 개요를 조회한다.
+     *
+     * @param jwt       인증된 JWT 토큰
+     * @param teamId    팀 ID
+     * @param projectId 프로젝트 ID
+     * @return 200 OK + BusinessOverviewResponse
+     */
+    @Operation(summary = "프로젝트 사업 개요 조회", description = "프로젝트의 사업 개요와 요약 지표를 조회한다.")
+    @ApiResponse(
+        responseCode = "200",
+        description = "조회 성공",
+        content = @Content(schema = @Schema(implementation = BusinessOverviewResponse.class))
+    )
+    @ApiResponse(responseCode = "400", description = "프로젝트 미존재 또는 접근 권한 없음", content = @Content)
+    @GetMapping("/{projectId}/business-overview")
+    public ResponseEntity<BusinessOverviewResponse> getBusinessOverview(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId
+    ) {
+        return ResponseEntity.ok(
+            toBusinessOverviewResponse(projectService.getBusinessOverview(jwt.getSubject(), teamId, projectId))
+        );
+    }
+
+    /**
+     * 프로젝트 사업 개요를 수정한다.
+     *
+     * @param jwt       인증된 JWT 토큰
+     * @param teamId    팀 ID
+     * @param projectId 프로젝트 ID
+     * @param request   사업 개요 수정 요청
+     * @return 200 OK + BusinessOverviewResponse
+     */
+    @Operation(summary = "프로젝트 사업 개요 수정", description = "프로젝트의 사업 개요 정보를 부분 수정한다.")
+    @ApiResponse(
+        responseCode = "200",
+        description = "수정 성공",
+        content = @Content(schema = @Schema(implementation = BusinessOverviewResponse.class))
+    )
+    @ApiResponse(responseCode = "400", description = "유효성 검증 실패", content = @Content)
+    @ApiResponse(responseCode = "403", description = "VIEWER 접근 불가", content = @Content)
+    @ApiResponse(responseCode = "404", description = "팀 또는 프로젝트 미존재", content = @Content)
+    @PatchMapping("/{projectId}/business-overview")
+    public ResponseEntity<BusinessOverviewResponse> updateBusinessOverview(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Valid @RequestBody UpdateBusinessOverviewRequest request
+    ) {
+        return ResponseEntity.ok(
+            toBusinessOverviewResponse(
+                projectService.updateBusinessOverview(
+                    jwt.getSubject(),
+                    teamId,
+                    projectId,
+                    request.clientCompany(),
+                    request.contractorCompany(),
+                    request.contractAmount(),
+                    request.projectStartDate(),
+                    request.projectEndDate(),
+                    request.projectScope()
+                )
+            )
+        );
+    }
+
+    /**
      * 서비스 계층 프로젝트 결과를 HTTP 응답 DTO로 변환한다.
      *
      * @param result 서비스 계층 결과
@@ -175,5 +247,15 @@ public class ProjectController {
             result.teamId(),
             result.createdAt()
         );
+    }
+
+    /**
+     * 서비스 계층 사업 개요 결과를 HTTP 응답 DTO로 변환한다.
+     *
+     * @param result 서비스 계층 결과
+     * @return HTTP 응답 DTO
+     */
+    private BusinessOverviewResponse toBusinessOverviewResponse(BusinessOverviewResult result) {
+        return BusinessOverviewResponse.from(result);
     }
 }

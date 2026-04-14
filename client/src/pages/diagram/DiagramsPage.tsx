@@ -1,35 +1,21 @@
-import { useMemo } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, BookOpen, FileText, Plus } from 'lucide-react';
+import { ArrowLeft, BookOpen, ClipboardList, FileText, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { fetchDiagrams } from '@/api/diagramApi';
-import { fetchDictionarySets } from '@/api/dictionarySetApi';
 import { fetchProject } from '@/api/projectApi';
 import { fetchTeam } from '@/api/teamApi';
-import DocumentHubRow from '@/components/workspace/DocumentHubRow';
-import DocumentTypeBadge from '@/components/workspace/DocumentTypeBadge';
-import CreateDocumentDialog from '@/components/workspace/CreateDocumentDialog';
+import BusinessOverviewTab from '@/components/project/BusinessOverviewTab';
+import DocumentHubTabContent from '@/components/workspace/DocumentHubTabContent';
 import ProjectWorkspaceHero from '@/components/workspace/ProjectWorkspaceHero';
-import WorkspaceEmptyState from '@/components/workspace/WorkspaceEmptyState';
-import ConfirmDialog from '@/components/ui/confirm-dialog';
 import Header from '@/components/layout/Header';
-import Spinner from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
-import { useDiagramDocumentHubActions } from '@/hooks/useDiagramDocumentHubActions';
 import { useRecentProjectContext } from '@/hooks/useRecentProjectContext';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { getWorkspaceDocumentsTitleLabel } from '@/lib/workspace-labels';
-import type { DocumentListItem } from '@/types/workspace';
 
 /**
  * 문서 허브 페이지.
@@ -41,7 +27,10 @@ import type { DocumentListItem } from '@/types/workspace';
 export default function DiagramsPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const [activeTab, setActiveTab] = useState<'documents' | 'overview'>('documents');
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [documentCount, setDocumentCount] = useState(0);
   const { recordRecentProjectContext } = useRecentProjectContext(teamId);
   const { canEdit } = useTeamRole(teamId);
 
@@ -55,52 +44,20 @@ export default function DiagramsPage() {
     queryFn: () => fetchProject(teamId!, projectId!),
     enabled: !!teamId && !!projectId,
   });
-  const { data: dictionarySets = [] } = useQuery({
-    queryKey: queryKeys.dictionary.sets(teamId!),
-    queryFn: () => fetchDictionarySets(teamId!),
-    enabled: !!teamId,
-  });
-  const diagramsQuery = useQuery({
-    queryKey: queryKeys.diagrams.byProject(teamId!, projectId!),
-    queryFn: () => fetchDiagrams(teamId!, projectId!),
-    enabled: !!teamId && !!projectId,
-  });
-  const { data: diagrams = [], isLoading, isError } = diagramsQuery;
-
-  const {
-    dialogOpen,
-    setDialogOpen,
-    deleteTarget,
-    setDeleteTarget,
-    renamingId,
-    renameValue,
-    setRenameValue,
-    startRename,
-    confirmRename,
-    cancelRename,
-    createDocument,
-    confirmDeleteDocument,
-    updateDictionaryContext,
-    deleteDocumentPending,
-  } = useDiagramDocumentHubActions({
-    teamId,
-    projectId,
-  });
-
   const documentTitleToken = getWorkspaceDocumentsTitleLabel();
-  const documentItems = useMemo<DocumentListItem[]>(
-    () =>
-      diagrams.map((diagram) => ({
-        id: diagram.id,
-        name: diagram.name,
-        type: diagram.pluginId,
-        updatedAt: diagram.updatedAt,
-        dictionaryContextName: diagram.pluginId === 'erd' ? diagram.dictionarySetName : null,
-        templateLabel: diagram.templateLabel,
-        summaryText: diagram.summaryText,
-      })),
-    [diagrams],
-  );
+
+  /**
+   * 탭 전환 시 overview로 이동하면 문서 생성 다이얼로그를 닫는다.
+   *
+   * @param value 다음 탭 값
+   */
+  const handleTabChange = (value: string) => {
+    const nextTab = value === 'overview' ? 'overview' : 'documents';
+    if (nextTab !== 'documents') {
+      setCreateDialogOpen(false);
+    }
+    setActiveTab(nextTab);
+  };
 
   return (
     <div className="flex h-screen flex-col">
@@ -131,159 +88,69 @@ export default function DiagramsPage() {
             meta={
               <>
                 {team && <span>{t('workspace.meta.teamContext', { name: team.name })}</span>}
-                <span>{t('workspace.documents.documentCount', { count: diagrams.length })}</span>
+                <span>{t('workspace.documents.documentCount', { count: documentCount })}</span>
               </>
             }
             primaryAction={
-              canEdit ? (
-                <Button onClick={() => setDialogOpen(true)}>
+              canEdit && activeTab === 'documents' ? (
+                <Button onClick={() => setCreateDialogOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
                   {t('workspace.action.newDocument')}
                 </Button>
               ) : undefined
             }
             utilityActions={
-              <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      recordRecentProjectContext(projectId!);
-                      navigate(ROUTES.DICTIONARY(teamId!));
-                    }}
-                  >
-                    <BookOpen className="mr-2 h-4 w-4 text-brand-secondary" />
-                    {t('project.list.dictionaryButton')}
-                  </Button>
+              activeTab === 'documents' ? (
+                <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        recordRecentProjectContext(projectId!);
+                        navigate(ROUTES.DICTIONARY(teamId!));
+                      }}
+                    >
+                      <BookOpen className="mr-2 h-4 w-4 text-brand-secondary" />
+                      {t('project.list.dictionaryButton')}
+                    </Button>
+                  </div>
+                  <p className="max-w-md text-sm leading-6 text-muted-foreground">
+                    {t('workspace.documents.multiTypeHint')}
+                  </p>
                 </div>
-                <p className="max-w-md text-sm leading-6 text-muted-foreground">
-                  {t('workspace.documents.multiTypeHint')}
-                </p>
-              </div>
+              ) : undefined
             }
           />
 
-          <div className="surface-operational mt-6 rounded-xl px-4 py-3">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-3">
-                <DocumentTypeBadge documentType="erd" />
-                <DocumentTypeBadge documentType="markdown" />
-                <DocumentTypeBadge documentType="screen-spec" />
-                <p className="text-sm text-ink-secondary">
-                  {t('workspace.documents.typeScopeHint')}
-                </p>
-              </div>
-              <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                {t('workspace.documents.documentCount', { count: diagrams.length })}
-              </span>
-            </div>
-          </div>
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6">
+            <TabsList>
+              <TabsTrigger value="documents">
+                <FileText className="mr-2 h-4 w-4" />
+                {t('businessOverview.documentsTab')}
+              </TabsTrigger>
+              <TabsTrigger value="overview">
+                <ClipboardList className="mr-2 h-4 w-4" />
+                {t('businessOverview.tab.title')}
+              </TabsTrigger>
+            </TabsList>
 
-          {isLoading ? (
-            <Spinner text={t('common.loading')} />
-          ) : isError ? (
-            <div className="mt-6">
-              <WorkspaceEmptyState
-                icon={<AlertTriangle className="h-10 w-10" />}
-                title={t('workspace.status.loadFailedTitle')}
-                description={t('workspace.status.documentsLoadFailed')}
-                tone="error"
-                role="alert"
-                action={
-                  <Button variant="outline" onClick={() => void diagramsQuery.refetch()}>
-                    {t('workspace.status.retry')}
-                  </Button>
-                }
+            <TabsContent value="documents">
+              <DocumentHubTabContent
+                teamId={teamId!}
+                projectId={projectId!}
+                canEdit={canEdit}
+                createDialogOpen={createDialogOpen}
+                onCreateDialogOpenChange={setCreateDialogOpen}
+                onDocumentCountChange={setDocumentCount}
               />
-            </div>
-          ) : diagrams.length === 0 ? (
-            <div className="mt-6">
-              <WorkspaceEmptyState
-                icon={<FileText className="h-10 w-10" />}
-                title={t('workspace.documents.title')}
-                description={t('workspace.documents.empty')}
-                action={
-                  canEdit ? (
-                    <Button onClick={() => setDialogOpen(true)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      {t('workspace.action.newDocument')}
-                    </Button>
-                  ) : undefined
-                }
-              />
-            </div>
-          ) : (
-            <div className="mt-6 space-y-3">
-              {diagrams.map((diagram, index) => (
-                <DocumentHubRow
-                  key={diagram.id}
-                  item={documentItems[index]!}
-                  locale={i18n.resolvedLanguage ?? i18n.language}
-                  onOpen={() => navigate(ROUTES.DIAGRAM(teamId!, projectId!, diagram.id))}
-                  canEdit={canEdit}
-                  contextControl={
-                    canEdit && diagram.pluginId === 'erd' && dictionarySets.length > 0 ? (
-                      <div onClick={(event) => event.stopPropagation()}>
-                        <Select
-                          value={
-                            diagram.dictionarySetId != null ? String(diagram.dictionarySetId) : ''
-                          }
-                          onValueChange={(value) =>
-                            updateDictionaryContext(diagram.id, Number(value))
-                          }
-                        >
-                          <SelectTrigger className="h-9 min-w-[220px]">
-                            <SelectValue placeholder={t('diagram.list.selectDictionaryContext')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {dictionarySets.map((set) => (
-                              <SelectItem key={set.id} value={String(set.id)}>
-                                {set.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : undefined
-                  }
-                  renameState={
-                    renamingId === diagram.id
-                      ? {
-                          value: renameValue,
-                          onValueChange: setRenameValue,
-                          onConfirm: confirmRename,
-                          onCancel: cancelRename,
-                        }
-                      : undefined
-                  }
-                  onStartRename={canEdit ? () => startRename(diagram) : undefined}
-                  onDelete={canEdit ? () => setDeleteTarget(diagram.id) : undefined}
-                />
-              ))}
-            </div>
-          )}
+            </TabsContent>
+
+            <TabsContent value="overview">
+              <BusinessOverviewTab teamId={teamId!} projectId={projectId!} canEdit={canEdit} />
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
-
-      <CreateDocumentDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        dictionarySets={dictionarySets}
-        onCreate={createDocument}
-      />
-
-      <ConfirmDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeleteTarget(null);
-          }
-        }}
-        title={t('workspace.action.deleteErdDocumentTitle')}
-        description={t('workspace.action.deleteErdDocumentDescription')}
-        onConfirm={confirmDeleteDocument}
-        loading={deleteDocumentPending}
-      />
     </div>
   );
 }

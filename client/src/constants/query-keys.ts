@@ -23,6 +23,15 @@ export const queryKeys = {
     /** 프로젝트 상세 */
     detail: (teamId: string, projectId: string) =>
       ['teams', teamId, 'projects', projectId] as const,
+    /**
+     * 사업 개요 조회 캐시 키를 생성한다.
+     *
+     * @param teamId 팀 ID
+     * @param projectId 프로젝트 ID
+     * @returns 사업 개요 쿼리 키
+     */
+    businessOverview: (teamId: string, projectId: string) =>
+      ['teams', teamId, 'projects', projectId, 'business-overview'] as const,
   },
   /** 데이터 사전 관련 쿼리 키 */
   dictionary: {

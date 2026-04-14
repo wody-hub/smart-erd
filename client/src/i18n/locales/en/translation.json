@@ -506,6 +506,41 @@
       "settingsProject": "Settings for project {{name}}"
     }
   },
+  "businessOverview": {
+    "tab": {
+      "title": "Business overview"
+    },
+    "documentsTab": "Documents",
+    "field": {
+      "clientCompany": "Client company",
+      "contractorCompany": "Contractor company",
+      "contractAmount": "Contract amount",
+      "projectStartDate": "Project start date",
+      "projectEndDate": "Project end date",
+      "projectScope": "Project scope",
+      "empty": "Not registered"
+    },
+    "save": {
+      "success": "Business overview has been saved",
+      "failed": "Failed to save the business overview"
+    },
+    "summary": {
+      "memberCount": "Members",
+      "documentCount": "Documents",
+      "progressRate": "Progress",
+      "notAvailable": "-"
+    },
+    "emptyTitle": "No business overview has been registered yet",
+    "emptyDescription": "Register key information such as client, schedule, and budget for this project.",
+    "emptyCta": "Register business overview",
+    "editButton": "Edit",
+    "editAriaLabel": "Edit business overview",
+    "validation": {
+      "dateOrder": "End date must be on or after the start date",
+      "datePair": "Start and end dates must be filled together or left empty together",
+      "invalidAmount": "Contract amount must be a valid number"
+    }
+  },
   "diagram": {
     "list": {
       "title": "ERD documents",
