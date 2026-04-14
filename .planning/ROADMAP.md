@@ -89,10 +89,10 @@ Plans:
 **Plans**: 3 plans
 **UI hint**: yes
 
-Plans:
+Plans (상세 설계 완료 — `.planning/phases/04-사업-개요/`):
 - [ ] 04-01-PLAN — BE 기반: Project 엔티티 확장 + Flyway 마이그레이션 + business-overview GET/PATCH API
-- [ ] 04-02-PLAN — FE 기반: 타입/API/쿼리키 확장 + 번역 키 추가
-- [ ] 04-03-PLAN — UI 구현: DiagramsPage 탭 도입 + BusinessOverviewTab 컴포넌트
+- [ ] 04-02-PLAN — FE 기반: 타입/API/쿼리키 확장 + 포맷 유틸 + 번역 키 추가
+- [ ] 04-03-PLAN — UI 구현: DiagramsPage 탭 도입 + DocumentHubTabContent 추출 + BusinessOverviewTab 컴포넌트
 
 **설계 결정:**
 - UI 위치: DiagramsPage(문서 허브)에 `[문서] [사업 개요]` 탭으로 통합 (독립 라우트 신설 X)
