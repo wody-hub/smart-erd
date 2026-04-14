@@ -12,8 +12,8 @@
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: 마크다운 증분 동기화** - Section 단위 증분 동기화 및 증분 프리뷰 렌더링 완성
-- [ ] **Phase 2: 테마 선택** - Paper/Graphite/Midnight 큐레이션 테마 전역 적용
+- [x] **Phase 1: 마크다운 증분 동기화** - Section 단위 증분 동기화 및 증분 프리뷰 렌더링 완성
+- [x] **Phase 2: 테마 선택** - Paper/Graphite/Midnight 큐레이션 테마 전역 적용
 - [ ] **Phase 3: 화면기획 플러그인** - 마스터 컴포넌트+인스턴스 화면 설계 도구 구현
 - [ ] **Phase 4: 사업 개요** - 프로젝트 메타(발주처·계약·사업 범위) 등록 및 현황 조회
 - [ ] **Phase 5: WBS + 마일스톤** - 계층 작업분해구조 편집과 마일스톤 관리
@@ -38,9 +38,9 @@ Plans:
 - [x] 01-02-PLAN.md — BE MarkdownScopeResolver + MarkdownCollaborationPlugin
 - [x] 01-03-PLAN.md — FE 증분 동기화 핵심 경로 (applyIncrementalTextUpdate + buildSectionCommands + MutationApplier 교체)
 - [x] 01-04-PLAN.md — Section HTML 캐시 + useMarkdownSectionPreview + MarkdownDocumentPage 교체
-- [ ] 01-05-PLAN.md — [gap closure] 절대 offset 재계산 + RemotePendingBanner 배선
-- [ ] 01-06-PLAN.md — [gap closure] fenced code block 오탐 방지 + SectionPreviewCache GC
-- [ ] 01-07-PLAN.md — [gap closure] BE MarkdownScopeResolver payload 검증 강화
+- [x] 01-05-PLAN.md — [gap closure] 절대 offset 재계산 + RemotePendingBanner 배선
+- [x] 01-06-PLAN.md — [gap closure] fenced code block 오탐 방지 + SectionPreviewCache GC
+- [x] 01-07-PLAN.md — [gap closure] BE MarkdownScopeResolver payload 검증 강화
 
 ### Phase 2: 테마 선택
 **Goal**: 사용자가 Paper/Graphite/Midnight 3가지 테마 중 하나를 선택하면 앱 전역(ERD 캔버스, 마크다운 에디터, Dialog, Monaco)에 일관되게 적용되고 새로고침 후에도 유지된다
@@ -50,8 +50,12 @@ Plans:
   1. 사용자가 헤더에서 3가지 테마 중 하나를 선택할 수 있다
   2. 선택한 테마가 ERD 캔버스, 마크다운 에디터, 모달/Dialog, Monaco 에디터에 일관되게 반영된다
   3. 페이지를 새로고침하거나 브라우저를 다시 열어도 마지막으로 선택한 테마가 유지된다
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 3 plans
+
+Plans:
+- [x] 02-01-PLAN.md — Theme foundation 계약 구현 (helper, store, bootstrap, hook)
+- [x] 02-02-PLAN.md — 3-theme CSS variable rollout (Paper/Graphite/Midnight)
+- [x] 02-03-PLAN.md — ThemeSwitcher dropdown UI to header
 
 ### Phase 3: 화면기획 플러그인
 **Goal**: 화면기획 플러그인에서 마스터 컴포넌트를 정의하고 여러 화면에 인스턴스로 배치할 수 있으며, 실시간 협업과 산출물 내보내기가 동작한다
@@ -62,8 +66,18 @@ Plans:
   2. 마스터 컴포넌트를 수정하면 해당 마스터를 참조하는 모든 인스턴스에 자동으로 반영된다
   3. 두 사용자가 같은 화면기획 문서를 동시에 편집할 때 Yjs 기반 실시간 동기화가 동작한다
   4. 완성된 화면기획을 PNG 또는 PDF 파일로 내보낼 수 있다
-**Plans**: TBD
+**Plans**: In progress (plan 파일 미정의, 코드 선행 구현 진행 중)
 **UI hint**: yes
+
+구현 현황 (plan 파일 없이 코드 직접 구현됨):
+- [x] screen-spec 문서 플러그인 골격 (DocumentPlugin, ScopeResolver, MutationApplier, MutationPolicy)
+- [x] screen-design 페이지 UI (Canvas, Library, Inspector, EditorShell, PageState)
+- [x] 마스터 컴포넌트 CRUD + 인스턴스 배치/이동/리사이즈
+- [x] cross-screen move + constraint cascade + syncConstraintSource
+- [x] 실시간 협업 Yjs 연동 (session, document runtime, bootstrap)
+- [x] PNG/PDF 내보내기 파이프라인
+- [ ] BE 백엔드 ScreenSpecCollaborationPlugin 완성 (scope resolver 연동 등)
+- [ ] E2E 테스트 + QA 검증
 
 ### Phase 4: 사업 개요
 **Goal**: 프로젝트에 발주처·계약 기간·계약 금액·사업 범위 등 SI 사업 메타 정보를 등록하고, 사업 개요 화면에서 프로젝트 전체 현황을 한눈에 파악할 수 있다
@@ -131,9 +145,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 마크다운 증분 동기화 | 4/7 | Gap closure | - |
-| 2. 테마 선택 | 0/? | Not started | - |
-| 3. 화면기획 플러그인 | 0/? | Not started | - |
+| 1. 마크다운 증분 동기화 | 7/7 | Complete | 2026-04-03 |
+| 2. 테마 선택 | 3/3 | Complete | 2026-04-03 |
+| 3. 화면기획 플러그인 | -/? | In progress | - |
 | 4. 사업 개요 | 0/? | Not started | - |
 | 5. WBS + 마일스톤 | 0/? | Not started | - |
 | 6. 간트 차트 | 0/? | Not started | - |

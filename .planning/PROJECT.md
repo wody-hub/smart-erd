@@ -36,12 +36,12 @@ SI 프로젝트에서 발생하는 모든 산출물과 관리 활동을 **하나
 - ✓ Electron 데스크톱 앱 (macOS, Windows) — existing
 - ✓ 마크다운 증분 동기화 (Section-Update 방식) — Validated in Phase 1: markdown-incremental-sync
 - ✓ 마크다운 증분 프리뷰 렌더링 — Validated in Phase 1: markdown-incremental-sync
+- ✓ 테마 선택 기능 (Paper/Graphite/Midnight 3개 큐레이션 테마) — Validated in Phase 2: 테마-선택
 
 ### Active
 
 현재 진행 중이거나 곧 착수할 기능:
 
-- [ ] 테마 선택 기능 — Paper/Graphite/Midnight 3개 큐레이션 테마
 - [ ] 화면기획 플러그인 — Figma식 컴포넌트/인스턴스/화면 설계 도구
 
 ### Future — SI 프로젝트 관리 확장
