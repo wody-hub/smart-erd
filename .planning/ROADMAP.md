@@ -86,8 +86,38 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. 사용자가 프로젝트에 발주처, 수주사, 계약 금액, 사업 기간, 사업 범위를 등록하고 수정할 수 있다
   2. 사업 개요 화면에서 프로젝트의 핵심 메타 정보와 현재 현황(진척률, 인원 등 요약)을 한 화면에서 확인할 수 있다
-**Plans**: TBD
+**Plans**: 3 plans
 **UI hint**: yes
+
+Plans:
+- [ ] 04-01-PLAN — BE 기반: Project 엔티티 확장 + Flyway 마이그레이션 + business-overview GET/PATCH API
+- [ ] 04-02-PLAN — FE 기반: 타입/API/쿼리키 확장 + 번역 키 추가
+- [ ] 04-03-PLAN — UI 구현: DiagramsPage 탭 도입 + BusinessOverviewTab 컴포넌트
+
+**설계 결정:**
+- UI 위치: DiagramsPage(문서 허브)에 `[문서] [사업 개요]` 탭으로 통합 (독립 라우트 신설 X)
+- 엔티티: Project 테이블에 6개 nullable 컬럼 직접 추가 (별도 테이블 X)
+- API: `PATCH .../business-overview` 별도 엔드포인트 (기존 PUT projects 확장 X — SRP)
+- 금액: BIGINT 원 단위 (DECIMAL X — SI 계약금액은 정수 단위)
+- 날짜: DATE 타입 (TIMESTAMP X — 사업기간은 날짜 개념)
+- Phase 5 의존: `summary.progressRate: null` 고정 반환 → Phase 5에서 백엔드만 채우면 프론트 변경 없음
+
+**필드 설계:**
+
+| 필드 | 컬럼 | DB 타입 | Java 타입 | 비고 |
+|---|---|---|---|---|
+| 발주처 | `client_company` | VARCHAR(200) | String | nullable |
+| 수주사 | `contractor_company` | VARCHAR(200) | String | nullable |
+| 계약금액 | `contract_amount` | BIGINT | Long | nullable, 원 단위 |
+| 사업기간 시작 | `project_start_date` | DATE | LocalDate | nullable |
+| 사업기간 종료 | `project_end_date` | DATE | LocalDate | nullable |
+| 사업범위 | `project_scope` | TEXT | String | nullable |
+
+**리스크:**
+- DiagramsPage 파일 크기 증가 → 기존 콘텐츠도 DocumentHubTabContent로 추출하여 SRP 유지
+- contractAmount 표시 포맷 → `Intl.NumberFormat` 유틸 lib/에 추출, 인라인 금지
+- projectStartDate > projectEndDate → 서비스 레이어에서 BusinessException 투척
+- ProjectSettingsDialog와 기능 중복 → 의도적 분리 (기본정보 vs 사업메타)
 
 ### Phase 5: WBS + 마일스톤
 **Goal**: 계층 구조(업무 > 세부작업 > 태스크)로 WBS를 편집하고, 담당자·기간·진척률·M/M을 설정하며, 마일스톤을 등록하고 WBS 완료와 연동하여 달성률을 추적할 수 있다
