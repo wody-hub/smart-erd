@@ -96,11 +96,30 @@ Plans:
 
 **설계 결정:**
 - UI 위치: DiagramsPage(문서 허브)에 `[문서] [사업 개요]` 탭으로 통합 (독립 라우트 신설 X)
-- 엔티티: Project 테이블에 6개 nullable 컬럼 직접 추가 (별도 테이블 X)
-- API: `PATCH .../business-overview` 별도 엔드포인트 (기존 PUT projects 확장 X — SRP)
+- 탭 배치: 히어로 카드 직하, surface-operational 밴드 직상에 TabsList 배치. DictionaryWorkspace의 pill 스타일 재사용
+- 탭 상태: `useState<'documents' | 'overview'>` 로컬 상태 (URL 파라미터 X — 보조 정보이므로)
+- 히어로 카드: 탭 전환 시 히어로 내용 분기 (문서 탭: 프로젝트 설명, 사업 개요 탭: 사업 요약 또는 히어로 숨김)
+- 엔티티: Project 테이블에 6개 nullable 컬럼 직접 추가 (별도 테이블 X). Phase 5 착수 시 테이블 분리 재평가
+- API: `GET/PATCH .../business-overview` 별도 엔드포인트 (기존 PUT/GET projects 확장 X — SRP)
+- DTO: `BusinessOverviewResponse`(record), `UpdateBusinessOverviewRequest`(record) + `@Valid` — 기존 ProjectResponse 수정 X
+- 권한: PATCH business-overview는 `verifyEditable` (ADMIN/MEMBER). GET business-overview는 `verifyMembership` (전원 열람 가능)
 - 금액: BIGINT 원 단위 (DECIMAL X — SI 계약금액은 정수 단위)
-- 날짜: DATE 타입 (TIMESTAMP X — 사업기간은 날짜 개념)
-- Phase 5 의존: `summary.progressRate: null` 고정 반환 → Phase 5에서 백엔드만 채우면 프론트 변경 없음
+- 날짜: DATE 타입 (TIMESTAMP X — 사업기간은 날짜 개념). 둘 다 null이거나 둘 다 non-null (쌍 입력)
+- 날짜 검증: `Project.updateBusinessOverview()` 엔티티 메서드 내부에서 검증 (도메인 불변식). 서비스는 권한 검증 + 엔티티 호출만
+- Phase 5 의존: `summary` 객체 Phase 4에서 포함하되, 프론트는 `summary?.progressRate`로 optional chaining. Phase 5에서 채움
+- 트랜잭션: `ProjectService` 클래스 레벨 `@Transactional(readOnly = true)` 유지, `updateBusinessOverview` 메서드에 `@Transactional` 오버라이드
+
+**summary 응답 스키마 (Phase 4 고정값):**
+```json
+{
+  "memberCount": 5,
+  "documentCount": 12,
+  "progressRate": null
+}
+```
+- `memberCount`: TeamMember 실시간 count
+- `documentCount`: Diagram count (Phase 4에서 실제 집계)
+- `progressRate`: Phase 5 이전 null 고정. 프론트에서 null → `t('businessOverview.summary.progressRateUnavailable')` 표시
 
 **필드 설계:**
 
@@ -109,15 +128,48 @@ Plans:
 | 발주처 | `client_company` | VARCHAR(200) | String | nullable |
 | 수주사 | `contractor_company` | VARCHAR(200) | String | nullable |
 | 계약금액 | `contract_amount` | BIGINT | Long | nullable, 원 단위 |
-| 사업기간 시작 | `project_start_date` | DATE | LocalDate | nullable |
-| 사업기간 종료 | `project_end_date` | DATE | LocalDate | nullable |
+| 사업기간 시작 | `project_start_date` | DATE | LocalDate | nullable, 쌍 입력 |
+| 사업기간 종료 | `project_end_date` | DATE | LocalDate | nullable, 쌍 입력 |
 | 사업범위 | `project_scope` | TEXT | String | nullable |
 
+**BE 컨벤션:**
+- Flyway 마이그레이션: `V20260414_01__project_business_overview_columns.sql`
+- 엔티티 메서드 분리: `Project.update(name, description)` + `Project.updateBusinessOverview(clientCompany, ...)`
+- 예외 메시지 코드: `error.business.invalid-project-period` (messages.properties + messages_ko.properties)
+- `ProjectService`에 직접 추가 (별도 서비스 분리 X — 현재 172줄로 합리적 범위)
+
+**FE 컨벤션:**
+- 타입: `types/project.ts`에 `BusinessOverview`, `ProjectSummary` 인터페이스 추가 (인라인 정의 금지)
+- API: `api/projectApi.ts`에 `fetchBusinessOverview()`, `updateBusinessOverview()` 추가 (JSDoc + `@param` 필수)
+- 쿼리 키: `queryKeys.projects.businessOverview(teamId, projectId)` 추가
+- 캐시 무효화: mutation `onSuccess`에서 `queryKeys.projects.businessOverview` 키 무효화
+- i18n 키 네임스페이스: `businessOverview.tab.title`, `businessOverview.field.*`, `businessOverview.save.*`, `businessOverview.summary.*`
+- 금액 포맷: `lib/format.ts`에 `formatCurrency(amount: number): string` 추출. locale 무관 원화 포맷 ("1,000,000원")
+- 날짜 포맷: `Intl.DateTimeFormat` locale 기반 (ko: `2026.04.14`, en: `Apr 14, 2026`)
+- 페이지 코드 순서: BusinessOverviewTab 내부도 Page Component Code Ordering 규칙 준수
+- 디자인 토큰: 시맨틱 토큰만 사용 (하드코딩 금지). 요약 카드 `surface-operational`, 메타 필드 `bg-card`
+
+**UI 레이아웃:**
+- 요약 카드 3장: `grid grid-cols-1 md:grid-cols-3 gap-4` (memberCount, documentCount, progressRate)
+- 메타 필드 6개: `grid grid-cols-1 md:grid-cols-2 gap-6`. 사업범위(TEXT)는 `col-span-full`
+- 읽기 모드: `<dl>`, `<dt>`, `<dd>` 시맨틱 마크업. 레이블 `text-sm text-muted-foreground`, 값 `text-foreground font-medium`
+- 편집 모드: 우측 상단 `Button variant="outline"` + Pencil 아이콘 토글. `aria-label` 필수
+- null 대량 상태: 미등록 시 empty state 안내 메시지 ("사업 메타 정보를 등록해주세요") + 등록 CTA 버튼
+- 반응형: `max-w-5xl` 컨테이너 내 동작. 모바일 1-column, md 이상 2-column
+- 접근성: form 요소 `<label htmlFor>` 연결, 아이콘 버튼 `aria-label`, 요약 카드 `role="group"`
+
+**DiagramsPage 분해 (SRP):**
+- `DocumentHubTabContent` — 기존 문서 목록 영역 추출
+- `BusinessOverviewTab` — 사업 개요 영역 (별도 컴포넌트)
+- `DiagramsPage` — 탭 셸 역할만 (탭 전환 + 공통 헤더 + lazy fetch 제어)
+
 **리스크:**
-- DiagramsPage 파일 크기 증가 → 기존 콘텐츠도 DocumentHubTabContent로 추출하여 SRP 유지
-- contractAmount 표시 포맷 → `Intl.NumberFormat` 유틸 lib/에 추출, 인라인 금지
-- projectStartDate > projectEndDate → 서비스 레이어에서 BusinessException 투척
+- DiagramsPage 파일 크기 증가 → DocumentHubTabContent + BusinessOverviewTab 추출로 SRP 유지
+- contractAmount 표시 포맷 → `lib/format.ts`의 `formatCurrency()` 유틸 추출. Phase 7 인건비에서 재사용
+- projectStartDate > projectEndDate → 엔티티 `updateBusinessOverview` 내부 검증 + 프론트 폼 사전 검증 병행
 - ProjectSettingsDialog와 기능 중복 → 의도적 분리 (기본정보 vs 사업메타)
+- OCP: 현재 2탭은 하드코딩 OK. 3번째 탭 추가 시점(Phase 5)에 탭 config 배열 추출 검토
+- Phase 5 확장 시 Project 테이블 비대화 → Phase 5 착수 시점에 별도 테이블 분리 재평가
 
 ### Phase 5: WBS + 마일스톤
 **Goal**: 계층 구조(업무 > 세부작업 > 태스크)로 WBS를 편집하고, 담당자·기간·진척률·M/M을 설정하며, 마일스톤을 등록하고 WBS 완료와 연동하여 달성률을 추적할 수 있다
