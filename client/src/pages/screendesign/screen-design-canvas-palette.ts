@@ -1,3 +1,5 @@
+import { isDarkTheme, type ThemeName } from '@/lib/theme';
+
 export interface ScreenDesignCanvasPalette {
   frameFill: string;
   frameStroke: string;
@@ -44,19 +46,23 @@ const SCREEN_DESIGN_CANVAS_TOKENS = {
 /**
  * 현재 테마의 screen-spec canvas 색상 토큰을 Konva용 color string으로 해석한다.
  *
+ * @param theme 현재 활성 테마. fallback token을 선택하고 theme 변경 시 palette 재해석을 트리거한다.
  * @param root CSS variable을 읽을 기준 요소
  * @returns canvas 렌더링에 사용할 팔레트
  */
 export function resolveScreenDesignCanvasPalette(
+  theme: ThemeName,
   root: HTMLElement = document.documentElement,
 ): ScreenDesignCanvasPalette {
   const styles = getComputedStyle(root);
   const surfaceStroke = readHslToken(styles, SCREEN_DESIGN_CANVAS_TOKENS.surfaceStroke, '--border');
+  const frameShadowFallback = isDarkTheme(theme) ? '--surface-strong' : '--secondary';
+  const shadowColorFallback = isDarkTheme(theme) ? '--muted-foreground' : '--foreground';
 
   return {
     frameFill: readHslToken(styles, SCREEN_DESIGN_CANVAS_TOKENS.frameFill, '--card'),
     frameStroke: readHslToken(styles, SCREEN_DESIGN_CANVAS_TOKENS.frameStroke, '--border'),
-    frameShadow: readHslToken(styles, SCREEN_DESIGN_CANVAS_TOKENS.frameShadow, '--secondary'),
+    frameShadow: readHslToken(styles, SCREEN_DESIGN_CANVAS_TOKENS.frameShadow, frameShadowFallback),
     safeArea: readHslToken(styles, SCREEN_DESIGN_CANVAS_TOKENS.safeArea, '--border'),
     canvasBackground: readHslToken(
       styles,
@@ -96,7 +102,7 @@ export function resolveScreenDesignCanvasPalette(
     selection: readHslToken(styles, SCREEN_DESIGN_CANVAS_TOKENS.selection, '--primary'),
     orphan: readHslToken(styles, SCREEN_DESIGN_CANVAS_TOKENS.orphan, '--erd-warning'),
     anchorFill: readHslToken(styles, SCREEN_DESIGN_CANVAS_TOKENS.anchorFill, '--card'),
-    shadowColor: readHslToken(styles, SCREEN_DESIGN_CANVAS_TOKENS.shadowColor, '--foreground'),
+    shadowColor: readHslToken(styles, SCREEN_DESIGN_CANVAS_TOKENS.shadowColor, shadowColorFallback),
   };
 }
 

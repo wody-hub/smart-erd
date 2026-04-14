@@ -1,23 +1,36 @@
 import * as Y from 'yjs';
+import { readBoolean, readNumber, readPositiveNumber, readString } from '@/lib/yjs-read-utils';
+import {
+  SCREEN_SPEC_ROOT_KEY,
+  SCREEN_SPEC_SCREENS_KEY,
+  SCREEN_SPEC_SCREEN_ORDER_KEY,
+  SCREEN_SPEC_INSTANCES_KEY,
+  SCREEN_SPEC_LAYERS_KEY,
+  SCREEN_SPEC_MASTERS_KEY,
+  SCREEN_SPEC_INSTANCE_OVERRIDES_KEY,
+  SCREEN_SPEC_INSTANCE_MASTER_SNAPSHOT_KEY,
+  SCREEN_SPEC_SCHEMA_VERSION_KEY,
+  SCREEN_SPEC_LIBRARY_SEED_VERSION_KEY,
+} from '@/constants/screen-design';
 import {
   DEFAULT_SCREEN_DESIGN_FRAME_PRESET_ID,
   resolveScreenDesignFramePreset,
 } from './screen-design-frame-presets';
 import { convertCssColorToHex } from './screen-design-canvas-palette';
 
-const ROOT_KEY = 'screenSpec';
-const SCHEMA_VERSION_KEY = 'schemaVersion';
+const ROOT_KEY = SCREEN_SPEC_ROOT_KEY;
+const SCHEMA_VERSION_KEY = SCREEN_SPEC_SCHEMA_VERSION_KEY;
 export const SCREEN_DESIGN_DOCUMENT_SCHEMA_VERSION = 4;
 const SCHEMA_VERSION = SCREEN_DESIGN_DOCUMENT_SCHEMA_VERSION;
-const LIBRARY_SEED_VERSION_KEY = 'librarySeedVersion';
+const LIBRARY_SEED_VERSION_KEY = SCREEN_SPEC_LIBRARY_SEED_VERSION_KEY;
 const LIBRARY_SEED_VERSION = 1;
-const SCREENS_KEY = 'screens';
-const SCREEN_ORDER_KEY = 'screenOrder';
-const INSTANCES_KEY = 'instances';
-const LAYERS_KEY = 'layers';
-const MASTERS_KEY = 'masters';
-const INSTANCE_OVERRIDES_KEY = 'overrides';
-const INSTANCE_MASTER_SNAPSHOT_KEY = 'masterSnapshot';
+const SCREENS_KEY = SCREEN_SPEC_SCREENS_KEY;
+const SCREEN_ORDER_KEY = SCREEN_SPEC_SCREEN_ORDER_KEY;
+const INSTANCES_KEY = SCREEN_SPEC_INSTANCES_KEY;
+const LAYERS_KEY = SCREEN_SPEC_LAYERS_KEY;
+const MASTERS_KEY = SCREEN_SPEC_MASTERS_KEY;
+const INSTANCE_OVERRIDES_KEY = SCREEN_SPEC_INSTANCE_OVERRIDES_KEY;
+const INSTANCE_MASTER_SNAPSHOT_KEY = SCREEN_SPEC_INSTANCE_MASTER_SNAPSHOT_KEY;
 
 const BUILT_IN_LIBRARY_CATEGORY_IDS = [
   'layout',
@@ -1981,16 +1994,6 @@ function mergeExplicitAndDerivedIds(...sources: string[][]): string[] {
 }
 
 /**
- * 저장값에서 비어 있지 않은 문자열을 읽는다.
- *
- * @param value 해석할 저장값
- * @returns trim된 문자열 또는 null
- */
-function readString(value: unknown): string | null {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
-}
-
-/**
  * 화면기획 accent color 값을 canonical hex 형식으로 정규화한다.
  *
  * @param value 정규화할 색상 값
@@ -2037,37 +2040,6 @@ function resolveScreenDesignAccentColor(
   }
 
   return SCREEN_SPEC_CATEGORY_FALLBACK_HEX[categoryId];
-}
-
-/**
- * 저장값에서 유한한 숫자를 읽는다.
- *
- * @param value 해석할 저장값
- * @returns 유효한 숫자 또는 null
- */
-function readNumber(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-/**
- * 저장값에서 양수 정수를 읽는다.
- *
- * @param value 해석할 저장값
- * @returns 양수 정수 또는 null
- */
-function readPositiveNumber(value: unknown): number | null {
-  const parsed = readNumber(value);
-  return parsed !== null && parsed > 0 ? Math.round(parsed) : null;
-}
-
-/**
- * 저장값에서 boolean 값을 읽는다.
- *
- * @param value 해석할 저장값
- * @returns boolean 값 또는 null
- */
-function readBoolean(value: unknown): boolean | null {
-  return typeof value === 'boolean' ? value : null;
 }
 
 /**

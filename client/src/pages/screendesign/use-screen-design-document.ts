@@ -27,14 +27,14 @@ import {
   type ScreenDesignMasterTier,
 } from './screen-design-document';
 
-interface AddInstanceParams {
+export interface AddInstanceParams {
   screenId: string;
   masterId: string;
   x: number;
   y: number;
 }
 
-interface UpdateInstanceParams {
+export interface UpdateInstanceParams {
   x?: number;
   y?: number;
   width?: number | null;
