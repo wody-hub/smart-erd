@@ -145,6 +145,11 @@ test('ScreenSpecMutationPolicy 는 instance/layer command 를 세분화된 scope
       id: 'instance-2',
       mode: 'exclusive',
     },
+    {
+      kind: 'instance-cascade',
+      id: 'collection',
+      mode: 'exclusive',
+    },
   ]);
   assert.deepEqual(layerMutation.affectedScopes, [
     {
@@ -206,6 +211,158 @@ test('ScreenSpecMutationPolicy 는 instance/add 에 master shared scope 를 포�
       kind: 'master',
       id: 'master-7',
       mode: 'shared',
+    },
+  ]);
+});
+
+test('ScreenSpecMutationPolicy 는 cascaded instance writes 를 위한 coordination scope 를 포함한다', () => {
+  const mutationPolicy = new ScreenSpecMutationPolicy(new ScreenSpecScopeResolver());
+
+  const masterUpdateMutation = mutationPolicy.toMutation(
+    {
+      key: 'master:update',
+      payload: {
+        masterId: 'master-7',
+        width: 480,
+      },
+    },
+    {
+      origin: {
+        source: 'local',
+      },
+    },
+  );
+  const screenFrameMutation = mutationPolicy.toMutation(
+    {
+      key: 'screen:update-frame',
+      payload: {
+        screenId: 'screen-1',
+        width: 800,
+        height: 600,
+      },
+    },
+    {
+      origin: {
+        source: 'local',
+      },
+    },
+  );
+  const masterDeleteMutation = mutationPolicy.toMutation(
+    {
+      key: 'master:delete',
+      payload: {
+        masterId: 'master-7',
+      },
+    },
+    {
+      origin: {
+        source: 'local',
+      },
+    },
+  );
+  const screenDeleteMutation = mutationPolicy.toMutation(
+    {
+      key: 'screen:delete',
+      payload: {
+        screenId: 'screen-1',
+      },
+    },
+    {
+      origin: {
+        source: 'local',
+      },
+    },
+  );
+
+  assert.deepEqual(masterUpdateMutation.affectedScopes, [
+    {
+      kind: 'master',
+      id: 'master-7',
+      mode: 'exclusive',
+    },
+    {
+      kind: 'instance-cascade',
+      id: 'collection',
+      mode: 'exclusive',
+    },
+  ]);
+  assert.deepEqual(screenFrameMutation.affectedScopes, [
+    {
+      kind: 'screen',
+      id: 'screen-1',
+      mode: 'exclusive',
+    },
+    {
+      kind: 'instance-cascade',
+      id: 'collection',
+      mode: 'exclusive',
+    },
+  ]);
+  assert.deepEqual(masterDeleteMutation.affectedScopes, [
+    {
+      kind: 'master',
+      id: 'master-7',
+      mode: 'exclusive',
+    },
+    {
+      kind: 'instance-cascade',
+      id: 'collection',
+      mode: 'exclusive',
+    },
+  ]);
+  assert.deepEqual(screenDeleteMutation.affectedScopes, [
+    {
+      kind: 'screen',
+      id: 'screen-1',
+      mode: 'exclusive',
+    },
+    {
+      kind: 'instance-cascade',
+      id: 'collection',
+      mode: 'exclusive',
+    },
+  ]);
+});
+
+test('ScreenSpecMutationPolicy 는 cross-screen instance update 에 coordination scope 를 포함한다', () => {
+  const mutationPolicy = new ScreenSpecMutationPolicy(new ScreenSpecScopeResolver());
+
+  const moveMutation = mutationPolicy.toMutation(
+    {
+      key: 'instance:update',
+      payload: {
+        instanceId: 'instance-2',
+        screenId: 'screen-2',
+        x: 640,
+      },
+    },
+    {
+      origin: {
+        source: 'local',
+      },
+    },
+  );
+
+  assert.deepEqual(moveMutation.affectedScopes, [
+    {
+      kind: 'screen',
+      id: 'screen-2',
+      mode: 'shared',
+    },
+    {
+      kind: 'layer',
+      id: 'screen-2',
+      mode: 'shared',
+    },
+    {
+      kind: 'instance',
+      id: 'instance-2',
+      mode: 'exclusive',
+    },
+    {
+      kind: 'instance-cascade',
+      id: 'collection',
+      mode: 'exclusive',
     },
   ]);
 });

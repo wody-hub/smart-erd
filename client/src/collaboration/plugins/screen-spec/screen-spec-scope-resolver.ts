@@ -9,6 +9,12 @@ const MASTERS_SCOPE: ScopeRef = {
   mode: 'shared',
 };
 
+const INSTANCE_CASCADE_SCOPE: ScopeRef = {
+  kind: 'instance-cascade',
+  id: 'collection',
+  mode: 'exclusive',
+};
+
 /**
  * 화면기획 command가 영향을 주는 문서 scope를 계산한다.
  */
@@ -36,6 +42,7 @@ export class ScreenSpecScopeResolver implements ScopeResolver {
               id: masterId,
               mode: 'exclusive',
             },
+            INSTANCE_CASCADE_SCOPE,
           ]
         : [];
     }
@@ -43,9 +50,7 @@ export class ScreenSpecScopeResolver implements ScopeResolver {
     if (
       command.key === 'screen:add' ||
       command.key === 'screen:rename' ||
-      command.key === 'screen:update-frame' ||
-      command.key === 'screen:move' ||
-      command.key === 'screen:delete'
+      command.key === 'screen:move'
     ) {
       return screenId
         ? [
@@ -54,6 +59,19 @@ export class ScreenSpecScopeResolver implements ScopeResolver {
               id: screenId,
               mode: 'exclusive',
             },
+          ]
+        : [];
+    }
+
+    if (command.key === 'screen:update-frame' || command.key === 'screen:delete') {
+      return screenId
+        ? [
+            {
+              kind: 'screen',
+              id: screenId,
+              mode: 'exclusive',
+            },
+            INSTANCE_CASCADE_SCOPE,
           ]
         : [];
     }
@@ -96,6 +114,7 @@ export class ScreenSpecScopeResolver implements ScopeResolver {
               },
             ]
           : []),
+        ...(command.key === 'instance:update' && screenId ? [INSTANCE_CASCADE_SCOPE] : []),
       ];
     }
 

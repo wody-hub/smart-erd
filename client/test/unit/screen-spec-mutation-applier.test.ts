@@ -163,6 +163,268 @@ test('screen spec rebind clears stale overrides that now match the next master d
   assert.equal(instance.overrideState.accentColor, false);
 });
 
+test('screen spec instance add restores inherited size after an initial clamp is lifted', () => {
+  const { doc, applier } = createHarness();
+  setupScreenAndMasters(applier);
+
+  applyMutation(applier, 'master:update', {
+    masterId: 'master-small',
+    width: 600,
+    height: 300,
+  });
+  applyMutation(applier, 'screen:update-frame', {
+    screenId: 'screen-1',
+    width: 500,
+    height: 400,
+  });
+  applyMutation(applier, 'instance:add', {
+    instanceId: 'instance-1',
+    screenId: 'screen-1',
+    masterId: 'master-small',
+    x: 24,
+    y: 24,
+  });
+
+  let instance = readScreenDesignDocument(doc).instancesByScreenId['screen-1']?.[0];
+  assert.ok(instance);
+  assert.equal(instance.width, 500 - SCREEN_DESIGN_DOCUMENT_PADDING * 2);
+  assert.equal(instance.height, 300);
+  assert.equal(instance.overrideState.width, true);
+  assert.equal(instance.overrideState.height, false);
+
+  applyMutation(applier, 'screen:update-frame', {
+    screenId: 'screen-1',
+    width: 1200,
+    height: 900,
+  });
+
+  instance = readScreenDesignDocument(doc).instancesByScreenId['screen-1']?.[0];
+  assert.ok(instance);
+  assert.equal(instance.width, 600);
+  assert.equal(instance.height, 300);
+  assert.equal(instance.overrideState.width, false);
+  assert.equal(instance.overrideState.height, false);
+});
+
+test('screen spec screen move transfers the instance and clamps inherited size on a smaller destination screen', () => {
+  const { doc, applier } = createHarness();
+  setupScreenAndMasters(applier);
+
+  applyMutation(applier, 'master:update', {
+    masterId: 'master-small',
+    width: 600,
+    height: 300,
+  });
+  applyMutation(applier, 'screen:add', {
+    screenId: 'screen-2',
+    name: 'Screen 2',
+    width: 500,
+    height: 400,
+  });
+  applyMutation(applier, 'instance:add', {
+    instanceId: 'instance-1',
+    screenId: 'screen-1',
+    masterId: 'master-small',
+    x: 24,
+    y: 24,
+  });
+  applyMutation(applier, 'instance:update', {
+    instanceId: 'instance-1',
+    screenId: 'screen-2',
+  });
+
+  const snapshot = readScreenDesignDocument(doc);
+  const sourceInstances = snapshot.instancesByScreenId['screen-1'] ?? [];
+  const destinationInstance = snapshot.instancesByScreenId['screen-2']?.[0];
+
+  assert.equal(sourceInstances.length, 0);
+  assert.ok(destinationInstance);
+  assert.equal(destinationInstance.screenId, 'screen-2');
+  assert.equal(destinationInstance.width, 500 - SCREEN_DESIGN_DOCUMENT_PADDING * 2);
+  assert.equal(destinationInstance.height, 300);
+  assert.equal(destinationInstance.overrideState.width, true);
+  assert.equal(destinationInstance.overrideState.height, false);
+});
+
+test('screen spec screen move restores inherited size after leaving a constrained screen', () => {
+  const { doc, applier } = createHarness();
+  setupScreenAndMasters(applier);
+
+  applyMutation(applier, 'master:update', {
+    masterId: 'master-small',
+    width: 600,
+    height: 300,
+  });
+  applyMutation(applier, 'screen:add', {
+    screenId: 'screen-2',
+    name: 'Screen 2',
+    width: 500,
+    height: 400,
+  });
+  applyMutation(applier, 'instance:add', {
+    instanceId: 'instance-1',
+    screenId: 'screen-2',
+    masterId: 'master-small',
+    x: 24,
+    y: 24,
+  });
+
+  let instance = readScreenDesignDocument(doc).instancesByScreenId['screen-2']?.[0];
+  assert.ok(instance);
+  assert.equal(instance.width, 500 - SCREEN_DESIGN_DOCUMENT_PADDING * 2);
+  assert.equal(instance.overrideState.width, true);
+
+  applyMutation(applier, 'instance:update', {
+    instanceId: 'instance-1',
+    screenId: 'screen-1',
+  });
+
+  const snapshot = readScreenDesignDocument(doc);
+  const sourceInstances = snapshot.instancesByScreenId['screen-2'] ?? [];
+  instance = snapshot.instancesByScreenId['screen-1']?.[0];
+
+  assert.equal(sourceInstances.length, 0);
+  assert.ok(instance);
+  assert.equal(instance.screenId, 'screen-1');
+  assert.equal(instance.width, 600);
+  assert.equal(instance.height, 300);
+  assert.equal(instance.overrideState.width, false);
+  assert.equal(instance.overrideState.height, false);
+});
+
+test('screen spec screen move restores explicit override after leaving a constrained screen', () => {
+  const { doc, applier } = createHarness();
+  setupScreenAndMasters(applier);
+
+  applyMutation(applier, 'screen:add', {
+    screenId: 'screen-2',
+    name: 'Screen 2',
+    width: 500,
+    height: 400,
+  });
+  applyMutation(applier, 'instance:add', {
+    instanceId: 'instance-1',
+    screenId: 'screen-2',
+    masterId: 'master-small',
+    x: 24,
+    y: 24,
+  });
+  applyMutation(applier, 'instance:update', {
+    instanceId: 'instance-1',
+    width: 900,
+    height: 640,
+  });
+
+  let instance = readScreenDesignDocument(doc).instancesByScreenId['screen-2']?.[0];
+  assert.ok(instance);
+  assert.equal(instance.width, 500 - SCREEN_DESIGN_DOCUMENT_PADDING * 2);
+  assert.equal(instance.height, 400 - SCREEN_DESIGN_DOCUMENT_PADDING * 2);
+  assert.equal(instance.overrideState.width, true);
+  assert.equal(instance.overrideState.height, true);
+
+  applyMutation(applier, 'instance:update', {
+    instanceId: 'instance-1',
+    screenId: 'screen-1',
+  });
+
+  const snapshot = readScreenDesignDocument(doc);
+  const sourceInstances = snapshot.instancesByScreenId['screen-2'] ?? [];
+  instance = snapshot.instancesByScreenId['screen-1']?.[0];
+
+  assert.equal(sourceInstances.length, 0);
+  assert.ok(instance);
+  assert.equal(instance.screenId, 'screen-1');
+  assert.equal(instance.width, 900);
+  assert.equal(instance.height, 640);
+  assert.equal(instance.overrideState.width, true);
+  assert.equal(instance.overrideState.height, true);
+});
+
+test('screen spec rebind restores next master size after a constrained master switch is lifted', () => {
+  const { doc, applier } = createHarness();
+  setupScreenAndMasters(applier);
+
+  applyMutation(applier, 'screen:update-frame', {
+    screenId: 'screen-1',
+    width: 500,
+    height: 400,
+  });
+  applyMutation(applier, 'instance:add', {
+    instanceId: 'instance-1',
+    screenId: 'screen-1',
+    masterId: 'master-small',
+    x: 24,
+    y: 24,
+  });
+  applyMutation(applier, 'instance:update', {
+    instanceId: 'instance-1',
+    masterId: 'master-large',
+  });
+
+  let instance = readScreenDesignDocument(doc).instancesByScreenId['screen-1']?.[0];
+  assert.ok(instance);
+  assert.equal(instance.width, 500 - SCREEN_DESIGN_DOCUMENT_PADDING * 2);
+  assert.equal(instance.height, 320);
+  assert.equal(instance.overrideState.width, true);
+  assert.equal(instance.overrideState.height, false);
+
+  applyMutation(applier, 'screen:update-frame', {
+    screenId: 'screen-1',
+    width: 1200,
+    height: 900,
+  });
+
+  instance = readScreenDesignDocument(doc).instancesByScreenId['screen-1']?.[0];
+  assert.ok(instance);
+  assert.equal(instance.width, 480);
+  assert.equal(instance.height, 320);
+  assert.equal(instance.overrideState.width, false);
+  assert.equal(instance.overrideState.height, false);
+});
+
+test('screen spec direct resize restores explicit size after a constrained update is lifted', () => {
+  const { doc, applier } = createHarness();
+  setupScreenAndMasters(applier);
+
+  applyMutation(applier, 'screen:update-frame', {
+    screenId: 'screen-1',
+    width: 500,
+    height: 400,
+  });
+  applyMutation(applier, 'instance:add', {
+    instanceId: 'instance-1',
+    screenId: 'screen-1',
+    masterId: 'master-small',
+    x: 24,
+    y: 24,
+  });
+  applyMutation(applier, 'instance:update', {
+    instanceId: 'instance-1',
+    width: 900,
+    height: 640,
+  });
+
+  let instance = readScreenDesignDocument(doc).instancesByScreenId['screen-1']?.[0];
+  assert.ok(instance);
+  assert.equal(instance.width, 500 - SCREEN_DESIGN_DOCUMENT_PADDING * 2);
+  assert.equal(instance.height, 400 - SCREEN_DESIGN_DOCUMENT_PADDING * 2);
+  assert.equal(instance.overrideState.width, true);
+  assert.equal(instance.overrideState.height, true);
+
+  applyMutation(applier, 'screen:update-frame', {
+    screenId: 'screen-1',
+    width: 1200,
+    height: 900,
+  });
+
+  instance = readScreenDesignDocument(doc).instancesByScreenId['screen-1']?.[0];
+  assert.ok(instance);
+  assert.equal(instance.width, 900);
+  assert.equal(instance.height, 640);
+  assert.equal(instance.overrideState.width, true);
+  assert.equal(instance.overrideState.height, true);
+});
+
 test('screen spec master update reclamps inherited instances after resized defaults grow', () => {
   const { doc, applier } = createHarness();
   setupScreenAndMasters(applier);
