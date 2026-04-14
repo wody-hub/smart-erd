@@ -51,6 +51,8 @@ const LAYERS_KEY = SCREEN_SPEC_LAYERS_KEY;
 const MASTERS_KEY = SCREEN_SPEC_MASTERS_KEY;
 const INSTANCE_OVERRIDES_KEY = SCREEN_SPEC_INSTANCE_OVERRIDES_KEY;
 const INSTANCE_MASTER_SNAPSHOT_KEY = SCREEN_SPEC_INSTANCE_MASTER_SNAPSHOT_KEY;
+const WIDTH_CONSTRAINT_SOURCE_KEY = 'widthConstraintSource';
+const HEIGHT_CONSTRAINT_SOURCE_KEY = 'heightConstraintSource';
 
 interface ScreenSpecRootMaps {
   screens: Y.Map<Y.Map<unknown>>;
@@ -187,13 +189,83 @@ export class ScreenSpecDocumentMutationApplier {
       return null;
     }
 
-    return this.withTransaction(mutation.key, (maps) => {
+    return this.withTransaction(mutation.key, (maps, doc) => {
       const screenYMap = maps.screens.get(screenId);
       if (!(screenYMap instanceof Y.Map)) {
         return null;
       }
       screenYMap.set('width', width);
       screenYMap.set('height', height);
+
+      const snapshot = readScreenDesignDocument(doc);
+      const screen = snapshot.screens.find((candidate) => candidate.id === screenId);
+      if (!screen) {
+        return true;
+      }
+
+      for (const currentInstance of snapshot.instancesByScreenId[screenId] ?? []) {
+        const instanceYMap = maps.instances.get(currentInstance.id);
+        if (!(instanceYMap instanceof Y.Map)) {
+          continue;
+        }
+        const overrides = ensureNestedMap(instanceYMap, INSTANCE_OVERRIDES_KEY);
+        const desiredWidth =
+          readPositiveNumber(overrides.get(WIDTH_CONSTRAINT_SOURCE_KEY)) ??
+          (currentInstance.overrideState.width
+            ? currentInstance.width
+            : (currentInstance.masterSnapshot?.width ?? currentInstance.width));
+        const desiredHeight =
+          readPositiveNumber(overrides.get(HEIGHT_CONSTRAINT_SOURCE_KEY)) ??
+          (currentInstance.overrideState.height
+            ? currentInstance.height
+            : (currentInstance.masterSnapshot?.height ?? currentInstance.height));
+
+        const rect = clampInstanceRect(
+          {
+            x: currentInstance.x,
+            y: currentInstance.y,
+            width: desiredWidth,
+            height: desiredHeight,
+          },
+          screen,
+        );
+
+        if (!currentInstance.masterSnapshot) {
+          continue;
+        }
+
+        instanceYMap.set('x', rect.x);
+        instanceYMap.set('y', rect.y);
+        applyInstanceOverrides({
+          instanceYMap,
+          syncWidth:
+            rect.width !== currentInstance.width ||
+            readPositiveNumber(overrides.get(WIDTH_CONSTRAINT_SOURCE_KEY)) !== null,
+          syncHeight:
+            rect.height !== currentInstance.height ||
+            readPositiveNumber(overrides.get(HEIGHT_CONSTRAINT_SOURCE_KEY)) !== null,
+          syncLabel: false,
+          syncAccentColor: false,
+          width: rect.width,
+          height: rect.height,
+          label: currentInstance.overrideState.label ? currentInstance.label : null,
+          accentColor: currentInstance.overrideState.accentColor
+            ? normalizeScreenDesignColor(currentInstance.accentColor)
+            : null,
+          masterSnapshot: currentInstance.masterSnapshot,
+          masterId: currentInstance.masterId,
+        });
+        if (rect.width < desiredWidth) {
+          overrides.set(WIDTH_CONSTRAINT_SOURCE_KEY, desiredWidth);
+        } else {
+          overrides.delete(WIDTH_CONSTRAINT_SOURCE_KEY);
+        }
+        if (rect.height < desiredHeight) {
+          overrides.set(HEIGHT_CONSTRAINT_SOURCE_KEY, desiredHeight);
+        } else {
+          overrides.delete(HEIGHT_CONSTRAINT_SOURCE_KEY);
+        }
+      }
       return true;
     });
   }
@@ -310,21 +382,25 @@ export class ScreenSpecDocumentMutationApplier {
       return null;
     }
 
-    return this.withTransaction(mutation.key, (maps) => {
+    return this.withTransaction(mutation.key, (maps, doc) => {
       const masterYMap = maps.masters.get(masterId);
       if (!(masterYMap instanceof Y.Map)) {
         return null;
       }
 
       const name = readString(payload?.name);
+      let labelChanged = false;
       if (name) {
         masterYMap.set('name', name);
         masterYMap.delete('labelKey');
+        labelChanged = true;
       }
 
       const categoryId = readCategoryId(payload?.categoryId);
+      let categoryChanged = false;
       if (categoryId) {
         masterYMap.set('category', categoryId);
+        categoryChanged = true;
       }
 
       const tier = readTier(payload?.tier);
@@ -333,15 +409,20 @@ export class ScreenSpecDocumentMutationApplier {
       }
 
       const width = readPositiveNumber(payload?.width);
+      let widthChanged = false;
       if (width !== null) {
         masterYMap.set('width', sanitizeMasterDimension(width));
+        widthChanged = true;
       }
 
       const height = readPositiveNumber(payload?.height);
+      let heightChanged = false;
       if (height !== null) {
         masterYMap.set('height', sanitizeMasterDimension(height));
+        heightChanged = true;
       }
 
+      let accentColorChanged = false;
       if (hasOwn(payload, 'accentColor')) {
         const accentColor = normalizeScreenDesignColor(payload?.accentColor);
         if (accentColor) {
@@ -349,7 +430,134 @@ export class ScreenSpecDocumentMutationApplier {
         } else {
           masterYMap.delete('accentColor');
         }
+        accentColorChanged = true;
+      } else if (categoryChanged) {
+        accentColorChanged = true;
       }
+
+      if (!widthChanged && !heightChanged && !labelChanged && !accentColorChanged) {
+        return true;
+      }
+
+      const snapshot = readScreenDesignDocument(doc);
+      const nextMasterItem = resolveLibraryItemById(snapshot.libraryItems, masterId);
+      if (!nextMasterItem) {
+        return true;
+      }
+
+      const nextMasterSnapshot = createInstanceMasterSnapshot(nextMasterItem);
+      const instancesById = new Map(
+        Object.values(snapshot.instancesByScreenId)
+          .flat()
+          .map((instance) => [instance.id, instance] as const),
+      );
+      const fallbackPreset = resolveScreenDesignFramePreset('desktop');
+
+      maps.instances.forEach((instanceYMap, instanceId) => {
+        if (
+          !(instanceYMap instanceof Y.Map) ||
+          typeof instanceId !== 'string' ||
+          instanceYMap.get('masterId') !== masterId
+        ) {
+          return;
+        }
+
+        const currentInstance = instancesById.get(instanceId);
+        if (!currentInstance) {
+          return;
+        }
+
+        const screen = readScreenFromYMap(
+          currentInstance.screenId,
+          maps.screens.get(currentInstance.screenId),
+          {
+            fallbackWidth: fallbackPreset.width,
+            fallbackHeight: fallbackPreset.height,
+          },
+        );
+        if (!screen) {
+          return;
+        }
+
+        const overridesMap = ensureNestedMap(instanceYMap, INSTANCE_OVERRIDES_KEY);
+        const prevWidthConstraintSource = widthChanged
+          ? readPositiveNumber(overridesMap.get(WIDTH_CONSTRAINT_SOURCE_KEY))
+          : null;
+        const prevHeightConstraintSource = heightChanged
+          ? readPositiveNumber(overridesMap.get(HEIGHT_CONSTRAINT_SOURCE_KEY))
+          : null;
+
+        // Read the stored master snapshot (pre-update) to detect whether an existing
+        // constraint source came from an inherited dimension or an explicit user override.
+        const storedSnapshotYMap = instanceYMap.get(INSTANCE_MASTER_SNAPSHOT_KEY);
+        const prevMasterWidth =
+          storedSnapshotYMap instanceof Y.Map
+            ? readPositiveNumber(storedSnapshotYMap.get('width'))
+            : null;
+        const prevMasterHeight =
+          storedSnapshotYMap instanceof Y.Map
+            ? readPositiveNumber(storedSnapshotYMap.get('height'))
+            : null;
+
+        // Determine the unconstrained target dimensions for this master update:
+        // - No constraint source: current width already reflects the live master (inherited)
+        //   or the user's explicit value — pass through unchanged.
+        // - Constraint source == old master width: instance was inherited+clamped by a frame
+        //   resize — adopt the new master width as the updated target.
+        // - Constraint source != old master width: instance had an explicit override that was
+        //   clamped — preserve the user's desired value as the target.
+        const targetWidth = widthChanged
+          ? prevWidthConstraintSource !== null
+            ? prevWidthConstraintSource === prevMasterWidth
+              ? nextMasterSnapshot.width
+              : prevWidthConstraintSource
+            : currentInstance.width
+          : currentInstance.width;
+        const targetHeight = heightChanged
+          ? prevHeightConstraintSource !== null
+            ? prevHeightConstraintSource === prevMasterHeight
+              ? nextMasterSnapshot.height
+              : prevHeightConstraintSource
+            : currentInstance.height
+          : currentInstance.height;
+
+        const rect = clampInstanceRect(
+          {
+            x: currentInstance.x,
+            y: currentInstance.y,
+            width: targetWidth,
+            height: targetHeight,
+          },
+          screen,
+        );
+
+        instanceYMap.set('x', rect.x);
+        instanceYMap.set('y', rect.y);
+        applyInstanceOverrides({
+          instanceYMap,
+          syncWidth: widthChanged,
+          syncHeight: heightChanged,
+          syncLabel: labelChanged,
+          syncAccentColor: accentColorChanged,
+          width: rect.width,
+          height: rect.height,
+          label: currentInstance.overrideState.label ? currentInstance.label : null,
+          accentColor: currentInstance.overrideState.accentColor
+            ? normalizeScreenDesignColor(currentInstance.accentColor)
+            : null,
+          masterSnapshot: nextMasterSnapshot,
+          masterId,
+        });
+        // Re-establish constraint sources when the instance is still clamped after the master
+        // update. applyInstanceOverrides always clears these fields, so we set them here when
+        // the updated target still exceeds the screen boundary.
+        if (widthChanged && rect.width < targetWidth) {
+          overridesMap.set(WIDTH_CONSTRAINT_SOURCE_KEY, targetWidth);
+        }
+        if (heightChanged && rect.height < targetHeight) {
+          overridesMap.set(HEIGHT_CONSTRAINT_SOURCE_KEY, targetHeight);
+        }
+      });
       return true;
     });
   }
@@ -787,6 +995,7 @@ function applyInstanceOverrides(params: {
     } else {
       overrides.set('width', width);
     }
+    overrides.delete(WIDTH_CONSTRAINT_SOURCE_KEY);
     instanceYMap.delete('width');
   }
   if (syncHeight) {
@@ -795,6 +1004,7 @@ function applyInstanceOverrides(params: {
     } else {
       overrides.set('height', height);
     }
+    overrides.delete(HEIGHT_CONSTRAINT_SOURCE_KEY);
     instanceYMap.delete('height');
   }
   if (syncLabel) {
