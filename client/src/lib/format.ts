@@ -20,6 +20,7 @@ export function formatProjectDate(date: string, locale: string): string {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone: 'UTC',
   }).format(new Date(date));
 }
 

@@ -1,21 +1,48 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BookOpen, ClipboardList, FileText, Plus } from 'lucide-react';
+import {
+  ArrowLeft,
+  BookOpen,
+  ClipboardList,
+  FileText,
+  ListTree,
+  Plus,
+  type LucideIcon,
+} from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { fetchProject } from '@/api/projectApi';
 import { fetchTeam } from '@/api/teamApi';
-import BusinessOverviewTab from '@/components/project/BusinessOverviewTab';
-import DocumentHubTabContent from '@/components/workspace/DocumentHubTabContent';
-import ProjectWorkspaceHero from '@/components/workspace/ProjectWorkspaceHero';
 import Header from '@/components/layout/Header';
+import BusinessOverviewTab from '@/components/project/BusinessOverviewTab';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ProjectWorkspaceHero from '@/components/workspace/ProjectWorkspaceHero';
+import DocumentHubTabContent from '@/components/workspace/DocumentHubTabContent';
+import WbsTab from '@/components/wbs/WbsTab';
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
 import { useRecentProjectContext } from '@/hooks/useRecentProjectContext';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { getWorkspaceDocumentsTitleLabel } from '@/lib/workspace-labels';
+
+type DiagramsTabValue = 'documents' | 'overview' | 'wbs';
+
+interface DiagramsTabRenderContext {
+  teamId: string;
+  projectId: string;
+  canEdit: boolean;
+  createDialogOpen: boolean;
+  onCreateDialogOpenChange: (open: boolean) => void;
+  onDocumentCountChange: (count: number) => void;
+}
+
+interface DiagramsTabConfig {
+  value: DiagramsTabValue;
+  label: string;
+  icon: LucideIcon;
+  renderContent: (context: DiagramsTabRenderContext) => ReactNode;
+}
 
 /**
  * 문서 허브 페이지.
@@ -28,7 +55,7 @@ export default function DiagramsPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'documents' | 'overview'>('documents');
+  const [activeTab, setActiveTab] = useState<DiagramsTabValue>('documents');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [documentCount, setDocumentCount] = useState(0);
   const { recordRecentProjectContext } = useRecentProjectContext(teamId);
@@ -46,13 +73,64 @@ export default function DiagramsPage() {
   });
   const documentTitleToken = getWorkspaceDocumentsTitleLabel();
 
+  const tabs: DiagramsTabConfig[] = [
+    {
+      value: 'documents',
+      label: t('businessOverview.documentsTab'),
+      icon: FileText,
+      renderContent: ({
+        teamId: currentTeamId,
+        projectId: currentProjectId,
+        canEdit: currentCanEdit,
+        createDialogOpen: currentCreateDialogOpen,
+        onCreateDialogOpenChange,
+        onDocumentCountChange,
+      }) => (
+        <DocumentHubTabContent
+          teamId={currentTeamId}
+          projectId={currentProjectId}
+          canEdit={currentCanEdit}
+          createDialogOpen={currentCreateDialogOpen}
+          onCreateDialogOpenChange={onCreateDialogOpenChange}
+          onDocumentCountChange={onDocumentCountChange}
+        />
+      ),
+    },
+    {
+      value: 'overview',
+      label: t('businessOverview.tab.title'),
+      icon: ClipboardList,
+      renderContent: ({
+        teamId: currentTeamId,
+        projectId: currentProjectId,
+        canEdit: currentCanEdit,
+      }) => (
+        <BusinessOverviewTab
+          teamId={currentTeamId}
+          projectId={currentProjectId}
+          canEdit={currentCanEdit}
+        />
+      ),
+    },
+    {
+      value: 'wbs',
+      label: t('wbs.tab.title'),
+      icon: ListTree,
+      renderContent: ({
+        teamId: currentTeamId,
+        projectId: currentProjectId,
+        canEdit: currentCanEdit,
+      }) => <WbsTab teamId={currentTeamId} projectId={currentProjectId} canEdit={currentCanEdit} />,
+    },
+  ];
+
   /**
    * 탭 전환 시 overview로 이동하면 문서 생성 다이얼로그를 닫는다.
    *
    * @param value 다음 탭 값
    */
   const handleTabChange = (value: string) => {
-    const nextTab = value === 'overview' ? 'overview' : 'documents';
+    const nextTab = tabs.find((tab) => tab.value === value)?.value ?? 'documents';
     if (nextTab !== 'documents') {
       setCreateDialogOpen(false);
     }
@@ -124,30 +202,26 @@ export default function DiagramsPage() {
 
           <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6">
             <TabsList>
-              <TabsTrigger value="documents">
-                <FileText className="mr-2 h-4 w-4" />
-                {t('businessOverview.documentsTab')}
-              </TabsTrigger>
-              <TabsTrigger value="overview">
-                <ClipboardList className="mr-2 h-4 w-4" />
-                {t('businessOverview.tab.title')}
-              </TabsTrigger>
+              {tabs.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value}>
+                  <tab.icon className="mr-2 h-4 w-4" />
+                  {tab.label}
+                </TabsTrigger>
+              ))}
             </TabsList>
 
-            <TabsContent value="documents">
-              <DocumentHubTabContent
-                teamId={teamId!}
-                projectId={projectId!}
-                canEdit={canEdit}
-                createDialogOpen={createDialogOpen}
-                onCreateDialogOpenChange={setCreateDialogOpen}
-                onDocumentCountChange={setDocumentCount}
-              />
-            </TabsContent>
-
-            <TabsContent value="overview">
-              <BusinessOverviewTab teamId={teamId!} projectId={projectId!} canEdit={canEdit} />
-            </TabsContent>
+            {tabs.map((tab) => (
+              <TabsContent key={tab.value} value={tab.value}>
+                {tab.renderContent({
+                  teamId: teamId!,
+                  projectId: projectId!,
+                  canEdit,
+                  createDialogOpen,
+                  onCreateDialogOpenChange: setCreateDialogOpen,
+                  onDocumentCountChange: setDocumentCount,
+                })}
+              </TabsContent>
+            ))}
           </Tabs>
         </div>
       </main>

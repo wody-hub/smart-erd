@@ -541,6 +541,138 @@
       "invalidAmount": "Contract amount must be a valid number"
     }
   },
+  "wbs": {
+    "tab": {
+      "title": "WBS"
+    },
+    "section": {
+      "title": "WBS Items",
+      "description": "Manage project work items in a hierarchy with schedule, progress, and milestone mapping."
+    },
+    "action": {
+      "create": "Add WBS item"
+    },
+    "dnd": {
+      "hint": "Drag with the handle to reorder. Move left/right while dragging to change hierarchy level."
+    },
+    "field": {
+      "name": "Item",
+      "period": "Period",
+      "progressRate": "Progress",
+      "estimatedMm": "Est. M/M",
+      "milestone": "Milestone",
+      "actions": "Actions",
+      "noPeriod": "Not set",
+      "noEstimatedMm": "Not set",
+      "noMilestone": "No milestone",
+      "mmValue": "{{value}} M/M"
+    },
+    "form": {
+      "createTitle": "Create WBS item",
+      "editTitle": "Edit WBS item",
+      "createDescription": "Enter the basic information for this WBS item.",
+      "editDescription": "Update the basic information for this WBS item.",
+      "name": "Item name",
+      "namePlaceholder": "e.g. Requirement analysis",
+      "parent": "Parent item",
+      "parentPlaceholder": "Select parent item",
+      "parentRoot": "Top-level item",
+      "milestone": "Milestone",
+      "milestonePlaceholder": "Select milestone",
+      "noMilestone": "No mapping",
+      "startDate": "Start date",
+      "endDate": "End date",
+      "progressRate": "Progress (%)",
+      "estimatedMm": "Estimated M/M",
+      "estimatedMmPlaceholder": "e.g. 1.5"
+    },
+    "validation": {
+      "dateOrder": "End date must be on or after the start date",
+      "progressRate": "Progress must be between 0 and 100",
+      "estimatedMm": "Estimated M/M must be a number greater than or equal to 0"
+    },
+    "delete": {
+      "title": "Delete WBS item",
+      "description": "Delete \"{{name}}\"? Child items may also be removed."
+    },
+    "toast": {
+      "created": "WBS item created",
+      "createFailed": "Failed to create WBS item",
+      "updated": "WBS item updated",
+      "updateFailed": "Failed to update WBS item",
+      "deleted": "WBS item deleted",
+      "deleteFailed": "Failed to delete WBS item",
+      "loadFailed": "Failed to load WBS items",
+      "reorderFailed": "Failed to reorder WBS items",
+      "reordered": "WBS order updated",
+      "depthLimitExceeded": "Cannot move item beyond depth level 3",
+      "invalidMove": "Cannot move an item into its own child"
+    },
+    "empty": {
+      "title": "No WBS items yet",
+      "description": "Create your first WBS item to start planning project work."
+    },
+    "aria": {
+      "edit": "Edit WBS item {{name}}",
+      "delete": "Delete WBS item {{name}}",
+      "expand": "Expand WBS item {{name}}",
+      "collapse": "Collapse WBS item {{name}}",
+      "drag": "Drag WBS item {{name}}",
+      "editName": "Edit name of WBS item {{name}}",
+      "editProgress": "Edit progress of WBS item {{name}}"
+    }
+  },
+  "milestone": {
+    "section": {
+      "title": "Milestones",
+      "description": "Track major checkpoints with target dates and achievement rates."
+    },
+    "action": {
+      "create": "Add milestone"
+    },
+    "field": {
+      "targetDate": "Target date",
+      "achievementRate": "Achievement",
+      "linkedWbsCount": "{{count}} WBS item(s) linked",
+      "noDescription": "No description"
+    },
+    "status": {
+      "onTrack": "On track",
+      "delayed": "Delayed"
+    },
+    "form": {
+      "createTitle": "Create milestone",
+      "editTitle": "Edit milestone",
+      "createDescription": "Enter the milestone details.",
+      "editDescription": "Update the milestone details.",
+      "name": "Name",
+      "namePlaceholder": "e.g. First release",
+      "targetDate": "Target date",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter milestone details"
+    },
+    "delete": {
+      "title": "Delete milestone",
+      "description": "Delete milestone \"{{name}}\"?"
+    },
+    "toast": {
+      "created": "Milestone created",
+      "createFailed": "Failed to create milestone",
+      "updated": "Milestone updated",
+      "updateFailed": "Failed to update milestone",
+      "deleted": "Milestone deleted",
+      "deleteFailed": "Failed to delete milestone",
+      "loadFailed": "Failed to load milestones"
+    },
+    "empty": {
+      "title": "No milestones yet",
+      "description": "Create milestones to track important delivery checkpoints."
+    },
+    "aria": {
+      "edit": "Edit milestone {{name}}",
+      "delete": "Delete milestone {{name}}"
+    }
+  },
   "diagram": {
     "list": {
       "title": "ERD documents",

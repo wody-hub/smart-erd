@@ -539,6 +539,138 @@
       "invalidAmount": "계약 금액은 올바른 숫자여야 합니다"
     }
   },
+  "wbs": {
+    "tab": {
+      "title": "WBS"
+    },
+    "section": {
+      "title": "WBS 작업",
+      "description": "프로젝트 작업 항목을 계층으로 등록하고 기간, 진척률, 마일스톤 연결 정보를 관리합니다."
+    },
+    "action": {
+      "create": "WBS 항목 추가"
+    },
+    "dnd": {
+      "hint": "핸들을 드래그해 순서를 변경하세요. 드래그 중 좌우로 움직이면 계층 레벨을 변경할 수 있습니다."
+    },
+    "field": {
+      "name": "항목",
+      "period": "기간",
+      "progressRate": "진척률",
+      "estimatedMm": "예상 M/M",
+      "milestone": "마일스톤",
+      "actions": "작업",
+      "noPeriod": "미설정",
+      "noEstimatedMm": "미설정",
+      "noMilestone": "연결 없음",
+      "mmValue": "{{value}} M/M"
+    },
+    "form": {
+      "createTitle": "WBS 항목 생성",
+      "editTitle": "WBS 항목 수정",
+      "createDescription": "WBS 항목의 기본 정보를 입력합니다.",
+      "editDescription": "WBS 항목의 기본 정보를 수정합니다.",
+      "name": "항목명",
+      "namePlaceholder": "예: 요구사항 분석",
+      "parent": "상위 항목",
+      "parentPlaceholder": "상위 항목 선택",
+      "parentRoot": "최상위 항목",
+      "milestone": "마일스톤",
+      "milestonePlaceholder": "연결할 마일스톤 선택",
+      "noMilestone": "연결 안 함",
+      "startDate": "시작일",
+      "endDate": "종료일",
+      "progressRate": "진척률(%)",
+      "estimatedMm": "예상 M/M",
+      "estimatedMmPlaceholder": "예: 1.5"
+    },
+    "validation": {
+      "dateOrder": "종료일은 시작일 이후여야 합니다",
+      "progressRate": "진척률은 0에서 100 사이여야 합니다",
+      "estimatedMm": "예상 M/M은 0 이상의 숫자여야 합니다"
+    },
+    "delete": {
+      "title": "WBS 항목 삭제",
+      "description": "\"{{name}}\" 항목을 삭제하시겠습니까? 하위 항목도 함께 삭제될 수 있습니다."
+    },
+    "toast": {
+      "created": "WBS 항목이 생성되었습니다",
+      "createFailed": "WBS 항목 생성에 실패했습니다",
+      "updated": "WBS 항목이 수정되었습니다",
+      "updateFailed": "WBS 항목 수정에 실패했습니다",
+      "deleted": "WBS 항목이 삭제되었습니다",
+      "deleteFailed": "WBS 항목 삭제에 실패했습니다",
+      "loadFailed": "WBS 목록을 불러오지 못했습니다",
+      "reorderFailed": "WBS 순서 변경에 실패했습니다",
+      "reordered": "WBS 순서가 변경되었습니다",
+      "depthLimitExceeded": "항목을 3단계보다 깊게 이동할 수 없습니다",
+      "invalidMove": "항목을 자신의 하위 항목 아래로 이동할 수 없습니다"
+    },
+    "empty": {
+      "title": "WBS 항목이 없습니다",
+      "description": "첫 WBS 항목을 생성해 프로젝트 작업 구조를 시작하세요."
+    },
+    "aria": {
+      "edit": "WBS 항목 {{name}} 수정",
+      "delete": "WBS 항목 {{name}} 삭제",
+      "expand": "WBS 항목 {{name}} 펼치기",
+      "collapse": "WBS 항목 {{name}} 접기",
+      "drag": "WBS 항목 {{name}} 드래그",
+      "editName": "WBS 항목 {{name}} 이름 수정",
+      "editProgress": "WBS 항목 {{name}} 진척률 수정"
+    }
+  },
+  "milestone": {
+    "section": {
+      "title": "마일스톤",
+      "description": "목표일과 달성률을 기준으로 주요 이정표를 관리합니다."
+    },
+    "action": {
+      "create": "마일스톤 추가"
+    },
+    "field": {
+      "targetDate": "목표일",
+      "achievementRate": "달성률",
+      "linkedWbsCount": "연결된 WBS {{count}}건",
+      "noDescription": "설명 없음"
+    },
+    "status": {
+      "onTrack": "정상",
+      "delayed": "지연"
+    },
+    "form": {
+      "createTitle": "마일스톤 생성",
+      "editTitle": "마일스톤 수정",
+      "createDescription": "마일스톤 기본 정보를 입력합니다.",
+      "editDescription": "마일스톤 기본 정보를 수정합니다.",
+      "name": "이름",
+      "namePlaceholder": "예: 1차 오픈",
+      "targetDate": "목표일",
+      "description": "설명",
+      "descriptionPlaceholder": "마일스톤 설명을 입력하세요"
+    },
+    "delete": {
+      "title": "마일스톤 삭제",
+      "description": "\"{{name}}\" 마일스톤을 삭제하시겠습니까?"
+    },
+    "toast": {
+      "created": "마일스톤이 생성되었습니다",
+      "createFailed": "마일스톤 생성에 실패했습니다",
+      "updated": "마일스톤이 수정되었습니다",
+      "updateFailed": "마일스톤 수정에 실패했습니다",
+      "deleted": "마일스톤이 삭제되었습니다",
+      "deleteFailed": "마일스톤 삭제에 실패했습니다",
+      "loadFailed": "마일스톤 목록을 불러오지 못했습니다"
+    },
+    "empty": {
+      "title": "마일스톤이 없습니다",
+      "description": "프로젝트의 주요 목표 지점을 마일스톤으로 등록해 추적하세요."
+    },
+    "aria": {
+      "edit": "마일스톤 {{name}} 수정",
+      "delete": "마일스톤 {{name}} 삭제"
+    }
+  },
   "diagram": {
     "list": {
       "title": "ERD 문서",

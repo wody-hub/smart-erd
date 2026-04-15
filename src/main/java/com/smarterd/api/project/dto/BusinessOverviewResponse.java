@@ -18,7 +18,7 @@ import org.springframework.lang.Nullable;
  * @param projectScope      사업 범위
  * @param memberCount       팀 멤버 수
  * @param documentCount     문서(다이어그램) 수
- * @param progressRate      진행률 (Phase 4에서는 null)
+ * @param progressRate      진행률 (WBS 평균 진척률, WBS 항목이 없으면 null)
  */
 @Schema(description = "프로젝트 사업 개요 응답")
 public record BusinessOverviewResponse(
@@ -53,7 +53,7 @@ public record BusinessOverviewResponse(
     @Schema(description = "문서(다이어그램) 수", example = "12") long documentCount,
 
     /** 진행률 */
-    @Nullable @Schema(description = "Phase 5(WBS) 예정, 현재 항상 null", example = "null") Integer progressRate
+    @Nullable @Schema(description = "WBS 평균 진척률 (WBS 항목이 없으면 null)", example = "72") Integer progressRate
 ) {
     /**
      * 서비스 계층 결과를 응답 DTO로 변환한다.

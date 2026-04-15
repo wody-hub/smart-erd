@@ -71,4 +71,16 @@ export const queryKeys = {
     detail: (teamId: string, projectId: string, diagramId: string) =>
       ['teams', teamId, 'projects', projectId, 'diagrams', diagramId] as const,
   },
+  /** WBS 관련 쿼리 키 */
+  wbs: {
+    /** 프로젝트 WBS 전체 목록 */
+    all: (teamId: string, projectId: string) =>
+      ['teams', teamId, 'projects', projectId, 'wbs'] as const,
+  },
+  /** 마일스톤 관련 쿼리 키 */
+  milestones: {
+    /** 프로젝트 마일스톤 전체 목록 */
+    all: (teamId: string, projectId: string) =>
+      ['teams', teamId, 'projects', projectId, 'milestones'] as const,
+  },
 } as const;

@@ -36,6 +36,9 @@ public class ProjectService {
     /** 다이어그램 레포지토리 (프로젝트 삭제 시 cascade용) */
     private final DiagramRepository diagramRepository;
 
+    /** 프로젝트 진행률 제공자 (DIP — pm 도메인 구현체) */
+    private final ProjectProgressProvider projectProgressProvider;
+
     /** 인증 서비스 (사용자 조회) */
     private final AuthService authService;
 
@@ -257,6 +260,7 @@ public class ProjectService {
     private BusinessOverviewResult toBusinessOverviewResult(Project project, Team team) {
         final var memberCount = teamService.countMembers(team);
         final var documentCount = diagramRepository.countByProjectAndDeletedAtIsNull(project);
+        final var progressRate = projectProgressProvider.getAverageProgressRate(project);
         return new BusinessOverviewResult(
             project.getId(),
             project.getName(),
@@ -268,7 +272,7 @@ public class ProjectService {
             project.getProjectScope(),
             memberCount,
             documentCount,
-            null
+            progressRate
         );
     }
 
@@ -285,7 +289,7 @@ public class ProjectService {
      * @param projectScope      사업 범위
      * @param memberCount       프로젝트 팀 멤버 수
      * @param documentCount     프로젝트 문서(다이어그램) 수
-     * @param progressRate      진행률 (Phase 4에서는 null)
+     * @param progressRate      진행률 (WBS 평균 진척률, WBS 항목이 없으면 null)
      */
     public record BusinessOverviewResult(
         Long projectId,
