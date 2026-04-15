@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { DocumentReadExecutor } from '@/collaboration/core/contracts/document-read-executor';
 import type { DocumentReadContext } from '@/collaboration/core/contracts/document-read-executor';
+import { normalizeTableHeaderColor } from '@/lib/table-colors';
 import type {
   ERDEdge,
   ERDEdgeData,
@@ -57,7 +58,9 @@ function toTableNode(
         typeof props.logicalTableName === 'string' ? props.logicalTableName : undefined,
       tableTermId: typeof props.tableTermId === 'number' ? props.tableTermId : undefined,
       headerColor:
-        typeof props.headerColor === 'string' ? (props.headerColor as TableHeaderColor) : undefined,
+        typeof props.headerColor === 'string'
+          ? normalizeTableHeaderColor(props.headerColor as TableHeaderColor)
+          : undefined,
       handleLayout:
         typeof props.handleLayout === 'string'
           ? (props.handleLayout as TableHandleLayout)
@@ -99,7 +102,10 @@ function toGroup(groupId: string, props: Record<string, unknown>): TableGroup {
   return {
     id: groupId,
     label: typeof props.label === 'string' ? props.label : 'Group',
-    color: typeof props.color === 'string' ? (props.color as TableHeaderColor) : undefined,
+    color:
+      typeof props.color === 'string'
+        ? normalizeTableHeaderColor(props.color as TableHeaderColor)
+        : undefined,
     tableIds: Array.isArray(props.tableIds)
       ? props.tableIds.filter((tableId): tableId is string => typeof tableId === 'string')
       : [],
@@ -115,11 +121,7 @@ function readTableNodes(context: DocumentReadContext): TableNode[] {
       .filter((props): props is Record<string, unknown> => !!props)
       .map(toColumn);
 
-    return toTableNode(
-      tableRef.id,
-      (tableEntity?.props ?? {}) as Record<string, unknown>,
-      columns,
-    );
+    return toTableNode(tableRef.id, (tableEntity?.props ?? {}) as Record<string, unknown>, columns);
   });
 }
 

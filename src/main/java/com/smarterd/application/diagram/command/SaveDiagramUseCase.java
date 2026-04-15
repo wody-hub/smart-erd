@@ -1,7 +1,7 @@
 package com.smarterd.application.diagram.command;
 
 import com.smarterd.domain.diagram.service.DiagramService;
-import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
+import com.smarterd.domain.diagram.service.SaveDiagramResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

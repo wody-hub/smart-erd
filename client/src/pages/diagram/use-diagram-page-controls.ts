@@ -17,7 +17,6 @@ type UseDiagramPageControlsParams = {
 
 type UseDiagramPageControlsResult = {
   columnDefinitionExporting: boolean;
-  dictionaryDialogOpen: boolean;
   handleExportColumnDefinition: (content: string) => Promise<void>;
   handleExportIndexDefinition: (content: string) => Promise<void>;
   handleExportTableDefinition: (content: string) => Promise<void>;
@@ -25,7 +24,6 @@ type UseDiagramPageControlsResult = {
   handleToggleValidation: () => void;
   indexDefinitionExporting: boolean;
   leftPanel: 'sidebar' | 'code';
-  setDictionaryDialogOpen: Dispatch<SetStateAction<boolean>>;
   setLeftPanel: Dispatch<SetStateAction<'sidebar' | 'code'>>;
   setValidationOpen: Dispatch<SetStateAction<boolean>>;
   tableDefinitionExporting: boolean;
@@ -39,7 +37,6 @@ export function useDiagramPageControls({
   teamId,
 }: UseDiagramPageControlsParams): UseDiagramPageControlsResult {
   const [validationOpen, setValidationOpen] = useState(false);
-  const [dictionaryDialogOpen, setDictionaryDialogOpen] = useState(false);
   const [leftPanel, setLeftPanel] = useState<'sidebar' | 'code'>('sidebar');
   const [tableDefinitionExporting, setTableDefinitionExporting] = useState(false);
   const [columnDefinitionExporting, setColumnDefinitionExporting] = useState(false);
@@ -145,7 +142,6 @@ export function useDiagramPageControls({
 
   return {
     columnDefinitionExporting,
-    dictionaryDialogOpen,
     handleExportColumnDefinition,
     handleExportIndexDefinition,
     handleExportTableDefinition,
@@ -153,7 +149,6 @@ export function useDiagramPageControls({
     handleToggleValidation,
     indexDefinitionExporting,
     leftPanel,
-    setDictionaryDialogOpen,
     setLeftPanel,
     setValidationOpen,
     tableDefinitionExporting,

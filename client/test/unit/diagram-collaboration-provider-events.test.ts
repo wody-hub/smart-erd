@@ -20,9 +20,12 @@ function createStoreBridge() {
   };
   const bridge: DiagramCollaborationStoreBridge = {
     loadPreview: () => undefined,
+    refreshPersistedCanvasFromYDoc: () => undefined,
+    applyPreviewPositionChangesToPersisted: () => [],
     setConnectionStatus: (status) => {
       calls.connectionStatus.push(status);
     },
+    setConnectionIssue: () => undefined,
     setPresenceMode: (mode) => {
       calls.presenceMode.push(mode);
     },
@@ -47,6 +50,7 @@ function createStoreBridge() {
     removePeerByLoginId: (loginId) => {
       calls.removedLoginIds.push(loginId);
     },
+    applyDocumentChange: () => undefined,
     resetCollaboration: () => undefined,
   };
   return { bridge, calls };

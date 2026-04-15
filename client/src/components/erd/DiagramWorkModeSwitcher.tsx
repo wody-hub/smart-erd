@@ -30,11 +30,11 @@ export default function DiagramWorkModeSwitcher({
   const { t } = useTranslation();
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-header-muted">{t('diagram.workMode.label')}</span>
+    <div className="header-utility-group">
+      <span className="header-utility-label hidden lg:inline">{t('diagram.workMode.label')}</span>
       <Select value={mode} onValueChange={(value) => onModeChange(value as DiagramWorkMode)}>
         <SelectTrigger
-          className="h-8 w-[150px] border-header/40 bg-header/70 text-xs text-header-foreground"
+          className="header-control-trigger h-8 w-[154px] rounded-full px-3 text-xs font-semibold"
           aria-label={t('diagram.workMode.label')}
         >
           <SelectValue />

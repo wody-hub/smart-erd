@@ -2,6 +2,8 @@ package com.smarterd.domain.diagram.collaboration;
 
 import com.smarterd.collaboration.channel.CollaborationAccessPolicy;
 import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
+import com.smarterd.domain.common.exception.DomainAccessDeniedException;
+import com.smarterd.domain.common.message.MessageCode;
 import org.springframework.stereotype.Component;
 
 /**
@@ -26,21 +28,24 @@ public class DiagramCollaborationSessionMetadataPolicy implements CollaborationA
 
     /**
      * {@inheritDoc}
+     *
+     * @param session 검증할 협업 인증 세션
      */
     @Override
     public void validateAccess(CollaborationAuthenticatedSession session) {
         if (!resourceKeyFactory.channelType().equals(session.resourceKey().channelType())) {
-            throw new IllegalArgumentException(
-                "다이어그램 채널 접근 정책에 맞지 않는 채널 타입: " + session.resourceKey().channelType()
+            throw new DomainAccessDeniedException(
+                MessageCode.ERROR_ACCESS_DENIED_DIAGRAM_CHANNEL_TYPE.code(),
+                session.resourceKey().channelType()
             );
         }
 
         try {
             resourceKeyFactory.parseDiagramId(session.resourceKey());
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                "다이어그램 채널 resourceId는 Long으로 해석 가능해야 한다: " + session.resourceKey().resourceId(),
-                e
+            throw new DomainAccessDeniedException(
+                MessageCode.ERROR_ACCESS_DENIED_DIAGRAM_RESOURCE_ID.code(),
+                session.resourceKey().resourceId()
             );
         }
     }

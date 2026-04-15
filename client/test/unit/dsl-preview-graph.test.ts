@@ -8,6 +8,7 @@ import {
   type DslPreviewGraph,
 } from '../../src/lib/dsl-preview-graph.js';
 import { buildColumnHandleId } from '../../src/lib/handle-id.js';
+import { normalizeTableHeaderColor } from '../../src/lib/table-colors.js';
 import type { DdlParseResult } from '../../src/lib/ddl-parser.js';
 import type { Column, ERDEdge, TableNode } from '../../src/types/erd.js';
 
@@ -129,7 +130,7 @@ test('buildPreviewGraphFromDslParsedSchema 는 persisted ERD 배치를 우선 �
   assert.ok(persistedNode);
   assert.ok(newNode);
   assert.deepEqual(persistedNode.position, { x: 240, y: 180 });
-  assert.equal(persistedNode.data.headerColor, 'green');
+  assert.equal(persistedNode.data.headerColor, normalizeTableHeaderColor('green'));
   assert.equal(persistedNode.data.handleLayout, 'right');
   assert.ok(newNode.position.x > persistedNode.position.x);
 });
@@ -382,7 +383,7 @@ test('refreshPreviewGraphFromPersistedSources 는 오류 상태에서도 persist
   );
 
   assert.deepEqual(refreshed.nodes[0].position, { x: 200, y: 100 });
-  assert.equal(refreshed.nodes[0].data.headerColor, 'blue');
+  assert.equal(refreshed.nodes[0].data.headerColor, normalizeTableHeaderColor('blue'));
   assert.equal(refreshed.nodes[1].data.handleLayout, 'right');
   assert.equal(refreshed.edges[0].data?.routingType, 'straight');
   assert.equal(refreshed.edges[0].data?.handleMode, 'manual');

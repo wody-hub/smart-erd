@@ -26,6 +26,5 @@ public record PersistYdocSnapshotRequest(
     @Schema(description = "현재 Y.Doc 전체 상태 update 바이트(base64)", format = "byte")
     byte[] ydocSnapshot,
 
-    @Schema(description = "기존 persisted snapshot이 없을 때만 저장", example = "false")
-    boolean persistOnlyIfMissing
+    @Schema(description = "기존 persisted snapshot이 없을 때만 저장", example = "false") boolean persistOnlyIfMissing
 ) {}

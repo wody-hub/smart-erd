@@ -36,6 +36,7 @@ test('resolveDiagramWorkModeRuntimeState 는 code 모드에서 preview 중이어
     mode: 'code',
     capabilities: createDiagramWorkModeCapabilities('code'),
     canEdit: true,
+    isAuthoritativeBootstrapBlocked: false,
     isPersistedPreviewMode: true,
     hasActiveGroupView: false,
   });
@@ -49,11 +50,12 @@ test('resolveDiagramWorkModeRuntimeState 는 code 모드에서 preview 중이어
   assert.equal(runtime.canEditDictionaryManagement, true);
 });
 
-test('resolveDiagramWorkModeRuntimeState 는 sync 모드에서 preview 중 코드/캔버스를 함께 잠근다', () => {
+test('resolveDiagramWorkModeRuntimeState 는 erd 모드에서 preview 중 코드/캔버스를 함께 잠근다', () => {
   const runtime = resolveDiagramWorkModeRuntimeState({
-    mode: 'sync',
-    capabilities: createDiagramWorkModeCapabilities('sync'),
+    mode: 'erd',
+    capabilities: createDiagramWorkModeCapabilities('erd'),
     canEdit: true,
+    isAuthoritativeBootstrapBlocked: false,
     isPersistedPreviewMode: true,
     hasActiveGroupView: false,
   });

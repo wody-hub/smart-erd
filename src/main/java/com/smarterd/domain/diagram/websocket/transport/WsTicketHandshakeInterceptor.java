@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.lang.NonNull;
@@ -56,7 +57,8 @@ public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
             final var queryParams = UriComponentsBuilder.fromUri(uri).build().getQueryParams();
             final var ticket = queryParams.getFirst("ticket");
             if (AppStringUtils.isBlank(ticket)) {
-                log.warn("WebSocket 핸드셰이크 실패: ticket 파라미터 없음");
+                log.warn("WebSocket 핸드셰이크 실패: ticket 파라미터 없음 (path={})", uri.getPath());
+                rejectHandshake(response);
                 return false;
             }
 
@@ -85,7 +87,12 @@ public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
                 protocolVersion
             );
             if (validationResultOpt.isEmpty()) {
-                log.warn("WebSocket 핸드셰이크 실패: 경로 또는 ticket 검증 실패");
+                log.warn(
+                    "WebSocket 핸드셰이크 실패: ticket 검증 실패 (path={}, ticketPrefix={})",
+                    path,
+                    ticket.length() > 8 ? ticket.substring(0, 8) + "..." : ticket
+                );
+                rejectHandshake(response);
                 return false;
             }
             final var validationResult = validationResultOpt.get();
@@ -103,8 +110,23 @@ public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
             return true;
         } catch (NumberFormatException e) {
             log.warn("WebSocket 핸드셰이크 실패: diagramId 파싱 오류", e);
+            rejectHandshake(response);
             return false;
         }
+    }
+
+    /**
+     * 핸드셰이크 거부 시 HTTP 403 상태 코드를 명시적으로 설정한다.
+     *
+     * <p>Spring의 {@code WebSocketHttpRequestHandler}는 {@code beforeHandshake()}가 false를
+     * 반환하면 응답 상태를 설정하지 않아 기본값 200 OK가 남는다.
+     * 이로 인해 브라우저가 "Unexpected response code: 200" 에러를 표시하므로,
+     * 명시적으로 403을 설정하여 클라이언트가 인증 실패를 올바르게 감지할 수 있게 한다.</p>
+     *
+     * @param response HTTP 응답
+     */
+    private void rejectHandshake(ServerHttpResponse response) {
+        response.setStatusCode(HttpStatus.FORBIDDEN);
     }
 
     @Override

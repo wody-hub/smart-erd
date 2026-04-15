@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
 import { YjsProvider } from '@/collaboration/YjsProvider';
-import type { DocumentBootstrapPayload } from '@/collaboration/core/contracts/document-bootstrap';
 import type { DocumentMutationSession } from '@/collaboration/core/session/document-mutation-session';
 import type { PreviewSyncStatus } from '@/collaboration/core/collaboration-preview-sync-status';
 import { useSnapshotCompaction } from '@/hooks/useSnapshotCompaction';
 import type { DiagramDetail } from '@/types/diagram';
+import type { DocumentBootstrapPayload } from '@/types/document';
 import { DiagramDocumentPersistenceSession } from './diagram-document-persistence-session.js';
 import { useDiagramCollaborationRuntime } from './use-diagram-collaboration-runtime.js';
 import {
@@ -49,21 +49,21 @@ export function useDiagramCollaborationSession(
     documentCheckpointReader,
   } = useDiagramCollaborationRuntime(diagram, documentBootstrap, setupAttempt);
   const { providerRef, isPreviewMode, setupErrorKind } = useDiagramCollaborationProvider({
-      collaborationBootstrap,
-      sharedDocumentEngine,
-      snapshotCodec,
-      diagramId,
-      teamId,
-      projectId,
-      initYDoc,
-      destroyYDoc,
-      beforeDestroyYDoc,
-      resetCollaboration: storeBridge.resetCollaboration,
-      resetRuntimeState,
-      createProviderLifecycle,
-      onSetupFailed: handleProviderSetupFailed,
-      setupAttempt,
-    });
+    collaborationBootstrap,
+    sharedDocumentEngine,
+    snapshotCodec,
+    diagramId,
+    teamId,
+    projectId,
+    initYDoc,
+    destroyYDoc,
+    beforeDestroyYDoc,
+    resetCollaboration: storeBridge.resetCollaboration,
+    resetRuntimeState,
+    createProviderLifecycle,
+    onSetupFailed: handleProviderSetupFailed,
+    setupAttempt,
+  });
 
   useSnapshotCompaction(providerRef, diagramId);
 

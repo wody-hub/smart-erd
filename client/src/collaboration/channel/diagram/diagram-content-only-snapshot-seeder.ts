@@ -38,11 +38,7 @@ export class DiagramContentOnlySnapshotSeeder {
       return 'skipped';
     }
 
-    this.documentAdapter.applyBootstrapToDoc(
-      doc,
-      bootstrap,
-      DIAGRAM_BOOTSTRAP_TRANSACTION_ORIGIN,
-    );
+    this.documentAdapter.applyBootstrapToDoc(doc, bootstrap, DIAGRAM_BOOTSTRAP_TRANSACTION_ORIGIN);
     const persisted = await persistDiagramYdocSnapshot(
       teamId,
       projectId,

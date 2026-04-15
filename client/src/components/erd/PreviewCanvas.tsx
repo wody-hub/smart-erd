@@ -126,10 +126,10 @@ interface PreviewCanvasProps {
   onPositionOverridesChange: (next: DiagramPreviewPositionRecord) => void;
   /** preview 위치 편집 가능 여부 */
   canEdit?: boolean;
-  /** 사전 관리 진입 허용 여부 */
-  canOpenDictionary: boolean;
-  /** 사전 관리 열기 핸들러 */
-  onOpenDictionary?: () => void;
+  /** 다이어그램 사전 컨텍스트 진입 허용 여부 */
+  canOpenDictionaryContext: boolean;
+  /** 다이어그램 사전 컨텍스트 열기 핸들러 */
+  onOpenDictionaryContext?: () => void;
   /** 테이블 정의서 엑셀 다운로드 핸들러 */
   onExportTableDefinition?: (content: string) => Promise<void> | void;
   /** 컬럼 정의서 엑셀 다운로드 핸들러 */
@@ -153,10 +153,10 @@ interface PreviewCanvasToolbarProps {
   hasGraph: boolean;
   /** preview 편집 가능 여부 */
   canEdit: boolean;
-  /** 사전 관리 진입 허용 여부 */
-  canOpenDictionary: boolean;
-  /** 사전 관리 열기 핸들러 */
-  onOpenDictionary?: () => void;
+  /** 다이어그램 사전 컨텍스트 진입 허용 여부 */
+  canOpenDictionaryContext: boolean;
+  /** 다이어그램 사전 컨텍스트 열기 핸들러 */
+  onOpenDictionaryContext?: () => void;
   /** 테이블 정의서 엑셀 다운로드 핸들러 */
   onExportTableDefinition?: () => void;
   /** 컬럼 정의서 엑셀 다운로드 핸들러 */
@@ -175,13 +175,13 @@ interface PreviewCanvasToolbarProps {
  * code 모드 preview 상단 액션 바.
  *
  * code 모드에서 preview 전용 액션만 제공한다.
- * 현재는 위치 초기화, export, 사전 관리 진입을 지원한다.
+ * 현재는 위치 초기화, export, 다이어그램 사전 컨텍스트 진입을 지원한다.
  *
  * @param props.diagramName export 파일명
  * @param props.onResetLayout preview 배치 초기화 핸들러
  * @param props.hasGraph preview 그래프 존재 여부
- * @param props.canOpenDictionary 사전 관리 진입 허용 여부
- * @param props.onOpenDictionary 사전 관리 열기 핸들러
+ * @param props.canOpenDictionaryContext 다이어그램 사전 컨텍스트 진입 허용 여부
+ * @param props.onOpenDictionaryContext 다이어그램 사전 컨텍스트 열기 핸들러
  * @returns preview 툴바 JSX
  */
 function PreviewCanvasToolbar({
@@ -189,8 +189,8 @@ function PreviewCanvasToolbar({
   onResetLayout,
   hasGraph,
   canEdit,
-  canOpenDictionary,
-  onOpenDictionary,
+  canOpenDictionaryContext,
+  onOpenDictionaryContext,
   onExportTableDefinition,
   onExportColumnDefinition,
   onExportIndexDefinition,
@@ -210,7 +210,7 @@ function PreviewCanvasToolbar({
   return (
     <>
       <Panel position="top-center">
-        <div className="bg-card border border-border rounded-lg shadow-md p-1 gap-1 flex">
+        <div className="surface-operational flex gap-1 rounded-lg p-1">
           <Button
             variant="ghost"
             size="sm"
@@ -283,12 +283,12 @@ function PreviewCanvasToolbar({
             variant="ghost"
             size="sm"
             className="gap-1.5"
-            aria-label={t('erd.toolbar.dictionary')}
-            onClick={onOpenDictionary}
-            disabled={!canOpenDictionary || !onOpenDictionary}
+            aria-label={t('erd.toolbar.dictionaryContext')}
+            onClick={onOpenDictionaryContext}
+            disabled={!canOpenDictionaryContext || !onOpenDictionaryContext}
           >
             <BookText className="h-4 w-4" />
-            {t('erd.toolbar.dictionary')}
+            {t('erd.toolbar.dictionaryContext')}
           </Button>
         </div>
       </Panel>
@@ -342,8 +342,8 @@ function buildPreviewFallbackNodes(nodes: readonly TableNode[]): DslPreviewNode[
  * @param props.diagramName export 파일명에 사용할 다이어그램 이름
  * @param props.positionOverrides code 모드 로컬 preview 위치 override
  * @param props.onPositionOverridesChange code 모드 로컬 preview 위치 override 변경 핸들러
- * @param props.canOpenDictionary 사전 관리 진입 허용 여부
- * @param props.onOpenDictionary 사전 관리 열기 핸들러
+ * @param props.canOpenDictionaryContext 다이어그램 사전 컨텍스트 진입 허용 여부
+ * @param props.onOpenDictionaryContext 다이어그램 사전 컨텍스트 열기 핸들러
  * @returns read-only preview canvas JSX
  */
 export default function PreviewCanvas({
@@ -353,8 +353,8 @@ export default function PreviewCanvas({
   positionOverrides,
   onPositionOverridesChange,
   canEdit = true,
-  canOpenDictionary,
-  onOpenDictionary,
+  canOpenDictionaryContext,
+  onOpenDictionaryContext,
   onExportTableDefinition,
   onExportColumnDefinition,
   onExportIndexDefinition,
@@ -661,8 +661,8 @@ export default function PreviewCanvas({
         onResetLayout={handleResetLayout}
         hasGraph={hasGraph}
         canEdit={canEdit}
-        canOpenDictionary={canOpenDictionary}
-        onOpenDictionary={onOpenDictionary}
+        canOpenDictionaryContext={canOpenDictionaryContext}
+        onOpenDictionaryContext={onOpenDictionaryContext}
         onExportTableDefinition={handleExportTableDefinition}
         onExportColumnDefinition={handleExportColumnDefinition}
         onExportIndexDefinition={handleExportIndexDefinition}
@@ -674,66 +674,75 @@ export default function PreviewCanvas({
       {hasGraph ? (
         <TooltipProvider delayDuration={300}>
           <CompactTableRenderingProvider mode={compactTableRenderingMode}>
-          <ConnectedColumnIdsProvider edges={effectiveGraph!.edges}>
-            <ReactFlow
-              nodes={displayNodes}
-              edges={effectiveGraph!.edges}
-              onInit={(instance) => {
-                reactFlowInstanceRef.current = instance;
-                lastViewportZoomRef.current = instance.getZoom();
-                setCompactTableRenderingMode(
-                  resolveCompactTableRenderingMode(displayNodes.length, lastViewportZoomRef.current),
-                );
-                applyZoomTextCompensation(instance.getZoom());
-              }}
-              onMoveEnd={(_event, viewport) => {
-                lastViewportZoomRef.current = viewport.zoom;
-                setCompactTableRenderingMode(
-                  resolveCompactTableRenderingMode(displayNodes.length, viewport.zoom),
-                );
-                const autoFitMovePending = autoFitViewportMovePendingRef.current;
-                autoFitViewportMovePendingRef.current = false;
-                if (!autoFitMovePending) {
-                  manualViewportInteractionRef.current = true;
-                }
-                const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
-                if (
-                  lastAppliedZoom != null &&
-                  Math.abs(viewport.zoom - lastAppliedZoom) <= TABLE_HEADER_ZOOM_CHANGE_EPSILON
-                ) {
-                  return;
-                }
-                scheduleZoomTextCompensation(viewport.zoom);
-              }}
-              onNodesChange={handleNodesChange}
-              nodeTypes={previewCanvasNodeTypes}
-              edgeTypes={previewEdgeTypes}
-              deleteKeyCode={null}
-              panActivationKeyCode={null}
-              nodesDraggable={canEdit}
-              nodesConnectable={false}
-              elementsSelectable={false}
-              nodesFocusable={false}
-              edgesFocusable={false}
-              panOnDrag
-              zoomOnScroll
-              fitView
-              fitViewOptions={{ padding: 0.2 }}
-              minZoom={0.2}
-              maxZoom={1.5}
-              proOptions={{ hideAttribution: true }}
-              className="bg-background"
-            >
-              <Background
-                variant={BackgroundVariant.Dots}
-                gap={16}
-                size={1}
-                color="hsl(var(--muted-foreground) / 0.18)"
-              />
-              <Controls showInteractive={false} />
-              {displayNodes.length <= PREVIEW_MINIMAP_NODE_LIMIT && <MiniMap pannable zoomable />}
-            </ReactFlow>
-          </ConnectedColumnIdsProvider>
+            <ConnectedColumnIdsProvider edges={effectiveGraph!.edges}>
+              <ReactFlow
+                nodes={displayNodes}
+                edges={effectiveGraph!.edges}
+                onInit={(instance) => {
+                  reactFlowInstanceRef.current = instance;
+                  lastViewportZoomRef.current = instance.getZoom();
+                  setCompactTableRenderingMode(
+                    resolveCompactTableRenderingMode(
+                      displayNodes.length,
+                      lastViewportZoomRef.current,
+                    ),
+                  );
+                  applyZoomTextCompensation(instance.getZoom());
+                }}
+                onMoveEnd={(_event, viewport) => {
+                  lastViewportZoomRef.current = viewport.zoom;
+                  setCompactTableRenderingMode(
+                    resolveCompactTableRenderingMode(displayNodes.length, viewport.zoom),
+                  );
+                  const autoFitMovePending = autoFitViewportMovePendingRef.current;
+                  autoFitViewportMovePendingRef.current = false;
+                  if (!autoFitMovePending) {
+                    manualViewportInteractionRef.current = true;
+                  }
+                  const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
+                  if (
+                    lastAppliedZoom != null &&
+                    Math.abs(viewport.zoom - lastAppliedZoom) <= TABLE_HEADER_ZOOM_CHANGE_EPSILON
+                  ) {
+                    return;
+                  }
+                  scheduleZoomTextCompensation(viewport.zoom);
+                }}
+                onNodesChange={handleNodesChange}
+                nodeTypes={previewCanvasNodeTypes}
+                edgeTypes={previewEdgeTypes}
+                deleteKeyCode={null}
+                panActivationKeyCode={null}
+                nodesDraggable={canEdit}
+                nodesConnectable={false}
+                elementsSelectable={false}
+                nodesFocusable={false}
+                edgesFocusable={false}
+                panOnDrag
+                zoomOnScroll
+                fitView
+                fitViewOptions={{ padding: 0.2 }}
+                minZoom={0.2}
+                maxZoom={1.5}
+                proOptions={{ hideAttribution: true }}
+                className="bg-background"
+              >
+                <Background
+                  variant={BackgroundVariant.Dots}
+                  gap={16}
+                  size={1}
+                  color="hsl(var(--muted-foreground) / 0.18)"
+                />
+                <Controls showInteractive={false} />
+                {displayNodes.length <= PREVIEW_MINIMAP_NODE_LIMIT && (
+                  <MiniMap
+                    pannable
+                    zoomable
+                    style={{ backgroundColor: 'hsl(var(--background))' }}
+                  />
+                )}
+              </ReactFlow>
+            </ConnectedColumnIdsProvider>
           </CompactTableRenderingProvider>
         </TooltipProvider>
       ) : (
@@ -742,7 +751,7 @@ export default function PreviewCanvas({
 
       {(blockingBannerMessage || fallbackBannerMessage) && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 max-w-[calc(100%-2rem)] -translate-x-1/2 px-4">
-          <div className="rounded-md border border-amber-500/30 bg-background/92 px-3 py-2 text-xs text-amber-700 shadow-sm backdrop-blur dark:text-amber-300">
+          <div className="banner-warm-surface rounded-md border px-3 py-2 text-xs text-ink-secondary shadow-operational backdrop-blur">
             {blockingBannerMessage ?? fallbackBannerMessage}
           </div>
         </div>

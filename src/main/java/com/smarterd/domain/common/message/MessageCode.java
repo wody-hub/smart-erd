@@ -9,6 +9,8 @@ public enum MessageCode {
     ERROR_ACCESS_DENIED_NOT_ADMIN("error.access-denied.not-admin"),
     ERROR_ACCESS_DENIED_NOT_MEMBER("error.access-denied.not-member"),
     ERROR_ACCESS_DENIED_VIEWER_READONLY("error.access-denied.viewer-readonly"),
+    ERROR_ACCESS_DENIED_DIAGRAM_CHANNEL_TYPE("error.access-denied.diagram-channel-type"),
+    ERROR_ACCESS_DENIED_DIAGRAM_RESOURCE_ID("error.access-denied.diagram-resource-id"),
     ERROR_BULK_CONCURRENT_DUPLICATE("error.bulk.concurrent-duplicate"),
     ERROR_BULK_EMPTY_FILE("error.bulk.empty-file"),
     ERROR_BULK_MISSING_COLUMNS("error.bulk.missing-columns"),
@@ -48,6 +50,16 @@ public enum MessageCode {
     ERROR_BUSINESS_DIAGRAM_CONTENT_INVALID_JSON("error.business.diagram-content-invalid-json"),
     ERROR_BUSINESS_DIAGRAM_SNAPSHOT_STALE("error.business.diagram-snapshot-stale"),
     ERROR_BUSINESS_DIAGRAM_SAVE_WHILE_EDITING("error.business.diagram-save-while-editing"),
+    ERROR_BUSINESS_DOCUMENT_PLUGIN_UNSUPPORTED("error.business.document-plugin-unsupported"),
+    ERROR_BUSINESS_DOCUMENT_EXPORT_FORMAT_UNSUPPORTED("error.business.document-export-format-unsupported"),
+    ERROR_BUSINESS_ERD_DICTIONARY_CONTEXT_REQUIRED("error.business.erd-dictionary-context-required"),
+    ERROR_BUSINESS_INVALID_PROJECT_PERIOD("error.business.invalid-project-period"),
+    ERROR_BUSINESS_INVALID_WBS_PERIOD("error.business.invalid-wbs-period"),
+    ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED("error.business.markdown-dictionary-context-not-allowed"),
+    ERROR_BUSINESS_SCREEN_SPEC_DICTIONARY_CONTEXT_NOT_ALLOWED(
+        "error.business.screen-spec-dictionary-context-not-allowed"
+    ),
+    ERROR_BUSINESS_MARKDOWN_TEMPLATE_INVALID("error.business.markdown-template-invalid"),
     ERROR_BUSINESS_DICTIONARY_SET_DEFAULT_DELETE_FORBIDDEN("error.business.dictionary-set-default-delete-forbidden"),
     ERROR_BUSINESS_PROJECT_TEAM_MISMATCH("error.business.project-team-mismatch"),
     ERROR_BUSINESS_REFRESH_TOKEN_EXPIRED("error.business.refresh-token-expired"),
@@ -57,6 +69,10 @@ public enum MessageCode {
     ERROR_BUSINESS_TERM_DOMAIN_SET_MISMATCH("error.business.term-domain-set-mismatch"),
     ERROR_BUSINESS_TERM_DOMAIN_TEAM_MISMATCH("error.business.term-domain-team-mismatch"),
     ERROR_BUSINESS_TERM_TEAM_MISMATCH("error.business.term-team-mismatch"),
+    ERROR_BUSINESS_WBS_DEPTH_LIMIT_EXCEEDED("error.business.wbs-depth-limit-exceeded"),
+    ERROR_BUSINESS_WBS_ESTIMATED_MM_OUT_OF_RANGE("error.business.wbs-estimated-mm-out-of-range"),
+    ERROR_BUSINESS_WBS_PROGRESS_RATE_OUT_OF_RANGE("error.business.wbs-progress-rate-out-of-range"),
+    ERROR_BUSINESS_WBS_REORDER_INVALID("error.business.wbs-reorder-invalid"),
     ERROR_BUSINESS_WORD_TEAM_MISMATCH("error.business.word-team-mismatch"),
     ERROR_BUSINESS_TICKET_LIMIT_EXCEEDED("error.business.ticket-limit-exceeded"),
     ERROR_DUPLICATE_DICTIONARY_SET_NAME("error.duplicate.dictionary-set-name"),
@@ -68,9 +84,11 @@ public enum MessageCode {
     ERROR_NOT_FOUND_DIAGRAM("error.not-found.diagram"),
     ERROR_NOT_FOUND_DICTIONARY_SET("error.not-found.dictionary-set"),
     ERROR_NOT_FOUND_DOMAIN("error.not-found.domain"),
+    ERROR_NOT_FOUND_MILESTONE("error.not-found.milestone"),
     ERROR_NOT_FOUND_PROJECT("error.not-found.project"),
     ERROR_NOT_FOUND_TEAM("error.not-found.team"),
     ERROR_NOT_FOUND_TERM("error.not-found.term"),
+    ERROR_NOT_FOUND_WBS_ITEM("error.not-found.wbs-item"),
     ERROR_NOT_FOUND_WORD("error.not-found.word"),
     ERROR_NOT_FOUND_USER("error.not-found.user"),
     ERROR_VALIDATION_FAILED("error.validation.failed"),
@@ -82,10 +100,20 @@ public enum MessageCode {
         this.code = code;
     }
 
+    /**
+     * 메시지 코드 문자열을 반환한다.
+     *
+     * @return i18n lookup용 코드 문자열
+     */
     public String code() {
         return code;
     }
 
+    /**
+     * 메시지 코드를 문자열로 반환한다.
+     *
+     * @return 메시지 코드 문자열
+     */
     @Override
     public String toString() {
         return code;

@@ -25,6 +25,14 @@ ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션
 | SQL 로깅    | p6spy-spring-boot-starter 1.12.1 (바인딩 파라미터 포함 SQL 로깅)                          |
 | 토스트      | Sonner                                                                                    |
 | 포맷팅      | Prettier (Java + TypeScript 통합), prettier-plugin-java                                   |
+| 실시간 협업 | Yjs 13.6, y-websocket, WebSocket (Spring)                                                 |
+| 마크다운    | marked 14, DOMPurify 3.2, js-yaml 4.1                                                    |
+| 데스크톱    | Electron 40, electron-vite, electron-builder                                              |
+| 엑셀        | Apache POI 5.4 (poi-ooxml)                                                                |
+| SQL 파싱    | node-sql-parser 5.4                                                                       |
+| 이미지/PDF  | html-to-image, jspdf                                                                      |
+| DB 마이그레이션 | Flyway (12 마이그레이션 파일)                                                         |
+| 캐시        | Redis 7 (Docker, WebSocket 티켓 저장)                                                     |
 | 코드 품질   | ESLint, SonarQube / SonarLint                                                             |
 
 ## AI 확장 아키텍처 원칙
@@ -232,10 +240,12 @@ src/main/java/com/smarterd/
 ├── api/                             # HTTP 인터페이스 계층
 │   ├── auth/
 │   │   ├── AuthController.java      #   POST /api/auth/login, /api/auth/signup
-│   │   └── dto/                     #   LoginRequest, SignupRequest, AuthResponse (record)
+│   │   ├── dto/                     #   LoginRequest, SignupRequest, AuthResponse (record)
+│   │   └── validator/               #   인증 관련 커스텀 검증기
 │   ├── team/
 │   │   ├── TeamController.java      #   팀 CRUD + 멤버 관리 (7 엔드포인트)
-│   │   └── dto/                     #   CreateTeamRequest, TeamResponse, AddMemberRequest 등
+│   │   ├── dto/                     #   CreateTeamRequest, TeamResponse, AddMemberRequest 등
+│   │   └── validator/               #   팀 관련 커스텀 검증기
 │   ├── project/
 │   │   ├── ProjectController.java   #   프로젝트 CRUD (4 엔드포인트)
 │   │   └── dto/                     #   Create/Update request, ProjectResponse
@@ -251,52 +261,84 @@ src/main/java/com/smarterd/
 │   │   ├── WsTicketController.java  #   WebSocket 접속용 일회용 ticket 발급
 │   │   └── dto/                     #   Create/Save/Rename/Detail/Response, Snapshot, WsTicket record
 │   └── common/
-│       └── GlobalExceptionHandler.java  # 전역 예외 처리 (404/403/409/400 매핑)
+│       ├── GlobalExceptionHandler.java  # 전역 예외 처리 (404/403/409/400/429 매핑)
+│       └── dto/                     #   PageResponse, PageSearchRequest (공통 페이징)
+├── application/                     # 유스케이스 계층 (도메인 조합, Cross-domain orchestration)
+│   ├── collaboration/
+│   │   ├── command/                 #   IssueCollaborationTicketUseCase, PersistCollaborationSnapshotUseCase, ValidateCollaborationTicketUseCase
+│   │   └── query/                   #   LoadCollaborationHandoffUseCase
+│   └── diagram/
+│       ├── command/                 #   SaveDiagramUseCase, SaveDiagramAuthoritativeContentUseCase, PersistDiagramSnapshotUseCase 등
+│       ├── model/                   #   DiagramPresenceParticipantPayload, DiagramSessionJoinCompletion 등
+│       └── port/                    #   DiagramPresencePort, DiagramRealtimeSessionPort (DIP 포트 인터페이스)
+├── collaboration/                   # 도메인 무관 실시간 협업 프레임워크
+│   ├── channel/                     #   CollaborationChannelPlugin, CollaborationWebSocketBinding, Registry, Authenticator
+│   ├── document/                    #   SharedDocumentEngine, DocumentSnapshotCodec, DocumentCheckpoint
+│   ├── handoff/                     #   CollaborationHandoffPolicy, CollaborationHandoffResult
+│   ├── metadata/                    #   DocumentMetadata, DocumentMetadataService
+│   ├── persistence/                 #   DocumentPersistenceCoordinator, DocumentBootstrapReader, PersistedDocument
+│   ├── plugin/                      #   BaseCollaborationPlugin, CollaborationPluginRegistry, ScopeResolver, DomainValidationHook
+│   ├── session/                     #   CollaborationAuthenticatedSession
+│   ├── snapshot/                    #   CollaborationSnapshotStore, CollaborationSnapshotSaveCommand
+│   └── CollaborationLimits.java     #   협업 제한 설정값
 ├── config/                          # 설정
-│   ├── SecurityConfig.java          #   Spring Security (OAuth2 Resource Server JWT, CSRF 비활성)
-│   ├── JwtConfig.java               #   JwtEncoder / JwtDecoder 빈 (NimbusJwtDecoder, HS256)
-│   ├── JwtProperties.java           #   @ConfigurationProperties("smart-erd.jwt") — secret, access-expiration, refresh-expiration
-│   ├── CorsConfig.java              #   @ConfigurationProperties("smart-erd.cors") + CorsProperties 내부 클래스
-│   ├── LocaleConfig.java            #   AcceptHeaderLocaleResolver (ko/en, 기본: en)
-│   ├── ValidationConfig.java        #   LocalValidatorFactoryBean + MessageSource 연결
-│   ├── QuerydslConfig.java          #   JPAQueryFactory 빈 (QueryDSL 타입 안전 쿼리 빌더)
-│   ├── BlazeConfig.java             #   CriteriaBuilderFactory 빈 (Blaze-Persistence 고급 쿼리)
-│   ├── OpenApiConfig.java           #   Swagger/OpenAPI 설정 (JWT Bearer 인증 스킴)
-│   └── PrettySqlFormat.java         #   p6spy SQL 포맷터 (Hibernate FormatStyle.BASIC 기반 들여쓰기)
-└── domain/                          # 도메인 계층 (Service도 여기에 위치)
-    ├── common/
-    │   ├── entity/                  #   BaseTimeEntity, BaseAuditEntity (시각/작성자 감사 공통 베이스)
-    │   ├── exception/               #   커스텀 예외 계층 (7종, 모두 LocalizedException 상속)
-    │   │   ├── LocalizedException.java          # 추상 베이스 — messageCode + messageArgs
-    │   │   ├── EntityNotFoundException.java     # → 404
-    │   │   ├── DomainAccessDeniedException.java # → 403
-    │   │   ├── DuplicateException.java          # → 409
-    │   │   ├── ConflictException.java           # → 409
-    │   │   ├── TooManyRequestsException.java    # → 429
-    │   │   └── BusinessException.java           # → 400
-    │   └── message/
-    │       └── MessageCode.java     #   공통 다국어 메시지 코드 enum
-    ├── user/
-    │   ├── entity/                   #   User, RefreshToken (loginId unique, BCrypt password)
-    │   ├── repository/              #   UserRepository, RefreshTokenRepository (+Custom — QueryDSL bulk delete)
-    │   └── service/                 #   AuthService, AuthUserDetailsService, JwtTokenService
-    ├── team/
-    │   ├── entity/                  #   Team, TeamMember (@IdClass), TeamMemberId (record), TeamMemberRole
-    │   ├── repository/             #   TeamRepository (+Custom), TeamMemberRepository (+Custom) — QueryDSL fetch join
-    │   └── service/                #   TeamService (팀 CRUD + 멤버 관리, ADMIN 권한 체크)
-    ├── project/
-    │   ├── entity/                  #   Project (team 소속)
-    │   ├── repository/             #   ProjectRepository (findByTeam)
-    │   └── service/                #   ProjectService (프로젝트 CRUD, 팀 소속 확인)
-    ├── diagram/
-    │   ├── entity/                  #   Diagram (TEXT content + Y.Doc snapshot + revision 메타), SaveSource
-    │   ├── repository/             #   DiagramRepository + Custom + snapshot/projection 조회 타입
-    │   ├── service/                #   DiagramService, DiagramSnapshotService, DiagramDictionaryBindingService
-    │   └── websocket/              #   diagram 협업 전용 ticket / transport / room / relay / protocol / session / model
-    └── dictionary/
-        ├── entity/                  #   DictionarySet, Domain, Term, Word
-        ├── repository/             #   DictionarySet/Domain/Term/Word repository (+Custom — QueryDSL fetch join)
-        └── service/                #   CRUD 서비스 + *BulkService + Suggest/Migration + bulk session store
+│   ├── dictionary/                  #   BulkValidationSessionStoreConfig
+│   ├── i18n/                        #   LocaleConfig, ValidationConfig
+│   ├── openapi/                     #   OpenApiConfig (Swagger UI, JWT Bearer 인증 스킴)
+│   ├── persistence/                 #   QuerydslConfig, BlazeConfig, LoginIdAuditorAware, PrettySqlFormat, sqlformat/
+│   ├── scheduler/                   #   RefreshTokenCleanupScheduler, LoginRateLimitCleanupScheduler
+│   ├── security/                    #   SecurityConfig, JwtConfig, JwtProperties, CorsConfig, AuthSecurityProperties
+│   ├── support/                     #   EnvironmentProfile
+│   └── websocket/                   #   WebSocketConfig, WebSocketProperties, WsTicketStoreConfig
+├── domain/                          # 도메인 계층 (Service도 여기에 위치)
+│   ├── common/
+│   │   ├── entity/                  #   BaseTimeEntity, BaseAuditEntity (시각/작성자 감사 공통 베이스)
+│   │   ├── exception/               #   커스텀 예외 계층 (7종, 모두 LocalizedException 상속)
+│   │   │   ├── LocalizedException.java          # 추상 베이스 — messageCode + messageArgs
+│   │   │   ├── EntityNotFoundException.java     # → 404
+│   │   │   ├── DomainAccessDeniedException.java # → 403
+│   │   │   ├── DuplicateException.java          # → 409
+│   │   │   ├── ConflictException.java           # → 409
+│   │   │   ├── TooManyRequestsException.java    # → 429
+│   │   │   └── BusinessException.java           # → 400
+│   │   └── message/
+│   │       └── MessageCode.java     #   공통 다국어 메시지 코드 enum
+│   ├── user/
+│   │   ├── entity/                  #   User, RefreshToken, LoginRateLimitAttempt (loginId unique, BCrypt password)
+│   │   ├── repository/             #   UserRepository, RefreshTokenRepository(+Custom), LoginRateLimitAttemptRepository
+│   │   └── service/                #   AuthService, AuthUserDetailsService, JwtTokenService, LoginRateLimitService
+│   ├── team/
+│   │   ├── entity/                  #   Team, TeamMember (@IdClass), TeamMemberId (record), TeamMemberRole
+│   │   ├── repository/             #   TeamRepository (+Custom), TeamMemberRepository (+Custom) — QueryDSL fetch join
+│   │   └── service/                #   TeamService (팀 CRUD + 멤버 관리, ADMIN 권한 체크)
+│   ├── project/
+│   │   ├── entity/                  #   Project (team 소속)
+│   │   ├── repository/             #   ProjectRepository (findByTeam)
+│   │   └── service/                #   ProjectService (프로젝트 CRUD, 팀 소속 확인)
+│   ├── diagram/
+│   │   ├── entity/                  #   Diagram (TEXT content + Y.Doc snapshot + revision 메타), DiagramPluginId (ERD/MARKDOWN), SaveSource
+│   │   ├── repository/             #   DiagramRepository + Custom + DiagramBootstrapProjection, DiagramSummaryProjection, DiagramWithSnapshotFlag, SnapshotWithRevision
+│   │   ├── service/                #   DiagramService, DiagramSnapshotService, DiagramDictionaryBindingService, DiagramColumnDefinitionExportService, DiagramTableDefinitionExportService, DiagramIndexDefinitionExportService
+│   │   ├── collaboration/          #   DiagramCollaborationChannelPlugin, DiagramCollaborationWebSocketBinding, DiagramCollaborationTicketSupport/Issuer/Authenticator, DiagramCollaborationRuntimeSupport, DiagramCollaborationSnapshotStore, DiagramCollaborationHandoffPolicy, DiagramDocumentBootstrapReader, DiagramDocumentMetadataService, DiagramCollaborationDocumentDefaults
+│   │   └── websocket/              #   diagram 협업 전용 모듈
+│   │       ├── mapper/              #     DiagramApplicationPayloadMapper
+│   │       ├── model/               #     JoinResult, LeaveResult, JoinRejectionReason, PresenceParticipant, PresenceSnapshot
+│   │       ├── protocol/            #     YjsUpdateFormat
+│   │       ├── relay/               #     DiagramMessageHandler, DiagramMessageSender, DiagramPresenceNotifier + relay/handler/ (6개 핸들러)
+│   │       ├── room/                #     DiagramRoomManager, DiagramSessionRegistry, DiagramPresenceManager, DiagramSessionRateLimiter, DiagramUpdateBuffer
+│   │       ├── session/             #     AuthenticatedSession, DiagramWebSocketSessionInfo, DiagramWebSocketSessionResolver
+│   │       ├── ticket/              #     WsTicketService, WsTicketStore (interface), InMemoryWsTicketStore, RedisWsTicketStore, TicketData
+│   │       └── transport/           #     DiagramWebSocketHandler, DiagramWebSocketMessageDispatcher, DiagramWebSocketSessionLifecycle, WsTicketHandshakeInterceptor
+│   ├── dictionary/
+│   │   ├── entity/                  #   DictionarySet, Domain, Term, Word
+│   │   ├── repository/             #   DictionarySet/Domain/Term/Word repository (+Custom — QueryDSL fetch join)
+│   │   └── service/                #   CRUD 서비스 + *BulkService + Suggest/Migration/Export + bulk session store (InMemory/Redis)
+│   └── markdown/
+│       └── service/                 #   MarkdownDocumentDescriptorService, MarkdownExportService, MarkdownTemplateService, MarkdownTemplateDescriptor
+├── utils/                           # 공용 유틸리티
+│   ├── AppStringUtils.java          #   문자열 검증/정규화 래퍼
+│   ├── AppArrayUtils.java           #   배열 유틸리티 래퍼
+│   └── excel/                       #   Excel 관련 유틸리티
 ```
 
 ### 프론트엔드
@@ -308,7 +350,10 @@ client/
 ├── tailwind.config.js               # CSS 변수 기반 색상, darkMode: ["class"], tailwindcss-animate
 ├── postcss.config.js                # tailwindcss + autoprefixer
 ├── vite.config.ts                   # @/ alias → ./src, 프록시 /api → :9503 (frontend-test는 :9502)
+├── electron.vite.config.ts          # Electron 빌드 설정
+├── electron-builder.yml             # 데스크톱 패키징 (Mac DMG universal, Win NSIS/portable)
 ├── tsconfig.app.json                # paths: { "@/*": ["./src/*"] }
+├── playwright.config.*              # Playwright E2E 테스트 설정
 ├── .prettierrc.json                 # Prettier 설정
 ├── .prettierignore                  # Prettier 무시 파일
 ├── eslint.config.js                 # ESLint flat config (TypeScript + Prettier)
@@ -325,29 +370,86 @@ client/
     │       └── ko/translation.json  # 한국어 번역 (~200 키)
     ├── api/
     │   ├── axiosInstance.ts         # baseURL: /api, JWT 자동 첨부 + 401 Refresh Token 갱신 (큐 패턴)
-    │   ├── authApi.ts               # login(), signup()
+    │   ├── authApi.ts               # login(), signup(), refresh(), logout()
     │   ├── teamApi.ts               # fetchTeams(), fetchTeam(), createTeam(), fetchMembers(), inviteMember(), removeMember()
     │   ├── projectApi.ts            # fetchProjects(), createProject(), deleteProject()
-    │   ├── diagramApi.ts            # fetchDiagrams(), fetchDiagram(), createDiagram(), saveDiagram(), renameDiagram(), deleteDiagram()
-    │   ├── domainApi.ts             # fetchDomains(), createDomain(), updateDomain(), deleteDomain()
-    │   └── termApi.ts               # fetchTerms(), createTerm(), updateTerm(), deleteTerm()
+    │   ├── diagramApi.ts            # CRUD + save + bootstrap + snapshot + export
+    │   ├── dictionarySetApi.ts      # DictionarySet CRUD
+    │   ├── domainApi.ts             # Domain CRUD + bulk
+    │   ├── termApi.ts               # Term CRUD + bulk
+    │   ├── wordApi.ts               # Word CRUD + bulk
+    │   └── suggestApi.ts            # 용어/도메인 suggest
+    ├── collaboration/               # 실시간 협업 프레임워크 (Yjs + WebSocket)
+    │   ├── core/                    #   도메인 무관 협업 코어
+    │   │   ├── contracts/           #     document-bootstrap, document-plugin, shared-document-engine, document-checkpoint, document-metadata
+    │   │   ├── draft/               #     draft-state
+    │   │   ├── engines/             #     yjs-shared-document-engine
+    │   │   ├── persistence/         #     document-persistence-coordinator, passthrough-document-snapshot-codec
+    │   │   ├── session/             #     document-mutation-session, document-session-bootstrap, use-document-page-host
+    │   │   ├── store/               #     document-store, document-revision-tracker, document-change-origin
+    │   │   ├── collaboration-runtime-types.ts
+    │   │   ├── collaboration-session-machine.ts
+    │   │   └── use-collaboration-session.ts
+    │   ├── channel/                 #   채널별 협업 구현
+    │   │   ├── diagram/             #     다이어그램 채널 (30+ 파일: provider, session, transport, hooks)
+    │   │   └── document/            #     마크다운 채널 (bootstrap, runtime, hooks)
+    │   ├── plugins/                 #   문서 타입 플러그인
+    │   │   ├── erd/                 #     ERD 플러그인 (mutation applier, plugin, scope collector, document actions)
+    │   │   └── markdown/            #     Markdown 플러그인 (mutation applier, plugin, sanitize policy)
+    │   ├── registry/                #   플러그인/엔진 레지스트리
+    │   ├── yjs/                     #   Yjs 어댑터 (diagram, markdown)
+    │   ├── YjsProvider.ts           #   Yjs WebSocket provider
+    │   └── yjsBridge.ts             #   Yjs ↔ Zustand 양방향 브릿지
     ├── constants/
     │   ├── keybindings.ts           # KEYBINDINGS — 키보드 단축키 레지스트리
     │   ├── storage.ts               # STORAGE_KEYS — localStorage 키 상수
     │   ├── routes.ts                # ROUTES — 라우트 경로 상수 (정적 + 파라미터)
-    │   └── query-keys.ts            # queryKeys — React Query 캐시 키 계층 구조
-    ├── hooks/
+    │   ├── query-keys.ts            # queryKeys — React Query 캐시 키 계층 구조
+    │   ├── canvas-history.ts        # 캔버스 히스토리 상수
+    │   ├── code-sync.ts             # 코드 동기화 상수
+    │   ├── collab-lock.ts           # 협업 잠금 상수
+    │   ├── sync-status.ts           # 동기화 상태 상수
+    │   └── ws.ts                    # WebSocket 상수
+    ├── hooks/                       # 커스텀 훅 (35+ 파일)
     │   ├── useInlineEdit.ts         # 인라인 텍스트 편집 공통 훅
-    │   └── useFkConnectMode.ts      # FK 연결 모드 상태/로직 캡슐화 훅
+    │   ├── useFkConnectMode.ts      # FK 연결 모드 상태/로직 캡슐화 훅
+    │   ├── useDarkMode.ts           # 다크 모드 토글
+    │   ├── useExportDiagram.ts      # 다이어그램 내보내기
+    │   ├── useDictionaryCache.ts    # 사전 데이터 캐시
+    │   ├── useDictionarySuggest.ts  # 사전 자동완성
+    │   ├── useBidirectionalCodeSync.ts # 코드 에디터 양방향 동기화
+    │   ├── useAutoBackup.ts         # 자동 백업
+    │   ├── useAwareness.ts          # Yjs awareness (원격 커서)
+    │   ├── useSnapshotCompaction.ts  # 스냅샷 압축
+    │   └── ...                      # (기타 도메인별 훅)
     ├── components/
     │   ├── auth/
     │   │   └── ProtectedRoute.tsx   # 인증 가드 (미인증 시 /login 리다이렉트)
-    │   ├── erd/
+    │   ├── erd/                     # ERD 캔버스 컴포넌트 (50+ 파일)
     │   │   ├── ERDCanvas.tsx        # @xyflow/react 캔버스 (FK 연결, 엣지 삭제, 자동 배치, 하이라이트)
     │   │   ├── TableNode.tsx        # 커스텀 노드: 테이블 헤더 + 컬럼 행 (PK/FK 뱃지, 좌우 Handle)
     │   │   ├── CanvasToolbar.tsx    # 플로팅 툴바 (FK Connect + Auto Layout 버튼)
+    │   │   ├── PreviewCanvas.tsx    # 미리보기 캔버스
+    │   │   ├── DdlCodeEditorPanel.tsx  # DDL 코드 에디터 패널
+    │   │   ├── DslCodeEditorPanel.tsx  # DSL 코드 에디터 패널
+    │   │   ├── DiagramSidebar.tsx   # 다이어그램 전용 사이드바
+    │   │   ├── RemoteCursors.tsx    # 원격 커서 표시 (협업)
+    │   │   ├── ValidationPanel.tsx  # 유효성 검증 패널
     │   │   ├── EdgeContextMenu.tsx  # 엣지 우클릭 컨텍스트 메뉴 (삭제)
     │   │   └── DeleteEdgeDialog.tsx # 엣지 삭제 다이얼로그 (FK 제거/유지/취소 3버튼)
+    │   ├── markdown/                # 마크다운 에디터 UI
+    │   │   ├── MarkdownEditorShell.tsx  # 에디터 셸 레이아웃
+    │   │   ├── MarkdownPreviewPane.tsx  # 마크다운 미리보기 패널
+    │   │   ├── MarkdownToolbar.tsx      # 마크다운 편집 툴바
+    │   │   ├── MarkdownOutlineRail.tsx  # 아웃라인 네비게이션 레일
+    │   │   ├── MarkdownInfoDrawer.tsx   # 문서 정보 드로어
+    │   │   └── MarkdownStatusStrip.tsx  # 상태 표시줄
+    │   ├── workspace/               # 문서 허브 공통 컴포넌트
+    │   │   ├── CreateDocumentDialog.tsx   # 문서 생성 다이얼로그
+    │   │   ├── DocumentHubRow.tsx         # 문서 목록 행
+    │   │   ├── DocumentTypeBadge.tsx      # 문서 타입 뱃지
+    │   │   ├── ProjectWorkspaceHero.tsx   # 프로젝트 워크스페이스 히어로
+    │   │   └── WorkspaceEmptyState.tsx    # 빈 상태 표시
     │   ├── layout/
     │   │   ├── Header.tsx           # 상단 고정 헤더 (bg-header, 사용자명, 로그아웃, 다이어그램 Save)
     │   │   ├── LanguageSwitcher.tsx  # 언어 전환 드롭다운 (ko/en)
@@ -372,12 +474,22 @@ client/
     │       ├── select.tsx           #   Select — @radix-ui/react-select
     │       ├── table.tsx            #   Table — 시맨틱 HTML 테이블 컴포넌트
     │       ├── tabs.tsx             #   Tabs — @radix-ui/react-tabs
+    │       ├── sonner.tsx           #   Sonner 토스트 래퍼
     │       └── spinner.tsx          #   Spinner — Loader2 animate-spin + 선택적 텍스트
-    ├── lib/
+    ├── lib/                         # 순수 유틸리티 + 설정 (40+ 파일)
     │   ├── utils.ts                 # cn() = clsx + tailwind-merge
     │   ├── api-error.ts             # getErrorMessage() — 서버 에러 메시지 추출
     │   ├── query-client.ts          # QueryClient 설정 (staleTime: 30s, retry: 1)
-    │   └── auto-layout.ts           # dagre 기반 자동 배치 순수 함수 (LR 방향)
+    │   ├── auto-layout.ts           # dagre 기반 자동 배치 순수 함수 (LR 방향)
+    │   ├── platform.ts              # Electron/웹 환경 감지
+    │   ├── handle-id.ts             # Handle ID 파싱 유틸
+    │   ├── dsl-parser.ts            # DSL 파서
+    │   ├── ddl-parser.ts            # DDL 파서
+    │   ├── ddl-generator.ts         # DDL 생성기
+    │   ├── dsl-generator.ts         # DSL 생성기
+    │   ├── erd-yjs-utils.ts         # ERD Yjs 유틸리티
+    │   ├── erd-diff-apply.ts        # ERD diff 적용
+    │   └── export/                  # 내보내기 유틸리티
     ├── pages/                       # 도메인별 페이지 디렉토리
     │   ├── auth/
     │   │   ├── LoginPage.tsx        # 로그인 폼 (useMutation + authApi, 성공 시 /teams 이동)
@@ -388,19 +500,32 @@ client/
     │   │   └── ProjectsPage.tsx     # 프로젝트 목록 + CRUD + 멤버 관리 (useQuery + useMutation)
     │   ├── dictionary/
     │   │   └── DictionaryPage.tsx   # 데이터 사전: 도메인/용어 탭 (Tabs 컨테이너)
-    │   └── diagram/
-    │       ├── DiagramsPage.tsx     # 다이어그램 목록 + CRUD + 인라인 이름 변경 (useQuery + useMutation)
-    │       └── DiagramPage.tsx      # 다이어그램 편집기: Header + Sidebar + ERDCanvas (useQuery + useMutation)
+    │   ├── diagram/
+    │   │   ├── DiagramsPage.tsx     # 다이어그램 목록 + CRUD + 인라인 이름 변경 (useQuery + useMutation)
+    │   │   └── DiagramPage.tsx      # ERD 편집기: Header + Sidebar + ERDCanvas (useQuery + useMutation)
+    │   ├── document/
+    │   │   ├── DocumentEditorRoute.tsx   # pluginId 기반 ERD/Markdown 에디터 분기
+    │   │   └── MarkdownDocumentPage.tsx  # 마크다운 문서 편집 페이지
+    │   └── settings/
+    │       └── SettingsPage.tsx     # 설정 페이지 (Electron 전용)
     ├── stores/
     │   ├── useAuthStore.ts          # Zustand: 인증 상태 (tokens, loginId, name) + localStorage 동기화
-    │   └── useCanvasStore.ts        # Zustand: nodes, edges, onChange 핸들러, serialize/deserialize
-    └── types/
-        ├── erd.ts                   # Column, TableNodeData, TableNode, ERDEdge
-        ├── auth.ts                  # AuthResponse
-        ├── team.ts                  # Team, TeamMember, TeamMemberRole
-        ├── project.ts              # Project
-        ├── diagram.ts              # DiagramSummary, DiagramDetail
-        └── dictionary.ts           # Domain, Term, DomainFormData, TermFormData
+    │   ├── canvas/                  # 캔버스 액션 모듈 (canvasGroupActions, canvasTableActions, canvasSyncActions, canvasStoreHelpers, canvasStoreTypes)
+    │   └── erd/                     # ERD 전용 스토어 (useCanvasStore, useCollaborationStore)
+    ├── types/
+    │   ├── erd.ts                   # Column, TableNodeData, TableNode, ERDEdge
+    │   ├── auth.ts                  # AuthResponse
+    │   ├── team.ts                  # Team, TeamMember, TeamMemberRole
+    │   ├── project.ts              # Project
+    │   ├── diagram.ts              # DiagramSummary, DiagramDetail
+    │   ├── dictionary.ts           # Domain, Term, Word, DictionarySet, DomainFormData, TermFormData
+    │   ├── document.ts             # DocumentPluginId, DocumentBootstrapPayload, CreateProjectDocumentInput
+    │   ├── markdown.ts             # ParsedMarkdownBuffer, MarkdownHeadingItem
+    │   ├── workspace.ts            # DocumentListItem, WorkspaceDocumentType
+    │   ├── collaboration.ts        # WsTicketIssueResponse
+    │   └── vendor.d.ts, electron.d.ts  # 외부 모듈 타입 선언
+    └── workers/                     # Web Worker
+        └── dslParser.worker.ts      # DSL 파싱 Worker (비동기)
 ```
 
 ## 코드 표준
@@ -756,13 +881,16 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 | `hooks/`                 | 재사용 커스텀 훅 (2+ 컴포넌트에서 반복 시 추출)                                              |
 | `lib/`                   | 순수 유틸리티 함수 및 설정 (api-error, query-client, utils)                                  |
 | `types/`                 | 도메인별 공유 TypeScript 타입 정의                                                           |
+| `collaboration/`         | shared document engine, plugin registry, session bootstrap, Yjs adapter 등 협업 런타임 구현 |
 | `components/ui/`         | 범용 재사용 컴포넌트 (shadcn/ui + 공유 다이얼로그). 도메인 로직 금지                         |
 | `components/team/`       | 팀 도메인 전용 컴포넌트 (MembersDialog)                                                      |
 | `components/dictionary/` | 사전 도메인 전용 컴포넌트 (DomainTab, TermTab, 폼 다이얼로그)                                |
 | `components/auth/`       | 인증 관련 컴포넌트 (ProtectedRoute)                                                          |
+| `components/markdown/`   | Markdown 문서 편집 UI 전용 컴포넌트                                                          |
 | `components/erd/`        | ERD 도메인 전용 컴포넌트                                                                     |
 | `components/layout/`     | 페이지 구조용 공통 컴포넌트. ERD 전용 상태/협업/UI 책임 금지                                 |
-| `pages/`                 | 도메인별 서브디렉토리(`auth/`, `team/`, `project/`, `dictionary/`, `diagram/`)로 페이지 관리 |
+| `components/workspace/`  | 문서 플랫폼 쉘/허브용 공통 컴포넌트. 도메인 API 호출 없이 표시 모델과 슬롯 조합만 담당       |
+| `pages/`                 | 도메인별 서브디렉토리(`auth/`, `team/`, `project/`, `dictionary/`, `diagram/`, `document/`)로 페이지 관리 |
 | `stores/`                | Zustand 클라이언트 상태 관리 (`use` prefix)                                                  |
 | `stores/erd/`            | ERD 전용 Zustand 진입 경로. ERD 화면/훅/컴포넌트는 이 경로를 우선 사용                       |
 
@@ -770,6 +898,8 @@ Prettier는 단일 파라미터 람다에 괄호를 추가하지만 (`(x) -> ...
 
 - ERD는 사전 "관리 기능"이 아니라 사전 "조회 데이터 계약"만 소비한다.
 - `components/layout/`는 공통 프레임 역할만 수행하고, `useCanvasStore`, `useCollaborationStore`, `react-flow`, Yjs에 직접 의존하지 않는다.
+- `components/workspace/`는 workspace shell, hero, row, empty state 같은 상위 UX 조립만 담당한다. 도메인별 query/mutation은 page 또는 hook 계층에 둔다.
+- 문서 협업 런타임은 `collaboration/` 아래에 두고, 페이지는 `pages/document/`, 문서 전용 UI는 `components/markdown/` 아래에 둔다.
 - ERD 전용 UI는 `components/erd/` 아래에 둔다. 협업 바, 다이어그램 사이드바, 캔버스 보조 UI도 여기에 포함한다.
 - ERD 관련 페이지/훅/컴포넌트는 상태 접근 시 `stores/erd/*` 경로를 우선 사용한다.
 - `components/dictionary/`와 `pages/dictionary/`의 사전 생성/수정/삭제 절차를 ERD 내부에 직접 import하지 않는다.

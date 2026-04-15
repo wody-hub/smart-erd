@@ -12,9 +12,13 @@ import java.time.Instant;
  *
  * @param id                다이어그램 ID
  * @param name              다이어그램 이름
+ * @param pluginId          문서 플러그인 ID
  * @param projectId         소속 프로젝트 ID
  * @param dictionarySetId   사전 세트 ID
  * @param dictionarySetName 사전 세트 이름
+ * @param templateKey       markdown 템플릿 키
+ * @param templateLabel     markdown 템플릿 표시 이름
+ * @param summaryText       markdown 요약
  * @param content           직렬화된 React Flow JSON (노드 + 엣지)
  * @param hasYdocSnapshot   Y.Doc 스냅샷 존재 여부 (클라이언트 JSON 마이그레이션 판단용)
  * @param contentRevision   content 리비전 (long 문자열)
@@ -29,11 +33,19 @@ public record DiagramDetailResponse(
 
     @Schema(description = "다이어그램 이름", example = "Main ERD") String name,
 
+    @Schema(description = "문서 플러그인 ID", example = "erd") String pluginId,
+
     @Schema(description = "소속 프로젝트 ID", example = "1") Long projectId,
 
     @Schema(description = "사전 세트 ID", example = "1") Long dictionarySetId,
 
     @Schema(description = "사전 세트 이름", example = "Default") String dictionarySetName,
+
+    @Schema(description = "markdown 템플릿 키", example = "technical-spec") String templateKey,
+
+    @Schema(description = "markdown 템플릿 표시 이름", example = "Technical Spec") String templateLabel,
+
+    @Schema(description = "markdown 요약") String summaryText,
 
     @Schema(description = "직렬화된 React Flow JSON") String content,
 
@@ -63,9 +75,13 @@ public record DiagramDetailResponse(
         return new DiagramDetailResponse(
             diagram.getId(),
             diagram.getName(),
+            diagram.getPluginId(),
             projectId,
             diagram.getDictionarySet() != null ? diagram.getDictionarySet().getId() : null,
             diagram.getDictionarySet() != null ? diagram.getDictionarySet().getName() : null,
+            null,
+            null,
+            null,
             diagram.getContent(),
             hasYdocSnapshot,
             String.valueOf(diagram.getContentRevision()),

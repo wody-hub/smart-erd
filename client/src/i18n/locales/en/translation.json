@@ -29,6 +29,360 @@
       "enterName": "Enter a name for the resource you want to create."
     }
   },
+  "workspace": {
+    "section": {
+      "teams": "Teams",
+      "projects": "Projects",
+      "documents": "Documents",
+      "dictionary": "Dictionary",
+      "members": "Members",
+      "settings": "Settings"
+    },
+    "teams": {
+      "description": "Choose the team workspace you want to work in, then move into projects and documents.",
+      "emptyTitle": "No teams yet",
+      "teamCount": "{{count}} teams",
+      "openWorkspace": "Open workspace"
+    },
+    "documentType": {
+      "erd": "ERD",
+      "markdown": "Markdown",
+      "screenSpec": "Screen Spec"
+    },
+    "documents": {
+      "title": "Documents",
+      "description": "Manage this project's documents and jump straight into editing.",
+      "empty": "No documents in this project yet. Create your first ERD document.",
+      "documentCount": "{{count}} documents",
+      "typeScopeHint": "ERD and Markdown documents can coexist in this hub.",
+      "multiTypeHint": "Manage ERD and Markdown documents together here. Creation asks for the right type-specific setup up front.",
+      "dictionaryContextHint": "Pick the dictionary context to attach before creating a new document."
+    },
+    "projects": {
+      "description": "Pick a project to enter its document workspace. Keep dictionary, members, and settings as team-level utilities.",
+      "projectCount": "{{count}} projects",
+      "openProject": "Open documents",
+      "emptyTitle": "No projects yet"
+    },
+    "dictionary": {
+      "description": "Manage the shared word, term, and domain assets used across ERD and future document types.",
+      "teamContext": "This is the shared dictionary asset hub for team {{name}}.",
+      "setManagementTitle": "Dictionary set management",
+      "setManagementDescription": "Choose the default dictionary set used by documents, then rename it, mark it as default, or delete it here.",
+      "setManagementHint": "Use the tabs below to edit words, terms, and domains in the selected set.",
+      "emptySetTitle": "No dictionary sets yet"
+    },
+    "meta": {
+      "updatedAt": "Updated: {{date}}",
+      "dictionaryContext": "Dictionary: {{name}}",
+      "teamContext": "Team: {{name}}",
+      "templateContext": "Template: {{name}}"
+    },
+    "action": {
+      "newDocument": "New document",
+      "newErdDocument": "New ERD document",
+      "newMarkdownDocument": "New Markdown document",
+      "newScreenSpecDocument": "New Screen Spec document",
+      "openDocument": "Open document {{name}}",
+      "backToDocuments": "Back to Documents",
+      "documentActions": "Document actions",
+      "renameDocument": "Rename document",
+      "deleteDocument": "Delete document",
+      "projectActions": "Project actions",
+      "createErdDocumentTitle": "Create new ERD document",
+      "erdDocumentNameLabel": "ERD document name",
+      "erdDocumentNamePlaceholder": "Enter the ERD document name",
+      "deleteErdDocumentTitle": "Delete ERD document",
+      "deleteErdDocumentDescription": "Are you sure you want to delete this ERD document?"
+    },
+    "createDocument": {
+      "description": "Choose the document type and provide the minimum setup to create it.",
+      "eyebrow": "Document setup",
+      "stepType": "Step 1 · Choose a document type",
+      "stepSetup": "Step 2 · Confirm the starting setup",
+      "stepTypeDescription": "Start by choosing how this document should work.",
+      "stepSetupDescription": "Confirm the name and starting setup, then jump straight into editing.",
+      "pluginSectionTitle": "Document type",
+      "pluginSectionHint": "ERD and Screen Spec start from canvas workflows, while Markdown starts from a writing workflow.",
+      "nameLabel": "Document name",
+      "namePlaceholder": "Enter a document name",
+      "nameHint": "This name appears in the document hub and the editor header.",
+      "templateLabel": "Markdown template",
+      "templateHint": "Start with a document structure and default frontmatter already in place.",
+      "dictionaryHint": "Choose the default dictionary context attached to the ERD document.",
+      "screenSpecSetupHint": "The first revision opens a blank collaborative stage so the next phase can add shapes, layout presets, and screen state.",
+      "erdRequiresDictionary": "Create at least one dictionary context in this project before starting an ERD document.",
+      "selected": "Selected",
+      "previewTitle": "Creation preview",
+      "previewNameLabel": "Document name",
+      "previewPendingName": "The name will appear here once you enter it.",
+      "previewTemplateLabel": "Template",
+      "previewDictionaryLabel": "Dictionary context",
+      "previewCanvasLabel": "Canvas state",
+      "previewCanvasBlank": "Blank collaborative stage",
+      "includesTitle": "Includes",
+      "previewMarkdownLine1": "Frontmatter and the initial section structure are created together.",
+      "previewMarkdownLine2": "You can start editing immediately with Write, Outline, and Preview flows.",
+      "previewMarkdownLine3": "The document is ready to export as MD or HTML.",
+      "previewErdLine1": "You start from an ERD canvas with the dictionary context attached.",
+      "previewErdLine2": "Tables, relations, and code sync work are ready from the first screen.",
+      "previewErdLine3": "The document stays managed alongside the dictionary in the hub.",
+      "previewScreenSpecLine1": "A blank Konva stage is created inside the collaboration runtime from the first load.",
+      "previewScreenSpecLine2": "The document joins the same Yjs/WebSocket flow as the other plugin types.",
+      "previewScreenSpecLine3": "The next phase can add screen entities and canvas tools without changing the route shell.",
+      "erdDescription": "Create an ERD canvas document with a dictionary context attached.",
+      "markdownDescription": "Start a technical note, meeting note, or release note from a template.",
+      "screenSpecDescription": "Start a collaborative screen-design document from a blank canvas stage."
+    },
+    "status": {
+      "loadFailedTitle": "We couldn't load this workspace",
+      "teamsLoadFailed": "Retry loading the workspace list.",
+      "projectsLoadFailed": "You can retry the project list while keeping the current team context.",
+      "documentsLoadFailed": "You can retry the document hub while keeping the current project context.",
+      "documentUnsupported": "This document uses a plugin type that the current editor does not support.",
+      "dictionaryLoadFailed": "You can retry the dictionary asset workspace while keeping the current team context.",
+      "retry": "Retry"
+    }
+  },
+  "markdown": {
+    "outline": {
+      "title": "Outline",
+      "empty": "Add headings to the body to see the section structure here."
+    },
+    "preview": {
+      "title": "Preview"
+    },
+    "info": {
+      "title": "Document info",
+      "description": "Inspect frontmatter and template details.",
+      "template": "Template",
+      "empty": "No frontmatter yet."
+    },
+    "mode": {
+      "write": "Write",
+      "outline": "Outline",
+      "split": "Split",
+      "preview": "Preview"
+    },
+    "toolbar": {
+      "export": "Export"
+    },
+    "toast": {
+      "created": "Markdown document created",
+      "createFailed": "Failed to create the markdown document",
+      "saved": "Markdown document saved",
+      "saveFailed": "Failed to save markdown document",
+      "exported": "Document exported",
+      "exportFailed": "Failed to export document"
+    },
+    "status": {
+      "loadFailed": "We couldn't load the markdown document. Try again.",
+      "saving": "Saving...",
+      "unsaved": "Unsaved changes",
+      "saved": "Saved",
+      "savedAt": "Saved at {{time}}",
+      "frontmatterInvalid": "Frontmatter YAML syntax error"
+    }
+  },
+  "screenSpec": {
+    "toast": {
+      "created": "Screen Spec document created",
+      "createFailed": "Failed to create the Screen Spec document"
+    },
+    "status": {
+      "loadFailed": "We couldn't load the Screen Spec document. Try again.",
+      "connecting": "Connecting the collaborative canvas...",
+      "ready": "Canvas live"
+    },
+    "aria": {
+      "connecting": "Connecting the Screen Spec collaborative canvas.",
+      "ready": "The Screen Spec canvas is ready.",
+      "connectionIssue": "There is a problem with the Screen Spec collaboration connection.",
+      "selectedScreen": "Selected screen {{screen}} with {{count}} instances.",
+      "selectedInstance": "Selected {{name}} on screen {{screen}}.",
+      "remoteSync": "Changes from another collaborator were applied to {{screen}}."
+    },
+    "toolbar": {
+      "screenLabel": "Screen",
+      "frameLabel": "Frame",
+      "previousScreen": "Previous screen",
+      "nextScreen": "Next screen",
+      "fitToFrame": "Fit",
+      "actualSize": "100%",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "export": "Export",
+      "exporting": "Exporting..."
+    },
+    "library": {
+      "title": "Building Blocks",
+      "subtitle": "Select a master to preview and stage the next drag interaction.",
+      "dragHint": "Drag a master onto the active screen",
+      "searchPlaceholder": "Search masters",
+      "listAriaLabel": "Screen spec master component library",
+      "emptyFiltered": "No masters match the current filter.",
+      "action": {
+        "newMaster": "New Master",
+        "renameMaster": "Rename",
+        "deleteMaster": "Delete"
+      },
+      "tier": {
+        "block": "Block",
+        "widget": "Widget"
+      },
+      "origin": {
+        "builtIn": "Built-in",
+        "custom": "Custom"
+      },
+      "category": {
+        "layout": "Layout",
+        "table": "Table",
+        "form": "Form",
+        "input": "Input",
+        "feedback": "Feedback",
+        "button": "Button"
+      },
+      "dialog": {
+        "createTitle": "Create a master component",
+        "createDescription": "Add a reusable component to this document library.",
+        "renameTitle": "Rename master component",
+        "renameDescription": "Update the label used in the library and preview panel.",
+        "deleteTitle": "Delete master component",
+        "deleteDescription": "Delete \"{{name}}\" from this document library.",
+        "nameLabel": "Master component name"
+      },
+      "item": {
+        "gnb": "GNB",
+        "lnb": "LNB",
+        "tabMenu": "Tab Menu",
+        "breadcrumb": "Breadcrumb",
+        "dataTable": "Data Table",
+        "simpleTable": "Simple Table",
+        "cardList": "Card List",
+        "loginForm": "Login Form",
+        "searchBar": "Search Bar",
+        "filterPanel": "Filter Panel",
+        "editForm": "Create/Edit Form",
+        "textInput": "Text Input",
+        "dropdown": "Dropdown",
+        "checkboxGroup": "Checkbox Group",
+        "radioGroup": "Radio Group",
+        "datePicker": "Date Picker",
+        "toast": "Toast",
+        "dialog": "Confirm Dialog",
+        "spinner": "Loading Spinner",
+        "emptyState": "Empty State",
+        "primaryButton": "Primary Button",
+        "iconButton": "Icon Button",
+        "buttonGroup": "Button Group"
+      }
+    },
+    "framePreset": {
+      "mobile": {
+        "label": "Mobile App"
+      },
+      "tablet": {
+        "label": "Tablet"
+      },
+      "desktop": {
+        "label": "Desktop Web"
+      }
+    },
+    "inspector": {
+      "title": "Inspector",
+      "masterTitle": "Master",
+      "masterEmpty": "Select a master in the library to inspect it.",
+      "screen": "Screen",
+      "selection": "Selection",
+      "frame": "Frame",
+      "size": "Size",
+      "status": "Status",
+      "masterDefault": "Master default",
+      "name": "Name",
+      "category": "Category",
+      "tier": "Tier",
+      "width": "Width",
+      "height": "Height",
+      "origin": "Origin",
+      "position": "Position",
+      "labelOverride": "Label override",
+      "accentColor": "Accent color",
+      "resetLabel": "Use master label",
+      "resetColor": "Use master color",
+      "resetSize": "Use master size",
+      "overrideStatus": {
+        "inherited": "Inherited from the master",
+        "overridden": "Overridden on this instance"
+      },
+      "layers": "Layers",
+      "bringToFront": "Bring to front",
+      "sendToBack": "Send to back",
+      "bringForward": "Bring forward",
+      "sendBackward": "Send backward",
+      "deleteSelection": "Delete selection",
+      "selectionEmpty": "Select an instance on the canvas to inspect it.",
+      "keyboardHint": "Tab cycles selection. Arrow keys move. Shift+Arrow moves faster. Shift+PageUp/PageDown switches screens.",
+      "previewHint": "Drag from the library to the stage when instance placement is enabled.",
+      "view": "View",
+      "zoom": "Zoom",
+      "offsetX": "Offset X",
+      "offsetY": "Offset Y"
+    },
+    "canvas": {
+      "title": "Blank collaborative canvas",
+      "workspaceTitle": "Screen canvas",
+      "gestureHint": "Drag to pan. Scroll to zoom.",
+      "dropHint": "Release to place the master on the active screen",
+      "emptyState": "Drag a master here to start the screen",
+      "selectMasterHint": "Choose a master from the library to preview it here."
+    },
+    "orphan": {
+      "title": "Deleted master",
+      "description": "This instance keeps its last known master snapshot. Rebind it to another master or delete it manually.",
+      "rebindLabel": "Reconnect to master",
+      "rebindPlaceholder": "Choose a replacement master",
+      "rebindAction": "Reconnect instance"
+    },
+    "screen": {
+      "defaultName": "Screen {{index}}"
+    },
+    "screenList": {
+      "title": "Screens",
+      "add": "Add",
+      "instanceCount": "{{count}} instances",
+      "instanceCount_one": "{{count}} instance",
+      "instanceCount_other": "{{count}} instances",
+      "namePlaceholder": "Screen name",
+      "moveUp": "Move screen up",
+      "moveDown": "Move screen down",
+      "delete": "Delete screen"
+    },
+    "export": {
+      "noScreens": "There are no screens to export",
+      "failed": "Failed to export the Screen Spec",
+      "inProgress": "Another export is already in progress",
+      "pngSuccess": "Exported {{screen}} as PNG",
+      "pdfSuccess": "Exported {{count}} screens as PDF",
+      "progress": {
+        "preparing": "Preparing export",
+        "rendering": "Rendering screen",
+        "assembling": "Building PDF",
+        "downloading": "Preparing download",
+        "failed": "Export failed",
+        "stepPreparing": "Prepare",
+        "stepRendering": "Render",
+        "stepFinalizing": "Finalize",
+        "stepDownloading": "Save",
+        "preparingDocument": "Preparing the screen list and export stages.",
+        "collectingScreens": "Checking the {{count}} screens included in the PDF.",
+        "renderingScreen": "Rendering {{screen}} into an export image.",
+        "renderingPage": "Rendering {{screen}} for page {{current}} of {{total}}.",
+        "downloadReady": "Finishing the file save sequence.",
+        "retryLater": "Please try again in a moment.",
+        "pdfPage": "Placing page {{current}} of {{total}} into the PDF."
+      }
+    }
+  },
   "auth": {
     "login": {
       "title": "Smart ERD",
@@ -152,25 +506,192 @@
       "settingsProject": "Settings for project {{name}}"
     }
   },
+  "businessOverview": {
+    "tab": {
+      "title": "Business overview"
+    },
+    "documentsTab": "Documents",
+    "field": {
+      "clientCompany": "Client company",
+      "contractorCompany": "Contractor company",
+      "contractAmount": "Contract amount",
+      "projectStartDate": "Project start date",
+      "projectEndDate": "Project end date",
+      "projectScope": "Project scope",
+      "empty": "Not registered"
+    },
+    "save": {
+      "success": "Business overview has been saved",
+      "failed": "Failed to save the business overview"
+    },
+    "summary": {
+      "memberCount": "Members",
+      "documentCount": "Documents",
+      "progressRate": "Progress",
+      "notAvailable": "-"
+    },
+    "emptyTitle": "No business overview has been registered yet",
+    "emptyDescription": "Register key information such as client, schedule, and budget for this project.",
+    "emptyCta": "Register business overview",
+    "editButton": "Edit",
+    "editAriaLabel": "Edit business overview",
+    "validation": {
+      "dateOrder": "End date must be on or after the start date",
+      "datePair": "Start and end dates must be filled together or left empty together",
+      "invalidAmount": "Contract amount must be a valid number"
+    }
+  },
+  "wbs": {
+    "tab": {
+      "title": "WBS"
+    },
+    "section": {
+      "title": "WBS Items",
+      "description": "Manage project work items in a hierarchy with schedule, progress, and milestone mapping."
+    },
+    "action": {
+      "create": "Add WBS item"
+    },
+    "dnd": {
+      "hint": "Drag with the handle to reorder. Move left/right while dragging to change hierarchy level."
+    },
+    "field": {
+      "name": "Item",
+      "period": "Period",
+      "progressRate": "Progress",
+      "estimatedMm": "Est. M/M",
+      "milestone": "Milestone",
+      "actions": "Actions",
+      "noPeriod": "Not set",
+      "noEstimatedMm": "Not set",
+      "noMilestone": "No milestone",
+      "mmValue": "{{value}} M/M"
+    },
+    "form": {
+      "createTitle": "Create WBS item",
+      "editTitle": "Edit WBS item",
+      "createDescription": "Enter the basic information for this WBS item.",
+      "editDescription": "Update the basic information for this WBS item.",
+      "name": "Item name",
+      "namePlaceholder": "e.g. Requirement analysis",
+      "parent": "Parent item",
+      "parentPlaceholder": "Select parent item",
+      "parentRoot": "Top-level item",
+      "milestone": "Milestone",
+      "milestonePlaceholder": "Select milestone",
+      "noMilestone": "No mapping",
+      "startDate": "Start date",
+      "endDate": "End date",
+      "progressRate": "Progress (%)",
+      "estimatedMm": "Estimated M/M",
+      "estimatedMmPlaceholder": "e.g. 1.5"
+    },
+    "validation": {
+      "dateOrder": "End date must be on or after the start date",
+      "progressRate": "Progress must be between 0 and 100",
+      "estimatedMm": "Estimated M/M must be a number greater than or equal to 0"
+    },
+    "delete": {
+      "title": "Delete WBS item",
+      "description": "Delete \"{{name}}\"? Child items may also be removed."
+    },
+    "toast": {
+      "created": "WBS item created",
+      "createFailed": "Failed to create WBS item",
+      "updated": "WBS item updated",
+      "updateFailed": "Failed to update WBS item",
+      "deleted": "WBS item deleted",
+      "deleteFailed": "Failed to delete WBS item",
+      "loadFailed": "Failed to load WBS items",
+      "reorderFailed": "Failed to reorder WBS items",
+      "reordered": "WBS order updated",
+      "depthLimitExceeded": "Cannot move item beyond depth level 3",
+      "invalidMove": "Cannot move an item into its own child"
+    },
+    "empty": {
+      "title": "No WBS items yet",
+      "description": "Create your first WBS item to start planning project work."
+    },
+    "aria": {
+      "edit": "Edit WBS item {{name}}",
+      "delete": "Delete WBS item {{name}}",
+      "expand": "Expand WBS item {{name}}",
+      "collapse": "Collapse WBS item {{name}}",
+      "drag": "Drag WBS item {{name}}",
+      "editName": "Edit name of WBS item {{name}}",
+      "editProgress": "Edit progress of WBS item {{name}}"
+    }
+  },
+  "milestone": {
+    "section": {
+      "title": "Milestones",
+      "description": "Track major checkpoints with target dates and achievement rates."
+    },
+    "action": {
+      "create": "Add milestone"
+    },
+    "field": {
+      "targetDate": "Target date",
+      "achievementRate": "Achievement",
+      "linkedWbsCount": "{{count}} WBS item(s) linked",
+      "noDescription": "No description"
+    },
+    "status": {
+      "onTrack": "On track",
+      "delayed": "Delayed"
+    },
+    "form": {
+      "createTitle": "Create milestone",
+      "editTitle": "Edit milestone",
+      "createDescription": "Enter the milestone details.",
+      "editDescription": "Update the milestone details.",
+      "name": "Name",
+      "namePlaceholder": "e.g. First release",
+      "targetDate": "Target date",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter milestone details"
+    },
+    "delete": {
+      "title": "Delete milestone",
+      "description": "Delete milestone \"{{name}}\"?"
+    },
+    "toast": {
+      "created": "Milestone created",
+      "createFailed": "Failed to create milestone",
+      "updated": "Milestone updated",
+      "updateFailed": "Failed to update milestone",
+      "deleted": "Milestone deleted",
+      "deleteFailed": "Failed to delete milestone",
+      "loadFailed": "Failed to load milestones"
+    },
+    "empty": {
+      "title": "No milestones yet",
+      "description": "Create milestones to track important delivery checkpoints."
+    },
+    "aria": {
+      "edit": "Edit milestone {{name}}",
+      "delete": "Delete milestone {{name}}"
+    }
+  },
   "diagram": {
     "list": {
-      "title": "Diagrams",
+      "title": "ERD documents",
       "backToProjects": "Back to Projects",
-      "newButton": "New Diagram",
-      "createButton": "Create Diagram",
-      "empty": "No diagrams yet. Create your first diagram.",
+      "newButton": "New ERD document",
+      "createButton": "Create ERD document",
+      "empty": "No ERD documents yet. Create your first ERD document.",
       "updatedAt": "Updated: {{date}}",
       "selectDictionarySet": "Select dictionary set",
       "selectDictionaryContext": "Select dictionary context"
     },
     "create": {
-      "dialogTitle": "Create New Diagram",
-      "inputLabel": "Diagram Name",
-      "placeholder": "Enter diagram name"
+      "dialogTitle": "Create new ERD document",
+      "inputLabel": "ERD document name",
+      "placeholder": "Enter the ERD document name"
     },
     "delete": {
-      "dialogTitle": "Delete Diagram",
-      "dialogDescription": "Are you sure you want to delete this diagram?"
+      "dialogTitle": "Delete ERD document",
+      "dialogDescription": "Are you sure you want to delete this ERD document?"
     },
     "edit": {
       "loadError": "Failed to load diagram. Please try again later.",
@@ -203,6 +724,7 @@
       "code": "Code-first",
       "erd": "ERD-only",
       "codeInfo": "In code-first mode, the canvas shows a read-only ERD preview generated from the DSL. Changes are reflected only after you click 'Apply to ERD'.",
+      "codeInfoCompact": "Code-first preview",
       "codeDslOnly": "Phase 1 supports the DSL tab only",
       "codePreviewParsing": "Building the DSL preview ERD.",
       "codePreviewBlocked": "Fix the DSL errors to show the preview ERD.",
@@ -211,23 +733,23 @@
       "sharedDraftConflict": "The persisted ERD changed since this shared draft started. Refresh before applying it again."
     },
     "toast": {
-      "created": "Diagram created",
-      "createFailed": "Failed to create diagram",
-      "deleted": "Diagram deleted",
-      "deleteFailed": "Failed to delete diagram",
-      "renamed": "Diagram renamed",
-      "renameFailed": "Failed to rename diagram",
-      "dictionarySetUpdated": "Diagram dictionary set updated",
-      "dictionarySetUpdateFailed": "Failed to update diagram dictionary set",
-      "dictionaryContextUpdated": "Diagram dictionary context updated",
-      "dictionaryContextUpdateFailed": "Failed to update diagram dictionary context",
+      "created": "ERD document created",
+      "createFailed": "Failed to create the ERD document",
+      "deleted": "ERD document deleted",
+      "deleteFailed": "Failed to delete the ERD document",
+      "renamed": "ERD document renamed",
+      "renameFailed": "Failed to rename the ERD document",
+      "dictionarySetUpdated": "ERD document dictionary set updated",
+      "dictionarySetUpdateFailed": "Failed to update the ERD document dictionary set",
+      "dictionaryContextUpdated": "ERD document dictionary context updated",
+      "dictionaryContextUpdateFailed": "Failed to update the ERD document dictionary context",
       "backupSynced": "Backup synced",
       "noChanges": "No changes to backup",
       "backupFailed": "Failed to sync backup"
     },
     "aria": {
-      "renameDiagram": "Rename diagram {{name}}",
-      "deleteDiagram": "Delete diagram {{name}}"
+      "renameDiagram": "Rename ERD document {{name}}",
+      "deleteDiagram": "Delete ERD document {{name}}"
     }
   },
   "erd": {
@@ -271,8 +793,8 @@
       "validateActive": "Validate (active)",
       "ddlExport": "SQL DDL",
       "ddlImport": "DDL Import",
-      "dictionary": "Dictionary",
-      "dictionaryActive": "Dictionary (active)",
+      "dictionaryContext": "Dictionary Context",
+      "dictionaryContextActive": "Dictionary Context (active)",
       "codeEditor": "Code",
       "codeEditorActive": "Close code editor"
     },
@@ -514,6 +1036,8 @@
     },
     "color": {
       "default": "Default",
+      "supporting": "Supporting",
+      "attention": "Attention",
       "red": "Red",
       "orange": "Orange",
       "amber": "Amber",
@@ -792,6 +1316,7 @@
   "dictionary": {
     "title": "Data Dictionary",
     "backToProjects": "Back to Projects",
+    "backToRecentProject": "Back to Previous Project",
     "tabs": {
       "words": "Words",
       "domains": "Domains",
@@ -1073,6 +1598,12 @@
       "title": "Collaborators {{count}}",
       "online": "Online",
       "me": "Me"
+    },
+    "remotePending": {
+      "message": "Remote changes pending",
+      "accept": "Accept",
+      "reject": "Reject",
+      "merge": "Merge"
     }
   },
   "permission": {
@@ -1098,5 +1629,14 @@
   "language": {
     "ko": "한국어",
     "en": "English"
+  },
+  "theme": {
+    "paper": "Paper",
+    "graphite": "Graphite",
+    "midnight": "Midnight",
+    "current": "Current theme",
+    "aria": {
+      "switchTheme": "Switch theme"
+    }
   }
 }

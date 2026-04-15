@@ -18,6 +18,7 @@ import useAuthStore from '@/stores/useAuthStore';
 import { getErrorMessage } from '@/lib/api-error';
 import { isElectron, initServerUrl } from '@/lib/platform';
 import { ROUTES } from '@/constants/routes';
+import { STORAGE_KEYS } from '@/constants/storage';
 import { toast } from 'sonner';
 
 /** Electron 환경에서 선택 가능한 서버 URL 목록. */
@@ -30,15 +31,14 @@ const SERVER_URL_OPTIONS = [
   { label: 'Local (127.0.0.1:9501)', value: 'http://127.0.0.1:9501' },
 ];
 
-/** Electron 서버 URL을 localStorage에 저장하는 키. */
-const ELECTRON_SERVER_URL_KEY = 'smart-erd-server-url';
-
 /**
  * 로그인 페이지 컴포넌트.
  *
  * 로그인 ID와 비밀번호 입력 폼을 중앙에 배치한 인증 화면이다.
  * Electron 환경에서는 서버 URL 선택 셀렉트박스를 추가로 표시한다.
  * 인증 성공 시 JWT 토큰을 저장하고 /teams 페이지로 이동한다.
+ *
+ * @returns 로그인 페이지 JSX
  */
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -57,13 +57,19 @@ export default function LoginPage() {
   // Electron: 저장된 서버 URL 로드 (electronAPI → localStorage fallback)
   useEffect(() => {
     if (!isDesktop) return;
+
+    /**
+     * 저장된 Electron 서버 URL을 로드해 상태와 런타임 캐시를 동기화한다.
+     *
+     * @returns 서버 URL 로드 완료 Promise
+     */
     const loadUrl = async () => {
       const api = window.electronAPI;
       let saved = '';
       if (api) {
         saved = await api.getServerUrl();
       } else {
-        saved = localStorage.getItem(ELECTRON_SERVER_URL_KEY) ?? '';
+        saved = localStorage.getItem(STORAGE_KEYS.SERVER_URL) ?? '';
       }
       const url = saved || SERVER_URL_OPTIONS[0].value;
       setServerUrl(url);
@@ -77,6 +83,7 @@ export default function LoginPage() {
    * electronAPI가 있으면 electron-store에, 없으면 localStorage에 저장한다.
    *
    * @param url 선택된 서버 URL
+   * @returns 서버 URL 저장 완료 Promise
    */
   const handleServerUrlChange = async (url: string) => {
     setServerUrl(url);
@@ -85,7 +92,7 @@ export default function LoginPage() {
     if (api) {
       await api.setServerUrl(url);
     } else {
-      localStorage.setItem(ELECTRON_SERVER_URL_KEY, url);
+      localStorage.setItem(STORAGE_KEYS.SERVER_URL, url);
     }
   };
 
@@ -98,7 +105,12 @@ export default function LoginPage() {
     onError: (err) => toast.error(getErrorMessage(err, t('auth.login.error'))),
   });
 
-  /** 로그인 폼 제출 핸들러. @param e 폼 이벤트 */
+  /**
+   * 로그인 폼 제출을 처리한다.
+   *
+   * @param e 폼 이벤트
+   * @returns 없음
+   */
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!loginId.trim() || !password) return;

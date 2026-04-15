@@ -1,6 +1,7 @@
 import dagre from 'dagre';
 import type { Node } from '@xyflow/react';
 import type { DdlParseResult, ParsedRelation, ParsedTable } from './ddl-parser.js';
+import { normalizeTableHeaderColor } from './table-colors.js';
 import type {
   ERDEdge,
   EdgeHandleMode,
@@ -248,7 +249,7 @@ function resolvePreviewLayoutSourceMaps(sourceEntries: readonly string[]): {
       physicalTableName,
       position: { x, y },
       headerColor: headerColorRaw?.trim()
-        ? (headerColorRaw.trim() as TableNodeData['headerColor'])
+        ? normalizeTableHeaderColor(headerColorRaw.trim() as TableNodeData['headerColor'])
         : undefined,
       handleLayout: handleLayoutRaw?.trim()
         ? (handleLayoutRaw.trim() as TableNodeData['handleLayout'])

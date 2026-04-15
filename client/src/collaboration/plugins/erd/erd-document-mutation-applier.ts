@@ -25,6 +25,7 @@ import {
   resolveEdgeHandlesFromPreference,
 } from '@/lib/edge-handles';
 import { extractColId } from '@/lib/handle-id';
+import { readString } from '@/lib/yjs-read-utils';
 import type {
   EdgeRoutingType,
   RelationType,
@@ -533,7 +534,7 @@ export class ErdDocumentMutationApplier {
   }
 
   private applyGroupDelete(mutation: DocumentMutation): boolean {
-    const groupId = this.readString(mutation.payload?.groupId);
+    const groupId = readString(mutation.payload?.groupId);
     if (!groupId) {
       return false;
     }
@@ -549,8 +550,8 @@ export class ErdDocumentMutationApplier {
   }
 
   private applyGroupRename(mutation: DocumentMutation): boolean {
-    const groupId = this.readString(mutation.payload?.groupId);
-    const label = this.readString(mutation.payload?.label)?.trim();
+    const groupId = readString(mutation.payload?.groupId);
+    const label = readString(mutation.payload?.label)?.trim();
     if (!groupId || !label) {
       return false;
     }
@@ -569,7 +570,7 @@ export class ErdDocumentMutationApplier {
   }
 
   private applyGroupUpdateColor(mutation: DocumentMutation): boolean {
-    const groupId = this.readString(mutation.payload?.groupId);
+    const groupId = readString(mutation.payload?.groupId);
     const color = this.readGroupColor(mutation.payload?.color);
     if (!groupId || color == null) {
       return false;
@@ -590,7 +591,7 @@ export class ErdDocumentMutationApplier {
   }
 
   private applyGroupUpdateTables(mutation: DocumentMutation): boolean {
-    const groupId = this.readString(mutation.payload?.groupId);
+    const groupId = readString(mutation.payload?.groupId);
     if (!groupId) {
       return false;
     }
@@ -770,11 +771,11 @@ export class ErdDocumentMutationApplier {
   }
 
   private applyEdgeConnect(mutation: DocumentMutation): boolean {
-    const requestedEdgeId = this.readString(mutation.payload?.edgeId);
-    const sourceTableId = this.readString(mutation.payload?.sourceTableId);
-    const targetTableId = this.readString(mutation.payload?.targetTableId);
-    const sourceHandle = this.readString(mutation.payload?.sourceHandle);
-    const targetHandle = this.readString(mutation.payload?.targetHandle);
+    const requestedEdgeId = readString(mutation.payload?.edgeId);
+    const sourceTableId = readString(mutation.payload?.sourceTableId);
+    const targetTableId = readString(mutation.payload?.targetTableId);
+    const sourceHandle = readString(mutation.payload?.sourceHandle);
+    const targetHandle = readString(mutation.payload?.targetHandle);
     const relationType = this.readRelationType(mutation.payload?.relationType);
     if (!sourceTableId || !targetTableId || !sourceHandle || !targetHandle || !relationType) {
       return false;
@@ -797,9 +798,9 @@ export class ErdDocumentMutationApplier {
     const edgeId =
       requestedEdgeId ??
       buildStableEdgeId({
-        parentTable: this.readString(sourceTableYMap.get('label')) ?? sourceTableId,
+        parentTable: readString(sourceTableYMap.get('label')) ?? sourceTableId,
         parentColumn: sourceColumn.name,
-        childTable: this.readString(targetTableYMap.get('label')) ?? targetTableId,
+        childTable: readString(targetTableYMap.get('label')) ?? targetTableId,
         childColumn: targetColumn.name,
       });
 
@@ -819,8 +820,8 @@ export class ErdDocumentMutationApplier {
   }
 
   private applyEdgeAddFkRelation(mutation: DocumentMutation): boolean {
-    const parentTableId = this.readString(mutation.payload?.parentTableId);
-    const childTableId = this.readString(mutation.payload?.childTableId);
+    const parentTableId = readString(mutation.payload?.parentTableId);
+    const childTableId = readString(mutation.payload?.childTableId);
     const relationType = this.readRelationType(mutation.payload?.relationType);
     if (!parentTableId || !childTableId || !relationType) {
       return false;
@@ -845,7 +846,7 @@ export class ErdDocumentMutationApplier {
     }
     const childColumns = this.readColumns(childTableYMap);
     const existingNames = childColumns.map((column) => column.name);
-    const parentLabel = this.readString(parentTableYMap.get('label')) ?? parentTableId;
+    const parentLabel = readString(parentTableYMap.get('label')) ?? parentTableId;
     const prefix = buildFkPrefix(parentLabel);
     const parentNode = this.readTableNodeLike(parentTableId, parentTableYMap);
     const childNode = this.readTableNodeLike(childTableId, childTableYMap);
@@ -882,7 +883,7 @@ export class ErdDocumentMutationApplier {
         const edgeId = buildStableEdgeId({
           parentTable: parentLabel,
           parentColumn: parentColumn.name,
-          childTable: this.readString(childTableYMap.get('label')) ?? childTableId,
+          childTable: readString(childTableYMap.get('label')) ?? childTableId,
           childColumn: fkName,
         });
         const edgeYMap = createEdgeYMap(
@@ -900,7 +901,7 @@ export class ErdDocumentMutationApplier {
   }
 
   private applyEdgeDelete(mutation: DocumentMutation): boolean {
-    const edgeId = this.readString(mutation.payload?.edgeId);
+    const edgeId = readString(mutation.payload?.edgeId);
     if (!edgeId) {
       return false;
     }
@@ -915,8 +916,8 @@ export class ErdDocumentMutationApplier {
 
     doc.transact(() => {
       if (removeFkColumn) {
-        const targetTableId = this.readString(edgeYMap.get('target'));
-        const targetHandle = this.readString(edgeYMap.get('targetHandle'));
+        const targetTableId = readString(edgeYMap.get('target'));
+        const targetHandle = readString(edgeYMap.get('targetHandle'));
         if (targetTableId && targetHandle) {
           const targetColumnId = extractColId(targetHandle, targetTableId);
           const targetTableYMap = getTablesMap(doc).get(targetTableId);
@@ -932,7 +933,7 @@ export class ErdDocumentMutationApplier {
   }
 
   private applyEdgeUpdateRoutingType(mutation: DocumentMutation): boolean {
-    const edgeId = this.readString(mutation.payload?.edgeId);
+    const edgeId = readString(mutation.payload?.edgeId);
     const routingType = this.readEdgeRoutingType(mutation.payload?.routingType);
     if (!edgeId || !routingType) {
       return false;
@@ -952,8 +953,8 @@ export class ErdDocumentMutationApplier {
   }
 
   private applyEdgeUpdateHandleSelection(mutation: DocumentMutation): boolean {
-    const edgeId = this.readString(mutation.payload?.edgeId);
-    const selection = this.readString(mutation.payload?.selection);
+    const edgeId = readString(mutation.payload?.edgeId);
+    const selection = readString(mutation.payload?.selection);
     if (!edgeId || !selection) {
       return false;
     }
@@ -964,10 +965,10 @@ export class ErdDocumentMutationApplier {
       return false;
     }
 
-    const sourceTableId = this.readString(edgeYMap.get('source'));
-    const targetTableId = this.readString(edgeYMap.get('target'));
-    const sourceHandle = this.readString(edgeYMap.get('sourceHandle'));
-    const targetHandle = this.readString(edgeYMap.get('targetHandle'));
+    const sourceTableId = readString(edgeYMap.get('source'));
+    const targetTableId = readString(edgeYMap.get('target'));
+    const sourceHandle = readString(edgeYMap.get('sourceHandle'));
+    const targetHandle = readString(edgeYMap.get('targetHandle'));
     if (!sourceTableId || !targetTableId || !sourceHandle || !targetHandle) {
       return false;
     }
@@ -1014,7 +1015,7 @@ export class ErdDocumentMutationApplier {
   }
 
   private applyEdgeUpdateWaypoints(mutation: DocumentMutation): boolean {
-    const edgeId = this.readString(mutation.payload?.edgeId);
+    const edgeId = readString(mutation.payload?.edgeId);
     const waypoints = this.readWaypoints(mutation.payload?.waypoints);
     if (!edgeId || !waypoints) {
       return false;
@@ -1035,7 +1036,7 @@ export class ErdDocumentMutationApplier {
   }
 
   private applyEdgeResetWaypoints(mutation: DocumentMutation): boolean {
-    const edgeId = this.readString(mutation.payload?.edgeId);
+    const edgeId = readString(mutation.payload?.edgeId);
     if (!edgeId) {
       return false;
     }
@@ -1071,10 +1072,6 @@ export class ErdDocumentMutationApplier {
     return true;
   }
 
-  private readString(value: unknown): string | null {
-    return typeof value === 'string' && value.length > 0 ? value : null;
-  }
-
   private readRelationType(value: unknown): RelationType | null {
     return value === 'identifying' || value === 'non-identifying' ? value : null;
   }
@@ -1085,6 +1082,8 @@ export class ErdDocumentMutationApplier {
 
   private readGroupColor(value: unknown): TableHeaderColor | 'default' | null {
     return value === 'default' ||
+      value === 'supporting' ||
+      value === 'attention' ||
       value === 'red' ||
       value === 'orange' ||
       value === 'amber' ||
@@ -1211,8 +1210,8 @@ export class ErdDocumentMutationApplier {
         id: tableId,
         position: { x: positionX, y: positionY },
         data: {
-          label: this.readString(tableYMap.get('label')) ?? tableId,
-          logicalTableName: this.readString(tableYMap.get('logicalTableName')) ?? undefined,
+          label: readString(tableYMap.get('label')) ?? tableId,
+          logicalTableName: readString(tableYMap.get('logicalTableName')) ?? undefined,
           tableTermId:
             typeof tableYMap.get('tableTermId') === 'number'
               ? Number(tableYMap.get('tableTermId'))
@@ -1251,10 +1250,10 @@ export class ErdDocumentMutationApplier {
     getEdgesMap(doc).forEach((edgeYMap, edgeId) => {
       edges.push({
         id: edgeId,
-        source: this.readString(edgeYMap.get('source')) ?? '',
-        target: this.readString(edgeYMap.get('target')) ?? '',
-        sourceHandle: this.readString(edgeYMap.get('sourceHandle')) ?? undefined,
-        targetHandle: this.readString(edgeYMap.get('targetHandle')) ?? undefined,
+        source: readString(edgeYMap.get('source')) ?? '',
+        target: readString(edgeYMap.get('target')) ?? '',
+        sourceHandle: readString(edgeYMap.get('sourceHandle')) ?? undefined,
+        targetHandle: readString(edgeYMap.get('targetHandle')) ?? undefined,
         data: {
           relationType: this.readRelationType(edgeYMap.get('relationType')) ?? undefined,
           routingType: this.readEdgeRoutingType(edgeYMap.get('routingType')) ?? undefined,
@@ -1296,16 +1295,16 @@ export class ErdDocumentMutationApplier {
     if (!columnYMap) {
       return null;
     }
-    const name = this.readString(columnYMap.get('name'));
+    const name = readString(columnYMap.get('name'));
     if (!name) {
       return null;
     }
     return {
       id: columnId,
       name,
-      type: this.readString(columnYMap.get('type')) ?? undefined,
+      type: readString(columnYMap.get('type')) ?? undefined,
       pk: columnYMap.get('pk') === true,
-      logicalName: this.readString(columnYMap.get('logicalName')) ?? undefined,
+      logicalName: readString(columnYMap.get('logicalName')) ?? undefined,
       domainId:
         typeof columnYMap.get('domainId') === 'number'
           ? Number(columnYMap.get('domainId'))
@@ -1337,17 +1336,17 @@ export class ErdDocumentMutationApplier {
       if (!(column instanceof Y.Map)) {
         continue;
       }
-      const id = this.readString(column.get('id'));
-      const name = this.readString(column.get('name'));
+      const id = readString(column.get('id'));
+      const name = readString(column.get('name'));
       if (!id || !name) {
         continue;
       }
       result.push({
         id,
         name,
-        type: this.readString(column.get('type')) ?? undefined,
+        type: readString(column.get('type')) ?? undefined,
         pk: column.get('pk') === true,
-        logicalName: this.readString(column.get('logicalName')) ?? undefined,
+        logicalName: readString(column.get('logicalName')) ?? undefined,
         domainId:
           typeof column.get('domainId') === 'number' ? Number(column.get('domainId')) : undefined,
       });

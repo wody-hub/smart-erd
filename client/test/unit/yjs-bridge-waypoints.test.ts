@@ -87,6 +87,7 @@ test('migrateJsonToYDoc 는 relationType, routingType, waypoints 를 함께 보�
       ],
       groups: [],
     }),
+    'unit-test',
   );
 
   const [edge] = yEdgesMapToEdges(getEdgesMap(doc));

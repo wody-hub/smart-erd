@@ -14,13 +14,8 @@ import QuickTermDialog from './QuickTermDialog';
 import TableNodeHeader from './TableNodeHeader';
 import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
 import { getColumnHandlePlacements } from './columnHandleLayout';
-import {
-  useConnectedColumnDirections,
-  useConnectedColumnIds,
-} from './ConnectedColumnIdsContext';
-import {
-  useCompactTableRenderingMode,
-} from './CompactTableRenderingContext';
+import { useConnectedColumnDirections, useConnectedColumnIds } from './ConnectedColumnIdsContext';
+import { useCompactTableRenderingMode } from './CompactTableRenderingContext';
 import { useTableColumnRenderModel } from './useTableColumnRenderModel';
 import { useTableNodeInteractions } from './useTableNodeInteractions';
 import { TableNodeEditableRows, TableNodeStaticRows } from './TableNodeRows';
@@ -194,95 +189,94 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
       data-table-name={label}
       data-table-logical-name={logicalTableName ?? ''}
       className={cn(
-        'bg-card border border-border rounded shadow-md w-max min-w-[420px]',
-        isHighlighted && 'ring-2 ring-primary shadow-lg',
+        'surface-data w-max min-w-[420px] rounded shadow-operational',
+        isHighlighted && 'ring-2 ring-primary shadow-editorial',
       )}
     >
-        {/* Table header */}
-        <TableNodeHeader
-          label={label}
-          logicalTableName={logicalTableName}
-          tableTermId={tableTermId}
-          headerColor={headerColor}
-          handleLayout={handleLayout}
-          isEditing={isEditing}
-          duplicateLogicalNameColumnCount={duplicateLogicalNameColumnCount}
-          lockInfo={lockInfo}
-          onLogicalNameChange={handleTableLogicalNameChange}
-          onSelectTerm={handleTableSelectTerm}
-          onSelectDerived={handleTableSelectDerived}
-          onRegisterNew={setTableQuickTermLogicalName}
-          onNavigateToCode={canNavigateToCode ? handleNavigateToCode : undefined}
-          onRename={handleRename}
-          onColorChange={handleHeaderColorChange}
-          onHandleLayoutChange={handleHeaderHandleLayoutChange}
+      {/* Table header */}
+      <TableNodeHeader
+        label={label}
+        logicalTableName={logicalTableName}
+        tableTermId={tableTermId}
+        headerColor={headerColor}
+        handleLayout={handleLayout}
+        isEditing={isEditing}
+        duplicateLogicalNameColumnCount={duplicateLogicalNameColumnCount}
+        lockInfo={lockInfo}
+        onLogicalNameChange={handleTableLogicalNameChange}
+        onSelectTerm={handleTableSelectTerm}
+        onSelectDerived={handleTableSelectDerived}
+        onRegisterNew={setTableQuickTermLogicalName}
+        onNavigateToCode={canNavigateToCode ? handleNavigateToCode : undefined}
+        onRename={handleRename}
+        onColorChange={handleHeaderColorChange}
+        onHandleLayoutChange={handleHeaderHandleLayoutChange}
+      />
+
+      {/* Columns — 편집 모드: DnD 래핑, 정적 모드: StaticColumnRow */}
+      {isEditing ? (
+        <TableNodeEditableRows
+          nodeId={id}
+          columns={columns}
+          canEdit={canEdit}
+          fkMode={fkMode}
+          resolvedHandleLayout={resolvedHandleLayout}
+          renderMetaById={columnRenderMetaById}
+          domainPopoverColId={domainPopoverColId}
+          sensors={sensors}
+          isConnected={isConnected}
+          t={t}
+          onDragEnd={handleDragEnd}
+          onDomainPopoverOpenChange={(open, colId) => setDomainPopoverColId(open ? colId : null)}
+          onUpdateColumn={applyColumnUpdates}
+          onDeleteColumn={handleDeleteColumn}
+          onLogicalNameChange={handleLogicalNameChange}
+          onSelectTerm={handleSelectTerm}
+          onSelectDerived={handleDerivedSelect}
+          onRegisterNew={(colId, logicalName) =>
+            setQuickTermTarget({
+              nodeId: id,
+              colId,
+              logicalName,
+            })
+          }
+          onDomainChange={handleDomainChange}
         />
+      ) : (
+        <TableNodeStaticRows
+          nodeId={id}
+          visibleColumns={visibleStaticColumns}
+          hiddenUnconnectedColumnCount={hiddenUnconnectedColumnCount}
+          compactMode={staticRowCompactMode}
+          fkMode={fkMode}
+          targetHandlePlacements={targetHandlePlacements}
+          sourceHandlePlacements={sourceHandlePlacements}
+          renderMetaById={columnRenderMetaById}
+          validationWarningTextByStatus={
+            validationWarningTextByStatus as Record<WarningValidationStatus, string>
+          }
+          getConnectedDirections={getConnectedDirections}
+          onExpandHiddenColumns={
+            canExpandHiddenColumns && hiddenUnconnectedColumnCount > 0
+              ? expandHiddenColumns
+              : undefined
+          }
+          t={t}
+        />
+      )}
 
-        {/* Columns — 편집 모드: DnD 래핑, 정적 모드: StaticColumnRow */}
-        {isEditing ? (
-          <TableNodeEditableRows
-            nodeId={id}
-            columns={columns}
-            canEdit={canEdit}
-            fkMode={fkMode}
-            resolvedHandleLayout={resolvedHandleLayout}
-            renderMetaById={columnRenderMetaById}
-            domainPopoverColId={domainPopoverColId}
-            sensors={sensors}
-            isConnected={isConnected}
-            t={t}
-            onDragEnd={handleDragEnd}
-            onDomainPopoverOpenChange={(open, colId) => setDomainPopoverColId(open ? colId : null)}
-            onUpdateColumn={applyColumnUpdates}
-            onDeleteColumn={handleDeleteColumn}
-            onLogicalNameChange={handleLogicalNameChange}
-            onSelectTerm={handleSelectTerm}
-            onSelectDerived={handleDerivedSelect}
-            onRegisterNew={(colId, logicalName) =>
-              setQuickTermTarget({
-                nodeId: id,
-                colId,
-                logicalName,
-              })
-            }
-            onDomainChange={handleDomainChange}
-          />
-        ) : (
-          <TableNodeStaticRows
-            nodeId={id}
-            visibleColumns={visibleStaticColumns}
-            hiddenUnconnectedColumnCount={hiddenUnconnectedColumnCount}
-            compactMode={staticRowCompactMode}
-            fkMode={fkMode}
-            targetHandlePlacements={targetHandlePlacements}
-            sourceHandlePlacements={sourceHandlePlacements}
-            renderMetaById={columnRenderMetaById}
-            validationWarningTextByStatus={validationWarningTextByStatus as Record<
-              WarningValidationStatus,
-              string
-            >}
-            getConnectedDirections={getConnectedDirections}
-            onExpandHiddenColumns={
-              canExpandHiddenColumns && hiddenUnconnectedColumnCount > 0
-                ? expandHiddenColumns
-                : undefined
-            }
-            t={t}
-          />
-        )}
-
-        {/* Add column button */}
-        {isEditing && (
-          <div className="border-t border-border">
-            <button
-              className="nodrag flex w-full items-center justify-center gap-1 px-3 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              onClick={handleAddColumn}
-            >
-              <Plus className="h-3 w-3" />
-              {t('erd.tableNode.addColumn')}
-            </button>
-          </div>
-        )}
+      {/* Add column button */}
+      {isEditing && (
+        <div className="border-t border-border">
+          <button
+            className="nodrag flex w-full items-center justify-center gap-1 px-3 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            onClick={handleAddColumn}
+          >
+            <Plus className="h-3 w-3" />
+            {t('erd.tableNode.addColumn')}
+          </button>
+        </div>
+      )}
       {quickTermTarget && (
         <QuickTermDialog
           open

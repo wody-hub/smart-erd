@@ -6,12 +6,15 @@ import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.repository.ProjectRepository;
+import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +35,9 @@ public class ProjectService {
 
     /** 다이어그램 레포지토리 (프로젝트 삭제 시 cascade용) */
     private final DiagramRepository diagramRepository;
+
+    /** 프로젝트 진행률 제공자 (DIP — pm 도메인 구현체) */
+    private final ProjectProgressProvider projectProgressProvider;
 
     /** 인증 서비스 (사용자 조회) */
     private final AuthService authService;
@@ -138,6 +144,70 @@ public class ProjectService {
     }
 
     /**
+     * 프로젝트 사업 개요를 조회한다.
+     *
+     * @param loginId   요청 사용자의 로그인 ID
+     * @param teamId    팀 ID
+     * @param projectId 프로젝트 ID
+     * @return 사업 개요 결과
+     */
+    public BusinessOverviewResult getBusinessOverview(String loginId, Long teamId, Long projectId) {
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = teamService.findTeamById(teamId);
+        teamService.verifyMembership(team, user);
+
+        final var project = findProjectById(projectId);
+        verifyProjectBelongsToTeam(project, teamId);
+
+        return toBusinessOverviewResult(project, team);
+    }
+
+    /**
+     * 프로젝트 사업 개요를 수정한다.
+     *
+     * @param loginId           요청 사용자의 로그인 ID
+     * @param teamId            팀 ID
+     * @param projectId         프로젝트 ID
+     * @param clientCompany     발주사
+     * @param contractorCompany 수주사
+     * @param contractAmount    계약 금액
+     * @param projectStartDate  프로젝트 시작일
+     * @param projectEndDate    프로젝트 종료일
+     * @param projectScope      사업 범위
+     * @return 수정된 사업 개요 결과
+     */
+    @Transactional
+    public BusinessOverviewResult updateBusinessOverview(
+        String loginId,
+        Long teamId,
+        Long projectId,
+        @Nullable String clientCompany,
+        @Nullable String contractorCompany,
+        @Nullable Long contractAmount,
+        @Nullable LocalDate projectStartDate,
+        @Nullable LocalDate projectEndDate,
+        @Nullable String projectScope
+    ) {
+        final var user = authService.findUserByLoginId(loginId);
+        final var team = teamService.findTeamById(teamId);
+        teamService.verifyEditable(team, user);
+
+        final var project = findProjectById(projectId);
+        verifyProjectBelongsToTeam(project, teamId);
+
+        project.updateBusinessOverview(
+            clientCompany,
+            contractorCompany,
+            contractAmount,
+            projectStartDate,
+            projectEndDate,
+            projectScope
+        );
+
+        return toBusinessOverviewResult(project, team);
+    }
+
+    /**
      * 프로젝트 ID로 프로젝트를 조회한다.
      *
      * @param projectId 프로젝트 ID
@@ -179,6 +249,61 @@ public class ProjectService {
             project.getUpdatedAt()
         );
     }
+
+    /**
+     * 프로젝트 엔티티를 사업 개요 서비스 결과로 변환한다.
+     *
+     * @param project 프로젝트 엔티티
+     * @param team    프로젝트 소속 팀 엔티티
+     * @return 사업 개요 서비스 결과
+     */
+    private BusinessOverviewResult toBusinessOverviewResult(Project project, Team team) {
+        final var memberCount = teamService.countMembers(team);
+        final var documentCount = diagramRepository.countByProjectAndDeletedAtIsNull(project);
+        final var progressRate = projectProgressProvider.getAverageProgressRate(project);
+        return new BusinessOverviewResult(
+            project.getId(),
+            project.getName(),
+            project.getClientCompany(),
+            project.getContractorCompany(),
+            project.getContractAmount(),
+            project.getProjectStartDate(),
+            project.getProjectEndDate(),
+            project.getProjectScope(),
+            memberCount,
+            documentCount,
+            progressRate
+        );
+    }
+
+    /**
+     * 프로젝트 사업 개요 응답용 서비스 결과.
+     *
+     * @param projectId         프로젝트 ID
+     * @param projectName       프로젝트 이름
+     * @param clientCompany     발주사
+     * @param contractorCompany 수주사
+     * @param contractAmount    계약 금액
+     * @param projectStartDate  프로젝트 시작일
+     * @param projectEndDate    프로젝트 종료일
+     * @param projectScope      사업 범위
+     * @param memberCount       프로젝트 팀 멤버 수
+     * @param documentCount     프로젝트 문서(다이어그램) 수
+     * @param progressRate      진행률 (WBS 평균 진척률, WBS 항목이 없으면 null)
+     */
+    public record BusinessOverviewResult(
+        Long projectId,
+        String projectName,
+        @Nullable String clientCompany,
+        @Nullable String contractorCompany,
+        @Nullable Long contractAmount,
+        @Nullable LocalDate projectStartDate,
+        @Nullable LocalDate projectEndDate,
+        @Nullable String projectScope,
+        long memberCount,
+        long documentCount,
+        @Nullable Integer progressRate
+    ) {}
 
     /**
      * 프로젝트 응답용 서비스 결과.

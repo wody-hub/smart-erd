@@ -1,5 +1,6 @@
 import { resolveEdgeHandlesFromPreference, type EdgeHandleResolution } from '@/lib/edge-handles';
 import { extractColId } from '@/lib/handle-id';
+import { readString } from '@/lib/yjs-read-utils';
 import { getEdgesMap, getTablesMap } from '@/collaboration/yjsBridge';
 import type {
   EdgeHandleMode,
@@ -92,10 +93,6 @@ export function normalizeEdgeHandlesInYDoc(params: { doc: Y.Doc; nodeIds?: strin
   });
 
   return mutated;
-}
-
-function readString(value: unknown): string | null {
-  return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 function readHandleMode(value: unknown): EdgeHandleMode | undefined {

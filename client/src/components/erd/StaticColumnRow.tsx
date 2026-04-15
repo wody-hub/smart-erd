@@ -4,9 +4,20 @@ import { AlertTriangle } from 'lucide-react';
 import type { Column } from '@/types/erd';
 import type { ColumnWarning } from '@/hooks/useColumnValidation';
 import { cn } from '@/lib/utils';
-import { buildColumnHandleId } from '@/lib/handle-id';
+import { buildColumnHandleId, buildLegacyColumnHandleId } from '@/lib/handle-id';
 import type { ColumnHandlePlacement } from './columnHandleLayout';
 import type { CompactTableRenderingMode } from './CompactTableRenderingContext';
+
+const LEGACY_HANDLE_CLASSNAME =
+  '!w-2 !h-2 !opacity-0 !pointer-events-none !border-0 !bg-transparent';
+
+function getLegacyHandlePlacement(
+  placements: ColumnHandlePlacement[],
+  type: 'source' | 'target',
+): ColumnHandlePlacement | null {
+  const preferredSide = type === 'source' ? 'right' : 'left';
+  return placements.find((placement) => placement.side === preferredSide) ?? placements[0] ?? null;
+}
 
 /** StaticColumnRow 컴포넌트 props */
 interface StaticColumnRowProps {
@@ -74,35 +85,70 @@ function StaticColumnRow({
   domainPhysicalType,
   compactMode = 'off',
 }: StaticColumnRowProps) {
+  const legacyTargetPlacement = showTargetHandles
+    ? getLegacyHandlePlacement(targetHandlePlacements, 'target')
+    : null;
+  const legacySourcePlacement = showSourceHandles
+    ? getLegacyHandlePlacement(sourceHandlePlacements, 'source')
+    : null;
+  const targetHandles = showTargetHandles ? (
+    <>
+      {legacyTargetPlacement && (
+        <Handle
+          key={buildLegacyColumnHandleId(nodeId, col.id, 'target')}
+          type="target"
+          position={legacyTargetPlacement.position}
+          id={buildLegacyColumnHandleId(nodeId, col.id, 'target')}
+          className={LEGACY_HANDLE_CLASSNAME}
+          style={legacyTargetPlacement.style}
+        />
+      )}
+      {targetHandlePlacements.map((placement) => (
+        <Handle
+          key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+          type="target"
+          position={placement.position}
+          id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
+          className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+          style={placement.style}
+        />
+      ))}
+    </>
+  ) : null;
+  const sourceHandles = showSourceHandles ? (
+    <>
+      {legacySourcePlacement && (
+        <Handle
+          key={buildLegacyColumnHandleId(nodeId, col.id, 'source')}
+          type="source"
+          position={legacySourcePlacement.position}
+          id={buildLegacyColumnHandleId(nodeId, col.id, 'source')}
+          className={LEGACY_HANDLE_CLASSNAME}
+          style={legacySourcePlacement.style}
+        />
+      )}
+      {sourceHandlePlacements.map((placement) => (
+        <Handle
+          key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+          type="source"
+          position={placement.position}
+          id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
+          className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
+          style={placement.style}
+        />
+      ))}
+    </>
+  ) : null;
+
   if (compactMode === 'aggressive') {
     return (
       <div className="relative px-3 py-1 text-xs group/col">
         <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
-          {showTargetHandles &&
-            targetHandlePlacements.map((placement) => (
-              <Handle
-                key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
-                type="target"
-                position={placement.position}
-                id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
-                className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
-                style={placement.style}
-              />
-            ))}
+          {targetHandles}
 
           <span className="min-w-0 flex-1 truncate text-xs">{col.logicalName || col.name}</span>
 
-          {showSourceHandles &&
-            sourceHandlePlacements.map((placement) => (
-              <Handle
-                key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
-                type="source"
-                position={placement.position}
-                id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
-                className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
-                style={placement.style}
-              />
-            ))}
+          {sourceHandles}
         </div>
       </div>
     );
@@ -117,17 +163,7 @@ function StaticColumnRow({
         )}
       >
         <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
-          {showTargetHandles &&
-            targetHandlePlacements.map((placement) => (
-              <Handle
-                key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
-                type="target"
-                position={placement.position}
-                id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
-                className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
-                style={placement.style}
-              />
-            ))}
+          {targetHandles}
 
           <span
             className={cn(
@@ -150,17 +186,7 @@ function StaticColumnRow({
             {col.name}
           </span>
 
-          {showSourceHandles &&
-            sourceHandlePlacements.map((placement) => (
-              <Handle
-                key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
-                type="source"
-                position={placement.position}
-                id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
-                className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
-                style={placement.style}
-              />
-            ))}
+          {sourceHandles}
         </div>
       </div>
     );
@@ -174,17 +200,7 @@ function StaticColumnRow({
       )}
     >
       <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
-        {showTargetHandles &&
-          targetHandlePlacements.map((placement) => (
-            <Handle
-              key={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
-              type="target"
-              position={placement.position}
-              id={buildColumnHandleId(nodeId, col.id, 'target', placement.side)}
-              className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
-              style={placement.style}
-            />
-          ))}
+        {targetHandles}
 
         {/* PK badge */}
         <span
@@ -277,17 +293,7 @@ function StaticColumnRow({
           NN
         </span>
 
-        {showSourceHandles &&
-          sourceHandlePlacements.map((placement) => (
-            <Handle
-              key={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
-              type="source"
-              position={placement.position}
-              id={buildColumnHandleId(nodeId, col.id, 'source', placement.side)}
-              className="!w-2 !h-2 !bg-erd-handle !border-erd-handle-border"
-              style={placement.style}
-            />
-          ))}
+        {sourceHandles}
       </div>
     </div>
   );

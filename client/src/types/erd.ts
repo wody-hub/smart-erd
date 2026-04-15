@@ -26,9 +26,16 @@ export interface Column {
   domainId?: number;
 }
 
-/** 테이블/그룹 헤더 색상 프리셋 (기본 + 9가지 커스텀 색상) */
+/**
+ * 테이블/그룹 헤더 색상 프리셋.
+ *
+ * 새 디자인 시스템에서는 `default`, `supporting`, `attention`만 노출한다.
+ * 나머지 값은 기존 저장 문서 호환용 legacy 색상 키다.
+ */
 export type TableHeaderColor =
   | 'default'
+  | 'supporting'
+  | 'attention'
   | 'red'
   | 'orange'
   | 'amber'

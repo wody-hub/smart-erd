@@ -20,6 +20,18 @@ export const queryKeys = {
   projects: {
     /** 팀별 프로젝트 목록 */
     byTeam: (teamId: string) => ['teams', teamId, 'projects'] as const,
+    /** 프로젝트 상세 */
+    detail: (teamId: string, projectId: string) =>
+      ['teams', teamId, 'projects', projectId] as const,
+    /**
+     * 사업 개요 조회 캐시 키를 생성한다.
+     *
+     * @param teamId 팀 ID
+     * @param projectId 프로젝트 ID
+     * @returns 사업 개요 쿼리 키
+     */
+    businessOverview: (teamId: string, projectId: string) =>
+      ['teams', teamId, 'projects', projectId, 'business-overview'] as const,
   },
   /** 데이터 사전 관련 쿼리 키 */
   dictionary: {
@@ -58,5 +70,17 @@ export const queryKeys = {
     /** 다이어그램 상세 */
     detail: (teamId: string, projectId: string, diagramId: string) =>
       ['teams', teamId, 'projects', projectId, 'diagrams', diagramId] as const,
+  },
+  /** WBS 관련 쿼리 키 */
+  wbs: {
+    /** 프로젝트 WBS 전체 목록 */
+    all: (teamId: string, projectId: string) =>
+      ['teams', teamId, 'projects', projectId, 'wbs'] as const,
+  },
+  /** 마일스톤 관련 쿼리 키 */
+  milestones: {
+    /** 프로젝트 마일스톤 전체 목록 */
+    all: (teamId: string, projectId: string) =>
+      ['teams', teamId, 'projects', projectId, 'milestones'] as const,
   },
 } as const;

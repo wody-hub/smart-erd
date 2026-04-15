@@ -1,17 +1,10 @@
 import type { TableHeaderColor } from '@/types/erd';
 
 /** 색상 프리셋의 i18n 키 */
-type ColorLabel =
-  | 'erd.color.default'
-  | 'erd.color.red'
-  | 'erd.color.orange'
-  | 'erd.color.amber'
-  | 'erd.color.green'
-  | 'erd.color.teal'
-  | 'erd.color.blue'
-  | 'erd.color.indigo'
-  | 'erd.color.purple'
-  | 'erd.color.pink';
+type ColorLabel = 'erd.color.default' | 'erd.color.supporting' | 'erd.color.attention';
+
+/** 현재 디자인 시스템에서 실제로 노출하는 헤더 색상 프리셋 */
+export type CanonicalTableHeaderColor = 'default' | 'supporting' | 'attention';
 
 /** 색상 프리셋 설정 */
 export interface ColorConfig {
@@ -23,68 +16,80 @@ export interface ColorConfig {
   fg: string;
 }
 
+const CANONICAL_TABLE_COLOR_ORDER: CanonicalTableHeaderColor[] = [
+  'default',
+  'supporting',
+  'attention',
+];
+
+const LEGACY_TABLE_COLOR_MAP: Record<
+  Exclude<TableHeaderColor, CanonicalTableHeaderColor>,
+  CanonicalTableHeaderColor
+> = {
+  red: 'attention',
+  orange: 'attention',
+  amber: 'attention',
+  green: 'supporting',
+  teal: 'supporting',
+  blue: 'default',
+  indigo: 'default',
+  purple: 'default',
+  pink: 'attention',
+};
+
 /**
- * 테이블/그룹 헤더 색상 프리셋 상수.
- *
- * `default`는 기존 ERD 테이블 헤더 색상을 사용하며,
- * 나머지 9개는 `index.css`에 정의된 커스텀 CSS Variable을 참조한다.
- * 인라인 스타일로 `hsl(var(--token))` 형태로 사용한다.
+ * 저장된 테이블 헤더 색상을 현재 디자인 시스템의 canonical preset으로 정규화한다.
  */
-export const TABLE_COLORS: Record<TableHeaderColor, ColorConfig> = {
+export function normalizeTableHeaderColor(
+  color?: TableHeaderColor | null,
+): CanonicalTableHeaderColor {
+  if (!color || color === 'default' || color === 'supporting' || color === 'attention') {
+    return color ?? 'default';
+  }
+  return LEGACY_TABLE_COLOR_MAP[color];
+}
+
+const CANONICAL_TABLE_COLORS: Record<CanonicalTableHeaderColor, ColorConfig> = {
   default: {
     label: 'erd.color.default',
     bg: 'var(--erd-table-header)',
     fg: 'var(--erd-table-header-foreground)',
   },
-  red: {
-    label: 'erd.color.red',
-    bg: 'var(--erd-color-red)',
-    fg: 'var(--erd-color-red-foreground)',
+  supporting: {
+    label: 'erd.color.supporting',
+    bg: 'var(--erd-table-supporting)',
+    fg: 'var(--erd-table-supporting-foreground)',
   },
-  orange: {
-    label: 'erd.color.orange',
-    bg: 'var(--erd-color-orange)',
-    fg: 'var(--erd-color-orange-foreground)',
-  },
-  amber: {
-    label: 'erd.color.amber',
-    bg: 'var(--erd-color-amber)',
-    fg: 'var(--erd-color-amber-foreground)',
-  },
-  green: {
-    label: 'erd.color.green',
-    bg: 'var(--erd-color-green)',
-    fg: 'var(--erd-color-green-foreground)',
-  },
-  teal: {
-    label: 'erd.color.teal',
-    bg: 'var(--erd-color-teal)',
-    fg: 'var(--erd-color-teal-foreground)',
-  },
-  blue: {
-    label: 'erd.color.blue',
-    bg: 'var(--erd-color-blue)',
-    fg: 'var(--erd-color-blue-foreground)',
-  },
-  indigo: {
-    label: 'erd.color.indigo',
-    bg: 'var(--erd-color-indigo)',
-    fg: 'var(--erd-color-indigo-foreground)',
-  },
-  purple: {
-    label: 'erd.color.purple',
-    bg: 'var(--erd-color-purple)',
-    fg: 'var(--erd-color-purple-foreground)',
-  },
-  pink: {
-    label: 'erd.color.pink',
-    bg: 'var(--erd-color-pink)',
-    fg: 'var(--erd-color-pink-foreground)',
+  attention: {
+    label: 'erd.color.attention',
+    bg: 'var(--erd-table-attention)',
+    fg: 'var(--erd-table-attention-foreground)',
   },
 };
 
-/** TABLE_COLORS의 entries 배열 (반복 렌더링용) */
-export const TABLE_COLOR_ENTRIES = Object.entries(TABLE_COLORS) as [
-  TableHeaderColor,
-  ColorConfig,
-][];
+/**
+ * 테이블/그룹 헤더 색상 프리셋 상수.
+ *
+ * 새 UI에서는 3개 semantic preset만 노출하고,
+ * legacy 색상 키는 기존 문서 호환을 위해 canonical preset으로 매핑한다.
+ */
+export const TABLE_COLORS: Record<TableHeaderColor, ColorConfig> = {
+  default: CANONICAL_TABLE_COLORS.default,
+  supporting: CANONICAL_TABLE_COLORS.supporting,
+  attention: CANONICAL_TABLE_COLORS.attention,
+  red: CANONICAL_TABLE_COLORS.attention,
+  orange: CANONICAL_TABLE_COLORS.attention,
+  amber: CANONICAL_TABLE_COLORS.attention,
+  green: CANONICAL_TABLE_COLORS.supporting,
+  teal: CANONICAL_TABLE_COLORS.supporting,
+  blue: CANONICAL_TABLE_COLORS.default,
+  indigo: CANONICAL_TABLE_COLORS.default,
+  purple: CANONICAL_TABLE_COLORS.default,
+  pink: CANONICAL_TABLE_COLORS.attention,
+};
+
+/** 실제 UI에서 노출할 color picker 엔트리 배열 */
+export const TABLE_COLOR_PICKER_ENTRIES = CANONICAL_TABLE_COLOR_ORDER.map((key) => [
+  key,
+  CANONICAL_TABLE_COLORS[key],
+]) as [CanonicalTableHeaderColor, ColorConfig][];

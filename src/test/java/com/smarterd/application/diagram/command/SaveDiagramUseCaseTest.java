@@ -6,7 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.service.DiagramService;
-import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
+import com.smarterd.domain.diagram.service.SaveDiagramResult;
 import com.smarterd.domain.project.entity.Project;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

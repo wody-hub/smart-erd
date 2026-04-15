@@ -2,6 +2,7 @@ package com.smarterd.domain.diagram.repository;
 
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.project.entity.Project;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -99,4 +100,13 @@ public interface DiagramRepositoryCustom {
      * @return DiagramBootstrapProjection Optional
      */
     Optional<DiagramBootstrapProjection> findBootstrapById(Long diagramId);
+
+    /**
+     * 프로젝트의 삭제되지 않은 다이어그램을 목록용 경량 프로젝션으로 조회한다.
+     * content, ydoc_snapshot 컬럼을 제외하여 대용량 데이터 로딩을 방지한다.
+     *
+     * @param project 프로젝트 엔티티
+     * @return 목록용 프로젝션 목록
+     */
+    List<DiagramSummaryProjection> findSummariesByProject(Project project);
 }

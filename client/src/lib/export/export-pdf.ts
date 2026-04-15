@@ -12,10 +12,7 @@ export interface SinglePagePdfLayout {
 }
 
 /** 단일 페이지 PDF에 맞는 페이지 크기를 계산한다. */
-export const getSinglePagePdfLayout = (
-  width: number,
-  height: number,
-): SinglePagePdfLayout => {
+export const getSinglePagePdfLayout = (width: number, height: number): SinglePagePdfLayout => {
   const boundedWidth = Math.max(1, width);
   const boundedHeight = Math.max(1, height);
   const pageScale = Math.min(

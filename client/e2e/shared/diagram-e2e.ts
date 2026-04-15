@@ -60,6 +60,12 @@ export interface E2EConfig {
   bootLogPath: string;
 }
 
+interface ProvisionCollaborationFixtureOptions {
+  pluginId?: 'erd' | 'markdown' | 'screen-spec';
+  diagramName?: string;
+  templateKey?: string | null;
+}
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -339,10 +345,12 @@ export function getE2EProvisioningConfig(): E2EConfig {
 
 export async function provisionCollaborationFixture(
   config: E2EConfig,
+  options: ProvisionCollaborationFixtureOptions = {},
 ): Promise<{ loginId: string; password: string; target: DiagramTarget }> {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const loginId = `e2e-collab-${suffix}@example.com`;
   const password = `E2E-${suffix}`;
+  const pluginId = options.pluginId ?? 'erd';
   const signup = await postJson<{
     accessToken: string;
   }>(`${config.apiBaseUrl}/auth/signup`, {
@@ -356,18 +364,22 @@ export async function provisionCollaborationFixture(
     { name: `E2E Team ${suffix}` },
     signup.accessToken,
   );
-  const dictionarySets = await fetchJson<DictionarySetSummary[]>(
-    `${config.apiBaseUrl}/teams/${team.id}/dictionary-sets`,
-    signup.accessToken,
-  );
-  const dictionarySet =
-    dictionarySets.find((candidate) => candidate.isDefault) ??
-    dictionarySets[0] ??
-    (await postJson<DictionarySetSummary>(
+  let dictionarySetId: number | null = null;
+  if (pluginId === 'erd') {
+    const dictionarySets = await fetchJson<DictionarySetSummary[]>(
       `${config.apiBaseUrl}/teams/${team.id}/dictionary-sets`,
-      { name: `E2E Dictionary ${suffix}` },
       signup.accessToken,
-    ));
+    );
+    const dictionarySet =
+      dictionarySets.find((candidate) => candidate.isDefault) ??
+      dictionarySets[0] ??
+      (await postJson<DictionarySetSummary>(
+        `${config.apiBaseUrl}/teams/${team.id}/dictionary-sets`,
+        { name: `E2E Dictionary ${suffix}` },
+        signup.accessToken,
+      ));
+    dictionarySetId = dictionarySet.id;
+  }
 
   const project = await postJson<ProjectSummary>(
     `${config.apiBaseUrl}/teams/${team.id}/projects`,
@@ -376,7 +388,12 @@ export async function provisionCollaborationFixture(
   );
   const diagram = await postJson<DiagramSummary>(
     `${config.apiBaseUrl}/teams/${team.id}/projects/${project.id}/diagrams`,
-    { name: `E2E Diagram ${suffix}`, dictionarySetId: dictionarySet.id },
+    {
+      name: options.diagramName ?? `E2E Diagram ${suffix}`,
+      pluginId,
+      dictionarySetId,
+      templateKey: pluginId === 'markdown' ? (options.templateKey ?? null) : null,
+    },
     signup.accessToken,
   );
 
@@ -705,5 +722,5 @@ export async function captureDiagramReady(
 }
 
 export async function expectDiagramHeaderVisible(page: Page, target: DiagramTarget): Promise<void> {
-  await expect(page.getByText(target.diagramName)).toBeVisible();
+  await expect(page.getByRole('main').getByText(target.diagramName)).toBeVisible();
 }

@@ -14,6 +14,8 @@ import com.smarterd.collaboration.handoff.CollaborationHandoffResult;
 import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
 import com.smarterd.collaboration.snapshot.CollaborationSnapshotSaveCommand;
 import com.smarterd.collaboration.snapshot.CollaborationSnapshotStore;
+import com.smarterd.domain.common.exception.DomainAccessDeniedException;
+import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import java.time.Instant;
@@ -71,8 +73,8 @@ class DiagramCollaborationPluginTest {
         );
 
         assertThatThrownBy(() -> policy.validateAccess(session))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("board");
+            .isInstanceOf(DomainAccessDeniedException.class)
+            .hasMessage(MessageCode.ERROR_ACCESS_DENIED_DIAGRAM_CHANNEL_TYPE.code());
     }
 
     @Test

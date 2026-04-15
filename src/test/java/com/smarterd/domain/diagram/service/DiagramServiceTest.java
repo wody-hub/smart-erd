@@ -13,10 +13,14 @@ import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
+import com.smarterd.domain.diagram.entity.DiagramPluginId;
 import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.service.DictionarySetService;
+import com.smarterd.domain.markdown.service.MarkdownDocumentDescriptorService;
+import com.smarterd.domain.markdown.service.MarkdownTemplateDescriptor;
+import com.smarterd.domain.markdown.service.MarkdownTemplateService;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.service.ProjectService;
 import com.smarterd.domain.team.entity.Team;
@@ -65,6 +69,12 @@ class DiagramServiceTest {
 
     @Mock
     private DocumentBootstrapReader documentBootstrapReader;
+
+    @Mock
+    private MarkdownTemplateService markdownTemplateService;
+
+    @Mock
+    private MarkdownDocumentDescriptorService markdownDocumentDescriptorService;
 
     @InjectMocks
     private DiagramService diagramService;
@@ -121,7 +131,7 @@ class DiagramServiceTest {
     }
 
     @Test
-    @DisplayName("updateDiagramDictionarySet - content JSON 파싱 실패면 400 예외를 던지고 세트 변경을 중단한다")
+    @DisplayName("updateDiagramDictionarySet - 바인딩 무효화 중 예외 발생 시 세트 변경을 중단한다")
     void updateDiagramDictionarySet_whenContentJsonInvalid_throwsBusinessException() throws Exception {
         // given
         final var loginId = "tester";
@@ -193,6 +203,247 @@ class DiagramServiceTest {
         assertThatThrownBy(() ->
             diagramService.updateDiagramDictionarySet(loginId, teamId, projectId, diagramId, 300L)
         ).isInstanceOf(ConflictException.class);
+    }
+
+    @Test
+    @DisplayName("updateDiagramDictionarySet - markdown 문서는 사전 컨텍스트 변경을 허용하지 않는다")
+    void updateDiagramDictionarySet_whenMarkdownDocument_throwsBusinessException() {
+        final var loginId = "tester";
+        final var teamId = 1L;
+        final var projectId = 10L;
+        final var diagramId = 100L;
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(teamId, user);
+        final var project = createProject(projectId, team);
+        final var diagram = Objects.requireNonNull(
+            Diagram.builder()
+                .name("Markdown")
+                .pluginId("markdown")
+                .project(project)
+                .content("---\ntitle: Doc\n---\n")
+                .build()
+        );
+        ReflectionTestUtils.setField(diagram, "id", diagramId);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(teamId)).thenReturn(team);
+        when(projectService.findProjectById(projectId)).thenReturn(project);
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(
+            Optional.of(diagram)
+        );
+
+        assertThatThrownBy(() -> diagramService.updateDiagramDictionarySet(loginId, teamId, projectId, diagramId, 300L))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage(MessageCode.ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
+        verify(roomManager, never()).getSessionCount(diagramId);
+        verify(dictionarySetService, never()).findByTeamAndId(team, 300L);
+    }
+
+    @Test
+    @DisplayName("updateDiagramDictionarySet - 화면기획 문서는 사전 컨텍스트 변경을 허용하지 않는다")
+    void updateDiagramDictionarySet_whenScreenSpecDocument_throwsBusinessException() {
+        final var loginId = "tester";
+        final var teamId = 1L;
+        final var projectId = 10L;
+        final var diagramId = 100L;
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(teamId, user);
+        final var project = createProject(projectId, team);
+        final var diagram = Objects.requireNonNull(
+            Diagram.builder().name("Screen Spec").pluginId("screen-spec").project(project).content(null).build()
+        );
+        ReflectionTestUtils.setField(diagram, "id", diagramId);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(teamId)).thenReturn(team);
+        when(projectService.findProjectById(projectId)).thenReturn(project);
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(
+            Optional.of(diagram)
+        );
+
+        assertThatThrownBy(() -> diagramService.updateDiagramDictionarySet(loginId, teamId, projectId, diagramId, 300L))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage(MessageCode.ERROR_BUSINESS_SCREEN_SPEC_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
+        verify(roomManager, never()).getSessionCount(diagramId);
+        verify(dictionarySetService, never()).findByTeamAndId(team, 300L);
+    }
+
+    @Test
+    @DisplayName("createDiagram - ERD 문서를 dictionarySetId와 함께 생성한다")
+    void createDiagram_erdWithDictionarySet_createsDiagram() {
+        final var loginId = "tester";
+        final var teamId = 1L;
+        final var projectId = 10L;
+        final var setId = 200L;
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(teamId, user);
+        final var project = createProject(projectId, team);
+        final var dictionarySet = createDictionarySet(setId, team);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(teamId)).thenReturn(team);
+        when(projectService.findProjectById(projectId)).thenReturn(project);
+        when(dictionarySetService.findByTeamAndId(team, setId)).thenReturn(dictionarySet);
+
+        final var result = diagramService.createDiagram(loginId, teamId, projectId, "Test ERD", "erd", setId, null);
+
+        assertThat(result.name()).isEqualTo("Test ERD");
+        assertThat(result.pluginId()).isEqualTo(DiagramPluginId.ERD.value());
+        verify(diagramRepository).save(org.mockito.ArgumentMatchers.any(Diagram.class));
+    }
+
+    @Test
+    @DisplayName("createDiagram - ERD 문서에 dictionarySetId가 null이면 예외를 던진다")
+    void createDiagram_erdWithoutDictionarySet_throwsBusinessException() {
+        final var loginId = "tester";
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(1L, user);
+        final var project = createProject(10L, team);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(1L)).thenReturn(team);
+        when(projectService.findProjectById(10L)).thenReturn(project);
+
+        assertThatThrownBy(() -> diagramService.createDiagram(loginId, 1L, 10L, "Test", "erd", null, null))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage(MessageCode.ERROR_BUSINESS_ERD_DICTIONARY_CONTEXT_REQUIRED.code());
+    }
+
+    @Test
+    @DisplayName("createDiagram - Markdown 문서를 templateKey와 함께 생성한다")
+    void createDiagram_markdownWithTemplate_createsDiagram() {
+        final var loginId = "tester";
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(1L, user);
+        final var project = createProject(10L, team);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(1L)).thenReturn(team);
+        when(projectService.findProjectById(10L)).thenReturn(project);
+        when(markdownTemplateService.buildInitialContent("API Doc", "technical-spec")).thenReturn(
+            "---\ntemplate: technical-spec\n---\n# API Doc"
+        );
+        when(markdownDocumentDescriptorService.describe(org.mockito.ArgumentMatchers.anyString())).thenReturn(
+            new MarkdownTemplateDescriptor("technical-spec", "기술 설계 문서", "API Doc")
+        );
+
+        final var result = diagramService.createDiagram(
+            loginId,
+            1L,
+            10L,
+            "API Doc",
+            "markdown",
+            null,
+            "technical-spec"
+        );
+
+        assertThat(result.name()).isEqualTo("API Doc");
+        assertThat(result.pluginId()).isEqualTo(DiagramPluginId.MARKDOWN.value());
+        verify(markdownTemplateService).buildInitialContent("API Doc", "technical-spec");
+    }
+
+    @Test
+    @DisplayName("createDiagram - Markdown 문서에 dictionarySetId가 있으면 예외를 던진다")
+    void createDiagram_markdownWithDictionarySet_throwsBusinessException() {
+        final var loginId = "tester";
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(1L, user);
+        final var project = createProject(10L, team);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(1L)).thenReturn(team);
+        when(projectService.findProjectById(10L)).thenReturn(project);
+
+        assertThatThrownBy(() -> diagramService.createDiagram(loginId, 1L, 10L, "Doc", "markdown", 200L, null))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage(MessageCode.ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
+    }
+
+    @Test
+    @DisplayName("createDiagram - 화면기획 문서는 dictionarySet 없이 생성한다")
+    void createDiagram_screenSpecWithoutDictionarySet_createsDiagram() {
+        final var loginId = "tester";
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(1L, user);
+        final var project = createProject(10L, team);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(1L)).thenReturn(team);
+        when(projectService.findProjectById(10L)).thenReturn(project);
+
+        final var result = diagramService.createDiagram(loginId, 1L, 10L, "Screen Flow", "screen-spec", null, null);
+
+        assertThat(result.name()).isEqualTo("Screen Flow");
+        assertThat(result.pluginId()).isEqualTo(DiagramPluginId.SCREEN_SPEC.value());
+        verify(diagramRepository).save(org.mockito.ArgumentMatchers.any(Diagram.class));
+    }
+
+    @Test
+    @DisplayName("createDiagram - screendesign alias를 받아도 canonical screen-spec으로 저장한다")
+    void createDiagram_screenDesignAlias_normalizesToScreenSpec() {
+        final var loginId = "tester";
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(1L, user);
+        final var project = createProject(10L, team);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(1L)).thenReturn(team);
+        when(projectService.findProjectById(10L)).thenReturn(project);
+
+        final var result = diagramService.createDiagram(loginId, 1L, 10L, "Wireframe", "screendesign", null, null);
+
+        assertThat(result.pluginId()).isEqualTo(DiagramPluginId.SCREEN_SPEC.value());
+    }
+
+    @Test
+    @DisplayName("createDiagram - 화면기획 문서에 dictionarySetId가 있으면 예외를 던진다")
+    void createDiagram_screenSpecWithDictionarySet_throwsBusinessException() {
+        final var loginId = "tester";
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(1L, user);
+        final var project = createProject(10L, team);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(1L)).thenReturn(team);
+        when(projectService.findProjectById(10L)).thenReturn(project);
+
+        assertThatThrownBy(() -> diagramService.createDiagram(loginId, 1L, 10L, "Spec", "screen-spec", 200L, null))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage(MessageCode.ERROR_BUSINESS_SCREEN_SPEC_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
+    }
+
+    @Test
+    @DisplayName("createDiagram - ERD 문서에 templateKey가 있으면 예외를 던진다")
+    void createDiagram_erdWithTemplateKey_throwsBusinessException() {
+        final var loginId = "tester";
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(1L, user);
+        final var project = createProject(10L, team);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(1L)).thenReturn(team);
+        when(projectService.findProjectById(10L)).thenReturn(project);
+
+        assertThatThrownBy(() -> diagramService.createDiagram(loginId, 1L, 10L, "ERD", "erd", 200L, "technical-spec"))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage(MessageCode.ERROR_BUSINESS_MARKDOWN_TEMPLATE_INVALID.code());
+    }
+
+    @Test
+    @DisplayName("createDiagram - 미지원 pluginId면 예외를 던진다")
+    void createDiagram_unsupportedPluginId_throwsBusinessException() {
+        final var loginId = "tester";
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(1L, user);
+        final var project = createProject(10L, team);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(1L)).thenReturn(team);
+        when(projectService.findProjectById(10L)).thenReturn(project);
+
+        assertThatThrownBy(() -> diagramService.createDiagram(loginId, 1L, 10L, "Doc", "unknown", null, null))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage(MessageCode.ERROR_BUSINESS_DOCUMENT_PLUGIN_UNSUPPORTED.code());
     }
 
     @Test

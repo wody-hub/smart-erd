@@ -459,22 +459,21 @@ function SqlDdlEditor({
     clearQueueTimeoutHold,
     syncStatus,
     draftState,
-  } =
-    useBidirectionalCodeSync({
-      enableCodeToErdSync: canEdit && enableCodeToErdAutoSync,
-      enableErdToCodeSync: canEdit && enableErdToCodeAutoSync,
-      codeText: ddlText,
-      parsing,
-      hasBlockingErrors,
-      hasParsedTables: parseResult != null && !hasBlockingErrors,
-      hasRemoteEditLocks,
-      parsedSchemaHash,
-      onCodeTextChange: handleDdlChange,
-      onSyncCodeTextChange: syncCodeChange,
-      generateCodeFromErd: generateFromErd,
-      currentErdRevisionHash: diagramErdStructureSnapshot.currentRevisionHash,
-      applyParsedToErd,
-    });
+  } = useBidirectionalCodeSync({
+    enableCodeToErdSync: canEdit && enableCodeToErdAutoSync,
+    enableErdToCodeSync: canEdit && enableErdToCodeAutoSync,
+    codeText: ddlText,
+    parsing,
+    hasBlockingErrors,
+    hasParsedTables: parseResult != null && !hasBlockingErrors,
+    hasRemoteEditLocks,
+    parsedSchemaHash,
+    onCodeTextChange: handleDdlChange,
+    onSyncCodeTextChange: syncCodeChange,
+    generateCodeFromErd: generateFromErd,
+    currentErdRevisionHash: diagramErdStructureSnapshot.currentRevisionHash,
+    applyParsedToErd,
+  });
 
   const handleApplyWithSyncReset = useCallback(() => {
     if (isCodeEditorApplyBlocked(draftState)) {
@@ -641,7 +640,7 @@ function SqlDdlEditor({
           {t('erd.ddlImport.dbmsLabel')}
         </Label>
         <Select value={dbms} onValueChange={(v) => handleDbmsChange(v as DbmsType)}>
-          <SelectTrigger className="h-8 text-xs" aria-label={t('erd.ddlImport.dbmsLabel')}>
+          <SelectTrigger className="h-9 text-sm" aria-label={t('erd.ddlImport.dbmsLabel')}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

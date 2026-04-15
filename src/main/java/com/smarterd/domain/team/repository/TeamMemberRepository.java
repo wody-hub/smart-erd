@@ -31,6 +31,14 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, TeamMemb
     List<TeamMember> findByTeam(Team team);
 
     /**
+     * 특정 팀의 멤버 수를 조회한다.
+     *
+     * @param team 팀
+     * @return 멤버 수
+     */
+    long countByTeam(Team team);
+
+    /**
      * 특정 팀-사용자 멤버십이 존재하는지 확인한다.
      *
      * @param team 팀

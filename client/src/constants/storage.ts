@@ -18,8 +18,14 @@ export const STORAGE_KEYS = {
   DIAGRAM_WORK_MODE_PREFIX: 'smart-erd-work-mode',
   /** 다이어그램 단위 DSL draft prefix */
   DIAGRAM_DSL_DRAFT_PREFIX: 'smart-erd-dsl-draft',
+  /** 팀 단위 최근 프로젝트 컨텍스트 prefix */
+  RECENT_PROJECT_CONTEXT_PREFIX: 'smart-erd-recent-project-context',
   /** Diff Apply rollout 강제 모드 override */
   ERD_DIFF_APPLY_FORCE_MODE: 'smart-erd-diff-apply-force-mode',
   /** Internal rollout 로컬 opt-in 토글 */
   ERD_DIFF_APPLY_INTERNAL_OPT_IN: 'smart-erd-diff-apply-internal-opt-in',
+  /** 테마 설정 (paper | graphite | midnight) */
+  THEME: 'smart-erd-theme',
+  /** Electron 전용 서버 URL */
+  SERVER_URL: 'smart-erd-server-url',
 } as const;

@@ -12,6 +12,8 @@ import com.smarterd.collaboration.channel.CollaborationTicketAuthenticator;
 import com.smarterd.collaboration.channel.CollaborationTicketSupport;
 import com.smarterd.collaboration.channel.CollaborationTicketSupportRegistry;
 import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
+import com.smarterd.domain.common.exception.DomainAccessDeniedException;
+import com.smarterd.domain.common.message.MessageCode;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -90,6 +92,37 @@ class ValidateCollaborationTicketUseCaseTest {
         when(collaborationTicketAuthenticator.validateAndConsume("ticket-1", 2)).thenReturn(Optional.of(session));
 
         assertThat(useCase.validateAndConsume("ticket-1", requested, 2)).isEmpty();
+        verify(collaborationAccessPolicy).validateAccess(session);
+    }
+
+    @Test
+    void validateAndConsume_returnsEmptyWhenAccessPolicyRejectsSession() {
+        final var useCase = new ValidateCollaborationTicketUseCase(
+            collaborationTicketSupportRegistry,
+            collaborationRuntimeSupportRegistry
+        );
+        final var resourceKey = new CollaborationResourceKey("diagram", "100");
+        final var session = new CollaborationAuthenticatedSession(
+            "user-1",
+            "tester",
+            "Tester",
+            resourceKey,
+            Instant.parse("2026-03-23T00:00:00Z"),
+            2
+        );
+
+        when(collaborationTicketSupportRegistry.getRequired(resourceKey)).thenReturn(collaborationTicketSupport);
+        when(collaborationRuntimeSupportRegistry.getRequired(resourceKey)).thenReturn(collaborationRuntimeSupport);
+        when(collaborationTicketSupport.ticketAuthenticator()).thenReturn(collaborationTicketAuthenticator);
+        when(collaborationRuntimeSupport.accessPolicy()).thenReturn(collaborationAccessPolicy);
+        when(collaborationTicketAuthenticator.validateAndConsume("ticket-1", 2)).thenReturn(Optional.of(session));
+        org.mockito.Mockito.doThrow(
+            new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_DIAGRAM_CHANNEL_TYPE.code())
+        )
+            .when(collaborationAccessPolicy)
+            .validateAccess(session);
+
+        assertThat(useCase.validateAndConsume("ticket-1", resourceKey, 2)).isEmpty();
         verify(collaborationAccessPolicy).validateAccess(session);
     }
 }

@@ -271,7 +271,11 @@ export function createCanvasSyncActions(
             return tableYMap ? yTableYMapToNode(nodeId, tableYMap) : null;
           })
           .filter((node): node is Node<TableNodeData> => node != null);
-        nextState.nodes = mergeEntitiesById(get().nodes as Node<TableNodeData>[], requestedNodeIds, nextNodes);
+        nextState.nodes = mergeEntitiesById(
+          get().nodes as Node<TableNodeData>[],
+          requestedNodeIds,
+          nextNodes,
+        );
       }
     }
     if (targets.has('edges')) {
@@ -285,7 +289,11 @@ export function createCanvasSyncActions(
             return edgeYMap ? yEdgeYMapToEdge(edgeId, edgeYMap) : null;
           })
           .filter((edge): edge is Edge<ERDEdgeData> => edge != null);
-        nextState.edges = mergeEntitiesById(get().edges as Edge<ERDEdgeData>[], requestedEdgeIds, nextEdges);
+        nextState.edges = mergeEntitiesById(
+          get().edges as Edge<ERDEdgeData>[],
+          requestedEdgeIds,
+          nextEdges,
+        );
       }
     }
     if (targets.has('groups')) {
@@ -405,6 +413,10 @@ export function createCanvasSyncActions(
       const groupsMap = getGroupsMap(ydoc);
       const internal = get().internal;
 
+      ydoc.transact(() => {
+        normalizeEdgeHandlesInYDoc({ doc: ydoc });
+      }, CANVAS_HISTORY_ORIGIN.SYSTEM_FALLBACK);
+
       set({
         nodes: yTablesMapToNodes(tablesMap),
         edges: yEdgesMapToEdges(edgesMap),
@@ -453,9 +465,7 @@ export function createCanvasSyncActions(
             );
         if (get().internal.isNodeDragging) {
           queueDeferredProjectionSync(
-            nodeIds
-              ? { targets: ['nodes'], nodeIds }
-              : (scopedRequest ?? { targets: ['nodes'] }),
+            nodeIds ? { targets: ['nodes'], nodeIds } : (scopedRequest ?? { targets: ['nodes'] }),
           );
           return;
         }
