@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 3 화면기획 플러그인 진행 중
-last_updated: "2026-04-14T11:21:00.000Z"
-last_activity: 2026-04-14
+last_updated: "2026-04-15T08:32:47Z"
+last_activity: 2026-04-15
 progress:
   total_phases: 8
-  completed_phases: 2
-  total_plans: 10
-  completed_plans: 10
-  percent: 25
+  completed_phases: 4
+  total_plans: 14
+  completed_plans: 14
+  percent: 50
 ---
 
 # Project State
@@ -27,29 +27,32 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 Phase: 3
 Plan: In progress (plugin framework + mutation applier + scope resolver 구현됨)
-Status: Phase 3 실행 중 — 마스터/인스턴스/화면 CRUD + 실시간 협업 + 내보내기 구현 진행 중
-Last activity: 2026-04-14
+Status: Phase 3 실행 중, Phase 4/5 회고적 SUMMARY/학습 동기화 완료
+Last activity: 2026-04-15
 
-Progress: [██▒░░░░░░░] 25%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 14
+- Average duration: mixed (Phase 1/2 tracked + Phase 4/5 retrospective sync)
+- Total execution time: n/a (Phase 4/5 retrospective sync)
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01-markdown-incremental-sync | 7 | tracked | tracked |
+| 02-테마-선택 | 3 | tracked | tracked |
+| 04-사업-개요 | 3 | retrospective | retrospective |
+| 05-wbs-milestone | 1 | retrospective | retrospective |
 
 **Recent Trend:**
 
-- Last 5 plans: -
-- Trend: -
+- Last 5 plans: 02-02, 04-01, 04-02, 04-03, 05-single
+- Trend: 문서/테마 기반 기능 이후 PM 도메인(WBS/마일스톤) 구현까지 확장 완료
 
 *Updated after each plan completion*
 | Phase 01-markdown-incremental-sync P02 | 2min | 1 tasks | 3 files |
@@ -60,6 +63,10 @@ Progress: [██▒░░░░░░░] 25%
 | Phase 02-테마-선택 P01 | 3min | 1 tasks | 6 files |
 | Phase 02-테마-선택 P03 | 3min | 1 tasks | 7 files |
 | Phase 02-테마-선택 P02 | 5min | 1 tasks | 2 files |
+| Phase 04-사업-개요 P01 | retrospective (cc73406) | 1 commit | 12 files |
+| Phase 04-사업-개요 P02 | retrospective (cc73406) | 1 commit | 6 files |
+| Phase 04-사업-개요 P03 | retrospective (cc73406) | 1 commit | 3 files |
+| Phase 05-wbs-milestone P01 | retrospective (0bb81d4) | 1 commit | 52 files |
 
 ## Accumulated Context
 
@@ -69,7 +76,12 @@ Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
 - 로드맵 초기화: Phase 1~3은 진행 중 기능(문서/에디터), Phase 4~8은 신규 SI PM 기능
-- Phase 5(WBS): PostgreSQL `ltree` 확장 초기 적용 결정 — adjacency list 대신 path 기반 인덱스
+- [Phase 04-사업-개요]: Project 엔티티에 사업 개요 6개 컬럼을 추가하고 `GET/PATCH business-overview` API를 별도 경로로 분리
+- [Phase 04-사업-개요]: DiagramsPage를 `documents/overview` 탭 구조로 재구성하고 문서 허브를 `DocumentHubTabContent`로 분리
+- [Phase 05-wbs-milestone]: `milestones`, `wbs_items` 스키마 + CHECK 제약(depth/progress/estimated_mm/period)과 인덱스를 도입
+- [Phase 05-wbs-milestone]: `ProjectProgressProvider` 인터페이스와 `WbsProgressProvider` 구현으로 사업 개요 `progressRate`를 WBS 평균값과 연동
+- [Phase 05-wbs-milestone]: PM 서비스 공통 인증/권한 검증 경로를 `ProjectContextLoader`로 통합
+- [Phase 05-wbs-milestone]: WBS 재정렬에서 depth 제한(<=2) + cycle 방지(`computeDepth`) + affected parent 최소 payload 전략 적용
 - Phase 6(간트): 직접 Canvas 구현 금지, `@svar-ui/react-gantt` MIT 라이브러리 사용 결정
 - Phase 5/6: WBS 날짜 컬럼은 `DATE` 타입 사용 — 간트 타임존 버그 방지
 - [Phase 01-markdown-incremental-sync]: DomainValidationHook은 별도 빈 없이 no-op lambda로 구현 (markdown 플러그인)
@@ -89,12 +101,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 5 진입 전: PostgreSQL `ltree` + Spring Data JPA 연동 패턴 스파이크 필요
 - Phase 6 진입 전: `@svar-ui/react-gantt` + Tailwind CSS Variable 테마 호환성 POC 필요
 - Phase 8 이후: `openpdf 3.0.3` Spring Boot 3.5 통합 호환성 검증 필요 (보고서 PDF 대비)
 
 ## Session Continuity
 
-Last session: 2026-04-14T11:21:00.000Z
-Stopped at: Phase 3 화면기획 플러그인 — cross-screen move + cascade scope 구현
+Last session: 2026-04-15T08:32:47Z
+Stopped at: Phase 4/5 회고적 SUMMARY/STATE 동기화 완료, Phase 3 화면기획 플러그인 작업 지속
 Resume file: None
