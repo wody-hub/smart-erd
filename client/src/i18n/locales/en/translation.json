@@ -627,6 +627,9 @@
       "title": "Gantt"
     },
     "description": "Review WBS schedules and milestones on one timeline, then drag bars to update dates directly.",
+    "dnd": {
+      "hint": "Drag timeline bars to adjust schedule dates."
+    },
     "toolbar": {
       "day": "Day",
       "week": "Week",
@@ -641,6 +644,9 @@
       "milestone": "Milestone",
       "delayed": "Delayed",
       "onTrack": "On track"
+    },
+    "stats": {
+      "omitted": "{{count}} omitted"
     },
     "toast": {
       "updateSuccess": "Schedule changes from Gantt were saved",

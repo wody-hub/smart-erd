@@ -455,7 +455,9 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
         <div>
           <p className="text-xs text-muted-foreground">{t('wbs.tab.title')}</p>
           <p className="text-sm font-semibold text-foreground">{model.stats.datedTaskCount}</p>
-          <p className="text-xs text-muted-foreground">omitted {model.stats.omittedItemCount}</p>
+          <p className="text-xs text-muted-foreground">
+            {t('gantt.stats.omitted', { count: model.stats.omittedItemCount })}
+          </p>
         </div>
         <div>
           <p className="text-xs text-muted-foreground">{t('gantt.legend.milestone')}</p>
@@ -475,7 +477,7 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
       </div>
 
       <p className={cn('text-xs text-muted-foreground')}>
-        {canEdit ? t('wbs.dnd.hint') : t('gantt.description')}
+        {canEdit ? t('gantt.dnd.hint') : t('gantt.description')}
       </p>
     </div>
   );
