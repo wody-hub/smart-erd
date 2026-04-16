@@ -18,6 +18,7 @@ import useThemeStore from '@/stores/useThemeStore';
 import type { UpdateWbsItemPayload, WbsItem } from '@/types/wbs';
 import { buildGanttModel, type GanttTaskMeta } from './gantt-adapter';
 import { expandDateRange, formatDateOnly, parseDateOnly } from './gantt-date-utils';
+import { resolveWbsDateRangeUpdate } from './gantt-update-guards';
 import {
   GANTT_SCALE_PRESETS,
   GANTT_SCALE_PRESET_ORDER,
@@ -247,24 +248,27 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
 
           const start = event.task.start;
           const end = event.task.end;
-          if (!(start instanceof Date) || !(end instanceof Date)) {
-            return false;
-          }
-
           const original = wbsByIdRef.current.get(taskId);
           if (!original) {
             return false;
           }
-
-          const startDate = formatDateOnly(start);
-          const endDate = formatDateOnly(end);
-          if (startDate === original.startDate && endDate === original.endDate) {
-            return true;
+          const dateRangeUpdate = resolveWbsDateRangeUpdate({
+            start,
+            end,
+            originalStartDate: original.startDate,
+            originalEndDate: original.endDate,
+          });
+          if (!dateRangeUpdate) {
+            return false;
           }
 
           persistDateMutation.mutate({
             wbsId: taskId,
-            payload: buildPersistencePayload(original, startDate, endDate),
+            payload: buildPersistencePayload(
+              original,
+              dateRangeUpdate.startDate,
+              dateRangeUpdate.endDate,
+            ),
           });
           return true;
         },
