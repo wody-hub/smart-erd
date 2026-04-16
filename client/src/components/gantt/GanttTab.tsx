@@ -121,24 +121,27 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
       {
         id: 'text',
         header: t('wbs.field.name'),
-        width: 300,
-        flexgrow: 1,
+        width: 320,
+        resize: false,
         sort: true,
       },
       {
         id: 'start',
         header: t('wbs.form.startDate'),
         width: 132,
+        resize: false,
       },
       {
         id: 'end',
         header: t('wbs.form.endDate'),
         width: 132,
+        resize: false,
       },
       {
         id: 'progress',
         header: t('wbs.field.progressRate'),
-        width: 116,
+        width: 96,
+        resize: false,
         getter: (task) => {
           if (task.kind === 'milestone') {
             return task.isDelayed ? t('gantt.legend.delayed') : t('gantt.legend.onTrack');
@@ -149,17 +152,6 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
           const progress = Number(task.progress ?? 0);
           const normalized = Math.round(Math.min(Math.max(progress, 0), 100));
           return `${normalized}%`;
-        },
-      },
-      {
-        id: 'milestoneLinks',
-        header: t('wbs.field.milestone'),
-        width: 120,
-        getter: (task) => {
-          if (task.kind !== 'milestone') {
-            return '';
-          }
-          return task.linkedWbsItemCount ?? 0;
         },
       },
     ],
@@ -389,6 +381,7 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
               zoom={false}
               rollups={false}
               baselines={false}
+              criticalPath={{ type: 'strict' }}
               summary={{ autoConvert: false, autoProgress: false }}
             />
           </div>
