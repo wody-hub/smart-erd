@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Gantt, Willow, WillowDark, type IApi, type IColumnConfig } from '@svar-ui/react-gantt';
+import { setID } from '@svar-ui/lib-dom';
 import '@svar-ui/react-gantt/all.css';
 import { CalendarRange } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -74,6 +75,7 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
   const invalidateRelatedQueries = useProjectQueryInvalidation(teamId, projectId);
   const [zoomPreset, setZoomPreset] = useState<GanttZoomPreset>('week');
   const [rangeOverride, setRangeOverride] = useState<GanttRangeOverride | null>(null);
+  const ganttShellRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<IApi | null>(null);
   const canEditRef = useRef(canEdit);
   const taskMetaByIdRef = useRef<Map<string, GanttTaskMeta>>(new Map());
@@ -170,6 +172,64 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
   useEffect(() => {
     setRangeOverride(null);
   }, [model.range.end.getTime(), model.range.start.getTime()]);
+
+  const applyMilestoneVisualStates = useCallback(() => {
+    const root = ganttShellRef.current;
+    if (!root) {
+      return;
+    }
+
+    const barsById = new Map<string, HTMLElement>();
+    root.querySelectorAll<HTMLElement>('.wx-bar.wx-milestone[data-id]').forEach((bar) => {
+      const encodedId = bar.getAttribute('data-id');
+      if (encodedId) {
+        barsById.set(encodedId, bar);
+      }
+    });
+
+    model.tasks.forEach((task) => {
+      if (task.kind !== 'milestone') {
+        return;
+      }
+
+      const taskDomId = String(setID(String(task.id)));
+      const bar = barsById.get(taskDomId);
+      if (!bar) {
+        return;
+      }
+
+      const fillColor = task.isDelayed ? 'hsl(var(--destructive))' : 'hsl(var(--success))';
+      const content = bar.querySelector<HTMLElement>('.wx-content');
+
+      bar.style.borderColor = fillColor;
+      if (content) {
+        content.style.backgroundColor = fillColor;
+      }
+    });
+  }, [model.tasks]);
+
+  useEffect(() => {
+    const root = ganttShellRef.current;
+    if (!root) {
+      return;
+    }
+
+    applyMilestoneVisualStates();
+
+    if (typeof MutationObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new MutationObserver(() => {
+      applyMilestoneVisualStates();
+    });
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+    });
+
+    return () => observer.disconnect();
+  }, [applyMilestoneVisualStates]);
 
   const bindInterceptors = useCallback(
     (api: IApi) => {
@@ -364,7 +424,10 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
 
       <p className="text-sm text-muted-foreground">{t('gantt.description')}</p>
 
-      <div className="gantt-shell min-h-[32rem] overflow-hidden rounded-xl border border-border/70 bg-card lg:min-h-[40rem]">
+      <div
+        ref={ganttShellRef}
+        className="gantt-shell min-h-[32rem] overflow-hidden rounded-xl border border-border/70 bg-card lg:min-h-[40rem]"
+      >
         <ThemeWrapper>
           <div className="wx-theme h-full min-h-[32rem] lg:min-h-[40rem]">
             <Gantt
