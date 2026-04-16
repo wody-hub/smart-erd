@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   BookOpen,
+  CalendarRange,
   ClipboardList,
   FileText,
   ListTree,
@@ -17,6 +18,7 @@ import Header from '@/components/layout/Header';
 import BusinessOverviewTab from '@/components/project/BusinessOverviewTab';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import GanttTab from '@/components/gantt/GanttTab';
 import ProjectWorkspaceHero from '@/components/workspace/ProjectWorkspaceHero';
 import DocumentHubTabContent from '@/components/workspace/DocumentHubTabContent';
 import WbsTab from '@/components/wbs/WbsTab';
@@ -24,9 +26,10 @@ import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
 import { useRecentProjectContext } from '@/hooks/useRecentProjectContext';
 import { useTeamRole } from '@/hooks/useTeamRole';
+import { cn } from '@/lib/utils';
 import { getWorkspaceDocumentsTitleLabel } from '@/lib/workspace-labels';
 
-type DiagramsTabValue = 'documents' | 'overview' | 'wbs';
+type DiagramsTabValue = 'documents' | 'overview' | 'wbs' | 'gantt';
 
 interface DiagramsTabRenderContext {
   teamId: string;
@@ -122,6 +125,18 @@ export default function DiagramsPage() {
         canEdit: currentCanEdit,
       }) => <WbsTab teamId={currentTeamId} projectId={currentProjectId} canEdit={currentCanEdit} />,
     },
+    {
+      value: 'gantt',
+      label: t('gantt.tab.title'),
+      icon: CalendarRange,
+      renderContent: ({
+        teamId: currentTeamId,
+        projectId: currentProjectId,
+        canEdit: currentCanEdit,
+      }) => (
+        <GanttTab teamId={currentTeamId} projectId={currentProjectId} canEdit={currentCanEdit} />
+      ),
+    },
   ];
 
   /**
@@ -147,7 +162,9 @@ export default function DiagramsPage() {
         }}
       />
       <main className="workspace-shell flex-1 overflow-auto p-6">
-        <div className="workspace-container max-w-5xl">
+        <div
+          className={cn('workspace-container', activeTab === 'gantt' ? 'max-w-none' : 'max-w-5xl')}
+        >
           <Button
             variant="ghost"
             size="sm"

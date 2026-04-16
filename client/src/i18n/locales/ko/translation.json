@@ -620,6 +620,31 @@
       "editProgress": "WBS 항목 {{name}} 진척률 수정"
     }
   },
+  "gantt": {
+    "tab": {
+      "title": "간트"
+    },
+    "description": "WBS 일정과 마일스톤을 같은 타임라인에서 확인하고 막대를 드래그해 기간을 바로 조정할 수 있습니다.",
+    "toolbar": {
+      "day": "일",
+      "week": "주",
+      "month": "월",
+      "today": "오늘"
+    },
+    "empty": {
+      "title": "표시할 간트 데이터가 없습니다",
+      "description": "기간이 설정된 WBS 항목 또는 목표일이 있는 마일스톤을 등록하면 간트 차트가 표시됩니다."
+    },
+    "legend": {
+      "milestone": "마일스톤",
+      "delayed": "지연",
+      "onTrack": "정상"
+    },
+    "toast": {
+      "updateSuccess": "간트에서 변경한 일정이 저장되었습니다",
+      "updateFailed": "간트 일정 저장에 실패했습니다"
+    }
+  },
   "milestone": {
     "section": {
       "title": "마일스톤",

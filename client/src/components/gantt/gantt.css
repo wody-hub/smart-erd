@@ -1,0 +1,75 @@
+.gantt-shell .wx-theme {
+  height: 100%;
+}
+
+.gantt-shell .wx-layout {
+  height: 100%;
+}
+
+.gantt-shell .wx-willow-theme,
+.gantt-shell .wx-willow-dark-theme {
+  --wx-background: hsl(var(--card));
+  --wx-color-font: hsl(var(--foreground));
+  --wx-color-secondary-font: hsl(var(--foreground-secondary));
+  --wx-border: 1px solid hsl(var(--border) / 0.7);
+  --wx-gantt-border: 1px solid hsl(var(--border) / 0.7);
+  --wx-gantt-border-color: hsl(var(--border));
+  --wx-timescale-border: 1px solid hsl(var(--border) / 0.7);
+  --wx-gantt-task-color: hsl(var(--primary));
+  --wx-gantt-task-fill-color: hsl(var(--primary) / 0.86);
+  --wx-gantt-task-border-color: hsl(var(--primary) / 0.92);
+  --wx-gantt-summary-color: hsl(var(--brand-secondary));
+  --wx-gantt-summary-fill-color: hsl(var(--brand-secondary) / 0.84);
+  --wx-gantt-summary-border-color: hsl(var(--brand-secondary) / 0.92);
+  --wx-gantt-milestone-color: hsl(var(--success));
+  --wx-gantt-critical-color: hsl(var(--destructive));
+  --wx-gantt-link-color: hsl(var(--foreground-secondary));
+  --wx-gantt-link-marker-color: hsl(var(--foreground-secondary));
+  --wx-gantt-link-marker-background: hsl(var(--background));
+  --wx-gantt-select-color: hsl(var(--muted));
+  --wx-grid-header-font-color: hsl(var(--foreground-secondary));
+  --wx-grid-body-font-color: hsl(var(--foreground));
+  --wx-timescale-font-color: hsl(var(--foreground-secondary));
+}
+
+.gantt-shell .wx-milestone.wx-critical .wx-content {
+  background-color: hsl(var(--destructive));
+}
+
+.gantt-shell .wx-milestone:not(.wx-critical) .wx-content {
+  background-color: hsl(var(--success));
+}
+
+.gantt-shell .wx-milestone.wx-critical {
+  border-color: hsl(var(--destructive));
+}
+
+.gantt-shell .wx-milestone:not(.wx-critical) {
+  border-color: hsl(var(--success));
+}
+
+.gantt-shell .wx-scale .wx-cell {
+  font-weight: 600;
+}
+
+.gantt-shell .wx-task .wx-text,
+.gantt-shell .wx-summary .wx-text,
+.gantt-shell .wx-milestone .wx-text {
+  font-weight: 500;
+}
+
+.gantt-legend-marker {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  transform: rotate(45deg);
+  border-radius: 0.15rem;
+}
+
+.gantt-legend-marker--on-track {
+  background-color: hsl(var(--success));
+}
+
+.gantt-legend-marker--delayed {
+  background-color: hsl(var(--destructive));
+}

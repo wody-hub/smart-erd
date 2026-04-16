@@ -622,6 +622,31 @@
       "editProgress": "Edit progress of WBS item {{name}}"
     }
   },
+  "gantt": {
+    "tab": {
+      "title": "Gantt"
+    },
+    "description": "Review WBS schedules and milestones on one timeline, then drag bars to update dates directly.",
+    "toolbar": {
+      "day": "Day",
+      "week": "Week",
+      "month": "Month",
+      "today": "Today"
+    },
+    "empty": {
+      "title": "No Gantt data to display",
+      "description": "Add WBS items with dates or milestones with target dates to render the Gantt chart."
+    },
+    "legend": {
+      "milestone": "Milestone",
+      "delayed": "Delayed",
+      "onTrack": "On track"
+    },
+    "toast": {
+      "updateSuccess": "Schedule changes from Gantt were saved",
+      "updateFailed": "Failed to save schedule changes from Gantt"
+    }
+  },
   "milestone": {
     "section": {
       "title": "Milestones",
