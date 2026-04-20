@@ -1,4 +1,4 @@
-import type { WbsItem, ReorderWbsPayload } from '@/types/wbs';
+import type { CreateWbsItemPayload, ReorderWbsPayload, WbsItem } from '@/types/wbs';
 
 /** 루트 부모 키 (부모가 null인 항목의 맵 키). */
 export const ROOT_PARENT_KEY = '__root__';
@@ -315,4 +315,126 @@ export function buildReorderPayload(input: BuildReorderPayloadInput): ReorderWbs
   });
 
   return { items: payloadItems };
+}
+
+/** inline quick-add row 종류. */
+export type InlineCreatePlacementKind = 'root' | 'child';
+
+/** inline quick-add row 배치 정보. */
+export interface InlineCreatePlacement {
+  /** row를 붙일 기준 항목 ID. 루트 row는 null */
+  afterItemId: number | null;
+  /** 생성 시 사용할 부모 ID */
+  parentId: number | null;
+  /** 새 항목이 들어갈 깊이 */
+  depth: number;
+  /** row 종류 */
+  kind: InlineCreatePlacementKind;
+}
+
+/** buildInlineCreatePlacements 입력값. */
+export interface BuildInlineCreatePlacementsInput {
+  /** 현재 보이는 WBS 항목 목록 */
+  visibleItems: WbsItem[];
+  /** 자식 존재 여부 맵 */
+  hasChildrenById: Map<number, boolean>;
+  /** 접힌 항목 ID 집합 */
+  collapsedIds: Set<number>;
+}
+
+/**
+ * 특정 visible subtree의 마지막 descendant index를 찾는다.
+ *
+ * @param visibleItems 현재 보이는 항목 목록
+ * @param startIndex subtree 시작 index
+ * @returns 마지막 descendant index
+ */
+function findLastVisibleDescendantIndex(visibleItems: WbsItem[], startIndex: number): number {
+  const source = visibleItems[startIndex];
+  if (!source) {
+    return startIndex;
+  }
+
+  let index = startIndex;
+  while (index + 1 < visibleItems.length) {
+    const nextItem = visibleItems[index + 1];
+    if (!nextItem || nextItem.depth <= source.depth) {
+      break;
+    }
+    index += 1;
+  }
+
+  return index;
+}
+
+/**
+ * dedicated WBS workspace의 inline quick-add row 배치를 계산한다.
+ *
+ * - child row는 현재 subtree의 마지막 visible row 뒤에 붙는다
+ * - 자식이 있는 접힌 항목 아래에는 child row를 노출하지 않는다
+ * - root row는 항상 가장 마지막에 붙는다
+ *
+ * @param input 배치 계산 입력값
+ * @returns inline quick-add row 목록
+ */
+export function buildInlineCreatePlacements(
+  input: BuildInlineCreatePlacementsInput,
+): InlineCreatePlacement[] {
+  const { visibleItems, hasChildrenById, collapsedIds } = input;
+  const placements: InlineCreatePlacement[] = [];
+
+  visibleItems.forEach((item, index) => {
+    if (item.depth >= MAX_WBS_DEPTH) {
+      return;
+    }
+
+    const hasChildren = hasChildrenById.get(item.id) === true;
+    if (!hasChildren || collapsedIds.has(item.id)) {
+      return;
+    }
+
+    const placementIndex = findLastVisibleDescendantIndex(visibleItems, index);
+    placements.push({
+      afterItemId: visibleItems[placementIndex]?.id ?? item.id,
+      parentId: item.id,
+      depth: item.depth + 1,
+      kind: 'child',
+    });
+  });
+
+  placements.push({
+    afterItemId: visibleItems.length > 0 ? visibleItems[visibleItems.length - 1]!.id : null,
+    parentId: null,
+    depth: 0,
+    kind: 'root',
+  });
+
+  return placements;
+}
+
+/**
+ * dedicated inline quick-add 생성 payload를 구성한다.
+ *
+ * Phase 6.1 contract:
+ * - assignee / dates / milestone / estimated M/M 는 비운다
+ * - progressRate 는 backend implicit default에 기대지 않고 0으로 명시한다
+ *
+ * @param name 생성할 항목명
+ * @param parentId 부모 항목 ID
+ * @returns create payload
+ */
+export function buildInlineCreatePayload(
+  name: string,
+  parentId: number | null,
+): CreateWbsItemPayload {
+  return {
+    name,
+    parentId,
+    assigneeUserId: null,
+    startDate: null,
+    endDate: null,
+    progressRate: 0,
+    estimatedMm: null,
+    milestoneId: null,
+  };
 }

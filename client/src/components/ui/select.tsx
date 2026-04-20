@@ -131,16 +131,21 @@ function SelectLabel({
 function SelectItem({
   className,
   children,
+  secondaryText,
   ref,
   ...props
 }: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & {
   ref?: React.Ref<React.ComponentRef<typeof SelectPrimitive.Item>>;
+  secondaryText?: React.ReactNode;
 }) {
+  const hasSecondaryText = secondaryText != null;
+
   return (
     <SelectPrimitive.Item
       ref={ref}
       className={cn(
-        'relative flex w-full cursor-default select-none items-center rounded-md py-2 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-secondary focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+        'relative flex w-full cursor-default select-none rounded-md py-2 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-secondary focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+        hasSecondaryText ? 'items-start' : 'items-center',
         className,
       )}
       {...props}
@@ -151,7 +156,12 @@ function SelectItem({
         </SelectPrimitive.ItemIndicator>
       </span>
 
-      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      <div className={cn('min-w-0', hasSecondaryText && 'flex flex-col gap-0.5')}>
+        <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+        {hasSecondaryText ? (
+          <span className="block text-xs leading-4 text-muted-foreground">{secondaryText}</span>
+        ) : null}
+      </div>
     </SelectPrimitive.Item>
   );
 }

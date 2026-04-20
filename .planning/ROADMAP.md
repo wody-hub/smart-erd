@@ -2,7 +2,7 @@
 
 ## Overview
 
-현재 검증된 ERD 협업 코어와 마크다운 에디터 위에, 진행 중인 문서/에디터 완성 작업(Phase 1~3)을 마무리하고, SI 현장 맞춤형 PM 기능(사업 개요 → WBS+마일스톤 → 간트 → 인력 M/M → 이슈 트래커)을 단계적으로 추가한다. 각 단계는 이전 단계의 데이터를 기반으로 쌓이며, 이슈 트래커 완성 시점에 통합 SI PM 플랫폼 v1이 완성된다.
+현재 검증된 ERD 협업 코어와 마크다운 에디터 위에, 진행 중인 문서/에디터 완성 작업(Phase 1~3)을 마무리하고, SI 현장 맞춤형 PM 기능(사업 개요 → WBS+마일스톤 → 간트 → WBS 작업공간 확장 → 인력 M/M → 이슈 트래커)을 단계적으로 추가한다. 각 단계는 이전 단계의 데이터를 기반으로 쌓이며, 이슈 트래커 완성 시점에 통합 SI PM 플랫폼 v1이 완성된다.
 
 ## Phases
 
@@ -15,9 +15,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: 마크다운 증분 동기화** - Section 단위 증분 동기화 및 증분 프리뷰 렌더링 완성
 - [x] **Phase 2: 테마 선택** - Paper/Graphite/Midnight 큐레이션 테마 전역 적용
 - [ ] **Phase 3: 화면기획 플러그인** - 마스터 컴포넌트+인스턴스 화면 설계 도구 구현
-- [ ] **Phase 4: 사업 개요** - 프로젝트 메타(발주처·계약·사업 범위) 등록 및 현황 조회
-- [ ] **Phase 5: WBS + 마일스톤** - 계층 작업분해구조 편집과 마일스톤 관리
-- [ ] **Phase 6: 간트 차트** - WBS 데이터 기반 타임라인 시각화 및 인터랙션
+- [x] **Phase 4: 사업 개요** - 프로젝트 메타(발주처·계약·사업 범위) 등록 및 현황 조회
+- [x] **Phase 5: WBS + 마일스톤** - 계층 작업분해구조 편집과 마일스톤 관리
+- [x] **Phase 6: 간트 차트** - WBS 데이터 기반 타임라인 시각화 및 인터랙션
+- [ ] **Phase 6.1 (INSERTED): WBS 작업공간 확장** - 전용 WBS 페이지, 하단 인라인 추가, 담당자 배정 UX 보강
 - [ ] **Phase 7: 인력 투입 (M/M)** - 팀원별 M/M 계획·실적 및 인건비 자동 계산
 - [ ] **Phase 8: 이슈 트래커** - 이슈 등록·상태 관리·필터링·Excel 내보내기
 
@@ -90,9 +91,9 @@ Plans:
 **UI hint**: yes
 
 Plans (상세 설계 완료 — `.planning/phases/04-사업-개요/`):
-- [ ] 04-01-PLAN — BE 기반: Project 엔티티 확장 + Flyway 마이그레이션 + business-overview GET/PATCH API
-- [ ] 04-02-PLAN — FE 기반: 타입/API/쿼리키 확장 + 포맷 유틸 + 번역 키 추가
-- [ ] 04-03-PLAN — UI 구현: DiagramsPage 탭 도입 + DocumentHubTabContent 추출 + BusinessOverviewTab 컴포넌트
+- [x] 04-01-PLAN — BE 기반: Project 엔티티 확장 + Flyway 마이그레이션 + business-overview GET/PATCH API
+- [x] 04-02-PLAN — FE 기반: 타입/API/쿼리키 확장 + 포맷 유틸 + 번역 키 추가
+- [x] 04-03-PLAN — UI 구현: DiagramsPage 탭 도입 + DocumentHubTabContent 추출 + BusinessOverviewTab 컴포넌트
 
 **설계 결정:**
 - UI 위치: DiagramsPage(문서 허브)에 `[문서] [사업 개요]` 탭으로 통합 (독립 라우트 신설 X)
@@ -172,16 +173,16 @@ Plans (상세 설계 완료 — `.planning/phases/04-사업-개요/`):
 - Phase 5 확장 시 Project 테이블 비대화 → Phase 5 착수 시점에 별도 테이블 분리 재평가
 
 ### Phase 5: WBS + 마일스톤
-**Goal**: 계층 구조(업무 > 세부작업 > 태스크)로 WBS를 편집하고, 담당자·기간·진척률·M/M을 설정하며, 마일스톤을 등록하고 WBS 완료와 연동하여 달성률을 추적할 수 있다
+**Goal**: 계층 구조(업무 > 세부작업 > 태스크)로 WBS를 편집하고, 기간·진척률·예상 M/M을 관리하며, 마일스톤을 등록하고 WBS 완료와 연동하여 달성률을 추적할 수 있다
 **Depends on**: Phase 4
-**Requirements**: WBS-01, WBS-02, WBS-03, WBS-04, WBS-05, MILE-01, MILE-02, MILE-03, MILE-04
+**Requirements**: WBS-01, WBS-03, WBS-04, WBS-05, MILE-01, MILE-02, MILE-03, MILE-04
 **Success Criteria** (what must be TRUE):
   1. 사용자가 계층 구조(최대 3단계)로 WBS 항목을 생성·편집·삭제할 수 있고 트리를 접기/펼치기로 탐색할 수 있다
-  2. 각 WBS 항목에 담당자, 시작일, 종료일, 진척률, 예상 M/M을 설정할 수 있다
+  2. 각 WBS 항목에 시작일, 종료일, 진척률, 예상 M/M을 설정할 수 있다
   3. 사용자가 WBS 행을 드래그 앤 드롭으로 이동하고 재배치할 수 있다
   4. 프로젝트에 마일스톤을 등록하고 연관 WBS 항목을 연결하면 달성률이 자동 계산된다
   5. 마일스톤 목표일 대비 지연 여부가 시각적으로 구분되어 표시된다
-**Plans**: TBD
+**Plans**: summary only (see `.planning/phases/05-wbs-milestone/SUMMARY.md`)
 **UI hint**: yes
 
 ### Phase 6: 간트 차트
@@ -193,12 +194,29 @@ Plans (상세 설계 완료 — `.planning/phases/04-사업-개요/`):
   2. 사용자가 일/주/월 단위로 타임라인 줌을 전환할 수 있다
   3. 사용자가 간트 바를 드래그하여 WBS 항목의 시작일/종료일을 변경할 수 있다
   4. 마일스톤이 간트 차트에 다이아몬드 마커로 표시되고 목표일 지연 여부가 색으로 구분된다
-**Plans**: TBD
+**Plans**: 1 plan
 **UI hint**: yes
+
+Plans (상세 설계 완료 — `.planning/phases/06-간트-차트/`):
+- [x] 06-01-PLAN.md — SVAR 기반 gantt 탭 통합 + date-safe adapter + drag persistence
+
+### Phase 6.1 (INSERTED): WBS 작업공간 확장
+**Goal**: 현재 WBS 탭은 유지하면서 더 넓은 전용 WBS 작업공간을 추가하고, 하단 인라인 항목 추가와 담당자 배정을 완성해 Phase 7 인력 계획의 입력 기반을 만든다
+**Depends on**: Phase 6
+**Requirements**: WBS-02, WBS-06, WBS-07
+**Success Criteria** (what must be TRUE):
+  1. 현재 프로젝트 허브의 WBS 탭은 그대로 유지되며, 사용자가 더 넓은 전용 WBS 작업공간으로 이동할 수 있다
+  2. 전용 WBS 작업공간에서 루트 하단과 펼쳐진 상위 항목 그룹 하단에 새 WBS 항목을 인라인으로 추가할 수 있다
+  3. 사용자가 팀 멤버 목록에서 WBS 담당자를 지정/변경할 수 있고, 지정된 담당자가 WBS 목록에 표시된다
+**Plans**: 1 plan
+**UI hint**: yes
+
+Plans (상세 설계 완료 — `.planning/phases/06.1-wbs-작업공간-확장/`):
+- [x] 06.1-01-PLAN.md — 전용 WBS 페이지 + assignee selector + 하단 inline append
 
 ### Phase 7: 인력 투입 (M/M)
 **Goal**: 팀원별 투입 기간·참여율·등급·단가를 등록하고, 계획 대비 실적을 비교하며, 프로젝트 전체 인건비가 M/M × 단가로 자동 계산된다
-**Depends on**: Phase 4
+**Depends on**: Phase 6.1
 **Requirements**: HR-01, HR-02, HR-03, HR-04
 **Success Criteria** (what must be TRUE):
   1. 사용자가 팀원별 투입 기간과 참여율(%)을 등록하고 편집할 수 있다
@@ -223,15 +241,16 @@ Plans (상세 설계 완료 — `.planning/phases/04-사업-개요/`):
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.1 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 마크다운 증분 동기화 | 7/7 | Complete | 2026-04-03 |
 | 2. 테마 선택 | 3/3 | Complete | 2026-04-03 |
 | 3. 화면기획 플러그인 | -/? | In progress | - |
-| 4. 사업 개요 | 0/? | Not started | - |
-| 5. WBS + 마일스톤 | 0/? | Not started | - |
-| 6. 간트 차트 | 0/? | Not started | - |
+| 4. 사업 개요 | 3/3 | Complete | 2026-04-15 |
+| 5. WBS + 마일스톤 | summary only | Complete | 2026-04-15 |
+| 6. 간트 차트 | 1/1 | Complete | 2026-04-16 |
+| 6.1 WBS 작업공간 확장 | 1/1 | Planning complete | - |
 | 7. 인력 투입 (M/M) | 0/? | Not started | - |
 | 8. 이슈 트래커 | 0/? | Not started | - |

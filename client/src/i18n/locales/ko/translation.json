@@ -64,6 +64,13 @@
       "openProject": "문서 열기",
       "emptyTitle": "아직 프로젝트가 없습니다"
     },
+    "projectHub": {
+      "overviewDescription": "프로젝트의 핵심 정보를 확인하고 다음 실행 구간을 정리합니다.",
+      "overviewMeta": "사업 개요 기준선",
+      "wbsMeta": "WBS 작업 구조",
+      "ganttDescription": "WBS 일정과 마일스톤 진행을 타임라인에서 검토하고 계획을 조정합니다.",
+      "ganttMeta": "타임라인 계획 모드"
+    },
     "dictionary": {
       "description": "ERD와 앞으로 추가될 문서 타입이 공통으로 쓰는 용어, 도메인, 단어 자산을 관리합니다.",
       "teamContext": "{{name}} 팀의 공통 사전 자산을 관리하는 공간입니다.",
@@ -547,6 +554,12 @@
       "title": "WBS 작업",
       "description": "프로젝트 작업 항목을 계층으로 등록하고 기간, 진척률, 마일스톤 연결 정보를 관리합니다."
     },
+    "workspace": {
+      "title": "WBS 작업공간",
+      "description": "작업 구조를 넓게 편집하고 담당자를 배정하며 같은 맥락에서 새 항목을 연속으로 추가합니다.",
+      "open": "작업공간 열기",
+      "backToProject": "프로젝트 허브로 돌아가기"
+    },
     "action": {
       "create": "WBS 항목 추가"
     },
@@ -555,11 +568,13 @@
     },
     "field": {
       "name": "항목",
+      "assignee": "담당자",
       "period": "기간",
       "progressRate": "진척률",
       "estimatedMm": "예상 M/M",
       "milestone": "마일스톤",
       "actions": "작업",
+      "unassigned": "미배정",
       "noPeriod": "미설정",
       "noEstimatedMm": "미설정",
       "noMilestone": "연결 없음",
@@ -575,6 +590,11 @@
       "parent": "상위 항목",
       "parentPlaceholder": "상위 항목 선택",
       "parentRoot": "최상위 항목",
+      "assignee": "담당자",
+      "assigneePlaceholder": "담당자 선택",
+      "assigneeLoading": "팀 멤버 불러오는 중",
+      "assigneeUnavailable": "팀 멤버 목록을 지금 불러오지 못했습니다. 다른 항목은 계속 저장할 수 있습니다.",
+      "unassigned": "미배정",
       "milestone": "마일스톤",
       "milestonePlaceholder": "연결할 마일스톤 선택",
       "noMilestone": "연결 안 함",
@@ -592,6 +612,14 @@
     "delete": {
       "title": "WBS 항목 삭제",
       "description": "\"{{name}}\" 항목을 삭제하시겠습니까? 하위 항목도 함께 삭제될 수 있습니다."
+    },
+    "quickAdd": {
+      "root": "루트 레벨에 항목 추가",
+      "child": "하위 항목 추가",
+      "add": "추가",
+      "cancel": "취소",
+      "setLater": "상세에서 설정",
+      "nameRequired": "항목명을 입력한 뒤 추가하세요."
     },
     "toast": {
       "created": "WBS 항목이 생성되었습니다",
@@ -628,6 +656,9 @@
     "dnd": {
       "hint": "타임라인 막대를 드래그해 일정 날짜를 조정하세요."
     },
+    "readOnly": {
+      "hint": "조회 권한만 있어 일정은 볼 수 있지만 드래그 편집은 사용할 수 없습니다."
+    },
     "toolbar": {
       "day": "일",
       "week": "주",
@@ -649,6 +680,10 @@
     "toast": {
       "updateSuccess": "간트에서 변경한 일정이 저장되었습니다",
       "updateFailed": "간트 일정 저장에 실패했습니다"
+    },
+    "status": {
+      "loadFailedTitle": "간트 데이터를 불러오지 못했습니다",
+      "loadFailed": "프로젝트 컨텍스트는 유지한 채 간트 타임라인을 다시 불러올 수 있습니다."
     }
   },
   "milestone": {

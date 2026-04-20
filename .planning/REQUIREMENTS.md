@@ -29,6 +29,8 @@
 - [ ] **WBS-03**: WBS 항목에 예상 M/M(투입공수)를 설정할 수 있다
 - [ ] **WBS-04**: WBS 항목을 드래그 앤 드롭으로 이동/재배치할 수 있다
 - [ ] **WBS-05**: WBS 트리를 접기/펼치기로 탐색할 수 있다
+- [ ] **WBS-06**: 프로젝트 허브의 WBS 탭에서 더 넓은 전용 WBS 작업공간으로 이동할 수 있다
+- [ ] **WBS-07**: 전용 WBS 작업공간에서 루트 하단과 펼쳐진 상위 항목 그룹 하단에 WBS 항목을 인라인으로 추가할 수 있다
 
 ### 간트 차트
 
@@ -122,10 +124,12 @@
 | BIZ-01 | Phase 4 | Pending |
 | BIZ-02 | Phase 4 | Pending |
 | WBS-01 | Phase 5 | Pending |
-| WBS-02 | Phase 5 | Pending |
+| WBS-02 | Phase 6.1 | Pending |
 | WBS-03 | Phase 5 | Pending |
 | WBS-04 | Phase 5 | Pending |
 | WBS-05 | Phase 5 | Pending |
+| WBS-06 | Phase 6.1 | Pending |
+| WBS-07 | Phase 6.1 | Pending |
 | MILE-01 | Phase 5 | Pending |
 | MILE-02 | Phase 5 | Pending |
 | MILE-03 | Phase 5 | Pending |
@@ -144,10 +148,10 @@
 | ISSUE-04 | Phase 8 | Pending |
 
 **Coverage:**
-- v1 requirements: 32 total
-- Mapped to phases: 32
+- v1 requirements: 34 total
+- Mapped to phases: 34
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-02 after ROADMAP.md initialization*
+*Last updated: 2026-04-16 after RIS-126 Phase 6.1 insertion review*

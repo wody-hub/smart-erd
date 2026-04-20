@@ -13,7 +13,7 @@
     "build:electron": "electron-vite build",
     "dist:mac": "electron-vite build && electron-builder --mac",
     "dist:win": "electron-vite build && electron-builder --win",
-    "test:unit": "node --input-type=module --eval \"import { rmSync } from 'node:fs'; rmSync('.tmp-test', { recursive: true, force: true });\" && tsc -p tsconfig.test.json && node ./scripts/rewrite-test-aliases.mjs && node --test .tmp-test/test/unit",
+    "test:unit": "node ./scripts/run-unit-tests.mjs",
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test e2e/smoke",
     "test:e2e:smoke:collaboration": "playwright test e2e/smoke/diagram-collaboration.spec.ts --browser=chromium --workers=1 --retries=0",

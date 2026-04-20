@@ -21,23 +21,24 @@ import {
 } from '@/components/ui/select';
 import { isDateOrderValid } from '@/lib/format';
 import type { Milestone } from '@/types/milestone';
+import type { TeamMember } from '@/types/team';
 import type { WbsItem } from '@/types/wbs';
 import { collectDescendantIds } from './wbs-tree-utils';
 
 const ROOT_VALUE = '__root__';
 const NO_MILESTONE_VALUE = '__none__';
+const UNASSIGNED_VALUE = '__unassigned__';
 
 /**
  * WBS 항목 폼 값.
- *
- * assigneeUserId는 의도적으로 포함하지 않는다. 담당자 편집은 별도 UX/권한 정책으로 분리되어 있으며,
- * 수정 요청 시 기존 assigneeUserId를 유지해서 update payload에 반영한다.
  */
 export interface WbsItemFormValues {
   /** 항목명 */
   name: string;
   /** 부모 항목 ID */
   parentId: number | null;
+  /** 담당자 사용자 ID */
+  assigneeUserId: number | null;
   /** 시작일 */
   startDate: string | null;
   /** 종료일 */
@@ -64,6 +65,12 @@ interface WbsItemFormDialogProps {
   items: WbsItem[];
   /** 마일스톤 선택 목록 */
   milestones: Milestone[];
+  /** 담당자 선택 목록 */
+  members: TeamMember[];
+  /** 담당자 목록 로딩 여부 */
+  membersLoading?: boolean;
+  /** 담당자 목록 에러 여부 */
+  membersError?: boolean;
   /** 제출 중 여부 */
   loading?: boolean;
 }
@@ -81,6 +88,9 @@ export default function WbsItemFormDialog({
   initialData,
   items,
   milestones,
+  members,
+  membersLoading = false,
+  membersError = false,
   loading = false,
 }: WbsItemFormDialogProps) {
   const { t } = useTranslation();
@@ -88,6 +98,7 @@ export default function WbsItemFormDialog({
 
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState(ROOT_VALUE);
+  const [assigneeUserId, setAssigneeUserId] = useState(UNASSIGNED_VALUE);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [progressRate, setProgressRate] = useState('0');
@@ -111,6 +122,9 @@ export default function WbsItemFormDialog({
     }
     setName(initialData?.name ?? '');
     setParentId(initialData?.parentId != null ? String(initialData.parentId) : ROOT_VALUE);
+    setAssigneeUserId(
+      initialData?.assigneeUserId != null ? String(initialData.assigneeUserId) : UNASSIGNED_VALUE,
+    );
     setStartDate(initialData?.startDate ?? '');
     setEndDate(initialData?.endDate ?? '');
     setProgressRate(String(initialData?.progressRate ?? 0));
@@ -157,6 +171,7 @@ export default function WbsItemFormDialog({
     await onSubmit({
       name: trimmedName,
       parentId: parentId === ROOT_VALUE ? null : Number(parentId),
+      assigneeUserId: assigneeUserId === UNASSIGNED_VALUE ? null : Number(assigneeUserId),
       startDate: startDate || null,
       endDate: endDate || null,
       progressRate: parsedProgressRate,
@@ -206,6 +221,41 @@ export default function WbsItemFormDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="wbs-assignee">{t('wbs.form.assignee')}</Label>
+              <Select
+                value={assigneeUserId}
+                onValueChange={setAssigneeUserId}
+                disabled={membersLoading || membersError}
+              >
+                <SelectTrigger id="wbs-assignee">
+                  <SelectValue
+                    placeholder={
+                      membersLoading
+                        ? t('wbs.form.assigneeLoading')
+                        : t('wbs.form.assigneePlaceholder')
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED_VALUE}>{t('wbs.form.unassigned')}</SelectItem>
+                  {members.map((member) => (
+                    <SelectItem
+                      key={member.userId}
+                      value={String(member.userId)}
+                      textValue={member.name}
+                      secondaryText={member.loginId}
+                    >
+                      {member.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {membersError ? (
+                <p className="text-xs text-muted-foreground">{t('wbs.form.assigneeUnavailable')}</p>
+              ) : null}
             </div>
 
             <div className="space-y-2">

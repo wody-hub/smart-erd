@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { useInlineEdit } from '@/hooks/useInlineEdit';
 import { formatProjectDate } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import type { WbsItem } from '@/types/wbs';
 import { TREE_INDENT } from './wbs-tree-utils';
 
@@ -20,6 +21,8 @@ export interface SortableWbsRowProps {
   canEdit: boolean;
   /** 로케일 */
   locale: string;
+  /** 담당자 이름 */
+  assigneeName: string | null;
   /** 연결 마일스톤 이름 */
   milestoneName: string | null;
   /** 자식 항목 존재 여부 */
@@ -28,6 +31,8 @@ export interface SortableWbsRowProps {
   collapsed: boolean;
   /** 비활성 여부 */
   disabled: boolean;
+  /** 강조 상태 */
+  highlighted?: boolean;
   /** 번역 함수 */
   t: TFunction;
   /** 접기/펼치기 토글 핸들러 */
@@ -78,10 +83,12 @@ export default function SortableWbsRow({
   item,
   canEdit,
   locale,
+  assigneeName,
   milestoneName,
   hasChildren,
   collapsed,
   disabled,
+  highlighted = false,
   t,
   onToggleCollapse,
   onInlineNameSubmit,
@@ -126,7 +133,10 @@ export default function SortableWbsRow({
         transition,
         opacity: isDragging ? 0.5 : undefined,
       }}
-      className={isDragging ? 'bg-accent/40' : undefined}
+      className={cn(
+        isDragging && 'bg-accent/40',
+        highlighted && 'bg-primary/5 ring-1 ring-inset ring-primary/20',
+      )}
     >
       <TableCell>
         <div
@@ -202,6 +212,16 @@ export default function SortableWbsRow({
             <span className="truncate font-medium text-foreground">{item.name}</span>
           )}
         </div>
+      </TableCell>
+
+      <TableCell>
+        {assigneeName ? (
+          <span className="inline-flex max-w-full items-center rounded-full border border-border/80 bg-card px-2.5 py-1 text-xs font-medium text-foreground">
+            <span className="truncate">{assigneeName}</span>
+          </span>
+        ) : (
+          <span className="text-sm text-muted-foreground">{t('wbs.field.unassigned')}</span>
+        )}
       </TableCell>
 
       <TableCell className="text-sm text-muted-foreground">

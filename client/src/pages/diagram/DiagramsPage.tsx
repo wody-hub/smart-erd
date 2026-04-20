@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   BookOpen,
@@ -47,6 +47,10 @@ interface DiagramsTabConfig {
   renderContent: (context: DiagramsTabRenderContext) => ReactNode;
 }
 
+interface DiagramsRouteState {
+  initialTab?: DiagramsTabValue;
+}
+
 /**
  * 문서 허브 페이지.
  *
@@ -56,9 +60,13 @@ interface DiagramsTabConfig {
  */
 export default function DiagramsPage() {
   const { teamId, projectId } = useParams<{ teamId: string; projectId: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<DiagramsTabValue>('documents');
+  const routeState = location.state as DiagramsRouteState | undefined;
+  const [activeTab, setActiveTab] = useState<DiagramsTabValue>(
+    routeState?.initialTab ?? 'documents',
+  );
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [documentCount, setDocumentCount] = useState(0);
   const { recordRecentProjectContext } = useRecentProjectContext(teamId);
@@ -75,6 +83,39 @@ export default function DiagramsPage() {
     enabled: !!teamId && !!projectId,
   });
   const documentTitleToken = getWorkspaceDocumentsTitleLabel();
+
+  const heroCopy =
+    activeTab === 'documents'
+      ? {
+          section: 'documents' as const,
+          tone: 'documents' as const,
+          eyebrow: t(documentTitleToken.key),
+          description: project?.description || t('workspace.documents.description'),
+          metaDetail: t('workspace.documents.documentCount', { count: documentCount }),
+        }
+      : activeTab === 'overview'
+        ? {
+            section: 'projects' as const,
+            tone: 'projects' as const,
+            eyebrow: t('businessOverview.tab.title'),
+            description: project?.description || t('workspace.projectHub.overviewDescription'),
+            metaDetail: t('workspace.projectHub.overviewMeta'),
+          }
+        : activeTab === 'wbs'
+          ? {
+              section: 'projects' as const,
+              tone: 'projects' as const,
+              eyebrow: t('wbs.tab.title'),
+              description: t('wbs.section.description'),
+              metaDetail: t('workspace.projectHub.wbsMeta'),
+            }
+          : {
+              section: 'projects' as const,
+              tone: 'projects' as const,
+              eyebrow: t('gantt.tab.title'),
+              description: t('workspace.projectHub.ganttDescription'),
+              metaDetail: t('workspace.projectHub.ganttMeta'),
+            };
 
   const tabs: DiagramsTabConfig[] = [
     {
@@ -158,17 +199,17 @@ export default function DiagramsPage() {
         workspaceContext={{
           team: team ? { id: teamId!, name: team.name } : undefined,
           project: project ? { id: projectId!, name: project.name } : undefined,
-          section: 'documents',
+          section: heroCopy.section,
         }}
       />
-      <main className="workspace-shell flex-1 overflow-auto p-6">
+      <main className="workspace-shell flex-1 overflow-auto p-3 sm:p-6">
         <div
           className={cn('workspace-container', activeTab === 'gantt' ? 'max-w-none' : 'max-w-5xl')}
         >
           <Button
             variant="ghost"
             size="sm"
-            className="mb-4"
+            className="mb-3 sm:mb-4"
             onClick={() => navigate(ROUTES.PROJECTS(teamId!))}
           >
             <ArrowLeft className="mr-1 h-4 w-4" />
@@ -176,14 +217,14 @@ export default function DiagramsPage() {
           </Button>
 
           <ProjectWorkspaceHero
-            eyebrow={t(documentTitleToken.key)}
+            eyebrow={heroCopy.eyebrow}
             title={project?.name ?? t('common.loading')}
-            description={project?.description || t('workspace.documents.description')}
-            tone="documents"
+            description={heroCopy.description}
+            tone={heroCopy.tone}
             meta={
               <>
                 {team && <span>{t('workspace.meta.teamContext', { name: team.name })}</span>}
-                <span>{t('workspace.documents.documentCount', { count: documentCount })}</span>
+                <span>{heroCopy.metaDetail}</span>
               </>
             }
             primaryAction={
@@ -217,12 +258,16 @@ export default function DiagramsPage() {
             }
           />
 
-          <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6">
-            <TabsList>
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-4 sm:mt-6">
+            <TabsList className="gap-1">
               {tabs.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value}>
-                  <tab.icon className="mr-2 h-4 w-4" />
-                  {tab.label}
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="px-3 text-xs sm:px-4 sm:text-sm"
+                >
+                  <tab.icon className="mr-0 hidden h-4 w-4 sm:mr-2 sm:block" />
+                  <span className="truncate">{tab.label}</span>
                 </TabsTrigger>
               ))}
             </TabsList>

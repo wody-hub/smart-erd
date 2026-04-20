@@ -12,6 +12,7 @@ const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const SignupPage = lazy(() => import('./pages/auth/SignupPage'));
 const TeamsPage = lazy(() => import('./pages/team/TeamsPage'));
 const ProjectsPage = lazy(() => import('./pages/project/ProjectsPage'));
+const ProjectWbsPage = lazy(() => import('./pages/project/ProjectWbsPage'));
 const DiagramsPage = lazy(() => import('./pages/diagram/DiagramsPage'));
 const DocumentEditorRoute = lazy(() => import('./pages/document/DocumentEditorRoute'));
 const DictionaryPage = lazy(() => import('./pages/dictionary/DictionaryPage'));
@@ -89,6 +90,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <DiagramsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path={ROUTES.PROJECT_WBS_PATTERN}
+                element={
+                  <ProtectedRoute>
+                    <ProjectWbsPage />
                   </ProtectedRoute>
                 }
               />

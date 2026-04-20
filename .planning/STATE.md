@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 3 화면기획 플러그인 진행 중
-last_updated: "2026-04-15T08:32:47Z"
-last_activity: 2026-04-15
+last_updated: "2026-04-16T23:10:35Z"
+last_activity: 2026-04-17
 progress:
   total_phases: 8
   completed_phases: 4
@@ -84,6 +84,8 @@ Recent decisions affecting current work:
 - [Phase 05-wbs-milestone]: WBS 재정렬에서 depth 제한(<=2) + cycle 방지(`computeDepth`) + affected parent 최소 payload 전략 적용
 - Phase 6(간트): 직접 Canvas 구현 금지, `@svar-ui/react-gantt` MIT 라이브러리 사용 결정
 - Phase 5/6: WBS 날짜 컬럼은 `DATE` 타입 사용 — 간트 타임존 버그 방지
+- Phase 6.1(삽입): WBS 작업공간 확장 phase를 추가하고, assignee UX + dedicated workspace + inline append를 Phase 7 전에 선행
+- Phase 6.1 planning rerun (`$gsd:plan-phase 6.1 --reviews`) 완료: roadmap ownership/progress drift와 UI-spec status drift를 접고, leaf-first-child inline append는 제외 유지, 다음 단계는 `$gsd:execute-phase 6.1`
 - [Phase 01-markdown-incremental-sync]: DomainValidationHook은 별도 빈 없이 no-op lambda로 구현 (markdown 플러그인)
 - [Phase 01]: slug 기반 section ID 채택 — heading-{index}-{slug} 대신 slugify(text) + 충돌 접미사로 안정성 확보
 - [Phase 01]: diff-match-patch cursor 기반 Y.Text 증분 적용: DIFF_EQUAL/DELETE/INSERT -> cursor offset 매핑
@@ -97,7 +99,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- Phase 6.1 WBS 작업공간 확장: planning rerun complete, execution baseline은 `06.1-01-PLAN.md` + `06.1-REVIEWS.md`; 다음 작업은 `$gsd:execute-phase 6.1`
 
 ### Blockers/Concerns
 

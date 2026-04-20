@@ -64,6 +64,13 @@
       "openProject": "Open documents",
       "emptyTitle": "No projects yet"
     },
+    "projectHub": {
+      "overviewDescription": "Review the project's core context and align the next execution window.",
+      "overviewMeta": "Business overview baseline",
+      "wbsMeta": "WBS work structure",
+      "ganttDescription": "Review WBS schedules and milestones on a shared timeline, then adjust the plan with confidence.",
+      "ganttMeta": "Timeline planning mode"
+    },
     "dictionary": {
       "description": "Manage the shared word, term, and domain assets used across ERD and future document types.",
       "teamContext": "This is the shared dictionary asset hub for team {{name}}.",
@@ -549,6 +556,12 @@
       "title": "WBS Items",
       "description": "Manage project work items in a hierarchy with schedule, progress, and milestone mapping."
     },
+    "workspace": {
+      "title": "WBS workspace",
+      "description": "Expand the work structure, assign owners, and append new items without leaving the project context.",
+      "open": "Open workspace",
+      "backToProject": "Back to project hub"
+    },
     "action": {
       "create": "Add WBS item"
     },
@@ -557,11 +570,13 @@
     },
     "field": {
       "name": "Item",
+      "assignee": "Assignee",
       "period": "Period",
       "progressRate": "Progress",
       "estimatedMm": "Est. M/M",
       "milestone": "Milestone",
       "actions": "Actions",
+      "unassigned": "Unassigned",
       "noPeriod": "Not set",
       "noEstimatedMm": "Not set",
       "noMilestone": "No milestone",
@@ -577,6 +592,11 @@
       "parent": "Parent item",
       "parentPlaceholder": "Select parent item",
       "parentRoot": "Top-level item",
+      "assignee": "Assignee",
+      "assigneePlaceholder": "Select assignee",
+      "assigneeLoading": "Loading members",
+      "assigneeUnavailable": "Team member options are temporarily unavailable. You can still save other changes.",
+      "unassigned": "Unassigned",
       "milestone": "Milestone",
       "milestonePlaceholder": "Select milestone",
       "noMilestone": "No mapping",
@@ -594,6 +614,14 @@
     "delete": {
       "title": "Delete WBS item",
       "description": "Delete \"{{name}}\"? Child items may also be removed."
+    },
+    "quickAdd": {
+      "root": "Add item at root level",
+      "child": "Add sub-item",
+      "add": "Add",
+      "cancel": "Cancel",
+      "setLater": "Set in details",
+      "nameRequired": "Enter a name before adding the item."
     },
     "toast": {
       "created": "WBS item created",
@@ -630,6 +658,9 @@
     "dnd": {
       "hint": "Drag timeline bars to adjust schedule dates."
     },
+    "readOnly": {
+      "hint": "You can review the schedule, but drag editing is unavailable because you do not have edit access."
+    },
     "toolbar": {
       "day": "Day",
       "week": "Week",
@@ -651,6 +682,10 @@
     "toast": {
       "updateSuccess": "Schedule changes from Gantt were saved",
       "updateFailed": "Failed to save schedule changes from Gantt"
+    },
+    "status": {
+      "loadFailedTitle": "We couldn't load the Gantt timeline",
+      "loadFailed": "Retry the timeline while keeping the current project context."
     }
   },
   "milestone": {

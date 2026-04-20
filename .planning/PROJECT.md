@@ -117,6 +117,7 @@ ERD/문서/화면기획 기반이 완성된 후 확장할 SI 프로젝트 관리
 | Split View 우선 (WYSIWYG 후순위) | 구현 비용 대비 효과 최적, 기술 문서에 적합 | ✓ Good |
 | localStorage 테마 저장 (서버 저장 미구현) | 빠른 제공 우선, 사용자 preference API 부재 | — Pending |
 | ERD/문서 먼저, PM 기능 나중에 | 협업 코어 검증 후 관리 기능 확장이 리스크 최소화 | — Pending |
+| Phase 6.1 WBS 작업공간 확장 삽입 | Phase 7 전에 WBS assignee 입력/넓은 authoring surface를 먼저 닫아야 인력 M/M 입력 품질이 확보됨 | — Planned (RIS-126) |
 
 ## Evolution
 
@@ -136,4 +137,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-02 after initialization*
+*Last updated: 2026-04-16 after RIS-126 Phase 6.1 creation*
