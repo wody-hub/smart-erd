@@ -16,7 +16,7 @@ function TabsList({
     <TabsPrimitive.List
       ref={ref}
       className={cn(
-        'inline-flex h-11 items-center justify-center rounded-full border border-border/80 bg-secondary/75 p-1 text-muted-foreground shadow-operational',
+        'inline-flex h-11 w-full max-w-full items-center justify-start overflow-x-auto overflow-y-hidden rounded-full border border-border/80 bg-secondary/75 p-1 text-muted-foreground shadow-operational [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:w-fit sm:justify-center',
         className,
       )}
       {...props}
@@ -35,7 +35,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       ref={ref}
       className={cn(
-        'inline-flex items-center justify-center whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-operational',
+        'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-operational',
         className,
       )}
       {...props}

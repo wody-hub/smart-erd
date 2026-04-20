@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import Spinner from '@/components/ui/spinner';
 import WorkspaceEmptyState from '@/components/workspace/WorkspaceEmptyState';
 import { queryKeys } from '@/constants/query-keys';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useProjectQueryInvalidation } from '@/hooks/useProjectQueryInvalidation';
 import { getErrorMessage } from '@/lib/api-error';
 import { cn } from '@/lib/utils';
@@ -71,6 +72,7 @@ function buildPersistencePayload(
 export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) {
   const { t } = useTranslation();
   const theme = useThemeStore((state) => state.theme);
+  const isSmallViewport = useMediaQuery('(max-width: 640px)');
   const ThemeWrapper = theme === 'paper' ? Willow : WillowDark;
   const invalidateRelatedQueries = useProjectQueryInvalidation(teamId, projectId);
   const [zoomPreset, setZoomPreset] = useState<GanttZoomPreset>('week');
@@ -112,14 +114,20 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
       }),
     [milestonesQuery.data, wbsQuery.data],
   );
+  const rangeStartMs = model.range.start.getTime();
+  const rangeEndMs = model.range.end.getTime();
 
   const wbsById = useMemo(
     () => new Map((wbsQuery.data ?? []).map((item) => [item.id, item])),
     [wbsQuery.data],
   );
 
-  const columns = useMemo<IColumnConfig[]>(
-    () => [
+  const columns = useMemo<IColumnConfig[]>(() => {
+    if (isSmallViewport) {
+      return [];
+    }
+
+    return [
       {
         id: 'text',
         header: t('wbs.field.name'),
@@ -156,9 +164,8 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
           return `${normalized}%`;
         },
       },
-    ],
-    [t],
-  );
+    ];
+  }, [isSmallViewport, t]);
 
   useEffect(() => {
     canEditRef.current = canEdit;
@@ -171,7 +178,7 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
 
   useEffect(() => {
     setRangeOverride(null);
-  }, [model.range.end.getTime(), model.range.start.getTime()]);
+  }, [rangeEndMs, rangeStartMs]);
 
   const applyMilestoneVisualStates = useCallback(() => {
     const root = ganttShellRef.current;
@@ -369,8 +376,8 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
     return (
       <WorkspaceEmptyState
         icon={<CalendarRange className="h-10 w-10" />}
-        title={t('workspace.status.loadFailedTitle')}
-        description={t('workspace.status.documentsLoadFailed')}
+        title={t('gantt.status.loadFailedTitle')}
+        description={t('gantt.status.loadFailed')}
         tone="error"
         role="alert"
         action={
@@ -401,7 +408,7 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
   const activeRange = rangeOverride ?? model.range;
 
   return (
-    <div className="mt-6 space-y-4">
+    <div className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         {GANTT_SCALE_PRESET_ORDER.map((preset) => {
           const isActive = preset === zoomPreset;
@@ -426,10 +433,10 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
 
       <div
         ref={ganttShellRef}
-        className="gantt-shell min-h-[32rem] overflow-hidden rounded-xl border border-border/70 bg-card lg:min-h-[40rem]"
+        className="gantt-shell min-h-[27rem] overflow-hidden rounded-xl border border-border/70 bg-card sm:min-h-[32rem] lg:min-h-[40rem]"
       >
         <ThemeWrapper>
-          <div className="wx-theme h-full min-h-[32rem] lg:min-h-[40rem]">
+          <div className="wx-theme h-full min-h-[27rem] sm:min-h-[32rem] lg:min-h-[40rem]">
             <Gantt
               init={handleGanttInit}
               tasks={model.tasks}
@@ -477,7 +484,7 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
       </div>
 
       <p className={cn('text-xs text-muted-foreground')}>
-        {canEdit ? t('gantt.dnd.hint') : t('gantt.description')}
+        {canEdit ? t('gantt.dnd.hint') : t('gantt.readOnly.hint')}
       </p>
     </div>
   );
