@@ -51,7 +51,7 @@ jobs:
           SERVER_PORT=9500 SPRING_PROFILES_ACTIVE=test ./gradlew bootRun > /tmp/smart-erd-backend.log 2>&1 &
           echo $! > /tmp/smart-erd-backend.pid
           for i in {1..120}; do
-            if curl -sf http://127.0.0.1:9500/api/health > /dev/null; then
+            if curl -sf http://127.0.0.1:9500/v3/api-docs > /dev/null; then
               exit 0
             fi
             sleep 1
