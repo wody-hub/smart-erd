@@ -1,5 +1,7 @@
+import { diff_match_patch, DIFF_EQUAL, DIFF_INSERT, DIFF_DELETE } from 'diff-match-patch';
 import * as Y from 'yjs';
 import { parseMarkdownBuffer, serializeMarkdownBuffer } from '@/lib/markdown';
+import { computeSectionBoundaries } from '@/lib/markdown-section-index';
 import type { MarkdownCollaborationBootstrap } from '@/collaboration/channel/document/markdown-collaboration-bootstrap';
 import type { YjsDocumentAdapter } from './yjs-document-adapter.js';
 
@@ -12,9 +14,7 @@ const METADATA_KEY = 'metadata';
 /**
  * markdown bootstrap/buffer와 Y.Doc 간 변환을 담당한다.
  */
-export class MarkdownYjsDocumentAdapter
-  implements YjsDocumentAdapter<MarkdownCollaborationBootstrap>
-{
+export class MarkdownYjsDocumentAdapter implements YjsDocumentAdapter<MarkdownCollaborationBootstrap> {
   /**
    * bootstrap content를 canonical markdown shared state로 반영한다.
    *
@@ -151,6 +151,54 @@ export class MarkdownYjsDocumentAdapter
       result[key] = toPlainJsonValue(value);
     }
     return result;
+  }
+
+  /**
+   * markdown:section-update 커맨드를 증분 Y.Text 적용으로 처리한다.
+   *
+   * sectionId로 현재 Y.Text body에서 section 경계를 재계산한 뒤,
+   * diff-match-patch로 현재 section과 변경된 section의 diff를 계산하고
+   * Y.Doc.transact 내부에서 증분 연산을 적용한다.
+   *
+   * 동시 편집 시 앞 section 길이가 변경되어도 sectionId 기반 경계 재계산으로
+   * 올바른 offset에 diff가 적용된다.
+   *
+   * @param doc          대상 Y.Doc
+   * @param sectionId    대상 section의 안정적 ID (slug 기반)
+   * @param sectionText  변경된 section 전체 텍스트
+   * @param origin       Yjs transaction origin
+   */
+  applySectionUpdate(doc: Y.Doc, sectionId: string, sectionText: string, origin: unknown): void {
+    const bodyText = this.getBodyText(doc);
+    const currentBody = bodyText.toString();
+    const boundaries = computeSectionBoundaries(currentBody);
+    const target = boundaries.find((b) => b.id === sectionId);
+    if (!target) {
+      return;
+    }
+
+    const currentSection = currentBody.slice(target.startOffset, target.endOffset);
+    if (currentSection === sectionText) {
+      return;
+    }
+
+    const dmp = new diff_match_patch();
+    const diffs = dmp.diff_main(currentSection, sectionText);
+    dmp.diff_cleanupSemantic(diffs);
+
+    doc.transact(() => {
+      let cursor = target.startOffset;
+      for (const [op, text] of diffs) {
+        if (op === DIFF_EQUAL) {
+          cursor += text.length;
+        } else if (op === DIFF_DELETE) {
+          bodyText.delete(cursor, text.length);
+        } else if (op === DIFF_INSERT) {
+          bodyText.insert(cursor, text);
+          cursor += text.length;
+        }
+      }
+    }, origin);
   }
 
   private getBodyText(doc: Y.Doc): Y.Text {

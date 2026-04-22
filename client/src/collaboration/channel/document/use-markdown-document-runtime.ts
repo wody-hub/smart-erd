@@ -10,9 +10,7 @@ import type {
   DocumentCommand,
   PluginContext,
 } from '@/collaboration/core/contracts/document-plugin';
-import type {
-  DocumentCheckpointReader,
-} from '@/collaboration/core/contracts/document-checkpoint';
+import type { DocumentCheckpointReader } from '@/collaboration/core/contracts/document-checkpoint';
 import type {
   DocumentCommandDispatchResult,
   DocumentMutationSession,
@@ -57,7 +55,9 @@ export function useMarkdownDocumentRuntime({
   );
   const documentMutationApplier = useMemo(
     () =>
-      sharedDocumentEngine ? new MarkdownDocumentMutationApplier(sharedDocumentEngine, documentAdapter) : null,
+      sharedDocumentEngine
+        ? new MarkdownDocumentMutationApplier(sharedDocumentEngine, documentAdapter)
+        : null,
     [documentAdapter, sharedDocumentEngine],
   );
   const documentReadContextFactory = useMemo(
@@ -222,7 +222,9 @@ export function useMarkdownDocumentRuntime({
   );
   const readSerializedBuffer = useCallback(
     () =>
-      sharedDocumentEngine ? documentAdapter.serializeBuffer(sharedDocumentEngine.getDocument()) : '',
+      sharedDocumentEngine
+        ? documentAdapter.serializeBuffer(sharedDocumentEngine.getDocument())
+        : '',
     [documentAdapter, sharedDocumentEngine],
   );
 

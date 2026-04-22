@@ -4,7 +4,11 @@ import { dump, load } from 'js-yaml';
 import { MARKDOWN_SANITIZE_POLICY } from '@/collaboration/plugins/markdown/markdown-sanitize-policy.generated';
 import { downloadBlobFile } from '@/lib/export/export-core';
 import type { DocumentExportFormat } from '@/types/document';
-import type { MarkdownHeadingItem, MarkdownTemplateKey, ParsedMarkdownBuffer } from '@/types/markdown';
+import type {
+  MarkdownHeadingItem,
+  MarkdownTemplateKey,
+  ParsedMarkdownBuffer,
+} from '@/types/markdown';
 
 const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
@@ -63,7 +67,10 @@ export function parseMarkdownBuffer(buffer: string): ParsedMarkdownBuffer {
  * @param body markdown 본문
  * @returns 직렬화된 markdown 버퍼
  */
-export function serializeMarkdownBuffer(frontmatter: Record<string, unknown>, body: string): string {
+export function serializeMarkdownBuffer(
+  frontmatter: Record<string, unknown>,
+  body: string,
+): string {
   const normalizedBody = body.replace(/\r\n/g, '\n');
   if (Object.keys(frontmatter).length === 0) {
     return normalizedBody;
@@ -105,13 +112,19 @@ export function exportMarkdownBuffer(
 ): void {
   const fileBaseName = sanitizeFilename(documentName || 'document');
   if (format === 'md') {
-    downloadBlobFile(new Blob([buffer], { type: 'text/markdown;charset=utf-8' }), `${fileBaseName}.md`);
+    downloadBlobFile(
+      new Blob([buffer], { type: 'text/markdown;charset=utf-8' }),
+      `${fileBaseName}.md`,
+    );
     return;
   }
 
   const parsedBuffer = parseMarkdownBuffer(buffer);
   const htmlDocument = renderMarkdownHtmlDocument(documentName, parsedBuffer.body);
-  downloadBlobFile(new Blob([htmlDocument], { type: 'text/html;charset=utf-8' }), `${fileBaseName}.html`);
+  downloadBlobFile(
+    new Blob([htmlDocument], { type: 'text/html;charset=utf-8' }),
+    `${fileBaseName}.html`,
+  );
 }
 
 /**
@@ -222,7 +235,10 @@ function slugify(text: string): string {
 }
 
 function sanitizeFilename(name: string): string {
-  return name.replace(/[^a-zA-Z0-9가-힣._-]+/g, '-').replace(/-{2,}/g, '-').replace(/^-|-$/g, '');
+  return name
+    .replace(/[^a-zA-Z0-9가-힣._-]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 function escapeHtml(value: string): string {

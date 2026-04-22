@@ -27,9 +27,8 @@ public class DiagramDocumentBootstrapReader implements DocumentBootstrapReader {
             .findBootstrapById(documentId)
             .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_DIAGRAM.code(), documentId));
         final var defaults = DiagramCollaborationDocumentDefaults.resolve(projection.pluginId());
-        final long revision = projection.snapshotRevision() != null
-            ? projection.snapshotRevision()
-            : projection.contentRevision();
+        final long revision =
+            projection.snapshotRevision() != null ? projection.snapshotRevision() : projection.contentRevision();
 
         return new DocumentBootstrapHeader(
             defaults.pluginSchemaVersion(),

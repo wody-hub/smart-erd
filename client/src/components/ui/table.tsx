@@ -46,7 +46,10 @@ function TableFooter({
   return (
     <tfoot
       ref={ref}
-      className={cn('border-t border-border/70 bg-secondary/40 font-medium [&>tr]:last:border-b-0', className)}
+      className={cn(
+        'border-t border-border/70 bg-secondary/40 font-medium [&>tr]:last:border-b-0',
+        className,
+      )}
       {...props}
     />
   );

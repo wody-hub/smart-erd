@@ -1,5 +1,9 @@
 import axiosInstance from './axiosInstance';
-import type { Project } from '@/types/project';
+import type {
+  BusinessOverviewResponse,
+  Project,
+  UpdateBusinessOverviewPayload,
+} from '@/types/project';
 
 /**
  * 팀의 프로젝트 목록을 조회한다.
@@ -41,6 +45,7 @@ export async function createProject(teamId: string, name: string): Promise<Proje
  *
  * @param teamId    프로젝트가 속한 팀 ID
  * @param projectId 삭제할 프로젝트 ID
+ * @returns 삭제 완료
  */
 export async function deleteProject(teamId: string, projectId: number): Promise<void> {
   await axiosInstance.delete(`/teams/${teamId}/projects/${projectId}`);
@@ -60,5 +65,42 @@ export async function updateProject(
   data: { name: string; description?: string },
 ): Promise<Project> {
   const res = await axiosInstance.put<Project>(`/teams/${teamId}/projects/${projectId}`, data);
+  return res.data;
+}
+
+/**
+ * 사업 개요를 조회한다.
+ *
+ * @param teamId 팀 ID
+ * @param projectId 프로젝트 ID
+ * @returns 사업 개요 응답
+ */
+export async function fetchBusinessOverview(
+  teamId: string,
+  projectId: string,
+): Promise<BusinessOverviewResponse> {
+  const res = await axiosInstance.get<BusinessOverviewResponse>(
+    `/teams/${teamId}/projects/${projectId}/business-overview`,
+  );
+  return res.data;
+}
+
+/**
+ * 사업 개요를 수정한다.
+ *
+ * @param teamId 팀 ID
+ * @param projectId 프로젝트 ID
+ * @param data 사업 개요 수정 payload
+ * @returns 수정된 사업 개요 응답
+ */
+export async function updateBusinessOverview(
+  teamId: string,
+  projectId: string,
+  data: UpdateBusinessOverviewPayload,
+): Promise<BusinessOverviewResponse> {
+  const res = await axiosInstance.patch<BusinessOverviewResponse>(
+    `/teams/${teamId}/projects/${projectId}/business-overview`,
+    data,
+  );
   return res.data;
 }

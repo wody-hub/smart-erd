@@ -2,9 +2,9 @@ package com.smarterd.domain.diagram.service;
 
 import com.smarterd.collaboration.metadata.DocumentMetadataService;
 import com.smarterd.collaboration.persistence.DocumentBootstrapReader;
+import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
-import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.entity.DiagramPluginId;
@@ -13,13 +13,11 @@ import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import com.smarterd.domain.dictionary.entity.DictionarySet;
 import com.smarterd.domain.dictionary.service.DictionarySetService;
 import com.smarterd.domain.markdown.service.MarkdownDocumentDescriptorService;
-import com.smarterd.domain.markdown.service.MarkdownTemplateDescriptor;
 import com.smarterd.domain.markdown.service.MarkdownTemplateService;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.service.ProjectService;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -81,7 +79,9 @@ public class DiagramService {
      * @param teamId    팀 ID
      * @param projectId 프로젝트 ID
      * @param name      다이어그램 이름
+     * @param pluginId 생성할 문서 플러그인 ID
      * @param dictionarySetId 사전 세트 ID
+     * @param templateKey markdown 초기 템플릿 키
      * @return 생성된 다이어그램 요약 결과
      */
     @Transactional
@@ -96,13 +96,14 @@ public class DiagramService {
     ) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var resolvedPluginId = DiagramPluginId.from(pluginId);
-        if (resolvedPluginId != DiagramPluginId.MARKDOWN && templateKey != null) {
+        if (!resolvedPluginId.supportsTemplates() && templateKey != null) {
             throw new BusinessException(MessageCode.ERROR_BUSINESS_MARKDOWN_TEMPLATE_INVALID.code());
         }
         final var dictionarySet = resolveDictionarySet(project, resolvedPluginId, dictionarySetId);
-        final var initialContent = resolvedPluginId == DiagramPluginId.MARKDOWN
-            ? markdownTemplateService.buildInitialContent(name, templateKey)
-            : null;
+        final var initialContent =
+            resolvedPluginId == DiagramPluginId.MARKDOWN
+                ? markdownTemplateService.buildInitialContent(name, templateKey)
+                : null;
 
         final var diagram = Diagram.builder()
             .name(name)
@@ -111,6 +112,10 @@ public class DiagramService {
             .content(initialContent)
             .dictionarySet(dictionarySet)
             .build();
+        if (resolvedPluginId == DiagramPluginId.MARKDOWN && initialContent != null) {
+            final var descriptor = markdownDocumentDescriptorService.describe(initialContent);
+            diagram.updateSummary(descriptor.templateKey(), descriptor.summaryText());
+        }
         diagramRepository.save(Objects.requireNonNull(diagram));
 
         return toDiagramSummaryResult(diagram, project.getId());
@@ -129,9 +134,23 @@ public class DiagramService {
         final var pid = project.getId();
 
         return diagramRepository
-            .findByProjectAndDeletedAtIsNull(project)
+            .findSummariesByProject(project)
             .stream()
-            .map((diagram) -> toDiagramSummaryResult(diagram, pid))
+            .map((projection) ->
+                new DiagramSummaryResult(
+                    projection.id(),
+                    projection.name(),
+                    projection.pluginId(),
+                    pid,
+                    projection.dictionarySetId(),
+                    projection.dictionarySetName(),
+                    projection.templateKey(),
+                    markdownTemplateService.resolveTemplateLabel(projection.templateKey()),
+                    projection.summaryText(),
+                    projection.createdAt(),
+                    projection.updatedAt()
+                )
+            )
             .toList();
     }
 
@@ -225,8 +244,9 @@ public class DiagramService {
     ) {
         final var project = verifyWriteAccess(loginId, teamId, projectId);
         final var diagram = findDiagramByProjectAndId(project, diagramId);
-        if (diagram.isMarkdownDocument()) {
-            throw new BusinessException(MessageCode.ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
+        final var resolvedPluginId = DiagramPluginId.from(diagram.getPluginId());
+        if (!resolvedPluginId.requiresDictionaryContext()) {
+            throw new BusinessException(resolvedPluginId.getDictionaryContextNotAllowedMessage().code());
         }
 
         if (roomManager.getSessionCount(diagramId) > 0) {
@@ -352,7 +372,6 @@ public class DiagramService {
      */
     private DiagramSummaryResult toDiagramSummaryResult(Diagram diagram, Long projectId) {
         final var dictionarySet = diagram.getDictionarySet();
-        final var markdownDescriptor = describeMarkdown(diagram);
         return new DiagramSummaryResult(
             diagram.getId(),
             diagram.getName(),
@@ -360,9 +379,9 @@ public class DiagramService {
             projectId,
             dictionarySet != null ? dictionarySet.getId() : null,
             dictionarySet != null ? dictionarySet.getName() : null,
-            markdownDescriptor.templateKey(),
-            markdownDescriptor.templateLabel(),
-            markdownDescriptor.summaryText(),
+            diagram.getTemplateKey(),
+            markdownTemplateService.resolveTemplateLabel(diagram.getTemplateKey()),
+            diagram.getSummaryText(),
             diagram.getCreatedAt(),
             diagram.getUpdatedAt()
         );
@@ -378,7 +397,6 @@ public class DiagramService {
      */
     private DiagramDetailResult toDiagramDetailResult(Diagram diagram, Long projectId, boolean hasYdocSnapshot) {
         final var dictionarySet = diagram.getDictionarySet();
-        final var markdownDescriptor = describeMarkdown(diagram);
         return new DiagramDetailResult(
             diagram.getId(),
             diagram.getName(),
@@ -386,9 +404,9 @@ public class DiagramService {
             projectId,
             dictionarySet != null ? dictionarySet.getId() : null,
             dictionarySet != null ? dictionarySet.getName() : null,
-            markdownDescriptor.templateKey(),
-            markdownDescriptor.templateLabel(),
-            markdownDescriptor.summaryText(),
+            diagram.getTemplateKey(),
+            markdownTemplateService.resolveTemplateLabel(diagram.getTemplateKey()),
+            diagram.getSummaryText(),
             diagram.getContent(),
             hasYdocSnapshot,
             diagram.getContentRevision(),
@@ -416,135 +434,23 @@ public class DiagramService {
     }
 
     /**
-     * 다이어그램 목록/이름변경 응답용 서비스 결과.
+     * 플러그인 종류에 맞는 사전 세트를 검증하고 반환한다.
      *
-     * @param id                다이어그램 ID
-     * @param name              다이어그램 이름
-     * @param projectId         소속 프로젝트 ID
-     * @param dictionarySetId   사전 세트 ID
-     * @param dictionarySetName 사전 세트 이름
-     * @param createdAt         생성 시각
-     * @param updatedAt         수정 시각
+     * @param project 프로젝트 엔티티
+     * @param pluginId 문서 플러그인 ID
+     * @param dictionarySetId 요청 사전 세트 ID
+     * @return 검증된 사전 세트, markdown 문서면 null
      */
-    public record DiagramSummaryResult(
-        Long id,
-        String name,
-        String pluginId,
-        Long projectId,
-        Long dictionarySetId,
-        String dictionarySetName,
-        String templateKey,
-        String templateLabel,
-        String summaryText,
-        Instant createdAt,
-        Instant updatedAt
-    ) {}
-
-    /**
-     * 다이어그램 상세 응답용 서비스 결과.
-     *
-     * @param id                다이어그램 ID
-     * @param name              다이어그램 이름
-     * @param projectId         소속 프로젝트 ID
-     * @param dictionarySetId   사전 세트 ID
-     * @param dictionarySetName 사전 세트 이름
-     * @param content           직렬화된 React Flow JSON
-     * @param hasYdocSnapshot   Y.Doc 스냅샷 존재 여부
-     * @param contentRevision   content 리비전
-     * @param snapshotRevision  snapshot 리비전
-     * @param snapshotUpdatedAt snapshot 저장 시각
-     * @param createdAt         생성 시각
-     * @param updatedAt         수정 시각
-     */
-    public record DiagramDetailResult(
-        Long id,
-        String name,
-        String pluginId,
-        Long projectId,
-        Long dictionarySetId,
-        String dictionarySetName,
-        String templateKey,
-        String templateLabel,
-        String summaryText,
-        String content,
-        boolean hasYdocSnapshot,
-        long contentRevision,
-        Long snapshotRevision,
-        Instant snapshotUpdatedAt,
-        Instant createdAt,
-        Instant updatedAt
-    ) {}
-
-    /**
-     * 다이어그램 bootstrap 응답용 서비스 결과.
-     *
-     * @param contentRevision content 리비전
-     * @param snapshotRevision snapshot 리비전
-     * @param hasYdocSnapshot Y.Doc 스냅샷 존재 여부
-     * @param artifactAvailable content fallback artifact 존재 여부
-     */
-    public record DiagramBootstrapResult(
-        String pluginId,
-        String engineId,
-        int pluginSchemaVersion,
-        int snapshotFormatVersion,
-        Integer artifactVersion,
-        long revision,
-        boolean snapshotAvailable,
-        boolean artifactAvailable
-    ) {}
-
-    /**
-     * 다이어그램 저장 응답용 서비스 결과.
-     *
-     * @param contentRevision   최신 content 리비전
-     * @param hasYdocSnapshot   Y.Doc 스냅샷 존재 여부
-     * @param snapshotRevision  snapshot 리비전
-     * @param snapshotUpdatedAt snapshot 저장 시각
-     * @param updatedAt         최종 수정 시각
-     */
-    public record SaveDiagramResult(
-        long contentRevision,
-        boolean hasYdocSnapshot,
-        Long snapshotRevision,
-        Instant snapshotUpdatedAt,
-        Instant updatedAt
-    ) {}
-
-    /**
-     * 다이어그램 사전 세트 변경 결과.
-     *
-     * @param dictionarySetId              변경된 사전 세트 ID
-     * @param invalidatedTermBindingCount  무효화된 term 바인딩 수
-     * @param invalidatedDomainBindingCount 무효화된 domain 바인딩 수
-     */
-    public record DictionarySetChangeResult(
-        Long dictionarySetId,
-        int invalidatedTermBindingCount,
-        int invalidatedDomainBindingCount
-    ) {}
-
-    private DictionarySet resolveDictionarySet(
-        Project project,
-        DiagramPluginId pluginId,
-        Long dictionarySetId
-    ) {
-        if (pluginId == DiagramPluginId.ERD) {
+    private DictionarySet resolveDictionarySet(Project project, DiagramPluginId pluginId, Long dictionarySetId) {
+        if (pluginId.requiresDictionaryContext()) {
             if (dictionarySetId == null) {
                 throw new BusinessException(MessageCode.ERROR_BUSINESS_ERD_DICTIONARY_CONTEXT_REQUIRED.code());
             }
             return dictionarySetService.findByTeamAndId(project.getTeam(), dictionarySetId);
         }
         if (dictionarySetId != null) {
-            throw new BusinessException(MessageCode.ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
+            throw new BusinessException(pluginId.getDictionaryContextNotAllowedMessage().code());
         }
         return null;
-    }
-
-    private MarkdownTemplateDescriptor describeMarkdown(Diagram diagram) {
-        if (!diagram.isMarkdownDocument()) {
-            return new MarkdownTemplateDescriptor(null, null, null);
-        }
-        return markdownDocumentDescriptorService.describe(diagram.getContent());
     }
 }

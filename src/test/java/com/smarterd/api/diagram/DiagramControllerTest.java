@@ -12,8 +12,8 @@ import com.smarterd.application.diagram.command.SaveDiagramUseCase;
 import com.smarterd.domain.diagram.service.DiagramColumnDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramIndexDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService;
-import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
 import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
+import com.smarterd.domain.diagram.service.SaveDiagramResult;
 import com.smarterd.domain.markdown.service.MarkdownExportService;
 import com.smarterd.utils.excel.ExcelData;
 import java.time.Instant;
@@ -242,7 +242,11 @@ class DiagramControllerTest {
 
         when(diagramService.loadReadableDiagram("tester", 1L, 10L, 100L)).thenReturn(diagram);
         when(markdownExportService.export(diagram, "md")).thenReturn(
-            new MarkdownExportService.MarkdownExportResult("text/markdown; charset=UTF-8", "test-doc.md", "# Hello".getBytes())
+            new MarkdownExportService.MarkdownExportResult(
+                "text/markdown; charset=UTF-8",
+                "test-doc.md",
+                "# Hello".getBytes()
+            )
         );
 
         controller.exportDocument(jwt, 1L, 10L, 100L, request, response);

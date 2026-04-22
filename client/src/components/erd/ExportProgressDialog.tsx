@@ -14,6 +14,15 @@ import { cn } from '@/lib/utils';
 interface ExportProgressDialogProps {
   /** 현재 export 진행 상태 */
   progress: ExportProgressState;
+  /** 다이얼로그 액션 라벨 */
+  actionLabel?: string;
+  /** 단계 라벨 override */
+  stepLabels?: {
+    preparing: string;
+    rendering: string;
+    finalizing: string;
+    downloading: string;
+  };
 }
 
 /**
@@ -24,10 +33,21 @@ interface ExportProgressDialogProps {
  * @param props.progress 현재 export 진행 상태
  * @returns export 진행 다이얼로그 JSX
  */
-export default function ExportProgressDialog({ progress }: ExportProgressDialogProps) {
+export default function ExportProgressDialog({
+  progress,
+  actionLabel,
+  stepLabels,
+}: ExportProgressDialogProps) {
   const { t } = useTranslation();
   const progressWidth = Math.max(progress.progressPercent, 0);
+  const resolvedActionLabel = actionLabel ?? t('erd.toolbar.export');
 
+  /**
+   * 현재 export stage를 다이얼로그 step id로 축약한다.
+   *
+   * @param stage 현재 export stage
+   * @returns step id 또는 매핑 불가 시 null
+   */
   const resolveStep = (stage: ExportProgressStage | null) => {
     switch (stage) {
       case 'preparing':
@@ -46,10 +66,22 @@ export default function ExportProgressDialog({ progress }: ExportProgressDialogP
 
   const currentStep = resolveStep(progress.currentStage);
   const steps = [
-    { id: 'preparing', label: t('erd.export.progress.stepPreparing') },
-    { id: 'rendering', label: t('erd.export.progress.stepRendering') },
-    { id: 'finalizing', label: t('erd.export.progress.stepFinalizing') },
-    { id: 'downloading', label: t('erd.export.progress.stepDownloading') },
+    {
+      id: 'preparing',
+      label: stepLabels?.preparing ?? t('erd.export.progress.stepPreparing'),
+    },
+    {
+      id: 'rendering',
+      label: stepLabels?.rendering ?? t('erd.export.progress.stepRendering'),
+    },
+    {
+      id: 'finalizing',
+      label: stepLabels?.finalizing ?? t('erd.export.progress.stepFinalizing'),
+    },
+    {
+      id: 'downloading',
+      label: stepLabels?.downloading ?? t('erd.export.progress.stepDownloading'),
+    },
   ] as const;
   const currentStepIndex = currentStep ? steps.findIndex((step) => step.id === currentStep) : -1;
 
@@ -62,7 +94,7 @@ export default function ExportProgressDialog({ progress }: ExportProgressDialogP
               {progress.formatLabel}
             </div>
             <div className="space-y-1 text-left">
-              <DialogTitle>{`${progress.formatLabel} ${t('erd.toolbar.export')}`}</DialogTitle>
+              <DialogTitle>{`${progress.formatLabel} ${resolvedActionLabel}`}</DialogTitle>
               <DialogDescription>{progress.stageLabel}</DialogDescription>
             </div>
           </div>
@@ -107,7 +139,7 @@ export default function ExportProgressDialog({ progress }: ExportProgressDialogP
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={progress.progressPercent}
-                aria-label={`${progress.formatLabel} ${t('erd.toolbar.export')}`}
+                aria-label={`${progress.formatLabel} ${resolvedActionLabel}`}
               >
                 <div
                   className="bg-primary h-full rounded-full"

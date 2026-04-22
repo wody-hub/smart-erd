@@ -22,9 +22,16 @@ import org.springframework.web.socket.WebSocketSession;
 @Slf4j
 public class DiagramWebSocketSessionLifecycle {
 
+    /** 다이어그램 세션 입장/퇴장 transport 유스케이스 */
     private final DiagramSessionTransportUseCase diagramSessionTransportUseCase;
+
+    /** 다이어그램 세션 입장 완료 유스케이스 */
     private final CompleteDiagramSessionJoinUseCase completeDiagramSessionJoinUseCase;
+
+    /** 다이어그램 세션 퇴장 완료 유스케이스 */
     private final CompleteDiagramSessionLeaveUseCase completeDiagramSessionLeaveUseCase;
+
+    /** 레거시 presence 브로드캐스트 포트 */
     private final DiagramLegacyPresencePort diagramLegacyPresencePort;
 
     /**
@@ -44,13 +51,8 @@ public class DiagramWebSocketSessionLifecycle {
             try {
                 final var rejectionReason = joinResult.rejectionReason();
                 final var closeCode =
-                    rejectionReason != null
-                        ? rejectionReason.closeCode()
-                        : CloseStatus.POLICY_VIOLATION.getCode();
-                final var closeReason =
-                    rejectionReason != null
-                        ? rejectionReason.closeReason()
-                        : "policy-violation";
+                    rejectionReason != null ? rejectionReason.closeCode() : CloseStatus.POLICY_VIOLATION.getCode();
+                final var closeReason = rejectionReason != null ? rejectionReason.closeReason() : "policy-violation";
                 log.warn(
                     "WebSocket room join 거부 후 세션 종료 (session={}, diagramId={}, userId={}, code={}, reason={})",
                     session.getId(),

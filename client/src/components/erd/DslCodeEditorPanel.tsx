@@ -936,7 +936,13 @@ export default function DslCodeEditorPanel({
     shouldIgnoreChangeRef.current = shouldIgnoreChange;
     markLocalEditStartedRef.current = markLocalEditStarted;
     markFinalizationDirtyRef.current = markFinalizationDirty;
-  }, [canEdit, handleUserCodeChange, markFinalizationDirty, markLocalEditStarted, shouldIgnoreChange]);
+  }, [
+    canEdit,
+    handleUserCodeChange,
+    markFinalizationDirty,
+    markLocalEditStarted,
+    shouldIgnoreChange,
+  ]);
 
   const handleApplyWithSyncReset = useCallback(() => {
     if (isCodeEditorApplyBlocked(draftState, isPersistedDraftStale)) {
@@ -2185,7 +2191,8 @@ export default function DslCodeEditorPanel({
       const shouldPromoteModelTextAsLocalDraft =
         persistDraft &&
         modelText.trim().length > 0 &&
-        (draftHydrationSourceRef.current == null || draftHydrationSourceRef.current === 'generated') &&
+        (draftHydrationSourceRef.current == null ||
+          draftHydrationSourceRef.current === 'generated') &&
         pendingHydratedTextRef.current == null;
 
       if (shouldPromoteModelTextAsLocalDraft) {
@@ -2374,11 +2381,11 @@ export default function DslCodeEditorPanel({
       </div>
 
       {/* 파싱 결과 프리뷰 + Apply/Refresh 버튼 */}
-        <CodeEditorFooter
-          onApply={handleApplyWithSyncReset}
-          applyButtonLabel={persistDraft ? t('erd.codeEditor.applyOnlyButton') : undefined}
-          canApply={canApplyWithDraftState}
-          executeApply={executeApplyWithSyncReset}
+      <CodeEditorFooter
+        onApply={handleApplyWithSyncReset}
+        applyButtonLabel={persistDraft ? t('erd.codeEditor.applyOnlyButton') : undefined}
+        canApply={canApplyWithDraftState}
+        executeApply={executeApplyWithSyncReset}
         confirmOpen={confirmOpen}
         setConfirmOpen={setConfirmOpen}
         confirmDescription={confirmDescription}

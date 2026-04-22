@@ -34,7 +34,9 @@ function pickRemainingPreviewPositionOverrides(
     remainingPreviewNodeIds.has(previewNode.id),
   );
   const remainingPositionOverrides = Object.fromEntries(
-    Object.entries(positionOverrides).filter(([previewNodeId]) => remainingPreviewNodeIds.has(previewNodeId)),
+    Object.entries(positionOverrides).filter(([previewNodeId]) =>
+      remainingPreviewNodeIds.has(previewNodeId),
+    ),
   );
   return {
     remainingPreviewNodes,
@@ -112,13 +114,16 @@ export function useDiagramPreviewPositionActions(): DiagramPreviewPositionAction
           );
           if (result === 'unavailable') {
             const remainingPreviewNodeIds = new Set(
-              persistedPositionChanges.slice(index).map((remainingChange) => remainingChange.previewNodeId),
+              persistedPositionChanges
+                .slice(index)
+                .map((remainingChange) => remainingChange.previewNodeId),
             );
-            const { remainingPreviewNodes, remainingPositionOverrides } = pickRemainingPreviewPositionOverrides(
-              previewNodes,
-              positionOverrides,
-              remainingPreviewNodeIds,
-            );
+            const { remainingPreviewNodes, remainingPositionOverrides } =
+              pickRemainingPreviewPositionOverrides(
+                previewNodes,
+                positionOverrides,
+                remainingPreviewNodeIds,
+              );
             const fallbackSyncedPreviewNodeIds = storeBridge.applyPreviewPositionChangesToPersisted(
               remainingPreviewNodes,
               remainingPositionOverrides,

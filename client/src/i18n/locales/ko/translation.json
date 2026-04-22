@@ -64,6 +64,14 @@
       "openProject": "문서 열기",
       "emptyTitle": "아직 프로젝트가 없습니다"
     },
+    "projectHub": {
+      "overviewDescription": "프로젝트의 핵심 정보를 확인하고 다음 실행 구간을 정리합니다.",
+      "overviewMeta": "사업 개요 기준선",
+      "wbsMeta": "WBS 작업 구조",
+      "ganttDescription": "WBS 일정과 마일스톤 진행을 타임라인에서 검토하고 계획을 조정합니다.",
+      "ganttMeta": "타임라인 계획 모드",
+      "staffingMeta": "계획/실적 M/M 및 인건비"
+    },
     "dictionary": {
       "description": "ERD와 앞으로 추가될 문서 타입이 공통으로 쓰는 용어, 도메인, 단어 자산을 관리합니다.",
       "teamContext": "{{name}} 팀의 공통 사전 자산을 관리하는 공간입니다.",
@@ -103,13 +111,14 @@
       "stepTypeDescription": "이번에 만들 문서의 작업 방식을 먼저 고르세요.",
       "stepSetupDescription": "이름과 시작 설정을 확인한 뒤 바로 편집으로 들어갑니다.",
       "pluginSectionTitle": "문서 유형",
-      "pluginSectionHint": "ERD는 캔버스 작업, Markdown은 기술 문서 작성에 맞춰 시작합니다.",
+      "pluginSectionHint": "ERD와 화면기획은 캔버스 작업으로, Markdown은 기술 문서 작성으로 시작합니다.",
       "nameLabel": "문서 이름",
       "namePlaceholder": "문서 이름을 입력하세요",
       "nameHint": "문서 허브와 편집기 상단에 표시되는 이름입니다.",
       "templateLabel": "Markdown 템플릿",
       "templateHint": "문서 골격과 기본 frontmatter를 함께 넣어 시작합니다.",
       "dictionaryHint": "ERD 문서에 연결할 기본 사전 컨텍스트를 선택합니다.",
+      "screenSpecSetupHint": "첫 리비전은 빈 협업 스테이지로 열리고, 다음 단계에서 도형 배치와 화면 상태 모델을 올릴 수 있습니다.",
       "erdRequiresDictionary": "ERD 문서를 만들려면 먼저 프로젝트에 사전 컨텍스트 세트를 준비해야 합니다.",
       "selected": "선택됨",
       "previewTitle": "생성 미리보기",
@@ -117,6 +126,8 @@
       "previewPendingName": "이름을 입력하면 여기에 반영됩니다.",
       "previewTemplateLabel": "템플릿",
       "previewDictionaryLabel": "사전 컨텍스트",
+      "previewCanvasLabel": "캔버스 상태",
+      "previewCanvasBlank": "빈 협업 스테이지",
       "includesTitle": "포함 내용",
       "previewMarkdownLine1": "frontmatter와 섹션 구조가 함께 생성됩니다.",
       "previewMarkdownLine2": "쓰기, Outline, 미리보기 흐름으로 바로 편집할 수 있습니다.",
@@ -124,8 +135,12 @@
       "previewErdLine1": "사전 컨텍스트가 연결된 ERD 캔버스로 시작합니다.",
       "previewErdLine2": "테이블, 관계, 코드 동기화 작업으로 바로 이어집니다.",
       "previewErdLine3": "문서 허브에서 사전과 함께 관리됩니다.",
+      "previewScreenSpecLine1": "첫 로드부터 협업 런타임 안에서 빈 Konva 스테이지가 생성됩니다.",
+      "previewScreenSpecLine2": "다른 문서 플러그인과 같은 Yjs/WebSocket 흐름에 바로 합류합니다.",
+      "previewScreenSpecLine3": "다음 단계에서 화면 엔티티와 캔버스 도구를 route shell 변경 없이 확장할 수 있습니다.",
       "erdDescription": "사전 컨텍스트를 연결해 ERD 캔버스 문서를 만듭니다.",
-      "markdownDescription": "템플릿을 고른 뒤 기술 문서나 회의록을 작성합니다."
+      "markdownDescription": "템플릿을 고른 뒤 기술 문서나 회의록을 작성합니다.",
+      "screenSpecDescription": "빈 캔버스 스테이지에서 시작하는 협업 화면기획 문서를 만듭니다."
     },
     "status": {
       "loadFailedTitle": "작업 영역을 불러오지 못했습니다",
@@ -175,6 +190,204 @@
       "saved": "저장됨",
       "savedAt": "{{time}} 저장",
       "frontmatterInvalid": "Frontmatter YAML 구문 오류"
+    }
+  },
+  "screenSpec": {
+    "toast": {
+      "created": "화면기획 문서가 생성되었습니다",
+      "createFailed": "화면기획 문서 생성에 실패했습니다"
+    },
+    "status": {
+      "loadFailed": "화면기획 문서를 불러오지 못했습니다. 다시 시도해 주세요.",
+      "connecting": "협업 캔버스를 연결하는 중입니다...",
+      "ready": "캔버스 연결됨"
+    },
+    "aria": {
+      "connecting": "화면기획 협업 캔버스를 연결하는 중입니다.",
+      "ready": "화면기획 캔버스가 준비되었습니다.",
+      "connectionIssue": "화면기획 협업 연결에 문제가 발생했습니다.",
+      "selectedScreen": "{{screen}} 화면이 선택되었습니다. 인스턴스 {{count}}개가 있습니다.",
+      "selectedInstance": "{{screen}} 화면에서 {{name}} 인스턴스가 선택되었습니다.",
+      "remoteSync": "{{screen}} 화면에 다른 사용자의 변경 사항이 반영되었습니다."
+    },
+    "toolbar": {
+      "screenLabel": "화면",
+      "frameLabel": "프레임",
+      "previousScreen": "이전 화면",
+      "nextScreen": "다음 화면",
+      "fitToFrame": "맞춤",
+      "actualSize": "100%",
+      "zoomIn": "확대",
+      "zoomOut": "축소",
+      "export": "내보내기",
+      "exporting": "내보내는 중..."
+    },
+    "library": {
+      "title": "빌딩 블록",
+      "subtitle": "마스터를 선택해 미리보기하고 다음 드래그 배치를 준비합니다.",
+      "dragHint": "마스터를 현재 화면 위로 드래그해 배치하세요",
+      "searchPlaceholder": "마스터 검색",
+      "listAriaLabel": "화면기획 마스터 컴포넌트 라이브러리",
+      "emptyFiltered": "현재 필터와 일치하는 마스터가 없습니다.",
+      "action": {
+        "newMaster": "새 마스터",
+        "renameMaster": "이름 변경",
+        "deleteMaster": "삭제"
+      },
+      "tier": {
+        "block": "블록",
+        "widget": "위젯"
+      },
+      "origin": {
+        "builtIn": "기본 제공",
+        "custom": "사용자 정의"
+      },
+      "category": {
+        "layout": "레이아웃",
+        "table": "표",
+        "form": "폼",
+        "input": "입력",
+        "feedback": "피드백",
+        "button": "버튼"
+      },
+      "dialog": {
+        "createTitle": "마스터 컴포넌트 생성",
+        "createDescription": "이 문서 라이브러리에 재사용 가능한 컴포넌트를 추가합니다.",
+        "renameTitle": "마스터 컴포넌트 이름 변경",
+        "renameDescription": "라이브러리와 미리보기 패널에 표시되는 이름을 바꿉니다.",
+        "deleteTitle": "마스터 컴포넌트 삭제",
+        "deleteDescription": "\"{{name}}\" 마스터를 이 문서 라이브러리에서 삭제합니다.",
+        "nameLabel": "마스터 컴포넌트 이름"
+      },
+      "item": {
+        "gnb": "GNB",
+        "lnb": "LNB",
+        "tabMenu": "탭 메뉴",
+        "breadcrumb": "브레드크럼",
+        "dataTable": "데이터 테이블",
+        "simpleTable": "심플 테이블",
+        "cardList": "카드 리스트",
+        "loginForm": "로그인 폼",
+        "searchBar": "검색 바",
+        "filterPanel": "필터 패널",
+        "editForm": "등록/수정 폼",
+        "textInput": "텍스트 입력",
+        "dropdown": "드롭다운",
+        "checkboxGroup": "체크박스 그룹",
+        "radioGroup": "라디오 그룹",
+        "datePicker": "날짜 선택기",
+        "toast": "알림 토스트",
+        "dialog": "확인 다이얼로그",
+        "spinner": "로딩 스피너",
+        "emptyState": "빈 상태",
+        "primaryButton": "기본 버튼",
+        "iconButton": "아이콘 버튼",
+        "buttonGroup": "버튼 그룹"
+      }
+    },
+    "framePreset": {
+      "mobile": {
+        "label": "모바일 앱"
+      },
+      "tablet": {
+        "label": "태블릿"
+      },
+      "desktop": {
+        "label": "데스크톱 웹"
+      }
+    },
+    "inspector": {
+      "title": "인스펙터",
+      "masterTitle": "마스터",
+      "masterEmpty": "라이브러리에서 마스터를 선택하면 여기서 확인할 수 있습니다.",
+      "screen": "화면",
+      "selection": "선택 항목",
+      "frame": "프레임",
+      "size": "크기",
+      "status": "상태",
+      "masterDefault": "마스터 기본값",
+      "name": "이름",
+      "category": "카테고리",
+      "tier": "티어",
+      "width": "너비",
+      "height": "높이",
+      "origin": "출처",
+      "position": "위치",
+      "labelOverride": "라벨 오버라이드",
+      "accentColor": "강조 색상",
+      "resetLabel": "마스터 라벨 사용",
+      "resetColor": "마스터 색상 사용",
+      "resetSize": "마스터 크기 사용",
+      "overrideStatus": {
+        "inherited": "마스터 기본값을 그대로 사용 중입니다.",
+        "overridden": "이 인스턴스에서 별도로 덮어쓴 값입니다."
+      },
+      "layers": "레이어",
+      "bringToFront": "맨 앞으로",
+      "sendToBack": "맨 뒤로",
+      "bringForward": "앞으로",
+      "sendBackward": "뒤로",
+      "deleteSelection": "선택 삭제",
+      "selectionEmpty": "캔버스에서 인스턴스를 선택하면 여기서 확인할 수 있습니다.",
+      "keyboardHint": "Tab으로 선택을 순환하고, 방향키로 이동합니다. Shift+방향키는 더 크게 이동하고, Shift+PageUp/PageDown으로 화면을 바꿉니다.",
+      "previewHint": "인스턴스 배치가 켜지면 라이브러리에서 스테이지로 바로 드래그할 수 있습니다.",
+      "view": "뷰",
+      "zoom": "확대 비율",
+      "offsetX": "X 오프셋",
+      "offsetY": "Y 오프셋"
+    },
+    "canvas": {
+      "title": "빈 협업 캔버스",
+      "workspaceTitle": "화면 캔버스",
+      "gestureHint": "드래그로 이동하고, 스크롤로 확대하세요.",
+      "dropHint": "마스터를 놓으면 현재 화면에 배치됩니다",
+      "emptyState": "마스터를 이곳으로 드래그해 화면을 시작하세요",
+      "selectMasterHint": "라이브러리에서 마스터를 선택하면 여기서 미리볼 수 있습니다."
+    },
+    "orphan": {
+      "title": "삭제된 마스터",
+      "description": "이 인스턴스는 마지막으로 알려진 마스터 스냅샷을 유지하고 있습니다. 다른 마스터에 다시 연결하거나 수동으로 삭제하세요.",
+      "rebindLabel": "다른 마스터에 연결",
+      "rebindPlaceholder": "대체할 마스터를 선택하세요",
+      "rebindAction": "인스턴스 다시 연결"
+    },
+    "screen": {
+      "defaultName": "화면 {{index}}"
+    },
+    "screenList": {
+      "title": "화면 목록",
+      "add": "추가",
+      "instanceCount": "인스턴스 {{count}}개",
+      "instanceCount_other": "인스턴스 {{count}}개",
+      "namePlaceholder": "화면 이름",
+      "moveUp": "화면을 위로 이동",
+      "moveDown": "화면을 아래로 이동",
+      "delete": "화면 삭제"
+    },
+    "export": {
+      "noScreens": "내보낼 화면이 없습니다",
+      "failed": "화면기획 내보내기에 실패했습니다",
+      "inProgress": "이미 다른 내보내기 작업이 진행 중입니다",
+      "pngSuccess": "{{screen}} 화면을 PNG로 내보냈습니다",
+      "pdfSuccess": "화면 {{count}}개를 PDF로 내보냈습니다",
+      "progress": {
+        "preparing": "내보내기를 준비하는 중",
+        "rendering": "화면을 렌더링하는 중",
+        "assembling": "PDF를 구성하는 중",
+        "downloading": "다운로드를 준비하는 중",
+        "failed": "내보내기에 실패했습니다",
+        "stepPreparing": "준비",
+        "stepRendering": "렌더링",
+        "stepFinalizing": "마무리",
+        "stepDownloading": "저장",
+        "preparingDocument": "화면 목록과 export 스테이지를 준비하고 있습니다.",
+        "collectingScreens": "PDF에 포함할 화면 {{count}}개를 확인하고 있습니다.",
+        "renderingScreen": "{{screen}} 화면을 이미지로 렌더링하고 있습니다.",
+        "renderingPage": "{{current}} / {{total}} 페이지용 {{screen}} 화면을 렌더링하고 있습니다.",
+        "downloadReady": "파일을 저장할 준비를 마무리하고 있습니다.",
+        "retryLater": "잠시 후 다시 시도해 주세요.",
+        "pdfPage": "{{current}} / {{total}} 페이지를 PDF에 배치하고 있습니다."
+      }
     }
   },
   "auth": {
@@ -297,6 +510,236 @@
     "aria": {
       "deleteProject": "프로젝트 {{name}} 삭제",
       "settingsProject": "프로젝트 {{name}} 설정"
+    }
+  },
+  "businessOverview": {
+    "tab": {
+      "title": "사업 개요"
+    },
+    "documentsTab": "문서",
+    "field": {
+      "clientCompany": "발주사",
+      "contractorCompany": "수주사",
+      "contractAmount": "계약 금액",
+      "projectStartDate": "프로젝트 시작일",
+      "projectEndDate": "프로젝트 종료일",
+      "projectScope": "프로젝트 범위",
+      "empty": "미등록"
+    },
+    "save": {
+      "success": "사업 개요가 저장되었습니다",
+      "failed": "사업 개요 저장에 실패했습니다"
+    },
+    "summary": {
+      "memberCount": "참여 인원",
+      "documentCount": "문서 수",
+      "progressRate": "진행률",
+      "notAvailable": "-"
+    },
+    "emptyTitle": "사업 개요가 아직 등록되지 않았습니다",
+    "emptyDescription": "프로젝트의 발주사, 일정, 예산 등 핵심 정보를 등록하세요.",
+    "emptyCta": "사업 개요 등록하기",
+    "editButton": "편집",
+    "editAriaLabel": "사업 개요 편집",
+    "validation": {
+      "dateOrder": "종료일은 시작일 이후여야 합니다",
+      "datePair": "시작일과 종료일은 함께 입력하거나 함께 비워야 합니다",
+      "invalidAmount": "계약 금액은 올바른 숫자여야 합니다"
+    }
+  },
+  "wbs": {
+    "tab": {
+      "title": "WBS"
+    },
+    "section": {
+      "title": "WBS 작업",
+      "description": "프로젝트 작업 항목을 계층으로 등록하고 기간, 진척률, 마일스톤 연결 정보를 관리합니다."
+    },
+    "workspace": {
+      "title": "WBS 작업공간",
+      "description": "작업 구조를 넓게 편집하고 담당자를 배정하며 같은 맥락에서 새 항목을 연속으로 추가합니다.",
+      "open": "작업공간 열기",
+      "backToProject": "프로젝트 허브로 돌아가기"
+    },
+    "action": {
+      "create": "WBS 항목 추가"
+    },
+    "dnd": {
+      "hint": "핸들을 드래그해 순서를 변경하세요. 드래그 중 좌우로 움직이면 계층 레벨을 변경할 수 있습니다."
+    },
+    "field": {
+      "name": "항목",
+      "assignee": "담당자",
+      "period": "기간",
+      "progressRate": "진척률",
+      "estimatedMm": "예상 M/M",
+      "milestone": "마일스톤",
+      "actions": "작업",
+      "unassigned": "미배정",
+      "noPeriod": "미설정",
+      "noEstimatedMm": "미설정",
+      "noMilestone": "연결 없음",
+      "mmValue": "{{value}} M/M"
+    },
+    "form": {
+      "createTitle": "WBS 항목 생성",
+      "editTitle": "WBS 항목 수정",
+      "createDescription": "WBS 항목의 기본 정보를 입력합니다.",
+      "editDescription": "WBS 항목의 기본 정보를 수정합니다.",
+      "name": "항목명",
+      "namePlaceholder": "예: 요구사항 분석",
+      "parent": "상위 항목",
+      "parentPlaceholder": "상위 항목 선택",
+      "parentRoot": "최상위 항목",
+      "assignee": "담당자",
+      "assigneePlaceholder": "담당자 선택",
+      "assigneeLoading": "팀 멤버 불러오는 중",
+      "assigneeUnavailable": "팀 멤버 목록을 지금 불러오지 못했습니다. 다른 항목은 계속 저장할 수 있습니다.",
+      "unassigned": "미배정",
+      "milestone": "마일스톤",
+      "milestonePlaceholder": "연결할 마일스톤 선택",
+      "noMilestone": "연결 안 함",
+      "startDate": "시작일",
+      "endDate": "종료일",
+      "progressRate": "진척률(%)",
+      "estimatedMm": "예상 M/M",
+      "estimatedMmPlaceholder": "예: 1.5"
+    },
+    "validation": {
+      "dateOrder": "종료일은 시작일 이후여야 합니다",
+      "progressRate": "진척률은 0에서 100 사이여야 합니다",
+      "estimatedMm": "예상 M/M은 0 이상의 숫자여야 합니다"
+    },
+    "delete": {
+      "title": "WBS 항목 삭제",
+      "description": "\"{{name}}\" 항목을 삭제하시겠습니까? 하위 항목도 함께 삭제될 수 있습니다."
+    },
+    "quickAdd": {
+      "root": "루트 레벨에 항목 추가",
+      "child": "하위 항목 추가",
+      "add": "추가",
+      "cancel": "취소",
+      "setLater": "상세에서 설정",
+      "nameRequired": "항목명을 입력한 뒤 추가하세요."
+    },
+    "toast": {
+      "created": "WBS 항목이 생성되었습니다",
+      "createFailed": "WBS 항목 생성에 실패했습니다",
+      "updated": "WBS 항목이 수정되었습니다",
+      "updateFailed": "WBS 항목 수정에 실패했습니다",
+      "deleted": "WBS 항목이 삭제되었습니다",
+      "deleteFailed": "WBS 항목 삭제에 실패했습니다",
+      "loadFailed": "WBS 목록을 불러오지 못했습니다",
+      "reorderFailed": "WBS 순서 변경에 실패했습니다",
+      "reordered": "WBS 순서가 변경되었습니다",
+      "depthLimitExceeded": "항목을 3단계보다 깊게 이동할 수 없습니다",
+      "invalidMove": "항목을 자신의 하위 항목 아래로 이동할 수 없습니다"
+    },
+    "empty": {
+      "title": "WBS 항목이 없습니다",
+      "description": "첫 WBS 항목을 생성해 프로젝트 작업 구조를 시작하세요.",
+      "readOnlyDescription": "현재 조회 전용 모드입니다. 기존 WBS 항목과 마일스톤 연결은 확인할 수 있지만, 추가/편집/재정렬은 편집 권한이 필요합니다."
+    },
+    "status": {
+      "loadFailedTitle": "WBS 작업공간을 불러오지 못했습니다"
+    },
+    "aria": {
+      "edit": "WBS 항목 {{name}} 수정",
+      "delete": "WBS 항목 {{name}} 삭제",
+      "expand": "WBS 항목 {{name}} 펼치기",
+      "collapse": "WBS 항목 {{name}} 접기",
+      "drag": "WBS 항목 {{name}} 드래그",
+      "editName": "WBS 항목 {{name}} 이름 수정",
+      "editProgress": "WBS 항목 {{name}} 진척률 수정"
+    }
+  },
+  "gantt": {
+    "tab": {
+      "title": "간트"
+    },
+    "description": "WBS 일정과 마일스톤을 같은 타임라인에서 확인하고 막대를 드래그해 기간을 바로 조정할 수 있습니다.",
+    "dnd": {
+      "hint": "타임라인 막대를 드래그해 일정 날짜를 조정하세요."
+    },
+    "readOnly": {
+      "hint": "조회 권한만 있어 일정은 볼 수 있지만 드래그 편집은 사용할 수 없습니다."
+    },
+    "toolbar": {
+      "day": "일",
+      "week": "주",
+      "month": "월",
+      "today": "오늘"
+    },
+    "empty": {
+      "title": "표시할 간트 데이터가 없습니다",
+      "description": "기간이 설정된 WBS 항목 또는 목표일이 있는 마일스톤을 등록하면 간트 차트가 표시됩니다."
+    },
+    "legend": {
+      "milestone": "마일스톤",
+      "delayed": "지연",
+      "onTrack": "정상"
+    },
+    "stats": {
+      "omitted": "{{count}}건 제외"
+    },
+    "toast": {
+      "updateSuccess": "간트에서 변경한 일정이 저장되었습니다",
+      "updateFailed": "간트 일정 저장에 실패했습니다"
+    },
+    "status": {
+      "loadFailedTitle": "간트 데이터를 불러오지 못했습니다",
+      "loadFailed": "프로젝트 컨텍스트는 유지한 채 간트 타임라인을 다시 불러올 수 있습니다."
+    }
+  },
+  "milestone": {
+    "section": {
+      "title": "마일스톤",
+      "description": "목표일과 달성률을 기준으로 주요 이정표를 관리합니다."
+    },
+    "action": {
+      "create": "마일스톤 추가"
+    },
+    "field": {
+      "targetDate": "목표일",
+      "achievementRate": "달성률",
+      "linkedWbsCount": "연결된 WBS {{count}}건",
+      "noDescription": "설명 없음"
+    },
+    "status": {
+      "onTrack": "정상",
+      "delayed": "지연"
+    },
+    "form": {
+      "createTitle": "마일스톤 생성",
+      "editTitle": "마일스톤 수정",
+      "createDescription": "마일스톤 기본 정보를 입력합니다.",
+      "editDescription": "마일스톤 기본 정보를 수정합니다.",
+      "name": "이름",
+      "namePlaceholder": "예: 1차 오픈",
+      "targetDate": "목표일",
+      "description": "설명",
+      "descriptionPlaceholder": "마일스톤 설명을 입력하세요"
+    },
+    "delete": {
+      "title": "마일스톤 삭제",
+      "description": "\"{{name}}\" 마일스톤을 삭제하시겠습니까?"
+    },
+    "toast": {
+      "created": "마일스톤이 생성되었습니다",
+      "createFailed": "마일스톤 생성에 실패했습니다",
+      "updated": "마일스톤이 수정되었습니다",
+      "updateFailed": "마일스톤 수정에 실패했습니다",
+      "deleted": "마일스톤이 삭제되었습니다",
+      "deleteFailed": "마일스톤 삭제에 실패했습니다",
+      "loadFailed": "마일스톤 목록을 불러오지 못했습니다"
+    },
+    "empty": {
+      "title": "마일스톤이 없습니다",
+      "description": "프로젝트의 주요 목표 지점을 마일스톤으로 등록해 추적하세요."
+    },
+    "aria": {
+      "edit": "마일스톤 {{name}} 수정",
+      "delete": "마일스톤 {{name}} 삭제"
     }
   },
   "diagram": {
@@ -1224,6 +1667,12 @@
       "title": "접속자 {{count}}명",
       "online": "접속 중",
       "me": "나"
+    },
+    "remotePending": {
+      "message": "원격 변경 대기 중",
+      "accept": "수락",
+      "reject": "거절",
+      "merge": "병합"
     }
   },
   "permission": {
@@ -1249,5 +1698,128 @@
   "language": {
     "ko": "한국어",
     "en": "English"
+  },
+  "theme": {
+    "paper": "Paper",
+    "graphite": "Graphite",
+    "midnight": "Midnight",
+    "current": "현재 테마",
+    "aria": {
+      "switchTheme": "테마 전환"
+    }
+  },
+  "staffing": {
+    "tab": {
+      "title": "인력 투입"
+    },
+    "section": {
+      "title": "인력 투입 계획",
+      "description": "팀원별 투입 기간, 참여율, 등급, 단가를 관리하고 계획 대비 실적 M/M을 비교합니다."
+    },
+    "action": {
+      "create": "인력 투입 추가",
+      "refresh": "인력 투입 새로고침",
+      "edit": "인력 투입 수정",
+      "delete": "인력 투입 삭제"
+    },
+    "summary": {
+      "plannedMm": "계획 M/M",
+      "actualMm": "실적 M/M",
+      "deltaMm": "차이",
+      "plannedCost": "계획 인건비",
+      "actualCost": "실적 인건비"
+    },
+    "field": {
+      "member": "팀원",
+      "grade": "등급",
+      "monthlyRate": "월 단가",
+      "plannedPeriod": "계획 기간",
+      "plannedParticipation": "계획 참여율",
+      "actualPeriod": "실적 기간",
+      "actualParticipation": "실적 참여율",
+      "plannedMm": "계획 M/M",
+      "actualMm": "실적 M/M",
+      "deltaMm": "M/M 차이",
+      "cost": "인건비",
+      "actions": "작업"
+    },
+    "form": {
+      "createTitle": "인력 투입 추가",
+      "editTitle": "인력 투입 수정",
+      "createDescription": "프로젝트 인력 투입 정보를 입력합니다.",
+      "editDescription": "프로젝트 인력 투입 정보를 수정합니다.",
+      "memberPlaceholder": "팀원을 선택하세요",
+      "gradePlaceholder": "등급을 선택하세요",
+      "ratePlaceholder": "월 단가를 입력하세요",
+      "memberLocked": "생성 후 팀원은 변경할 수 없습니다.",
+      "plannedStartDate": "계획 시작일",
+      "plannedEndDate": "계획 종료일",
+      "actualStartDate": "실적 시작일",
+      "actualEndDate": "실적 종료일",
+      "createAction": "인력 투입 추가",
+      "saveAction": "인력 투입 저장",
+      "close": "인력 투입 창 닫기",
+      "saving": "인력 투입 저장 중"
+    },
+    "empty": {
+      "title": "인력 투입을 계획하세요",
+      "description": "팀원의 기간, 참여율, 등급, 단가를 입력하면 M/M과 인건비가 자동 계산됩니다.",
+      "readOnlyDescription": "이 프로젝트에는 아직 인력 투입 행이 없습니다."
+    },
+    "status": {
+      "loading": "인력 투입 정보를 불러오는 중...",
+      "loadFailedTitle": "인력 투입 정보를 불러오지 못했습니다",
+      "loadFailed": "인력 투입 행과 계산된 M/M 합계를 다시 불러오세요.",
+      "readOnly": "인력 투입 정보는 볼 수 있지만 수정하려면 프로젝트 편집 권한이 필요합니다.",
+      "actualNotEntered": "실적 미입력"
+    },
+    "toast": {
+      "created": "인력 투입 행을 추가했습니다",
+      "updated": "인력 투입 행을 수정했습니다",
+      "deleted": "인력 투입 행을 삭제했습니다",
+      "createFailed": "인력 투입 행을 추가하지 못했습니다",
+      "updateFailed": "인력 투입 행을 수정하지 못했습니다",
+      "deleteFailed": "인력 투입 행을 삭제하지 못했습니다",
+      "refreshFailed": "인력 투입 정보를 새로고침하지 못했습니다"
+    },
+    "delete": {
+      "title": "인력 투입 행을 삭제할까요?",
+      "description": "{{name}}의 계획/실적 M/M과 인건비가 프로젝트 합계에서 제거됩니다.",
+      "confirm": "인력 투입 삭제"
+    },
+    "grade": {
+      "junior": "초급",
+      "middle": "중급",
+      "senior": "고급",
+      "expert": "특급"
+    },
+    "matrix": {
+      "title": "월별 투입 매트릭스",
+      "description": "월별 계획/실적 M/M을 팀원 단위로 비교합니다.",
+      "planned": "계획",
+      "actual": "실적",
+      "empty": "표시할 월별 투입 데이터가 없습니다.",
+      "windowRange": "{{start}} ~ {{end}} · 총 {{total}}개월",
+      "previousWindow": "이전 월 구간",
+      "nextWindow": "다음 월 구간"
+    },
+    "validation": {
+      "memberRequired": "팀원을 선택하세요.",
+      "duplicateMember": "이미 등록된 팀원입니다.",
+      "notTeamMember": "선택한 사용자는 현재 팀 멤버가 아닙니다.",
+      "invalidRate": "월 단가는 0 이상의 정수여야 합니다.",
+      "plannedDatePair": "계획 시작일과 종료일을 함께 입력하세요.",
+      "plannedDateOrder": "계획 종료일은 시작일 이후여야 합니다.",
+      "plannedParticipation": "계획 참여율은 0에서 100 사이여야 합니다.",
+      "actualDatePair": "실적 시작일과 종료일을 함께 입력하세요.",
+      "actualDateOrder": "실적 종료일은 시작일 이후여야 합니다.",
+      "actualParticipation": "실적 참여율은 0에서 100 사이여야 합니다.",
+      "rateOutOfRange": "월 단가는 허용 범위를 초과했습니다.",
+      "costOutOfRange": "계산된 인건비가 허용 범위를 초과했습니다."
+    },
+    "aria": {
+      "edit": "{{name}} 인력 투입 행 수정",
+      "delete": "{{name}} 인력 투입 행 삭제"
+    }
   }
 }

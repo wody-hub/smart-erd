@@ -96,18 +96,16 @@ export default function EditableColumnRow({
   const targetHandlePlacements = getColumnHandlePlacements(handleLayout, 'target');
   const sourceHandlePlacements = getColumnHandlePlacements(handleLayout, 'source');
   const shouldRenderHandles = connected || fkMode;
-  const legacyTargetPlacement =
-    shouldRenderHandles
-      ? targetHandlePlacements.find((placement) => placement.side === 'left') ??
-        targetHandlePlacements[0] ??
-        null
-      : null;
-  const legacySourcePlacement =
-    shouldRenderHandles
-      ? sourceHandlePlacements.find((placement) => placement.side === 'right') ??
-        sourceHandlePlacements[0] ??
-        null
-      : null;
+  const legacyTargetPlacement = shouldRenderHandles
+    ? (targetHandlePlacements.find((placement) => placement.side === 'left') ??
+      targetHandlePlacements[0] ??
+      null)
+    : null;
+  const legacySourcePlacement = shouldRenderHandles
+    ? (sourceHandlePlacements.find((placement) => placement.side === 'right') ??
+      sourceHandlePlacements[0] ??
+      null)
+    : null;
 
   return (
     <div

@@ -1,7 +1,35 @@
 import type { MarkdownTemplateKey } from '@/types/markdown';
 
+export const SCREEN_SPEC_DOCUMENT_PLUGIN_ID = 'screen-spec';
+export const SCREEN_DESIGN_DOCUMENT_PLUGIN_ALIAS = 'screendesign';
+
 /** 문서 플러그인 식별자. */
-export type DocumentPluginId = 'erd' | 'markdown';
+export type DocumentPluginId = 'erd' | 'markdown' | typeof SCREEN_SPEC_DOCUMENT_PLUGIN_ID;
+
+/**
+ * 서버 alias까지 포함해 화면기획 문서 여부를 판별한다.
+ *
+ * @param pluginId 검사할 문서 플러그인 id
+ * @returns 화면기획 문서 플러그인이면 true
+ */
+export function isScreenSpecPluginId(pluginId: string): boolean {
+  return (
+    pluginId === SCREEN_SPEC_DOCUMENT_PLUGIN_ID || pluginId === SCREEN_DESIGN_DOCUMENT_PLUGIN_ALIAS
+  );
+}
+
+/**
+ * 서버 응답의 문서 플러그인 ID를 canonical 값으로 정규화한다.
+ *
+ * @param pluginId 서버에서 받은 문서 플러그인 id
+ * @returns canonical 문서 플러그인 id
+ */
+export function normalizeDocumentPluginId(pluginId: string): DocumentPluginId {
+  if (isScreenSpecPluginId(pluginId)) {
+    return SCREEN_SPEC_DOCUMENT_PLUGIN_ID;
+  }
+  return pluginId as DocumentPluginId;
+}
 
 /** 문서 collaboration bootstrap 공통 헤더. */
 export interface DocumentBootstrapHeader {

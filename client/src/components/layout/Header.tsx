@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import useAuthStore from '@/stores/useAuthStore';
 import { ROUTES } from '@/constants/routes';
 import { isElectron } from '@/lib/platform';
+import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSwitcher from './LanguageSwitcher';
 import type { WorkspaceContext } from '@/types/workspace';
 import WorkspaceHeaderShell from './WorkspaceHeaderShell';
@@ -26,11 +27,7 @@ interface HeaderProps {
  * 공통 workspace 헤더 shell 위에서 앱명, breadcrumb, 공용 유틸을 조합한다.
  * 도메인 전용 액세서리는 page 또는 도메인 컴포넌트에서 rightSlot으로 전달한다.
  */
-export default function Header({
-  workspaceContext,
-  title,
-  rightSlot,
-}: HeaderProps) {
+export default function Header({ workspaceContext, title, rightSlot }: HeaderProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const name = useAuthStore((s) => s.name);
@@ -54,6 +51,7 @@ export default function Header({
         <div className="header-utility-rail">
           {rightSlot}
           <div className="header-utility-group">
+            <ThemeSwitcher />
             <LanguageSwitcher />
             {isElectron() && (
               <Button

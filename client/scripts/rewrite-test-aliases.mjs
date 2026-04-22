@@ -1,7 +1,10 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const tmpRoot = path.resolve('.tmp-test');
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const clientRoot = path.resolve(scriptDir, '..');
+const tmpRoot = path.join(clientRoot, '.tmp-test');
 
 /**
  * Recursively collects JavaScript files emitted for unit tests.

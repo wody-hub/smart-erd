@@ -118,10 +118,7 @@ export default function TableNodeHeader({
                   </button>
                 </PopoverTrigger>
                 <PopoverContent side="bottom" align="start" className="w-auto p-2">
-                  <TableColorPicker
-                    currentColor={normalizedHeaderColor}
-                    onSelect={onColorChange}
-                  />
+                  <TableColorPicker currentColor={normalizedHeaderColor} onSelect={onColorChange} />
                 </PopoverContent>
               </Popover>
             )}

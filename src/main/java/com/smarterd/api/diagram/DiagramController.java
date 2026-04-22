@@ -4,8 +4,8 @@ import com.smarterd.api.diagram.dto.CreateDiagramRequest;
 import com.smarterd.api.diagram.dto.DiagramBootstrapResponse;
 import com.smarterd.api.diagram.dto.DiagramDetailResponse;
 import com.smarterd.api.diagram.dto.DiagramResponse;
-import com.smarterd.api.diagram.dto.ExportDocumentRequest;
 import com.smarterd.api.diagram.dto.ExportDiagramWorkbookRequest;
+import com.smarterd.api.diagram.dto.ExportDocumentRequest;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotRequest;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotResponse;
 import com.smarterd.api.diagram.dto.RenameDiagramRequest;
@@ -15,15 +15,15 @@ import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetResponse;
 import com.smarterd.application.diagram.command.PersistDiagramSnapshotUseCase;
 import com.smarterd.application.diagram.command.SaveDiagramUseCase;
+import com.smarterd.domain.diagram.service.DiagramBootstrapResult;
 import com.smarterd.domain.diagram.service.DiagramColumnDefinitionExportService;
+import com.smarterd.domain.diagram.service.DiagramDetailResult;
 import com.smarterd.domain.diagram.service.DiagramIndexDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService;
-import com.smarterd.domain.diagram.service.DiagramService.DiagramBootstrapResult;
-import com.smarterd.domain.diagram.service.DiagramService.DiagramDetailResult;
-import com.smarterd.domain.diagram.service.DiagramService.DiagramSummaryResult;
-import com.smarterd.domain.diagram.service.DiagramService.DictionarySetChangeResult;
-import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
+import com.smarterd.domain.diagram.service.DiagramSummaryResult;
 import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
+import com.smarterd.domain.diagram.service.DictionarySetChangeResult;
+import com.smarterd.domain.diagram.service.SaveDiagramResult;
 import com.smarterd.domain.markdown.service.MarkdownExportService;
 import com.smarterd.utils.ExcelUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -410,7 +410,10 @@ public class DiagramController {
         final var diagram = diagramService.loadReadableDiagram(jwt.getSubject(), teamId, projectId, diagramId);
         final var exportResult = markdownExportService.export(diagram, request.format());
         response.setContentType(exportResult.contentType());
-        final var encodedName = java.net.URLEncoder.encode(exportResult.fileName(), java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
+        final var encodedName = java.net.URLEncoder.encode(
+            exportResult.fileName(),
+            java.nio.charset.StandardCharsets.UTF_8
+        ).replace("+", "%20");
         response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + encodedName);
         response.getOutputStream().write(exportResult.body());
     }

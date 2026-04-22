@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verify;
 
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.service.DiagramSnapshotService;
+import com.smarterd.domain.markdown.service.MarkdownDocumentDescriptorService;
 import com.smarterd.domain.project.entity.Project;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,9 +19,15 @@ class SaveDiagramAuthoritativeContentUseCaseTest {
     @Mock
     private DiagramSnapshotService diagramSnapshotService;
 
+    @Mock
+    private MarkdownDocumentDescriptorService markdownDocumentDescriptorService;
+
     @Test
     void execute_updatesContentAndSchedulesRealtimeReconcile() {
-        final var useCase = new SaveDiagramAuthoritativeContentUseCase(diagramSnapshotService);
+        final var useCase = new SaveDiagramAuthoritativeContentUseCase(
+            diagramSnapshotService,
+            markdownDocumentDescriptorService
+        );
         final var diagram = Diagram.builder()
             .name("D")
             .project(Project.builder().name("P").build())

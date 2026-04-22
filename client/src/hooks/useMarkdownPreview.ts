@@ -32,10 +32,9 @@ export function useMarkdownPreview(body: string): string {
       return;
     }
     try {
-      const worker = new Worker(
-        new URL('../lib/markdown-preview-worker.ts', import.meta.url),
-        { type: 'module' },
-      );
+      const worker = new Worker(new URL('../lib/markdown-preview-worker.ts', import.meta.url), {
+        type: 'module',
+      });
       worker.addEventListener('message', (event: MessageEvent<PreviewResponse>) => {
         if (event.data.id === requestIdRef.current) {
           setHtml(event.data.html);
@@ -57,17 +56,14 @@ export function useMarkdownPreview(body: string): string {
     };
   }, []);
 
-  const requestPreview = useCallback(
-    (nextBody: string) => {
-      const id = ++requestIdRef.current;
-      if (workerRef.current && !workerFailedRef.current) {
-        workerRef.current.postMessage({ id, body: nextBody });
-      } else {
-        setHtml(renderMarkdownPreview(nextBody));
-      }
-    },
-    [],
-  );
+  const requestPreview = useCallback((nextBody: string) => {
+    const id = ++requestIdRef.current;
+    if (workerRef.current && !workerFailedRef.current) {
+      workerRef.current.postMessage({ id, body: nextBody });
+    } else {
+      setHtml(renderMarkdownPreview(nextBody));
+    }
+  }, []);
 
   useEffect(() => {
     if (timerRef.current !== null) {

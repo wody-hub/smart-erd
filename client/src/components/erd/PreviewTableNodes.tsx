@@ -3,18 +3,13 @@ import { type NodeProps, type NodeTypes } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useErdDictionary } from './ErdDictionaryContext';
 import type { DslPreviewNode } from '@/lib/dsl-preview-graph';
-import {
-  type WarningValidationStatus,
-} from '@/hooks/useColumnValidation';
+import { type WarningValidationStatus } from '@/hooks/useColumnValidation';
 import TableNodeHeader from './TableNodeHeader';
 import StaticColumnRow from './StaticColumnRow';
 import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
 import type { TableNode as PersistedTableNode } from '@/types/erd';
 import { getColumnHandlePlacements } from './columnHandleLayout';
-import {
-  useConnectedColumnDirections,
-  useConnectedColumnIds,
-} from './ConnectedColumnIdsContext';
+import { useConnectedColumnDirections, useConnectedColumnIds } from './ConnectedColumnIdsContext';
 import {
   type CompactTableRenderingMode,
   resolvePreviewCompactTableMode,

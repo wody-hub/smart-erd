@@ -12,11 +12,7 @@ export class DiagramYjsDocumentAdapter implements YjsDocumentAdapter<DiagramColl
   /**
    * {@inheritDoc}
    */
-  applyBootstrapToDoc(
-    doc: Y.Doc,
-    bootstrap: DiagramCollaborationBootstrap,
-    origin: unknown,
-  ): void {
+  applyBootstrapToDoc(doc: Y.Doc, bootstrap: DiagramCollaborationBootstrap, origin: unknown): void {
     if (!bootstrap.content) {
       return;
     }

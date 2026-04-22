@@ -232,11 +232,38 @@ class DiagramServiceTest {
             Optional.of(diagram)
         );
 
-        assertThatThrownBy(() ->
-            diagramService.updateDiagramDictionarySet(loginId, teamId, projectId, diagramId, 300L)
-        )
+        assertThatThrownBy(() -> diagramService.updateDiagramDictionarySet(loginId, teamId, projectId, diagramId, 300L))
             .isInstanceOf(BusinessException.class)
             .hasMessage(MessageCode.ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
+        verify(roomManager, never()).getSessionCount(diagramId);
+        verify(dictionarySetService, never()).findByTeamAndId(team, 300L);
+    }
+
+    @Test
+    @DisplayName("updateDiagramDictionarySet - 화면기획 문서는 사전 컨텍스트 변경을 허용하지 않는다")
+    void updateDiagramDictionarySet_whenScreenSpecDocument_throwsBusinessException() {
+        final var loginId = "tester";
+        final var teamId = 1L;
+        final var projectId = 10L;
+        final var diagramId = 100L;
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(teamId, user);
+        final var project = createProject(projectId, team);
+        final var diagram = Objects.requireNonNull(
+            Diagram.builder().name("Screen Spec").pluginId("screen-spec").project(project).content(null).build()
+        );
+        ReflectionTestUtils.setField(diagram, "id", diagramId);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(teamId)).thenReturn(team);
+        when(projectService.findProjectById(projectId)).thenReturn(project);
+        when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, diagramId)).thenReturn(
+            Optional.of(diagram)
+        );
+
+        assertThatThrownBy(() -> diagramService.updateDiagramDictionarySet(loginId, teamId, projectId, diagramId, 300L))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage(MessageCode.ERROR_BUSINESS_SCREEN_SPEC_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
         verify(roomManager, never()).getSessionCount(diagramId);
         verify(dictionarySetService, never()).findByTeamAndId(team, 300L);
     }
@@ -293,11 +320,22 @@ class DiagramServiceTest {
         when(authService.findUserByLoginId(loginId)).thenReturn(user);
         when(teamService.findTeamById(1L)).thenReturn(team);
         when(projectService.findProjectById(10L)).thenReturn(project);
-        when(markdownTemplateService.buildInitialContent("API Doc", "technical-spec")).thenReturn("---\ntemplate: technical-spec\n---\n# API Doc");
-        when(markdownDocumentDescriptorService.describe(org.mockito.ArgumentMatchers.anyString()))
-            .thenReturn(new MarkdownTemplateDescriptor("technical-spec", "기술 설계 문서", "API Doc"));
+        when(markdownTemplateService.buildInitialContent("API Doc", "technical-spec")).thenReturn(
+            "---\ntemplate: technical-spec\n---\n# API Doc"
+        );
+        when(markdownDocumentDescriptorService.describe(org.mockito.ArgumentMatchers.anyString())).thenReturn(
+            new MarkdownTemplateDescriptor("technical-spec", "기술 설계 문서", "API Doc")
+        );
 
-        final var result = diagramService.createDiagram(loginId, 1L, 10L, "API Doc", "markdown", null, "technical-spec");
+        final var result = diagramService.createDiagram(
+            loginId,
+            1L,
+            10L,
+            "API Doc",
+            "markdown",
+            null,
+            "technical-spec"
+        );
 
         assertThat(result.name()).isEqualTo("API Doc");
         assertThat(result.pluginId()).isEqualTo(DiagramPluginId.MARKDOWN.value());
@@ -319,6 +357,59 @@ class DiagramServiceTest {
         assertThatThrownBy(() -> diagramService.createDiagram(loginId, 1L, 10L, "Doc", "markdown", 200L, null))
             .isInstanceOf(BusinessException.class)
             .hasMessage(MessageCode.ERROR_BUSINESS_MARKDOWN_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
+    }
+
+    @Test
+    @DisplayName("createDiagram - 화면기획 문서는 dictionarySet 없이 생성한다")
+    void createDiagram_screenSpecWithoutDictionarySet_createsDiagram() {
+        final var loginId = "tester";
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(1L, user);
+        final var project = createProject(10L, team);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(1L)).thenReturn(team);
+        when(projectService.findProjectById(10L)).thenReturn(project);
+
+        final var result = diagramService.createDiagram(loginId, 1L, 10L, "Screen Flow", "screen-spec", null, null);
+
+        assertThat(result.name()).isEqualTo("Screen Flow");
+        assertThat(result.pluginId()).isEqualTo(DiagramPluginId.SCREEN_SPEC.value());
+        verify(diagramRepository).save(org.mockito.ArgumentMatchers.any(Diagram.class));
+    }
+
+    @Test
+    @DisplayName("createDiagram - screendesign alias를 받아도 canonical screen-spec으로 저장한다")
+    void createDiagram_screenDesignAlias_normalizesToScreenSpec() {
+        final var loginId = "tester";
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(1L, user);
+        final var project = createProject(10L, team);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(1L)).thenReturn(team);
+        when(projectService.findProjectById(10L)).thenReturn(project);
+
+        final var result = diagramService.createDiagram(loginId, 1L, 10L, "Wireframe", "screendesign", null, null);
+
+        assertThat(result.pluginId()).isEqualTo(DiagramPluginId.SCREEN_SPEC.value());
+    }
+
+    @Test
+    @DisplayName("createDiagram - 화면기획 문서에 dictionarySetId가 있으면 예외를 던진다")
+    void createDiagram_screenSpecWithDictionarySet_throwsBusinessException() {
+        final var loginId = "tester";
+        final var user = createUser(1L, loginId);
+        final var team = createTeam(1L, user);
+        final var project = createProject(10L, team);
+
+        when(authService.findUserByLoginId(loginId)).thenReturn(user);
+        when(teamService.findTeamById(1L)).thenReturn(team);
+        when(projectService.findProjectById(10L)).thenReturn(project);
+
+        assertThatThrownBy(() -> diagramService.createDiagram(loginId, 1L, 10L, "Spec", "screen-spec", 200L, null))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage(MessageCode.ERROR_BUSINESS_SCREEN_SPEC_DICTIONARY_CONTEXT_NOT_ALLOWED.code());
     }
 
     @Test

@@ -46,6 +46,14 @@ public interface DiagramRepository extends JpaRepository<Diagram, Long>, Diagram
 
     long countByDictionarySetAndDeletedAtIsNull(DictionarySet dictionarySet);
 
+    /**
+     * 특정 프로젝트의 삭제되지 않은 다이어그램 수를 조회한다.
+     *
+     * @param project 프로젝트
+     * @return 다이어그램 수
+     */
+    long countByProjectAndDeletedAtIsNull(Project project);
+
     @Modifying
     @Query("update Diagram d set d.dictionarySet = null where d.dictionarySet = :dictionarySet")
     int clearDictionarySetReferences(@Param("dictionarySet") DictionarySet dictionarySet);

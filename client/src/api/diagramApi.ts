@@ -2,7 +2,11 @@ import axiosInstance from './axiosInstance';
 import { STORAGE_KEYS } from '@/constants/storage';
 import { downloadBlob } from '@/lib/download';
 import { getApiBaseUrl } from '@/lib/platform';
-import type { CreateProjectDocumentInput, DocumentBootstrapPayload } from '@/types/document';
+import {
+  normalizeDocumentPluginId,
+  type CreateProjectDocumentInput,
+  type DocumentBootstrapPayload,
+} from '@/types/document';
 import type {
   DiagramSummary,
   DiagramDetail,
@@ -12,6 +16,45 @@ import type {
 import type { WsTicketIssueResponse } from '@/types/collaboration';
 
 export type { DiagramSummary, DiagramDetail };
+
+/**
+ * 서버 다이어그램 요약 응답의 plugin id를 canonical 값으로 정규화한다.
+ *
+ * @param summary 서버에서 받은 다이어그램 요약
+ * @returns plugin id가 정규화된 다이어그램 요약
+ */
+function normalizeDiagramSummary(summary: DiagramSummary): DiagramSummary {
+  return {
+    ...summary,
+    pluginId: normalizeDocumentPluginId(summary.pluginId),
+  };
+}
+
+/**
+ * 서버 다이어그램 상세 응답의 plugin id를 canonical 값으로 정규화한다.
+ *
+ * @param detail 서버에서 받은 다이어그램 상세
+ * @returns plugin id가 정규화된 다이어그램 상세
+ */
+function normalizeDiagramDetail(detail: DiagramDetail): DiagramDetail {
+  return {
+    ...detail,
+    pluginId: normalizeDocumentPluginId(detail.pluginId),
+  };
+}
+
+/**
+ * 문서 bootstrap 응답의 plugin id를 canonical 값으로 정규화한다.
+ *
+ * @param bootstrap 서버에서 받은 문서 bootstrap
+ * @returns plugin id가 정규화된 문서 bootstrap
+ */
+function normalizeDocumentBootstrap(bootstrap: DocumentBootstrapPayload): DocumentBootstrapPayload {
+  return {
+    ...bootstrap,
+    pluginId: normalizeDocumentPluginId(bootstrap.pluginId),
+  };
+}
 
 /**
  * Uint8Array를 base64 문자열로 인코딩한다.
@@ -42,7 +85,7 @@ function encodeBytesToBase64(bytes: Uint8Array): string {
  */
 export async function fetchDiagrams(teamId: string, projectId: string): Promise<DiagramSummary[]> {
   const res = await axiosInstance.get(`/teams/${teamId}/projects/${projectId}/diagrams`);
-  return res.data;
+  return res.data.map(normalizeDiagramSummary);
 }
 
 /**
@@ -61,7 +104,7 @@ export async function fetchDiagram(
   const res = await axiosInstance.get(
     `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`,
   );
-  return res.data;
+  return normalizeDiagramDetail(res.data);
 }
 
 /**
@@ -80,7 +123,7 @@ export async function fetchDiagramBootstrap(
   const res = await axiosInstance.get(
     `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/bootstrap`,
   );
-  return res.data;
+  return normalizeDocumentBootstrap(res.data);
 }
 
 /**
@@ -102,7 +145,7 @@ export async function createDiagram(
     dictionarySetId: input.dictionarySetId ?? null,
     templateKey: input.templateKey ?? null,
   });
-  return res.data;
+  return normalizeDiagramSummary(res.data);
 }
 
 /**
@@ -112,6 +155,7 @@ export async function createDiagram(
  * @param projectId 프로젝트 ID
  * @param diagramId 다이어그램 ID
  * @param content   직렬화된 React Flow JSON
+ * @param ydocSnapshot 저장할 선택적 Y.Doc 스냅샷
  * @returns 최신 저장 상태
  */
 export async function saveDiagram(
@@ -138,8 +182,10 @@ export async function saveDiagram(
  * @param teamId 팀 ID
  * @param projectId 프로젝트 ID
  * @param diagramId 다이어그램 ID
+ * @param expectedContentRevision 현재 콘텐츠 revision 기대값
  * @param ydocSnapshot 현재 Y.Doc 전체 상태 update
- * @returns 없음
+ * @param options 스냅샷 저장 정책 옵션
+ * @returns 실제로 스냅샷이 저장됐는지 여부
  */
 export async function persistDiagramYdocSnapshot(
   teamId: string,
@@ -170,6 +216,7 @@ export async function persistDiagramYdocSnapshot(
  * @param teamId 팀 ID
  * @param projectId 프로젝트 ID
  * @param diagramId 다이어그램 ID
+ * @param expectedContentRevision 현재 콘텐츠 revision 기대값
  * @param ydocSnapshot 현재 Y.Doc 전체 상태 update
  * @returns 요청 시작 여부
  */
@@ -231,6 +278,7 @@ export async function renameDiagram(
  * @param projectId       프로젝트 ID
  * @param diagramId       다이어그램 ID
  * @param dictionarySetId 변경할 사전 세트 ID
+ * @returns 변경된 사전 컨텍스트 바인딩 결과
  */
 export async function updateDiagramDictionaryContext(
   teamId: string,
@@ -269,6 +317,7 @@ export async function requestWsTicket(diagramId: string): Promise<WsTicketIssueR
  * @param teamId    팀 ID
  * @param projectId 프로젝트 ID
  * @param diagramId 다이어그램 ID
+ * @returns 없음
  */
 export async function deleteDiagram(
   teamId: string,

@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { DraftParseStatus, DraftReconcileState, DraftState } from '@/collaboration/core/draft/draft-state';
+import type {
+  DraftParseStatus,
+  DraftReconcileState,
+  DraftState,
+} from '@/collaboration/core/draft/draft-state';
 import { djb2 } from '@/lib/hash';
 import { resolveCodeAutoApplyStatus } from '@/lib/code-sync-apply-gate';
 import type { SyncStatus } from '@/constants/sync-status';
@@ -122,13 +126,22 @@ export function useBidirectionalCodeSync({
   const lastObservedErdRevisionRef = useRef<string | null>(null);
   const pendingErdSyncRevisionRef = useRef<string | null>(null);
   const suppressNextErdSyncRef = useRef(false);
+  /**
+   * 초기 sync의 리비전 변경을 흡수할 수 있는 상태인지 여부.
+   *
+   * 마운트 직후 첫 리비전 변경은 WebSocket 초기 sync에서 발생하며,
+   * 사용자 편집이 아직 없는 상태이므로 remote-pending으로 처리하지 않는다.
+   * 사용자가 코드 편집을 시작하면 false로 전환되어 이후 remote 리비전 변경은
+   * 정상적으로 pending으로 표시된다.
+   */
+  const canAbsorbInitialSyncRef = useRef(true);
   const inFlightApplyRef = useRef(false);
   const parseBaseRevisionHashRef = useRef<string | null>(null);
   const prevParsingRef = useRef(parsing);
   const codeTextRef = useRef(codeText);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(null);
-  const [lastAcceptedRevision, setLastAcceptedRevision] = useState<string | undefined>(() =>
-    currentErdRevisionHash || undefined,
+  const [lastAcceptedRevision, setLastAcceptedRevision] = useState<string | undefined>(
+    () => currentErdRevisionHash || undefined,
   );
   const [pendingRemoteRevision, setPendingRemoteRevision] = useState<string | undefined>(undefined);
   const syncStatusRef = useRef<SyncStatus>(null);
@@ -197,6 +210,13 @@ export function useBidirectionalCodeSync({
       if (suppressNextErdSyncRef.current) {
         suppressNextErdSyncRef.current = false;
       }
+      // 사용자 코드 편집이 시작되기 전의 리비전 변경은 초기 sync 또는
+      // 아직 편집하지 않은 상태의 원격 변경이므로 remote-pending으로 처리하지 않고
+      // 현재 리비전을 조용히 수락한다. ERD→코드 자동 동기화가 활성이면 코드가 자동 갱신된다.
+      if (canAbsorbInitialSyncRef.current) {
+        acceptCurrentRevision(null);
+        return;
+      }
       pendingErdSyncRevisionRef.current = currentRevisionHash;
       setPendingRemoteRevision(currentRevisionHash);
     }
@@ -238,6 +258,7 @@ export function useBidirectionalCodeSync({
         return;
       }
       autoApplyBlockedRef.current = false;
+      canAbsorbInitialSyncRef.current = false;
       // Code 편집이 시작되면 직전 ERD->Code 대기열은 취소해 역방향 덮어쓰기를 방지한다.
       clearErdToCodeTimer();
       pendingErdSyncRevisionRef.current = null;
@@ -269,11 +290,17 @@ export function useBidirectionalCodeSync({
       }
       setStatus(null);
     },
-    [acceptCurrentRevision, codeText, draftTrackingEnabled, enableErdToCodeSync, syncUpdate, setStatus],
+    [
+      acceptCurrentRevision,
+      codeText,
+      draftTrackingEnabled,
+      enableErdToCodeSync,
+      syncUpdate,
+      setStatus,
+    ],
   );
 
-  const shouldBlockCodeToErdAutoSync =
-    blockCodeToErdAutoSync || pendingRemoteRevision != null;
+  const shouldBlockCodeToErdAutoSync = blockCodeToErdAutoSync || pendingRemoteRevision != null;
 
   // 코드 -> ERD 자동 반영
   useEffect(() => {
@@ -494,6 +521,7 @@ export function useBidirectionalCodeSync({
       parseBaseRevisionHashRef.current = null;
       userEditingSessionRef.current = false;
       syncStatusRef.current = null;
+      canAbsorbInitialSyncRef.current = true;
     };
   }, [clearCodeToErdTimer, clearErdToCodeTimer]);
 

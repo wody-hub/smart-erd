@@ -25,10 +25,7 @@ const DOCUMENT_TYPE_BADGE_STYLES: Record<WorkspaceDocumentType, string> = {
  * @param props 배지 props
  * @returns 문서 유형 배지 JSX
  */
-export default function DocumentTypeBadge({
-  documentType,
-  className,
-}: DocumentTypeBadgeProps) {
+export default function DocumentTypeBadge({ documentType, className }: DocumentTypeBadgeProps) {
   const { t } = useTranslation();
   const token = getWorkspaceDocumentTypeLabel(documentType);
 

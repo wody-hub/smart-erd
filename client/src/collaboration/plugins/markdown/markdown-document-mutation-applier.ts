@@ -19,7 +19,7 @@ export class MarkdownDocumentMutationApplier {
       case 'markdown:body-replace':
         return this.toApplyResult(this.applyBufferReplace(mutation));
       case 'markdown:section-update':
-        return this.toApplyResult(this.applyBufferReplace(mutation));
+        return this.toApplyResult(this.applySectionUpdate(mutation));
       case 'markdown:frontmatter-update':
         return this.toApplyResult(this.applyFrontmatterUpdate(mutation));
       default:
@@ -40,6 +40,20 @@ export class MarkdownDocumentMutationApplier {
       return false;
     }
     this.documentAdapter.replaceBuffer(this.engine.getDocument(), buffer, mutation.key);
+    return true;
+  }
+
+  private applySectionUpdate(mutation: DocumentMutation): boolean {
+    const payload = mutation.payload;
+    if (typeof payload?.sectionId !== 'string' || typeof payload?.sectionText !== 'string') {
+      return false;
+    }
+    this.documentAdapter.applySectionUpdate(
+      this.engine.getDocument(),
+      payload.sectionId as string,
+      payload.sectionText as string,
+      mutation.key,
+    );
     return true;
   }
 

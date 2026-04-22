@@ -12,6 +12,8 @@ export const ROUTES = {
   DICTIONARY_PATTERN: '/teams/:teamId/dictionary',
   /** 다이어그램 목록 페이지 (라우트 패턴) */
   DIAGRAMS_PATTERN: '/teams/:teamId/projects/:projectId/diagrams',
+  /** 전용 WBS 작업공간 페이지 (라우트 패턴) */
+  PROJECT_WBS_PATTERN: '/teams/:teamId/projects/:projectId/wbs',
   /** 다이어그램 편집 페이지 (라우트 패턴) */
   DIAGRAM_PATTERN: '/teams/:teamId/projects/:projectId/diagrams/:diagramId',
   /** 프로젝트 목록 페이지 */
@@ -19,6 +21,9 @@ export const ROUTES = {
   /** 다이어그램 목록 페이지 */
   DIAGRAMS: (teamId: string | number, projectId: string | number) =>
     `/teams/${teamId}/projects/${projectId}/diagrams`,
+  /** 전용 WBS 작업공간 페이지 */
+  PROJECT_WBS: (teamId: string | number, projectId: string | number) =>
+    `/teams/${teamId}/projects/${projectId}/wbs`,
   /** 다이어그램 편집 페이지 */
   DIAGRAM: (teamId: string | number, projectId: string | number, diagramId: string | number) =>
     `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`,

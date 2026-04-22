@@ -126,8 +126,9 @@ public class WsTicketService {
      * @param ticket 검증할 ticket 문자열
      * @return 검증 성공 시 세션 정보, 실패 시 empty
      */
+    @Transactional
     public Optional<AuthenticatedSession> validateAndConsume(String ticket) {
-        return wsTicketStore
+        final var result = wsTicketStore
             .consume(ticket)
             .map((data) -> {
                 final var sessionExpiresAt = Instant.now().plus(
@@ -142,6 +143,13 @@ public class WsTicketService {
                     1
                 );
             });
+        if (result.isEmpty()) {
+            log.debug(
+                "WebSocket ticket 검증 실패: ticketPrefix={}",
+                ticket.length() > 8 ? ticket.substring(0, 8) + "..." : ticket
+            );
+        }
+        return result;
     }
 
     /**

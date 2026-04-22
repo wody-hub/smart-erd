@@ -64,6 +64,14 @@
       "openProject": "Open documents",
       "emptyTitle": "No projects yet"
     },
+    "projectHub": {
+      "overviewDescription": "Review the project's core context and align the next execution window.",
+      "overviewMeta": "Business overview baseline",
+      "wbsMeta": "WBS work structure",
+      "ganttDescription": "Review WBS schedules and milestones on a shared timeline, then adjust the plan with confidence.",
+      "ganttMeta": "Timeline planning mode",
+      "staffingMeta": "Planned/actual M/M and labor cost"
+    },
     "dictionary": {
       "description": "Manage the shared word, term, and domain assets used across ERD and future document types.",
       "teamContext": "This is the shared dictionary asset hub for team {{name}}.",
@@ -103,13 +111,14 @@
       "stepTypeDescription": "Start by choosing how this document should work.",
       "stepSetupDescription": "Confirm the name and starting setup, then jump straight into editing.",
       "pluginSectionTitle": "Document type",
-      "pluginSectionHint": "ERD starts from a canvas workflow, Markdown starts from a writing workflow.",
+      "pluginSectionHint": "ERD and Screen Spec start from canvas workflows, while Markdown starts from a writing workflow.",
       "nameLabel": "Document name",
       "namePlaceholder": "Enter a document name",
       "nameHint": "This name appears in the document hub and the editor header.",
       "templateLabel": "Markdown template",
       "templateHint": "Start with a document structure and default frontmatter already in place.",
       "dictionaryHint": "Choose the default dictionary context attached to the ERD document.",
+      "screenSpecSetupHint": "The first revision opens a blank collaborative stage so the next phase can add shapes, layout presets, and screen state.",
       "erdRequiresDictionary": "Create at least one dictionary context in this project before starting an ERD document.",
       "selected": "Selected",
       "previewTitle": "Creation preview",
@@ -117,6 +126,8 @@
       "previewPendingName": "The name will appear here once you enter it.",
       "previewTemplateLabel": "Template",
       "previewDictionaryLabel": "Dictionary context",
+      "previewCanvasLabel": "Canvas state",
+      "previewCanvasBlank": "Blank collaborative stage",
       "includesTitle": "Includes",
       "previewMarkdownLine1": "Frontmatter and the initial section structure are created together.",
       "previewMarkdownLine2": "You can start editing immediately with Write, Outline, and Preview flows.",
@@ -124,8 +135,12 @@
       "previewErdLine1": "You start from an ERD canvas with the dictionary context attached.",
       "previewErdLine2": "Tables, relations, and code sync work are ready from the first screen.",
       "previewErdLine3": "The document stays managed alongside the dictionary in the hub.",
+      "previewScreenSpecLine1": "A blank Konva stage is created inside the collaboration runtime from the first load.",
+      "previewScreenSpecLine2": "The document joins the same Yjs/WebSocket flow as the other plugin types.",
+      "previewScreenSpecLine3": "The next phase can add screen entities and canvas tools without changing the route shell.",
       "erdDescription": "Create an ERD canvas document with a dictionary context attached.",
-      "markdownDescription": "Start a technical note, meeting note, or release note from a template."
+      "markdownDescription": "Start a technical note, meeting note, or release note from a template.",
+      "screenSpecDescription": "Start a collaborative screen-design document from a blank canvas stage."
     },
     "status": {
       "loadFailedTitle": "We couldn't load this workspace",
@@ -175,6 +190,205 @@
       "saved": "Saved",
       "savedAt": "Saved at {{time}}",
       "frontmatterInvalid": "Frontmatter YAML syntax error"
+    }
+  },
+  "screenSpec": {
+    "toast": {
+      "created": "Screen Spec document created",
+      "createFailed": "Failed to create the Screen Spec document"
+    },
+    "status": {
+      "loadFailed": "We couldn't load the Screen Spec document. Try again.",
+      "connecting": "Connecting the collaborative canvas...",
+      "ready": "Canvas live"
+    },
+    "aria": {
+      "connecting": "Connecting the Screen Spec collaborative canvas.",
+      "ready": "The Screen Spec canvas is ready.",
+      "connectionIssue": "There is a problem with the Screen Spec collaboration connection.",
+      "selectedScreen": "Selected screen {{screen}} with {{count}} instances.",
+      "selectedInstance": "Selected {{name}} on screen {{screen}}.",
+      "remoteSync": "Changes from another collaborator were applied to {{screen}}."
+    },
+    "toolbar": {
+      "screenLabel": "Screen",
+      "frameLabel": "Frame",
+      "previousScreen": "Previous screen",
+      "nextScreen": "Next screen",
+      "fitToFrame": "Fit",
+      "actualSize": "100%",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "export": "Export",
+      "exporting": "Exporting..."
+    },
+    "library": {
+      "title": "Building Blocks",
+      "subtitle": "Select a master to preview and stage the next drag interaction.",
+      "dragHint": "Drag a master onto the active screen",
+      "searchPlaceholder": "Search masters",
+      "listAriaLabel": "Screen spec master component library",
+      "emptyFiltered": "No masters match the current filter.",
+      "action": {
+        "newMaster": "New Master",
+        "renameMaster": "Rename",
+        "deleteMaster": "Delete"
+      },
+      "tier": {
+        "block": "Block",
+        "widget": "Widget"
+      },
+      "origin": {
+        "builtIn": "Built-in",
+        "custom": "Custom"
+      },
+      "category": {
+        "layout": "Layout",
+        "table": "Table",
+        "form": "Form",
+        "input": "Input",
+        "feedback": "Feedback",
+        "button": "Button"
+      },
+      "dialog": {
+        "createTitle": "Create a master component",
+        "createDescription": "Add a reusable component to this document library.",
+        "renameTitle": "Rename master component",
+        "renameDescription": "Update the label used in the library and preview panel.",
+        "deleteTitle": "Delete master component",
+        "deleteDescription": "Delete \"{{name}}\" from this document library.",
+        "nameLabel": "Master component name"
+      },
+      "item": {
+        "gnb": "GNB",
+        "lnb": "LNB",
+        "tabMenu": "Tab Menu",
+        "breadcrumb": "Breadcrumb",
+        "dataTable": "Data Table",
+        "simpleTable": "Simple Table",
+        "cardList": "Card List",
+        "loginForm": "Login Form",
+        "searchBar": "Search Bar",
+        "filterPanel": "Filter Panel",
+        "editForm": "Create/Edit Form",
+        "textInput": "Text Input",
+        "dropdown": "Dropdown",
+        "checkboxGroup": "Checkbox Group",
+        "radioGroup": "Radio Group",
+        "datePicker": "Date Picker",
+        "toast": "Toast",
+        "dialog": "Confirm Dialog",
+        "spinner": "Loading Spinner",
+        "emptyState": "Empty State",
+        "primaryButton": "Primary Button",
+        "iconButton": "Icon Button",
+        "buttonGroup": "Button Group"
+      }
+    },
+    "framePreset": {
+      "mobile": {
+        "label": "Mobile App"
+      },
+      "tablet": {
+        "label": "Tablet"
+      },
+      "desktop": {
+        "label": "Desktop Web"
+      }
+    },
+    "inspector": {
+      "title": "Inspector",
+      "masterTitle": "Master",
+      "masterEmpty": "Select a master in the library to inspect it.",
+      "screen": "Screen",
+      "selection": "Selection",
+      "frame": "Frame",
+      "size": "Size",
+      "status": "Status",
+      "masterDefault": "Master default",
+      "name": "Name",
+      "category": "Category",
+      "tier": "Tier",
+      "width": "Width",
+      "height": "Height",
+      "origin": "Origin",
+      "position": "Position",
+      "labelOverride": "Label override",
+      "accentColor": "Accent color",
+      "resetLabel": "Use master label",
+      "resetColor": "Use master color",
+      "resetSize": "Use master size",
+      "overrideStatus": {
+        "inherited": "Inherited from the master",
+        "overridden": "Overridden on this instance"
+      },
+      "layers": "Layers",
+      "bringToFront": "Bring to front",
+      "sendToBack": "Send to back",
+      "bringForward": "Bring forward",
+      "sendBackward": "Send backward",
+      "deleteSelection": "Delete selection",
+      "selectionEmpty": "Select an instance on the canvas to inspect it.",
+      "keyboardHint": "Tab cycles selection. Arrow keys move. Shift+Arrow moves faster. Shift+PageUp/PageDown switches screens.",
+      "previewHint": "Drag from the library to the stage when instance placement is enabled.",
+      "view": "View",
+      "zoom": "Zoom",
+      "offsetX": "Offset X",
+      "offsetY": "Offset Y"
+    },
+    "canvas": {
+      "title": "Blank collaborative canvas",
+      "workspaceTitle": "Screen canvas",
+      "gestureHint": "Drag to pan. Scroll to zoom.",
+      "dropHint": "Release to place the master on the active screen",
+      "emptyState": "Drag a master here to start the screen",
+      "selectMasterHint": "Choose a master from the library to preview it here."
+    },
+    "orphan": {
+      "title": "Deleted master",
+      "description": "This instance keeps its last known master snapshot. Rebind it to another master or delete it manually.",
+      "rebindLabel": "Reconnect to master",
+      "rebindPlaceholder": "Choose a replacement master",
+      "rebindAction": "Reconnect instance"
+    },
+    "screen": {
+      "defaultName": "Screen {{index}}"
+    },
+    "screenList": {
+      "title": "Screens",
+      "add": "Add",
+      "instanceCount": "{{count}} instances",
+      "instanceCount_one": "{{count}} instance",
+      "instanceCount_other": "{{count}} instances",
+      "namePlaceholder": "Screen name",
+      "moveUp": "Move screen up",
+      "moveDown": "Move screen down",
+      "delete": "Delete screen"
+    },
+    "export": {
+      "noScreens": "There are no screens to export",
+      "failed": "Failed to export the Screen Spec",
+      "inProgress": "Another export is already in progress",
+      "pngSuccess": "Exported {{screen}} as PNG",
+      "pdfSuccess": "Exported {{count}} screens as PDF",
+      "progress": {
+        "preparing": "Preparing export",
+        "rendering": "Rendering screen",
+        "assembling": "Building PDF",
+        "downloading": "Preparing download",
+        "failed": "Export failed",
+        "stepPreparing": "Prepare",
+        "stepRendering": "Render",
+        "stepFinalizing": "Finalize",
+        "stepDownloading": "Save",
+        "preparingDocument": "Preparing the screen list and export stages.",
+        "collectingScreens": "Checking the {{count}} screens included in the PDF.",
+        "renderingScreen": "Rendering {{screen}} into an export image.",
+        "renderingPage": "Rendering {{screen}} for page {{current}} of {{total}}.",
+        "downloadReady": "Finishing the file save sequence.",
+        "retryLater": "Please try again in a moment.",
+        "pdfPage": "Placing page {{current}} of {{total}} into the PDF."
+      }
     }
   },
   "auth": {
@@ -298,6 +512,236 @@
     "aria": {
       "deleteProject": "Delete project {{name}}",
       "settingsProject": "Settings for project {{name}}"
+    }
+  },
+  "businessOverview": {
+    "tab": {
+      "title": "Business overview"
+    },
+    "documentsTab": "Documents",
+    "field": {
+      "clientCompany": "Client company",
+      "contractorCompany": "Contractor company",
+      "contractAmount": "Contract amount",
+      "projectStartDate": "Project start date",
+      "projectEndDate": "Project end date",
+      "projectScope": "Project scope",
+      "empty": "Not registered"
+    },
+    "save": {
+      "success": "Business overview has been saved",
+      "failed": "Failed to save the business overview"
+    },
+    "summary": {
+      "memberCount": "Members",
+      "documentCount": "Documents",
+      "progressRate": "Progress",
+      "notAvailable": "-"
+    },
+    "emptyTitle": "No business overview has been registered yet",
+    "emptyDescription": "Register key information such as client, schedule, and budget for this project.",
+    "emptyCta": "Register business overview",
+    "editButton": "Edit",
+    "editAriaLabel": "Edit business overview",
+    "validation": {
+      "dateOrder": "End date must be on or after the start date",
+      "datePair": "Start and end dates must be filled together or left empty together",
+      "invalidAmount": "Contract amount must be a valid number"
+    }
+  },
+  "wbs": {
+    "tab": {
+      "title": "WBS"
+    },
+    "section": {
+      "title": "WBS Items",
+      "description": "Manage project work items in a hierarchy with schedule, progress, and milestone mapping."
+    },
+    "workspace": {
+      "title": "WBS workspace",
+      "description": "Expand the work structure, assign owners, and append new items without leaving the project context.",
+      "open": "Open workspace",
+      "backToProject": "Back to project hub"
+    },
+    "action": {
+      "create": "Add WBS item"
+    },
+    "dnd": {
+      "hint": "Drag with the handle to reorder. Move left/right while dragging to change hierarchy level."
+    },
+    "field": {
+      "name": "Item",
+      "assignee": "Assignee",
+      "period": "Period",
+      "progressRate": "Progress",
+      "estimatedMm": "Est. M/M",
+      "milestone": "Milestone",
+      "actions": "Actions",
+      "unassigned": "Unassigned",
+      "noPeriod": "Not set",
+      "noEstimatedMm": "Not set",
+      "noMilestone": "No milestone",
+      "mmValue": "{{value}} M/M"
+    },
+    "form": {
+      "createTitle": "Create WBS item",
+      "editTitle": "Edit WBS item",
+      "createDescription": "Enter the basic information for this WBS item.",
+      "editDescription": "Update the basic information for this WBS item.",
+      "name": "Item name",
+      "namePlaceholder": "e.g. Requirement analysis",
+      "parent": "Parent item",
+      "parentPlaceholder": "Select parent item",
+      "parentRoot": "Top-level item",
+      "assignee": "Assignee",
+      "assigneePlaceholder": "Select assignee",
+      "assigneeLoading": "Loading members",
+      "assigneeUnavailable": "Team member options are temporarily unavailable. You can still save other changes.",
+      "unassigned": "Unassigned",
+      "milestone": "Milestone",
+      "milestonePlaceholder": "Select milestone",
+      "noMilestone": "No mapping",
+      "startDate": "Start date",
+      "endDate": "End date",
+      "progressRate": "Progress (%)",
+      "estimatedMm": "Estimated M/M",
+      "estimatedMmPlaceholder": "e.g. 1.5"
+    },
+    "validation": {
+      "dateOrder": "End date must be on or after the start date",
+      "progressRate": "Progress must be between 0 and 100",
+      "estimatedMm": "Estimated M/M must be a number greater than or equal to 0"
+    },
+    "delete": {
+      "title": "Delete WBS item",
+      "description": "Delete \"{{name}}\"? Child items may also be removed."
+    },
+    "quickAdd": {
+      "root": "Add item at root level",
+      "child": "Add sub-item",
+      "add": "Add",
+      "cancel": "Cancel",
+      "setLater": "Set in details",
+      "nameRequired": "Enter a name before adding the item."
+    },
+    "toast": {
+      "created": "WBS item created",
+      "createFailed": "Failed to create WBS item",
+      "updated": "WBS item updated",
+      "updateFailed": "Failed to update WBS item",
+      "deleted": "WBS item deleted",
+      "deleteFailed": "Failed to delete WBS item",
+      "loadFailed": "Failed to load WBS items",
+      "reorderFailed": "Failed to reorder WBS items",
+      "reordered": "WBS order updated",
+      "depthLimitExceeded": "Cannot move item beyond depth level 3",
+      "invalidMove": "Cannot move an item into its own child"
+    },
+    "empty": {
+      "title": "No WBS items yet",
+      "description": "Create your first WBS item to start planning project work.",
+      "readOnlyDescription": "You can review existing WBS items and milestone links, but you need edit access to add or reorder items."
+    },
+    "status": {
+      "loadFailedTitle": "We couldn't load the WBS workspace"
+    },
+    "aria": {
+      "edit": "Edit WBS item {{name}}",
+      "delete": "Delete WBS item {{name}}",
+      "expand": "Expand WBS item {{name}}",
+      "collapse": "Collapse WBS item {{name}}",
+      "drag": "Drag WBS item {{name}}",
+      "editName": "Edit name of WBS item {{name}}",
+      "editProgress": "Edit progress of WBS item {{name}}"
+    }
+  },
+  "gantt": {
+    "tab": {
+      "title": "Gantt"
+    },
+    "description": "Review WBS schedules and milestones on one timeline, then drag bars to update dates directly.",
+    "dnd": {
+      "hint": "Drag timeline bars to adjust schedule dates."
+    },
+    "readOnly": {
+      "hint": "You can review the schedule, but drag editing is unavailable because you do not have edit access."
+    },
+    "toolbar": {
+      "day": "Day",
+      "week": "Week",
+      "month": "Month",
+      "today": "Today"
+    },
+    "empty": {
+      "title": "No Gantt data to display",
+      "description": "Add WBS items with dates or milestones with target dates to render the Gantt chart."
+    },
+    "legend": {
+      "milestone": "Milestone",
+      "delayed": "Delayed",
+      "onTrack": "On track"
+    },
+    "stats": {
+      "omitted": "{{count}} omitted"
+    },
+    "toast": {
+      "updateSuccess": "Schedule changes from Gantt were saved",
+      "updateFailed": "Failed to save schedule changes from Gantt"
+    },
+    "status": {
+      "loadFailedTitle": "We couldn't load the Gantt timeline",
+      "loadFailed": "Retry the timeline while keeping the current project context."
+    }
+  },
+  "milestone": {
+    "section": {
+      "title": "Milestones",
+      "description": "Track major checkpoints with target dates and achievement rates."
+    },
+    "action": {
+      "create": "Add milestone"
+    },
+    "field": {
+      "targetDate": "Target date",
+      "achievementRate": "Achievement",
+      "linkedWbsCount": "{{count}} WBS item(s) linked",
+      "noDescription": "No description"
+    },
+    "status": {
+      "onTrack": "On track",
+      "delayed": "Delayed"
+    },
+    "form": {
+      "createTitle": "Create milestone",
+      "editTitle": "Edit milestone",
+      "createDescription": "Enter the milestone details.",
+      "editDescription": "Update the milestone details.",
+      "name": "Name",
+      "namePlaceholder": "e.g. First release",
+      "targetDate": "Target date",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter milestone details"
+    },
+    "delete": {
+      "title": "Delete milestone",
+      "description": "Delete milestone \"{{name}}\"?"
+    },
+    "toast": {
+      "created": "Milestone created",
+      "createFailed": "Failed to create milestone",
+      "updated": "Milestone updated",
+      "updateFailed": "Failed to update milestone",
+      "deleted": "Milestone deleted",
+      "deleteFailed": "Failed to delete milestone",
+      "loadFailed": "Failed to load milestones"
+    },
+    "empty": {
+      "title": "No milestones yet",
+      "description": "Create milestones to track important delivery checkpoints."
+    },
+    "aria": {
+      "edit": "Edit milestone {{name}}",
+      "delete": "Delete milestone {{name}}"
     }
   },
   "diagram": {
@@ -1225,6 +1669,12 @@
       "title": "Collaborators {{count}}",
       "online": "Online",
       "me": "Me"
+    },
+    "remotePending": {
+      "message": "Remote changes pending",
+      "accept": "Accept",
+      "reject": "Reject",
+      "merge": "Merge"
     }
   },
   "permission": {
@@ -1250,5 +1700,128 @@
   "language": {
     "ko": "한국어",
     "en": "English"
+  },
+  "theme": {
+    "paper": "Paper",
+    "graphite": "Graphite",
+    "midnight": "Midnight",
+    "current": "Current theme",
+    "aria": {
+      "switchTheme": "Switch theme"
+    }
+  },
+  "staffing": {
+    "tab": {
+      "title": "Staffing"
+    },
+    "section": {
+      "title": "Staffing plan",
+      "description": "Manage team member periods, participation rates, grades, and rates, then compare planned and actual M/M."
+    },
+    "action": {
+      "create": "Add staffing row",
+      "refresh": "Refresh staffing",
+      "edit": "Edit staffing row",
+      "delete": "Delete staffing row"
+    },
+    "summary": {
+      "plannedMm": "Planned M/M",
+      "actualMm": "Actual M/M",
+      "deltaMm": "Delta",
+      "plannedCost": "Planned labor cost",
+      "actualCost": "Actual labor cost"
+    },
+    "field": {
+      "member": "Member",
+      "grade": "Grade",
+      "monthlyRate": "Monthly rate",
+      "plannedPeriod": "Planned period",
+      "plannedParticipation": "Planned participation",
+      "actualPeriod": "Actual period",
+      "actualParticipation": "Actual participation",
+      "plannedMm": "Planned M/M",
+      "actualMm": "Actual M/M",
+      "deltaMm": "M/M delta",
+      "cost": "Labor cost",
+      "actions": "Actions"
+    },
+    "form": {
+      "createTitle": "Add staffing row",
+      "editTitle": "Edit staffing row",
+      "createDescription": "Enter project staffing details.",
+      "editDescription": "Update project staffing details.",
+      "memberPlaceholder": "Select a team member",
+      "gradePlaceholder": "Select a grade",
+      "ratePlaceholder": "Enter monthly rate",
+      "memberLocked": "Member cannot be changed after creation.",
+      "plannedStartDate": "Planned start date",
+      "plannedEndDate": "Planned end date",
+      "actualStartDate": "Actual start date",
+      "actualEndDate": "Actual end date",
+      "createAction": "Add staffing row",
+      "saveAction": "Save staffing row",
+      "close": "Close staffing dialog",
+      "saving": "Saving staffing row"
+    },
+    "empty": {
+      "title": "Plan project staffing",
+      "description": "Add member periods, participation rates, grades, and rates to calculate M/M and labor cost.",
+      "readOnlyDescription": "No staffing rows have been registered for this project."
+    },
+    "status": {
+      "loading": "Loading staffing data...",
+      "loadFailedTitle": "Staffing data could not be loaded",
+      "loadFailed": "Retry loading staffing rows and calculated M/M totals.",
+      "readOnly": "You can review staffing data, but editing requires project edit access.",
+      "actualNotEntered": "Actual not entered"
+    },
+    "toast": {
+      "created": "Staffing row added",
+      "updated": "Staffing row updated",
+      "deleted": "Staffing row deleted",
+      "createFailed": "Could not add staffing row",
+      "updateFailed": "Could not update staffing row",
+      "deleteFailed": "Could not delete staffing row",
+      "refreshFailed": "Could not refresh staffing data"
+    },
+    "delete": {
+      "title": "Delete staffing row?",
+      "description": "Planned/actual M/M and labor cost for {{name}} will be removed from project totals.",
+      "confirm": "Delete staffing row"
+    },
+    "grade": {
+      "junior": "Junior",
+      "middle": "Middle",
+      "senior": "Senior",
+      "expert": "Expert"
+    },
+    "matrix": {
+      "title": "Monthly staffing matrix",
+      "description": "Compare monthly planned and actual M/M by member.",
+      "planned": "Planned",
+      "actual": "Actual",
+      "empty": "No monthly staffing data to display.",
+      "windowRange": "{{start}} ~ {{end}} · {{total}} months",
+      "previousWindow": "Previous month window",
+      "nextWindow": "Next month window"
+    },
+    "validation": {
+      "memberRequired": "Select a team member.",
+      "duplicateMember": "This member is already registered.",
+      "notTeamMember": "The selected user is not a current team member.",
+      "invalidRate": "Monthly rate must be an integer greater than or equal to 0.",
+      "plannedDatePair": "Enter both planned start and end dates.",
+      "plannedDateOrder": "Planned end date must be on or after planned start date.",
+      "plannedParticipation": "Planned participation must be between 0 and 100.",
+      "actualDatePair": "Enter both actual start and end dates.",
+      "actualDateOrder": "Actual end date must be on or after actual start date.",
+      "actualParticipation": "Actual participation must be between 0 and 100.",
+      "rateOutOfRange": "Monthly rate exceeds the allowed range.",
+      "costOutOfRange": "Calculated labor cost exceeds the allowed range."
+    },
+    "aria": {
+      "edit": "Edit staffing row for {{name}}",
+      "delete": "Delete staffing row for {{name}}"
+    }
   }
 }

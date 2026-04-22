@@ -1,10 +1,7 @@
 import type { TableHeaderColor } from '@/types/erd';
 
 /** 색상 프리셋의 i18n 키 */
-type ColorLabel =
-  | 'erd.color.default'
-  | 'erd.color.supporting'
-  | 'erd.color.attention';
+type ColorLabel = 'erd.color.default' | 'erd.color.supporting' | 'erd.color.attention';
 
 /** 현재 디자인 시스템에서 실제로 노출하는 헤더 색상 프리셋 */
 export type CanonicalTableHeaderColor = 'default' | 'supporting' | 'attention';
@@ -95,7 +92,4 @@ export const TABLE_COLORS: Record<TableHeaderColor, ColorConfig> = {
 export const TABLE_COLOR_PICKER_ENTRIES = CANONICAL_TABLE_COLOR_ORDER.map((key) => [
   key,
   CANONICAL_TABLE_COLORS[key],
-]) as [
-  CanonicalTableHeaderColor,
-  ColorConfig,
-][];
+]) as [CanonicalTableHeaderColor, ColorConfig][];

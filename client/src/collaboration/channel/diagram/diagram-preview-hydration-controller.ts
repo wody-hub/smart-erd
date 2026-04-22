@@ -106,7 +106,11 @@ export class DiagramPreviewHydrationController {
       Math.round(performance.now() - this.options.handoffStartedAt),
     );
     this.previewHydrationSource = 'fallback';
-    this.options.documentAdapter.applyBootstrapToDoc(this.options.ydoc, this.options.bootstrap, 'remote');
+    this.options.documentAdapter.applyBootstrapToDoc(
+      this.options.ydoc,
+      this.options.bootstrap,
+      'remote',
+    );
   }
 
   /**

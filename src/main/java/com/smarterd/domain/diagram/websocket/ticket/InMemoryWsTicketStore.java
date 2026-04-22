@@ -62,9 +62,12 @@ public class InMemoryWsTicketStore implements WsTicketStore {
 
     @Override
     public void removeByLoginIdAndDiagramId(String loginId, Long diagramId) {
-        tickets
+        final var removed = tickets
             .entrySet()
             .removeIf((e) -> e.getValue().loginId().equals(loginId) && e.getValue().diagramId().equals(diagramId));
+        if (removed && log.isDebugEnabled()) {
+            log.debug("WebSocket ticket 교체 삭제: loginId={}, diagramId={}", loginId, diagramId);
+        }
     }
 
     @Override

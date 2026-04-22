@@ -18,8 +18,8 @@ import com.smarterd.application.diagram.command.SaveDiagramUseCase;
 import com.smarterd.domain.diagram.service.DiagramColumnDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramIndexDefinitionExportService;
 import com.smarterd.domain.diagram.service.DiagramService;
-import com.smarterd.domain.diagram.service.DiagramService.SaveDiagramResult;
 import com.smarterd.domain.diagram.service.DiagramTableDefinitionExportService;
+import com.smarterd.domain.diagram.service.SaveDiagramResult;
 import com.smarterd.domain.markdown.service.MarkdownExportService;
 import com.smarterd.utils.excel.ExcelData;
 import java.time.Instant;
@@ -315,7 +315,11 @@ class DiagramControllerMvcTest {
         final var diagram = org.mockito.Mockito.mock(com.smarterd.domain.diagram.entity.Diagram.class);
         when(diagramService.loadReadableDiagram("tester", 1L, 10L, 100L)).thenReturn(diagram);
         when(markdownExportService.export(diagram, "md")).thenReturn(
-            new MarkdownExportService.MarkdownExportResult("text/markdown; charset=UTF-8", "document.md", "# Hello".getBytes())
+            new MarkdownExportService.MarkdownExportResult(
+                "text/markdown; charset=UTF-8",
+                "document.md",
+                "# Hello".getBytes()
+            )
         );
 
         mockMvc
@@ -329,12 +333,7 @@ class DiagramControllerMvcTest {
                     .content(objectMapper.writeValueAsString(java.util.Map.of("format", "md")))
             )
             .andExpect(status().isOk())
-            .andExpect(
-                header().string(
-                    "Content-Disposition",
-                    org.hamcrest.Matchers.containsString("document.md")
-                )
-            );
+            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("document.md")));
 
         verify(markdownExportService).export(diagram, "md");
     }

@@ -534,11 +534,11 @@ export default function DiagramPage() {
                             diagramName={diagramName || 'diagram'}
                             draftOverlayGraph={sharedDraftOverlayGraph}
                             tableFocusRequest={tableFocusRequest}
-                          provider={providerRef.current}
-                          validationOpen={validationOpen}
-                          onToggleValidation={handleToggleValidation}
-                          onOpenDictionaryContext={handleOpenDictionaryContext}
-                          canEdit={workModeRuntimeState.effectiveCanvasCanEdit}
+                            provider={providerRef.current}
+                            validationOpen={validationOpen}
+                            onToggleValidation={handleToggleValidation}
+                            onOpenDictionaryContext={handleOpenDictionaryContext}
+                            canEdit={workModeRuntimeState.effectiveCanvasCanEdit}
                             activeGroupId={activeGroupId}
                             activeGroupName={activeGroup?.label}
                             activeGroupTableIds={activeGroupTableIds}

@@ -37,7 +37,8 @@ public record DiagramResponse(
 
     @Schema(description = "markdown 템플릿 표시 이름", example = "Technical Spec") String templateLabel,
 
-    @Schema(description = "markdown 요약", example = "Describe the goal, scope, and intended audience.") String summaryText,
+    @Schema(description = "markdown 요약", example = "Describe the goal, scope, and intended audience.")
+    String summaryText,
 
     @Schema(description = "생성 시각 (UTC, ISO-8601)") Instant createdAt,
 

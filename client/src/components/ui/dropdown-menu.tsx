@@ -169,7 +169,11 @@ function DropdownMenuLabel({
   return (
     <DropdownMenuPrimitive.Label
       ref={ref}
-      className={cn('px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground', inset && 'pl-8', className)}
+      className={cn(
+        'px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground',
+        inset && 'pl-8',
+        className,
+      )}
       {...props}
     />
   );
@@ -193,7 +197,10 @@ function DropdownMenuSeparator({
 
 const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
   return (
-    <span className={cn('ml-auto text-[11px] tracking-[0.18em] text-muted-foreground/80', className)} {...props} />
+    <span
+      className={cn('ml-auto text-[11px] tracking-[0.18em] text-muted-foreground/80', className)}
+      {...props}
+    />
   );
 };
 DropdownMenuShortcut.displayName = 'DropdownMenuShortcut';

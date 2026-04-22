@@ -80,6 +80,14 @@ public class Diagram extends BaseAuditEntity {
     @Column(name = "snapshot_updated_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
     private Instant snapshotUpdatedAt;
 
+    /** markdown 템플릿 키 (ERD 문서는 null) */
+    @Column(name = "template_key", length = 64)
+    private String templateKey;
+
+    /** markdown 본문 요약 텍스트 (ERD 문서는 null) */
+    @Column(name = "summary_text", length = 200)
+    private String summaryText;
+
     /** 논리 삭제 시각 */
     @Column(name = "deleted_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
     private Instant deletedAt;
@@ -114,16 +122,42 @@ public class Diagram extends BaseAuditEntity {
         this.name = name;
     }
 
+    /**
+     * 다이어그램에 적용된 사전 세트를 변경한다.
+     *
+     * @param dictionarySet 변경할 사전 세트
+     */
     public void changeDictionarySet(DictionarySet dictionarySet) {
         this.dictionarySet = dictionarySet;
     }
 
+    /**
+     * 문서 플러그인 ID를 반환한다. null이면 기본값 {@code "erd"}를 반환한다.
+     *
+     * @return 문서 플러그인 ID
+     */
     public String getPluginId() {
         return Objects.requireNonNullElse(pluginId, DiagramPluginId.ERD.value());
     }
 
+    /**
+     * 이 다이어그램이 마크다운 문서인지 여부를 반환한다.
+     *
+     * @return 마크다운 문서이면 {@code true}
+     */
     public boolean isMarkdownDocument() {
         return DiagramPluginId.MARKDOWN.value().equals(getPluginId());
+    }
+
+    /**
+     * markdown 문서 허브 요약 정보를 갱신한다.
+     *
+     * @param templateKey 템플릿 키
+     * @param summaryText 본문 요약 텍스트
+     */
+    public void updateSummary(String templateKey, String summaryText) {
+        this.templateKey = templateKey;
+        this.summaryText = summaryText;
     }
 
     /**

@@ -21,14 +21,12 @@ public record CreateDiagramRequest(
     @Size(min = 1, max = 100, message = "{validation.size.diagram-name}")
     String name,
 
-    @Schema(description = "문서 플러그인 ID", example = "erd")
+    @Schema(description = "문서 플러그인 ID", example = "screen-spec")
     @NotBlank(message = "{validation.not-blank.plugin-id}")
-    @Pattern(regexp = "erd|markdown", message = "{validation.pattern.plugin-id}")
+    @Pattern(regexp = "erd|markdown|screen-spec|screendesign", message = "{validation.pattern.plugin-id}")
     String pluginId,
 
-    @Schema(description = "사전 세트 ID", example = "1")
-    @Nullable
-    Long dictionarySetId,
+    @Schema(description = "사전 세트 ID", example = "1") @Nullable Long dictionarySetId,
 
     @Schema(description = "markdown 템플릿 키", example = "technical-spec")
     @Nullable

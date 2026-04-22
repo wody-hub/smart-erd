@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { fetchDiagram, fetchDiagramBootstrap } from '@/api/diagramApi';
 import { fetchProject } from '@/api/projectApi';
 import { fetchTeam } from '@/api/teamApi';
+import { RemotePendingBanner } from '@/components/collaboration/RemotePendingBanner';
 import MarkdownEditorShell from '@/components/markdown/MarkdownEditorShell';
 import Header from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,7 @@ import { useDocumentPageHost } from '@/collaboration/core/session/use-document-p
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { useMarkdownPreview } from '@/hooks/useMarkdownPreview';
+import { useMarkdownSectionPreview } from '@/hooks/useMarkdownSectionPreview';
 import { exportMarkdownBuffer, parseMarkdownBuffer } from '@/lib/markdown';
 import type { DocumentExportFormat } from '@/types/document';
 import { useMarkdownDocumentSession } from '@/pages/document/use-markdown-document-session';
@@ -63,21 +64,25 @@ export default function MarkdownDocumentPage() {
     queryFn: () => fetchProject(resolvedTeamId, resolvedProjectId),
     enabled: Boolean(resolvedTeamId) && Boolean(resolvedProjectId),
   });
-  const {
-    documentBootstrap,
-    documentDetail,
-    isLoading,
-    isError,
-    retryDocumentSetup,
-  } = useDocumentPageHost({
-    bootstrapQueryKey: queryKeys.diagrams.bootstrap(resolvedTeamId, resolvedProjectId, resolvedDiagramId),
-    bootstrapQueryFn: () => fetchDiagramBootstrap(resolvedTeamId, resolvedProjectId, resolvedDiagramId),
-    detailQueryKey: queryKeys.diagrams.detail(resolvedTeamId, resolvedProjectId, resolvedDiagramId),
-    detailQueryFn: () => fetchDiagram(resolvedTeamId, resolvedProjectId, resolvedDiagramId),
-    expectedPluginId: MARKDOWN_PLUGIN_ID,
-    expectedEngineId: MARKDOWN_ENGINE_ID,
-    enabled: Boolean(resolvedTeamId) && Boolean(resolvedProjectId) && Boolean(resolvedDiagramId),
-  });
+  const { documentBootstrap, documentDetail, isLoading, isError, retryDocumentSetup } =
+    useDocumentPageHost({
+      bootstrapQueryKey: queryKeys.diagrams.bootstrap(
+        resolvedTeamId,
+        resolvedProjectId,
+        resolvedDiagramId,
+      ),
+      bootstrapQueryFn: () =>
+        fetchDiagramBootstrap(resolvedTeamId, resolvedProjectId, resolvedDiagramId),
+      detailQueryKey: queryKeys.diagrams.detail(
+        resolvedTeamId,
+        resolvedProjectId,
+        resolvedDiagramId,
+      ),
+      detailQueryFn: () => fetchDiagram(resolvedTeamId, resolvedProjectId, resolvedDiagramId),
+      expectedPluginId: MARKDOWN_PLUGIN_ID,
+      expectedEngineId: MARKDOWN_ENGINE_ID,
+      enabled: Boolean(resolvedTeamId) && Boolean(resolvedProjectId) && Boolean(resolvedDiagramId),
+    });
   const {
     buffer,
     setEditorBuffer,
@@ -89,6 +94,10 @@ export default function MarkdownDocumentPage() {
     handleSave,
     retryCollaborationSetup,
     documentMutationSession,
+    activeSectionId,
+    remoteMutation,
+    onAcceptRemote,
+    onRejectRemote,
   } = useMarkdownDocumentSession({
     teamId: resolvedTeamId,
     projectId: resolvedProjectId,
@@ -97,7 +106,8 @@ export default function MarkdownDocumentPage() {
     documentBootstrap,
   });
   const parsedBuffer = useMemo(() => parseMarkdownBuffer(buffer), [buffer]);
-  const previewHtml = useMarkdownPreview(parsedBuffer.body);
+  /** section-aware 증분 프리뷰 */
+  const previewHtml = useMarkdownSectionPreview(parsedBuffer.body);
 
   const handleBack = () => navigate(ROUTES.DIAGRAMS(resolvedTeamId, resolvedProjectId));
 
@@ -214,15 +224,17 @@ export default function MarkdownDocumentPage() {
         />
         <main className="workspace-shell flex-1 overflow-auto p-6">
           <div className="workspace-container max-w-[1480px]">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mb-4"
-              onClick={handleBack}
-            >
+            <Button variant="ghost" size="sm" className="mb-4" onClick={handleBack}>
               <ArrowLeft className="mr-1 h-4 w-4" />
               {t('workspace.action.backToDocuments')}
             </Button>
+            <RemotePendingBanner
+              remoteMutation={remoteMutation}
+              onAccept={onAcceptRemote}
+              onReject={onRejectRemote}
+              activeSectionId={activeSectionId}
+              className="mb-2"
+            />
             <MarkdownEditorShell
               headings={parsedBuffer.headings}
               previewHtml={previewHtml}

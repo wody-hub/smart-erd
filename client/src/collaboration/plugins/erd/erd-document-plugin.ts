@@ -28,6 +28,7 @@ import type { DdlParseResult } from '@/lib/ddl-parser';
 import type { DiagramDictionaryReconciliationPlan } from '@/lib/diagram-dictionary-reconciliation';
 import type { DiffPlan } from '@/lib/erd-diff-plan';
 import { extractColId } from '@/lib/handle-id';
+import { readString } from '@/lib/yjs-read-utils';
 import type { EdgeRoutingType, TableHeaderColor, Waypoint } from '@/types/erd';
 import { buildErdColumnEntityId } from './erd-column-entity-id';
 import { yDocToJson } from '@/collaboration/yjsBridge';
@@ -410,9 +411,9 @@ class ErdProjector implements Projector {
 
 class ErdScopeResolver implements ScopeResolver {
   resolve(command: DocumentCommand): ScopeRef[] {
-    const tableId = this.readString(command.payload?.tableId);
-    const colId = this.readString(command.payload?.colId);
-    const groupId = this.readString(command.payload?.groupId);
+    const tableId = readString(command.payload?.tableId);
+    const colId = readString(command.payload?.colId);
+    const groupId = readString(command.payload?.groupId);
 
     if (command.key.startsWith('table:') && tableId) {
       return [{ kind: 'table', id: tableId, mode: 'exclusive' }];
@@ -430,9 +431,9 @@ class ErdScopeResolver implements ScopeResolver {
       return [{ kind: 'table', id: tableId, mode: 'exclusive' }];
     }
     if (command.key === 'edge:connect') {
-      const edgeId = this.readString(command.payload?.edgeId);
-      const sourceTableId = this.readString(command.payload?.sourceTableId);
-      const targetTableId = this.readString(command.payload?.targetTableId);
+      const edgeId = readString(command.payload?.edgeId);
+      const sourceTableId = readString(command.payload?.sourceTableId);
+      const targetTableId = readString(command.payload?.targetTableId);
       return [
         ...(edgeId ? [{ kind: 'edge' as const, id: edgeId, mode: 'exclusive' as const }] : []),
         ...(sourceTableId
@@ -444,8 +445,8 @@ class ErdScopeResolver implements ScopeResolver {
       ];
     }
     if (command.key === 'edge:add-fk-relation') {
-      const parentTableId = this.readString(command.payload?.parentTableId);
-      const childTableId = this.readString(command.payload?.childTableId);
+      const parentTableId = readString(command.payload?.parentTableId);
+      const childTableId = readString(command.payload?.childTableId);
       return [
         ...(parentTableId
           ? [{ kind: 'table' as const, id: parentTableId, mode: 'shared' as const }]
@@ -456,7 +457,7 @@ class ErdScopeResolver implements ScopeResolver {
       ];
     }
     if (command.key === 'edge:delete') {
-      const edgeId = this.readString(command.payload?.edgeId);
+      const edgeId = readString(command.payload?.edgeId);
       return edgeId ? [{ kind: 'edge', id: edgeId, mode: 'exclusive' }] : [];
     }
     if (command.key === 'edge:normalize-handles' && Array.isArray(command.payload?.nodeIds)) {
@@ -470,7 +471,7 @@ class ErdScopeResolver implements ScopeResolver {
       command.key === 'edge:update-waypoints' ||
       command.key === 'edge:reset-waypoints'
     ) {
-      const edgeId = this.readString(command.payload?.edgeId);
+      const edgeId = readString(command.payload?.edgeId);
       return edgeId ? [{ kind: 'edge', id: edgeId, mode: 'exclusive' }] : [];
     }
     if (command.key === 'group:add' && groupId) {
@@ -500,10 +501,6 @@ class ErdScopeResolver implements ScopeResolver {
       return scopes;
     }
     return [];
-  }
-
-  private readString(value: unknown): string | null {
-    return typeof value === 'string' && value.length > 0 ? value : null;
   }
 }
 
@@ -542,10 +539,10 @@ class ErdMutationPolicy implements MutationPolicy {
   }
 
   private resolveStableEdgeId(payload?: Record<string, unknown>): string | null {
-    const sourceTableId = this.readString(payload?.sourceTableId);
-    const targetTableId = this.readString(payload?.targetTableId);
-    const sourceHandle = this.readString(payload?.sourceHandle);
-    const targetHandle = this.readString(payload?.targetHandle);
+    const sourceTableId = readString(payload?.sourceTableId);
+    const targetTableId = readString(payload?.targetTableId);
+    const sourceHandle = readString(payload?.sourceHandle);
+    const targetHandle = readString(payload?.targetHandle);
     if (!sourceTableId || !targetTableId || !sourceHandle || !targetHandle) {
       return null;
     }
@@ -595,10 +592,6 @@ class ErdMutationPolicy implements MutationPolicy {
         });
       },
     });
-  }
-
-  private readString(value: unknown): string | null {
-    return typeof value === 'string' && value.length > 0 ? value : null;
   }
 }
 
