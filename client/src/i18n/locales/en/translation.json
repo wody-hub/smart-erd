@@ -69,7 +69,8 @@
       "overviewMeta": "Business overview baseline",
       "wbsMeta": "WBS work structure",
       "ganttDescription": "Review WBS schedules and milestones on a shared timeline, then adjust the plan with confidence.",
-      "ganttMeta": "Timeline planning mode"
+      "ganttMeta": "Timeline planning mode",
+      "staffingMeta": "Planned/actual M/M and labor cost"
     },
     "dictionary": {
       "description": "Manage the shared word, term, and domain assets used across ERD and future document types.",
@@ -1707,6 +1708,120 @@
     "current": "Current theme",
     "aria": {
       "switchTheme": "Switch theme"
+    }
+  },
+  "staffing": {
+    "tab": {
+      "title": "Staffing"
+    },
+    "section": {
+      "title": "Staffing plan",
+      "description": "Manage team member periods, participation rates, grades, and rates, then compare planned and actual M/M."
+    },
+    "action": {
+      "create": "Add staffing row",
+      "refresh": "Refresh staffing",
+      "edit": "Edit staffing row",
+      "delete": "Delete staffing row"
+    },
+    "summary": {
+      "plannedMm": "Planned M/M",
+      "actualMm": "Actual M/M",
+      "deltaMm": "Delta",
+      "plannedCost": "Planned labor cost",
+      "actualCost": "Actual labor cost"
+    },
+    "field": {
+      "member": "Member",
+      "grade": "Grade",
+      "monthlyRate": "Monthly rate",
+      "plannedPeriod": "Planned period",
+      "plannedParticipation": "Planned participation",
+      "actualPeriod": "Actual period",
+      "actualParticipation": "Actual participation",
+      "plannedMm": "Planned M/M",
+      "actualMm": "Actual M/M",
+      "deltaMm": "M/M delta",
+      "cost": "Labor cost",
+      "actions": "Actions"
+    },
+    "form": {
+      "createTitle": "Add staffing row",
+      "editTitle": "Edit staffing row",
+      "createDescription": "Enter project staffing details.",
+      "editDescription": "Update project staffing details.",
+      "memberPlaceholder": "Select a team member",
+      "gradePlaceholder": "Select a grade",
+      "ratePlaceholder": "Enter monthly rate",
+      "memberLocked": "Member cannot be changed after creation.",
+      "plannedStartDate": "Planned start date",
+      "plannedEndDate": "Planned end date",
+      "actualStartDate": "Actual start date",
+      "actualEndDate": "Actual end date",
+      "createAction": "Add staffing row",
+      "saveAction": "Save staffing row",
+      "close": "Close staffing dialog",
+      "saving": "Saving staffing row"
+    },
+    "empty": {
+      "title": "Plan project staffing",
+      "description": "Add member periods, participation rates, grades, and rates to calculate M/M and labor cost.",
+      "readOnlyDescription": "No staffing rows have been registered for this project."
+    },
+    "status": {
+      "loading": "Loading staffing data...",
+      "loadFailedTitle": "Staffing data could not be loaded",
+      "loadFailed": "Retry loading staffing rows and calculated M/M totals.",
+      "readOnly": "You can review staffing data, but editing requires project edit access.",
+      "actualNotEntered": "Actual not entered"
+    },
+    "toast": {
+      "created": "Staffing row added",
+      "updated": "Staffing row updated",
+      "deleted": "Staffing row deleted",
+      "createFailed": "Could not add staffing row",
+      "updateFailed": "Could not update staffing row",
+      "deleteFailed": "Could not delete staffing row",
+      "refreshFailed": "Could not refresh staffing data"
+    },
+    "delete": {
+      "title": "Delete staffing row?",
+      "description": "Planned/actual M/M and labor cost for {{name}} will be removed from project totals.",
+      "confirm": "Delete staffing row"
+    },
+    "grade": {
+      "junior": "Junior",
+      "middle": "Middle",
+      "senior": "Senior",
+      "expert": "Expert"
+    },
+    "matrix": {
+      "title": "Monthly staffing matrix",
+      "description": "Compare monthly planned and actual M/M by member.",
+      "planned": "Planned",
+      "actual": "Actual",
+      "empty": "No monthly staffing data to display.",
+      "windowRange": "{{start}} ~ {{end}} · {{total}} months",
+      "previousWindow": "Previous month window",
+      "nextWindow": "Next month window"
+    },
+    "validation": {
+      "memberRequired": "Select a team member.",
+      "duplicateMember": "This member is already registered.",
+      "notTeamMember": "The selected user is not a current team member.",
+      "invalidRate": "Monthly rate must be an integer greater than or equal to 0.",
+      "plannedDatePair": "Enter both planned start and end dates.",
+      "plannedDateOrder": "Planned end date must be on or after planned start date.",
+      "plannedParticipation": "Planned participation must be between 0 and 100.",
+      "actualDatePair": "Enter both actual start and end dates.",
+      "actualDateOrder": "Actual end date must be on or after actual start date.",
+      "actualParticipation": "Actual participation must be between 0 and 100.",
+      "rateOutOfRange": "Monthly rate exceeds the allowed range.",
+      "costOutOfRange": "Calculated labor cost exceeds the allowed range."
+    },
+    "aria": {
+      "edit": "Edit staffing row for {{name}}",
+      "delete": "Delete staffing row for {{name}}"
     }
   }
 }

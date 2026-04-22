@@ -86,6 +86,8 @@ Recent decisions affecting current work:
 - Phase 5/6: WBS 날짜 컬럼은 `DATE` 타입 사용 — 간트 타임존 버그 방지
 - Phase 6.1(삽입): WBS 작업공간 확장 phase를 추가하고, assignee UX + dedicated workspace + inline append를 Phase 7 전에 선행
 - Phase 6.1 planning rerun (`$gsd:plan-phase 6.1 --reviews`) 완료: roadmap ownership/progress drift와 UI-spec status drift를 접고, leaf-first-child inline append는 제외 유지, 다음 단계는 `$gsd:execute-phase 6.1`
+- Phase 6.1(삽입) execute closeout 완료: Route 분리, assignee+query 통합, dedicated inline append, build/test 검증 통과 후 Phase 7 선행 조건 충족
+- Phase 7 execute closeout 완료 (`RIS-183`): staffing backend/API + project-hub staffing tab/matrix + QA 재검증 반영(실적 입력 원자성), 전체 자동 검증 통과 후 HR-01~HR-04를 Complete로 전환
 - [Phase 01-markdown-incremental-sync]: DomainValidationHook은 별도 빈 없이 no-op lambda로 구현 (markdown 플러그인)
 - [Phase 01]: slug 기반 section ID 채택 — heading-{index}-{slug} 대신 slugify(text) + 충돌 접미사로 안정성 확보
 - [Phase 01]: diff-match-patch cursor 기반 Y.Text 증분 적용: DIFF_EQUAL/DELETE/INSERT -> cursor offset 매핑
@@ -99,7 +101,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Phase 6.1 WBS 작업공간 확장: planning rerun complete, execution baseline은 `06.1-01-PLAN.md` + `06.1-REVIEWS.md`; 다음 작업은 `$gsd:execute-phase 6.1`
+- Phase 7 실행 잔여 없음; 다음 단계는 Phase 8(이슈 트래커) 계획/실행 착수
 
 ### Blockers/Concerns
 

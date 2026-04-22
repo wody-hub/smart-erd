@@ -8,6 +8,7 @@ import {
   FileText,
   ListTree,
   Plus,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -19,6 +20,7 @@ import BusinessOverviewTab from '@/components/project/BusinessOverviewTab';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import GanttTab from '@/components/gantt/GanttTab';
+import StaffingTab from '@/components/staffing/StaffingTab';
 import ProjectWorkspaceHero from '@/components/workspace/ProjectWorkspaceHero';
 import DocumentHubTabContent from '@/components/workspace/DocumentHubTabContent';
 import WbsTab from '@/components/wbs/WbsTab';
@@ -29,7 +31,7 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { cn } from '@/lib/utils';
 import { getWorkspaceDocumentsTitleLabel } from '@/lib/workspace-labels';
 
-type DiagramsTabValue = 'documents' | 'overview' | 'wbs' | 'gantt';
+type DiagramsTabValue = 'documents' | 'overview' | 'wbs' | 'gantt' | 'staffing';
 
 interface DiagramsTabRenderContext {
   teamId: string;
@@ -109,12 +111,20 @@ export default function DiagramsPage() {
               description: t('wbs.section.description'),
               metaDetail: t('workspace.projectHub.wbsMeta'),
             }
-          : {
+          : activeTab === 'gantt'
+            ? {
+                section: 'projects' as const,
+                tone: 'projects' as const,
+                eyebrow: t('gantt.tab.title'),
+                description: t('workspace.projectHub.ganttDescription'),
+                metaDetail: t('workspace.projectHub.ganttMeta'),
+              }
+            : {
               section: 'projects' as const,
               tone: 'projects' as const,
-              eyebrow: t('gantt.tab.title'),
-              description: t('workspace.projectHub.ganttDescription'),
-              metaDetail: t('workspace.projectHub.ganttMeta'),
+              eyebrow: t('staffing.tab.title'),
+              description: t('staffing.section.description'),
+              metaDetail: t('workspace.projectHub.staffingMeta'),
             };
 
   const tabs: DiagramsTabConfig[] = [
@@ -178,12 +188,29 @@ export default function DiagramsPage() {
         <GanttTab teamId={currentTeamId} projectId={currentProjectId} canEdit={currentCanEdit} />
       ),
     },
+    {
+      value: 'staffing',
+      label: t('staffing.tab.title'),
+      icon: UsersRound,
+      renderContent: ({
+        teamId: currentTeamId,
+        projectId: currentProjectId,
+        canEdit: currentCanEdit,
+      }) => (
+        <StaffingTab
+          teamId={currentTeamId}
+          projectId={currentProjectId}
+          canEdit={currentCanEdit}
+        />
+      ),
+    },
   ];
 
   /**
    * 탭 전환 시 overview로 이동하면 문서 생성 다이얼로그를 닫는다.
    *
    * @param value 다음 탭 값
+   * @returns 없음
    */
   const handleTabChange = (value: string) => {
     const nextTab = tabs.find((tab) => tab.value === value)?.value ?? 'documents';
@@ -204,7 +231,10 @@ export default function DiagramsPage() {
       />
       <main className="workspace-shell flex-1 overflow-auto p-3 sm:p-6">
         <div
-          className={cn('workspace-container', activeTab === 'gantt' ? 'max-w-none' : 'max-w-5xl')}
+          className={cn(
+            'workspace-container',
+            activeTab === 'gantt' || activeTab === 'staffing' ? 'max-w-none' : 'max-w-5xl',
+          )}
         >
           <Button
             variant="ghost"

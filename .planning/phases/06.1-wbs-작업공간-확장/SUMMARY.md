@@ -28,6 +28,11 @@
   - dedicated back navigation returns to the project hub with the `WBS` tab active
   - smoke-created WBS rows were deleted after verification so the project state returned to empty
 
+### 2026-04-21 closeout
+
+- `cd client && npm run build` ✅
+- `cd client && npm run test:unit` ✅ (`pass 312`)
+
 ## Notable Fixes During Smoke
 
 - The initial extraction caused quick-add rows to remount after create, which collapsed the active input and broke repeat append.

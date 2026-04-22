@@ -69,7 +69,8 @@
       "overviewMeta": "사업 개요 기준선",
       "wbsMeta": "WBS 작업 구조",
       "ganttDescription": "WBS 일정과 마일스톤 진행을 타임라인에서 검토하고 계획을 조정합니다.",
-      "ganttMeta": "타임라인 계획 모드"
+      "ganttMeta": "타임라인 계획 모드",
+      "staffingMeta": "계획/실적 M/M 및 인건비"
     },
     "dictionary": {
       "description": "ERD와 앞으로 추가될 문서 타입이 공통으로 쓰는 용어, 도메인, 단어 자산을 관리합니다.",
@@ -1705,6 +1706,120 @@
     "current": "현재 테마",
     "aria": {
       "switchTheme": "테마 전환"
+    }
+  },
+  "staffing": {
+    "tab": {
+      "title": "인력 투입"
+    },
+    "section": {
+      "title": "인력 투입 계획",
+      "description": "팀원별 투입 기간, 참여율, 등급, 단가를 관리하고 계획 대비 실적 M/M을 비교합니다."
+    },
+    "action": {
+      "create": "인력 투입 추가",
+      "refresh": "인력 투입 새로고침",
+      "edit": "인력 투입 수정",
+      "delete": "인력 투입 삭제"
+    },
+    "summary": {
+      "plannedMm": "계획 M/M",
+      "actualMm": "실적 M/M",
+      "deltaMm": "차이",
+      "plannedCost": "계획 인건비",
+      "actualCost": "실적 인건비"
+    },
+    "field": {
+      "member": "팀원",
+      "grade": "등급",
+      "monthlyRate": "월 단가",
+      "plannedPeriod": "계획 기간",
+      "plannedParticipation": "계획 참여율",
+      "actualPeriod": "실적 기간",
+      "actualParticipation": "실적 참여율",
+      "plannedMm": "계획 M/M",
+      "actualMm": "실적 M/M",
+      "deltaMm": "M/M 차이",
+      "cost": "인건비",
+      "actions": "작업"
+    },
+    "form": {
+      "createTitle": "인력 투입 추가",
+      "editTitle": "인력 투입 수정",
+      "createDescription": "프로젝트 인력 투입 정보를 입력합니다.",
+      "editDescription": "프로젝트 인력 투입 정보를 수정합니다.",
+      "memberPlaceholder": "팀원을 선택하세요",
+      "gradePlaceholder": "등급을 선택하세요",
+      "ratePlaceholder": "월 단가를 입력하세요",
+      "memberLocked": "생성 후 팀원은 변경할 수 없습니다.",
+      "plannedStartDate": "계획 시작일",
+      "plannedEndDate": "계획 종료일",
+      "actualStartDate": "실적 시작일",
+      "actualEndDate": "실적 종료일",
+      "createAction": "인력 투입 추가",
+      "saveAction": "인력 투입 저장",
+      "close": "인력 투입 창 닫기",
+      "saving": "인력 투입 저장 중"
+    },
+    "empty": {
+      "title": "인력 투입을 계획하세요",
+      "description": "팀원의 기간, 참여율, 등급, 단가를 입력하면 M/M과 인건비가 자동 계산됩니다.",
+      "readOnlyDescription": "이 프로젝트에는 아직 인력 투입 행이 없습니다."
+    },
+    "status": {
+      "loading": "인력 투입 정보를 불러오는 중...",
+      "loadFailedTitle": "인력 투입 정보를 불러오지 못했습니다",
+      "loadFailed": "인력 투입 행과 계산된 M/M 합계를 다시 불러오세요.",
+      "readOnly": "인력 투입 정보는 볼 수 있지만 수정하려면 프로젝트 편집 권한이 필요합니다.",
+      "actualNotEntered": "실적 미입력"
+    },
+    "toast": {
+      "created": "인력 투입 행을 추가했습니다",
+      "updated": "인력 투입 행을 수정했습니다",
+      "deleted": "인력 투입 행을 삭제했습니다",
+      "createFailed": "인력 투입 행을 추가하지 못했습니다",
+      "updateFailed": "인력 투입 행을 수정하지 못했습니다",
+      "deleteFailed": "인력 투입 행을 삭제하지 못했습니다",
+      "refreshFailed": "인력 투입 정보를 새로고침하지 못했습니다"
+    },
+    "delete": {
+      "title": "인력 투입 행을 삭제할까요?",
+      "description": "{{name}}의 계획/실적 M/M과 인건비가 프로젝트 합계에서 제거됩니다.",
+      "confirm": "인력 투입 삭제"
+    },
+    "grade": {
+      "junior": "초급",
+      "middle": "중급",
+      "senior": "고급",
+      "expert": "특급"
+    },
+    "matrix": {
+      "title": "월별 투입 매트릭스",
+      "description": "월별 계획/실적 M/M을 팀원 단위로 비교합니다.",
+      "planned": "계획",
+      "actual": "실적",
+      "empty": "표시할 월별 투입 데이터가 없습니다.",
+      "windowRange": "{{start}} ~ {{end}} · 총 {{total}}개월",
+      "previousWindow": "이전 월 구간",
+      "nextWindow": "다음 월 구간"
+    },
+    "validation": {
+      "memberRequired": "팀원을 선택하세요.",
+      "duplicateMember": "이미 등록된 팀원입니다.",
+      "notTeamMember": "선택한 사용자는 현재 팀 멤버가 아닙니다.",
+      "invalidRate": "월 단가는 0 이상의 정수여야 합니다.",
+      "plannedDatePair": "계획 시작일과 종료일을 함께 입력하세요.",
+      "plannedDateOrder": "계획 종료일은 시작일 이후여야 합니다.",
+      "plannedParticipation": "계획 참여율은 0에서 100 사이여야 합니다.",
+      "actualDatePair": "실적 시작일과 종료일을 함께 입력하세요.",
+      "actualDateOrder": "실적 종료일은 시작일 이후여야 합니다.",
+      "actualParticipation": "실적 참여율은 0에서 100 사이여야 합니다.",
+      "rateOutOfRange": "월 단가는 허용 범위를 초과했습니다.",
+      "costOutOfRange": "계산된 인건비가 허용 범위를 초과했습니다."
+    },
+    "aria": {
+      "edit": "{{name}} 인력 투입 행 수정",
+      "delete": "{{name}} 인력 투입 행 삭제"
     }
   }
 }

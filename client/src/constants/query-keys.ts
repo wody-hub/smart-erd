@@ -83,4 +83,10 @@ export const queryKeys = {
     all: (teamId: string, projectId: string) =>
       ['teams', teamId, 'projects', projectId, 'milestones'] as const,
   },
+  /** 인력 투입 관련 쿼리 키 */
+  staffing: {
+    /** 프로젝트 인력 투입 전체 조회 */
+    all: (teamId: string, projectId: string) =>
+      ['teams', teamId, 'projects', projectId, 'staffing'] as const,
+  },
 } as const;

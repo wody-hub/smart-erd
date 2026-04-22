@@ -48,10 +48,10 @@
 
 ### 인력 투입 (M/M)
 
-- [ ] **HR-01**: 팀원별 투입 기간과 참여율을 등록할 수 있다
-- [ ] **HR-02**: 인력 등급(초급/중급/고급/특급)과 월 단가를 설정할 수 있다
-- [ ] **HR-03**: 투입 계획 대비 실적을 비교할 수 있다
-- [ ] **HR-04**: 프로젝트 전체 인건비가 M/M × 단가로 자동 계산된다
+- [x] **HR-01**: 팀원별 투입 기간과 참여율을 등록할 수 있다
+- [x] **HR-02**: 인력 등급(초급/중급/고급/특급)과 월 단가를 설정할 수 있다
+- [x] **HR-03**: 투입 계획 대비 실적을 비교할 수 있다
+- [x] **HR-04**: 프로젝트 전체 인건비가 M/M × 단가로 자동 계산된다
 
 ### 이슈 트래커
 
@@ -124,12 +124,12 @@
 | BIZ-01 | Phase 4 | Pending |
 | BIZ-02 | Phase 4 | Pending |
 | WBS-01 | Phase 5 | Pending |
-| WBS-02 | Phase 6.1 | Pending |
+| WBS-02 | Phase 6.1 | Complete |
 | WBS-03 | Phase 5 | Pending |
 | WBS-04 | Phase 5 | Pending |
 | WBS-05 | Phase 5 | Pending |
-| WBS-06 | Phase 6.1 | Pending |
-| WBS-07 | Phase 6.1 | Pending |
+| WBS-06 | Phase 6.1 | Complete |
+| WBS-07 | Phase 6.1 | Complete |
 | MILE-01 | Phase 5 | Pending |
 | MILE-02 | Phase 5 | Pending |
 | MILE-03 | Phase 5 | Pending |
@@ -138,10 +138,10 @@
 | GANTT-02 | Phase 6 | Pending |
 | GANTT-03 | Phase 6 | Pending |
 | GANTT-04 | Phase 6 | Pending |
-| HR-01 | Phase 7 | Pending |
-| HR-02 | Phase 7 | Pending |
-| HR-03 | Phase 7 | Pending |
-| HR-04 | Phase 7 | Pending |
+| HR-01 | Phase 7 | Complete |
+| HR-02 | Phase 7 | Complete |
+| HR-03 | Phase 7 | Complete |
+| HR-04 | Phase 7 | Complete |
 | ISSUE-01 | Phase 8 | Pending |
 | ISSUE-02 | Phase 8 | Pending |
 | ISSUE-03 | Phase 8 | Pending |
@@ -154,4 +154,4 @@
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-16 after RIS-126 Phase 6.1 insertion review*
+*Last updated: 2026-04-22 after RIS-183 Phase 7 execution integration closeout*

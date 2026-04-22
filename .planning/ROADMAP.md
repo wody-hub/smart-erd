@@ -18,8 +18,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: 사업 개요** - 프로젝트 메타(발주처·계약·사업 범위) 등록 및 현황 조회
 - [x] **Phase 5: WBS + 마일스톤** - 계층 작업분해구조 편집과 마일스톤 관리
 - [x] **Phase 6: 간트 차트** - WBS 데이터 기반 타임라인 시각화 및 인터랙션
-- [ ] **Phase 6.1 (INSERTED): WBS 작업공간 확장** - 전용 WBS 페이지, 하단 인라인 추가, 담당자 배정 UX 보강
-- [ ] **Phase 7: 인력 투입 (M/M)** - 팀원별 M/M 계획·실적 및 인건비 자동 계산
+- [x] **Phase 6.1 (INSERTED): WBS 작업공간 확장** - 전용 WBS 페이지, 하단 인라인 추가, 담당자 배정 UX 보강
+- [x] **Phase 7: 인력 투입 (M/M)** - 팀원별 M/M 계획·실적 및 인건비 자동 계산
 - [ ] **Phase 8: 이슈 트래커** - 이슈 등록·상태 관리·필터링·Excel 내보내기
 
 ## Phase Details
@@ -223,8 +223,11 @@ Plans (상세 설계 완료 — `.planning/phases/06.1-wbs-작업공간-확장/`
   2. 사용자가 팀원의 인력 등급(초급/중급/고급/특급)과 월 단가를 설정할 수 있다
   3. 계획 M/M 대비 실적 M/M을 비교하는 매트릭스 뷰를 확인할 수 있다
   4. 프로젝트 전체 인건비 합계가 각 팀원의 M/M × 단가로 자동 계산되어 표시된다
-**Plans**: TBD
+**Plans**: 1 plan
 **UI hint**: yes
+
+Plans (상세 설계 완료 — `.planning/phases/07-인력-투입/`):
+- [x] 07-01-PLAN.md — staffing backend/API + project-hub staffing tab + matrix + closeout verification
 
 ### Phase 8: 이슈 트래커
 **Goal**: 이슈를 등록하고 상태(등록→처리중→완료)를 관리하며, 다양한 조건으로 필터링하고 Excel로 내보낼 수 있다
@@ -251,6 +254,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.1 → 7 �
 | 4. 사업 개요 | 3/3 | Complete | 2026-04-15 |
 | 5. WBS + 마일스톤 | summary only | Complete | 2026-04-15 |
 | 6. 간트 차트 | 1/1 | Complete | 2026-04-16 |
-| 6.1 WBS 작업공간 확장 | 1/1 | Planning complete | - |
-| 7. 인력 투입 (M/M) | 0/? | Not started | - |
+| 6.1 WBS 작업공간 확장 | 1/1 | Complete | 2026-04-21 |
+| 7. 인력 투입 (M/M) | 1/1 | Complete | 2026-04-22 |
 | 8. 이슈 트래커 | 0/? | Not started | - |
