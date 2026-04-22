@@ -523,46 +523,48 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       }
 
       return (
-        <div className="space-y-2">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={visibleItems.map((item) => item.id)}
-              strategy={verticalListSortingStrategy}
+        <div className="min-w-0 overflow-x-auto">
+          <div className="space-y-2">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
             >
-              <Table className="w-full min-w-[1320px] table-fixed">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[320px]">{t('wbs.field.name')}</TableHead>
-                    <TableHead className="w-[180px]">{t('wbs.field.assignee')}</TableHead>
-                    <TableHead className="w-[240px]">{t('wbs.field.period')}</TableHead>
-                    <TableHead className="w-[120px]">{t('wbs.field.progressRate')}</TableHead>
-                    <TableHead className="w-[140px]">{t('wbs.field.estimatedMm')}</TableHead>
-                    <TableHead className="w-[220px]">{t('wbs.field.milestone')}</TableHead>
-                    {canEdit && (
-                      <TableHead className="w-[100px]">{t('wbs.field.actions')}</TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
+              <SortableContext
+                items={visibleItems.map((item) => item.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <Table className="w-full min-w-[1320px] table-fixed">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[320px]">{t('wbs.field.name')}</TableHead>
+                      <TableHead className="w-[180px]">{t('wbs.field.assignee')}</TableHead>
+                      <TableHead className="w-[240px]">{t('wbs.field.period')}</TableHead>
+                      <TableHead className="w-[120px]">{t('wbs.field.progressRate')}</TableHead>
+                      <TableHead className="w-[140px]">{t('wbs.field.estimatedMm')}</TableHead>
+                      <TableHead className="w-[220px]">{t('wbs.field.milestone')}</TableHead>
+                      {canEdit && (
+                        <TableHead className="w-[100px]">{t('wbs.field.actions')}</TableHead>
+                      )}
+                    </TableRow>
+                  </TableHeader>
 
-                <TableBody>{tableRows}</TableBody>
-              </Table>
-            </SortableContext>
+                  <TableBody>{tableRows}</TableBody>
+                </Table>
+              </SortableContext>
 
-            <DragOverlay>
-              {activeDragItem ? (
-                <div className="rounded-md border bg-card px-3 py-2 text-sm shadow-lg">
-                  {activeDragItem.name}
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+              <DragOverlay>
+                {activeDragItem ? (
+                  <div className="rounded-md border bg-card px-3 py-2 text-sm shadow-lg">
+                    {activeDragItem.name}
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
 
-          <p className="text-xs text-muted-foreground">{t('wbs.dnd.hint')}</p>
+            <p className="px-1 text-xs text-muted-foreground">{t('wbs.dnd.hint')}</p>
+          </div>
         </div>
       );
     };
@@ -574,7 +576,7 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       wbsContent = (
         <WorkspaceEmptyState
           icon={<ListTree className="h-10 w-10" />}
-          title={t('workspace.status.loadFailedTitle')}
+          title={t('wbs.status.loadFailedTitle')}
           description={t('wbs.toast.loadFailed')}
           tone="error"
           role="alert"
@@ -590,7 +592,7 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
         <WorkspaceEmptyState
           icon={<ListTree className="h-10 w-10" />}
           title={t('wbs.empty.title')}
-          description={t('wbs.empty.description')}
+          description={canEdit ? t('wbs.empty.description') : t('wbs.empty.readOnlyDescription')}
           action={
             canEdit ? (
               <Button
@@ -612,10 +614,18 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
     return (
       <>
         <div
-          className={cn('grid gap-6 xl:grid-cols-[minmax(0,2.4fr)_minmax(320px,1fr)]', className)}
+          className={cn(
+            'grid gap-6 min-w-0',
+            variant === 'page'
+              ? 'xl:grid-cols-[minmax(0,2.4fr)_minmax(320px,1fr)]'
+              : 'xl:grid-cols-1',
+            className,
+          )}
         >
-          <section aria-label={t('wbs.section.title')}>{wbsContent}</section>
-          <aside>
+          <section aria-label={t('wbs.section.title')} className="min-w-0">
+            {wbsContent}
+          </section>
+          <aside className="min-w-0">
             <MilestonePanel teamId={teamId} projectId={projectId} canEdit={canEdit} />
           </aside>
         </div>

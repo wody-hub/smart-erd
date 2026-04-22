@@ -638,7 +638,11 @@
     },
     "empty": {
       "title": "No WBS items yet",
-      "description": "Create your first WBS item to start planning project work."
+      "description": "Create your first WBS item to start planning project work.",
+      "readOnlyDescription": "You can review existing WBS items and milestone links, but you need edit access to add or reorder items."
+    },
+    "status": {
+      "loadFailedTitle": "We couldn't load the WBS workspace"
     },
     "aria": {
       "edit": "Edit WBS item {{name}}",
