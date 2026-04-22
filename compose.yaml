@@ -24,5 +24,4 @@ services:
 
 volumes:
   postgres-data:
-    external: true
     name: smart-erd_postgres-data
