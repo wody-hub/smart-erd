@@ -63,6 +63,8 @@ jobs:
       - name: Start frontend
         working-directory: client
         run: |
+          VITE_API_PROXY_TARGET=http://127.0.0.1:9500 \
+          VITE_WS_PROXY_TARGET=ws://127.0.0.1:9500 \
           npm run dev -- --host 127.0.0.1 --port 4500 > /tmp/smart-erd-frontend.log 2>&1 &
           echo $! > /tmp/smart-erd-frontend.pid
           for i in {1..120}; do
