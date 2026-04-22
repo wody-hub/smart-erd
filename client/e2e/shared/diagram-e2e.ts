@@ -722,5 +722,7 @@ export async function captureDiagramReady(
 }
 
 export async function expectDiagramHeaderVisible(page: Page, target: DiagramTarget): Promise<void> {
-  await expect(page.getByRole('main').getByText(target.diagramName)).toBeVisible();
+  await expect(
+    page.locator('header').getByText(target.diagramName, { exact: true }).filter({ visible: true }),
+  ).toBeVisible();
 }
