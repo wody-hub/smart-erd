@@ -70,7 +70,9 @@
       "wbsMeta": "WBS work structure",
       "ganttDescription": "Review WBS schedules and milestones on a shared timeline, then adjust the plan with confidence.",
       "ganttMeta": "Timeline planning mode",
-      "staffingMeta": "Planned/actual M/M and labor cost"
+      "staffingMeta": "Planned/actual M/M and labor cost",
+      "issuesDescription": "Register project issues, filter the live list by status, priority, and assignee, then export the current result set to Excel.",
+      "issuesMeta": "Excel export for the current filtered list"
     },
     "dictionary": {
       "description": "Manage the shared word, term, and domain assets used across ERD and future document types.",
@@ -1822,6 +1824,116 @@
     "aria": {
       "edit": "Edit staffing row for {{name}}",
       "delete": "Delete staffing row for {{name}}"
+    }
+  },
+  "issues": {
+    "tab": {
+      "title": "Issues"
+    },
+    "section": {
+      "title": "Project issues",
+      "description": "Manage project execution issues by status, priority, and assignee."
+    },
+    "action": {
+      "create": "Create issue",
+      "refresh": "Refresh issues",
+      "export": "Export Excel",
+      "edit": "Edit issue",
+      "view": "View issue",
+      "start": "Start",
+      "markDone": "Mark done",
+      "resetFilters": "Reset filters"
+    },
+    "filter": {
+      "status": "Status",
+      "priority": "Priority",
+      "assignee": "Assignee",
+      "allStatuses": "All statuses",
+      "allPriorities": "All priorities",
+      "allAssignees": "All assignees",
+      "unassigned": "Unassigned",
+      "resultCount": "Showing {{count}} results"
+    },
+    "list": {
+      "column": {
+        "status": "Status",
+        "priority": "Priority",
+        "issue": "Issue",
+        "assignee": "Assignee",
+        "updatedAt": "Updated",
+        "actions": "Actions"
+      }
+    },
+    "form": {
+      "createTitle": "Create issue",
+      "editTitle": "Edit issue",
+      "viewTitle": "Issue details",
+      "createDescription": "Enter the issue title, description, priority, and assignee.",
+      "editDescription": "Update the current issue details.",
+      "viewDescription": "Review the current issue details.",
+      "title": "Title",
+      "description": "Description",
+      "priority": "Priority",
+      "assignee": "Assignee",
+      "status": "Status",
+      "createdAt": "Created",
+      "updatedAt": "Updated",
+      "titlePlaceholder": "Enter an issue title",
+      "descriptionPlaceholder": "Enter background and required action",
+      "priorityPlaceholder": "Select a priority",
+      "assigneePlaceholder": "Select an assignee",
+      "statusPlaceholder": "Select a status",
+      "titleHint": "{{current}} / {{max}} chars",
+      "descriptionHint": "{{current}} / {{max}} chars",
+      "saveAction": "Save issue",
+      "creating": "Creating issue",
+      "saving": "Saving issue"
+    },
+    "empty": {
+      "title": "Create your first project issue",
+      "description": "Add issues to manage execution work by status, priority, and assignee.",
+      "readOnlyDescription": "No issues have been registered for this project yet.",
+      "filteredTitle": "No issues match these filters",
+      "filteredDescription": "Adjust or reset the filters to see other issues."
+    },
+    "status": {
+      "loading": "Loading project issues...",
+      "refreshing": "Refreshing issues...",
+      "loadFailedTitle": "Project issues could not be loaded",
+      "loadFailed": "Retry loading project issues and the current filtered result.",
+      "readOnly": "You can review and export issues, but editing requires project edit access.",
+      "registered": "Registered",
+      "inProgress": "In progress",
+      "done": "Done"
+    },
+    "toast": {
+      "created": "Issue created",
+      "updated": "Issue updated",
+      "statusUpdated": "Issue status updated",
+      "createFailed": "Could not create the issue",
+      "updateFailed": "Could not update the issue",
+      "statusFailed": "Could not update the issue status",
+      "refreshFailed": "Could not refresh the issue list",
+      "exportFailed": "Excel export failed"
+    },
+    "validation": {
+      "titleRequired": "Enter a title.",
+      "titleTooLong": "Check the title length.",
+      "descriptionTooLong": "Issue description must be {{max}} characters or fewer.",
+      "assigneeInvalid": "Assignee must be a current team member.",
+      "priorityInvalid": "Select a valid priority.",
+      "statusInvalid": "Select a valid status."
+    },
+    "priority": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "critical": "Critical"
+    },
+    "aria": {
+      "edit": "Edit issue {{title}}",
+      "view": "View issue {{title}}",
+      "advance": "Move issue {{title}} to {{status}}"
     }
   }
 }

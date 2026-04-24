@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BookOpen,
   CalendarRange,
+  CircleAlert,
   ClipboardList,
   FileText,
   ListTree,
@@ -20,6 +21,7 @@ import BusinessOverviewTab from '@/components/project/BusinessOverviewTab';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import GanttTab from '@/components/gantt/GanttTab';
+import IssuesTab from '@/components/issues/IssuesTab';
 import StaffingTab from '@/components/staffing/StaffingTab';
 import ProjectWorkspaceHero from '@/components/workspace/ProjectWorkspaceHero';
 import DocumentHubTabContent from '@/components/workspace/DocumentHubTabContent';
@@ -31,7 +33,7 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { cn } from '@/lib/utils';
 import { getWorkspaceDocumentsTitleLabel } from '@/lib/workspace-labels';
 
-type DiagramsTabValue = 'documents' | 'overview' | 'wbs' | 'gantt' | 'staffing';
+type DiagramsTabValue = 'documents' | 'overview' | 'wbs' | 'gantt' | 'staffing' | 'issues';
 
 interface DiagramsTabRenderContext {
   teamId: string;
@@ -119,13 +121,21 @@ export default function DiagramsPage() {
                 description: t('workspace.projectHub.ganttDescription'),
                 metaDetail: t('workspace.projectHub.ganttMeta'),
               }
-            : {
-              section: 'projects' as const,
-              tone: 'projects' as const,
-              eyebrow: t('staffing.tab.title'),
-              description: t('staffing.section.description'),
-              metaDetail: t('workspace.projectHub.staffingMeta'),
-            };
+            : activeTab === 'staffing'
+              ? {
+                  section: 'projects' as const,
+                  tone: 'projects' as const,
+                  eyebrow: t('staffing.tab.title'),
+                  description: t('staffing.section.description'),
+                  metaDetail: t('workspace.projectHub.staffingMeta'),
+                }
+              : {
+                  section: 'projects' as const,
+                  tone: 'projects' as const,
+                  eyebrow: t('issues.tab.title'),
+                  description: t('issues.section.description'),
+                  metaDetail: t('workspace.projectHub.issuesMeta'),
+                };
 
   const tabs: DiagramsTabConfig[] = [
     {
@@ -197,11 +207,19 @@ export default function DiagramsPage() {
         projectId: currentProjectId,
         canEdit: currentCanEdit,
       }) => (
-        <StaffingTab
-          teamId={currentTeamId}
-          projectId={currentProjectId}
-          canEdit={currentCanEdit}
-        />
+        <StaffingTab teamId={currentTeamId} projectId={currentProjectId} canEdit={currentCanEdit} />
+      ),
+    },
+    {
+      value: 'issues',
+      label: t('issues.tab.title'),
+      icon: CircleAlert,
+      renderContent: ({
+        teamId: currentTeamId,
+        projectId: currentProjectId,
+        canEdit: currentCanEdit,
+      }) => (
+        <IssuesTab teamId={currentTeamId} projectId={currentProjectId} canEdit={currentCanEdit} />
       ),
     },
   ];
@@ -233,7 +251,9 @@ export default function DiagramsPage() {
         <div
           className={cn(
             'workspace-container',
-            activeTab === 'gantt' || activeTab === 'staffing' ? 'max-w-none' : 'max-w-5xl',
+            activeTab === 'gantt' || activeTab === 'staffing' || activeTab === 'issues'
+              ? 'max-w-none'
+              : 'max-w-5xl',
           )}
         >
           <Button

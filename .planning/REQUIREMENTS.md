@@ -17,34 +17,36 @@
 - [ ] **SPEC-03**: 화면기획 플러그인이 기존 협업 코어(Yjs, ScopeLock, Presence) 위에서 실시간 협업된다
 - [ ] **SPEC-04**: 화면기획 결과를 산출물(PNG/PDF)로 내보낼 수 있다
 
+Phase 3 status note (2026-04-23): SPEC-01~04 have substantial code in place, but remain unchecked here until browser/E2E/QA closeout evidence is recorded. See `.planning/phases/03-화면기획-플러그인/SUMMARY.md`.
+
 ### 사업 개요
 
-- [ ] **BIZ-01**: 프로젝트에 사업 메타 정보를 등록할 수 있다 (발주처, 수주사, 계약금액, 사업기간, 사업범위)
-- [ ] **BIZ-02**: 사업 개요 화면에서 프로젝트 전체 현황을 한눈에 파악할 수 있다
+- [x] **BIZ-01**: 프로젝트에 사업 메타 정보를 등록할 수 있다 (발주처, 수주사, 계약금액, 사업기간, 사업범위)
+- [x] **BIZ-02**: 사업 개요 화면에서 프로젝트 전체 현황을 한눈에 파악할 수 있다
 
 ### WBS (작업분해구조)
 
-- [ ] **WBS-01**: 계층 구조(업무 > 세부작업 > 태스크)로 WBS를 편집할 수 있다
-- [ ] **WBS-02**: 각 WBS 항목에 담당자, 시작일, 종료일, 진척률을 설정할 수 있다
-- [ ] **WBS-03**: WBS 항목에 예상 M/M(투입공수)를 설정할 수 있다
-- [ ] **WBS-04**: WBS 항목을 드래그 앤 드롭으로 이동/재배치할 수 있다
-- [ ] **WBS-05**: WBS 트리를 접기/펼치기로 탐색할 수 있다
-- [ ] **WBS-06**: 프로젝트 허브의 WBS 탭에서 더 넓은 전용 WBS 작업공간으로 이동할 수 있다
-- [ ] **WBS-07**: 전용 WBS 작업공간에서 루트 하단과 펼쳐진 상위 항목 그룹 하단에 WBS 항목을 인라인으로 추가할 수 있다
+- [x] **WBS-01**: 계층 구조(업무 > 세부작업 > 태스크)로 WBS를 편집할 수 있다
+- [x] **WBS-02**: 각 WBS 항목에 담당자, 시작일, 종료일, 진척률을 설정할 수 있다
+- [x] **WBS-03**: WBS 항목에 예상 M/M(투입공수)를 설정할 수 있다
+- [x] **WBS-04**: WBS 항목을 드래그 앤 드롭으로 이동/재배치할 수 있다
+- [x] **WBS-05**: WBS 트리를 접기/펼치기로 탐색할 수 있다
+- [x] **WBS-06**: 프로젝트 허브의 WBS 탭에서 더 넓은 전용 WBS 작업공간으로 이동할 수 있다
+- [x] **WBS-07**: 전용 WBS 작업공간에서 루트 하단과 펼쳐진 상위 항목 그룹 하단에 WBS 항목을 인라인으로 추가할 수 있다
 
 ### 간트 차트
 
-- [ ] **GANTT-01**: WBS 데이터를 기반으로 간트 차트가 자동 렌더링된다
-- [ ] **GANTT-02**: 간트 차트에서 일/주/월 단위로 타임라인을 조절할 수 있다
-- [ ] **GANTT-03**: 간트 차트에서 바를 드래그하여 기간을 변경할 수 있다
-- [ ] **GANTT-04**: 마일스톤이 간트 차트에 다이아몬드 마커로 표시된다
+- [x] **GANTT-01**: WBS 데이터를 기반으로 간트 차트가 자동 렌더링된다
+- [x] **GANTT-02**: 간트 차트에서 일/주/월 단위로 타임라인을 조절할 수 있다
+- [x] **GANTT-03**: 간트 차트에서 바를 드래그하여 기간을 변경할 수 있다
+- [x] **GANTT-04**: 마일스톤이 간트 차트에 다이아몬드 마커로 표시된다
 
 ### 마일스톤
 
-- [ ] **MILE-01**: 프로젝트에 마일스톤을 등록할 수 있다 (이름, 목표일, 설명)
-- [ ] **MILE-02**: 마일스톤에 연관 WBS 항목을 연결할 수 있다
-- [ ] **MILE-03**: 마일스톤 달성률이 연결된 WBS 항목의 진척률로 자동 계산된다
-- [ ] **MILE-04**: 마일스톤 목표일 대비 지연 상태가 시각적으로 표시된다
+- [x] **MILE-01**: 프로젝트에 마일스톤을 등록할 수 있다 (이름, 목표일, 설명)
+- [x] **MILE-02**: 마일스톤에 연관 WBS 항목을 연결할 수 있다
+- [x] **MILE-03**: 마일스톤 달성률이 연결된 WBS 항목의 진척률로 자동 계산된다
+- [x] **MILE-04**: 마일스톤 목표일 대비 지연 상태가 시각적으로 표시된다
 
 ### 인력 투입 (M/M)
 
@@ -55,10 +57,10 @@
 
 ### 이슈 트래커
 
-- [ ] **ISSUE-01**: 이슈를 등록할 수 있다 (제목, 내용, 우선순위, 담당자)
-- [ ] **ISSUE-02**: 이슈 상태를 관리할 수 있다 (등록 → 처리중 → 완료)
-- [ ] **ISSUE-03**: 이슈 목록을 상태/우선순위/담당자별로 필터링할 수 있다
-- [ ] **ISSUE-04**: 이슈 목록을 내보낼 수 있다 (Excel)
+- [x] **ISSUE-01**: 이슈를 등록할 수 있다 (제목, 내용, 우선순위, 담당자)
+- [x] **ISSUE-02**: 이슈 상태를 관리할 수 있다 (등록 → 처리중 → 완료)
+- [x] **ISSUE-03**: 이슈 목록을 상태/우선순위/담당자별로 필터링할 수 있다
+- [x] **ISSUE-04**: 이슈 목록을 내보낼 수 있다 (Excel)
 
 ## v2 Requirements
 
@@ -117,35 +119,35 @@
 | THEME-01 | Phase 2 | Complete |
 | THEME-02 | Phase 2 | Complete |
 | THEME-03 | Phase 2 | Complete |
-| SPEC-01 | Phase 3 | Pending |
-| SPEC-02 | Phase 3 | Pending |
-| SPEC-03 | Phase 3 | Pending |
-| SPEC-04 | Phase 3 | Pending |
-| BIZ-01 | Phase 4 | Pending |
-| BIZ-02 | Phase 4 | Pending |
-| WBS-01 | Phase 5 | Pending |
+| SPEC-01 | Phase 3 | Implemented, pending browser/E2E closeout |
+| SPEC-02 | Phase 3 | Implemented, pending browser/E2E closeout |
+| SPEC-03 | Phase 3 | Partially verified, pending multi-client E2E |
+| SPEC-04 | Phase 3 | Implemented, pending export smoke/QA |
+| BIZ-01 | Phase 4 | Complete |
+| BIZ-02 | Phase 4 | Complete |
+| WBS-01 | Phase 5 | Complete |
 | WBS-02 | Phase 6.1 | Complete |
-| WBS-03 | Phase 5 | Pending |
-| WBS-04 | Phase 5 | Pending |
-| WBS-05 | Phase 5 | Pending |
+| WBS-03 | Phase 5 | Complete |
+| WBS-04 | Phase 5 | Complete |
+| WBS-05 | Phase 5 | Complete |
 | WBS-06 | Phase 6.1 | Complete |
 | WBS-07 | Phase 6.1 | Complete |
-| MILE-01 | Phase 5 | Pending |
-| MILE-02 | Phase 5 | Pending |
-| MILE-03 | Phase 5 | Pending |
-| MILE-04 | Phase 5 | Pending |
-| GANTT-01 | Phase 6 | Pending |
-| GANTT-02 | Phase 6 | Pending |
-| GANTT-03 | Phase 6 | Pending |
-| GANTT-04 | Phase 6 | Pending |
+| MILE-01 | Phase 5 | Complete |
+| MILE-02 | Phase 5 | Complete |
+| MILE-03 | Phase 5 | Complete |
+| MILE-04 | Phase 5 | Complete |
+| GANTT-01 | Phase 6 | Complete |
+| GANTT-02 | Phase 6 | Complete |
+| GANTT-03 | Phase 6 | Complete |
+| GANTT-04 | Phase 6 | Complete |
 | HR-01 | Phase 7 | Complete |
 | HR-02 | Phase 7 | Complete |
 | HR-03 | Phase 7 | Complete |
 | HR-04 | Phase 7 | Complete |
-| ISSUE-01 | Phase 8 | Pending |
-| ISSUE-02 | Phase 8 | Pending |
-| ISSUE-03 | Phase 8 | Pending |
-| ISSUE-04 | Phase 8 | Pending |
+| ISSUE-01 | Phase 8 | Complete |
+| ISSUE-02 | Phase 8 | Complete |
+| ISSUE-03 | Phase 8 | Complete |
+| ISSUE-04 | Phase 8 | Complete |
 
 **Coverage:**
 - v1 requirements: 34 total
@@ -154,4 +156,4 @@
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-22 after RIS-183 Phase 7 execution integration closeout*
+*Last updated: 2026-04-23 after RIS-189 Phase 3 documentation refresh*

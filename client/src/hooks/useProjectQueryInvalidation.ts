@@ -13,14 +13,20 @@ export function useProjectQueryInvalidation(teamId: string, projectId: string) {
   const queryClient = useQueryClient();
 
   /**
-   * WBS, 마일스톤, 인력 투입, 사업 개요 쿼리를 무효화한다.
+   * WBS, 마일스톤, 인력 투입, 이슈, 사업 개요 쿼리를 무효화한다.
    *
    * @param options.includeWbs WBS 쿼리 무효화 포함 여부 (기본 true)
    * @param options.includeMilestones 마일스톤 쿼리 무효화 포함 여부 (기본 true)
    * @param options.includeStaffing 인력 투입 쿼리 무효화 포함 여부 (기본 true)
+   * @param options.includeIssues 프로젝트 이슈 쿼리 무효화 포함 여부 (기본 false)
    */
   const invalidateRelatedQueries = useCallback(
-    ({ includeWbs = true, includeMilestones = true, includeStaffing = true } = {}) => {
+    ({
+      includeWbs = true,
+      includeMilestones = true,
+      includeStaffing = true,
+      includeIssues = false,
+    } = {}) => {
       if (includeWbs) {
         queryClient.invalidateQueries({ queryKey: queryKeys.wbs.all(teamId, projectId) });
       }
@@ -31,6 +37,9 @@ export function useProjectQueryInvalidation(teamId: string, projectId: string) {
       }
       if (includeStaffing) {
         queryClient.invalidateQueries({ queryKey: queryKeys.staffing.all(teamId, projectId) });
+      }
+      if (includeIssues) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.issues.all(teamId, projectId) });
       }
       queryClient.invalidateQueries({
         queryKey: queryKeys.projects.businessOverview(teamId, projectId),

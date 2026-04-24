@@ -1,3 +1,5 @@
+import type { ProjectIssueFilters } from '@/types/issues';
+
 /**
  * React Query 캐시 키 상수.
  *
@@ -88,5 +90,11 @@ export const queryKeys = {
     /** 프로젝트 인력 투입 전체 조회 */
     all: (teamId: string, projectId: string) =>
       ['teams', teamId, 'projects', projectId, 'staffing'] as const,
+  },
+  /** 프로젝트 이슈 관련 쿼리 키 */
+  issues: {
+    /** 프로젝트 이슈 목록 조회 */
+    all: (teamId: string, projectId: string, filters: ProjectIssueFilters = {}) =>
+      ['teams', teamId, 'projects', projectId, 'issues', filters] as const,
   },
 } as const;

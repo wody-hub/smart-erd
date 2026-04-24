@@ -14,13 +14,13 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: 마크다운 증분 동기화** - Section 단위 증분 동기화 및 증분 프리뷰 렌더링 완성
 - [x] **Phase 2: 테마 선택** - Paper/Graphite/Midnight 큐레이션 테마 전역 적용
-- [ ] **Phase 3: 화면기획 플러그인** - 마스터 컴포넌트+인스턴스 화면 설계 도구 구현
+- [ ] **Phase 3: 화면기획 플러그인** - 마스터 컴포넌트+인스턴스 화면 설계 도구 구현 (구현 선행, 검증/마감 필요)
 - [x] **Phase 4: 사업 개요** - 프로젝트 메타(발주처·계약·사업 범위) 등록 및 현황 조회
 - [x] **Phase 5: WBS + 마일스톤** - 계층 작업분해구조 편집과 마일스톤 관리
 - [x] **Phase 6: 간트 차트** - WBS 데이터 기반 타임라인 시각화 및 인터랙션
 - [x] **Phase 6.1 (INSERTED): WBS 작업공간 확장** - 전용 WBS 페이지, 하단 인라인 추가, 담당자 배정 UX 보강
 - [x] **Phase 7: 인력 투입 (M/M)** - 팀원별 M/M 계획·실적 및 인건비 자동 계산
-- [ ] **Phase 8: 이슈 트래커** - 이슈 등록·상태 관리·필터링·Excel 내보내기
+- [x] **Phase 8: 이슈 트래커** - 이슈 등록·상태 관리·필터링·Excel 내보내기
 
 ## Phase Details
 
@@ -67,18 +67,25 @@ Plans:
   2. 마스터 컴포넌트를 수정하면 해당 마스터를 참조하는 모든 인스턴스에 자동으로 반영된다
   3. 두 사용자가 같은 화면기획 문서를 동시에 편집할 때 Yjs 기반 실시간 동기화가 동작한다
   4. 완성된 화면기획을 PNG 또는 PDF 파일로 내보낼 수 있다
-**Plans**: In progress (plan 파일 미정의, 코드 선행 구현 진행 중)
+**Plans**: In progress (closeout plan 필요)
 **UI hint**: yes
 
-구현 현황 (plan 파일 없이 코드 직접 구현됨):
+Summary:
+- `.planning/phases/03-화면기획-플러그인/SUMMARY.md`
+
+구현 현황 (코드 선행 구현됨):
 - [x] screen-spec 문서 플러그인 골격 (DocumentPlugin, ScopeResolver, MutationApplier, MutationPolicy)
 - [x] screen-design 페이지 UI (Canvas, Library, Inspector, EditorShell, PageState)
 - [x] 마스터 컴포넌트 CRUD + 인스턴스 배치/이동/리사이즈
 - [x] cross-screen move + constraint cascade + syncConstraintSource
 - [x] 실시간 협업 Yjs 연동 (session, document runtime, bootstrap)
 - [x] PNG/PDF 내보내기 파이프라인
-- [ ] BE 백엔드 ScreenSpecCollaborationPlugin 완성 (scope resolver 연동 등)
-- [ ] E2E 테스트 + QA 검증
+- [x] BE ScreenSpecCollaborationPlugin 등록 + ScreenSpecScopeResolver 연동
+- [x] 단위 테스트: FE screen-spec bootstrap/mutation/export/document + BE scope resolver
+- [ ] 구조 검증 DomainValidationHook 정책 확정 (현재 no-op)
+- [ ] 화면기획 브라우저 E2E + 다중 세션 협업 검증
+- [ ] PNG/PDF export 브라우저 smoke + QA 검증
+- [ ] Phase 3 closeout plan/validation/verification artifact 작성
 
 ### Phase 4: 사업 개요
 **Goal**: 프로젝트에 발주처·계약 기간·계약 금액·사업 범위 등 SI 사업 메타 정보를 등록하고, 사업 개요 화면에서 프로젝트 전체 현황을 한눈에 파악할 수 있다
@@ -238,8 +245,11 @@ Plans (상세 설계 완료 — `.planning/phases/07-인력-투입/`):
   2. 이슈 상태를 등록 → 처리중 → 완료 순서로 변경할 수 있다
   3. 이슈 목록을 상태, 우선순위, 담당자 기준으로 필터링할 수 있다
   4. 현재 이슈 목록을 Excel 파일로 내보낼 수 있다
-**Plans**: TBD
+**Plans**: 1 plan
 **UI hint**: yes
+
+Plans (상세 설계 완료 — `.planning/phases/08-이슈-트래커/`):
+- [x] 08-01-PLAN.md — issue tracker backend/API + project-hub issues tab + shared filter/export contract + closeout verification
 
 ## Progress
 
@@ -250,10 +260,10 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.1 → 7 �
 |-------|----------------|--------|-----------|
 | 1. 마크다운 증분 동기화 | 7/7 | Complete | 2026-04-03 |
 | 2. 테마 선택 | 3/3 | Complete | 2026-04-03 |
-| 3. 화면기획 플러그인 | -/? | In progress | - |
+| 3. 화면기획 플러그인 | summary only | In progress - closeout/verification needed | - |
 | 4. 사업 개요 | 3/3 | Complete | 2026-04-15 |
 | 5. WBS + 마일스톤 | summary only | Complete | 2026-04-15 |
 | 6. 간트 차트 | 1/1 | Complete | 2026-04-16 |
 | 6.1 WBS 작업공간 확장 | 1/1 | Complete | 2026-04-21 |
 | 7. 인력 투입 (M/M) | 1/1 | Complete | 2026-04-22 |
-| 8. 이슈 트래커 | 0/? | Not started | - |
+| 8. 이슈 트래커 | 1/1 | Complete | 2026-04-23 |
