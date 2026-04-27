@@ -29,6 +29,247 @@
       "enterName": "Enter a name for the resource you want to create."
     }
   },
+  "guide": {
+    "entry": {
+      "auth": "Open product guide",
+      "workspace": "Open guide",
+      "workspaceHint": "Review the team to project to document flow before you start the next workspace step."
+    },
+    "header": {
+      "label": "Public guide",
+      "quickStart": "Quick start"
+    },
+    "context": {
+      "label": "Current context",
+      "openedFrom": "Opened from {{source}}.",
+      "sources": {
+        "login": "login",
+        "signup": "signup",
+        "teams": "the team workspace",
+        "projects": "the project list",
+        "documents": "the document hub",
+        "overview": "the project overview tab",
+        "wbs": "the WBS tab",
+        "gantt": "the Gantt tab",
+        "staffing": "the staffing tab",
+        "issues": "the issues tab"
+      },
+      "return": {
+        "login": "Back to login",
+        "signup": "Back to signup",
+        "teams": "Back to teams",
+        "projects": "Back to project list",
+        "documents": "Back to document hub",
+        "overview": "Back to overview",
+        "wbs": "Back to WBS",
+        "gantt": "Back to Gantt",
+        "staffing": "Back to staffing",
+        "issues": "Back to issues"
+      }
+    },
+    "actions": {
+      "login": "Go to login",
+      "signup": "Create account",
+      "openTeams": "Open teams",
+      "openProjects": "Open project list",
+      "openProjectHub": "Open project hub",
+      "openDocumentHub": "Open document hub",
+      "openDictionary": "Open dictionary",
+      "openOverview": "Open overview",
+      "openWbs": "Open WBS",
+      "openGantt": "Open Gantt",
+      "openStaffing": "Open staffing",
+      "openIssues": "Open issues",
+      "reviewQuickStart": "Review quick start",
+      "viewDslDetail": "Open DSL detail"
+    },
+    "hero": {
+      "eyebrow": "Smart ERD guide",
+      "title": "Start from the right workspace before you draw the first table.",
+      "description": "Smart ERD is organized around team context, project hubs, document hubs, and a shared dictionary. This page explains the real product flow without going into editor-level DSL syntax.",
+      "primaryGuest": "Log in",
+      "secondaryGuest": "Create account",
+      "primaryAuthenticated": "Go to teams",
+      "secondaryAuthenticated": "Jump to quick start",
+      "highlightFlow": "Team to Project to Document",
+      "highlightNaming": "Matches current route labels",
+      "highlightPublic": "Available without sign-in",
+      "snapshotEyebrow": "Flow snapshot",
+      "snapshotTitle": "What you should expect",
+      "snapshotDescription": "Move through the same structure the app already uses today instead of guessing where each task lives.",
+      "snapshotTeam": {
+        "title": "Team workspace",
+        "description": "Create or choose the team that owns the shared members and dictionary assets."
+      },
+      "snapshotProject": {
+        "title": "Project hub",
+        "description": "Open a project to reach documents, overview, WBS, gantt, staffing, and issue tracking."
+      },
+      "snapshotDocument": {
+        "title": "Document workspace",
+        "description": "Create the document type you need, then attach dictionary context where ERD work requires it."
+      }
+    },
+    "nav": {
+      "product": "Product intro",
+      "quickStart": "Quick start",
+      "workspaceMap": "Workspace map",
+      "projectHub": "Project hub",
+      "documentHub": "Document hub",
+      "dictionary": "Dictionary",
+      "confusions": "Common confusions",
+      "dslDetail": "ERD DSL"
+    },
+    "product": {
+      "eyebrow": "Product intro",
+      "title": "The product is a workspace flow, not a single canvas.",
+      "description": "Teams hold shared operating context, projects bundle planning views, and document hubs hold the actual working files.",
+      "cards": {
+        "teamShared": {
+          "title": "Team-scoped context",
+          "description": "Members, roles, and the shared dictionary live at the team level so multiple projects can reuse the same standards."
+        },
+        "projectFocused": {
+          "title": "Project hub first",
+          "description": "Each project has a hub for documents and adjacent planning views instead of sending you directly into an editor."
+        },
+        "documentDriven": {
+          "title": "Document-driven execution",
+          "description": "ERD, Markdown, and Screen Spec documents are created from the document hub, then opened in the editor route that fits each type."
+        }
+      }
+    },
+    "quickStart": {
+      "eyebrow": "Quick start",
+      "title": "Quick start without guesswork.",
+      "description": "Follow this order when you are new to the product or when you need to explain the standard flow to someone else.",
+      "step1": {
+        "title": "Log in or create your account",
+        "description": "Use the public auth screens first. The guide stays public so you can review the product flow before signing in."
+      },
+      "step2": {
+        "title": "Choose or create a team",
+        "description": "The team is the top-level workspace. Shared members and dictionary assets are managed from there."
+      },
+      "step3": {
+        "title": "Open the project hub",
+        "description": "Move from Teams to Projects, then choose the project that owns the current document and planning work."
+      },
+      "step4": {
+        "title": "Create the right document",
+        "description": "Start from the document hub. If the work is ERD, make sure the document attaches the correct dictionary context."
+      }
+    },
+    "workspaceMap": {
+      "eyebrow": "Workspace map",
+      "title": "Use this mental model when deciding where work belongs.",
+      "description": "The same task often feels clearer once you know whether it belongs in the team layer, the project layer, or a specific document.",
+      "team": {
+        "title": "Teams",
+        "description": "Manage shared membership and enter the team-owned project list from here."
+      },
+      "project": {
+        "title": "Projects",
+        "description": "Choose the project that needs execution work, then open its hub."
+      },
+      "documentHub": {
+        "title": "Document hub",
+        "description": "Create or open ERD, Markdown, and Screen Spec documents in one place."
+      },
+      "dictionary": {
+        "title": "Dictionary",
+        "description": "Maintain reusable words, terms, and domains that ERD work can reference consistently."
+      }
+    },
+    "projectHub": {
+      "eyebrow": "Project hub",
+      "title": "These are the actual project-hub tabs available today.",
+      "description": "The project route is more than a document list. Use the surrounding tabs when the work is planning, tracking, or coordination.",
+      "overview": {
+        "title": "Business Overview",
+        "description": "Capture the project's core context and align the next execution window."
+      },
+      "wbs": {
+        "title": "WBS",
+        "description": "Break work into structure and manage the work tree directly in the hub."
+      },
+      "gantt": {
+        "title": "Gantt",
+        "description": "Review schedule and milestone progress on a shared timeline."
+      },
+      "staffing": {
+        "title": "Staffing",
+        "description": "Track planned versus actual staffing and labor cost for the project."
+      },
+      "issues": {
+        "title": "Issues",
+        "description": "Register and filter project issues, then export the current list when needed."
+      }
+    },
+    "documentHub": {
+      "eyebrow": "Document hub",
+      "title": "Document hub is where creation starts.",
+      "description": "Create the working document first, then move into the corresponding editor route.",
+      "erd": {
+        "title": "ERD document",
+        "description": "Start an ERD canvas with dictionary context attached so tables, relations, and sync flows are ready from the first screen."
+      },
+      "markdown": {
+        "title": "Markdown document",
+        "description": "Use Markdown for notes, plans, and structured text documents alongside ERD work in the same project."
+      },
+      "screenSpec": {
+        "title": "Screen Spec document",
+        "description": "Screen Spec exists as a collaborative screen-design document. Treat it as a supported document type, not a promise that every downstream workflow is already complete."
+      }
+    },
+    "dictionary": {
+      "eyebrow": "Dictionary",
+      "title": "Dictionary is shared infrastructure for consistent naming.",
+      "description": "Keep reusable naming assets in one place so ERD work can attach the right context instead of redefining terms per document.",
+      "sets": {
+        "title": "Dictionary sets",
+        "description": "Create and choose dictionary sets that documents can attach to."
+      },
+      "assets": {
+        "title": "Words, terms, and domains",
+        "description": "Each asset type has a different job in naming and standardization, so keep them in the shared dictionary instead of scattering them across documents."
+      },
+      "binding": {
+        "title": "Document binding",
+        "description": "ERD documents reference dictionary context from the hub, while the dictionary itself stays a team-shared workspace."
+      }
+    },
+    "confusions": {
+      "eyebrow": "Common confusions",
+      "title": "Common points that confuse first-time users.",
+      "description": "These are the boundary lines that are easiest to miss when you enter the product for the first time.",
+      "flow": {
+        "title": "Why doesn't this page explain every editor action?",
+        "description": "Because /guide is the top-level map. Detailed syntax and error examples stay closer to the ERD editor where they are used."
+      },
+      "projectVsDocument": {
+        "title": "Project vs document",
+        "description": "A project holds multiple planning surfaces and documents. The actual ERD or Markdown file is created inside that project."
+      },
+      "dictionaryContext": {
+        "title": "Dictionary vs dictionary context",
+        "description": "The dictionary workspace manages shared assets. A dictionary context is the specific set an ERD document attaches when it needs those assets."
+      },
+      "dsl": {
+        "title": "Where is the detailed DSL syntax guide?",
+        "description": "The detailed ERD DSL syntax and diagnostic guides remain in the editor. Use this page for product flow, then switch to the in-editor guide when writing or fixing DSL."
+      }
+    },
+    "detailCallout": {
+      "eyebrow": "Next step",
+      "title": "Use this page to orient yourself, then switch to the workspace that matches the job.",
+      "description": "If you need detailed ERD DSL syntax, examples, or error-handling steps, move into the editor workflow. This public guide intentionally stays at the product-flow level.",
+      "secondary": "Review common confusions",
+      "primaryAuthenticated": "Open workspace",
+      "primaryGuest": "Go to login"
+    }
+  },
   "workspace": {
     "section": {
       "teams": "Teams",

@@ -94,13 +94,18 @@ export default function SignupPage() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="justify-center">
+        <CardFooter className="flex-col gap-3">
           <p className="text-sm text-muted-foreground">
             {t('auth.signup.hasAccount')}{' '}
             <Link to={ROUTES.LOGIN} className="text-primary underline-offset-4 hover:underline">
               {t('auth.signup.loginLink')}
             </Link>
           </p>
+          <Button variant="link" size="sm" className="h-auto px-0" asChild>
+            <Link to={ROUTES.GUIDE_ENTRY({ source: 'signup', hash: 'guide-quick-start' })}>
+              {t('guide.entry.auth')}
+            </Link>
+          </Button>
         </CardFooter>
       </Card>
     </div>

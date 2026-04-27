@@ -117,30 +117,50 @@ export default function ProjectsPage() {
             }
             utilityActions={
               <>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    clearRecentProjectContext();
-                    navigate(ROUTES.DICTIONARY(teamId!));
-                  }}
-                >
-                  <BookOpen className="mr-2 h-4 w-4 text-brand-secondary" />
-                  {t('project.list.dictionaryButton')}
-                </Button>
-                <Button variant="outline" onClick={() => setMembersDialogOpen(true)}>
-                  <UserPlus className="mr-2 h-4 w-4 text-primary" />
-                  {t('project.list.membersButton')}
-                </Button>
-                {isAdmin && (
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant="outline"
-                    onClick={() => setTeamSettingsOpen(true)}
-                    aria-label={t('team.aria.settings')}
+                    onClick={() => {
+                      clearRecentProjectContext();
+                      navigate(ROUTES.DICTIONARY(teamId!));
+                    }}
                   >
-                    <Settings className="h-4 w-4 mr-2" />
-                    {t('workspace.section.settings')}
+                    <BookOpen className="mr-2 h-4 w-4 text-brand-secondary" />
+                    {t('project.list.dictionaryButton')}
                   </Button>
-                )}
+                  <Button variant="outline" onClick={() => setMembersDialogOpen(true)}>
+                    <UserPlus className="mr-2 h-4 w-4 text-primary" />
+                    {t('project.list.membersButton')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      navigate(
+                        ROUTES.GUIDE_ENTRY({
+                          source: 'projects',
+                          teamId: teamId!,
+                          hash: 'guide-project-hub',
+                        }),
+                      )
+                    }
+                  >
+                    <BookOpen className="mr-2 h-4 w-4 text-primary" />
+                    {t('guide.entry.workspace')}
+                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setTeamSettingsOpen(true)}
+                      aria-label={t('team.aria.settings')}
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      {t('workspace.section.settings')}
+                    </Button>
+                  )}
+                </div>
+                <p className="max-w-md text-sm leading-6 text-muted-foreground">
+                  {t('guide.entry.workspaceHint')}
+                </p>
               </>
             }
           />

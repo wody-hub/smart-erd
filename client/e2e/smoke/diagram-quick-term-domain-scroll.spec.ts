@@ -93,7 +93,7 @@ test('quick term domain dropdown scrolls inside the diagram code flow @smoke', a
 
   await page
     .getByRole('button', {
-      name: /ERROR 2행 사전에 없는 논리명: 신규컬럼|ERROR 2 .*Unknown term: 신규컬럼/i,
+      name: /사전에 없는 논리명: 신규컬럼|Unknown term: 신규컬럼/i,
     })
     .click();
   await page

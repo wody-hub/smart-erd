@@ -1,5 +1,47 @@
+export type GuideEntrySource =
+  | 'login'
+  | 'signup'
+  | 'teams'
+  | 'projects'
+  | 'documents'
+  | 'overview'
+  | 'wbs'
+  | 'gantt'
+  | 'staffing'
+  | 'issues';
+
+export interface GuideRouteOptions {
+  source?: GuideEntrySource;
+  teamId?: string | number;
+  projectId?: string | number;
+  hash?: string;
+}
+
+function buildGuideRoute(options: GuideRouteOptions = {}): string {
+  const searchParams = new URLSearchParams();
+
+  if (options.source) {
+    searchParams.set('source', options.source);
+  }
+  if (options.teamId != null) {
+    searchParams.set('teamId', String(options.teamId));
+  }
+  if (options.projectId != null) {
+    searchParams.set('projectId', String(options.projectId));
+  }
+
+  const queryString = searchParams.toString();
+  const hash = options.hash ? `#${options.hash.replace(/^#/, '')}` : '';
+
+  return `/guide${queryString ? `?${queryString}` : ''}${hash}`;
+}
+
 /** 애플리케이션 라우트 경로 상수. 정적 경로와 파라미터 기반 동적 경로를 제공한다. */
 export const ROUTES = {
+  /** 제품 가이드 페이지 */
+  GUIDE: '/guide',
+  /** 제품 가이드 페이지 (진입 맥락/앵커 포함) */
+  GUIDE_ENTRY: buildGuideRoute,
   /** 로그인 페이지 */
   LOGIN: '/login',
   /** 회원가입 페이지 */

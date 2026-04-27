@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Plus, Users } from 'lucide-react';
+import { AlertTriangle, BookOpen, Plus, Users } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import Header from '@/components/layout/Header';
@@ -60,6 +60,22 @@ export default function TeamsPage() {
                 <Plus className="mr-2 h-4 w-4" />
                 {t('team.list.newButton')}
               </Button>
+            }
+            utilityActions={
+              <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    navigate(ROUTES.GUIDE_ENTRY({ source: 'teams', hash: 'guide-workspace-map' }))
+                  }
+                >
+                  <BookOpen className="mr-2 h-4 w-4 text-primary" />
+                  {t('guide.entry.workspace')}
+                </Button>
+                <p className="max-w-md text-sm leading-6 text-muted-foreground">
+                  {t('guide.entry.workspaceHint')}
+                </p>
+              </div>
             }
           />
 

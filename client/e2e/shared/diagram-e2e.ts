@@ -431,7 +431,27 @@ export async function loginViaUi(page: Page, config: E2EConfig): Promise<string>
 }
 
 export async function openCodeEditor(page: Page, timeoutMs = 15_000): Promise<void> {
-  await page.getByRole('button', { name: /^(코드|Code)$/ }).click();
+  const hasMonacoModel = async (): Promise<boolean> =>
+    page.evaluate(() => Boolean(window.monaco?.editor?.getModels?.().length));
+
+  if (await hasMonacoModel()) {
+    return;
+  }
+
+  const legacyCodeButton = page.getByRole('button', { name: /^(코드|Code)$/ });
+  if (await legacyCodeButton.isVisible().catch(() => false)) {
+    await legacyCodeButton.click();
+  } else {
+    const workModeTrigger = page.getByRole('combobox', { name: /작업 모드|Work mode/i });
+    await expect(workModeTrigger).toBeVisible({ timeout: timeoutMs });
+
+    const currentWorkMode = (await workModeTrigger.textContent())?.trim() ?? '';
+    if (!/코드 위주|Code-first/i.test(currentWorkMode)) {
+      await workModeTrigger.click();
+      await page.getByRole('option', { name: /코드 위주|Code-first/i }).click();
+    }
+  }
+
   await page.waitForFunction(
     () => Boolean(window.monaco?.editor?.getModels?.().length),
     undefined,
@@ -548,7 +568,16 @@ export async function waitForDiagramNode(
 }
 
 export async function getNodeModelPosition(locator: Locator): Promise<Point> {
-  const transform = await locator.evaluate((element) => (element as HTMLElement).style.transform);
+  const transform = await locator.evaluate((element) => {
+    let current: HTMLElement | null = element as HTMLElement;
+    while (current) {
+      if (current.style.transform.includes('translate(')) {
+        return current.style.transform;
+      }
+      current = current.parentElement;
+    }
+    throw new Error('Node transform not found');
+  });
   return parseTranslate(transform);
 }
 

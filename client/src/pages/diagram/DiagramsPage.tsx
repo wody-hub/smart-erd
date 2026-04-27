@@ -87,6 +87,20 @@ export default function DiagramsPage() {
     enabled: !!teamId && !!projectId,
   });
   const documentTitleToken = getWorkspaceDocumentsTitleLabel();
+  const guideRoute =
+    activeTab === 'documents'
+      ? ROUTES.GUIDE_ENTRY({
+          source: 'documents',
+          teamId: teamId!,
+          projectId: projectId!,
+          hash: 'guide-document-hub',
+        })
+      : ROUTES.GUIDE_ENTRY({
+          source: activeTab,
+          teamId: teamId!,
+          projectId: projectId!,
+          hash: 'guide-project-hub',
+        });
 
   const heroCopy =
     activeTab === 'documents'
@@ -286,9 +300,9 @@ export default function DiagramsPage() {
               ) : undefined
             }
             utilityActions={
-              activeTab === 'documents' ? (
-                <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
+              <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                  {activeTab === 'documents' && (
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -299,12 +313,18 @@ export default function DiagramsPage() {
                       <BookOpen className="mr-2 h-4 w-4 text-brand-secondary" />
                       {t('project.list.dictionaryButton')}
                     </Button>
-                  </div>
-                  <p className="max-w-md text-sm leading-6 text-muted-foreground">
-                    {t('workspace.documents.multiTypeHint')}
-                  </p>
+                  )}
+                  <Button variant="outline" onClick={() => navigate(guideRoute)}>
+                    <BookOpen className="mr-2 h-4 w-4 text-primary" />
+                    {t('guide.entry.workspace')}
+                  </Button>
                 </div>
-              ) : undefined
+                <p className="max-w-md text-sm leading-6 text-muted-foreground">
+                  {activeTab === 'documents'
+                    ? t('workspace.documents.multiTypeHint')
+                    : t('guide.entry.workspaceHint')}
+                </p>
+              </div>
             }
           />
 

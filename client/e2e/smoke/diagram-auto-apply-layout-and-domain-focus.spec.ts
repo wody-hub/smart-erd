@@ -153,7 +153,7 @@ test('code auto apply preserves existing layout and appends new table @smoke', a
   await expectDiagramHeaderVisible(page, fixture.target);
   await waitForEditableDiagram(page, 30_000);
 
-  const usersNode = page.locator('.react-flow__node-table', { hasText: 'users' }).first();
+  const usersNode = page.locator('[data-table-name="users"]').first();
   await expect(usersNode).toBeVisible();
   const beforePosition = await getNodeModelPosition(usersNode);
 
@@ -168,11 +168,11 @@ test('code auto apply preserves existing layout and appends new table @smoke', a
     model.setValue('Table users {\n  id\n}\n\nTable invoices {\n  invoice_id\n}');
   });
 
-  const invoicesNode = page.locator('.react-flow__node-table', { hasText: 'invoices' }).first();
+  const invoicesNode = page.locator('[data-table-name="invoices"]').first();
   await expect(invoicesNode).toBeVisible({ timeout: 20_000 });
 
   await expect
-    .poll(async () => page.locator('.react-flow__node-table').count(), { timeout: 20_000 })
+    .poll(async () => page.locator('[data-table-node-kind]').count(), { timeout: 20_000 })
     .toBe(2);
 
   const afterUsersPosition = await getNodeModelPosition(usersNode);

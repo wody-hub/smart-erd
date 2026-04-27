@@ -177,13 +177,18 @@ export default function LoginPage() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="justify-center">
+        <CardFooter className="flex-col gap-3">
           <p className="text-sm text-muted-foreground">
             {t('auth.login.noAccount')}{' '}
             <Link to={ROUTES.SIGNUP} className="text-primary underline-offset-4 hover:underline">
               {t('auth.login.signupLink')}
             </Link>
           </p>
+          <Button variant="link" size="sm" className="h-auto px-0" asChild>
+            <Link to={ROUTES.GUIDE_ENTRY({ source: 'login', hash: 'guide-quick-start' })}>
+              {t('guide.entry.auth')}
+            </Link>
+          </Button>
         </CardFooter>
       </Card>
     </div>

@@ -10,6 +10,7 @@ import { ROUTES } from '@/constants/routes';
 
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const SignupPage = lazy(() => import('./pages/auth/SignupPage'));
+const GuidePage = lazy(() => import('./pages/guide/GuidePage'));
 const TeamsPage = lazy(() => import('./pages/team/TeamsPage'));
 const ProjectsPage = lazy(() => import('./pages/project/ProjectsPage'));
 const ProjectWbsPage = lazy(() => import('./pages/project/ProjectWbsPage'));
@@ -48,6 +49,7 @@ export default function App() {
         >
           {needsServerSetup ? (
             <Routes>
+              <Route path={ROUTES.GUIDE} element={<GuidePage />} />
               <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
               <Route path="*" element={<Navigate to={ROUTES.SETTINGS} replace />} />
             </Routes>
@@ -57,6 +59,7 @@ export default function App() {
               {isElectronEnv && <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />}
 
               {/* ── 공개 라우트 ── */}
+              <Route path={ROUTES.GUIDE} element={<GuidePage />} />
               <Route path={ROUTES.LOGIN} element={<LoginPage />} />
               <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
 
