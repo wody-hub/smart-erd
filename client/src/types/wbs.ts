@@ -6,7 +6,7 @@ export interface WbsItem {
   parentId: number | null;
   /** 항목명 */
   name: string;
-  /** 트리 깊이 (0~2) */
+  /** 트리 깊이 (0~8) */
   depth: number;
   /** 정렬 순서 */
   sortOrder: number;

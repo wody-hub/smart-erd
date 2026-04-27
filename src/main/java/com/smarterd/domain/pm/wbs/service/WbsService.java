@@ -233,7 +233,7 @@ public class WbsService {
         }
 
         final var parent = findByProjectAndId(project, parentId);
-        if (parent.getDepth() >= 2) {
+        if (parent.getDepth() >= WbsItem.MAX_DEPTH) {
             throw new BusinessException(MessageCode.ERROR_BUSINESS_WBS_DEPTH_LIMIT_EXCEEDED.code());
         }
         return parent;
@@ -351,7 +351,7 @@ public class WbsService {
 
         visiting.remove(itemId);
 
-        if (depth > 2) {
+        if (depth > WbsItem.MAX_DEPTH) {
             throw new BusinessException(MessageCode.ERROR_BUSINESS_WBS_DEPTH_LIMIT_EXCEEDED.code());
         }
 
@@ -419,7 +419,7 @@ public class WbsService {
      * @param id             항목 ID
      * @param parentId       부모 항목 ID
      * @param name           항목명
-     * @param depth          트리 깊이 (0~2)
+     * @param depth          트리 깊이 (0~8)
      * @param sortOrder      정렬 순서
      * @param assigneeUserId 담당자 사용자 ID
      * @param assigneeName   담당자 이름

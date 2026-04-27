@@ -96,6 +96,42 @@ class WbsServiceTest {
     }
 
     @Test
+    @DisplayName("createWbsItem - 4단계 중첩 부모 아래에도 생성할 수 있다")
+    void createWbsItem_withDeepParent_createsItemWithinRaisedDepthLimit() {
+        final var loginUser = createUser(1L, "tester", "Tester");
+        final var team = createTeam(10L, loginUser);
+        final var project = createProject(20L, team);
+        final var parent = createWbsItem(104L, project, null, "깊은 부모", 4, 0, null, null);
+
+        when(projectContextLoader.load("tester", 10L, 20L, true)).thenReturn(new ProjectContext(team, project));
+        when(wbsItemRepository.findByProjectAndId(project, 104L)).thenReturn(Optional.of(parent));
+        when(wbsItemRepository.findNextSortOrder(project, parent)).thenReturn(0);
+        when(wbsItemRepository.save(any(WbsItem.class))).thenAnswer((invocation) -> {
+            final var item = invocation.getArgument(0, WbsItem.class);
+            ReflectionTestUtils.setField(item, "id", 501L);
+            return item;
+        });
+
+        final var command = new WbsService.CreateWbsItemCommand(
+            104L,
+            "심화 화면 정의",
+            null,
+            LocalDate.parse("2026-04-28"),
+            LocalDate.parse("2026-04-30"),
+            0,
+            new BigDecimal("0.50"),
+            null
+        );
+
+        final var result = wbsService.createWbsItem("tester", 10L, 20L, command);
+
+        assertThat(result.id()).isEqualTo(501L);
+        assertThat(result.parentId()).isEqualTo(104L);
+        assertThat(result.depth()).isEqualTo(5);
+        verify(wbsItemRepository).save(any(WbsItem.class));
+    }
+
+    @Test
     @DisplayName("reorderWbsItems - 순환 부모 참조가 생기면 예외를 던진다")
     void reorderWbsItems_whenCycleCreated_throwsBusinessException() {
         final var loginUser = createUser(1L, "tester", "Tester");

@@ -2,8 +2,8 @@ import type { CreateWbsItemPayload, ReorderWbsPayload, WbsItem } from '@/types/w
 
 /** 루트 부모 키 (부모가 null인 항목의 맵 키). */
 export const ROOT_PARENT_KEY = '__root__';
-/** WBS 최대 트리 깊이 (0~2). */
-export const MAX_WBS_DEPTH = 2;
+/** WBS 최대 트리 깊이 (0~8). */
+export const MAX_WBS_DEPTH = 8;
 /** 트리 깊이당 좌측 들여쓰기(px). */
 export const TREE_INDENT = 16;
 /** 드래그 시 수평 이동 20px당 깊이 1단계 변경. */

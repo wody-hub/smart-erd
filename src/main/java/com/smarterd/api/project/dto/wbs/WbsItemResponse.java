@@ -18,7 +18,7 @@ public record WbsItemResponse(
 
     @Schema(description = "WBS 항목명", example = "요구사항 분석") String name,
 
-    @Schema(description = "트리 깊이 (0~2)", example = "1") int depth,
+    @Schema(description = "트리 깊이 (0~8)", example = "1") int depth,
 
     @Schema(description = "형제 항목 정렬 순서", example = "0") int sortOrder,
 

@@ -32,7 +32,8 @@ import org.springframework.lang.Nullable;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class WbsItem extends BaseAuditEntity {
 
-    private static final int MAX_DEPTH = 2;
+    /** 운영 WBS에서 사용하는 중첩 구조를 수용하기 위한 최대 깊이. */
+    public static final int MAX_DEPTH = 8;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
