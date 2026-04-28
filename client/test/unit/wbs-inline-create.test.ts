@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {
   buildInlineCreatePayload,
   buildInlineCreatePlacements,
+  buildTargetIndexReorderPayload,
+  ROOT_PARENT_KEY,
+  resolveMoveValidationError,
+  type ParentKey,
   type InlineCreatePlacement,
 } from '../../src/components/wbs/wbs-tree-utils.js';
 import type { WbsItem } from '../../src/types/wbs.js';
@@ -105,4 +109,100 @@ test('buildInlineCreatePayload pins the quick-add default fields for Phase 6.1',
     estimatedMm: null,
     milestoneId: null,
   });
+});
+
+test('buildTargetIndexReorderPayload moves an item to a different parent and reorders affected siblings', () => {
+  const rootA = makeWbsItem({ id: 1, name: 'A', depth: 0, sortOrder: 0 });
+  const rootB = makeWbsItem({ id: 2, name: 'B', depth: 0, sortOrder: 1 });
+  const childA1 = makeWbsItem({ id: 3, parentId: 1, name: 'A-1', depth: 1, sortOrder: 0 });
+  const childB1 = makeWbsItem({ id: 4, parentId: 2, name: 'B-1', depth: 1, sortOrder: 0 });
+
+  const allItems = [rootA, rootB, childA1, childB1];
+  const childrenByParent = new Map<ParentKey, WbsItem[]>([
+    [ROOT_PARENT_KEY, [rootA, rootB]],
+    [1, [childA1]],
+    [2, [childB1]],
+  ]);
+
+  const payload = buildTargetIndexReorderPayload({
+    allItems,
+    childrenByParent,
+    activeItemId: 3,
+    nextParentId: 2,
+    targetIndex: 1,
+  });
+
+  assert.deepEqual(payload, {
+    items: [{ id: 3, parentId: 2, sortOrder: 1 }],
+  });
+});
+
+test('buildTargetIndexReorderPayload reorders within the same parent from the top position', () => {
+  const root = makeWbsItem({ id: 10, name: 'Root', depth: 0, sortOrder: 0 });
+  const childA = makeWbsItem({ id: 11, parentId: 10, name: 'A', depth: 1, sortOrder: 0 });
+  const childB = makeWbsItem({ id: 12, parentId: 10, name: 'B', depth: 1, sortOrder: 1 });
+  const childC = makeWbsItem({ id: 13, parentId: 10, name: 'C', depth: 1, sortOrder: 2 });
+
+  const payload = buildTargetIndexReorderPayload({
+    allItems: [root, childA, childB, childC],
+    childrenByParent: new Map<ParentKey, WbsItem[]>([
+      [ROOT_PARENT_KEY, [root]],
+      [10, [childA, childB, childC]],
+    ]),
+    activeItemId: 13,
+    nextParentId: 10,
+    targetIndex: 0,
+  });
+
+  assert.deepEqual(payload, {
+    items: [
+      { id: 13, parentId: 10, sortOrder: 0 },
+      { id: 11, parentId: 10, sortOrder: 1 },
+      { id: 12, parentId: 10, sortOrder: 2 },
+    ],
+  });
+});
+
+test('resolveMoveValidationError blocks moving an item under its own descendant', () => {
+  const root = makeWbsItem({ id: 1, name: 'Root', depth: 0, sortOrder: 0 });
+  const child = makeWbsItem({ id: 2, parentId: 1, name: 'Child', depth: 1, sortOrder: 0 });
+  const grandchild = makeWbsItem({ id: 3, parentId: 2, name: 'Grandchild', depth: 2, sortOrder: 0 });
+  const itemById = new Map(
+    [root, child, grandchild].map((item) => [item.id, item] as const),
+  );
+
+  const error = resolveMoveValidationError({
+    activeItemId: 1,
+    nextParentId: 3,
+    itemById,
+    childrenByParent: new Map<ParentKey, WbsItem[]>([
+      [ROOT_PARENT_KEY, [root]],
+      [1, [child]],
+      [2, [grandchild]],
+    ]),
+  });
+
+  assert.equal(error, 'invalidMove');
+});
+
+test('resolveMoveValidationError blocks moves that would push descendants past the max depth', () => {
+  const root = makeWbsItem({ id: 1, name: 'Root', depth: 0, sortOrder: 0 });
+  const source = makeWbsItem({ id: 2, name: 'Source', depth: 0, sortOrder: 1 });
+  const sourceChild = makeWbsItem({ id: 3, parentId: 2, name: 'Source child', depth: 1, sortOrder: 0 });
+  const deepParent = makeWbsItem({ id: 4, parentId: 1, name: 'Deep parent', depth: 8, sortOrder: 0 });
+  const items = [root, source, sourceChild, deepParent];
+  const itemById = new Map(items.map((item) => [item.id, item] as const));
+
+  const error = resolveMoveValidationError({
+    activeItemId: 2,
+    nextParentId: 4,
+    itemById,
+    childrenByParent: new Map<ParentKey, WbsItem[]>([
+      [ROOT_PARENT_KEY, [root, source]],
+      [1, [deepParent]],
+      [2, [sourceChild]],
+    ]),
+  });
+
+  assert.equal(error, 'depthLimitExceeded');
 });

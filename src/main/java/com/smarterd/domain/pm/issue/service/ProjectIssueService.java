@@ -5,6 +5,7 @@ import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.pm.common.ProjectContextLoader;
+import com.smarterd.domain.pm.history.service.WorkItemHistoryService;
 import com.smarterd.domain.pm.issue.entity.ProjectIssue;
 import com.smarterd.domain.pm.issue.entity.ProjectIssuePriority;
 import com.smarterd.domain.pm.issue.entity.ProjectIssueStatus;
@@ -37,6 +38,7 @@ public class ProjectIssueService {
     private final ProjectContextLoader projectContextLoader;
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
+    private final WorkItemHistoryService workItemHistoryService;
 
     /**
      * 프로젝트 이슈 목록을 조회한다.
@@ -133,7 +135,15 @@ public class ProjectIssueService {
     public ProjectIssueResult advanceProjectIssueStatus(String loginId, Long teamId, Long projectId, Long issueId) {
         final var context = projectContextLoader.load(loginId, teamId, projectId, true);
         final var issue = findByProjectAndId(context.project(), issueId);
+        final var previousStatus = issue.getStatus();
         issue.advanceStatus();
+        workItemHistoryService.recordProjectIssueStatusChanged(
+            context.project(),
+            issueId,
+            previousStatus,
+            issue.getStatus(),
+            loginId
+        );
         return toResult(issue);
     }
 
@@ -161,7 +171,15 @@ public class ProjectIssueService {
         if (nextStatus == null || nextStatus != status) {
             throw new ConflictException(MessageCode.ERROR_BUSINESS_PROJECT_ISSUE_STATUS_TRANSITION_INVALID.code());
         }
+        final var previousStatus = issue.getStatus();
         issue.advanceStatus();
+        workItemHistoryService.recordProjectIssueStatusChanged(
+            context.project(),
+            issueId,
+            previousStatus,
+            issue.getStatus(),
+            loginId
+        );
         return toResult(issue);
     }
 

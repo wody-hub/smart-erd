@@ -26,6 +26,7 @@ import {
   GANTT_SCALE_PRESET_ORDER,
   type GanttZoomPreset,
 } from './gantt-scale-presets';
+import { collectExpandableTaskIds } from './gantt-tree-utils';
 import './gantt.css';
 
 /** Gantt event intercept tag to prevent duplicate bindings. */
@@ -75,7 +76,8 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
   const isSmallViewport = useMediaQuery('(max-width: 640px)');
   const ThemeWrapper = theme === 'paper' ? Willow : WillowDark;
   const invalidateRelatedQueries = useProjectQueryInvalidation(teamId, projectId);
-  const [zoomPreset, setZoomPreset] = useState<GanttZoomPreset>('week');
+  const [zoomPreset, setZoomPreset] = useState<GanttZoomPreset>('day');
+  const [isApiReady, setIsApiReady] = useState(false);
   const [rangeOverride, setRangeOverride] = useState<GanttRangeOverride | null>(null);
   const ganttShellRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<IApi | null>(null);
@@ -116,6 +118,7 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
   );
   const rangeStartMs = model.range.start.getTime();
   const rangeEndMs = model.range.end.getTime();
+  const expandableTaskIds = useMemo(() => collectExpandableTaskIds(model.tasks), [model.tasks]);
 
   const wbsById = useMemo(
     () => new Map((wbsQuery.data ?? []).map((item) => [item.id, item])),
@@ -340,9 +343,24 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
   const handleGanttInit = useCallback(
     (api: IApi) => {
       apiRef.current = api;
+      setIsApiReady(true);
       bindInterceptors(api);
     },
     [bindInterceptors],
+  );
+
+  const handleToggleAllBranches = useCallback(
+    async (mode: boolean) => {
+      const api = apiRef.current;
+      if (!api || expandableTaskIds.length === 0) {
+        return;
+      }
+
+      for (const taskId of expandableTaskIds) {
+        await Promise.resolve(api.exec('open-task', { id: taskId, mode }));
+      }
+    },
+    [expandableTaskIds],
   );
 
   const handleToday = async () => {
@@ -426,6 +444,24 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
         })}
         <Button type="button" variant="outline" size="sm" onClick={() => void handleToday()}>
           {t('gantt.toolbar.today')}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={!isApiReady || expandableTaskIds.length === 0}
+          onClick={() => void handleToggleAllBranches(true)}
+        >
+          {t('gantt.toolbar.expandAll')}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={!isApiReady || expandableTaskIds.length === 0}
+          onClick={() => void handleToggleAllBranches(false)}
+        >
+          {t('gantt.toolbar.collapseAll')}
         </Button>
       </div>
 

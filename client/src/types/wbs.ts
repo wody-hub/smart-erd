@@ -56,6 +56,54 @@ export interface WbsLinkedDocument {
   updatedAt: string;
 }
 
+/** WBS 댓글 응답 모델. */
+export interface WbsComment {
+  /** 댓글 ID */
+  id: number;
+  /** 댓글 내용 */
+  content: string;
+  /** 작성자 로그인 ID */
+  actorLoginId: string | null;
+  /** 작성자 이름 */
+  actorName: string | null;
+  /** 생성 일시 */
+  createdAt: string;
+  /** 수정 일시 */
+  updatedAt: string;
+}
+
+/** WBS 활동 로그 이벤트 타입. */
+export type WbsActivityEventType = 'DOCUMENT_LINKED' | 'DOCUMENT_UNLINKED' | 'ISSUE_STATUS_CHANGED';
+
+/** WBS 활동 로그 주체 타입. */
+export type WbsActivitySubjectType = 'DOCUMENT' | 'STATUS';
+
+/** WBS 활동 로그 응답 모델. */
+export interface WbsActivity {
+  /** 로그 ID */
+  id: number;
+  /** 이벤트 타입 */
+  eventType: WbsActivityEventType;
+  /** 보조 주체 타입 */
+  subjectType: WbsActivitySubjectType | null;
+  /** 보조 주체 ID */
+  subjectId: number | null;
+  /** 보조 주체 라벨 */
+  subjectLabel: string | null;
+  /** 이전 값 */
+  previousValue: string | null;
+  /** 현재 값 */
+  currentValue: string | null;
+  /** 상세 설명 */
+  detail: string | null;
+  /** 수행자 로그인 ID */
+  actorLoginId: string | null;
+  /** 수행자 이름 */
+  actorName: string | null;
+  /** 발생 시각 */
+  occurredAt: string;
+}
+
 /** 태그 목록 요약 모델. */
 export interface ProjectDocumentTag {
   /** 태그 이름 */
@@ -140,4 +188,10 @@ export interface ReorderWbsItem {
 export interface ReorderWbsPayload {
   /** 재정렬 대상 항목 목록 */
   items: ReorderWbsItem[];
+}
+
+/** WBS 댓글 생성 payload. */
+export interface CreateWbsCommentPayload {
+  /** 댓글 내용 */
+  content: string;
 }

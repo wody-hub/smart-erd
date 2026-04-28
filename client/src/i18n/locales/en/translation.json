@@ -75,11 +75,12 @@
       "openProjectHub": "Open project hub",
       "openDocumentHub": "Open document hub",
       "openDictionary": "Open dictionary",
-      "openOverview": "Open overview",
-      "openWbs": "Open WBS",
-      "openGantt": "Open Gantt",
-      "openStaffing": "Open staffing",
-      "openIssues": "Open issues",
+    "openOverview": "Open overview",
+    "openWbs": "Open WBS",
+    "openGantt": "Open Gantt",
+    "openMyTasks": "Open My Tasks",
+    "openStaffing": "Open staffing",
+    "openIssues": "Open issues",
       "reviewQuickStart": "Review quick start",
       "viewDslDetail": "Open DSL detail"
     },
@@ -151,15 +152,15 @@
         "title": "Choose or create a team",
         "description": "The team is the top-level workspace. Shared members and dictionary assets are managed from there."
       },
-      "step3": {
-        "title": "Open the project hub",
-        "description": "Move from Teams to Projects, then choose the project that owns the current document and planning work."
-      },
-      "step4": {
-        "title": "Create the right document",
-        "description": "Start from the document hub. If the work is ERD, make sure the document attaches the correct dictionary context."
-      }
+    "step3": {
+      "title": "Open the project hub",
+      "description": "Move from Teams to Projects, then choose the project that owns the current document and planning work. From there you will use WBS, Gantt, My Tasks, and issues from the same hub."
     },
+    "step4": {
+      "title": "Create the right document",
+      "description": "Start from the document hub. Markdown documents can be linked back into WBS work as reusable context, and ERD work should attach the correct dictionary context."
+    }
+  },
     "workspaceMap": {
       "eyebrow": "Workspace map",
       "title": "Use this mental model when deciding where work belongs.",
@@ -168,14 +169,14 @@
         "title": "Teams",
         "description": "Manage shared membership and enter the team-owned project list from here."
       },
-      "project": {
-        "title": "Projects",
-        "description": "Choose the project that needs execution work, then open its hub."
-      },
-      "documentHub": {
-        "title": "Document hub",
-        "description": "Create or open ERD, Markdown, and Screen Spec documents in one place."
-      },
+    "project": {
+      "title": "Projects",
+      "description": "Choose the project that needs execution work, then open its hub. Documents, WBS, Gantt, and My Tasks move together inside that project."
+    },
+    "documentHub": {
+      "title": "Document hub",
+      "description": "Create or open ERD, Markdown, and Screen Spec documents in one place. Those documents can later be linked from WBS items or personal TODOs."
+    },
       "dictionary": {
         "title": "Dictionary",
         "description": "Maintain reusable words, terms, and domains that ERD work can reference consistently."
@@ -183,22 +184,26 @@
     },
     "projectHub": {
       "eyebrow": "Project hub",
-      "title": "These are the actual project-hub tabs available today.",
-      "description": "The project route is more than a document list. Use the surrounding tabs when the work is planning, tracking, or coordination.",
+    "title": "These are the actual project-hub tabs available today.",
+    "description": "The project route is more than a document list. Use the surrounding tabs for planning, tracking, coordination, and personal TODO management.",
       "overview": {
         "title": "Business Overview",
         "description": "Capture the project's core context and align the next execution window."
       },
-      "wbs": {
-        "title": "WBS",
-        "description": "Break work into structure and manage the work tree directly in the hub."
-      },
-      "gantt": {
-        "title": "Gantt",
-        "description": "Review schedule and milestone progress on a shared timeline."
-      },
-      "staffing": {
-        "title": "Staffing",
+    "wbs": {
+      "title": "WBS",
+      "description": "Break work into structure and manage the work tree directly in the hub. Each item can carry linked documents, comments, and activity history."
+    },
+    "gantt": {
+      "title": "Gantt",
+      "description": "Review schedule and milestone progress on a shared timeline. TODOs linked to WBS can be checked here as shared schedule risk context."
+    },
+    "myTasks": {
+      "title": "My Tasks",
+      "description": "Manage personal TODOs in a private workspace and only promote them into shared project context when you link them to WBS."
+    },
+    "staffing": {
+      "title": "Staffing",
         "description": "Track planned versus actual staffing and labor cost for the project."
       },
       "issues": {
@@ -208,16 +213,16 @@
     },
     "documentHub": {
       "eyebrow": "Document hub",
-      "title": "Document hub is where creation starts.",
-      "description": "Create the working document first, then move into the corresponding editor route.",
+    "title": "Document hub is where creation starts.",
+    "description": "Create the working document first, then move into the corresponding editor route. Created documents can later be referenced from WBS items or personal TODOs.",
       "erd": {
         "title": "ERD document",
         "description": "Start an ERD canvas with dictionary context attached so tables, relations, and sync flows are ready from the first screen."
       },
-      "markdown": {
-        "title": "Markdown document",
-        "description": "Use Markdown for notes, plans, and structured text documents alongside ERD work in the same project."
-      },
+    "markdown": {
+      "title": "Markdown document",
+      "description": "Use Markdown for notes, plans, and structured text documents alongside ERD work in the same project. Add tags so the Tags tab can find them again, then link them into WBS items or personal TODOs."
+    },
       "screenSpec": {
         "title": "Screen Spec document",
         "description": "Screen Spec exists as a collaborative screen-design document. Treat it as a supported document type, not a promise that every downstream workflow is already complete."
@@ -244,21 +249,25 @@
       "eyebrow": "Common confusions",
       "title": "Common points that confuse first-time users.",
       "description": "These are the boundary lines that are easiest to miss when you enter the product for the first time.",
-      "flow": {
-        "title": "Why doesn't this page explain every editor action?",
-        "description": "Because /guide is the top-level map. Detailed syntax and error examples stay closer to the ERD editor where they are used."
-      },
-      "projectVsDocument": {
-        "title": "Project vs document",
-        "description": "A project holds multiple planning surfaces and documents. The actual ERD or Markdown file is created inside that project."
-      },
-      "dictionaryContext": {
-        "title": "Dictionary vs dictionary context",
-        "description": "The dictionary workspace manages shared assets. A dictionary context is the specific set an ERD document attaches when it needs those assets."
-      },
-      "dsl": {
-        "title": "Where is the detailed DSL syntax guide?",
-        "description": "The detailed ERD DSL syntax and diagnostic guides remain in the editor. Use this page for product flow, then switch to the in-editor guide when writing or fixing DSL."
+    "flow": {
+      "title": "Why doesn't this page explain every editor action?",
+      "description": "Because /guide is the top-level map. It explains product flow such as WBS document links, comments and activity, and My Tasks boundaries, while detailed editor syntax and error examples stay closer to the editor."
+    },
+    "projectVsDocument": {
+      "title": "Project vs document",
+      "description": "A project holds multiple planning surfaces and documents. The actual ERD or Markdown file is created in the project's document hub, and WBS uses links to those documents instead of storing long-form content itself."
+    },
+    "dictionaryContext": {
+      "title": "Dictionary vs dictionary context",
+      "description": "The dictionary workspace manages shared assets. A dictionary context is the specific set an ERD document attaches when it needs those assets."
+    },
+    "todoPrivacy": {
+      "title": "When does My Tasks become shared?",
+      "description": "My Tasks stays private by default. Only TODOs linked to WBS appear in shared project context for schedule and risk tracking."
+    },
+    "dsl": {
+      "title": "Where is the detailed DSL syntax guide?",
+      "description": "The detailed ERD DSL syntax and diagnostic guides remain in the editor. Use this page for product flow, then switch to the in-editor guide when writing or fixing DSL."
       }
     },
     "detailCallout": {
@@ -337,6 +346,7 @@
       "overviewMeta": "Business overview baseline",
       "tagsMeta": "Tag-driven document index",
       "wbsMeta": "WBS work structure",
+      "myTasksMeta": "Personal TODO and WBS linking",
       "ganttDescription": "Review WBS schedules and milestones on a shared timeline, then adjust the plan with confidence.",
       "ganttMeta": "Timeline planning mode",
       "staffingMeta": "Planned/actual M/M and labor cost",
@@ -820,6 +830,136 @@
       "invalidAmount": "Contract amount must be a valid number"
     }
   },
+  "myTasks": {
+    "tab": {
+      "title": "My Tasks"
+    },
+    "section": {
+      "title": "Personal TODOs",
+      "description": "Manage your personal execution list inside the project context and promote only the needed items into WBS."
+    },
+    "action": {
+      "create": "Add TODO",
+      "save": "Save"
+    },
+    "field": {
+      "title": "Title",
+      "description": "Description",
+      "status": "Status",
+      "priority": "Priority",
+      "targetDate": "Target date",
+      "progressRate": "Progress (%)",
+      "linkedWbs": "Linked WBS"
+    },
+    "statusValue": {
+      "TODO": "Todo",
+      "IN_PROGRESS": "In progress",
+      "DONE": "Done"
+    },
+    "priorityValue": {
+      "LOW": "Low",
+      "MEDIUM": "Medium",
+      "HIGH": "High",
+      "CRITICAL": "Critical"
+    },
+    "meta": {
+      "updatedAt": "Updated {{date}}",
+      "targetDate": "Target {{date}}",
+      "noTargetDate": "No target date",
+      "linkedWbs": "Linked WBS: {{name}}",
+      "privateOnly": "This TODO is still private because it is not linked to WBS yet."
+    },
+    "detail": {
+      "description": "Adjust status, schedule, and WBS linkage from one panel.",
+      "emptyTitle": "No TODO selected",
+      "emptyDescription": "Choose a TODO from the list to inspect and edit its details."
+    },
+    "empty": {
+      "title": "No personal TODOs yet",
+      "description": "Create your first TODO, then share only the items that need WBS visibility.",
+      "readOnlyDescription": "This view is read-only. You need edit access to create or modify your personal TODOs.",
+      "cta": "Create the first TODO"
+    },
+    "wbs": {
+      "placeholder": "Select a WBS item",
+      "unlinked": "Not linked",
+      "privateHint": "Until this TODO is linked to WBS, the task and its linked documents remain private to you.",
+      "sharedHint": "After linking to WBS, only the title, status, progress, schedule metadata, and shared documents become visible in the project context."
+    },
+    "documents": {
+      "title": "Linked documents",
+      "description": "Manage the documents attached to this TODO and control their visibility.",
+      "linkAction": "Link document",
+      "unlinkAction": "Unlink document",
+      "privatePolicy": "This TODO is still private. Its linked documents also stay private by default.",
+      "sharedPolicy": "This TODO is linked to WBS. Only documents marked as project shared flow into the WBS-side shared context.",
+      "noSummary": "No summary is available for this document yet.",
+      "linkedAt": "Linked on {{date}}",
+      "linkedAtUnknown": "Linked time unavailable",
+      "visibilityLabel": "Document visibility",
+      "visibility": {
+        "private": "Private",
+        "projectShared": "Project shared"
+      },
+      "linkDialog": {
+        "title": "Link TODO document",
+        "description": "Choose the document to attach and its visibility level.",
+        "documentPlaceholder": "Select a project document",
+        "confirm": "Link document",
+        "noSummary": "No summary is available for this document yet."
+      },
+      "empty": {
+        "title": "No linked documents",
+        "description": "Attach documents to preserve implementation context for this TODO."
+      },
+      "status": {
+        "loadFailedTitle": "We couldn't load TODO documents",
+        "loadFailedDescription": "Try again in a moment."
+      }
+    },
+    "wbsProjection": {
+      "title": "WBS projection",
+      "description": "Review how this TODO is projected into the shared WBS context.",
+      "currentTaskShared": "This TODO is currently included in the shared TODO list for the linked WBS item.",
+      "totalLinkedTasks": "{{count}} shared TODO(s) linked to the same WBS item",
+      "status": {
+        "loadFailedTitle": "We couldn't load the WBS projection summary",
+        "loadFailedDescription": "Retry the WBS linkage summary."
+      }
+    },
+    "create": {
+      "title": "Add TODO",
+      "description": "Create a personal task and optionally link it to WBS right away."
+    },
+    "delete": {
+      "title": "Delete TODO",
+      "description": "Delete the TODO \"{{title}}\"?"
+    },
+    "toast": {
+      "created": "TODO created",
+      "createFailed": "Failed to create TODO",
+      "updated": "TODO saved",
+      "updateFailed": "Failed to save TODO",
+      "deleted": "TODO deleted",
+      "deleteFailed": "Failed to delete TODO",
+      "wbsLinked": "Linked to WBS",
+      "wbsLinkFailed": "Failed to link to WBS",
+      "wbsUnlinked": "WBS link removed",
+      "wbsUnlinkFailed": "Failed to remove the WBS link",
+      "documentLinked": "Document linked",
+      "documentLinkFailed": "Failed to link document",
+      "documentUnlinked": "Document unlinked",
+      "documentUnlinkFailed": "Failed to unlink document"
+    },
+    "validation": {
+      "titleRequired": "Enter a TODO title.",
+      "progressRate": "Progress must be between 0 and 100."
+    },
+    "status": {
+      "loadFailedTitle": "We couldn't load My Tasks",
+      "loadFailedDescription": "Retry the personal TODO list while keeping the current project context."
+    }
+  },
   "wbs": {
     "tab": {
       "title": "WBS"
@@ -830,13 +970,82 @@
     },
     "details": {
       "title": "WBS Context",
-      "description": "Select a WBS item to review its linked project documents.",
+      "description": "Review linked documents, comments, and activity history for the selected WBS item.",
       "level": "Level {{level}}",
+      "tabs": {
+        "documents": "Documents {{count}}",
+        "comments": "Comments {{count}}",
+        "activities": "Activity {{count}}",
+        "todos": "Shared TODOs {{count}}"
+      },
       "linkedDocuments": "Linked documents",
       "linkedDocumentsHint": "Keep the row compact and move document context into this side panel.",
       "linkAction": "Link document",
       "linkedAt": "Linked on {{date}}",
       "openDocumentsHub": "Open documents hub",
+      "comments": {
+        "title": "Work comments",
+        "description": "Capture short execution context so the next collaborator can pick up the same WBS item from this panel.",
+        "placeholder": "Leave status notes, blockers, or the next action for this work item.",
+        "hint": "{{current}} / {{max}} characters",
+        "submit": "Post comment",
+        "readOnly": "This view is read-only. You can review existing comments, but posting a new one requires edit access.",
+        "unknownActor": "Unknown author",
+        "status": {
+          "loadFailedTitle": "We couldn't load comments",
+          "loadFailedDescription": "Try again in a moment."
+        },
+        "empty": {
+          "title": "No comments yet",
+          "description": "Post the first comment to capture context or the next action."
+        }
+      },
+      "activities": {
+        "title": "Activity log",
+        "description": "Review system activity such as document linking and status changes in reverse chronological order.",
+        "defaultDetail": "An activity entry was recorded.",
+        "actorLine": "Performed by {{actor}}",
+        "unknownActor": "Unknown user",
+        "previousValue": "Previous: {{value}}",
+        "currentValue": "Current: {{value}}",
+        "filters": {
+          "all": "All {{count}}",
+          "document": "Documents {{count}}",
+          "status": "Status {{count}}"
+        },
+        "eventType": {
+          "DOCUMENT_LINKED": "Document linked",
+          "DOCUMENT_UNLINKED": "Document unlinked",
+          "ISSUE_STATUS_CHANGED": "Status changed"
+        },
+        "status": {
+          "loadFailedTitle": "We couldn't load the activity log",
+          "loadFailedDescription": "Try again in a moment."
+        },
+        "empty": {
+          "title": "No activity yet",
+          "description": "Document links and status changes will appear here with the latest items first.",
+          "filteredTitle": "No activity matches this filter",
+          "filteredDescription": "Choose another filter to inspect the recorded activity."
+        }
+      },
+      "todos": {
+        "title": "Linked shared TODOs",
+        "description": "Only personal TODOs that are linked to this WBS item and meet the visibility rules appear here.",
+        "owner": "Owner {{name}}",
+        "targetDate": "Target {{date}}",
+        "noTargetDate": "No target date",
+        "sharedDocuments": "{{count}} shared document(s)",
+        "noSharedDocuments": "No promoted shared documents yet.",
+        "status": {
+          "loadFailedTitle": "We couldn't load shared TODOs",
+          "loadFailedDescription": "Try again in a moment."
+        },
+        "empty": {
+          "title": "No shared TODOs linked yet",
+          "description": "When personal TODOs are linked to this WBS item, they appear here as schedule-risk context."
+        }
+      },
       "empty": {
         "title": "No WBS item selected",
         "description": "Choose a row from the WBS tree to inspect its document context."
@@ -860,7 +1069,9 @@
         "linked": "Document linked",
         "linkFailed": "Failed to link document",
         "unlinked": "Document unlinked",
-        "unlinkFailed": "Failed to unlink document"
+        "unlinkFailed": "Failed to unlink document",
+        "commentCreated": "Comment posted",
+        "commentCreateFailed": "Failed to post comment"
       }
     },
     "workspace": {

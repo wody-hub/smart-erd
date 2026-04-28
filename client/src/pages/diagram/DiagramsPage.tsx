@@ -9,6 +9,7 @@ import {
   FileText,
   Hash,
   ListTree,
+  ListTodo,
   Plus,
   UsersRound,
   type LucideIcon,
@@ -19,6 +20,7 @@ import { fetchProject } from '@/api/projectApi';
 import { fetchTeam } from '@/api/teamApi';
 import Header from '@/components/layout/Header';
 import BusinessOverviewTab from '@/components/project/BusinessOverviewTab';
+import MyTasksTab from '@/components/project/MyTasksTab';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import GanttTab from '@/components/gantt/GanttTab';
@@ -35,7 +37,15 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { cn } from '@/lib/utils';
 import { getWorkspaceDocumentsTitleLabel } from '@/lib/workspace-labels';
 
-type DiagramsTabValue = 'documents' | 'tags' | 'overview' | 'wbs' | 'gantt' | 'staffing' | 'issues';
+type DiagramsTabValue =
+  | 'documents'
+  | 'tags'
+  | 'overview'
+  | 'wbs'
+  | 'myTasks'
+  | 'gantt'
+  | 'staffing'
+  | 'issues';
 
 interface DiagramsTabRenderContext {
   teamId: string;
@@ -76,7 +86,7 @@ export default function DiagramsPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [documentCount, setDocumentCount] = useState(0);
   const { recordRecentProjectContext } = useRecentProjectContext(teamId);
-  const { canEdit } = useTeamRole(teamId);
+  const { role, canEdit } = useTeamRole(teamId);
 
   const { data: team } = useQuery({
     queryKey: queryKeys.teams.detail(teamId!),
@@ -98,7 +108,8 @@ export default function DiagramsPage() {
           hash: 'guide-document-hub',
         })
       : ROUTES.GUIDE_ENTRY({
-          source: activeTab === 'tags' ? 'documents' : activeTab,
+          source:
+            activeTab === 'tags' ? 'documents' : activeTab === 'myTasks' ? 'overview' : activeTab,
           teamId: teamId!,
           projectId: projectId!,
           hash: 'guide-project-hub',
@@ -137,29 +148,37 @@ export default function DiagramsPage() {
                 description: t('wbs.section.description'),
                 metaDetail: t('workspace.projectHub.wbsMeta'),
               }
-            : activeTab === 'gantt'
+            : activeTab === 'myTasks'
               ? {
                   section: 'projects' as const,
                   tone: 'projects' as const,
-                  eyebrow: t('gantt.tab.title'),
-                  description: t('workspace.projectHub.ganttDescription'),
-                  metaDetail: t('workspace.projectHub.ganttMeta'),
+                  eyebrow: t('myTasks.tab.title'),
+                  description: t('myTasks.section.description'),
+                  metaDetail: t('workspace.projectHub.myTasksMeta'),
                 }
-              : activeTab === 'staffing'
+              : activeTab === 'gantt'
                 ? {
                     section: 'projects' as const,
                     tone: 'projects' as const,
-                    eyebrow: t('staffing.tab.title'),
-                    description: t('staffing.section.description'),
-                    metaDetail: t('workspace.projectHub.staffingMeta'),
+                    eyebrow: t('gantt.tab.title'),
+                    description: t('workspace.projectHub.ganttDescription'),
+                    metaDetail: t('workspace.projectHub.ganttMeta'),
                   }
-                : {
-                    section: 'projects' as const,
-                    tone: 'projects' as const,
-                    eyebrow: t('issues.tab.title'),
-                    description: t('issues.section.description'),
-                    metaDetail: t('workspace.projectHub.issuesMeta'),
-                  };
+                : activeTab === 'staffing'
+                  ? {
+                      section: 'projects' as const,
+                      tone: 'projects' as const,
+                      eyebrow: t('staffing.tab.title'),
+                      description: t('staffing.section.description'),
+                      metaDetail: t('workspace.projectHub.staffingMeta'),
+                    }
+                  : {
+                      section: 'projects' as const,
+                      tone: 'projects' as const,
+                      eyebrow: t('issues.tab.title'),
+                      description: t('issues.section.description'),
+                      metaDetail: t('workspace.projectHub.issuesMeta'),
+                    };
 
   const tabs: DiagramsTabConfig[] = [
     {
@@ -221,6 +240,21 @@ export default function DiagramsPage() {
         projectId: currentProjectId,
         canEdit: currentCanEdit,
       }) => <WbsTab teamId={currentTeamId} projectId={currentProjectId} canEdit={currentCanEdit} />,
+    },
+    {
+      value: 'myTasks',
+      label: t('myTasks.tab.title'),
+      icon: ListTodo,
+      renderContent: ({
+        teamId: currentTeamId,
+        projectId: currentProjectId,
+      }) => (
+        <MyTasksTab
+          teamId={currentTeamId}
+          projectId={currentProjectId}
+          canManagePersonalTodos={role != null}
+        />
+      ),
     },
     {
       value: 'gantt',

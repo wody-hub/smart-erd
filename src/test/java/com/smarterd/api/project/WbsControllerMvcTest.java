@@ -8,10 +8,17 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smarterd.domain.pm.history.entity.WorkActivityEventType;
+import com.smarterd.domain.pm.history.entity.WorkActivitySubjectType;
+import com.smarterd.domain.pm.history.entity.WorkTargetType;
+import com.smarterd.domain.pm.history.service.WorkItemHistoryService;
+import com.smarterd.domain.pm.history.service.WorkItemHistoryService.WorkActivityResult;
+import com.smarterd.domain.pm.history.service.WorkItemHistoryService.WorkCommentResult;
 import com.smarterd.domain.pm.wbs.service.WbsDocumentService;
 import com.smarterd.domain.pm.wbs.service.WbsDocumentService.DocumentTagResult;
 import com.smarterd.domain.pm.wbs.service.WbsDocumentService.LinkedDocumentResult;
@@ -47,12 +54,15 @@ class WbsControllerMvcTest {
     @Mock
     private WbsDocumentService wbsDocumentService;
 
+    @Mock
+    private WorkItemHistoryService workItemHistoryService;
+
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
-        final var controller = new WbsController(wbsService, wbsDocumentService);
+        final var controller = new WbsController(wbsService, wbsDocumentService, workItemHistoryService);
         this.mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .setCustomArgumentResolvers(new TestJwtArgumentResolver())
             .build();
@@ -170,9 +180,7 @@ class WbsControllerMvcTest {
 
         mockMvc
             .perform(
-                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
-                    "/api/teams/1/projects/10/wbs/100/documents/42"
-                ).with((request) -> {
+                put("/api/teams/1/projects/10/wbs/100/documents/42").with((request) -> {
                     request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                     return request;
                 })
@@ -214,6 +222,59 @@ class WbsControllerMvcTest {
             .andExpect(jsonPath("$[0].id").value(42));
     }
 
+    @Test
+    void getWbsComments_returnsList() throws Exception {
+        when(workItemHistoryService.getWbsComments("tester", 1L, 10L, 100L)).thenReturn(List.of(sampleComment(301L)));
+
+        mockMvc
+            .perform(
+                get("/api/teams/1/projects/10/wbs/100/comments").with((request) -> {
+                    request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                    return request;
+                })
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(301))
+            .andExpect(jsonPath("$[0].content").value("첫 댓글"))
+            .andExpect(jsonPath("$[0].actorName").value("김개발"));
+    }
+
+    @Test
+    void addWbsComment_returnsCreated() throws Exception {
+        when(workItemHistoryService.addWbsComment("tester", 1L, 10L, 100L, "첫 댓글")).thenReturn(sampleComment(301L));
+
+        mockMvc
+            .perform(
+                post("/api/teams/1/projects/10/wbs/100/comments")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(java.util.Map.of("content", "첫 댓글")))
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(301))
+            .andExpect(jsonPath("$.content").value("첫 댓글"));
+    }
+
+    @Test
+    void getWbsActivities_returnsList() throws Exception {
+        when(workItemHistoryService.getWbsActivities("tester", 1L, 10L, 100L)).thenReturn(List.of(sampleActivity(401L)));
+
+        mockMvc
+            .perform(
+                get("/api/teams/1/projects/10/wbs/100/activities").with((request) -> {
+                    request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                    return request;
+                })
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(401))
+            .andExpect(jsonPath("$[0].eventType").value("DOCUMENT_LINKED"))
+            .andExpect(jsonPath("$[0].subjectLabel").value("API Spec"));
+    }
+
     private WbsItemResult sampleResult(Long id, Long parentId, String name, int depth, int sortOrder) {
         return new WbsItemResult(
             id,
@@ -246,6 +307,37 @@ class WbsControllerMvcTest {
             Instant.parse("2026-04-28T01:00:00Z"),
             Instant.parse("2026-04-28T00:00:00Z"),
             Instant.parse("2026-04-28T01:30:00Z")
+        );
+    }
+
+    private WorkCommentResult sampleComment(Long id) {
+        return new WorkCommentResult(
+            id,
+            WorkTargetType.WBS,
+            100L,
+            "첫 댓글",
+            "kim",
+            "김개발",
+            Instant.parse("2026-04-28T01:00:00Z"),
+            Instant.parse("2026-04-28T01:00:00Z")
+        );
+    }
+
+    private WorkActivityResult sampleActivity(Long id) {
+        return new WorkActivityResult(
+            id,
+            WorkTargetType.WBS,
+            100L,
+            WorkActivityEventType.DOCUMENT_LINKED,
+            WorkActivitySubjectType.DOCUMENT,
+            42L,
+            "API Spec",
+            null,
+            null,
+            "Linked document to WBS item",
+            "kim",
+            "김개발",
+            Instant.parse("2026-04-28T01:10:00Z")
         );
     }
 

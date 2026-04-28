@@ -12,6 +12,7 @@ import com.smarterd.domain.common.exception.DomainAccessDeniedException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.pm.common.ProjectContextLoader;
 import com.smarterd.domain.pm.common.ProjectContextLoader.ProjectContext;
+import com.smarterd.domain.pm.history.service.WorkItemHistoryService;
 import com.smarterd.domain.pm.issue.entity.ProjectIssue;
 import com.smarterd.domain.pm.issue.entity.ProjectIssuePriority;
 import com.smarterd.domain.pm.issue.entity.ProjectIssueStatus;
@@ -47,6 +48,9 @@ class ProjectIssueServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private WorkItemHistoryService workItemHistoryService;
 
     @InjectMocks
     private ProjectIssueService projectIssueService;
@@ -222,6 +226,37 @@ class ProjectIssueServiceTest {
     }
 
     @Test
+    @DisplayName("advanceProjectIssueStatus records shared activity when status changes")
+    void advanceProjectIssueStatus_recordsSharedActivity() {
+        final var loginUser = createUser(1L, "tester", "Tester");
+        final var team = createTeam(10L, loginUser);
+        final var project = createProject(20L, team);
+        final var issue = createIssue(
+            100L,
+            project,
+            null,
+            ProjectIssueStatus.REGISTERED,
+            ProjectIssuePriority.MEDIUM,
+            "등록 이슈",
+            null
+        );
+
+        when(projectContextLoader.load("tester", 10L, 20L, true)).thenReturn(new ProjectContext(team, project));
+        when(projectIssueRepository.findByProjectAndId(project, 100L)).thenReturn(Optional.of(issue));
+
+        final var result = projectIssueService.advanceProjectIssueStatus("tester", 10L, 20L, 100L);
+
+        verify(workItemHistoryService).recordProjectIssueStatusChanged(
+            project,
+            100L,
+            ProjectIssueStatus.REGISTERED,
+            ProjectIssueStatus.IN_PROGRESS,
+            "tester"
+        );
+        assertThat(result.status()).isEqualTo(ProjectIssueStatus.IN_PROGRESS);
+    }
+
+    @Test
     @DisplayName("updateProjectIssueStatus rejects non-next transitions")
     void updateProjectIssueStatus_rejectsNonNextTransition() {
         final var loginUser = createUser(1L, "tester", "Tester");
@@ -245,6 +280,43 @@ class ProjectIssueServiceTest {
         )
             .isInstanceOf(ConflictException.class)
             .hasMessage(MessageCode.ERROR_BUSINESS_PROJECT_ISSUE_STATUS_TRANSITION_INVALID.code());
+    }
+
+    @Test
+    @DisplayName("updateProjectIssueStatus records shared activity on valid next transition")
+    void updateProjectIssueStatus_recordsSharedActivity() {
+        final var loginUser = createUser(1L, "tester", "Tester");
+        final var team = createTeam(10L, loginUser);
+        final var project = createProject(20L, team);
+        final var issue = createIssue(
+            100L,
+            project,
+            null,
+            ProjectIssueStatus.REGISTERED,
+            ProjectIssuePriority.MEDIUM,
+            "등록 이슈",
+            null
+        );
+
+        when(projectContextLoader.load("tester", 10L, 20L, true)).thenReturn(new ProjectContext(team, project));
+        when(projectIssueRepository.findByProjectAndId(project, 100L)).thenReturn(Optional.of(issue));
+
+        final var result = projectIssueService.updateProjectIssueStatus(
+            "tester",
+            10L,
+            20L,
+            100L,
+            ProjectIssueStatus.IN_PROGRESS
+        );
+
+        verify(workItemHistoryService).recordProjectIssueStatusChanged(
+            project,
+            100L,
+            ProjectIssueStatus.REGISTERED,
+            ProjectIssueStatus.IN_PROGRESS,
+            "tester"
+        );
+        assertThat(result.status()).isEqualTo(ProjectIssueStatus.IN_PROGRESS);
     }
 
     @Test

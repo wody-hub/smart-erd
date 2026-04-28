@@ -236,6 +236,35 @@ export interface BuildReorderPayloadInput {
   nextDepth: number;
 }
 
+/** buildTargetIndexReorderPayload 입력값. */
+export interface BuildTargetIndexReorderPayloadInput {
+  /** 전체 WBS 항목 */
+  allItems: WbsItem[];
+  /** 부모별 자식 맵 */
+  childrenByParent: Map<ParentKey, WbsItem[]>;
+  /** 이동 대상 항목 ID */
+  activeItemId: number;
+  /** 이동 후 부모 ID */
+  nextParentId: number | null;
+  /** 이동 후 sibling 내 index */
+  targetIndex: number;
+}
+
+/** 이동 검증 오류 코드. */
+export type MoveValidationError = 'invalidMove' | 'depthLimitExceeded';
+
+/** resolveMoveValidationError 입력값. */
+export interface ResolveMoveValidationErrorInput {
+  /** 이동 대상 항목 ID */
+  activeItemId: number;
+  /** 이동 후 부모 ID */
+  nextParentId: number | null;
+  /** 항목 ID 맵 */
+  itemById: Map<number, WbsItem>;
+  /** 부모별 자식 맵 */
+  childrenByParent: Map<ParentKey, WbsItem[]>;
+}
+
 /**
  * 드래그 결과를 reorder API payload로 변환한다.
  *
@@ -315,6 +344,93 @@ export function buildReorderPayload(input: BuildReorderPayloadInput): ReorderWbs
   });
 
   return { items: payloadItems };
+}
+
+/**
+ * 명시적 부모/위치 선택 결과를 reorder API payload로 변환한다.
+ *
+ * @param input payload 구성 입력값
+ * @returns reorder payload
+ */
+export function buildTargetIndexReorderPayload(
+  input: BuildTargetIndexReorderPayloadInput,
+): ReorderWbsPayload {
+  const { allItems, childrenByParent, activeItemId, nextParentId, targetIndex } = input;
+  const activeItem = allItems.find((item) => item.id === activeItemId);
+  if (!activeItem) {
+    return { items: [] };
+  }
+
+  const previousKey = toParentKey(activeItem.parentId);
+  const nextKey = toParentKey(nextParentId);
+  const affectedParentKeys = new Set<ParentKey>([previousKey, nextKey]);
+  const originalById = new Map(allItems.map((item) => [item.id, item]));
+
+  const siblingsByParent = new Map<ParentKey, WbsItem[]>();
+  childrenByParent.forEach((siblings, key) => {
+    siblingsByParent.set(key, [...siblings]);
+  });
+
+  const previousSiblings = (siblingsByParent.get(previousKey) ?? []).filter(
+    (item) => item.id !== activeItemId,
+  );
+  siblingsByParent.set(previousKey, previousSiblings);
+
+  const nextSiblings =
+    previousKey === nextKey
+      ? previousSiblings
+      : [...(siblingsByParent.get(nextKey) ?? []).filter((item) => item.id !== activeItemId)];
+  const normalizedTargetIndex = clamp(targetIndex, 0, nextSiblings.length);
+
+  nextSiblings.splice(normalizedTargetIndex, 0, activeItem);
+  siblingsByParent.set(nextKey, nextSiblings);
+
+  const payloadItems: ReorderWbsPayload['items'] = [];
+  affectedParentKeys.forEach((parentKey) => {
+    const siblings = siblingsByParent.get(parentKey) ?? [];
+    siblings.forEach((item, sortOrder) => {
+      const parentId = parentKey === ROOT_PARENT_KEY ? null : parentKey;
+      const original = originalById.get(item.id);
+      if (original && original.parentId === parentId && original.sortOrder === sortOrder) {
+        return;
+      }
+      payloadItems.push({
+        id: item.id,
+        parentId,
+        sortOrder,
+      });
+    });
+  });
+
+  return { items: payloadItems };
+}
+
+/**
+ * 이동 대상 부모가 유효한지 검증한다.
+ *
+ * @param input 이동 검증 입력값
+ * @returns 검증 오류 코드 또는 null
+ */
+export function resolveMoveValidationError(
+  input: ResolveMoveValidationErrorInput,
+): MoveValidationError | null {
+  const { activeItemId, nextParentId, itemById, childrenByParent } = input;
+  if (nextParentId == null) {
+    return null;
+  }
+
+  const descendants = collectDescendantIds(activeItemId, childrenByParent);
+  if (descendants.has(nextParentId)) {
+    return 'invalidMove';
+  }
+
+  const maxDepthOffset = getMaxDescendantDepthOffset(activeItemId, itemById, childrenByParent);
+  const nextDepth = (itemById.get(nextParentId)?.depth ?? -1) + 1;
+  if (nextDepth < 0 || nextDepth + maxDepthOffset > MAX_WBS_DEPTH) {
+    return 'depthLimitExceeded';
+  }
+
+  return null;
 }
 
 /** inline quick-add row 종류. */

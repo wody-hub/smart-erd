@@ -1,11 +1,15 @@
 package com.smarterd.api.project;
 
+import com.smarterd.api.project.dto.wbs.CreateWbsCommentRequest;
+import com.smarterd.api.project.dto.wbs.WbsActivityResponse;
+import com.smarterd.api.project.dto.wbs.WbsCommentResponse;
 import com.smarterd.api.project.dto.wbs.CreateWbsItemRequest;
 import com.smarterd.api.project.dto.wbs.ReorderWbsItemsRequest;
 import com.smarterd.api.project.dto.wbs.UpdateWbsItemRequest;
 import com.smarterd.api.project.dto.wbs.WbsDocumentResponse;
 import com.smarterd.api.project.dto.wbs.WbsDocumentTagResponse;
 import com.smarterd.api.project.dto.wbs.WbsItemResponse;
+import com.smarterd.domain.pm.history.service.WorkItemHistoryService;
 import com.smarterd.domain.pm.wbs.service.WbsDocumentService;
 import com.smarterd.domain.pm.wbs.service.WbsService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,6 +46,7 @@ public class WbsController {
 
     private final WbsService wbsService;
     private final WbsDocumentService wbsDocumentService;
+    private final WorkItemHistoryService workItemHistoryService;
 
     @Operation(summary = "WBS 트리 조회")
     @GetMapping
@@ -68,6 +73,56 @@ public class WbsController {
                 .getLinkedDocuments(jwt.getSubject(), teamId, projectId, wbsItemId)
                 .stream()
                 .map(WbsDocumentResponse::from)
+                .toList()
+        );
+    }
+
+    @Operation(summary = "WBS 댓글 목록 조회")
+    @GetMapping("/{wbsItemId}/comments")
+    public ResponseEntity<List<WbsCommentResponse>> getWbsComments(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Parameter(description = "WBS 항목 ID") @PathVariable Long wbsItemId
+    ) {
+        return ResponseEntity.ok(
+            workItemHistoryService
+                .getWbsComments(jwt.getSubject(), teamId, projectId, wbsItemId)
+                .stream()
+                .map(WbsCommentResponse::from)
+                .toList()
+        );
+    }
+
+    @Operation(summary = "WBS 댓글 작성")
+    @PostMapping("/{wbsItemId}/comments")
+    public ResponseEntity<WbsCommentResponse> addWbsComment(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Parameter(description = "WBS 항목 ID") @PathVariable Long wbsItemId,
+        @Valid @RequestBody CreateWbsCommentRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            WbsCommentResponse.from(
+                workItemHistoryService.addWbsComment(jwt.getSubject(), teamId, projectId, wbsItemId, request.content())
+            )
+        );
+    }
+
+    @Operation(summary = "WBS 활동 로그 조회")
+    @GetMapping("/{wbsItemId}/activities")
+    public ResponseEntity<List<WbsActivityResponse>> getWbsActivities(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Parameter(description = "WBS 항목 ID") @PathVariable Long wbsItemId
+    ) {
+        return ResponseEntity.ok(
+            workItemHistoryService
+                .getWbsActivities(jwt.getSubject(), teamId, projectId, wbsItemId)
+                .stream()
+                .map(WbsActivityResponse::from)
                 .toList()
         );
     }

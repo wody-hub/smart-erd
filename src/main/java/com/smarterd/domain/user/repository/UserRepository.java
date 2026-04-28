@@ -1,6 +1,8 @@
 package com.smarterd.domain.user.repository;
 
 import com.smarterd.domain.user.entity.User;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -17,6 +19,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @return 사용자 Optional (존재하지 않으면 empty)
      */
     Optional<User> findByLoginId(String loginId);
+
+    /**
+     * 여러 로그인 ID에 해당하는 사용자를 조회한다.
+     *
+     * @param loginIds 로그인 ID 목록
+     * @return 조회된 사용자 목록
+     */
+    List<User> findByLoginIdIn(Collection<String> loginIds);
 
     /**
      * 해당 로그인 ID가 이미 존재하는지 확인한다.

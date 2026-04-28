@@ -62,6 +62,17 @@ Phase 3 status note (2026-04-23): SPEC-01~04 have substantial code in place, but
 - [x] **ISSUE-03**: 이슈 목록을 상태/우선순위/담당자별로 필터링할 수 있다
 - [x] **ISSUE-04**: 이슈 목록을 내보낼 수 있다 (Excel)
 
+### WBS 작업 히스토리 관리
+
+- [x] **WHM-01**: WBS 또는 간트 작업 문맥에서 작업 문서를 새로 만들거나 기존 프로젝트 문서를 연결할 수 있다
+- [x] **WHM-02**: 작업 단위로 댓글과 작업 히스토리를 기록하고 조회할 수 있다
+- [x] **WHM-03**: 작업 문서에 태그를 부여할 수 있다
+- [x] **WHM-04**: 프로젝트 허브의 태그 탭에서 태그 목록과 태그별 문서 목록을 조회할 수 있다
+- [x] **WHM-05**: WBS와 별개인 개인 TODO를 등록하고 관리할 수 있다
+- [x] **WHM-06**: 개인 TODO는 WBS, 문서와 참조 연결할 수 있다
+- [x] **WHM-07**: WBS에 연결되지 않은 개인 TODO는 작성자 외 사용자에게 노출되지 않는다
+- [x] **WHM-08**: WBS에 연결된 TODO는 WBS에서 표시되고 진척/일정 리스크 관리 대상이 된다
+
 ## v2 Requirements
 
 ### 보고서 체계
@@ -148,10 +159,18 @@ Phase 3 status note (2026-04-23): SPEC-01~04 have substantial code in place, but
 | ISSUE-02 | Phase 8 | Complete |
 | ISSUE-03 | Phase 8 | Complete |
 | ISSUE-04 | Phase 8 | Complete |
+| WHM-01 | Phase 8.1 | Complete |
+| WHM-02 | Phase 8.1 | Complete |
+| WHM-03 | Phase 8.1 | Complete |
+| WHM-04 | Phase 8.1 | Complete |
+| WHM-05 | Phase 8.1 | Complete |
+| WHM-06 | Phase 8.1 | Complete |
+| WHM-07 | Phase 8.1 | Complete |
+| WHM-08 | Phase 8.1 | Complete |
 
 **Coverage:**
-- v1 requirements: 34 total
-- Mapped to phases: 34
+- v1 requirements: 42 total
+- Mapped to phases: 42
 - Unmapped: 0 ✓
 
 ---

@@ -4,6 +4,8 @@
   "private": true,
   "description": "ERwin과 같은 ERD 설계 도구를 웹 기반으로 구현한 간이 솔루션.",
   "scripts": {
+    "dev:random": "node scripts/dev-random-ports.mjs",
+    "dev:random:test": "SMART_ERD_PROFILE=test node scripts/dev-random-ports.mjs",
     "format": "prettier --write \"src/**/*.java\" \"client/src/**/*.{ts,tsx}\" \"src/**/*.yml\"",
     "format:check": "prettier --check \"src/**/*.java\" \"client/src/**/*.{ts,tsx}\" \"src/**/*.yml\"",
     "format:java": "prettier --write \"src/**/*.java\"",

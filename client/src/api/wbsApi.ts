@@ -1,10 +1,15 @@
 import axiosInstance from './axiosInstance';
 import { normalizeDocumentPluginId } from '@/types/document';
 import type {
+  CreateWbsCommentPayload,
   CreateWbsItemPayload,
   ProjectDocumentTag,
   ReorderWbsPayload,
   TaggedDocument,
+  WbsActivity,
+  WbsActivityEventType,
+  WbsActivitySubjectType,
+  WbsComment,
   UpdateWbsItemPayload,
   WbsItem,
   WbsLinkedDocument,
@@ -120,6 +125,34 @@ function normalizeProjectDocumentTag(raw: Record<string, unknown>): ProjectDocum
   };
 }
 
+function normalizeWbsComment(raw: Record<string, unknown>): WbsComment {
+  return {
+    id: Number(raw.id ?? 0),
+    content: String(raw.content ?? ''),
+    actorLoginId: raw.actorLoginId == null ? null : String(raw.actorLoginId),
+    actorName: raw.actorName == null ? null : String(raw.actorName),
+    createdAt: String(raw.createdAt ?? ''),
+    updatedAt: String(raw.updatedAt ?? raw.createdAt ?? ''),
+  };
+}
+
+function normalizeWbsActivity(raw: Record<string, unknown>): WbsActivity {
+  return {
+    id: Number(raw.id ?? 0),
+    eventType: String(raw.eventType ?? 'DOCUMENT_LINKED') as WbsActivityEventType,
+    subjectType:
+      raw.subjectType == null ? null : (String(raw.subjectType) as WbsActivitySubjectType),
+    subjectId: raw.subjectId == null ? null : Number(raw.subjectId),
+    subjectLabel: raw.subjectLabel == null ? null : String(raw.subjectLabel),
+    previousValue: raw.previousValue == null ? null : String(raw.previousValue),
+    currentValue: raw.currentValue == null ? null : String(raw.currentValue),
+    detail: raw.detail == null ? null : String(raw.detail),
+    actorLoginId: raw.actorLoginId == null ? null : String(raw.actorLoginId),
+    actorName: raw.actorName == null ? null : String(raw.actorName),
+    occurredAt: String(raw.occurredAt ?? ''),
+  };
+}
+
 function normalizeTaggedDocument(raw: Record<string, unknown>): TaggedDocument {
   return {
     id: Number(raw.id ?? 0),
@@ -144,6 +177,41 @@ export async function fetchWbsLinkedDocuments(
     `/teams/${teamId}/projects/${projectId}/wbs/${wbsId}/documents`,
   );
   return (res.data as Record<string, unknown>[]).map(normalizeWbsLinkedDocument);
+}
+
+export async function fetchWbsComments(
+  teamId: string,
+  projectId: string,
+  wbsId: number,
+): Promise<WbsComment[]> {
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/projects/${projectId}/wbs/${wbsId}/comments`,
+  );
+  return (res.data as Record<string, unknown>[]).map(normalizeWbsComment);
+}
+
+export async function createWbsComment(
+  teamId: string,
+  projectId: string,
+  wbsId: number,
+  payload: CreateWbsCommentPayload,
+): Promise<WbsComment> {
+  const res = await axiosInstance.post(
+    `/teams/${teamId}/projects/${projectId}/wbs/${wbsId}/comments`,
+    payload,
+  );
+  return normalizeWbsComment(res.data as Record<string, unknown>);
+}
+
+export async function fetchWbsActivities(
+  teamId: string,
+  projectId: string,
+  wbsId: number,
+): Promise<WbsActivity[]> {
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/projects/${projectId}/wbs/${wbsId}/activities`,
+  );
+  return (res.data as Record<string, unknown>[]).map(normalizeWbsActivity);
 }
 
 export async function linkWbsDocument(

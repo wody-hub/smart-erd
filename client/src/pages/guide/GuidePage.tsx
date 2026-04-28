@@ -27,7 +27,7 @@ import useAuthStore from '@/stores/useAuthStore';
 
 type GuideActionVariant = 'default' | 'outline' | 'ghost';
 type GuideActionStyle = 'buttons' | 'inline' | 'inline-reveal';
-type ProjectHubTab = 'documents' | 'overview' | 'wbs' | 'gantt' | 'staffing' | 'issues';
+type ProjectHubTab = 'documents' | 'overview' | 'wbs' | 'gantt' | 'myTasks' | 'staffing' | 'issues';
 
 interface GuideActionItem {
   label: string;
@@ -402,6 +402,7 @@ export default function GuidePage() {
   const overviewAction = buildProjectTabAction('overview', t('guide.actions.openOverview'));
   const wbsAction = buildProjectTabAction('wbs', t('guide.actions.openWbs'));
   const ganttAction = buildProjectTabAction('gantt', t('guide.actions.openGantt'));
+  const myTasksAction = buildProjectTabAction('myTasks', t('guide.actions.openMyTasks'));
   const staffingAction = buildProjectTabAction('staffing', t('guide.actions.openStaffing'));
   const issuesAction = buildProjectTabAction('issues', t('guide.actions.openIssues'));
   const quickStartAction: GuideActionItem = {
@@ -620,6 +621,12 @@ export default function GuidePage() {
       actions: [ganttAction],
     },
     {
+      icon: Workflow,
+      title: t('guide.projectHub.myTasks.title'),
+      description: t('guide.projectHub.myTasks.description'),
+      actions: [myTasksAction],
+    },
+    {
       icon: UsersRound,
       title: t('guide.projectHub.staffing.title'),
       description: t('guide.projectHub.staffing.description'),
@@ -693,6 +700,12 @@ export default function GuidePage() {
       title: t('guide.confusions.dictionaryContext.title'),
       description: t('guide.confusions.dictionaryContext.description'),
       actions: [dictionaryAction],
+    },
+    {
+      icon: Workflow,
+      title: t('guide.confusions.todoPrivacy.title'),
+      description: t('guide.confusions.todoPrivacy.description'),
+      actions: [myTasksAction, wbsAction],
     },
     {
       icon: CircleAlert,

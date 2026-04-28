@@ -59,15 +59,19 @@ public class MarkdownDocumentDescriptorService {
         if (frontmatter == null || frontmatter.isBlank()) {
             return Map.of();
         }
-        final var loaded = yaml.load(frontmatter);
-        if (loaded instanceof Map<?, ?> map) {
-            final var result = new java.util.LinkedHashMap<String, Object>();
-            map.forEach((key, value) -> {
-                if (key != null) {
-                    result.put(key.toString(), value);
-                }
-            });
-            return result;
+        try {
+            final var loaded = yaml.load(frontmatter);
+            if (loaded instanceof Map<?, ?> map) {
+                final var result = new java.util.LinkedHashMap<String, Object>();
+                map.forEach((key, value) -> {
+                    if (key != null) {
+                        result.put(key.toString(), value);
+                    }
+                });
+                return result;
+            }
+        } catch (RuntimeException ex) {
+            return Map.of();
         }
         return Map.of();
     }
@@ -112,7 +116,7 @@ public class MarkdownDocumentDescriptorService {
         if (value == null) {
             return null;
         }
-        final var normalized = value.toString().trim().toLowerCase();
+        final var normalized = value.toString().trim().toLowerCase(java.util.Locale.ROOT);
         return normalized.isBlank() ? null : normalized;
     }
 

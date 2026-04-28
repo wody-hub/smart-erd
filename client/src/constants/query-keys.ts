@@ -35,6 +35,15 @@ export const queryKeys = {
     businessOverview: (teamId: string, projectId: string) =>
       ['teams', teamId, 'projects', projectId, 'business-overview'] as const,
   },
+  /** 프로젝트 TODO 관련 쿼리 키 */
+  projectTodos: {
+    /** 프로젝트 내 내 TODO 목록 */
+    all: (teamId: string, projectId: string) =>
+      ['teams', teamId, 'projects', projectId, 'todos'] as const,
+    /** 특정 TODO 연결 문서 목록 */
+    documents: (teamId: string, projectId: string, todoId: number | null) =>
+      ['teams', teamId, 'projects', projectId, 'todos', todoId, 'documents'] as const,
+  },
   /** 데이터 사전 관련 쿼리 키 */
   dictionary: {
     /** 팀별 사전 세트 목록 */
@@ -81,6 +90,15 @@ export const queryKeys = {
     /** WBS별 연결 문서 목록 */
     linkedDocuments: (teamId: string, projectId: string, wbsId: number | null) =>
       ['teams', teamId, 'projects', projectId, 'wbs', wbsId, 'linked-documents'] as const,
+    /** WBS별 댓글 목록 */
+    comments: (teamId: string, projectId: string, wbsId: number | null) =>
+      ['teams', teamId, 'projects', projectId, 'wbs', wbsId, 'comments'] as const,
+    /** WBS별 활동 로그 목록 */
+    activities: (teamId: string, projectId: string, wbsId: number | null) =>
+      ['teams', teamId, 'projects', projectId, 'wbs', wbsId, 'activities'] as const,
+    /** WBS별 공유 TODO 요약 */
+    sharedTodos: (teamId: string, projectId: string, wbsId: number | null) =>
+      ['teams', teamId, 'projects', projectId, 'wbs', wbsId, 'todos'] as const,
     /** 프로젝트 태그 목록 */
     tags: (teamId: string, projectId: string) =>
       ['teams', teamId, 'projects', projectId, 'document-tags'] as const,

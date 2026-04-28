@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.pm.common.ProjectContextLoader;
 import com.smarterd.domain.pm.common.ProjectContextLoader.ProjectContext;
+import com.smarterd.domain.pm.history.service.WorkItemHistoryService;
 import com.smarterd.domain.pm.wbs.entity.WbsDocumentLink;
 import com.smarterd.domain.pm.wbs.entity.WbsItem;
 import com.smarterd.domain.pm.wbs.repository.WbsDocumentLinkRepository;
@@ -45,6 +46,9 @@ class WbsDocumentServiceTest {
     @Mock
     private MarkdownDocumentDescriptorService markdownDocumentDescriptorService;
 
+    @Mock
+    private WorkItemHistoryService workItemHistoryService;
+
     @InjectMocks
     private WbsDocumentService wbsDocumentService;
 
@@ -75,6 +79,7 @@ class WbsDocumentServiceTest {
 
         final var result = wbsDocumentService.linkDocument("tester", 10L, 20L, 100L, 42L);
 
+        verify(workItemHistoryService).recordWbsDocumentLinked(project, 100L, 42L, "API Spec", "tester");
         assertThat(result.id()).isEqualTo(42L);
         assertThat(result.tags()).containsExactly("spec");
         assertThat(result.linkedAt()).isEqualTo(Instant.parse("2026-04-28T01:00:00Z"));
@@ -126,10 +131,13 @@ class WbsDocumentServiceTest {
         when(projectContextLoader.load("tester", 10L, 20L, true)).thenReturn(new ProjectContext(team, project));
         when(wbsItemRepository.findByProjectAndId(project, 100L)).thenReturn(Optional.of(wbsItem));
         when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, 42L)).thenReturn(Optional.of(document));
+        when(wbsDocumentLinkRepository.findByWbsItemAndDiagram(wbsItem, document))
+            .thenReturn(Optional.of(WbsDocumentLink.builder().wbsItem(wbsItem).diagram(document).build()));
 
         wbsDocumentService.unlinkDocument("tester", 10L, 20L, 100L, 42L);
 
         verify(wbsDocumentLinkRepository).deleteByWbsItemAndDiagram(wbsItem, document);
+        verify(workItemHistoryService).recordWbsDocumentUnlinked(project, 100L, 42L, "API Spec", "tester");
     }
 
     private Team createTeam(Long id) {

@@ -6,6 +6,7 @@ import com.smarterd.domain.diagram.repository.DiagramRepository;
 import com.smarterd.domain.markdown.service.MarkdownDocumentDescriptorService;
 import com.smarterd.domain.markdown.service.MarkdownTemplateDescriptor;
 import com.smarterd.domain.pm.common.ProjectContextLoader;
+import com.smarterd.domain.pm.history.service.WorkItemHistoryService;
 import com.smarterd.domain.pm.wbs.entity.WbsDocumentLink;
 import com.smarterd.domain.pm.wbs.entity.WbsItem;
 import com.smarterd.domain.pm.wbs.repository.WbsDocumentLinkRepository;
@@ -34,6 +35,7 @@ public class WbsDocumentService {
     private final WbsDocumentLinkRepository wbsDocumentLinkRepository;
     private final DiagramRepository diagramRepository;
     private final MarkdownDocumentDescriptorService markdownDocumentDescriptorService;
+    private final WorkItemHistoryService workItemHistoryService;
 
     public List<LinkedDocumentResult> getLinkedDocuments(String loginId, Long teamId, Long projectId, Long wbsItemId) {
         final var context = projectContextLoader.load(loginId, teamId, projectId, false);
@@ -59,6 +61,13 @@ public class WbsDocumentService {
         }
 
         final var link = wbsDocumentLinkRepository.save(WbsDocumentLink.builder().wbsItem(wbsItem).diagram(document).build());
+        workItemHistoryService.recordWbsDocumentLinked(
+            context.project(),
+            wbsItemId,
+            document.getId(),
+            document.getName(),
+            loginId
+        );
         return toLinkedDocumentResult(link, link.getCreatedAt());
     }
 
@@ -69,7 +78,19 @@ public class WbsDocumentService {
         final var document = diagramRepository
             .findByProjectAndIdAndDeletedAtIsNull(context.project(), documentId)
             .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_DIAGRAM.code(), documentId));
+        final var existing = wbsDocumentLinkRepository.findByWbsItemAndDiagram(wbsItem, document);
+        if (existing.isEmpty()) {
+            return;
+        }
+
         wbsDocumentLinkRepository.deleteByWbsItemAndDiagram(wbsItem, document);
+        workItemHistoryService.recordWbsDocumentUnlinked(
+            context.project(),
+            wbsItemId,
+            document.getId(),
+            document.getName(),
+            loginId
+        );
     }
 
     public List<DocumentTagResult> getDocumentTags(String loginId, Long teamId, Long projectId) {

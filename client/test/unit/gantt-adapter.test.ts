@@ -6,6 +6,7 @@ import {
   inclusiveDurationDays,
   parseDateOnly,
 } from '../../src/components/gantt/gantt-date-utils.js';
+import { collectExpandableTaskIds } from '../../src/components/gantt/gantt-tree-utils.js';
 import type { Milestone } from '../../src/types/milestone.js';
 import type { WbsItem } from '../../src/types/wbs.js';
 
@@ -200,4 +201,41 @@ test('buildGanttModel preserves WBS sort order before milestone append', () => {
 
   assert.deepEqual(wbsOrder, [1, 2, 5, 4]);
   assert.deepEqual(milestoneOrder, ['milestone:49', 'milestone:50']);
+});
+
+test('collectExpandableTaskIds returns only non-milestone branches with children', () => {
+  const wbsItems: WbsItem[] = [
+    makeWbsItem({ id: 1, name: 'Root', depth: 0, sortOrder: 1 }),
+    makeWbsItem({
+      id: 2,
+      parentId: 1,
+      name: 'Child A',
+      depth: 1,
+      sortOrder: 1,
+      startDate: '2026-03-11',
+      endDate: '2026-03-12',
+    }),
+    makeWbsItem({
+      id: 3,
+      parentId: 2,
+      name: 'Grandchild',
+      depth: 2,
+      sortOrder: 1,
+      startDate: '2026-03-13',
+      endDate: '2026-03-14',
+    }),
+    makeWbsItem({
+      id: 4,
+      name: 'Standalone',
+      depth: 0,
+      sortOrder: 2,
+      startDate: '2026-03-15',
+      endDate: '2026-03-18',
+    }),
+  ];
+
+  const milestones: Milestone[] = [makeMilestone({ id: 50, targetDate: '2026-03-10' })];
+  const model = buildGanttModel({ wbsItems, milestones });
+
+  assert.deepEqual(collectExpandableTaskIds(model.tasks), [1, 2]);
 });

@@ -21,6 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6.1 (INSERTED): WBS 작업공간 확장** - 전용 WBS 페이지, 하단 인라인 추가, 담당자 배정 UX 보강
 - [x] **Phase 7: 인력 투입 (M/M)** - 팀원별 M/M 계획·실적 및 인건비 자동 계산
 - [x] **Phase 8: 이슈 트래커** - 이슈 등록·상태 관리·필터링·Excel 내보내기
+- [x] **Phase 8.1 (INSERTED): WBS 작업 히스토리 관리** - WBS/Gantt 문서화, 태그 허브, 개인 TODO와 공유 WBS 연결
 
 ## Phase Details
 
@@ -251,10 +252,32 @@ Plans (상세 설계 완료 — `.planning/phases/07-인력-투입/`):
 Plans (상세 설계 완료 — `.planning/phases/08-이슈-트래커/`):
 - [x] 08-01-PLAN.md — issue tracker backend/API + project-hub issues tab + shared filter/export contract + closeout verification
 
+### Phase 8.1 (INSERTED): WBS 작업 히스토리 관리
+**Goal**: WBS/Gantt 작업에 문서를 연결하고 태그 중심 문서 허브를 제공하며, 개인 TODO를 WBS와 선택적으로 연결해 일정 리스크를 함께 관리할 수 있다
+**Depends on**: Phase 8
+**Requirements**: WHM-01, WHM-02, WHM-03, WHM-04, WHM-05, WHM-06, WHM-07, WHM-08
+**Success Criteria** (what must be TRUE):
+  1. 사용자가 WBS 항목 또는 간트 문맥에서 작업 문서를 생성하거나 기존 문서를 연결할 수 있다
+  2. 작업 문서에는 태그를 달 수 있고, 프로젝트 허브의 별도 `Tags` 탭에서 태그 목록과 태그별 문서 목록을 조회할 수 있다
+  3. WBS 작업 단위로 댓글/작업 히스토리를 기록할 수 있다
+  4. 사용자가 개인 TODO를 등록하고, 필요할 때만 특정 WBS에 연결하여 공유 진척/일정 리스크 관리 대상으로 승격할 수 있다
+  5. WBS에 연결되지 않은 개인 TODO는 다른 사용자에게 노출되지 않는다
+**Plans**: review/validation/verification complete
+**UI hint**: yes
+
+GSD source of truth:
+- `.planning/phases/08.1-wbs-작업-히스토리-관리/08.1-CONTEXT.md`
+- `.planning/phases/08.1-wbs-작업-히스토리-관리/08.1-RESEARCH.md`
+- `.planning/phases/08.1-wbs-작업-히스토리-관리/08.1-AGENT-WORK-PLAN.md`
+- `.planning/phases/08.1-wbs-작업-히스토리-관리/08.1-REVIEWS.md`
+- `.planning/phases/08.1-wbs-작업-히스토리-관리/08.1-VALIDATION.md`
+- `.planning/phases/08.1-wbs-작업-히스토리-관리/08.1-VERIFICATION.md`
+- `.planning/phases/08.1-wbs-작업-히스토리-관리/SUMMARY.md`
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.1 → 7 → 8
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.1 → 7 → 8 → 8.1
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -267,3 +290,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.1 → 7 �
 | 6.1 WBS 작업공간 확장 | 1/1 | Complete | 2026-04-21 |
 | 7. 인력 투입 (M/M) | 1/1 | Complete | 2026-04-22 |
 | 8. 이슈 트래커 | 1/1 | Complete | 2026-04-23 |
+| 8.1 WBS 작업 히스토리 관리 | closeout | Complete | 2026-04-28 |
