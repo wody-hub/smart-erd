@@ -78,6 +78,15 @@ export const queryKeys = {
     /** 프로젝트 WBS 전체 목록 */
     all: (teamId: string, projectId: string) =>
       ['teams', teamId, 'projects', projectId, 'wbs'] as const,
+    /** WBS별 연결 문서 목록 */
+    linkedDocuments: (teamId: string, projectId: string, wbsId: number | null) =>
+      ['teams', teamId, 'projects', projectId, 'wbs', wbsId, 'linked-documents'] as const,
+    /** 프로젝트 태그 목록 */
+    tags: (teamId: string, projectId: string) =>
+      ['teams', teamId, 'projects', projectId, 'document-tags'] as const,
+    /** 특정 태그의 문서 목록 */
+    tagDocuments: (teamId: string, projectId: string, tag: string | null) =>
+      ['teams', teamId, 'projects', projectId, 'document-tags', tag, 'documents'] as const,
   },
   /** 마일스톤 관련 쿼리 키 */
   milestones: {

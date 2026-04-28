@@ -1,9 +1,13 @@
 import axiosInstance from './axiosInstance';
+import { normalizeDocumentPluginId } from '@/types/document';
 import type {
   CreateWbsItemPayload,
+  ProjectDocumentTag,
   ReorderWbsPayload,
+  TaggedDocument,
   UpdateWbsItemPayload,
   WbsItem,
+  WbsLinkedDocument,
 } from '@/types/wbs';
 
 /**
@@ -92,4 +96,96 @@ export async function reorderWbsItems(
     payload,
   );
   return res.data;
+}
+
+function normalizeWbsLinkedDocument(raw: Record<string, unknown>): WbsLinkedDocument {
+  return {
+    id: Number(raw.id ?? 0),
+    name: String(raw.name ?? ''),
+    pluginId: normalizeDocumentPluginId(String(raw.pluginId ?? 'markdown')),
+    templateKey: raw.templateKey == null ? null : String(raw.templateKey),
+    summaryText: raw.summaryText == null ? null : String(raw.summaryText),
+    templateLabel: raw.templateLabel == null ? null : String(raw.templateLabel),
+    tags: Array.isArray(raw.tags) ? raw.tags.map((tag) => String(tag)) : [],
+    linkedAt: raw.linkedAt == null ? null : String(raw.linkedAt),
+    createdAt: String(raw.createdAt ?? ''),
+    updatedAt: String(raw.updatedAt ?? raw.linkedAt ?? ''),
+  };
+}
+
+function normalizeProjectDocumentTag(raw: Record<string, unknown>): ProjectDocumentTag {
+  return {
+    tag: String(raw.tag ?? ''),
+    documentCount: Number(raw.documentCount ?? 0),
+  };
+}
+
+function normalizeTaggedDocument(raw: Record<string, unknown>): TaggedDocument {
+  return {
+    id: Number(raw.id ?? 0),
+    name: String(raw.name ?? ''),
+    pluginId: normalizeDocumentPluginId(String(raw.pluginId ?? 'markdown')),
+    templateKey: raw.templateKey == null ? null : String(raw.templateKey),
+    summaryText: raw.summaryText == null ? null : String(raw.summaryText),
+    templateLabel: raw.templateLabel == null ? null : String(raw.templateLabel),
+    tags: Array.isArray(raw.tags) ? raw.tags.map((tag) => String(tag)) : [],
+    linkedAt: raw.linkedAt == null ? null : String(raw.linkedAt),
+    createdAt: String(raw.createdAt ?? ''),
+    updatedAt: String(raw.updatedAt ?? ''),
+  };
+}
+
+export async function fetchWbsLinkedDocuments(
+  teamId: string,
+  projectId: string,
+  wbsId: number,
+): Promise<WbsLinkedDocument[]> {
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/projects/${projectId}/wbs/${wbsId}/documents`,
+  );
+  return (res.data as Record<string, unknown>[]).map(normalizeWbsLinkedDocument);
+}
+
+export async function linkWbsDocument(
+  teamId: string,
+  projectId: string,
+  wbsId: number,
+  documentId: number,
+): Promise<void> {
+  await axiosInstance.put(
+    `/teams/${teamId}/projects/${projectId}/wbs/${wbsId}/documents/${documentId}`,
+  );
+}
+
+export async function unlinkWbsDocument(
+  teamId: string,
+  projectId: string,
+  wbsId: number,
+  documentId: number,
+): Promise<void> {
+  await axiosInstance.delete(
+    `/teams/${teamId}/projects/${projectId}/wbs/${wbsId}/documents/${documentId}`,
+  );
+}
+
+export async function fetchProjectDocumentTags(
+  teamId: string,
+  projectId: string,
+): Promise<ProjectDocumentTag[]> {
+  const res = await axiosInstance.get(`/teams/${teamId}/projects/${projectId}/wbs/document-tags`);
+  return (res.data as Record<string, unknown>[]).map(normalizeProjectDocumentTag);
+}
+
+export async function fetchTaggedDocuments(
+  teamId: string,
+  projectId: string,
+  tag: string,
+): Promise<TaggedDocument[]> {
+  const res = await axiosInstance.get(
+    `/teams/${teamId}/projects/${projectId}/wbs/document-tags/documents`,
+    {
+      params: { tag },
+    },
+  );
+  return (res.data as Record<string, unknown>[]).map(normalizeTaggedDocument);
 }

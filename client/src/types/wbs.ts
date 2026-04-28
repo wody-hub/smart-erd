@@ -32,6 +32,62 @@ export interface WbsItem {
   updatedAt: string;
 }
 
+/** WBS에 연결된 문서 요약 모델. */
+export interface WbsLinkedDocument {
+  /** 문서 ID */
+  id: number;
+  /** 문서 제목 */
+  name: string;
+  /** 문서 플러그인 ID */
+  pluginId: string;
+  /** markdown 템플릿 키 */
+  templateKey: string | null;
+  /** markdown/문서 요약 */
+  summaryText: string | null;
+  /** markdown 템플릿 라벨 */
+  templateLabel: string | null;
+  /** 문서 태그 */
+  tags: string[];
+  /** 연결 시각 */
+  linkedAt: string | null;
+  /** 생성 일시 */
+  createdAt: string;
+  /** 최종 수정 일시 */
+  updatedAt: string;
+}
+
+/** 태그 목록 요약 모델. */
+export interface ProjectDocumentTag {
+  /** 태그 이름 */
+  tag: string;
+  /** 연결 문서 수 */
+  documentCount: number;
+}
+
+/** 태그 기준 문서 목록 요약 모델. */
+export interface TaggedDocument {
+  /** 문서 ID */
+  id: number;
+  /** 문서 제목 */
+  name: string;
+  /** 문서 플러그인 ID */
+  pluginId: string;
+  /** markdown 템플릿 키 */
+  templateKey: string | null;
+  /** markdown/문서 요약 */
+  summaryText: string | null;
+  /** markdown 템플릿 라벨 */
+  templateLabel: string | null;
+  /** 문서 태그 */
+  tags: string[];
+  /** 연결 시각 */
+  linkedAt: string | null;
+  /** 생성 일시 */
+  createdAt: string;
+  /** 최종 수정 일시 */
+  updatedAt: string;
+}
+
 /** WBS 항목 생성 payload. */
 export interface CreateWbsItemPayload {
   /** 항목명 */

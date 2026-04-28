@@ -1,4 +1,11 @@
-import { forwardRef, type ReactNode, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import {
+  forwardRef,
+  type ReactNode,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -14,6 +21,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ListTree } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchDiagrams } from '@/api/diagramApi';
 import { fetchMilestones } from '@/api/milestoneApi';
 import { fetchMembers } from '@/api/teamApi';
 import {
@@ -47,18 +55,22 @@ import type {
   WbsItem,
 } from '@/types/wbs';
 import SortableWbsRow from './SortableWbsRow';
+import WbsDetailPanel from './WbsDetailPanel';
 import WbsInlineCreateRow from './WbsInlineCreateRow';
 import WbsItemFormDialog, { type WbsItemFormValues } from './WbsItemFormDialog';
+import WbsMoveDialog, { type WbsMoveDialogValues } from './WbsMoveDialog';
 import {
   MAX_WBS_DEPTH,
   buildChildrenByParent,
   buildInlineCreatePayload,
   buildInlineCreatePlacements,
   buildReorderPayload,
+  buildTargetIndexReorderPayload,
   collectDescendantIds,
   flattenTreeItems,
   getMaxDescendantDepthOffset,
   projectPlacement,
+  resolveMoveValidationError,
   type InlineCreatePlacement,
 } from './wbs-tree-utils';
 
@@ -98,9 +110,11 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
     const [formOpen, setFormOpen] = useState(false);
     const [editTarget, setEditTarget] = useState<WbsItem | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<WbsItem | null>(null);
+    const [moveTarget, setMoveTarget] = useState<WbsItem | null>(null);
     const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
     const [activeDragItemId, setActiveDragItemId] = useState<number | null>(null);
     const [highlightedItemId, setHighlightedItemId] = useState<number | null>(null);
+    const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
     const sensors = useSensors(
       useSensor(PointerSensor, {
@@ -140,6 +154,12 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
     const milestonesQuery = useQuery({
       queryKey: queryKeys.milestones.all(teamId, projectId),
       queryFn: () => fetchMilestones(teamId, projectId),
+      enabled: Boolean(teamId) && Boolean(projectId),
+    });
+
+    const diagramsQuery = useQuery({
+      queryKey: queryKeys.diagrams.byProject(teamId, projectId),
+      queryFn: () => fetchDiagrams(teamId, projectId),
       enabled: Boolean(teamId) && Boolean(projectId),
     });
 
@@ -220,6 +240,17 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       [childrenByParent, collapsedIds],
     );
 
+    useEffect(() => {
+      if (visibleItems.length === 0) {
+        setSelectedItemId(null);
+        return;
+      }
+      if (selectedItemId != null && visibleItems.some((item) => item.id === selectedItemId)) {
+        return;
+      }
+      setSelectedItemId(visibleItems[0]?.id ?? null);
+    }, [selectedItemId, visibleItems]);
+
     const milestoneNameById = useMemo(
       () =>
         new Map((milestonesQuery.data ?? []).map((milestone) => [milestone.id, milestone.name])),
@@ -252,6 +283,27 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       });
       return map;
     }, [inlineCreatePlacements]);
+
+    /**
+     * 단일 WBS 항목 update payload를 구성한다.
+     *
+     * @param item 기준 항목
+     * @param overrides 덮어쓸 필드
+     * @returns update payload
+     */
+    const buildUpdatePayload = (
+      item: WbsItem,
+      overrides: Partial<UpdateWbsItemPayload>,
+    ): UpdateWbsItemPayload => ({
+      name: item.name,
+      assigneeUserId: item.assigneeUserId,
+      startDate: item.startDate,
+      endDate: item.endDate,
+      progressRate: item.progressRate,
+      estimatedMm: item.estimatedMm,
+      milestoneId: item.milestoneId,
+      ...overrides,
+    });
 
     /**
      * 생성/수정 dialog submit을 처리한다.
@@ -305,15 +357,7 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
     const handleInlineNameSubmit = (item: WbsItem, nextName: string) => {
       updateMutation.mutate({
         wbsId: item.id,
-        payload: {
-          name: nextName,
-          assigneeUserId: item.assigneeUserId,
-          startDate: item.startDate,
-          endDate: item.endDate,
-          progressRate: item.progressRate,
-          estimatedMm: item.estimatedMm,
-          milestoneId: item.milestoneId,
-        },
+        payload: buildUpdatePayload(item, { name: nextName }),
       });
     };
 
@@ -326,15 +370,62 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
     const handleInlineProgressSubmit = (item: WbsItem, nextProgress: number) => {
       updateMutation.mutate({
         wbsId: item.id,
-        payload: {
-          name: item.name,
-          assigneeUserId: item.assigneeUserId,
-          startDate: item.startDate,
-          endDate: item.endDate,
-          progressRate: nextProgress,
-          estimatedMm: item.estimatedMm,
-          milestoneId: item.milestoneId,
-        },
+        payload: buildUpdatePayload(item, { progressRate: nextProgress }),
+      });
+    };
+
+    /**
+     * 인라인 담당자 수정을 처리한다.
+     *
+     * @param item 수정 대상 항목
+     * @param nextAssigneeUserId 다음 담당자 ID
+     */
+    const handleInlineAssigneeSubmit = (item: WbsItem, nextAssigneeUserId: number | null) => {
+      updateMutation.mutate({
+        wbsId: item.id,
+        payload: buildUpdatePayload(item, { assigneeUserId: nextAssigneeUserId }),
+      });
+    };
+
+    /**
+     * 인라인 기간 수정을 처리한다.
+     *
+     * @param item 수정 대상 항목
+     * @param nextPeriod 다음 기간
+     */
+    const handleInlinePeriodSubmit = (
+      item: WbsItem,
+      nextPeriod: Pick<UpdateWbsItemPayload, 'startDate' | 'endDate'>,
+    ) => {
+      updateMutation.mutate({
+        wbsId: item.id,
+        payload: buildUpdatePayload(item, nextPeriod),
+      });
+    };
+
+    /**
+     * 인라인 예상 M/M 수정을 처리한다.
+     *
+     * @param item 수정 대상 항목
+     * @param nextEstimatedMm 다음 예상 M/M
+     */
+    const handleInlineEstimatedMmSubmit = (item: WbsItem, nextEstimatedMm: number | null) => {
+      updateMutation.mutate({
+        wbsId: item.id,
+        payload: buildUpdatePayload(item, { estimatedMm: nextEstimatedMm }),
+      });
+    };
+
+    /**
+     * 인라인 마일스톤 수정을 처리한다.
+     *
+     * @param item 수정 대상 항목
+     * @param nextMilestoneId 다음 마일스톤 ID
+     */
+    const handleInlineMilestoneSubmit = (item: WbsItem, nextMilestoneId: number | null) => {
+      updateMutation.mutate({
+        wbsId: item.id,
+        payload: buildUpdatePayload(item, { milestoneId: nextMilestoneId }),
       });
     };
 
@@ -426,6 +517,50 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       reorderMutation.mutate(payload);
     };
 
+    /**
+     * 명시적 이동 dialog submit을 처리한다.
+     *
+     * @param values 이동 대상 부모/위치
+     */
+    const handleMoveSubmit = async (values: WbsMoveDialogValues): Promise<boolean> => {
+      if (!moveTarget) {
+        return false;
+      }
+
+      if (values.parentId != null && !itemById.has(values.parentId)) {
+        toast.error(t('wbs.toast.reorderFailed'));
+        return false;
+      }
+
+      const validationError = resolveMoveValidationError({
+        activeItemId: moveTarget.id,
+        nextParentId: values.parentId,
+        itemById,
+        childrenByParent,
+      });
+      if (validationError) {
+        toast.error(t(`wbs.toast.${validationError}`));
+        return false;
+      }
+
+      const payload = buildTargetIndexReorderPayload({
+        allItems,
+        childrenByParent,
+        activeItemId: moveTarget.id,
+        nextParentId: values.parentId,
+        targetIndex: values.targetIndex,
+      });
+
+      if (payload.items.length === 0) {
+        setMoveTarget(null);
+        return true;
+      }
+
+      await reorderMutation.mutateAsync(payload);
+      setMoveTarget(null);
+      return true;
+    };
+
     const locale = i18n.resolvedLanguage ?? i18n.language;
     const activeDragItem =
       activeDragItemId == null ? null : (itemById.get(activeDragItemId) ?? null);
@@ -502,14 +637,24 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
             disabled={isMutating}
             highlighted={highlightedItemId === item.id}
             t={t}
+            members={membersQuery.data ?? []}
+            milestones={milestonesQuery.data ?? []}
+            membersUnavailable={membersQuery.isLoading || membersQuery.isError}
             onToggleCollapse={handleToggleCollapse}
             onInlineNameSubmit={handleInlineNameSubmit}
             onInlineProgressSubmit={handleInlineProgressSubmit}
+            onInlineAssigneeSubmit={handleInlineAssigneeSubmit}
+            onInlinePeriodSubmit={handleInlinePeriodSubmit}
+            onInlineEstimatedMmSubmit={handleInlineEstimatedMmSubmit}
+            onInlineMilestoneSubmit={handleInlineMilestoneSubmit}
             onOpenEditDialog={(target) => {
               setEditTarget(target);
               setFormOpen(true);
             }}
+            onOpenMoveDialog={setMoveTarget}
             onRequestDelete={setDeleteTarget}
+            onSelect={(target) => setSelectedItemId(target.id)}
+            selected={selectedItemId === item.id}
           />,
         );
 
@@ -545,7 +690,7 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
                       <TableHead className="w-[140px]">{t('wbs.field.estimatedMm')}</TableHead>
                       <TableHead className="w-[220px]">{t('wbs.field.milestone')}</TableHead>
                       {canEdit && (
-                        <TableHead className="w-[100px]">{t('wbs.field.actions')}</TableHead>
+                        <TableHead className="w-[140px]">{t('wbs.field.actions')}</TableHead>
                       )}
                     </TableRow>
                   </TableHeader>
@@ -611,6 +756,8 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       wbsContent = renderTable();
     }
 
+    const selectedItem = selectedItemId == null ? null : (itemById.get(selectedItemId) ?? null);
+
     return (
       <>
         <div
@@ -626,7 +773,17 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
             {wbsContent}
           </section>
           <aside className="min-w-0">
-            <MilestonePanel teamId={teamId} projectId={projectId} canEdit={canEdit} />
+            <div className="space-y-6">
+              <WbsDetailPanel
+                teamId={teamId}
+                projectId={projectId}
+                canEdit={canEdit}
+                locale={locale}
+                item={selectedItem}
+                allDocuments={diagramsQuery.data ?? []}
+              />
+              <MilestonePanel teamId={teamId} projectId={projectId} canEdit={canEdit} />
+            </div>
           </aside>
         </div>
 
@@ -648,6 +805,19 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
           loading={
             createMutation.isPending || updateMutation.isPending || reorderMutation.isPending
           }
+        />
+
+        <WbsMoveDialog
+          open={moveTarget != null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setMoveTarget(null);
+            }
+          }}
+          item={moveTarget}
+          items={allItems}
+          loading={reorderMutation.isPending}
+          onSubmit={handleMoveSubmit}
         />
 
         <ConfirmDialog

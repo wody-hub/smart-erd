@@ -295,9 +295,36 @@
       "description": "이 프로젝트의 문서를 관리하고 바로 편집으로 들어가세요.",
       "empty": "이 프로젝트에는 아직 문서가 없습니다. 첫 번째 ERD 문서를 만들어보세요.",
       "documentCount": "문서 {{count}}개",
-      "typeScopeHint": "ERD와 Markdown 문서를 같은 허브에서 생성하고 편집할 수 있습니다.",
+      "typeScopeHint": "ERD, Markdown, 화면기획 문서를 같은 허브에서 생성하고 편집할 수 있습니다.",
       "multiTypeHint": "이 허브에서 ERD와 Markdown 문서를 함께 관리합니다. 생성 시 문서 유형과 필요한 초기 설정을 고릅니다.",
       "dictionaryContextHint": "새 문서를 만들기 전에 연결할 사전 컨텍스트를 선택하세요."
+    },
+    "tags": {
+      "title": "Tags",
+      "description": "전체 문서 목록 대신 태그 묶음 중심으로 프로젝트 문서를 탐색합니다.",
+      "documentCount": "문서 {{count}}개",
+      "documentsTitle": "#{{tag}} 문서",
+      "documentsFallbackTitle": "태그 문서",
+      "documentsDescription": "선택한 태그에 연결된 문서를 확인합니다.",
+      "linkedWbsCount": "연결 WBS {{count}}개",
+      "selectPrompt": {
+        "title": "태그를 선택하세요",
+        "description": "왼쪽 태그를 선택하면 연결된 문서 목록을 확인할 수 있습니다."
+      },
+      "empty": {
+        "title": "아직 태그가 없습니다",
+        "description": "이 프로젝트에 태그가 달린 문서가 생기면 여기에서 확인할 수 있습니다."
+      },
+      "noDocuments": {
+        "title": "이 태그에 연결된 문서가 없습니다",
+        "description": "태그는 있지만 표시할 연결 문서가 아직 없습니다."
+      },
+      "status": {
+        "loadFailedTitle": "태그를 불러오지 못했습니다",
+        "loadFailedDescription": "프로젝트 태그 인덱스 동기화 후 다시 시도해 주세요.",
+        "documentsLoadFailedTitle": "태그 문서를 불러오지 못했습니다",
+        "documentsLoadFailedDescription": "문서-태그 조회가 준비된 뒤 다시 시도해 주세요."
+      }
     },
     "projects": {
       "description": "프로젝트를 선택해 문서 작업 공간으로 들어가세요. 사전, 멤버, 설정은 팀 유틸리티로 분리합니다.",
@@ -308,6 +335,7 @@
     "projectHub": {
       "overviewDescription": "프로젝트의 핵심 정보를 확인하고 다음 실행 구간을 정리합니다.",
       "overviewMeta": "사업 개요 기준선",
+      "tagsMeta": "태그 중심 문서 인덱스",
       "wbsMeta": "WBS 작업 구조",
       "ganttDescription": "WBS 일정과 마일스톤 진행을 타임라인에서 검토하고 계획을 조정합니다.",
       "ganttMeta": "타임라인 계획 모드",
@@ -798,6 +826,41 @@
       "title": "WBS 작업",
       "description": "프로젝트 작업 항목을 계층으로 등록하고 기간, 진척률, 마일스톤 연결 정보를 관리합니다."
     },
+    "details": {
+      "title": "WBS 문맥",
+      "description": "선택한 WBS 항목에 연결된 프로젝트 문서를 확인합니다.",
+      "level": "레벨 {{level}}",
+      "linkedDocuments": "연결 문서",
+      "linkedDocumentsHint": "행은 요약 중심으로 유지하고, 문서 문맥은 이 우측 패널로 분리합니다.",
+      "linkAction": "문서 연결",
+      "linkedAt": "{{date}} 연결",
+      "openDocumentsHub": "문서 허브 열기",
+      "empty": {
+        "title": "선택된 WBS 항목이 없습니다",
+        "description": "WBS 트리에서 행을 선택하면 연결 문서 문맥을 확인할 수 있습니다."
+      },
+      "noLinkedDocuments": {
+        "title": "연결된 문서가 아직 없습니다",
+        "description": "이 WBS 항목에는 연결된 프로젝트 문서가 없습니다."
+      },
+      "status": {
+        "loadFailedTitle": "연결 문서를 불러오지 못했습니다",
+        "loadFailedDescription": "WBS 문서 인덱스 동기화 후 다시 시도해 주세요."
+      },
+      "linkDialog": {
+        "title": "프로젝트 문서 연결",
+        "description": "선택한 WBS 항목에 연결할 기존 프로젝트 문서를 선택하세요.",
+        "placeholder": "프로젝트 문서 선택",
+        "confirm": "문서 연결",
+        "noSummary": "이 문서에는 아직 요약이 없습니다."
+      },
+      "toast": {
+        "linked": "문서를 연결했습니다",
+        "linkFailed": "문서 연결에 실패했습니다",
+        "unlinked": "문서 연결을 해제했습니다",
+        "unlinkFailed": "문서 연결 해제에 실패했습니다"
+      }
+    },
     "workspace": {
       "title": "WBS 작업공간",
       "description": "작업 구조를 넓게 편집하고 담당자를 배정하며 같은 맥락에서 새 항목을 연속으로 추가합니다.",
@@ -806,6 +869,19 @@
     },
     "action": {
       "create": "WBS 항목 추가"
+    },
+    "move": {
+      "title": "WBS 항목 이동",
+      "description": "\"{{name}}\" 항목의 새 위치를 선택합니다.",
+      "descriptionFallback": "항목의 새 위치를 선택합니다.",
+      "parent": "새 상위 항목",
+      "parentPlaceholder": "이동할 상위 항목 선택",
+      "position": "같은 레벨 내 위치",
+      "positionPlaceholder": "이동 위치 선택",
+      "positionStart": "맨 위로 이동",
+      "positionAfter": "\"{{name}}\" 다음으로 이동",
+      "positionEnd": "맨 아래로 이동",
+      "submit": "이동"
     },
     "dnd": {
       "hint": "핸들을 드래그해 순서를 변경하세요. 드래그 중 좌우로 움직이면 계층 레벨을 변경할 수 있습니다."
@@ -875,7 +951,7 @@
       "loadFailed": "WBS 목록을 불러오지 못했습니다",
       "reorderFailed": "WBS 순서 변경에 실패했습니다",
       "reordered": "WBS 순서가 변경되었습니다",
-      "depthLimitExceeded": "항목을 3단계보다 깊게 이동할 수 없습니다",
+      "depthLimitExceeded": "항목을 허용된 최대 깊이보다 더 깊게 이동할 수 없습니다",
       "invalidMove": "항목을 자신의 하위 항목 아래로 이동할 수 없습니다"
     },
     "empty": {
@@ -893,7 +969,12 @@
       "collapse": "WBS 항목 {{name}} 접기",
       "drag": "WBS 항목 {{name}} 드래그",
       "editName": "WBS 항목 {{name}} 이름 수정",
-      "editProgress": "WBS 항목 {{name}} 진척률 수정"
+      "editAssignee": "WBS 항목 {{name}} 담당자 수정",
+      "editPeriod": "WBS 항목 {{name}} 기간 수정",
+      "editProgress": "WBS 항목 {{name}} 진척률 수정",
+      "editEstimatedMm": "WBS 항목 {{name}} 예상 M/M 수정",
+      "editMilestone": "WBS 항목 {{name}} 마일스톤 수정",
+      "move": "WBS 항목 {{name}} 이동"
     }
   },
   "gantt": {
@@ -911,7 +992,9 @@
       "day": "일",
       "week": "주",
       "month": "월",
-      "today": "오늘"
+      "today": "오늘",
+      "expandAll": "모두 펼치기",
+      "collapseAll": "모두 접기"
     },
     "empty": {
       "title": "표시할 간트 데이터가 없습니다",

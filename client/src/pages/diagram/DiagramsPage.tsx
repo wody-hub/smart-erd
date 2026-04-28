@@ -7,6 +7,7 @@ import {
   CircleAlert,
   ClipboardList,
   FileText,
+  Hash,
   ListTree,
   Plus,
   UsersRound,
@@ -25,6 +26,7 @@ import IssuesTab from '@/components/issues/IssuesTab';
 import StaffingTab from '@/components/staffing/StaffingTab';
 import ProjectWorkspaceHero from '@/components/workspace/ProjectWorkspaceHero';
 import DocumentHubTabContent from '@/components/workspace/DocumentHubTabContent';
+import TagsTab from '@/components/wbs/TagsTab';
 import WbsTab from '@/components/wbs/WbsTab';
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
@@ -33,7 +35,7 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { cn } from '@/lib/utils';
 import { getWorkspaceDocumentsTitleLabel } from '@/lib/workspace-labels';
 
-type DiagramsTabValue = 'documents' | 'overview' | 'wbs' | 'gantt' | 'staffing' | 'issues';
+type DiagramsTabValue = 'documents' | 'tags' | 'overview' | 'wbs' | 'gantt' | 'staffing' | 'issues';
 
 interface DiagramsTabRenderContext {
   teamId: string;
@@ -96,7 +98,7 @@ export default function DiagramsPage() {
           hash: 'guide-document-hub',
         })
       : ROUTES.GUIDE_ENTRY({
-          source: activeTab,
+          source: activeTab === 'tags' ? 'documents' : activeTab,
           teamId: teamId!,
           projectId: projectId!,
           hash: 'guide-project-hub',
@@ -119,39 +121,63 @@ export default function DiagramsPage() {
             description: project?.description || t('workspace.projectHub.overviewDescription'),
             metaDetail: t('workspace.projectHub.overviewMeta'),
           }
-        : activeTab === 'wbs'
+        : activeTab === 'tags'
           ? {
               section: 'projects' as const,
               tone: 'projects' as const,
-              eyebrow: t('wbs.tab.title'),
-              description: t('wbs.section.description'),
-              metaDetail: t('workspace.projectHub.wbsMeta'),
+              eyebrow: t('workspace.tags.title'),
+              description: t('workspace.tags.description'),
+              metaDetail: t('workspace.projectHub.tagsMeta'),
             }
-          : activeTab === 'gantt'
+          : activeTab === 'wbs'
             ? {
                 section: 'projects' as const,
                 tone: 'projects' as const,
-                eyebrow: t('gantt.tab.title'),
-                description: t('workspace.projectHub.ganttDescription'),
-                metaDetail: t('workspace.projectHub.ganttMeta'),
+                eyebrow: t('wbs.tab.title'),
+                description: t('wbs.section.description'),
+                metaDetail: t('workspace.projectHub.wbsMeta'),
               }
-            : activeTab === 'staffing'
+            : activeTab === 'gantt'
               ? {
                   section: 'projects' as const,
                   tone: 'projects' as const,
-                  eyebrow: t('staffing.tab.title'),
-                  description: t('staffing.section.description'),
-                  metaDetail: t('workspace.projectHub.staffingMeta'),
+                  eyebrow: t('gantt.tab.title'),
+                  description: t('workspace.projectHub.ganttDescription'),
+                  metaDetail: t('workspace.projectHub.ganttMeta'),
                 }
-              : {
-                  section: 'projects' as const,
-                  tone: 'projects' as const,
-                  eyebrow: t('issues.tab.title'),
-                  description: t('issues.section.description'),
-                  metaDetail: t('workspace.projectHub.issuesMeta'),
-                };
+              : activeTab === 'staffing'
+                ? {
+                    section: 'projects' as const,
+                    tone: 'projects' as const,
+                    eyebrow: t('staffing.tab.title'),
+                    description: t('staffing.section.description'),
+                    metaDetail: t('workspace.projectHub.staffingMeta'),
+                  }
+                : {
+                    section: 'projects' as const,
+                    tone: 'projects' as const,
+                    eyebrow: t('issues.tab.title'),
+                    description: t('issues.section.description'),
+                    metaDetail: t('workspace.projectHub.issuesMeta'),
+                  };
 
   const tabs: DiagramsTabConfig[] = [
+    {
+      value: 'overview',
+      label: t('businessOverview.tab.title'),
+      icon: ClipboardList,
+      renderContent: ({
+        teamId: currentTeamId,
+        projectId: currentProjectId,
+        canEdit: currentCanEdit,
+      }) => (
+        <BusinessOverviewTab
+          teamId={currentTeamId}
+          projectId={currentProjectId}
+          canEdit={currentCanEdit}
+        />
+      ),
+    },
     {
       value: 'documents',
       label: t('businessOverview.documentsTab'),
@@ -175,19 +201,15 @@ export default function DiagramsPage() {
       ),
     },
     {
-      value: 'overview',
-      label: t('businessOverview.tab.title'),
-      icon: ClipboardList,
+      value: 'tags',
+      label: t('workspace.tags.title'),
+      icon: Hash,
       renderContent: ({
         teamId: currentTeamId,
         projectId: currentProjectId,
         canEdit: currentCanEdit,
       }) => (
-        <BusinessOverviewTab
-          teamId={currentTeamId}
-          projectId={currentProjectId}
-          canEdit={currentCanEdit}
-        />
+        <TagsTab teamId={currentTeamId} projectId={currentProjectId} canEdit={currentCanEdit} />
       ),
     },
     {

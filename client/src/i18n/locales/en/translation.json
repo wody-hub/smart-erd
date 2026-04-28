@@ -295,9 +295,36 @@
       "description": "Manage this project's documents and jump straight into editing.",
       "empty": "No documents in this project yet. Create your first ERD document.",
       "documentCount": "{{count}} documents",
-      "typeScopeHint": "ERD and Markdown documents can coexist in this hub.",
+      "typeScopeHint": "ERD, markdown, and screen-spec documents can coexist in this hub.",
       "multiTypeHint": "Manage ERD and Markdown documents together here. Creation asks for the right type-specific setup up front.",
       "dictionaryContextHint": "Pick the dictionary context to attach before creating a new document."
+    },
+    "tags": {
+      "title": "Tags",
+      "description": "Browse project documents through tag clusters instead of the full hub list.",
+      "documentCount": "{{count}} doc(s)",
+      "documentsTitle": "#{{tag}} documents",
+      "documentsFallbackTitle": "Tagged documents",
+      "documentsDescription": "Review the documents connected to the selected tag.",
+      "linkedWbsCount": "{{count}} linked WBS item(s)",
+      "selectPrompt": {
+        "title": "Choose a tag",
+        "description": "Select a tag on the left to inspect its connected documents."
+      },
+      "empty": {
+        "title": "No tags yet",
+        "description": "Tag data will appear here once tagged documents are available in this project."
+      },
+      "noDocuments": {
+        "title": "No documents for this tag",
+        "description": "This tag exists, but there are no linked project documents to show yet."
+      },
+      "status": {
+        "loadFailedTitle": "We couldn't load tags",
+        "loadFailedDescription": "Try again after the project tag index finishes syncing.",
+        "documentsLoadFailedTitle": "We couldn't load tagged documents",
+        "documentsLoadFailedDescription": "Try again after the document-tag lookup finishes syncing."
+      }
     },
     "projects": {
       "description": "Pick a project to enter its document workspace. Keep dictionary, members, and settings as team-level utilities.",
@@ -308,6 +335,7 @@
     "projectHub": {
       "overviewDescription": "Review the project's core context and align the next execution window.",
       "overviewMeta": "Business overview baseline",
+      "tagsMeta": "Tag-driven document index",
       "wbsMeta": "WBS work structure",
       "ganttDescription": "Review WBS schedules and milestones on a shared timeline, then adjust the plan with confidence.",
       "ganttMeta": "Timeline planning mode",
@@ -800,6 +828,41 @@
       "title": "WBS Items",
       "description": "Manage project work items in a hierarchy with schedule, progress, and milestone mapping."
     },
+    "details": {
+      "title": "WBS Context",
+      "description": "Select a WBS item to review its linked project documents.",
+      "level": "Level {{level}}",
+      "linkedDocuments": "Linked documents",
+      "linkedDocumentsHint": "Keep the row compact and move document context into this side panel.",
+      "linkAction": "Link document",
+      "linkedAt": "Linked on {{date}}",
+      "openDocumentsHub": "Open documents hub",
+      "empty": {
+        "title": "No WBS item selected",
+        "description": "Choose a row from the WBS tree to inspect its document context."
+      },
+      "noLinkedDocuments": {
+        "title": "No linked documents yet",
+        "description": "This WBS item does not have any connected project documents."
+      },
+      "status": {
+        "loadFailedTitle": "We couldn't load linked documents",
+        "loadFailedDescription": "Try again after the WBS document index finishes syncing."
+      },
+      "linkDialog": {
+        "title": "Link project document",
+        "description": "Choose an existing project document to connect to the selected WBS item.",
+        "placeholder": "Select a project document",
+        "confirm": "Link document",
+        "noSummary": "No summary available for this document yet."
+      },
+      "toast": {
+        "linked": "Document linked",
+        "linkFailed": "Failed to link document",
+        "unlinked": "Document unlinked",
+        "unlinkFailed": "Failed to unlink document"
+      }
+    },
     "workspace": {
       "title": "WBS workspace",
       "description": "Expand the work structure, assign owners, and append new items without leaving the project context.",
@@ -808,6 +871,19 @@
     },
     "action": {
       "create": "Add WBS item"
+    },
+    "move": {
+      "title": "Move WBS item",
+      "description": "Choose a new location for \"{{name}}\".",
+      "descriptionFallback": "Choose a new location for this item.",
+      "parent": "New parent item",
+      "parentPlaceholder": "Select the new parent item",
+      "position": "Position within the level",
+      "positionPlaceholder": "Select a new position",
+      "positionStart": "Move to the top",
+      "positionAfter": "Move after \"{{name}}\"",
+      "positionEnd": "Move to the bottom",
+      "submit": "Move"
     },
     "dnd": {
       "hint": "Drag with the handle to reorder. Move left/right while dragging to change hierarchy level."
@@ -877,7 +953,7 @@
       "loadFailed": "Failed to load WBS items",
       "reorderFailed": "Failed to reorder WBS items",
       "reordered": "WBS order updated",
-      "depthLimitExceeded": "Cannot move item beyond depth level 3",
+      "depthLimitExceeded": "Cannot move the item deeper than the allowed maximum depth",
       "invalidMove": "Cannot move an item into its own child"
     },
     "empty": {
@@ -895,7 +971,12 @@
       "collapse": "Collapse WBS item {{name}}",
       "drag": "Drag WBS item {{name}}",
       "editName": "Edit name of WBS item {{name}}",
-      "editProgress": "Edit progress of WBS item {{name}}"
+      "editAssignee": "Edit assignee of WBS item {{name}}",
+      "editPeriod": "Edit period of WBS item {{name}}",
+      "editProgress": "Edit progress of WBS item {{name}}",
+      "editEstimatedMm": "Edit estimated M/M of WBS item {{name}}",
+      "editMilestone": "Edit milestone of WBS item {{name}}",
+      "move": "Move WBS item {{name}}"
     }
   },
   "gantt": {
@@ -913,7 +994,9 @@
       "day": "Day",
       "week": "Week",
       "month": "Month",
-      "today": "Today"
+      "today": "Today",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all"
     },
     "empty": {
       "title": "No Gantt data to display",
