@@ -21,6 +21,7 @@ import com.smarterd.domain.dictionary.service.DictionarySetService;
 import com.smarterd.domain.markdown.service.MarkdownDocumentDescriptorService;
 import com.smarterd.domain.markdown.service.MarkdownTemplateDescriptor;
 import com.smarterd.domain.markdown.service.MarkdownTemplateService;
+import com.smarterd.domain.pm.documenthub.service.ProjectDocumentHubService;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.project.service.ProjectService;
 import com.smarterd.domain.team.entity.Team;
@@ -75,6 +76,9 @@ class DiagramServiceTest {
 
     @Mock
     private MarkdownDocumentDescriptorService markdownDocumentDescriptorService;
+
+    @Mock
+    private ProjectDocumentHubService projectDocumentHubService;
 
     @InjectMocks
     private DiagramService diagramService;
