@@ -12,6 +12,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smarterd.domain.pm.wbs.service.WbsDocumentService;
+import com.smarterd.domain.pm.wbs.service.WbsDocumentService.DocumentTagResult;
+import com.smarterd.domain.pm.wbs.service.WbsDocumentService.LinkedDocumentResult;
 import com.smarterd.domain.pm.wbs.service.WbsService;
 import com.smarterd.domain.pm.wbs.service.WbsService.WbsItemResult;
 import java.math.BigDecimal;
@@ -41,12 +44,15 @@ class WbsControllerMvcTest {
     @Mock
     private WbsService wbsService;
 
+    @Mock
+    private WbsDocumentService wbsDocumentService;
+
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
-        final var controller = new WbsController(wbsService);
+        final var controller = new WbsController(wbsService, wbsDocumentService);
         this.mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .setCustomArgumentResolvers(new TestJwtArgumentResolver())
             .build();
@@ -142,6 +148,72 @@ class WbsControllerMvcTest {
         );
     }
 
+    @Test
+    void getLinkedDocuments_returnsList() throws Exception {
+        when(wbsDocumentService.getLinkedDocuments("tester", 1L, 10L, 100L)).thenReturn(List.of(sampleDocument(42L)));
+
+        mockMvc
+            .perform(
+                get("/api/teams/1/projects/10/wbs/100/documents").with((request) -> {
+                    request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                    return request;
+                })
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(42))
+            .andExpect(jsonPath("$[0].tags[0]").value("spec"));
+    }
+
+    @Test
+    void linkDocument_returnsDocument() throws Exception {
+        when(wbsDocumentService.linkDocument("tester", 1L, 10L, 100L, 42L)).thenReturn(sampleDocument(42L));
+
+        mockMvc
+            .perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                    "/api/teams/1/projects/10/wbs/100/documents/42"
+                ).with((request) -> {
+                    request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                    return request;
+                })
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value("API Spec"));
+    }
+
+    @Test
+    void getDocumentTags_returnsTagCounts() throws Exception {
+        when(wbsDocumentService.getDocumentTags("tester", 1L, 10L)).thenReturn(List.of(new DocumentTagResult("spec", 2)));
+
+        mockMvc
+            .perform(
+                get("/api/teams/1/projects/10/wbs/document-tags").with((request) -> {
+                    request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                    return request;
+                })
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].tag").value("spec"))
+            .andExpect(jsonPath("$[0].documentCount").value(2));
+    }
+
+    @Test
+    void getDocumentsByTag_returnsDocuments() throws Exception {
+        when(wbsDocumentService.getDocumentsByTag("tester", 1L, 10L, "spec")).thenReturn(List.of(sampleDocument(42L)));
+
+        mockMvc
+            .perform(
+                get("/api/teams/1/projects/10/wbs/document-tags/documents")
+                    .queryParam("tag", "spec")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(42));
+    }
+
     private WbsItemResult sampleResult(Long id, Long parentId, String name, int depth, int sortOrder) {
         return new WbsItemResult(
             id,
@@ -159,6 +231,21 @@ class WbsControllerMvcTest {
             null,
             Instant.parse("2026-04-14T00:00:00Z"),
             Instant.parse("2026-04-14T00:00:00Z")
+        );
+    }
+
+    private LinkedDocumentResult sampleDocument(Long id) {
+        return new LinkedDocumentResult(
+            id,
+            "API Spec",
+            "markdown",
+            "technical-spec",
+            "Technical Spec",
+            "Describe the goal and scope.",
+            List.of("spec"),
+            Instant.parse("2026-04-28T01:00:00Z"),
+            Instant.parse("2026-04-28T00:00:00Z"),
+            Instant.parse("2026-04-28T01:30:00Z")
         );
     }
 

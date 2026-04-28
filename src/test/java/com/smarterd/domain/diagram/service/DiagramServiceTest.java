@@ -324,7 +324,7 @@ class DiagramServiceTest {
             "---\ntemplate: technical-spec\n---\n# API Doc"
         );
         when(markdownDocumentDescriptorService.describe(org.mockito.ArgumentMatchers.anyString())).thenReturn(
-            new MarkdownTemplateDescriptor("technical-spec", "기술 설계 문서", "API Doc")
+            new MarkdownTemplateDescriptor("technical-spec", "기술 설계 문서", "API Doc", java.util.List.of("spec"))
         );
 
         final var result = diagramService.createDiagram(

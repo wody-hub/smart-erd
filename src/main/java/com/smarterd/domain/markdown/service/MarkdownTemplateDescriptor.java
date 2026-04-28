@@ -1,5 +1,6 @@
 package com.smarterd.domain.markdown.service;
 
+import java.util.List;
 import org.springframework.lang.Nullable;
 
 /**
@@ -8,9 +9,11 @@ import org.springframework.lang.Nullable;
  * @param templateKey 템플릿 키
  * @param templateLabel 템플릿 표시 이름
  * @param summaryText 본문 요약
+ * @param tags 문서 태그
  */
 public record MarkdownTemplateDescriptor(
     @Nullable String templateKey,
     @Nullable String templateLabel,
-    @Nullable String summaryText
+    @Nullable String summaryText,
+    List<String> tags
 ) {}
