@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import org.springframework.lang.Nullable;
 
 /**
@@ -38,6 +39,10 @@ public record WbsItemResponse(
 
     @Nullable @Schema(description = "연결된 마일스톤 이름", example = "요구사항 확정") String milestoneName,
 
+    @Schema(description = "선행 WBS 항목 ID 목록", example = "[1, 2]") List<Long> predecessorIds,
+
+    @Schema(description = "후행 WBS 항목 ID 목록", example = "[3, 4]") List<Long> successorIds,
+
     @Schema(description = "생성 시각 (UTC, ISO-8601)") Instant createdAt,
 
     @Schema(description = "수정 시각 (UTC, ISO-8601)") Instant updatedAt
@@ -57,6 +62,8 @@ public record WbsItemResponse(
             result.estimatedMm(),
             result.milestoneId(),
             result.milestoneName(),
+            result.predecessorIds(),
+            result.successorIds(),
             result.createdAt(),
             result.updatedAt()
         );

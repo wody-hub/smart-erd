@@ -24,3 +24,29 @@ export function collectExpandableTaskIds(tasks: GanttTask[]): Array<string | num
     .filter((task) => task.kind !== 'milestone' && parentIds.has(String(task.id)))
     .map((task) => task.id);
 }
+
+/**
+ * Applies deterministic open/closed state to expandable Gantt branches.
+ *
+ * Rendering all branch states in one React update avoids imperative per-branch
+ * toggles that can leave the chart in an intermediate layout.
+ */
+export function applyExpandedTaskState(
+  tasks: GanttTask[],
+  expandedTaskIds: ReadonlySet<string>,
+): GanttTask[] {
+  const expandableTaskIds = new Set(
+    collectExpandableTaskIds(tasks).map((taskId) => String(taskId)),
+  );
+
+  return tasks.map((task) => {
+    if (!expandableTaskIds.has(String(task.id))) {
+      return task;
+    }
+
+    return {
+      ...task,
+      open: expandedTaskIds.has(String(task.id)),
+    };
+  });
+}

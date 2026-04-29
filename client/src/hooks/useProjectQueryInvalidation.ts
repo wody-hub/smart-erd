@@ -29,6 +29,9 @@ export function useProjectQueryInvalidation(teamId: string, projectId: string) {
     } = {}) => {
       if (includeWbs) {
         queryClient.invalidateQueries({ queryKey: queryKeys.wbs.all(teamId, projectId) });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.wbs.dependencies(teamId, projectId),
+        });
       }
       if (includeMilestones) {
         queryClient.invalidateQueries({

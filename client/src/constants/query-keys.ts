@@ -87,6 +87,9 @@ export const queryKeys = {
     /** 프로젝트 WBS 전체 목록 */
     all: (teamId: string, projectId: string) =>
       ['teams', teamId, 'projects', projectId, 'wbs'] as const,
+    /** 프로젝트 WBS dependency 목록 */
+    dependencies: (teamId: string, projectId: string) =>
+      ['teams', teamId, 'projects', projectId, 'wbs', 'dependencies'] as const,
     /** WBS별 연결 문서 목록 */
     linkedDocuments: (teamId: string, projectId: string, wbsId: number | null) =>
       ['teams', teamId, 'projects', projectId, 'wbs', wbsId, 'linked-documents'] as const,

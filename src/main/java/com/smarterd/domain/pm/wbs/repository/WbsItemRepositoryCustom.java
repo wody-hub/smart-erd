@@ -43,11 +43,12 @@ public interface WbsItemRepositoryCustom {
     /**
      * 마일스톤별 WBS 진척률 집계 결과.
      *
-     * @param count    연결된 WBS 항목 수
-     * @param averageRate 평균 진척률 (반올림), 항목이 없으면 0
+     * @param count          연결된 WBS 항목 수
+     * @param completedCount 완료된 WBS 항목 수
+     * @param averageRate    평균 진척률 (반올림), 항목이 없으면 0
      */
-    record MilestoneProgressAggregate(long count, int averageRate) {
+    record MilestoneProgressAggregate(long count, long completedCount, int averageRate) {
         /** 항목이 없는 경우의 기본 집계. */
-        public static final MilestoneProgressAggregate EMPTY = new MilestoneProgressAggregate(0, 0);
+        public static final MilestoneProgressAggregate EMPTY = new MilestoneProgressAggregate(0, 0, 0);
     }
 }

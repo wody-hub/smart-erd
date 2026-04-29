@@ -11,8 +11,10 @@ import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.pm.common.ProjectContextLoader;
 import com.smarterd.domain.pm.common.ProjectContextLoader.ProjectContext;
 import com.smarterd.domain.pm.milestone.entity.Milestone;
+import com.smarterd.domain.pm.milestone.entity.MilestoneType;
 import com.smarterd.domain.pm.milestone.repository.MilestoneRepository;
 import com.smarterd.domain.pm.wbs.entity.WbsItem;
+import com.smarterd.domain.pm.wbs.repository.WbsDependencyRepository;
 import com.smarterd.domain.pm.wbs.repository.WbsItemRepository;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.team.entity.Team;
@@ -39,6 +41,9 @@ class WbsServiceTest {
 
     @Mock
     private MilestoneRepository milestoneRepository;
+
+    @Mock
+    private WbsDependencyRepository wbsDependencyRepository;
 
     @Mock
     private ProjectContextLoader projectContextLoader;
@@ -163,6 +168,7 @@ class WbsServiceTest {
 
         when(projectContextLoader.load("tester", 10L, 20L, false)).thenReturn(new ProjectContext(team, project));
         when(wbsItemRepository.findByProjectWithRelations(project)).thenReturn(List.of(rootA, childB1, rootB));
+        when(wbsDependencyRepository.findByProjectWithRelations(project)).thenReturn(List.of());
 
         final var result = wbsService.getWbsItems("tester", 10L, 20L);
 
@@ -193,6 +199,9 @@ class WbsServiceTest {
             .name(name)
             .targetDate(targetDate)
             .description(null)
+            .type(MilestoneType.DELIVERABLE)
+            .owner(null)
+            .readinessNote(null)
             .sortOrder(sortOrder)
             .build();
         ReflectionTestUtils.setField(milestone, "id", id);

@@ -58,6 +58,70 @@
   font-weight: 500;
 }
 
+.gantt-shell .wx-bar.gantt-task--has-dependency,
+.gantt-shell .wx-row.gantt-task--has-dependency,
+.gantt-shell .wx-grid-row.gantt-task--has-dependency {
+  box-shadow: 0 0 0 1px hsl(var(--foreground-secondary) / 0.55);
+}
+
+.gantt-shell .wx-bar.gantt-task--milestone-linked,
+.gantt-shell .wx-row.gantt-task--milestone-linked,
+.gantt-shell .wx-grid-row.gantt-task--milestone-linked {
+  box-shadow:
+    0 0 0 1px hsl(var(--foreground-secondary) / 0.55),
+    0 0 0 3px hsl(var(--success) / 0.14);
+}
+
+.gantt-shell .wx-bar.gantt-task--selected,
+.gantt-shell .wx-row.gantt-task--selected,
+.gantt-shell .wx-grid-row.gantt-task--selected {
+  box-shadow: 0 0 0 2px hsl(var(--primary));
+}
+
+.gantt-shell .wx-bar.gantt-task--predecessor,
+.gantt-shell .wx-row.gantt-task--predecessor,
+.gantt-shell .wx-grid-row.gantt-task--predecessor {
+  box-shadow: 0 0 0 2px hsl(var(--warning) / 0.78);
+}
+
+.gantt-shell .wx-bar.gantt-task--successor,
+.gantt-shell .wx-row.gantt-task--successor,
+.gantt-shell .wx-grid-row.gantt-task--successor {
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.72);
+}
+
+.gantt-shell .wx-bar.gantt-task--selected-milestone,
+.gantt-shell .wx-row.gantt-task--selected-milestone,
+.gantt-shell .wx-grid-row.gantt-task--selected-milestone {
+  box-shadow: 0 0 0 2px hsl(var(--success));
+}
+
+.gantt-shell .gantt-link--dependency {
+  stroke: hsl(var(--foreground-secondary) / 0.85);
+  stroke-width: 1.8px;
+}
+
+.gantt-shell .gantt-link--milestone {
+  stroke: hsl(var(--success) / 0.78);
+  stroke-dasharray: 5 3;
+  stroke-width: 1.8px;
+}
+
+.gantt-shell .gantt-link--predecessor {
+  stroke: hsl(var(--warning));
+  stroke-width: 2.4px;
+}
+
+.gantt-shell .gantt-link--successor {
+  stroke: hsl(var(--primary));
+  stroke-width: 2.4px;
+}
+
+.gantt-shell .gantt-link--selected-milestone {
+  stroke: hsl(var(--success));
+  stroke-width: 2.4px;
+}
+
 .gantt-legend-marker {
   display: inline-block;
   width: 0.75rem;
@@ -72,4 +136,21 @@
 
 .gantt-legend-marker--delayed {
   background-color: hsl(var(--destructive));
+}
+
+.gantt-legend-line {
+  display: inline-block;
+  width: 1rem;
+  height: 0;
+  border-top-width: 2px;
+  border-top-style: solid;
+}
+
+.gantt-legend-line--dependency {
+  border-top-color: hsl(var(--foreground-secondary));
+}
+
+.gantt-legend-line--milestone {
+  border-top-color: hsl(var(--success));
+  border-top-style: dashed;
 }

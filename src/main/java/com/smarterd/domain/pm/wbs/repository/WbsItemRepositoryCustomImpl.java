@@ -2,6 +2,7 @@ package com.smarterd.domain.pm.wbs.repository;
 
 import static com.smarterd.domain.pm.wbs.entity.QWbsItem.wbsItem;
 
+import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.core.Tuple;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.smarterd.domain.pm.milestone.entity.Milestone;
@@ -58,8 +59,9 @@ public class WbsItemRepositoryCustomImpl implements WbsItemRepositoryCustom {
 
     @Override
     public Map<Long, MilestoneProgressAggregate> aggregateProgressByMilestone(Project project) {
+        final var completedCountExpression = new CaseBuilder().when(wbsItem.progressRate.goe(100)).then(1).otherwise(0).sum();
         final var results = queryFactory
-            .select(wbsItem.milestone.id, wbsItem.count(), wbsItem.progressRate.avg())
+            .select(wbsItem.milestone.id, wbsItem.count(), completedCountExpression, wbsItem.progressRate.avg())
             .from(wbsItem)
             .where(wbsItem.project.eq(project).and(wbsItem.milestone.isNotNull()))
             .groupBy(wbsItem.milestone.id)
@@ -69,11 +71,16 @@ public class WbsItemRepositoryCustomImpl implements WbsItemRepositoryCustom {
         for (final Tuple row : results) {
             final var milestoneId = row.get(wbsItem.milestone.id);
             final var count = row.get(wbsItem.count());
+            final var completedCount = row.get(completedCountExpression);
             final var avg = row.get(wbsItem.progressRate.avg());
             if (milestoneId != null && count != null) {
                 aggregates.put(
                     milestoneId,
-                    new MilestoneProgressAggregate(count, avg == null ? 0 : (int) Math.round(avg))
+                    new MilestoneProgressAggregate(
+                        count,
+                        completedCount == null ? 0 : completedCount.longValue(),
+                        avg == null ? 0 : (int) Math.round(avg)
+                    )
                 );
             }
         }
@@ -82,8 +89,9 @@ public class WbsItemRepositoryCustomImpl implements WbsItemRepositoryCustom {
 
     @Override
     public MilestoneProgressAggregate aggregateProgressByMilestone(Milestone milestone) {
+        final var completedCountExpression = new CaseBuilder().when(wbsItem.progressRate.goe(100)).then(1).otherwise(0).sum();
         final var result = queryFactory
-            .select(wbsItem.count(), wbsItem.progressRate.avg())
+            .select(wbsItem.count(), completedCountExpression, wbsItem.progressRate.avg())
             .from(wbsItem)
             .where(wbsItem.milestone.eq(milestone))
             .fetchOne();
@@ -92,10 +100,15 @@ public class WbsItemRepositoryCustomImpl implements WbsItemRepositoryCustom {
             return MilestoneProgressAggregate.EMPTY;
         }
         final var count = result.get(wbsItem.count());
+        final var completedCount = result.get(completedCountExpression);
         final var avg = result.get(wbsItem.progressRate.avg());
         if (count == null || count == 0L) {
             return MilestoneProgressAggregate.EMPTY;
         }
-        return new MilestoneProgressAggregate(count, avg == null ? 0 : (int) Math.round(avg));
+        return new MilestoneProgressAggregate(
+            count,
+            completedCount == null ? 0 : completedCount.longValue(),
+            avg == null ? 0 : (int) Math.round(avg)
+        );
     }
 }

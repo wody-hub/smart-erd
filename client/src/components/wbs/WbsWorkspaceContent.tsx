@@ -780,6 +780,8 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
                 canEdit={canEdit}
                 locale={locale}
                 item={selectedItem}
+                allItems={allItems}
+                milestones={milestonesQuery.data ?? []}
                 allDocuments={diagramsQuery.data ?? []}
               />
               <MilestonePanel teamId={teamId} projectId={projectId} canEdit={canEdit} />

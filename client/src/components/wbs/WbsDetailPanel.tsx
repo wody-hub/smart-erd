@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Clock3, ExternalLink, Link2, MessageSquare, Send, Workflow } from 'lucide-react';
+import { Clock3, ExternalLink, Link2, MessageSquare, Route, Send, Workflow } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -12,10 +12,22 @@ import {
   linkWbsDocument,
   unlinkWbsDocument,
 } from '@/api/wbsApi';
+import {
+  createWbsDependency,
+  deleteWbsDependency,
+  fetchWbsDependencies,
+} from '@/api/wbsDependencyApi';
 import { fetchSharedTodoSummaries } from '@/api/projectTodoApi';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import Spinner from '@/components/ui/spinner';
@@ -24,14 +36,16 @@ import DocumentHubRow from '@/components/workspace/DocumentHubRow';
 import { queryKeys } from '@/constants/query-keys';
 import { ROUTES } from '@/constants/routes';
 import { getErrorMessage } from '@/lib/api-error';
+import type { Milestone } from '@/types/milestone';
 import type { SharedTodoSummary } from '@/types/project-todo';
-import type { WbsActivity, WbsActivityEventType } from '@/types/wbs';
 import type { DiagramSummary } from '@/types/diagram';
 import type { WorkspaceDocumentType } from '@/types/workspace';
-import type { WbsItem } from '@/types/wbs';
+import type { WbsActivity, WbsActivityEventType, WbsItem } from '@/types/wbs';
+import { buildWbsDependencySummary } from './wbs-dependency-summary';
 import WbsDocumentLinkDialog from './WbsDocumentLinkDialog';
 
 const WBS_COMMENT_MAX_LENGTH = 4000;
+const NO_DEPENDENCY_TARGET = '__none__';
 
 interface WbsDetailPanelProps {
   teamId: string;
@@ -39,6 +53,8 @@ interface WbsDetailPanelProps {
   canEdit: boolean;
   locale: string;
   item: WbsItem | null;
+  allItems: WbsItem[];
+  milestones: Milestone[];
   allDocuments: DiagramSummary[];
 }
 
@@ -82,6 +98,8 @@ export default function WbsDetailPanel({
   canEdit,
   locale,
   item,
+  allItems,
+  milestones,
   allDocuments,
 }: WbsDetailPanelProps) {
   const navigate = useNavigate();
@@ -91,6 +109,8 @@ export default function WbsDetailPanel({
   const [activeTab, setActiveTab] = useState('documents');
   const [commentDraft, setCommentDraft] = useState('');
   const [activityFilter, setActivityFilter] = useState<'all' | 'document' | 'status'>('all');
+  const [selectedPredecessorId, setSelectedPredecessorId] = useState(NO_DEPENDENCY_TARGET);
+  const [selectedSuccessorId, setSelectedSuccessorId] = useState(NO_DEPENDENCY_TARGET);
 
   const linkedDocumentsQuery = useQuery({
     queryKey: queryKeys.wbs.linkedDocuments(teamId, projectId, item?.id ?? null),
@@ -101,6 +121,12 @@ export default function WbsDetailPanel({
   const commentsQuery = useQuery({
     queryKey: queryKeys.wbs.comments(teamId, projectId, item?.id ?? null),
     queryFn: () => fetchWbsComments(teamId, projectId, item!.id),
+    enabled: item != null,
+  });
+
+  const dependenciesQuery = useQuery({
+    queryKey: queryKeys.wbs.dependencies(teamId, projectId),
+    queryFn: () => fetchWbsDependencies(teamId, projectId),
     enabled: item != null,
   });
 
@@ -135,6 +161,63 @@ export default function WbsDetailPanel({
       (activity) => getActivityCategory(activity.eventType) === activityFilter,
     );
   }, [activitiesQuery.data, activityFilter]);
+
+  const itemNameById = useMemo(
+    () => new Map(allItems.map((entry) => [entry.id, entry.name])),
+    [allItems],
+  );
+
+  const predecessorDependencies = useMemo(
+    () =>
+      (dependenciesQuery.data ?? []).filter(
+        (dependency) => dependency.successorWbsItemId === item?.id,
+      ),
+    [dependenciesQuery.data, item?.id],
+  );
+
+  const successorDependencies = useMemo(
+    () =>
+      (dependenciesQuery.data ?? []).filter(
+        (dependency) => dependency.predecessorWbsItemId === item?.id,
+      ),
+    [dependenciesQuery.data, item?.id],
+  );
+
+  const dependencySummary = useMemo(() => {
+    if (!item) {
+      return null;
+    }
+    return buildWbsDependencySummary({
+      item,
+      allItems,
+      dependencies: dependenciesQuery.data ?? [],
+      milestones,
+    });
+  }, [allItems, dependenciesQuery.data, item, milestones]);
+
+  const predecessorCandidateItems = useMemo(() => {
+    if (!item) {
+      return [];
+    }
+    const blockedIds = new Set(
+      predecessorDependencies.map((dependency) => dependency.predecessorWbsItemId),
+    );
+    return allItems.filter(
+      (candidate) => candidate.id !== item.id && !blockedIds.has(candidate.id),
+    );
+  }, [allItems, item, predecessorDependencies]);
+
+  const successorCandidateItems = useMemo(() => {
+    if (!item) {
+      return [];
+    }
+    const blockedIds = new Set(
+      successorDependencies.map((dependency) => dependency.successorWbsItemId),
+    );
+    return allItems.filter(
+      (candidate) => candidate.id !== item.id && !blockedIds.has(candidate.id),
+    );
+  }, [allItems, item, successorDependencies]);
 
   const linkMutation = useMutation({
     mutationFn: async (documentId: number) => {
@@ -197,6 +280,43 @@ export default function WbsDetailPanel({
       toast.error(getErrorMessage(error, t('wbs.details.toast.commentCreateFailed'))),
   });
 
+  const createDependencyMutation = useMutation({
+    mutationFn: async (payload: { predecessorWbsItemId: number; successorWbsItemId: number }) =>
+      createWbsDependency(teamId, projectId, {
+        ...payload,
+        dependencyType: 'FS',
+      }),
+    onSuccess: () => {
+      setSelectedPredecessorId(NO_DEPENDENCY_TARGET);
+      setSelectedSuccessorId(NO_DEPENDENCY_TARGET);
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.wbs.dependencies(teamId, projectId) }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.wbs.activities(teamId, projectId, item?.id ?? null),
+        }),
+      ]);
+      toast.success(t('wbs.details.toast.dependencyCreated'));
+    },
+    onError: (error) =>
+      toast.error(getErrorMessage(error, t('wbs.details.toast.dependencyCreateFailed'))),
+  });
+
+  const deleteDependencyMutation = useMutation({
+    mutationFn: async (dependencyId: number) =>
+      deleteWbsDependency(teamId, projectId, dependencyId),
+    onSuccess: () => {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.wbs.dependencies(teamId, projectId) }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.wbs.activities(teamId, projectId, item?.id ?? null),
+        }),
+      ]);
+      toast.success(t('wbs.details.toast.dependencyDeleted'));
+    },
+    onError: (error) =>
+      toast.error(getErrorMessage(error, t('wbs.details.toast.dependencyDeleteFailed'))),
+  });
+
   const activityCounts = useMemo(() => {
     const activities = activitiesQuery.data ?? [];
     return {
@@ -214,6 +334,12 @@ export default function WbsDetailPanel({
   const sharedTodoCount = sharedTodosQuery.data?.length ?? 0;
   const isCommentSubmitDisabled =
     createCommentMutation.isPending || commentDraft.trim().length === 0;
+  const isDependencyBusy = createDependencyMutation.isPending || deleteDependencyMutation.isPending;
+
+  useEffect(() => {
+    setSelectedPredecessorId(NO_DEPENDENCY_TARGET);
+    setSelectedSuccessorId(NO_DEPENDENCY_TARGET);
+  }, [item?.id]);
 
   if (!item) {
     return (
@@ -232,6 +358,12 @@ export default function WbsDetailPanel({
       </Card>
     );
   }
+
+  const nextMilestoneLabel = dependencySummary?.nextMilestone
+    ? `${dependencySummary.nextMilestone.name} · ${new Date(
+        dependencySummary.nextMilestone.targetDate,
+      ).toLocaleDateString(locale)}`
+    : t('wbs.details.dependencies.summary.noMilestone');
 
   return (
     <>
@@ -259,6 +391,264 @@ export default function WbsDetailPanel({
         </CardHeader>
 
         <CardContent className="space-y-4">
+          <section className="space-y-4 rounded-xl border border-border/80 bg-secondary/10 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  {t('wbs.details.dependencies.title')}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {t('wbs.details.dependencies.description')}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={dependencySummary?.isInCurrentWave ? 'default' : 'secondary'}>
+                  {dependencySummary?.isInCurrentWave
+                    ? t('wbs.details.dependencies.summary.currentWave')
+                    : t('wbs.details.dependencies.summary.futureWave')}
+                </Badge>
+                <Badge variant="outline">
+                  {t('wbs.details.dependencies.summary.nextMilestoneLabel')}: {nextMilestoneLabel}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-lg border border-border/70 bg-background/80 p-3">
+                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                  {t('wbs.details.dependencies.summary.predecessorCount')}
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">
+                  {dependencySummary?.predecessorCount ?? 0}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/70 bg-background/80 p-3">
+                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                  {t('wbs.details.dependencies.summary.successorCount')}
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">
+                  {dependencySummary?.successorCount ?? 0}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/70 bg-background/80 p-3">
+                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                  {t('wbs.details.dependencies.summary.chainTitle')}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-foreground">
+                  {dependencySummary?.blockingChain.length
+                    ? dependencySummary.blockingChain.map((entry) => entry.name).join(' → ')
+                    : t('wbs.details.dependencies.summary.noChain')}
+                </p>
+              </div>
+            </div>
+
+            {dependenciesQuery.isLoading ? (
+              <Spinner text={t('common.loading')} />
+            ) : dependenciesQuery.isError ? (
+              <WorkspaceEmptyState
+                icon={<Route className="h-10 w-10" />}
+                title={t('wbs.details.dependencies.status.loadFailedTitle')}
+                description={t('wbs.details.dependencies.status.loadFailedDescription')}
+                tone="error"
+                action={
+                  <Button variant="outline" onClick={() => void dependenciesQuery.refetch()}>
+                    {t('workspace.status.retry')}
+                  </Button>
+                }
+              />
+            ) : (
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div className="space-y-3 rounded-lg border border-border/70 bg-background/80 p-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {t('wbs.details.dependencies.predecessors.title')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('wbs.details.dependencies.predecessors.description')}
+                    </p>
+                  </div>
+
+                  {canEdit ? (
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Select
+                        value={
+                          selectedPredecessorId === NO_DEPENDENCY_TARGET
+                            ? undefined
+                            : selectedPredecessorId
+                        }
+                        onValueChange={setSelectedPredecessorId}
+                        disabled={isDependencyBusy || predecessorCandidateItems.length === 0}
+                      >
+                        <SelectTrigger className="sm:flex-1">
+                          <SelectValue
+                            placeholder={t('wbs.details.dependencies.predecessors.placeholder')}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {predecessorCandidateItems.map((candidate) => (
+                            <SelectItem key={candidate.id} value={String(candidate.id)}>
+                              {candidate.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={
+                          isDependencyBusy || selectedPredecessorId === NO_DEPENDENCY_TARGET
+                        }
+                        onClick={() => {
+                          if (selectedPredecessorId === NO_DEPENDENCY_TARGET) {
+                            return;
+                          }
+                          createDependencyMutation.mutate({
+                            predecessorWbsItemId: Number(selectedPredecessorId),
+                            successorWbsItemId: item.id,
+                          });
+                        }}
+                      >
+                        {t('wbs.details.dependencies.addAction')}
+                      </Button>
+                    </div>
+                  ) : null}
+
+                  {predecessorDependencies.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t('wbs.details.dependencies.predecessors.empty')}
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {predecessorDependencies.map((dependency) => (
+                        <div
+                          key={dependency.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-foreground">
+                              {dependency.predecessorWbsItemName ??
+                                itemNameById.get(dependency.predecessorWbsItemId) ??
+                                `#${dependency.predecessorWbsItemId}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {t('wbs.details.dependencies.type', {
+                                type: dependency.dependencyType,
+                              })}
+                            </p>
+                          </div>
+                          {canEdit ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={isDependencyBusy}
+                              onClick={() => deleteDependencyMutation.mutate(dependency.id)}
+                            >
+                              {t('wbs.details.dependencies.removeAction')}
+                            </Button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3 rounded-lg border border-border/70 bg-background/80 p-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {t('wbs.details.dependencies.successors.title')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('wbs.details.dependencies.successors.description')}
+                    </p>
+                  </div>
+
+                  {canEdit ? (
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Select
+                        value={
+                          selectedSuccessorId === NO_DEPENDENCY_TARGET
+                            ? undefined
+                            : selectedSuccessorId
+                        }
+                        onValueChange={setSelectedSuccessorId}
+                        disabled={isDependencyBusy || successorCandidateItems.length === 0}
+                      >
+                        <SelectTrigger className="sm:flex-1">
+                          <SelectValue
+                            placeholder={t('wbs.details.dependencies.successors.placeholder')}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {successorCandidateItems.map((candidate) => (
+                            <SelectItem key={candidate.id} value={String(candidate.id)}>
+                              {candidate.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={isDependencyBusy || selectedSuccessorId === NO_DEPENDENCY_TARGET}
+                        onClick={() => {
+                          if (selectedSuccessorId === NO_DEPENDENCY_TARGET) {
+                            return;
+                          }
+                          createDependencyMutation.mutate({
+                            predecessorWbsItemId: item.id,
+                            successorWbsItemId: Number(selectedSuccessorId),
+                          });
+                        }}
+                      >
+                        {t('wbs.details.dependencies.addAction')}
+                      </Button>
+                    </div>
+                  ) : null}
+
+                  {successorDependencies.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t('wbs.details.dependencies.successors.empty')}
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {successorDependencies.map((dependency) => (
+                        <div
+                          key={dependency.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-foreground">
+                              {dependency.successorWbsItemName ??
+                                itemNameById.get(dependency.successorWbsItemId) ??
+                                `#${dependency.successorWbsItemId}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {t('wbs.details.dependencies.type', {
+                                type: dependency.dependencyType,
+                              })}
+                            </p>
+                          </div>
+                          {canEdit ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={isDependencyBusy}
+                              onClick={() => deleteDependencyMutation.mutate(dependency.id)}
+                            >
+                              {t('wbs.details.dependencies.removeAction')}
+                            </Button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
+
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="documents">

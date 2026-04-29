@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smarterd.domain.pm.milestone.entity.MilestoneType;
 import com.smarterd.domain.pm.milestone.service.MilestoneService;
 import com.smarterd.domain.pm.milestone.service.MilestoneService.MilestoneResult;
 import java.time.Instant;
@@ -64,7 +65,9 @@ class MilestoneControllerMvcTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].id").value(100))
+            .andExpect(jsonPath("$[0].type").value("APPROVAL"))
             .andExpect(jsonPath("$[0].achievementRate").value(75))
+            .andExpect(jsonPath("$[0].linkedWbsCompletedCount").value(1))
             .andExpect(jsonPath("$[0].isDelayed").value(true));
     }
 
@@ -77,7 +80,10 @@ class MilestoneControllerMvcTest {
                 eq(10L),
                 eq("요구사항 확정"),
                 eq(LocalDate.parse("2026-05-31")),
-                eq("분석 산출물 완료")
+                eq("분석 산출물 완료"),
+                eq(MilestoneType.APPROVAL),
+                eq(7L),
+                eq("승인 전 검토자료 배포 필요")
             )
         ).thenReturn(sampleResult(101L, "요구사항 확정", 0, false));
 
@@ -97,14 +103,23 @@ class MilestoneControllerMvcTest {
                                 "targetDate",
                                 "2026-05-31",
                                 "description",
-                                "분석 산출물 완료"
+                                "분석 산출물 완료",
+                                "type",
+                                "APPROVAL",
+                                "ownerUserId",
+                                7,
+                                "readinessNote",
+                                "승인 전 검토자료 배포 필요"
                             )
                         )
                     )
             )
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").value(101))
-            .andExpect(jsonPath("$.name").value("요구사항 확정"));
+            .andExpect(jsonPath("$.name").value("요구사항 확정"))
+            .andExpect(jsonPath("$.type").value("APPROVAL"))
+            .andExpect(jsonPath("$.ownerUserId").value(7))
+            .andExpect(jsonPath("$.readinessNote").value("승인 전 검토자료 배포 필요"));
     }
 
     private MilestoneResult sampleResult(Long id, String name, int achievementRate, boolean isDelayed) {
@@ -114,9 +129,17 @@ class MilestoneControllerMvcTest {
             name,
             LocalDate.parse("2026-05-31"),
             null,
+            MilestoneType.APPROVAL,
+            7L,
+            "김개발",
+            "승인 전 검토자료 배포 필요",
             0,
-            0,
+            2,
+            1,
             achievementRate,
+            0,
+            0,
+            2,
             isDelayed,
             Instant.parse("2026-04-14T00:00:00Z"),
             Instant.parse("2026-04-14T00:00:00Z")

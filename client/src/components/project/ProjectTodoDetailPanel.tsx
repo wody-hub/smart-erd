@@ -24,6 +24,7 @@ import type {
   TodoDocument,
 } from '@/types/project-todo';
 import type { WbsItem } from '@/types/wbs';
+import WbsHierarchySelect from './WbsHierarchySelect';
 import type { TodoEditorValues } from './project-todo-editor';
 
 function toDocumentType(pluginId: string): 'erd' | 'markdown' | 'screen-spec' {
@@ -107,7 +108,12 @@ export default function ProjectTodoDetailPanel({
               <CardDescription>{t('myTasks.detail.description')}</CardDescription>
             </div>
             {canManagePersonalTodos ? (
-              <Button variant="outline" size="sm" onClick={() => onDelete(selectedTodo)} disabled={isMutating}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onDelete(selectedTodo)}
+                disabled={isMutating}
+              >
                 <Trash2 className="mr-2 h-4 w-4" />
                 {t('common.button.delete')}
               </Button>
@@ -115,7 +121,9 @@ export default function ProjectTodoDetailPanel({
           </div>
 
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-            <span>{t('myTasks.meta.updatedAt', { date: formatDateTime(selectedTodo.updatedAt) })}</span>
+            <span>
+              {t('myTasks.meta.updatedAt', { date: formatDateTime(selectedTodo.updatedAt) })}
+            </span>
             <span>
               {selectedTodo.linkedWbsItemName
                 ? t('myTasks.meta.linkedWbs', { name: selectedTodo.linkedWbsItemName })
@@ -130,7 +138,9 @@ export default function ProjectTodoDetailPanel({
               <Input
                 id="todo-title"
                 value={editorValues.title}
-                onChange={(event) => onEditorChange((current) => ({ ...current, title: event.target.value }))}
+                onChange={(event) =>
+                  onEditorChange((current) => ({ ...current, title: event.target.value }))
+                }
                 disabled={!canManagePersonalTodos || isMutating}
               />
             </div>
@@ -160,7 +170,9 @@ export default function ProjectTodoDetailPanel({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="TODO">{t('myTasks.statusValue.TODO')}</SelectItem>
-                  <SelectItem value="IN_PROGRESS">{t('myTasks.statusValue.IN_PROGRESS')}</SelectItem>
+                  <SelectItem value="IN_PROGRESS">
+                    {t('myTasks.statusValue.IN_PROGRESS')}
+                  </SelectItem>
                   <SelectItem value="DONE">{t('myTasks.statusValue.DONE')}</SelectItem>
                 </SelectContent>
               </Select>
@@ -170,7 +182,10 @@ export default function ProjectTodoDetailPanel({
               <Select
                 value={editorValues.priority}
                 onValueChange={(value) =>
-                  onEditorChange((current) => ({ ...current, priority: value as ProjectTodoPriority }))
+                  onEditorChange((current) => ({
+                    ...current,
+                    priority: value as ProjectTodoPriority,
+                  }))
                 }
                 disabled={!canManagePersonalTodos || isMutating}
               >
@@ -215,23 +230,16 @@ export default function ProjectTodoDetailPanel({
 
           <div className="space-y-2">
             <Label>{t('myTasks.field.linkedWbs')}</Label>
-            <Select
+            <WbsHierarchySelect
+              items={allWbsItems}
               value={editorValues.linkedWbsItemId}
               onValueChange={onLinkedWbsChange}
+              placeholder={t('myTasks.wbs.placeholder')}
+              unlinkedLabel={t('myTasks.wbs.unlinked')}
+              searchPlaceholder={t('myTasks.wbs.searchPlaceholder')}
+              noResultsText={t('myTasks.wbs.noResults')}
               disabled={!canManagePersonalTodos || isMutating}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t('myTasks.wbs.placeholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t('myTasks.wbs.unlinked')}</SelectItem>
-                {allWbsItems.map((item) => (
-                  <SelectItem key={item.id} value={String(item.id)}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
             <p className="text-xs leading-5 text-muted-foreground">
               {selectedTodo.linkedWbsItemId == null
                 ? t('myTasks.wbs.privateHint')
@@ -272,7 +280,11 @@ export default function ProjectTodoDetailPanel({
 
           <div className="flex justify-end">
             {canManagePersonalTodos ? (
-              <Button variant="outline" onClick={onOpenDocumentDialog} disabled={isMutating || linkableDocumentsCount === 0}>
+              <Button
+                variant="outline"
+                onClick={onOpenDocumentDialog}
+                disabled={isMutating || linkableDocumentsCount === 0}
+              >
                 <Link2 className="mr-2 h-4 w-4" />
                 {t('myTasks.documents.linkAction')}
               </Button>
@@ -302,12 +314,17 @@ export default function ProjectTodoDetailPanel({
           ) : (
             <div className="space-y-3">
               {todoDocuments.map((document) => (
-                <div key={document.id} className="rounded-xl border border-border/70 bg-card px-4 py-4">
+                <div
+                  key={document.id}
+                  className="rounded-xl border border-border/70 bg-card px-4 py-4"
+                >
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <DocumentTypeBadge documentType={toDocumentType(document.pluginId)} />
-                        <span className="truncate text-sm font-semibold text-foreground">{document.name}</span>
+                        <span className="truncate text-sm font-semibold text-foreground">
+                          {document.name}
+                        </span>
                         <Badge variant="outline">
                           {t(
                             `myTasks.documents.visibility.${
@@ -321,7 +338,9 @@ export default function ProjectTodoDetailPanel({
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {document.linkedAt
-                          ? t('myTasks.documents.linkedAt', { date: formatDateTime(document.linkedAt) })
+                          ? t('myTasks.documents.linkedAt', {
+                              date: formatDateTime(document.linkedAt),
+                            })
                           : t('myTasks.documents.linkedAtUnknown')}
                       </p>
                     </div>
@@ -338,13 +357,19 @@ export default function ProjectTodoDetailPanel({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="PRIVATE">{t('myTasks.documents.visibility.private')}</SelectItem>
+                              <SelectItem value="PRIVATE">
+                                {t('myTasks.documents.visibility.private')}
+                              </SelectItem>
                               <SelectItem value="PROJECT_SHARED">
                                 {t('myTasks.documents.visibility.projectShared')}
                               </SelectItem>
                             </SelectContent>
                           </Select>
-                          <Button variant="outline" onClick={() => onDocumentUnlink(document.id)} disabled={isMutating}>
+                          <Button
+                            variant="outline"
+                            onClick={() => onDocumentUnlink(document.id)}
+                            disabled={isMutating}
+                          >
                             <Unlink2 className="mr-2 h-4 w-4" />
                             {t('myTasks.documents.unlinkAction')}
                           </Button>

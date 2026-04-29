@@ -20,6 +20,8 @@ public class MilestoneRepositoryCustomImpl implements MilestoneRepositoryCustom 
     public List<Milestone> findByProjectOrderBySortOrder(Project project) {
         return queryFactory
             .selectFrom(milestone)
+            .leftJoin(milestone.owner)
+            .fetchJoin()
             .where(milestone.project.eq(project))
             .orderBy(milestone.sortOrder.asc(), milestone.id.asc())
             .fetch();

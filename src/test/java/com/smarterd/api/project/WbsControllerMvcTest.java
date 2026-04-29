@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -19,6 +20,9 @@ import com.smarterd.domain.pm.history.entity.WorkTargetType;
 import com.smarterd.domain.pm.history.service.WorkItemHistoryService;
 import com.smarterd.domain.pm.history.service.WorkItemHistoryService.WorkActivityResult;
 import com.smarterd.domain.pm.history.service.WorkItemHistoryService.WorkCommentResult;
+import com.smarterd.domain.pm.wbs.entity.WbsDependencyType;
+import com.smarterd.domain.pm.wbs.service.WbsDependencyService;
+import com.smarterd.domain.pm.wbs.service.WbsDependencyService.WbsDependencyResult;
 import com.smarterd.domain.pm.wbs.service.WbsDocumentService;
 import com.smarterd.domain.pm.wbs.service.WbsDocumentService.DocumentTagResult;
 import com.smarterd.domain.pm.wbs.service.WbsDocumentService.LinkedDocumentResult;
@@ -55,6 +59,9 @@ class WbsControllerMvcTest {
     private WbsDocumentService wbsDocumentService;
 
     @Mock
+    private WbsDependencyService wbsDependencyService;
+
+    @Mock
     private WorkItemHistoryService workItemHistoryService;
 
     private MockMvc mockMvc;
@@ -62,7 +69,12 @@ class WbsControllerMvcTest {
 
     @BeforeEach
     void setUp() {
-        final var controller = new WbsController(wbsService, wbsDocumentService, workItemHistoryService);
+        final var controller = new WbsController(
+            wbsService,
+            wbsDependencyService,
+            wbsDocumentService,
+            workItemHistoryService
+        );
         this.mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .setCustomArgumentResolvers(new TestJwtArgumentResolver())
             .build();
@@ -120,6 +132,75 @@ class WbsControllerMvcTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").value(101))
             .andExpect(jsonPath("$.name").value("요구사항 분석"));
+    }
+
+    @Test
+    void getDependencies_returnsList() throws Exception {
+        when(wbsDependencyService.getDependencies("tester", 1L, 10L)).thenReturn(List.of(sampleDependency(501L)));
+
+        mockMvc
+            .perform(
+                get("/api/teams/1/projects/10/wbs/dependencies").with((request) -> {
+                    request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                    return request;
+                })
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(501))
+            .andExpect(jsonPath("$[0].predecessorWbsItemId").value(100))
+            .andExpect(jsonPath("$[0].successorWbsItemId").value(101))
+            .andExpect(jsonPath("$[0].dependencyType").value("FS"));
+    }
+
+    @Test
+    void createDependency_returnsCreated() throws Exception {
+        when(
+            wbsDependencyService.createDependency(
+                eq("tester"),
+                eq(1L),
+                eq(10L),
+                any(WbsDependencyService.WbsDependencyCommand.class)
+            )
+        ).thenReturn(sampleDependency(501L));
+
+        mockMvc
+            .perform(
+                post("/api/teams/1/projects/10/wbs/dependencies")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(
+                            java.util.Map.of(
+                                "predecessorWbsItemId",
+                                100,
+                                "successorWbsItemId",
+                                101,
+                                "dependencyType",
+                                "FS"
+                            )
+                        )
+                    )
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(501))
+            .andExpect(jsonPath("$.dependencyType").value("FS"));
+    }
+
+    @Test
+    void deleteDependency_returnsNoContent() throws Exception {
+        mockMvc
+            .perform(
+                delete("/api/teams/1/projects/10/wbs/dependencies/501").with((request) -> {
+                    request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                    return request;
+                })
+            )
+            .andExpect(status().isNoContent());
+
+        verify(wbsDependencyService).deleteDependency("tester", 1L, 10L, 501L);
     }
 
     @Test
@@ -290,8 +371,24 @@ class WbsControllerMvcTest {
             null,
             null,
             null,
+            List.of(),
+            List.of(),
             Instant.parse("2026-04-14T00:00:00Z"),
             Instant.parse("2026-04-14T00:00:00Z")
+        );
+    }
+
+    private WbsDependencyResult sampleDependency(Long id) {
+        return new WbsDependencyResult(
+            id,
+            100L,
+            "요구사항 분석",
+            101L,
+            "화면 설계",
+            WbsDependencyType.FS,
+            0,
+            Instant.parse("2026-04-28T00:00:00Z"),
+            Instant.parse("2026-04-28T00:00:00Z")
         );
     }
 

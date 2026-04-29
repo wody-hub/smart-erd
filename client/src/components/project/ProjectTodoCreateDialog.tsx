@@ -20,6 +20,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import type { ProjectTodoPriority, ProjectTodoStatus } from '@/types/project-todo';
 import type { WbsItem } from '@/types/wbs';
+import WbsHierarchySelect from './WbsHierarchySelect';
 import type { TodoEditorValues } from './project-todo-editor';
 
 interface ProjectTodoCreateDialogProps {
@@ -56,7 +57,9 @@ export default function ProjectTodoCreateDialog({
             <Input
               id="create-todo-title"
               value={createValues.title}
-              onChange={(event) => onChange((current) => ({ ...current, title: event.target.value }))}
+              onChange={(event) =>
+                onChange((current) => ({ ...current, title: event.target.value }))
+              }
             />
           </div>
           <div className="space-y-2">
@@ -84,7 +87,9 @@ export default function ProjectTodoCreateDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="TODO">{t('myTasks.statusValue.TODO')}</SelectItem>
-                  <SelectItem value="IN_PROGRESS">{t('myTasks.statusValue.IN_PROGRESS')}</SelectItem>
+                  <SelectItem value="IN_PROGRESS">
+                    {t('myTasks.statusValue.IN_PROGRESS')}
+                  </SelectItem>
                   <SelectItem value="DONE">{t('myTasks.statusValue.DONE')}</SelectItem>
                 </SelectContent>
               </Select>
@@ -114,7 +119,9 @@ export default function ProjectTodoCreateDialog({
                 id="create-todo-date"
                 type="date"
                 value={createValues.targetDate}
-                onChange={(event) => onChange((current) => ({ ...current, targetDate: event.target.value }))}
+                onChange={(event) =>
+                  onChange((current) => ({ ...current, targetDate: event.target.value }))
+                }
               />
             </div>
             <div className="space-y-2">
@@ -133,22 +140,18 @@ export default function ProjectTodoCreateDialog({
           </div>
           <div className="space-y-2">
             <Label>{t('myTasks.field.linkedWbs')}</Label>
-            <Select
+            <WbsHierarchySelect
+              items={allWbsItems}
               value={createValues.linkedWbsItemId}
-              onValueChange={(value) => onChange((current) => ({ ...current, linkedWbsItemId: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t('myTasks.wbs.placeholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t('myTasks.wbs.unlinked')}</SelectItem>
-                {allWbsItems.map((item) => (
-                  <SelectItem key={item.id} value={String(item.id)}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onValueChange={(value) =>
+                onChange((current) => ({ ...current, linkedWbsItemId: value }))
+              }
+              placeholder={t('myTasks.wbs.placeholder')}
+              unlinkedLabel={t('myTasks.wbs.unlinked')}
+              searchPlaceholder={t('myTasks.wbs.searchPlaceholder')}
+              noResultsText={t('myTasks.wbs.noResults')}
+              disabled={createPending}
+            />
           </div>
         </div>
         <DialogFooter>

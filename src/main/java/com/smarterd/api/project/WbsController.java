@@ -1,15 +1,19 @@
 package com.smarterd.api.project;
 
 import com.smarterd.api.project.dto.wbs.CreateWbsCommentRequest;
+import com.smarterd.api.project.dto.wbs.CreateWbsDependencyRequest;
 import com.smarterd.api.project.dto.wbs.WbsActivityResponse;
 import com.smarterd.api.project.dto.wbs.WbsCommentResponse;
 import com.smarterd.api.project.dto.wbs.CreateWbsItemRequest;
 import com.smarterd.api.project.dto.wbs.ReorderWbsItemsRequest;
+import com.smarterd.api.project.dto.wbs.UpdateWbsDependencyRequest;
 import com.smarterd.api.project.dto.wbs.UpdateWbsItemRequest;
+import com.smarterd.api.project.dto.wbs.WbsDependencyResponse;
 import com.smarterd.api.project.dto.wbs.WbsDocumentResponse;
 import com.smarterd.api.project.dto.wbs.WbsDocumentTagResponse;
 import com.smarterd.api.project.dto.wbs.WbsItemResponse;
 import com.smarterd.domain.pm.history.service.WorkItemHistoryService;
+import com.smarterd.domain.pm.wbs.service.WbsDependencyService;
 import com.smarterd.domain.pm.wbs.service.WbsDocumentService;
 import com.smarterd.domain.pm.wbs.service.WbsService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -45,6 +49,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class WbsController {
 
     private final WbsService wbsService;
+    private final WbsDependencyService wbsDependencyService;
     private final WbsDocumentService wbsDocumentService;
     private final WorkItemHistoryService workItemHistoryService;
 
@@ -58,6 +63,78 @@ public class WbsController {
         return ResponseEntity.ok(
             wbsService.getWbsItems(jwt.getSubject(), teamId, projectId).stream().map(WbsItemResponse::from).toList()
         );
+    }
+
+    @Operation(summary = "WBS dependency 목록 조회")
+    @GetMapping("/dependencies")
+    public ResponseEntity<List<WbsDependencyResponse>> getDependencies(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId
+    ) {
+        return ResponseEntity.ok(
+            wbsDependencyService
+                .getDependencies(jwt.getSubject(), teamId, projectId)
+                .stream()
+                .map(WbsDependencyResponse::from)
+                .toList()
+        );
+    }
+
+    @Operation(summary = "WBS dependency 생성")
+    @PostMapping("/dependencies")
+    public ResponseEntity<WbsDependencyResponse> createDependency(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Valid @RequestBody CreateWbsDependencyRequest request
+    ) {
+        final var result = wbsDependencyService.createDependency(
+            jwt.getSubject(),
+            teamId,
+            projectId,
+            new WbsDependencyService.WbsDependencyCommand(
+                request.predecessorWbsItemId(),
+                request.successorWbsItemId(),
+                request.dependencyType()
+            )
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(WbsDependencyResponse.from(result));
+    }
+
+    @Operation(summary = "WBS dependency 수정")
+    @PutMapping("/dependencies/{dependencyId}")
+    public ResponseEntity<WbsDependencyResponse> updateDependency(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Parameter(description = "dependency ID") @PathVariable Long dependencyId,
+        @Valid @RequestBody UpdateWbsDependencyRequest request
+    ) {
+        final var result = wbsDependencyService.updateDependency(
+            jwt.getSubject(),
+            teamId,
+            projectId,
+            dependencyId,
+            new WbsDependencyService.WbsDependencyCommand(
+                request.predecessorWbsItemId(),
+                request.successorWbsItemId(),
+                request.dependencyType()
+            )
+        );
+        return ResponseEntity.ok(WbsDependencyResponse.from(result));
+    }
+
+    @Operation(summary = "WBS dependency 삭제")
+    @DeleteMapping("/dependencies/{dependencyId}")
+    public ResponseEntity<Void> deleteDependency(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Parameter(description = "dependency ID") @PathVariable Long dependencyId
+    ) {
+        wbsDependencyService.deleteDependency(jwt.getSubject(), teamId, projectId, dependencyId);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "WBS 연결 문서 조회")

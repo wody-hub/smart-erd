@@ -8,7 +8,9 @@ import {
   Link2,
   Pencil,
   Plus,
+  ShieldCheck,
   Trash2,
+  UserRound,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -17,6 +19,7 @@ import {
   fetchMilestones,
   updateMilestone,
 } from '@/api/milestoneApi';
+import { fetchMembers } from '@/api/teamApi';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import MilestoneFormDialog from '@/components/milestone/MilestoneFormDialog';
 import { Badge } from '@/components/ui/badge';
@@ -54,11 +57,18 @@ export default function MilestonePanel({ teamId, projectId, canEdit }: Milestone
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Milestone | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Milestone | null>(null);
+  const [filter, setFilter] = useState<'all' | 'approval' | 'delayed'>('all');
 
   const milestonesQuery = useQuery({
     queryKey: queryKeys.milestones.all(teamId, projectId),
     queryFn: () => fetchMilestones(teamId, projectId),
     enabled: Boolean(teamId) && Boolean(projectId),
+  });
+
+  const membersQuery = useQuery({
+    queryKey: queryKeys.teams.members(teamId),
+    queryFn: () => fetchMembers(teamId),
+    enabled: Boolean(teamId),
   });
 
   const createMutation = useMutation({
@@ -130,6 +140,15 @@ export default function MilestonePanel({ teamId, projectId, canEdit }: Milestone
   }
 
   const milestones = milestonesQuery.data ?? [];
+  const filteredMilestones = milestones.filter((milestone) => {
+    if (filter === 'approval') {
+      return milestone.type === 'APPROVAL';
+    }
+    if (filter === 'delayed') {
+      return milestone.isDelayed;
+    }
+    return true;
+  });
   const locale = i18n.resolvedLanguage ?? i18n.language;
 
   return (
@@ -151,6 +170,19 @@ export default function MilestonePanel({ teamId, projectId, canEdit }: Milestone
           )}
         </div>
         <p className="text-sm text-muted-foreground">{t('milestone.section.description')}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {(['all', 'approval', 'delayed'] as const).map((value) => (
+            <Button
+              key={value}
+              type="button"
+              size="sm"
+              variant={filter === value ? 'default' : 'outline'}
+              onClick={() => setFilter(value)}
+            >
+              {t(`milestone.filter.${value}`)}
+            </Button>
+          ))}
+        </div>
       </CardHeader>
 
       <CardContent>
@@ -172,9 +204,15 @@ export default function MilestonePanel({ teamId, projectId, canEdit }: Milestone
               ) : undefined
             }
           />
+        ) : filteredMilestones.length === 0 ? (
+          <WorkspaceEmptyState
+            icon={<CalendarClock className="h-10 w-10" />}
+            title={t('milestone.filter.emptyTitle')}
+            description={t('milestone.filter.emptyDescription')}
+          />
         ) : (
           <div className="space-y-3">
-            {milestones.map((milestone) => {
+            {filteredMilestones.map((milestone) => {
               const isDelayed = milestone.isDelayed;
               const achievementRate = Math.min(Math.max(milestone.achievementRate, 0), 100);
               const linkedWbsItemCount = milestone.linkedWbsItemCount ?? 0;
@@ -195,6 +233,7 @@ export default function MilestonePanel({ teamId, projectId, canEdit }: Milestone
                         <h3 className="truncate text-base font-semibold text-foreground">
                           {milestone.name}
                         </h3>
+                        <Badge variant="outline">{t(`milestone.type.${milestone.type}`)}</Badge>
                         <Badge variant={isDelayed ? 'destructive' : 'secondary'}>
                           {isDelayed
                             ? t('milestone.status.delayed')
@@ -254,6 +293,27 @@ export default function MilestonePanel({ teamId, projectId, canEdit }: Milestone
                         {t('milestone.field.linkedWbsCount', { count: linkedWbsItemCount })}
                       </p>
 
+                      <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                        {t('milestone.field.blockingCount', {
+                          count: milestone.inboundDependencyCount,
+                        })}
+                      </p>
+
+                      <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <UserRound className="h-3.5 w-3.5 shrink-0" />
+                        {milestone.ownerName
+                          ? t('milestone.field.ownerValue', { name: milestone.ownerName })
+                          : t('milestone.field.noOwner')}
+                      </p>
+
+                      <p className="inline-flex items-start gap-1 text-xs text-muted-foreground">
+                        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          {milestone.readinessNote?.trim() || t('milestone.field.noReadinessNote')}
+                        </span>
+                      </p>
+
                       <p className="text-sm text-muted-foreground">
                         {milestone.description ?? t('milestone.field.noDescription')}
                       </p>
@@ -302,6 +362,9 @@ export default function MilestonePanel({ teamId, projectId, canEdit }: Milestone
         }}
         initialData={editTarget}
         onSubmit={handleSubmit}
+        members={membersQuery.data ?? []}
+        membersLoading={membersQuery.isLoading}
+        membersError={membersQuery.isError}
         loading={createMutation.isPending || updateMutation.isPending}
       />
 

@@ -72,7 +72,10 @@ public class MilestoneController {
             projectId,
             request.name(),
             request.targetDate(),
-            request.description()
+            request.description(),
+            request.type(),
+            request.ownerUserId(),
+            request.readinessNote()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(MilestoneResponse.from(result));
     }
@@ -93,7 +96,10 @@ public class MilestoneController {
             milestoneId,
             request.name(),
             request.targetDate(),
-            request.description()
+            request.description(),
+            request.type(),
+            request.ownerUserId(),
+            request.readinessNote()
         );
         return ResponseEntity.ok(MilestoneResponse.from(result));
     }

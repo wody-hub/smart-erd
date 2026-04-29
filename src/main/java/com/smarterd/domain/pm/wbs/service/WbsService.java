@@ -8,6 +8,7 @@ import com.smarterd.domain.pm.common.ProjectContextLoader;
 import com.smarterd.domain.pm.milestone.entity.Milestone;
 import com.smarterd.domain.pm.milestone.repository.MilestoneRepository;
 import com.smarterd.domain.pm.wbs.entity.WbsItem;
+import com.smarterd.domain.pm.wbs.repository.WbsDependencyRepository;
 import com.smarterd.domain.pm.wbs.repository.WbsItemRepository;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.team.entity.Team;
@@ -41,6 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class WbsService {
 
     private final WbsItemRepository wbsItemRepository;
+    private final WbsDependencyRepository wbsDependencyRepository;
     private final MilestoneRepository milestoneRepository;
     private final ProjectContextLoader projectContextLoader;
     private final TeamMemberRepository teamMemberRepository;
@@ -57,7 +59,29 @@ public class WbsService {
     public List<WbsItemResult> getWbsItems(String loginId, Long teamId, Long projectId) {
         final var context = projectContextLoader.load(loginId, teamId, projectId, false);
         final var items = wbsItemRepository.findByProjectWithRelations(context.project());
-        return orderAsTree(items).stream().map(this::toResult).toList();
+        final var dependencies = wbsDependencyRepository.findByProjectWithRelations(context.project());
+        final Map<Long, List<Long>> predecessorIdsByItemId = new HashMap<>();
+        final Map<Long, List<Long>> successorIdsByItemId = new HashMap<>();
+
+        for (final var dependency : dependencies) {
+            successorIdsByItemId
+                .computeIfAbsent(dependency.getPredecessor().getId(), (ignored) -> new ArrayList<>())
+                .add(dependency.getSuccessor().getId());
+            predecessorIdsByItemId
+                .computeIfAbsent(dependency.getSuccessor().getId(), (ignored) -> new ArrayList<>())
+                .add(dependency.getPredecessor().getId());
+        }
+
+        return orderAsTree(items)
+            .stream()
+            .map((item) ->
+                toResult(
+                    item,
+                    predecessorIdsByItemId.getOrDefault(item.getId(), List.of()),
+                    successorIdsByItemId.getOrDefault(item.getId(), List.of())
+                )
+            )
+            .toList();
     }
 
     /**
@@ -360,6 +384,10 @@ public class WbsService {
     }
 
     private WbsItemResult toResult(WbsItem item) {
+        return toResult(item, List.of(), List.of());
+    }
+
+    private WbsItemResult toResult(WbsItem item, List<Long> predecessorIds, List<Long> successorIds) {
         final var assignee = item.getAssignee();
         final var milestone = item.getMilestone();
         return new WbsItemResult(
@@ -376,6 +404,8 @@ public class WbsService {
             item.getEstimatedMm(),
             milestone == null ? null : milestone.getId(),
             milestone == null ? null : milestone.getName(),
+            List.copyOf(predecessorIds),
+            List.copyOf(successorIds),
             item.getCreatedAt(),
             item.getUpdatedAt()
         );
@@ -429,6 +459,8 @@ public class WbsService {
      * @param estimatedMm    예상 M/M
      * @param milestoneId    마일스톤 ID
      * @param milestoneName  마일스톤 이름
+     * @param predecessorIds 선행 WBS ID 목록
+     * @param successorIds   후행 WBS ID 목록
      * @param createdAt      생성 시각
      * @param updatedAt      수정 시각
      */
@@ -446,6 +478,8 @@ public class WbsService {
         @Nullable BigDecimal estimatedMm,
         @Nullable Long milestoneId,
         @Nullable String milestoneName,
+        List<Long> predecessorIds,
+        List<Long> successorIds,
         Instant createdAt,
         Instant updatedAt
     ) {}
