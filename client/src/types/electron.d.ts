@@ -19,4 +19,13 @@ interface ElectronAPI {
 interface Window {
   /** Electron preload에서 노출한 API. 웹 환경에서는 undefined. */
   electronAPI?: ElectronAPI;
+  /** Monaco editor handle exposed by the browser app during E2E flows. */
+  monaco?: {
+    editor?: {
+      getEditors?: () => Array<unknown>;
+      getModels?: () => Array<{
+        getValue(): string;
+      }>;
+    };
+  };
 }

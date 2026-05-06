@@ -245,14 +245,22 @@ function isListeningOnPort(port: number): boolean {
   }
 }
 
-function resolveDefaultE2EEndpoints(): { baseUrl: string; apiBaseUrl: string } {
-  const localFrontend = isListeningOnPort(4501);
-  const localBackend = isListeningOnPort(9501);
-  if (localFrontend && localBackend) {
-    return {
-      baseUrl: 'http://localhost:4501',
-      apiBaseUrl: 'http://localhost:9501/api',
-    };
+export function resolveDefaultE2EEndpoints(
+  isPortOpen: (port: number) => boolean = isListeningOnPort,
+): { baseUrl: string; apiBaseUrl: string } {
+  const profiles = [
+    { frontendPort: 4501, backendPort: 9501 },
+    { frontendPort: 4502, backendPort: 9502 },
+    { frontendPort: 4503, backendPort: 9503 },
+  ];
+
+  for (const profile of profiles) {
+    if (isPortOpen(profile.frontendPort) && isPortOpen(profile.backendPort)) {
+      return {
+        baseUrl: `http://localhost:${profile.frontendPort}`,
+        apiBaseUrl: `http://localhost:${profile.backendPort}/api`,
+      };
+    }
   }
 
   return {

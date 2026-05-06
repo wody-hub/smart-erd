@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Palette } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,8 @@ import { getErrorMessage } from '@/lib/api-error';
 import { isElectron, initServerUrl } from '@/lib/platform';
 import { ROUTES } from '@/constants/routes';
 import { STORAGE_KEYS } from '@/constants/storage';
+import useThemeStore from '@/stores/useThemeStore';
+import type { ThemeName } from '@/lib/theme';
 import { toast } from 'sonner';
 
 /** Electron 환경에서 선택 가능한 서버 URL 목록. */
@@ -30,6 +33,8 @@ const SERVER_URL_OPTIONS = [
   { label: 'Test (127.0.0.1:9502)', value: 'http://127.0.0.1:9502' },
   { label: 'Local (127.0.0.1:9501)', value: 'http://127.0.0.1:9501' },
 ];
+
+const THEME_OPTIONS: ThemeName[] = ['paper', 'graphite', 'midnight'];
 
 /**
  * 로그인 페이지 컴포넌트.
@@ -50,6 +55,8 @@ export default function LoginPage() {
   /** 선택된 서버 URL (Electron 전용) */
   const [serverUrl, setServerUrl] = useState('');
   const login = useAuthStore((s) => s.login);
+  const theme = useThemeStore((s) => s.theme);
+  const setTheme = useThemeStore((s) => s.setTheme);
 
   /** Electron 환경 여부 */
   const isDesktop = isElectron();
@@ -129,6 +136,25 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="login-theme">{t('theme.current')}</Label>
+              <Select value={theme} onValueChange={(value) => setTheme(value as ThemeName)}>
+                <SelectTrigger id="login-theme">
+                  <div className="flex items-center gap-2">
+                    <Palette className="h-4 w-4 text-muted-foreground" />
+                    <SelectValue />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {THEME_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {t(`theme.${option}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Electron 전용: 서버 URL 선택 */}
             {isDesktop && (
               <div className="space-y-2">

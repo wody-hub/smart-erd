@@ -1,18 +1,26 @@
 import axiosInstance from './axiosInstance';
 import { normalizeDocumentPluginId } from '@/types/document';
 import type {
+  BulkCreateWbsItemsPayload,
+  BulkCreateWbsItemsResponse,
   CreateWbsCommentPayload,
   CreateWbsItemPayload,
   ProjectDocumentTag,
   ReorderWbsPayload,
+  SaveWbsTemplatePayload,
   TaggedDocument,
   WbsActivity,
   WbsActivityEventType,
   WbsActivitySubjectType,
   WbsComment,
+  WbsDependencyShiftPayload,
+  WbsDependencyShiftResponse,
   UpdateWbsItemPayload,
   WbsItem,
   WbsLinkedDocument,
+  WbsSubtreeInstantiationPayload,
+  WbsSubtreeMutationResponse,
+  WbsTemplateSummary,
 } from '@/types/wbs';
 
 /**
@@ -98,6 +106,90 @@ export async function reorderWbsItems(
 ): Promise<WbsItem[]> {
   const res = await axiosInstance.patch<WbsItem[]>(
     `/teams/${teamId}/projects/${projectId}/wbs/reorder`,
+    payload,
+  );
+  return res.data;
+}
+
+export async function fetchWbsTemplates(
+  teamId: string,
+  projectId: string,
+): Promise<WbsTemplateSummary[]> {
+  const res = await axiosInstance.get<WbsTemplateSummary[]>(
+    `/teams/${teamId}/projects/${projectId}/wbs/templates`,
+  );
+  return res.data;
+}
+
+export async function saveWbsTemplate(
+  teamId: string,
+  projectId: string,
+  payload: SaveWbsTemplatePayload,
+): Promise<WbsTemplateSummary> {
+  const res = await axiosInstance.post<WbsTemplateSummary>(
+    `/teams/${teamId}/projects/${projectId}/wbs/templates`,
+    payload,
+  );
+  return res.data;
+}
+
+export async function instantiateWbsTemplate(
+  teamId: string,
+  projectId: string,
+  templateId: number,
+  payload: WbsSubtreeInstantiationPayload,
+): Promise<WbsSubtreeMutationResponse> {
+  const res = await axiosInstance.post<WbsSubtreeMutationResponse>(
+    `/teams/${teamId}/projects/${projectId}/wbs/templates/${templateId}/instantiate`,
+    payload,
+  );
+  return res.data;
+}
+
+export async function duplicateWbsSubtree(
+  teamId: string,
+  projectId: string,
+  wbsId: number,
+  payload: WbsSubtreeInstantiationPayload,
+): Promise<WbsSubtreeMutationResponse> {
+  const res = await axiosInstance.post<WbsSubtreeMutationResponse>(
+    `/teams/${teamId}/projects/${projectId}/wbs/${wbsId}/duplicate-subtree`,
+    payload,
+  );
+  return res.data;
+}
+
+export async function bulkCreateWbsItems(
+  teamId: string,
+  projectId: string,
+  payload: BulkCreateWbsItemsPayload,
+): Promise<BulkCreateWbsItemsResponse> {
+  const res = await axiosInstance.post<BulkCreateWbsItemsResponse>(
+    `/teams/${teamId}/projects/${projectId}/wbs/bulk-create`,
+    payload,
+  );
+  return res.data;
+}
+
+export async function previewWbsDependencyShift(
+  teamId: string,
+  projectId: string,
+  payload: WbsDependencyShiftPayload,
+): Promise<WbsDependencyShiftResponse> {
+  const res = await axiosInstance.post<WbsDependencyShiftResponse>(
+    `/teams/${teamId}/projects/${projectId}/wbs/dependency-shift-preview`,
+    payload,
+  );
+  return res.data;
+}
+
+export async function applyWbsDependencyShift(
+  teamId: string,
+  projectId: string,
+  payload: WbsDependencyShiftPayload,
+): Promise<WbsDependencyShiftResponse> {
+  const res = await axiosInstance.post<WbsDependencyShiftResponse>(
+    `/teams/${teamId}/projects/${projectId}/wbs/dependency-shift-apply`,
     payload,
   );
   return res.data;

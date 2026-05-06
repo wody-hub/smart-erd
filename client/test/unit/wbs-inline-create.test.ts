@@ -22,7 +22,13 @@ function makeWbsItem(overrides: Partial<WbsItem>): WbsItem {
     assigneeName: null,
     startDate: null,
     endDate: null,
+    actualStartDate: null,
+    actualEndDate: null,
     progressRate: 0,
+    plannedProgressRate: null,
+    progressVarianceRate: null,
+    startVarianceDays: null,
+    endVarianceDays: null,
     estimatedMm: null,
     milestoneId: null,
     milestoneName: null,
@@ -105,6 +111,8 @@ test('buildInlineCreatePayload pins the quick-add default fields for Phase 6.1',
     assigneeUserId: null,
     startDate: null,
     endDate: null,
+    actualStartDate: null,
+    actualEndDate: null,
     progressRate: 0,
     estimatedMm: null,
     milestoneId: null,
@@ -166,10 +174,14 @@ test('buildTargetIndexReorderPayload reorders within the same parent from the to
 test('resolveMoveValidationError blocks moving an item under its own descendant', () => {
   const root = makeWbsItem({ id: 1, name: 'Root', depth: 0, sortOrder: 0 });
   const child = makeWbsItem({ id: 2, parentId: 1, name: 'Child', depth: 1, sortOrder: 0 });
-  const grandchild = makeWbsItem({ id: 3, parentId: 2, name: 'Grandchild', depth: 2, sortOrder: 0 });
-  const itemById = new Map(
-    [root, child, grandchild].map((item) => [item.id, item] as const),
-  );
+  const grandchild = makeWbsItem({
+    id: 3,
+    parentId: 2,
+    name: 'Grandchild',
+    depth: 2,
+    sortOrder: 0,
+  });
+  const itemById = new Map([root, child, grandchild].map((item) => [item.id, item] as const));
 
   const error = resolveMoveValidationError({
     activeItemId: 1,
@@ -188,8 +200,20 @@ test('resolveMoveValidationError blocks moving an item under its own descendant'
 test('resolveMoveValidationError blocks moves that would push descendants past the max depth', () => {
   const root = makeWbsItem({ id: 1, name: 'Root', depth: 0, sortOrder: 0 });
   const source = makeWbsItem({ id: 2, name: 'Source', depth: 0, sortOrder: 1 });
-  const sourceChild = makeWbsItem({ id: 3, parentId: 2, name: 'Source child', depth: 1, sortOrder: 0 });
-  const deepParent = makeWbsItem({ id: 4, parentId: 1, name: 'Deep parent', depth: 8, sortOrder: 0 });
+  const sourceChild = makeWbsItem({
+    id: 3,
+    parentId: 2,
+    name: 'Source child',
+    depth: 1,
+    sortOrder: 0,
+  });
+  const deepParent = makeWbsItem({
+    id: 4,
+    parentId: 1,
+    name: 'Deep parent',
+    depth: 8,
+    sortOrder: 0,
+  });
   const items = [root, source, sourceChild, deepParent];
   const itemById = new Map(items.map((item) => [item.id, item] as const));
 

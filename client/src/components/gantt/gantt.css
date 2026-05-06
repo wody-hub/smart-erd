@@ -72,6 +72,20 @@
     0 0 0 3px hsl(var(--success) / 0.14);
 }
 
+.gantt-shell .wx-bar.gantt-task--compared,
+.gantt-shell .wx-row.gantt-task--compared,
+.gantt-shell .wx-grid-row.gantt-task--compared {
+  background-image: linear-gradient(90deg, hsl(var(--accent) / 0.08), transparent);
+}
+
+.gantt-shell .wx-bar.gantt-task--delayed,
+.gantt-shell .wx-row.gantt-task--delayed,
+.gantt-shell .wx-grid-row.gantt-task--delayed {
+  box-shadow:
+    0 0 0 1px hsl(var(--destructive) / 0.5),
+    inset 0 0 0 999px hsl(var(--destructive) / 0.05);
+}
+
 .gantt-shell .wx-bar.gantt-task--selected,
 .gantt-shell .wx-row.gantt-task--selected,
 .gantt-shell .wx-grid-row.gantt-task--selected {
@@ -105,6 +119,17 @@
   stroke: hsl(var(--success) / 0.78);
   stroke-dasharray: 5 3;
   stroke-width: 1.8px;
+}
+
+.gantt-shell .wx-baseline {
+  background: repeating-linear-gradient(
+    135deg,
+    hsl(var(--accent)),
+    hsl(var(--accent)) 6px,
+    hsl(var(--accent) / 0.75) 6px,
+    hsl(var(--accent) / 0.75) 12px
+  );
+  opacity: 0.85;
 }
 
 .gantt-shell .gantt-link--predecessor {
@@ -153,4 +178,8 @@
 .gantt-legend-line--milestone {
   border-top-color: hsl(var(--success));
   border-top-style: dashed;
+}
+
+.gantt-legend-line--actual {
+  border-top-color: hsl(var(--accent));
 }

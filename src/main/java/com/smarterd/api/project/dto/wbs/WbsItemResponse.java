@@ -31,7 +31,19 @@ public record WbsItemResponse(
 
     @Nullable @Schema(description = "종료일", example = "2026-04-30") LocalDate endDate,
 
+    @Nullable @Schema(description = "실적 시작일", example = "2026-04-22") LocalDate actualStartDate,
+
+    @Nullable @Schema(description = "실적 종료일", example = "2026-05-02") LocalDate actualEndDate,
+
     @Schema(description = "진척률 (0~100)", example = "60") int progressRate,
+
+    @Nullable @Schema(description = "기준일 기준 계획 진척률 (0~100)", example = "75") Integer plannedProgressRate,
+
+    @Nullable @Schema(description = "실적 진척률과 계획 진척률의 차이", example = "-15") Integer progressVarianceRate,
+
+    @Nullable @Schema(description = "계획 시작일 대비 실적 시작일 편차 일수", example = "2") Integer startVarianceDays,
+
+    @Nullable @Schema(description = "계획 종료일 대비 실적 종료일 편차 일수", example = "3") Integer endVarianceDays,
 
     @Nullable @Schema(description = "예상 M/M", example = "1.50") BigDecimal estimatedMm,
 
@@ -58,7 +70,13 @@ public record WbsItemResponse(
             result.assigneeName(),
             result.startDate(),
             result.endDate(),
+            result.actualStartDate(),
+            result.actualEndDate(),
             result.progressRate(),
+            result.plannedProgressRate(),
+            result.progressVarianceRate(),
+            result.startVarianceDays(),
+            result.endVarianceDays(),
             result.estimatedMm(),
             result.milestoneId(),
             result.milestoneName(),

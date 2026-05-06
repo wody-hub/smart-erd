@@ -19,21 +19,34 @@ import {
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { ListTree } from 'lucide-react';
+import { ChevronDown, CopyPlus, LayoutTemplate, ListTree } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchDiagrams } from '@/api/diagramApi';
 import { fetchMilestones } from '@/api/milestoneApi';
 import { fetchMembers } from '@/api/teamApi';
 import {
+  bulkCreateWbsItems,
   createWbsItem,
   deleteWbsItem,
+  duplicateWbsSubtree,
   fetchWbsItems,
+  fetchWbsTemplates,
+  instantiateWbsTemplate,
   reorderWbsItems,
+  saveWbsTemplate,
   updateWbsItem,
 } from '@/api/wbsApi';
 import MilestonePanel from '@/components/milestone/MilestonePanel';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import Spinner from '@/components/ui/spinner';
 import {
   Table,
@@ -49,32 +62,99 @@ import { useProjectQueryInvalidation } from '@/hooks/useProjectQueryInvalidation
 import { getErrorMessage } from '@/lib/api-error';
 import { cn } from '@/lib/utils';
 import type {
+  BulkCreateWbsItemPayload,
   CreateWbsItemPayload,
   ReorderWbsPayload,
   UpdateWbsItemPayload,
   WbsItem,
+  WbsTemplateSummary,
 } from '@/types/wbs';
 import SortableWbsRow from './SortableWbsRow';
 import WbsDetailPanel from './WbsDetailPanel';
+import WbsBulkCreateDialog from './WbsBulkCreateDialog';
 import WbsInlineCreateRow from './WbsInlineCreateRow';
 import WbsItemFormDialog, { type WbsItemFormValues } from './WbsItemFormDialog';
 import WbsMoveDialog, { type WbsMoveDialogValues } from './WbsMoveDialog';
 import {
+  WBS_VIEW_PRESET_COLUMNS,
+  type ParsedBulkCreateLine,
+  type WbsViewPreset,
+  type WbsVisibleColumn,
+} from './wbs-authoring-utils';
+import {
   MAX_WBS_DEPTH,
   buildChildrenByParent,
   buildInlineCreatePayload,
-  buildInlineCreatePlacements,
   buildReorderPayload,
   buildTargetIndexReorderPayload,
   collectDescendantIds,
   flattenTreeItems,
   getMaxDescendantDepthOffset,
+  planStructuralMove,
   projectPlacement,
   resolveMoveValidationError,
-  type InlineCreatePlacement,
+  toParentKey,
+  type InlineCreatePlacementKind,
+  type StructuralMoveKind,
 } from './wbs-tree-utils';
 
 const HIGHLIGHT_DURATION_MS = 2200;
+const PAGE_NAME_COLUMN_WIDTH = 280;
+const PAGE_ACTIONS_COLUMN_WIDTH = 260;
+const PAGE_VISIBLE_COLUMN_WIDTHS: Record<Exclude<WbsVisibleColumn, 'name'>, number> = {
+  assignee: 160,
+  period: 220,
+  actualPeriod: 220,
+  progressRate: 96,
+  plannedProgressRate: 120,
+  progressVarianceRate: 156,
+  estimatedMm: 110,
+  milestone: 170,
+};
+
+function getPageTableMinWidth(visibleColumns: Set<WbsVisibleColumn>): number {
+  let total = PAGE_NAME_COLUMN_WIDTH + PAGE_ACTIONS_COLUMN_WIDTH;
+  visibleColumns.forEach((column) => {
+    if (column !== 'name') {
+      total += PAGE_VISIBLE_COLUMN_WIDTHS[column];
+    }
+  });
+  return total;
+}
+
+function getTemplateSummaryStorageKey(teamId: string, projectId: string): string {
+  return `smart-erd:wbs-template-summaries:${teamId}:${projectId}`;
+}
+
+function readStoredTemplateSummaries(teamId: string, projectId: string): WbsTemplateSummary[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+  const raw = window.localStorage.getItem(getTemplateSummaryStorageKey(teamId, projectId));
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw) as WbsTemplateSummary[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredTemplateSummaries(
+  teamId: string,
+  projectId: string,
+  templates: WbsTemplateSummary[],
+): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.localStorage.setItem(
+    getTemplateSummaryStorageKey(teamId, projectId),
+    JSON.stringify(templates),
+  );
+}
 
 /** WbsWorkspaceContent imperative handle. */
 export interface WbsWorkspaceContentHandle {
@@ -115,6 +195,18 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
     const [activeDragItemId, setActiveDragItemId] = useState<number | null>(null);
     const [highlightedItemId, setHighlightedItemId] = useState<number | null>(null);
     const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+    const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
+    const [batchBusy, setBatchBusy] = useState(false);
+    const [viewPreset, setViewPreset] = useState<WbsViewPreset>('structure');
+    const [visibleColumns, setVisibleColumns] = useState<Set<WbsVisibleColumn>>(
+      () => new Set(WBS_VIEW_PRESET_COLUMNS.structure),
+    );
+    const [inlineCreateTarget, setInlineCreateTarget] = useState<{
+      afterItemId: number | null;
+      parentId: number | null;
+      depth: number;
+      kind: InlineCreatePlacementKind;
+    } | null>(null);
 
     const sensors = useSensors(
       useSensor(PointerSensor, {
@@ -145,11 +237,29 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       return () => window.clearTimeout(timer);
     }, [highlightedItemId]);
 
+    const storedTemplates = useMemo(
+      () => readStoredTemplateSummaries(teamId, projectId),
+      [projectId, teamId],
+    );
+
     const wbsQuery = useQuery({
       queryKey: queryKeys.wbs.all(teamId, projectId),
       queryFn: () => fetchWbsItems(teamId, projectId),
       enabled: Boolean(teamId) && Boolean(projectId),
     });
+
+    const templatesQuery = useQuery({
+      queryKey: queryKeys.wbs.templates(teamId, projectId),
+      queryFn: () => fetchWbsTemplates(teamId, projectId),
+      enabled: Boolean(teamId) && Boolean(projectId),
+    });
+
+    useEffect(() => {
+      if (!templatesQuery.data) {
+        return;
+      }
+      writeStoredTemplateSummaries(teamId, projectId, templatesQuery.data);
+    }, [projectId, teamId, templatesQuery.data]);
 
     const milestonesQuery = useQuery({
       queryKey: queryKeys.milestones.all(teamId, projectId),
@@ -262,28 +372,6 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       [membersQuery.data],
     );
 
-    const inlineCreatePlacements = useMemo(
-      () =>
-        variant === 'page' && canEdit
-          ? buildInlineCreatePlacements({
-              visibleItems,
-              hasChildrenById,
-              collapsedIds,
-            })
-          : [],
-      [canEdit, collapsedIds, hasChildrenById, variant, visibleItems],
-    );
-
-    const inlineCreateRowsByAfterItemId = useMemo(() => {
-      const map = new Map<number | null, InlineCreatePlacement[]>();
-      inlineCreatePlacements.forEach((placement) => {
-        const current = map.get(placement.afterItemId) ?? [];
-        current.push(placement);
-        map.set(placement.afterItemId, current);
-      });
-      return map;
-    }, [inlineCreatePlacements]);
-
     /**
      * 단일 WBS 항목 update payload를 구성한다.
      *
@@ -299,6 +387,8 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       assigneeUserId: item.assigneeUserId,
       startDate: item.startDate,
       endDate: item.endDate,
+      actualStartDate: item.actualStartDate ?? null,
+      actualEndDate: item.actualEndDate ?? null,
       progressRate: item.progressRate,
       estimatedMm: item.estimatedMm,
       milestoneId: item.milestoneId,
@@ -319,6 +409,8 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
             assigneeUserId: values.assigneeUserId,
             startDate: values.startDate,
             endDate: values.endDate,
+            actualStartDate: values.actualStartDate,
+            actualEndDate: values.actualEndDate,
             progressRate: values.progressRate,
             estimatedMm: values.estimatedMm,
             milestoneId: values.milestoneId,
@@ -333,6 +425,8 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
         assigneeUserId: values.assigneeUserId,
         startDate: values.startDate,
         endDate: values.endDate,
+        actualStartDate: values.actualStartDate,
+        actualEndDate: values.actualEndDate,
         progressRate: values.progressRate,
         estimatedMm: values.estimatedMm,
         milestoneId: values.milestoneId,
@@ -346,6 +440,36 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
      */
     const handleInlineCreate = async (input: { name: string; parentId: number | null }) => {
       await createMutation.mutateAsync(buildInlineCreatePayload(input.name, input.parentId));
+      setInlineCreateTarget(null);
+    };
+
+    /**
+     * 지정 행 기준 inline quick-add composer를 연다.
+     *
+     * @param item 기준 항목
+     * @param kind 생성 종류
+     */
+    const openInlineCreate = (
+      item: WbsItem,
+      kind: Extract<InlineCreatePlacementKind, 'child' | 'sibling'>,
+    ) => {
+      setSelectedItemId(item.id);
+      if (kind === 'child') {
+        setCollapsedIds((prev) => {
+          if (!prev.has(item.id)) {
+            return prev;
+          }
+          const next = new Set(prev);
+          next.delete(item.id);
+          return next;
+        });
+      }
+      setInlineCreateTarget({
+        afterItemId: item.id,
+        parentId: kind === 'child' ? item.id : item.parentId,
+        depth: kind === 'child' ? item.depth + 1 : item.depth,
+        kind,
+      });
     };
 
     /**
@@ -561,16 +685,192 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       return true;
     };
 
+    /**
+     * modal-less 구조 이동을 처리한다.
+     *
+     * @param item 이동 대상 항목
+     * @param action 이동 액션
+     */
+    const handleStructuralMove = (item: WbsItem, action: StructuralMoveKind) => {
+      const plan = planStructuralMove({
+        action,
+        activeItemId: item.id,
+        allItems,
+        childrenByParent,
+        itemById,
+      });
+      if (!plan) {
+        return;
+      }
+
+      const validationError = resolveMoveValidationError({
+        activeItemId: item.id,
+        nextParentId: plan.nextParentId,
+        itemById,
+        childrenByParent,
+      });
+      if (validationError) {
+        toast.error(t(`wbs.toast.${validationError}`));
+        return;
+      }
+
+      const payload = buildTargetIndexReorderPayload({
+        allItems,
+        childrenByParent,
+        activeItemId: item.id,
+        nextParentId: plan.nextParentId,
+        targetIndex: plan.targetIndex,
+      });
+      if (payload.items.length === 0) {
+        return;
+      }
+
+      setSelectedItemId(item.id);
+      reorderMutation.mutate(payload);
+    };
+
     const locale = i18n.resolvedLanguage ?? i18n.language;
     const activeDragItem =
       activeDragItemId == null ? null : (itemById.get(activeDragItemId) ?? null);
     const isMutating =
+      batchBusy ||
       createMutation.isPending ||
       updateMutation.isPending ||
       deleteMutation.isPending ||
       reorderMutation.isPending;
-    const tableColumnCount = canEdit ? 7 : 6;
+    const tableColumnCount = 1 + visibleColumns.size + (canEdit ? 1 : 0);
     const shouldShowPageInlineCreate = variant === 'page' && canEdit;
+    const selectedItem = selectedItemId == null ? null : (itemById.get(selectedItemId) ?? null);
+    const templates = templatesQuery.data ?? storedTemplates;
+
+    const isColumnVisible = (column: WbsVisibleColumn) => visibleColumns.has(column);
+    const pageTableMinWidth = variant === 'page' ? getPageTableMinWidth(visibleColumns) : undefined;
+
+    const updateVisibleColumns = (columns: Iterable<WbsVisibleColumn>) => {
+      setVisibleColumns(new Set(columns));
+    };
+
+    const handlePresetChange = (preset: WbsViewPreset) => {
+      setViewPreset(preset);
+      updateVisibleColumns(WBS_VIEW_PRESET_COLUMNS[preset]);
+    };
+
+    const handleBulkCreateSubmit = async (
+      bulkItems: ParsedBulkCreateLine[],
+      parentId: number | null,
+    ) => {
+      if (bulkItems.length === 0) {
+        return;
+      }
+
+      setBatchBusy(true);
+      try {
+        const clientKeyByDepth = new Map<number, string>();
+        const payloadItems: BulkCreateWbsItemPayload[] = bulkItems.map((entry, index) => {
+          const clientKey = `bulk-${Date.now()}-${index}-${entry.lineNumber}`;
+          const parentClientKey =
+            entry.depth === 0 ? null : (clientKeyByDepth.get(entry.depth - 1) ?? null);
+          clientKeyByDepth.set(entry.depth, clientKey);
+          return {
+            clientKey,
+            parentId: entry.depth === 0 ? parentId : null,
+            parentClientKey,
+            name: entry.name,
+            assigneeUserId: null,
+            startDate: null,
+            endDate: null,
+            progressRate: 0,
+            estimatedMm: null,
+            milestoneId: null,
+          };
+        });
+        await bulkCreateWbsItems(teamId, projectId, { items: payloadItems });
+        invalidateRelatedQueries();
+        setBulkCreateOpen(false);
+        toast.success(t('wbs.toast.bulkCreated', { count: bulkItems.length }));
+      } catch (error) {
+        toast.error(getErrorMessage(error, t('wbs.toast.bulkCreateFailed')));
+      } finally {
+        setBatchBusy(false);
+      }
+    };
+
+    const handleDuplicateSubtree = async (item: WbsItem) => {
+      setBatchBusy(true);
+      try {
+        const result = await duplicateWbsSubtree(teamId, projectId, item.id, {
+          parentId: item.parentId,
+          resetAssignee: false,
+          resetSchedule: false,
+          resetProgress: false,
+          resetMilestone: false,
+          includeDependencies: true,
+        });
+        const duplicatedRoot = result.items.find(
+          (createdItem) => createdItem.id === result.rootItemId,
+        );
+        if (duplicatedRoot) {
+          await updateWbsItem(teamId, projectId, duplicatedRoot.id, {
+            name: `${item.name} Copy`,
+            assigneeUserId: duplicatedRoot.assigneeUserId,
+            startDate: duplicatedRoot.startDate,
+            endDate: duplicatedRoot.endDate,
+            actualStartDate: duplicatedRoot.actualStartDate,
+            actualEndDate: duplicatedRoot.actualEndDate,
+            progressRate: duplicatedRoot.progressRate,
+            estimatedMm: duplicatedRoot.estimatedMm,
+            milestoneId: duplicatedRoot.milestoneId,
+          });
+          setSelectedItemId(duplicatedRoot.id);
+          setHighlightedItemId(duplicatedRoot.id);
+        }
+        invalidateRelatedQueries();
+        toast.success(t('wbs.toast.duplicated'));
+      } catch (error) {
+        toast.error(getErrorMessage(error, t('wbs.toast.duplicateFailed')));
+      } finally {
+        setBatchBusy(false);
+      }
+    };
+
+    const handleSaveTemplate = async (item: WbsItem) => {
+      try {
+        await saveWbsTemplate(teamId, projectId, {
+          sourceWbsItemId: item.id,
+          name: item.name,
+          description: null,
+        });
+        await templatesQuery.refetch();
+        toast.success(t('wbs.toast.templateSaved'));
+      } catch (error) {
+        toast.error(getErrorMessage(error, t('wbs.toast.templateSaveFailed')));
+      }
+    };
+
+    const handleApplyTemplate = async (
+      template: WbsTemplateSummary,
+      targetParentId: number | null,
+    ) => {
+      setBatchBusy(true);
+      try {
+        const result = await instantiateWbsTemplate(teamId, projectId, template.id, {
+          parentId: targetParentId,
+          resetAssignee: false,
+          resetSchedule: false,
+          resetProgress: false,
+          resetMilestone: false,
+          includeDependencies: true,
+        });
+        setSelectedItemId(result.rootItemId);
+        setHighlightedItemId(result.rootItemId);
+        invalidateRelatedQueries();
+        toast.success(t('wbs.toast.templateApplied', { name: template.name }));
+      } catch (error) {
+        toast.error(getErrorMessage(error, t('wbs.toast.templateApplyFailed')));
+      } finally {
+        setBatchBusy(false);
+      }
+    };
 
     /**
      * 지정 위치 뒤에 inline quick-add rows를 렌더링한다.
@@ -579,20 +879,22 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
      * @returns quick-add rows
      */
     const renderInlineCreateRows = (afterItemId: number | null) =>
-      (inlineCreateRowsByAfterItemId.get(afterItemId) ?? []).map((placement) => (
+      inlineCreateTarget && inlineCreateTarget.afterItemId === afterItemId ? (
         <WbsInlineCreateRow
-          key={`${placement.kind}-${placement.parentId ?? 'root'}`}
-          kind={placement.kind}
-          parentId={placement.parentId}
-          depth={placement.depth}
+          key={`${inlineCreateTarget.kind}-${inlineCreateTarget.parentId ?? 'root'}`}
+          kind={inlineCreateTarget.kind}
+          parentId={inlineCreateTarget.parentId}
+          depth={inlineCreateTarget.depth}
           parentName={
-            placement.parentId == null ? null : (itemById.get(placement.parentId)?.name ?? null)
+            inlineCreateTarget.parentId == null
+              ? null
+              : (itemById.get(inlineCreateTarget.parentId)?.name ?? null)
           }
           onCreate={handleInlineCreate}
           loading={createMutation.isPending}
           columnCount={tableColumnCount}
         />
-      ));
+      ) : null;
 
     /**
      * WBS table body를 렌더링한다.
@@ -616,6 +918,9 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       }
 
       visibleItems.forEach((item) => {
+        const siblings = childrenByParent.get(toParentKey(item.parentId)) ?? [];
+        const siblingIndex = siblings.findIndex((sibling) => sibling.id === item.id);
+
         tableRows.push(
           <SortableWbsRow
             key={`item-${item.id}`}
@@ -632,6 +937,7 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
               item.milestoneName ??
               (item.milestoneId == null ? null : (milestoneNameById.get(item.milestoneId) ?? null))
             }
+            visibleColumns={visibleColumns}
             hasChildren={hasChildrenById.get(item.id) === true}
             collapsed={collapsedIds.has(item.id)}
             disabled={isMutating}
@@ -640,6 +946,25 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
             members={membersQuery.data ?? []}
             milestones={milestonesQuery.data ?? []}
             membersUnavailable={membersQuery.isLoading || membersQuery.isError}
+            pageAuthoringMode={variant === 'page'}
+            canAddBelow={variant === 'page'}
+            canAddChild={variant === 'page' && item.depth < MAX_WBS_DEPTH}
+            canMoveUp={variant === 'page' && siblingIndex > 0}
+            canMoveDown={
+              variant === 'page' && siblingIndex >= 0 && siblingIndex < siblings.length - 1
+            }
+            canIndent={variant === 'page' && siblingIndex > 0 && item.depth < MAX_WBS_DEPTH}
+            canOutdent={variant === 'page' && item.parentId != null}
+            onAddBelow={(target) => openInlineCreate(target, 'sibling')}
+            onAddChild={(target) => openInlineCreate(target, 'child')}
+            onMoveUp={(target) => handleStructuralMove(target, 'moveUp')}
+            onMoveDown={(target) => handleStructuralMove(target, 'moveDown')}
+            onIndent={(target) => handleStructuralMove(target, 'indent')}
+            onOutdent={(target) => handleStructuralMove(target, 'outdent')}
+            templates={templates}
+            onDuplicate={handleDuplicateSubtree}
+            onSaveTemplate={handleSaveTemplate}
+            onApplyTemplate={(template, target) => handleApplyTemplate(template, target.id)}
             onToggleCollapse={handleToggleCollapse}
             onInlineNameSubmit={handleInlineNameSubmit}
             onInlineProgressSubmit={handleInlineProgressSubmit}
@@ -659,12 +984,18 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
         );
 
         if (shouldShowPageInlineCreate) {
-          tableRows.push(...renderInlineCreateRows(item.id));
+          const inlineRow = renderInlineCreateRows(item.id);
+          if (inlineRow) {
+            tableRows.push(inlineRow);
+          }
         }
       });
 
       if (shouldShowPageInlineCreate) {
-        tableRows.push(...renderInlineCreateRows(null));
+        const rootInlineRow = renderInlineCreateRows(null);
+        if (rootInlineRow) {
+          tableRows.push(rootInlineRow);
+        }
       }
 
       return (
@@ -680,17 +1011,85 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
                 items={visibleItems.map((item) => item.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <Table className="w-full min-w-[1320px] table-fixed">
+                <Table
+                  className={cn('w-full table-fixed', variant === 'page' ? '' : 'min-w-[1680px]')}
+                  style={
+                    pageTableMinWidth == null ? undefined : { minWidth: `${pageTableMinWidth}px` }
+                  }
+                >
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[320px]">{t('wbs.field.name')}</TableHead>
-                      <TableHead className="w-[180px]">{t('wbs.field.assignee')}</TableHead>
-                      <TableHead className="w-[240px]">{t('wbs.field.period')}</TableHead>
-                      <TableHead className="w-[120px]">{t('wbs.field.progressRate')}</TableHead>
-                      <TableHead className="w-[140px]">{t('wbs.field.estimatedMm')}</TableHead>
-                      <TableHead className="w-[220px]">{t('wbs.field.milestone')}</TableHead>
+                      <TableHead
+                        className={variant === 'page' ? 'h-9 w-[280px] px-3' : 'w-[320px]'}
+                      >
+                        {t('wbs.field.name')}
+                      </TableHead>
+                      {isColumnVisible('assignee') ? (
+                        <TableHead
+                          className={variant === 'page' ? 'h-9 w-[160px] px-3' : 'w-[180px]'}
+                        >
+                          {t('wbs.field.assignee')}
+                        </TableHead>
+                      ) : null}
+                      {isColumnVisible('period') ? (
+                        <TableHead
+                          className={variant === 'page' ? 'h-9 w-[220px] px-3' : 'w-[240px]'}
+                        >
+                          {t('wbs.field.period')}
+                        </TableHead>
+                      ) : null}
+                      {isColumnVisible('actualPeriod') ? (
+                        <TableHead
+                          className={variant === 'page' ? 'h-9 w-[220px] px-3' : 'w-[240px]'}
+                        >
+                          {t('wbs.field.actualPeriod')}
+                        </TableHead>
+                      ) : null}
+                      {isColumnVisible('progressRate') ? (
+                        <TableHead
+                          className={variant === 'page' ? 'h-9 w-[96px] px-3' : 'w-[120px]'}
+                        >
+                          {t('wbs.field.progressRate')}
+                        </TableHead>
+                      ) : null}
+                      {isColumnVisible('plannedProgressRate') ? (
+                        <TableHead
+                          className={variant === 'page' ? 'h-9 w-[120px] px-3' : 'w-[140px]'}
+                        >
+                          {t('wbs.field.plannedProgressRate')}
+                        </TableHead>
+                      ) : null}
+                      {isColumnVisible('progressVarianceRate') ? (
+                        <TableHead
+                          className={variant === 'page' ? 'h-9 w-[156px] px-3' : 'w-[180px]'}
+                        >
+                          {t('wbs.field.progressVarianceRate')}
+                        </TableHead>
+                      ) : null}
+                      {isColumnVisible('estimatedMm') ? (
+                        <TableHead
+                          className={variant === 'page' ? 'h-9 w-[110px] px-3' : 'w-[140px]'}
+                        >
+                          {t('wbs.field.estimatedMm')}
+                        </TableHead>
+                      ) : null}
+                      {isColumnVisible('milestone') ? (
+                        <TableHead
+                          className={variant === 'page' ? 'h-9 w-[170px] px-3' : 'w-[220px]'}
+                        >
+                          {t('wbs.field.milestone')}
+                        </TableHead>
+                      ) : null}
                       {canEdit && (
-                        <TableHead className="w-[140px]">{t('wbs.field.actions')}</TableHead>
+                        <TableHead
+                          className={
+                            variant === 'page'
+                              ? 'sticky right-0 z-20 h-9 w-[260px] border-l border-border/80 bg-secondary/32 px-3 text-right backdrop-blur supports-[backdrop-filter]:bg-secondary/28'
+                              : 'w-[140px]'
+                          }
+                        >
+                          {t('wbs.field.actions')}
+                        </TableHead>
                       )}
                     </TableRow>
                   </TableHeader>
@@ -756,8 +1155,6 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       wbsContent = renderTable();
     }
 
-    const selectedItem = selectedItemId == null ? null : (itemById.get(selectedItemId) ?? null);
-
     return (
       <>
         <div
@@ -770,6 +1167,116 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
           )}
         >
           <section aria-label={t('wbs.section.title')} className="min-w-0">
+            {variant === 'page' ? (
+              <div className="mb-4 flex flex-col gap-3 rounded-xl border border-border/80 bg-card/70 p-4">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">{t('wbs.view.title')}</p>
+                    <p className="text-sm text-muted-foreground">{t('wbs.view.description')}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(['structure', 'schedule', 'resourcing'] as const).map((preset) => (
+                      <Button
+                        key={preset}
+                        type="button"
+                        size="sm"
+                        variant={viewPreset === preset ? 'default' : 'outline'}
+                        onClick={() => handlePresetChange(preset)}
+                      >
+                        {t(`wbs.view.presets.${preset}`)}
+                      </Button>
+                    ))}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button type="button" size="sm" variant="outline">
+                          <ChevronDown className="mr-2 h-4 w-4" />
+                          {t('wbs.view.columns')}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>{t('wbs.view.columns')}</DropdownMenuLabel>
+                        {(
+                          [
+                            'assignee',
+                            'period',
+                            'actualPeriod',
+                            'progressRate',
+                            'plannedProgressRate',
+                            'progressVarianceRate',
+                            'estimatedMm',
+                            'milestone',
+                          ] satisfies WbsVisibleColumn[]
+                        ).map((column) => (
+                          <DropdownMenuCheckboxItem
+                            key={column}
+                            checked={isColumnVisible(column)}
+                            onCheckedChange={(checked) => {
+                              updateVisibleColumns(
+                                checked
+                                  ? [...visibleColumns, column]
+                                  : [...visibleColumns].filter((entry) => entry !== column),
+                              );
+                            }}
+                          >
+                            {t(`wbs.field.${column}`)}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="outline" onClick={() => setBulkCreateOpen(true)}>
+                    <CopyPlus className="mr-2 h-4 w-4" />
+                    {t('wbs.bulk.open')}
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button type="button" variant="outline">
+                        <LayoutTemplate className="mr-2 h-4 w-4" />
+                        {t('wbs.template.picker')}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-72">
+                      <DropdownMenuLabel>
+                        {selectedItem
+                          ? t('wbs.template.applyTargetSelected', { name: selectedItem.name })
+                          : t('wbs.template.applyTargetRoot')}
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {templates.length === 0 ? (
+                        <div className="px-2.5 py-2 text-sm text-muted-foreground">
+                          {t('wbs.template.empty')}
+                        </div>
+                      ) : (
+                        templates.map((template) => (
+                          <Button
+                            key={template.id}
+                            type="button"
+                            variant="ghost"
+                            className="h-auto w-full justify-start px-2.5 py-2 text-left"
+                            onClick={() =>
+                              void handleApplyTemplate(template, selectedItem?.id ?? null)
+                            }
+                          >
+                            <div className="space-y-0.5">
+                              <p className="text-sm font-medium text-foreground">{template.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {t('wbs.template.source', { name: template.rootName })}
+                              </p>
+                            </div>
+                          </Button>
+                        ))
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <span className="text-xs text-muted-foreground">
+                    {t('wbs.template.storageHint')}
+                  </span>
+                </div>
+              </div>
+            ) : null}
             {wbsContent}
           </section>
           <aside className="min-w-0">
@@ -820,6 +1327,14 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
           items={allItems}
           loading={reorderMutation.isPending}
           onSubmit={handleMoveSubmit}
+        />
+
+        <WbsBulkCreateDialog
+          open={bulkCreateOpen}
+          onOpenChange={setBulkCreateOpen}
+          loading={isMutating}
+          selectedParent={selectedItem}
+          onSubmit={handleBulkCreateSubmit}
         />
 
         <ConfirmDialog

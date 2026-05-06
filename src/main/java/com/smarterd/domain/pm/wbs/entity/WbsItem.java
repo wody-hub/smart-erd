@@ -71,6 +71,14 @@ public class WbsItem extends BaseAuditEntity {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    @Nullable
+    @Column(name = "actual_start_date")
+    private LocalDate actualStartDate;
+
+    @Nullable
+    @Column(name = "actual_end_date")
+    private LocalDate actualEndDate;
+
     @Column(name = "progress_rate", nullable = false)
     private int progressRate;
 
@@ -93,6 +101,8 @@ public class WbsItem extends BaseAuditEntity {
         @Nullable User assignee,
         @Nullable LocalDate startDate,
         @Nullable LocalDate endDate,
+        @Nullable LocalDate actualStartDate,
+        @Nullable LocalDate actualEndDate,
         int progressRate,
         @Nullable BigDecimal estimatedMm,
         @Nullable Milestone milestone
@@ -105,6 +115,8 @@ public class WbsItem extends BaseAuditEntity {
         this.assignee = assignee;
         this.startDate = startDate;
         this.endDate = endDate;
+        this.actualStartDate = actualStartDate;
+        this.actualEndDate = actualEndDate;
         this.progressRate = progressRate;
         this.estimatedMm = estimatedMm;
         this.milestone = milestone;
@@ -116,6 +128,8 @@ public class WbsItem extends BaseAuditEntity {
         @Nullable User assignee,
         @Nullable LocalDate startDate,
         @Nullable LocalDate endDate,
+        @Nullable LocalDate actualStartDate,
+        @Nullable LocalDate actualEndDate,
         int progressRate,
         @Nullable BigDecimal estimatedMm,
         @Nullable Milestone milestone
@@ -124,6 +138,8 @@ public class WbsItem extends BaseAuditEntity {
         this.assignee = assignee;
         this.startDate = startDate;
         this.endDate = endDate;
+        this.actualStartDate = actualStartDate;
+        this.actualEndDate = actualEndDate;
         this.progressRate = progressRate;
         this.estimatedMm = estimatedMm;
         this.milestone = milestone;
@@ -151,6 +167,10 @@ public class WbsItem extends BaseAuditEntity {
         }
 
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new BusinessException(MessageCode.ERROR_BUSINESS_INVALID_WBS_PERIOD.code());
+        }
+
+        if (actualStartDate != null && actualEndDate != null && actualStartDate.isAfter(actualEndDate)) {
             throw new BusinessException(MessageCode.ERROR_BUSINESS_INVALID_WBS_PERIOD.code());
         }
 

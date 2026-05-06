@@ -47,6 +47,7 @@ public class WbsService {
     private final ProjectContextLoader projectContextLoader;
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
+    private final WbsScheduleMetricsService wbsScheduleMetricsService;
 
     /**
      * 프로젝트의 WBS 항목을 트리 순서로 조회한다.
@@ -112,6 +113,8 @@ public class WbsService {
                 .assignee(assignee)
                 .startDate(command.startDate())
                 .endDate(command.endDate())
+                .actualStartDate(command.actualStartDate())
+                .actualEndDate(command.actualEndDate())
                 .progressRate(command.progressRate() == null ? 0 : command.progressRate())
                 .estimatedMm(command.estimatedMm())
                 .milestone(milestone)
@@ -148,6 +151,8 @@ public class WbsService {
         @Nullable Long assigneeUserId,
         @Nullable LocalDate startDate,
         @Nullable LocalDate endDate,
+        @Nullable LocalDate actualStartDate,
+        @Nullable LocalDate actualEndDate,
         @Nullable Integer progressRate,
         @Nullable BigDecimal estimatedMm,
         @Nullable Long milestoneId
@@ -162,6 +167,8 @@ public class WbsService {
             assignee,
             startDate,
             endDate,
+            actualStartDate,
+            actualEndDate,
             progressRate == null ? item.getProgressRate() : progressRate,
             estimatedMm,
             milestone
@@ -390,6 +397,13 @@ public class WbsService {
     private WbsItemResult toResult(WbsItem item, List<Long> predecessorIds, List<Long> successorIds) {
         final var assignee = item.getAssignee();
         final var milestone = item.getMilestone();
+        final var scheduleMetrics = wbsScheduleMetricsService.calculate(
+            item.getStartDate(),
+            item.getEndDate(),
+            item.getActualStartDate(),
+            item.getActualEndDate(),
+            item.getProgressRate()
+        );
         return new WbsItemResult(
             item.getId(),
             item.getParent() == null ? null : item.getParent().getId(),
@@ -400,7 +414,13 @@ public class WbsService {
             assignee == null ? null : assignee.getName(),
             item.getStartDate(),
             item.getEndDate(),
+            item.getActualStartDate(),
+            item.getActualEndDate(),
             item.getProgressRate(),
+            scheduleMetrics.plannedProgressRate(),
+            scheduleMetrics.progressVarianceRate(),
+            scheduleMetrics.startVarianceDays(),
+            scheduleMetrics.endVarianceDays(),
             item.getEstimatedMm(),
             milestone == null ? null : milestone.getId(),
             milestone == null ? null : milestone.getName(),
@@ -429,6 +449,8 @@ public class WbsService {
         @Nullable Long assigneeUserId,
         @Nullable LocalDate startDate,
         @Nullable LocalDate endDate,
+        @Nullable LocalDate actualStartDate,
+        @Nullable LocalDate actualEndDate,
         @Nullable Integer progressRate,
         @Nullable BigDecimal estimatedMm,
         @Nullable Long milestoneId
@@ -474,7 +496,13 @@ public class WbsService {
         @Nullable String assigneeName,
         @Nullable LocalDate startDate,
         @Nullable LocalDate endDate,
+        @Nullable LocalDate actualStartDate,
+        @Nullable LocalDate actualEndDate,
         int progressRate,
+        @Nullable Integer plannedProgressRate,
+        @Nullable Integer progressVarianceRate,
+        @Nullable Integer startVarianceDays,
+        @Nullable Integer endVarianceDays,
         @Nullable BigDecimal estimatedMm,
         @Nullable Long milestoneId,
         @Nullable String milestoneName,

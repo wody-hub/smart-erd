@@ -25,7 +25,13 @@ function makeWbsItem(overrides: Partial<WbsItem>): WbsItem {
     assigneeName: null,
     startDate: null,
     endDate: null,
+    actualStartDate: null,
+    actualEndDate: null,
     progressRate: 0,
+    plannedProgressRate: null,
+    progressVarianceRate: null,
+    startVarianceDays: null,
+    endVarianceDays: null,
     estimatedMm: null,
     milestoneId: null,
     milestoneName: null,
@@ -154,6 +160,7 @@ test('buildGanttModel maps dated WBS, summary projection, milestones, and stats'
   assert.equal(requirements?.parent, 1);
   assert.equal(requirements?.text, 'Requirements');
   assert.equal(requirements?.progress, 40);
+  assert.equal(requirements?.isDelayed, false);
 
   assert.ok(implementation);
   assert.equal(implementation?.type, 'task');
@@ -179,6 +186,38 @@ test('buildGanttModel maps dated WBS, summary projection, milestones, and stats'
 
   assert.equal(formatDateOnly(model.range.start), '2026-02-13');
   assert.equal(formatDateOnly(model.range.end), '2026-05-08');
+});
+
+test('buildGanttModel marks delayed WBS and carries actual schedule comparison data', () => {
+  const wbsItems: WbsItem[] = [
+    makeWbsItem({
+      id: 10,
+      name: 'Execution',
+      depth: 0,
+      sortOrder: 1,
+      startDate: '2026-04-01',
+      endDate: '2026-04-05',
+      actualStartDate: '2026-04-02',
+      actualEndDate: '2026-04-07',
+      progressRate: 30,
+      plannedProgressRate: 60,
+      progressVarianceRate: -30,
+      startVarianceDays: 1,
+      endVarianceDays: 2,
+    }),
+  ];
+
+  const model = buildGanttModel({ wbsItems, milestones: [], dependencies: [] });
+  const task = model.tasks.find((entry) => entry.id === 10);
+
+  assert.ok(task);
+  assert.equal(task?.isDelayed, true);
+  assert.equal(task?.hasActualDates, true);
+  assert.equal(formatDateOnly(task?.base_start as Date), '2026-04-02');
+  assert.equal(formatDateOnly(task?.base_end as Date), '2026-04-07');
+  assert.equal(task?.progressVarianceRate, -30);
+  assert.equal(model.stats.delayedTaskCount, 1);
+  assert.equal(model.stats.comparedTaskCount, 1);
 });
 
 test('buildGanttModel preserves WBS sort order before milestone append', () => {

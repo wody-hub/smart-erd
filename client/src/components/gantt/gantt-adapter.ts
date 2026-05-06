@@ -39,6 +39,10 @@ export interface GanttTaskStats {
   dependencyTaskCount: number;
   /** milestone 수렴 연결 수 */
   milestoneFlowCount: number;
+  /** 계획 대비 지연/편차가 있는 WBS 수 */
+  delayedTaskCount: number;
+  /** actual 일정이 기록돼 계획과 비교 가능한 WBS 수 */
+  comparedTaskCount: number;
 }
 
 /** rolling-wave 요약용 마일스톤 스냅샷. */
@@ -87,6 +91,8 @@ export interface GanttWbsMeta extends GanttConnectivityMeta {
   kind: 'wbs';
   wbsId: number;
   original: WbsItem;
+  isDelayed: boolean;
+  hasActualDates: boolean;
 }
 
 /** Summary 메타 정보. */
@@ -118,6 +124,17 @@ export type GanttTask = ITask & {
   isDelayed?: boolean;
   linkedWbsItemCount?: number;
   original?: WbsItem;
+  plannedStartDate?: string | null;
+  plannedEndDate?: string | null;
+  actualStartDate?: string | null;
+  actualEndDate?: string | null;
+  plannedProgressRate?: number | null;
+  progressVarianceRate?: number | null;
+  startVarianceDays?: number | null;
+  endVarianceDays?: number | null;
+  hasActualDates?: boolean;
+  base_start?: Date;
+  base_end?: Date;
 };
 
 /** 간트 링크 종류 메타 타입. */
@@ -182,6 +199,15 @@ function toOwnRange(item: WbsItem): DateRange | null {
   return { start, end };
 }
 
+function toActualRange(item: WbsItem): DateRange | null {
+  const start = tryParseDateOnly(item.actualStartDate ?? null);
+  const end = tryParseDateOnly(item.actualEndDate ?? null);
+  if (!start || !end) {
+    return null;
+  }
+  return { start, end };
+}
+
 function mergeRange(target: DateRange | null, source: DateRange | null): DateRange | null {
   if (!source) {
     return target;
@@ -204,6 +230,19 @@ function createConnectivityMeta(): GanttConnectivityMeta {
     outboundDependencyCount: 0,
     hasDependencies: false,
   };
+}
+
+function isDelayedWbsItem(item: WbsItem): boolean {
+  if ((item.progressVarianceRate ?? 0) < 0) {
+    return true;
+  }
+  if ((item.startVarianceDays ?? 0) > 0) {
+    return true;
+  }
+  if ((item.endVarianceDays ?? 0) > 0) {
+    return true;
+  }
+  return false;
 }
 
 function mapDependencyTypeToLinkType(type: WbsDependencyType): GanttLink['type'] {
@@ -323,6 +362,8 @@ export function buildGanttModel(input: BuildGanttModelInput): GanttModel {
     dependencyCount: 0,
     dependencyTaskCount: 0,
     milestoneFlowCount: 0,
+    delayedTaskCount: 0,
+    comparedTaskCount: 0,
   };
 
   let combinedRange: DateRange | null = null;
@@ -333,7 +374,10 @@ export function buildGanttModel(input: BuildGanttModelInput): GanttModel {
 
   orderedWbsItems.forEach((item) => {
     const ownRange = ownRangeById.get(item.id) ?? null;
+    const actualRange = toActualRange(item);
     const parent = item.parentId ?? undefined;
+    const isDelayed = isDelayedWbsItem(item);
+    const hasActualDates = actualRange != null;
 
     if (ownRange) {
       const task: GanttTask = {
@@ -348,13 +392,38 @@ export function buildGanttModel(input: BuildGanttModelInput): GanttModel {
         kind: 'wbs',
         wbsId: item.id,
         original: item,
+        isDelayed,
+        plannedStartDate: item.startDate,
+        plannedEndDate: item.endDate,
+        actualStartDate: item.actualStartDate,
+        actualEndDate: item.actualEndDate,
+        plannedProgressRate: item.plannedProgressRate,
+        progressVarianceRate: item.progressVarianceRate,
+        startVarianceDays: item.startVarianceDays,
+        endVarianceDays: item.endVarianceDays,
+        hasActualDates,
+        ...(actualRange
+          ? {
+              base_start: actualRange.start,
+              base_end: actualRange.end,
+            }
+          : {}),
       };
       tasks.push(task);
       stats.datedTaskCount += 1;
+      if (isDelayed) {
+        stats.delayedTaskCount += 1;
+      }
+      if (hasActualDates) {
+        stats.comparedTaskCount += 1;
+        combinedRange = mergeRange(combinedRange, actualRange);
+      }
       taskMetaById.set(String(task.id), {
         kind: 'wbs',
         wbsId: item.id,
         original: item,
+        isDelayed,
+        hasActualDates,
         ...createConnectivityMeta(),
       });
       combinedRange = mergeRange(combinedRange, ownRange);

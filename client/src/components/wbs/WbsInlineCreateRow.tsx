@@ -7,10 +7,12 @@ import { TableCell, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { TREE_INDENT } from './wbs-tree-utils';
 
+const PAGE_ROW_DIVIDER_CLASS = 'border-b-0 shadow-[inset_0_-1px_0_hsl(var(--border)/0.95)]';
+
 /** WbsInlineCreateRow props. */
 interface WbsInlineCreateRowProps {
   /** root 여부 */
-  kind: 'root' | 'child';
+  kind: 'root' | 'child' | 'sibling';
   /** 생성할 부모 ID */
   parentId: number | null;
   /** 새 row 깊이 */
@@ -53,7 +55,12 @@ export default function WbsInlineCreateRow({
     inputRef.current?.focus();
   }, [active]);
 
-  const promptLabel = kind === 'root' ? t('wbs.quickAdd.root') : t('wbs.quickAdd.child');
+  const promptLabel =
+    kind === 'root'
+      ? t('wbs.quickAdd.root')
+      : kind === 'child'
+        ? t('wbs.quickAdd.child')
+        : t('wbs.quickAdd.sibling');
 
   /**
    * inline 생성 row를 원래 상태로 되돌린다.
@@ -91,12 +98,12 @@ export default function WbsInlineCreateRow({
   if (!active) {
     return (
       <TableRow className="hover:bg-transparent">
-        <TableCell colSpan={columnCount} className="px-3 py-2">
+        <TableCell colSpan={columnCount} className={cn(PAGE_ROW_DIVIDER_CLASS, 'px-3 py-2')}>
           <button
             type="button"
             className={cn(
               'flex w-full items-center gap-2 rounded-md border border-dashed border-border/70 px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:border-primary/35 hover:bg-secondary/35 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-2',
-              kind === 'child' && 'ml-1',
+              (kind === 'child' || kind === 'sibling') && 'ml-1',
             )}
             onClick={() => setActive(true)}
             aria-label={
@@ -107,7 +114,7 @@ export default function WbsInlineCreateRow({
             <span
               className="truncate"
               style={{
-                paddingLeft: kind === 'child' ? `${Math.max(depth - 1, 0) * TREE_INDENT}px` : 0,
+                paddingLeft: kind === 'root' ? 0 : `${Math.max(depth - 1, 0) * TREE_INDENT}px`,
               }}
             >
               {promptLabel}
@@ -120,7 +127,7 @@ export default function WbsInlineCreateRow({
 
   return (
     <TableRow className="bg-secondary/20 hover:bg-secondary/25">
-      <TableCell>
+      <TableCell className={PAGE_ROW_DIVIDER_CLASS}>
         <div className="space-y-1">
           <div
             className="flex items-center gap-2"
@@ -157,12 +164,22 @@ export default function WbsInlineCreateRow({
         </div>
       </TableCell>
 
-      <TableCell className="text-sm text-muted-foreground">{t('wbs.quickAdd.setLater')}</TableCell>
-      <TableCell className="text-sm text-muted-foreground">{t('wbs.quickAdd.setLater')}</TableCell>
-      <TableCell className="text-sm text-muted-foreground">{t('wbs.quickAdd.setLater')}</TableCell>
-      <TableCell className="text-sm text-muted-foreground">{t('wbs.quickAdd.setLater')}</TableCell>
-      <TableCell className="text-sm text-muted-foreground">{t('wbs.quickAdd.setLater')}</TableCell>
-      <TableCell>
+      <TableCell className={cn(PAGE_ROW_DIVIDER_CLASS, 'text-sm text-muted-foreground')}>
+        {t('wbs.quickAdd.setLater')}
+      </TableCell>
+      <TableCell className={cn(PAGE_ROW_DIVIDER_CLASS, 'text-sm text-muted-foreground')}>
+        {t('wbs.quickAdd.setLater')}
+      </TableCell>
+      <TableCell className={cn(PAGE_ROW_DIVIDER_CLASS, 'text-sm text-muted-foreground')}>
+        {t('wbs.quickAdd.setLater')}
+      </TableCell>
+      <TableCell className={cn(PAGE_ROW_DIVIDER_CLASS, 'text-sm text-muted-foreground')}>
+        {t('wbs.quickAdd.setLater')}
+      </TableCell>
+      <TableCell className={cn(PAGE_ROW_DIVIDER_CLASS, 'text-sm text-muted-foreground')}>
+        {t('wbs.quickAdd.setLater')}
+      </TableCell>
+      <TableCell className={PAGE_ROW_DIVIDER_CLASS}>
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={() => void handleSubmit()} disabled={loading}>
             {t('wbs.quickAdd.add')}

@@ -29,6 +29,10 @@ public record CreateWbsItemRequest(
 
     @Schema(description = "종료일", example = "2026-04-30") @Nullable LocalDate endDate,
 
+    @Schema(description = "실적 시작일", example = "2026-04-22") @Nullable LocalDate actualStartDate,
+
+    @Schema(description = "실적 종료일", example = "2026-05-02") @Nullable LocalDate actualEndDate,
+
     @Schema(description = "진척률 (0~100)", example = "20")
     @Nullable
     @Min(value = 0, message = "{validation.min.wbs-progress-rate}")
@@ -45,5 +49,10 @@ public record CreateWbsItemRequest(
     @AssertTrue(message = "{validation.wbs-period.invalid}")
     public boolean isPeriodValid() {
         return startDate == null || endDate == null || !startDate.isAfter(endDate);
+    }
+
+    @AssertTrue(message = "{validation.wbs-period.invalid}")
+    public boolean isActualPeriodValid() {
+        return actualStartDate == null || actualEndDate == null || !actualStartDate.isAfter(actualEndDate);
     }
 }

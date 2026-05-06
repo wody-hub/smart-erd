@@ -1,3 +1,5 @@
+import type { WbsDependency } from './wbs-dependency';
+
 /** WBS 항목 응답 모델. */
 export interface WbsItem {
   /** WBS 항목 ID */
@@ -18,8 +20,20 @@ export interface WbsItem {
   startDate: string | null;
   /** 종료일 (yyyy-MM-dd) */
   endDate: string | null;
+  /** 실적 시작일 (yyyy-MM-dd) */
+  actualStartDate: string | null;
+  /** 실적 종료일 (yyyy-MM-dd) */
+  actualEndDate: string | null;
   /** 진척률 (0~100) */
   progressRate: number;
+  /** 기준일 기준 계획 진척률 (0~100) */
+  plannedProgressRate: number | null;
+  /** 실적 진척률 대비 계획 진척률 편차 */
+  progressVarianceRate: number | null;
+  /** 계획 시작일 대비 실적 시작일 편차 일수 */
+  startVarianceDays: number | null;
+  /** 계획 종료일 대비 실적 종료일 편차 일수 */
+  endVarianceDays: number | null;
   /** 예상 투입 M/M */
   estimatedMm: number | null;
   /** 연결 마일스톤 ID */
@@ -148,6 +162,10 @@ export interface CreateWbsItemPayload {
   startDate: string | null;
   /** 종료일 (yyyy-MM-dd) */
   endDate: string | null;
+  /** 실적 시작일 (yyyy-MM-dd) */
+  actualStartDate: string | null;
+  /** 실적 종료일 (yyyy-MM-dd) */
+  actualEndDate: string | null;
   /** 진척률 (0~100) */
   progressRate: number | null;
   /** 예상 투입 M/M */
@@ -166,6 +184,10 @@ export interface UpdateWbsItemPayload {
   startDate: string | null;
   /** 종료일 (yyyy-MM-dd) */
   endDate: string | null;
+  /** 실적 시작일 (yyyy-MM-dd) */
+  actualStartDate: string | null;
+  /** 실적 종료일 (yyyy-MM-dd) */
+  actualEndDate: string | null;
   /** 진척률 (0~100) */
   progressRate: number;
   /** 예상 투입 M/M */
@@ -194,4 +216,158 @@ export interface ReorderWbsPayload {
 export interface CreateWbsCommentPayload {
   /** 댓글 내용 */
   content: string;
+}
+
+/** WBS 템플릿 요약 응답 모델. */
+export interface WbsTemplateSummary {
+  /** 템플릿 ID */
+  id: number;
+  /** 템플릿 이름 */
+  name: string;
+  /** 템플릿 설명 */
+  description: string | null;
+  /** 원본 루트 항목 이름 */
+  rootName: string;
+  /** 포함된 WBS 항목 수 */
+  itemCount: number;
+  /** 포함된 dependency 수 */
+  dependencyCount: number;
+  /** 생성 시각 */
+  createdAt: string;
+  /** 수정 시각 */
+  updatedAt: string;
+}
+
+/** WBS 템플릿 저장 payload. */
+export interface SaveWbsTemplatePayload {
+  /** 스냅샷으로 저장할 subtree 루트 WBS ID */
+  sourceWbsItemId: number;
+  /** 템플릿 이름 */
+  name: string;
+  /** 템플릿 설명 */
+  description: string | null;
+}
+
+/** WBS subtree/템플릿 생성 공통 payload. */
+export interface WbsSubtreeInstantiationPayload {
+  /** 생성 대상 부모 WBS ID */
+  parentId: number | null;
+  /** 담당자 초기화 여부 */
+  resetAssignee: boolean;
+  /** 일정 초기화 여부 */
+  resetSchedule: boolean;
+  /** 진척률 초기화 여부 */
+  resetProgress: boolean;
+  /** 마일스톤 초기화 여부 */
+  resetMilestone: boolean;
+  /** subtree 내부 dependency 포함 여부 */
+  includeDependencies: boolean;
+}
+
+/** WBS subtree 생성/복제 응답 모델. */
+export interface WbsSubtreeMutationResponse {
+  /** 생성된 subtree 루트 WBS ID */
+  rootItemId: number;
+  /** 생성된 WBS 항목 목록 */
+  items: WbsItem[];
+  /** 생성된 dependency 목록 */
+  dependencies: WbsDependency[];
+}
+
+/** WBS 대량 생성 단일 항목 payload. */
+export interface BulkCreateWbsItemPayload {
+  /** 요청 항목 고유 키 */
+  clientKey: string;
+  /** 이미 존재하는 부모 WBS ID */
+  parentId: number | null;
+  /** 같은 요청 안에서 생성된 부모 항목 키 */
+  parentClientKey: string | null;
+  /** 항목명 */
+  name: string;
+  /** 담당자 사용자 ID */
+  assigneeUserId: number | null;
+  /** 시작일 */
+  startDate: string | null;
+  /** 종료일 */
+  endDate: string | null;
+  /** 진척률 */
+  progressRate: number | null;
+  /** 예상 투입 M/M */
+  estimatedMm: number | null;
+  /** 연결 마일스톤 ID */
+  milestoneId: number | null;
+}
+
+/** WBS 대량 생성 payload. */
+export interface BulkCreateWbsItemsPayload {
+  /** 생성할 항목 목록 */
+  items: BulkCreateWbsItemPayload[];
+}
+
+/** WBS 대량 생성 결과 항목. */
+export interface WbsCreatedItemMapping {
+  /** 요청 clientKey */
+  clientKey: string;
+  /** 생성된 WBS 항목 */
+  item: WbsItem;
+}
+
+/** WBS 대량 생성 응답 모델. */
+export interface BulkCreateWbsItemsResponse {
+  /** 생성 결과 목록 */
+  items: WbsCreatedItemMapping[];
+}
+
+/** dependency shift anchor payload. */
+export interface WbsDependencyShiftAnchorPayload {
+  /** 직접 이동한 WBS ID */
+  wbsItemId: number;
+  /** 이동 후 시작일 */
+  startDate: string | null;
+  /** 이동 후 종료일 */
+  endDate: string | null;
+}
+
+/** dependency shift preview/apply payload. */
+export interface WbsDependencyShiftPayload {
+  /** 직접 이동한 anchor 목록 */
+  anchors: WbsDependencyShiftAnchorPayload[];
+}
+
+/** dependency shift preview/apply 변경 항목. */
+export interface WbsDependencyShiftUpdate {
+  /** 대상 WBS ID */
+  wbsItemId: number;
+  /** 변경 전 시작일 */
+  originalStartDate: string | null;
+  /** 변경 전 종료일 */
+  originalEndDate: string | null;
+  /** 변경 후 시작일 */
+  startDate: string | null;
+  /** 변경 후 종료일 */
+  endDate: string | null;
+  /** anchor 변경 여부 */
+  anchor: boolean;
+}
+
+/** dependency shift 검증 이슈. */
+export interface WbsDependencyShiftIssue {
+  /** 관련 WBS ID */
+  wbsItemId: number | null;
+  /** 검증 코드 */
+  code: string;
+  /** 검증 메시지 */
+  message: string;
+}
+
+/** dependency shift preview/apply 응답 모델. */
+export interface WbsDependencyShiftResponse {
+  /** dependency graph validation 통과 여부 */
+  graphValid: boolean;
+  /** 실제 반영 여부 */
+  applied: boolean;
+  /** 변경 제안/적용 목록 */
+  updates: WbsDependencyShiftUpdate[];
+  /** 검증 이슈 목록 */
+  issues: WbsDependencyShiftIssue[];
 }

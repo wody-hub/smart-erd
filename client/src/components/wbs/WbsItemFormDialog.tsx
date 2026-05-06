@@ -43,6 +43,10 @@ export interface WbsItemFormValues {
   startDate: string | null;
   /** 종료일 */
   endDate: string | null;
+  /** 실적 시작일 */
+  actualStartDate: string | null;
+  /** 실적 종료일 */
+  actualEndDate: string | null;
   /** 진척률 */
   progressRate: number;
   /** 예상 M/M */
@@ -101,6 +105,8 @@ export default function WbsItemFormDialog({
   const [assigneeUserId, setAssigneeUserId] = useState(UNASSIGNED_VALUE);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [actualStartDate, setActualStartDate] = useState('');
+  const [actualEndDate, setActualEndDate] = useState('');
   const [progressRate, setProgressRate] = useState('0');
   const [estimatedMm, setEstimatedMm] = useState('');
   const [milestoneId, setMilestoneId] = useState(NO_MILESTONE_VALUE);
@@ -127,6 +133,8 @@ export default function WbsItemFormDialog({
     );
     setStartDate(initialData?.startDate ?? '');
     setEndDate(initialData?.endDate ?? '');
+    setActualStartDate(initialData?.actualStartDate ?? '');
+    setActualEndDate(initialData?.actualEndDate ?? '');
     setProgressRate(String(initialData?.progressRate ?? 0));
     setEstimatedMm(initialData?.estimatedMm != null ? String(initialData.estimatedMm) : '');
     setMilestoneId(
@@ -149,6 +157,10 @@ export default function WbsItemFormDialog({
 
     if (!isDateOrderValid(startDate, endDate)) {
       toast.error(t('wbs.validation.dateOrder'));
+      return;
+    }
+    if (!isDateOrderValid(actualStartDate, actualEndDate)) {
+      toast.error(t('wbs.validation.actualDateOrder'));
       return;
     }
 
@@ -174,6 +186,8 @@ export default function WbsItemFormDialog({
       assigneeUserId: assigneeUserId === UNASSIGNED_VALUE ? null : Number(assigneeUserId),
       startDate: startDate || null,
       endDate: endDate || null,
+      actualStartDate: actualStartDate || null,
+      actualEndDate: actualEndDate || null,
       progressRate: parsedProgressRate,
       estimatedMm: parsedEstimatedMm,
       milestoneId: milestoneId === NO_MILESTONE_VALUE ? null : Number(milestoneId),
@@ -305,6 +319,26 @@ export default function WbsItemFormDialog({
                 step={1}
                 value={progressRate}
                 onChange={(event) => setProgressRate(event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="wbs-actual-start-date">{t('wbs.form.actualStartDate')}</Label>
+              <Input
+                id="wbs-actual-start-date"
+                type="date"
+                value={actualStartDate}
+                onChange={(event) => setActualStartDate(event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="wbs-actual-end-date">{t('wbs.form.actualEndDate')}</Label>
+              <Input
+                id="wbs-actual-end-date"
+                type="date"
+                value={actualEndDate}
+                onChange={(event) => setActualEndDate(event.target.value)}
               />
             </div>
 

@@ -1,15 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Clock3, ExternalLink, Link2, MessageSquare, Route, Send, Workflow } from 'lucide-react';
+import {
+  CalendarRange,
+  Clock3,
+  ExternalLink,
+  Link2,
+  MessageSquare,
+  Route,
+  Send,
+  Workflow,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
+  applyWbsDependencyShift,
   createWbsComment,
   fetchWbsActivities,
   fetchWbsComments,
   fetchWbsLinkedDocuments,
   linkWbsDocument,
+  previewWbsDependencyShift,
   unlinkWbsDocument,
 } from '@/api/wbsApi';
 import {
@@ -41,6 +52,9 @@ import type { SharedTodoSummary } from '@/types/project-todo';
 import type { DiagramSummary } from '@/types/diagram';
 import type { WorkspaceDocumentType } from '@/types/workspace';
 import type { WbsActivity, WbsActivityEventType, WbsItem } from '@/types/wbs';
+import WbsDependencyShiftDialog from './WbsDependencyShiftDialog';
+import WbsLevelBadge from './WbsLevelBadge';
+import { shiftDateByDays } from './wbs-authoring-utils';
 import { buildWbsDependencySummary } from './wbs-dependency-summary';
 import WbsDocumentLinkDialog from './WbsDocumentLinkDialog';
 
@@ -111,6 +125,8 @@ export default function WbsDetailPanel({
   const [activityFilter, setActivityFilter] = useState<'all' | 'document' | 'status'>('all');
   const [selectedPredecessorId, setSelectedPredecessorId] = useState(NO_DEPENDENCY_TARGET);
   const [selectedSuccessorId, setSelectedSuccessorId] = useState(NO_DEPENDENCY_TARGET);
+  const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
+  const [shiftDaysValue, setShiftDaysValue] = useState('1');
 
   const linkedDocumentsQuery = useQuery({
     queryKey: queryKeys.wbs.linkedDocuments(teamId, projectId, item?.id ?? null),
@@ -140,6 +156,30 @@ export default function WbsDetailPanel({
     queryKey: queryKeys.wbs.sharedTodos(teamId, projectId, item?.id ?? null),
     queryFn: () => fetchSharedTodoSummaries(teamId, projectId, item!.id),
     enabled: item != null,
+  });
+
+  const shiftDays = Number.parseInt(shiftDaysValue, 10);
+  const shiftAnchor = useMemo(() => {
+    if (!item || Number.isNaN(shiftDays) || shiftDays === 0) {
+      return null;
+    }
+    return {
+      wbsItemId: item.id,
+      startDate: shiftDateByDays(item.startDate, shiftDays),
+      endDate: shiftDateByDays(item.endDate, shiftDays),
+    };
+  }, [item, shiftDays]);
+
+  const dependencyShiftPreviewQuery = useQuery({
+    queryKey: [
+      ...queryKeys.wbs.dependencies(teamId, projectId),
+      'preview',
+      shiftAnchor?.wbsItemId ?? null,
+      shiftAnchor?.startDate ?? null,
+      shiftAnchor?.endDate ?? null,
+    ],
+    queryFn: () => previewWbsDependencyShift(teamId, projectId, { anchors: [shiftAnchor!] }),
+    enabled: shiftDialogOpen && shiftAnchor != null,
   });
 
   const linkedDocumentIds = useMemo(
@@ -317,6 +357,27 @@ export default function WbsDetailPanel({
       toast.error(getErrorMessage(error, t('wbs.details.toast.dependencyDeleteFailed'))),
   });
 
+  const shiftDependencyMutation = useMutation({
+    mutationFn: async () => {
+      if (!shiftAnchor) {
+        return;
+      }
+      const result = await applyWbsDependencyShift(teamId, projectId, { anchors: [shiftAnchor] });
+      if (result.issues.length > 0) {
+        throw new Error(result.issues.map((issue) => issue.message).join('\n'));
+      }
+    },
+    onSuccess: () => {
+      setShiftDialogOpen(false);
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.wbs.all(teamId, projectId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.wbs.dependencies(teamId, projectId) }),
+      ]);
+      toast.success(t('wbs.details.toast.shiftApplied'));
+    },
+    onError: (error) => toast.error(getErrorMessage(error, t('wbs.details.toast.shiftApplyFailed'))),
+  });
+
   const activityCounts = useMemo(() => {
     const activities = activitiesQuery.data ?? [];
     return {
@@ -340,6 +401,12 @@ export default function WbsDetailPanel({
     setSelectedPredecessorId(NO_DEPENDENCY_TARGET);
     setSelectedSuccessorId(NO_DEPENDENCY_TARGET);
   }, [item?.id]);
+
+  useEffect(() => {
+    if (!shiftDialogOpen) {
+      setShiftDaysValue('1');
+    }
+  }, [shiftDialogOpen, item?.id]);
 
   if (!item) {
     return (
@@ -370,11 +437,14 @@ export default function WbsDetailPanel({
       <Card className="min-h-[420px]">
         <CardHeader className="space-y-4">
           <div className="flex items-start justify-between gap-3">
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <CardTitle className="text-xl">{item.name}</CardTitle>
               <CardDescription>{t('wbs.details.description')}</CardDescription>
             </div>
-            <Badge variant="outline">{t('wbs.details.level', { level: item.depth + 1 })}</Badge>
+            <WbsLevelBadge
+              label={t('wbs.details.level', { level: item.depth + 1 })}
+              className="text-xs"
+            />
           </div>
 
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -402,6 +472,17 @@ export default function WbsDetailPanel({
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                {canEdit ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShiftDialogOpen(true)}
+                  >
+                    <CalendarRange className="mr-2 h-4 w-4" />
+                    {t('wbs.shift.open')}
+                  </Button>
+                ) : null}
                 <Badge variant={dependencySummary?.isInCurrentWave ? 'default' : 'secondary'}>
                   {dependencySummary?.isInCurrentWave
                     ? t('wbs.details.dependencies.summary.currentWave')
@@ -1089,6 +1170,18 @@ export default function WbsDetailPanel({
         onConfirm={async (documentId) => {
           await linkMutation.mutateAsync(documentId);
         }}
+      />
+      <WbsDependencyShiftDialog
+        open={shiftDialogOpen}
+        onOpenChange={setShiftDialogOpen}
+        item={item}
+        allItems={allItems}
+        shiftDaysValue={shiftDaysValue}
+        onShiftDaysValueChange={setShiftDaysValue}
+        preview={dependencyShiftPreviewQuery.data ?? null}
+        previewLoading={dependencyShiftPreviewQuery.isFetching}
+        loading={shiftDependencyMutation.isPending}
+        onApply={() => shiftDependencyMutation.mutateAsync()}
       />
     </>
   );

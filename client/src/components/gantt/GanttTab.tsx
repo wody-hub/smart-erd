@@ -11,6 +11,7 @@ import { fetchWbsDependencies } from '@/api/wbsDependencyApi';
 import { fetchWbsItems, updateWbsItem } from '@/api/wbsApi';
 import { Button } from '@/components/ui/button';
 import Spinner from '@/components/ui/spinner';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import WorkspaceEmptyState from '@/components/workspace/WorkspaceEmptyState';
 import { queryKeys } from '@/constants/query-keys';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -51,6 +52,26 @@ interface GanttRangeOverride {
 
 type GanttViewFilter = 'all' | 'milestones' | 'delayed';
 
+function formatSchedulePeriod(startDate: string | null, endDate: string | null): string {
+  if (!startDate && !endDate) {
+    return '-';
+  }
+  if (startDate && endDate) {
+    return `${startDate} - ${endDate}`;
+  }
+  return startDate ?? endDate ?? '-';
+}
+
+function formatSignedValue(value: number | null | undefined, suffix = ''): string {
+  if (value == null || Number.isNaN(value)) {
+    return '-';
+  }
+  if (value > 0) {
+    return `+${value}${suffix}`;
+  }
+  return `${value}${suffix}`;
+}
+
 function buildPersistencePayload(
   item: WbsItem,
   startDate: string,
@@ -61,6 +82,8 @@ function buildPersistencePayload(
     assigneeUserId: item.assigneeUserId,
     startDate,
     endDate,
+    actualStartDate: item.actualStartDate ?? null,
+    actualEndDate: item.actualEndDate ?? null,
     progressRate: item.progressRate,
     estimatedMm: item.estimatedMm,
     milestoneId: item.milestoneId,
@@ -146,7 +169,7 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
     }
 
     if (viewFilter === 'delayed') {
-      return renderedTasks.filter((task) => task.kind === 'milestone' && task.isDelayed);
+      return renderedTasks.filter((task) => task.isDelayed);
     }
 
     return renderedTasks;
@@ -162,6 +185,10 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
           filteredTaskIdSet.has(String(link.source)) && filteredTaskIdSet.has(String(link.target)),
       ),
     [filteredTaskIdSet, model.links],
+  );
+  const hasActualComparisons = useMemo(
+    () => filteredTasks.some((task) => task.kind === 'wbs' && task.hasActualDates),
+    [filteredTasks],
   );
 
   const wbsById = useMemo(
@@ -209,6 +236,30 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
           const progress = Number(task.progress ?? 0);
           const normalized = Math.round(Math.min(Math.max(progress, 0), 100));
           return `${normalized}%`;
+        },
+      },
+      {
+        id: 'actual',
+        header: t('gantt.grid.actual'),
+        width: 220,
+        resize: false,
+        getter: (task) => {
+          if (task.kind !== 'wbs') {
+            return '-';
+          }
+          return formatSchedulePeriod(task.actualStartDate ?? null, task.actualEndDate ?? null);
+        },
+      },
+      {
+        id: 'gap',
+        header: t('gantt.grid.progressGap'),
+        width: 120,
+        resize: false,
+        getter: (task) => {
+          if (task.kind !== 'wbs') {
+            return '-';
+          }
+          return formatSignedValue(task.progressVarianceRate, 'pp');
         },
       },
     ];
@@ -270,6 +321,8 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
     const resetClasses = [
       'gantt-task--has-dependency',
       'gantt-task--milestone-linked',
+      'gantt-task--compared',
+      'gantt-task--delayed',
       'gantt-task--selected',
       'gantt-task--predecessor',
       'gantt-task--successor',
@@ -311,6 +364,14 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
           element.classList.toggle(
             'gantt-task--milestone-linked',
             taskMeta.milestoneTaskId != null,
+          );
+          element.classList.toggle(
+            'gantt-task--compared',
+            taskMeta.kind === 'wbs' && taskMeta.hasActualDates,
+          );
+          element.classList.toggle(
+            'gantt-task--delayed',
+            taskMeta.kind === 'wbs' ? taskMeta.isDelayed : Boolean(task.isDelayed),
           );
           element.classList.toggle('gantt-task--selected', selectedTaskId === String(task.id));
           element.classList.toggle('gantt-task--predecessor', predecessorSet.has(String(task.id)));
@@ -604,10 +665,15 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
   const activeRange = rangeOverride ?? model.range;
   const focusMilestone = model.waveSummary.focusMilestone;
   const hasFilteredTasks = filteredTasks.length > 0;
+  const selectedTask =
+    selectedTaskId == null
+      ? null
+      : (filteredTasks.find((task) => String(task.id) === selectedTaskId) ?? null);
+  const selectedWbsTask = selectedTask?.kind === 'wbs' ? selectedTask : null;
 
   return (
     <div className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
-      <div className="grid gap-3 rounded-xl border border-border/70 bg-background/60 p-4 lg:grid-cols-3">
+      <div className="grid gap-3 rounded-xl border border-border/70 bg-background/60 p-4 lg:grid-cols-4">
         <div className="space-y-1">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {t('gantt.wave.currentWave')}
@@ -656,6 +722,21 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
           <p className="text-xs text-muted-foreground">
             {t('gantt.wave.futureCandidatesHint', {
               count: model.waveSummary.futureTaskCount,
+            })}
+          </p>
+        </div>
+        <div className="space-y-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {t('gantt.comparison.title')}
+          </p>
+          <p className="text-sm font-semibold text-foreground">
+            {t('gantt.comparison.value', {
+              count: model.stats.comparedTaskCount,
+            })}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t('gantt.comparison.hint', {
+              delayed: model.stats.delayedTaskCount,
             })}
           </p>
         </div>
@@ -734,7 +815,7 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
                 links={filteredLinks}
                 zoom={false}
                 rollups={false}
-                baselines={false}
+                baselines={hasActualComparisons}
                 criticalPath={{ type: 'strict' }}
                 summary={{ autoConvert: false, autoProgress: false }}
               />
@@ -752,7 +833,54 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
         )}
       </div>
 
-      <div className="grid gap-3 rounded-xl border border-border/70 bg-background/60 p-4 lg:grid-cols-4">
+      {selectedWbsTask ? (
+        <div className="grid gap-3 rounded-xl border border-border/70 bg-background/60 p-4 lg:grid-cols-4">
+          <div>
+            <p className="text-xs text-muted-foreground">{t('gantt.grid.planned')}</p>
+            <p className="text-sm font-semibold text-foreground">
+              {formatSchedulePeriod(
+                selectedWbsTask.plannedStartDate ?? null,
+                selectedWbsTask.plannedEndDate ?? null,
+              )}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{t('gantt.grid.actual')}</p>
+            <p className="text-sm font-semibold text-foreground">
+              {formatSchedulePeriod(
+                selectedWbsTask.actualStartDate ?? null,
+                selectedWbsTask.actualEndDate ?? null,
+              )}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{t('gantt.grid.progressGap')}</p>
+            <p
+              className={cn(
+                'text-sm font-semibold',
+                (selectedWbsTask.progressVarianceRate ?? 0) < 0
+                  ? 'text-destructive'
+                  : 'text-foreground',
+              )}
+            >
+              {formatSignedValue(selectedWbsTask.progressVarianceRate, 'pp')}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{t('gantt.grid.finishVariance')}</p>
+            <p
+              className={cn(
+                'text-sm font-semibold',
+                (selectedWbsTask.endVarianceDays ?? 0) > 0 ? 'text-destructive' : 'text-foreground',
+              )}
+            >
+              {formatSignedValue(selectedWbsTask.endVarianceDays, t('gantt.grid.daysSuffix'))}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 rounded-xl border border-border/70 bg-background/60 p-4 lg:grid-cols-5">
         <div>
           <p className="text-xs text-muted-foreground">{t('wbs.tab.title')}</p>
           <p className="text-sm font-semibold text-foreground">{model.stats.datedTaskCount}</p>
@@ -774,6 +902,13 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
             {t('gantt.stats.milestoneFlow', { count: model.stats.milestoneFlowCount })}
           </p>
         </div>
+        <div>
+          <p className="text-xs text-muted-foreground">{t('gantt.comparison.title')}</p>
+          <p className="text-sm font-semibold text-foreground">{model.stats.comparedTaskCount}</p>
+          <p className="text-xs text-muted-foreground">
+            {t('gantt.stats.delayedTasks', { count: model.stats.delayedTaskCount })}
+          </p>
+        </div>
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">{t('gantt.legend.title')}</p>
           <p className="inline-flex items-center gap-2 text-sm text-foreground">
@@ -784,6 +919,17 @@ export default function GanttTab({ teamId, projectId, canEdit }: GanttTabProps) 
             <span className="gantt-legend-line gantt-legend-line--milestone" />
             {t('gantt.legend.linkedToMilestone')}
           </p>
+          <TooltipProvider delayDuration={180}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <p className="inline-flex cursor-help items-center gap-2 text-sm text-foreground">
+                  <span className="gantt-legend-line gantt-legend-line--actual" />
+                  {t('gantt.legend.actual')}
+                </p>
+              </TooltipTrigger>
+              <TooltipContent>{t('gantt.legend.actualHint')}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <p className="inline-flex items-center gap-2 text-sm text-foreground">
             <span className="gantt-legend-marker gantt-legend-marker--on-track" />
             {t('gantt.legend.onTrack')}

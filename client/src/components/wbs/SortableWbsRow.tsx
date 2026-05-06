@@ -1,37 +1,27 @@
-import { useEffect, useState } from 'react';
+import { type KeyboardEvent, useEffect, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { TFunction } from 'i18next';
-import {
-  ArrowRightLeft,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  GripVertical,
-  Pencil,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, GripVertical, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { TableCell, TableRow } from '@/components/ui/table';
-import { formatProjectDate, isDateOrderValid } from '@/lib/format';
+import { isDateOrderValid } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { Milestone } from '@/types/milestone';
 import type { TeamMember } from '@/types/team';
-import type { UpdateWbsItemPayload, WbsItem } from '@/types/wbs';
+import type { UpdateWbsItemPayload, WbsItem, WbsTemplateSummary } from '@/types/wbs';
+import { SortableWbsRowActionStrip } from './SortableWbsRowActionStrip';
+import { SortableWbsRowCells } from './SortableWbsRowCells';
+import {
+  NO_MILESTONE_VALUE,
+  UNASSIGNED_VALUE,
+} from './sortable-wbs-row-formatters';
+import { getWbsRowSurfaceClasses } from './sortable-wbs-row-surface';
+import type { WbsVisibleColumn } from './wbs-authoring-utils';
+import WbsLevelBadge from './WbsLevelBadge';
 import { TREE_INDENT } from './wbs-tree-utils';
-
-const UNASSIGNED_VALUE = '__unassigned__';
-const NO_MILESTONE_VALUE = '__none__';
 
 type InlineEditor =
   | 'name'
@@ -52,6 +42,8 @@ export interface SortableWbsRowProps {
   locale: string;
   /** 담당자 이름 */
   assigneeName: string | null;
+  /** 보이는 컬럼 집합 */
+  visibleColumns: Set<WbsVisibleColumn>;
   /** 연결 마일스톤 이름 */
   milestoneName: string | null;
   /** 자식 항목 존재 여부 */
@@ -97,59 +89,52 @@ export interface SortableWbsRowProps {
   onSelect?: (item: WbsItem) => void;
   /** 현재 선택 상태 */
   selected?: boolean;
+  /** dedicated page 여부 */
+  pageAuthoringMode?: boolean;
+  /** 같은 레벨 아래 추가 가능 여부 */
+  canAddBelow?: boolean;
+  /** 하위 추가 가능 여부 */
+  canAddChild?: boolean;
+  /** 위로 이동 가능 여부 */
+  canMoveUp?: boolean;
+  /** 아래로 이동 가능 여부 */
+  canMoveDown?: boolean;
+  /** 들여쓰기 가능 여부 */
+  canIndent?: boolean;
+  /** 내어쓰기 가능 여부 */
+  canOutdent?: boolean;
+  /** 같은 레벨 아래 inline composer 열기 */
+  onAddBelow?: (item: WbsItem) => void;
+  /** 하위 inline composer 열기 */
+  onAddChild?: (item: WbsItem) => void;
+  /** 위로 이동 */
+  onMoveUp?: (item: WbsItem) => void;
+  /** 아래로 이동 */
+  onMoveDown?: (item: WbsItem) => void;
+  /** 들여쓰기 */
+  onIndent?: (item: WbsItem) => void;
+  /** 내어쓰기 */
+  onOutdent?: (item: WbsItem) => void;
+  /** 저장된 템플릿 */
+  templates?: WbsTemplateSummary[];
+  /** 하위 트리 복제 */
+  onDuplicate?: (item: WbsItem) => void;
+  /** 템플릿 저장 */
+  onSaveTemplate?: (item: WbsItem) => void;
+  /** 템플릿 적용 */
+  onApplyTemplate?: (template: WbsTemplateSummary, item: WbsItem) => void;
 }
 
-function formatPeriod(
-  startDate: string | null,
-  endDate: string | null,
-  locale: string,
-  t: TFunction,
-): string {
-  if (startDate && endDate) {
-    return `${formatProjectDate(startDate, locale)} ~ ${formatProjectDate(endDate, locale)}`;
-  }
-  if (startDate) {
-    return `${formatProjectDate(startDate, locale)} ~ -`;
-  }
-  if (endDate) {
-    return `- ~ ${formatProjectDate(endDate, locale)}`;
-  }
-  return t('wbs.field.noPeriod');
-}
-
-function InlineActionButtons({
-  disabled,
-  onConfirm,
-  onCancel,
-}: {
-  disabled: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="flex items-center gap-1">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7"
-        onClick={onConfirm}
-        disabled={disabled}
-      >
-        <Check className="h-4 w-4" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7"
-        onClick={onCancel}
-        disabled={disabled}
-      >
-        <X className="h-4 w-4" />
-      </Button>
-    </div>
-  );
+function resetEditorState(item: WbsItem) {
+  return {
+    assigneeValue: item.assigneeUserId == null ? UNASSIGNED_VALUE : String(item.assigneeUserId),
+    endDateValue: item.endDate ?? '',
+    estimatedMmValue: item.estimatedMm == null ? '' : String(item.estimatedMm),
+    milestoneValue: item.milestoneId == null ? NO_MILESTONE_VALUE : String(item.milestoneId),
+    nameValue: item.name,
+    progressValue: String(item.progressRate),
+    startDateValue: item.startDate ?? '',
+  };
 }
 
 /**
@@ -163,6 +148,7 @@ export default function SortableWbsRow({
   canEdit,
   locale,
   assigneeName,
+  visibleColumns,
   milestoneName,
   hasChildren,
   collapsed,
@@ -184,11 +170,40 @@ export default function SortableWbsRow({
   onRequestDelete,
   onSelect,
   selected = false,
+  pageAuthoringMode = false,
+  canAddBelow = false,
+  canAddChild = false,
+  canMoveUp = false,
+  canMoveDown = false,
+  canIndent = false,
+  canOutdent = false,
+  onAddBelow,
+  onAddChild,
+  onMoveUp,
+  onMoveDown,
+  onIndent,
+  onOutdent,
+  templates = [],
+  onDuplicate,
+  onSaveTemplate,
+  onApplyTemplate,
 }: SortableWbsRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
     disabled: !canEdit || disabled,
   });
+  const surfaceClasses = getWbsRowSurfaceClasses({
+    highlighted,
+    isDragging,
+    pageAuthoringMode,
+    selected,
+  });
+  const levelBadge = (
+    <WbsLevelBadge
+      label={t('wbs.row.level', { level: item.depth + 1 })}
+      dense={pageAuthoringMode}
+    />
+  );
   const [activeEditor, setActiveEditor] = useState<InlineEditor>(null);
   const [nameValue, setNameValue] = useState(item.name);
   const [progressValue, setProgressValue] = useState(String(item.progressRate));
@@ -208,24 +223,26 @@ export default function SortableWbsRow({
     if (activeEditor != null) {
       return;
     }
-    setNameValue(item.name);
-    setProgressValue(String(item.progressRate));
-    setAssigneeValue(item.assigneeUserId == null ? UNASSIGNED_VALUE : String(item.assigneeUserId));
-    setStartDateValue(item.startDate ?? '');
-    setEndDateValue(item.endDate ?? '');
-    setEstimatedMmValue(item.estimatedMm == null ? '' : String(item.estimatedMm));
-    setMilestoneValue(item.milestoneId == null ? NO_MILESTONE_VALUE : String(item.milestoneId));
+    const nextState = resetEditorState(item);
+    setNameValue(nextState.nameValue);
+    setProgressValue(nextState.progressValue);
+    setAssigneeValue(nextState.assigneeValue);
+    setStartDateValue(nextState.startDateValue);
+    setEndDateValue(nextState.endDateValue);
+    setEstimatedMmValue(nextState.estimatedMmValue);
+    setMilestoneValue(nextState.milestoneValue);
   }, [activeEditor, item]);
 
   const closeEditor = () => {
+    const nextState = resetEditorState(item);
     setActiveEditor(null);
-    setNameValue(item.name);
-    setProgressValue(String(item.progressRate));
-    setAssigneeValue(item.assigneeUserId == null ? UNASSIGNED_VALUE : String(item.assigneeUserId));
-    setStartDateValue(item.startDate ?? '');
-    setEndDateValue(item.endDate ?? '');
-    setEstimatedMmValue(item.estimatedMm == null ? '' : String(item.estimatedMm));
-    setMilestoneValue(item.milestoneId == null ? NO_MILESTONE_VALUE : String(item.milestoneId));
+    setNameValue(nextState.nameValue);
+    setProgressValue(nextState.progressValue);
+    setAssigneeValue(nextState.assigneeValue);
+    setStartDateValue(nextState.startDateValue);
+    setEndDateValue(nextState.endDateValue);
+    setEstimatedMmValue(nextState.estimatedMmValue);
+    setMilestoneValue(nextState.milestoneValue);
   };
 
   const startEditor = (editor: Exclude<InlineEditor, null>) => {
@@ -235,7 +252,10 @@ export default function SortableWbsRow({
     setActiveEditor(editor);
   };
 
-  const handleEditorKeyDown = (event: React.KeyboardEvent<HTMLElement>, onConfirm: () => void) => {
+  const handleEditorKeyDown = (
+    event: KeyboardEvent<HTMLElement>,
+    onConfirm: () => void,
+  ) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       onConfirm();
@@ -328,17 +348,12 @@ export default function SortableWbsRow({
         transition,
         opacity: isDragging ? 0.5 : undefined,
       }}
-      className={cn(
-        'align-top',
-        isDragging && 'bg-accent/40',
-        selected && 'bg-secondary/55',
-        highlighted && 'bg-primary/5 ring-1 ring-inset ring-primary/20',
-      )}
+      className={surfaceClasses.row}
       onClick={() => onSelect?.(item)}
     >
-      <TableCell>
+      <TableCell className={cn(surfaceClasses.denseCell, surfaceClasses.dividerCell)}>
         <div
-          className="flex items-start gap-1.5"
+          className={cn('flex items-start gap-1.5', pageAuthoringMode && 'gap-1')}
           style={{ paddingLeft: `${item.depth * TREE_INDENT}px` }}
         >
           {hasChildren ? (
@@ -346,7 +361,7 @@ export default function SortableWbsRow({
               type="button"
               variant="ghost"
               size="icon"
-              className="mt-0.5 h-7 w-7 shrink-0"
+              className={cn(surfaceClasses.compactControl, 'shrink-0')}
               onClick={() => onToggleCollapse(item.id)}
               aria-expanded={!collapsed}
               aria-label={
@@ -368,7 +383,10 @@ export default function SortableWbsRow({
           {canEdit ? (
             <button
               type="button"
-              className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+              className={cn(
+                'inline-flex shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground',
+                surfaceClasses.compactControl,
+              )}
               aria-label={t('wbs.aria.drag', { name: item.name })}
               disabled={disabled}
               {...attributes}
@@ -378,292 +396,162 @@ export default function SortableWbsRow({
             </button>
           ) : null}
 
-          <div className="min-w-0 flex-1 space-y-1">
-            <span className="text-xs text-muted-foreground">L{item.depth + 1}</span>
+          <div className="min-w-0 flex-1">
             {activeEditor === 'name' && canEdit ? (
-              <div className="flex items-center gap-1">
-                <Input
-                  value={nameValue}
-                  onChange={(event) => setNameValue(event.target.value)}
-                  onKeyDown={(event) => handleEditorKeyDown(event, confirmNameEdit)}
-                  disabled={disabled}
-                  className="h-8 max-w-[260px]"
-                  autoFocus
-                  aria-label={t('wbs.aria.editName', { name: item.name })}
-                />
-                <InlineActionButtons
-                  disabled={disabled}
-                  onConfirm={confirmNameEdit}
-                  onCancel={closeEditor}
-                />
+              <div className={cn('flex items-center gap-2', pageAuthoringMode && 'gap-1.5')}>
+                <div className="flex min-w-0 flex-1 items-center gap-1">
+                  <Input
+                    value={nameValue}
+                    onChange={(event) => setNameValue(event.target.value)}
+                    onKeyDown={(event) => handleEditorKeyDown(event, confirmNameEdit)}
+                    disabled={disabled}
+                    className="h-8 max-w-[260px]"
+                    autoFocus
+                    aria-label={t('wbs.aria.editName', { name: item.name })}
+                  />
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={confirmNameEdit}
+                      disabled={disabled}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={closeEditor}
+                      disabled={disabled}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                {levelBadge}
               </div>
             ) : canEdit ? (
-              <button
-                type="button"
-                className="truncate text-left font-medium text-foreground hover:underline"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  startEditor('name');
-                }}
-                disabled={disabled}
-              >
-                {item.name}
-              </button>
+              <div className={cn('flex items-center gap-2', pageAuthoringMode && 'gap-1.5')}>
+                <button
+                  type="button"
+                  className={cn(
+                    'min-w-0 flex-1 truncate text-left font-medium text-foreground hover:underline',
+                    pageAuthoringMode && 'leading-5',
+                  )}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    startEditor('name');
+                  }}
+                  disabled={disabled}
+                >
+                  {item.name}
+                </button>
+                {levelBadge}
+              </div>
             ) : (
-              <button
-                type="button"
-                className="truncate text-left font-medium text-foreground"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onSelect?.(item);
-                }}
-              >
-                {item.name}
-              </button>
+              <div className={cn('flex items-center gap-2', pageAuthoringMode && 'gap-1.5')}>
+                <button
+                  type="button"
+                  className={cn(
+                    'min-w-0 flex-1 truncate text-left font-medium text-foreground',
+                    pageAuthoringMode && 'leading-5',
+                  )}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelect?.(item);
+                  }}
+                >
+                  {item.name}
+                </button>
+                {levelBadge}
+              </div>
             )}
           </div>
         </div>
       </TableCell>
 
-      <TableCell>
-        {activeEditor === 'assignee' && canEdit ? (
-          <div className="space-y-1">
-            <Select
-              value={assigneeValue}
-              onValueChange={setAssigneeValue}
-              disabled={disabled || membersUnavailable}
-            >
-              <SelectTrigger className="h-8">
-                <SelectValue placeholder={t('wbs.form.assigneePlaceholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UNASSIGNED_VALUE}>{t('wbs.form.unassigned')}</SelectItem>
-                {members.map((member) => (
-                  <SelectItem key={member.userId} value={String(member.userId)}>
-                    {member.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <InlineActionButtons
-              disabled={disabled || membersUnavailable}
-              onConfirm={confirmAssigneeEdit}
-              onCancel={closeEditor}
-            />
-          </div>
-        ) : canEdit ? (
-          <button
-            type="button"
-            className="inline-flex max-w-full items-center rounded-full border border-border/80 bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent"
-            onClick={() => startEditor('assignee')}
-            disabled={disabled || membersUnavailable}
-            aria-label={t('wbs.aria.editAssignee', { name: item.name })}
-          >
-            <span className="truncate">{assigneeName ?? t('wbs.field.unassigned')}</span>
-          </button>
-        ) : assigneeName ? (
-          <span className="inline-flex max-w-full items-center rounded-full border border-border/80 bg-card px-2.5 py-1 text-xs font-medium text-foreground">
-            <span className="truncate">{assigneeName}</span>
-          </span>
-        ) : (
-          <span className="text-sm text-muted-foreground">{t('wbs.field.unassigned')}</span>
-        )}
-      </TableCell>
+      <SortableWbsRowCells
+        activeEditor={activeEditor === 'name' ? null : activeEditor}
+        assigneeName={assigneeName}
+        assigneeValue={assigneeValue}
+        canEdit={canEdit}
+        disabled={disabled}
+        endDateValue={endDateValue}
+        estimatedMmValue={estimatedMmValue}
+        item={item}
+        locale={locale}
+        members={members}
+        membersUnavailable={membersUnavailable}
+        milestoneName={milestoneName}
+        milestoneValue={milestoneValue}
+        milestones={milestones}
+        pageDenseCellClass={surfaceClasses.denseCell}
+        pageDividerCellClass={surfaceClasses.dividerCell}
+        pageAuthoringMode={pageAuthoringMode}
+        progressValue={progressValue}
+        startDateValue={startDateValue}
+        t={t}
+        visibleColumns={visibleColumns}
+        onCancelEditor={closeEditor}
+        onConfirmAssigneeEdit={confirmAssigneeEdit}
+        onConfirmEstimatedMmEdit={confirmEstimatedMmEdit}
+        onConfirmMilestoneEdit={confirmMilestoneEdit}
+        onConfirmPeriodEdit={confirmPeriodEdit}
+        onConfirmProgressEdit={confirmProgressEdit}
+        onEditorKeyDown={(event) => {
+          if (activeEditor === 'period') {
+            handleEditorKeyDown(event, confirmPeriodEdit);
+            return;
+          }
+          if (activeEditor === 'progress') {
+            handleEditorKeyDown(event, confirmProgressEdit);
+            return;
+          }
+          if (activeEditor === 'estimatedMm') {
+            handleEditorKeyDown(event, confirmEstimatedMmEdit);
+          }
+        }}
+        onSetAssigneeValue={setAssigneeValue}
+        onSetEndDateValue={setEndDateValue}
+        onSetEstimatedMmValue={setEstimatedMmValue}
+        onSetMilestoneValue={setMilestoneValue}
+        onSetProgressValue={setProgressValue}
+        onSetStartDateValue={setStartDateValue}
+        onStartEditor={startEditor}
+      />
 
-      <TableCell className="text-sm text-muted-foreground">
-        {activeEditor === 'period' && canEdit ? (
-          <div className="space-y-1">
-            <div className="grid grid-cols-1 gap-1">
-              <Input
-                type="date"
-                value={startDateValue}
-                onChange={(event) => setStartDateValue(event.target.value)}
-                onKeyDown={(event) => handleEditorKeyDown(event, confirmPeriodEdit)}
-                className="h-8"
-                autoFocus
-                disabled={disabled}
-                aria-label={t('wbs.aria.editPeriod', { name: item.name })}
-              />
-              <Input
-                type="date"
-                value={endDateValue}
-                onChange={(event) => setEndDateValue(event.target.value)}
-                onKeyDown={(event) => handleEditorKeyDown(event, confirmPeriodEdit)}
-                className="h-8"
-                disabled={disabled}
-                aria-label={t('wbs.aria.editPeriod', { name: item.name })}
-              />
-            </div>
-            <InlineActionButtons
-              disabled={disabled}
-              onConfirm={confirmPeriodEdit}
-              onCancel={closeEditor}
-            />
-          </div>
-        ) : canEdit ? (
-          <button
-            type="button"
-            className="rounded-md px-2 py-1 text-left hover:bg-accent"
-            onClick={() => startEditor('period')}
-            disabled={disabled}
-            aria-label={t('wbs.aria.editPeriod', { name: item.name })}
-          >
-            {formatPeriod(item.startDate, item.endDate, locale, t)}
-          </button>
-        ) : (
-          formatPeriod(item.startDate, item.endDate, locale, t)
-        )}
-      </TableCell>
-
-      <TableCell className="tabular-nums">
-        {activeEditor === 'progress' && canEdit ? (
-          <div className="flex items-center gap-1">
-            <Input
-              value={progressValue}
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              className="h-8 w-20 tabular-nums"
-              onChange={(event) => setProgressValue(event.target.value)}
-              onKeyDown={(event) => handleEditorKeyDown(event, confirmProgressEdit)}
-              autoFocus
-              disabled={disabled}
-              aria-label={t('wbs.aria.editProgress', { name: item.name })}
-            />
-            <InlineActionButtons
-              disabled={disabled}
-              onConfirm={confirmProgressEdit}
-              onCancel={closeEditor}
-            />
-          </div>
-        ) : canEdit ? (
-          <button
-            type="button"
-            className="rounded-md px-2 py-1 text-left text-sm tabular-nums hover:bg-accent"
-            onClick={() => startEditor('progress')}
-            disabled={disabled}
-          >
-            {item.progressRate}%
-          </button>
-        ) : (
-          `${item.progressRate}%`
-        )}
-      </TableCell>
-
-      <TableCell className="tabular-nums">
-        {activeEditor === 'estimatedMm' && canEdit ? (
-          <div className="flex items-center gap-1">
-            <Input
-              type="number"
-              min={0}
-              step="0.01"
-              value={estimatedMmValue}
-              onChange={(event) => setEstimatedMmValue(event.target.value)}
-              onKeyDown={(event) => handleEditorKeyDown(event, confirmEstimatedMmEdit)}
-              className="h-8 w-24 tabular-nums"
-              autoFocus
-              disabled={disabled}
-              aria-label={t('wbs.aria.editEstimatedMm', { name: item.name })}
-            />
-            <InlineActionButtons
-              disabled={disabled}
-              onConfirm={confirmEstimatedMmEdit}
-              onCancel={closeEditor}
-            />
-          </div>
-        ) : canEdit ? (
-          <button
-            type="button"
-            className="rounded-md px-2 py-1 text-left text-sm tabular-nums hover:bg-accent"
-            onClick={() => startEditor('estimatedMm')}
-            disabled={disabled}
-            aria-label={t('wbs.aria.editEstimatedMm', { name: item.name })}
-          >
-            {item.estimatedMm != null
-              ? t('wbs.field.mmValue', { value: item.estimatedMm })
-              : t('wbs.field.noEstimatedMm')}
-          </button>
-        ) : item.estimatedMm != null ? (
-          t('wbs.field.mmValue', { value: item.estimatedMm })
-        ) : (
-          t('wbs.field.noEstimatedMm')
-        )}
-      </TableCell>
-
-      <TableCell className="text-sm text-muted-foreground">
-        {activeEditor === 'milestone' && canEdit ? (
-          <div className="space-y-1">
-            <Select value={milestoneValue} onValueChange={setMilestoneValue} disabled={disabled}>
-              <SelectTrigger className="h-8">
-                <SelectValue placeholder={t('wbs.form.milestonePlaceholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_MILESTONE_VALUE}>{t('wbs.form.noMilestone')}</SelectItem>
-                {milestones.map((milestone) => (
-                  <SelectItem key={milestone.id} value={String(milestone.id)}>
-                    {milestone.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <InlineActionButtons
-              disabled={disabled}
-              onConfirm={confirmMilestoneEdit}
-              onCancel={closeEditor}
-            />
-          </div>
-        ) : canEdit ? (
-          <button
-            type="button"
-            className="rounded-md px-2 py-1 text-left hover:bg-accent"
-            onClick={() => startEditor('milestone')}
-            disabled={disabled}
-            aria-label={t('wbs.aria.editMilestone', { name: item.name })}
-          >
-            {milestoneName ?? t('wbs.field.noMilestone')}
-          </button>
-        ) : (
-          (milestoneName ?? t('wbs.field.noMilestone'))
-        )}
-      </TableCell>
-
-      {canEdit ? (
-        <TableCell>
-          <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => onOpenEditDialog(item)}
-              aria-label={t('wbs.aria.edit', { name: item.name })}
-              disabled={disabled}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => onOpenMoveDialog(item)}
-              aria-label={t('wbs.aria.move', { name: item.name })}
-              disabled={disabled}
-            >
-              <ArrowRightLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => onRequestDelete(item)}
-              aria-label={t('wbs.aria.delete', { name: item.name })}
-              disabled={disabled}
-            >
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-          </div>
-        </TableCell>
-      ) : null}
+      <SortableWbsRowActionStrip
+        canAddBelow={canAddBelow}
+        canAddChild={canAddChild}
+        canEdit={canEdit}
+        canIndent={canIndent}
+        canMoveDown={canMoveDown}
+        canMoveUp={canMoveUp}
+        canOutdent={canOutdent}
+        disabled={disabled}
+        item={item}
+        pageActionCellClass={surfaceClasses.actionCell}
+        pageAuthoringMode={pageAuthoringMode}
+        pageDenseCellClass={surfaceClasses.denseCell}
+        t={t}
+        templates={templates}
+        onAddBelow={onAddBelow}
+        onAddChild={onAddChild}
+        onApplyTemplate={onApplyTemplate}
+        onDuplicate={onDuplicate}
+        onIndent={onIndent}
+        onMoveDown={onMoveDown}
+        onMoveUp={onMoveUp}
+        onOpenEditDialog={onOpenEditDialog}
+        onOpenMoveDialog={onOpenMoveDialog}
+        onOutdent={onOutdent}
+        onRequestDelete={onRequestDelete}
+        onSaveTemplate={onSaveTemplate}
+      />
     </TableRow>
   );
 }

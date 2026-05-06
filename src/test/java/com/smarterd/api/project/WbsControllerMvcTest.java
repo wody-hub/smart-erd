@@ -23,9 +23,13 @@ import com.smarterd.domain.pm.history.service.WorkItemHistoryService.WorkComment
 import com.smarterd.domain.pm.wbs.entity.WbsDependencyType;
 import com.smarterd.domain.pm.wbs.service.WbsDependencyService;
 import com.smarterd.domain.pm.wbs.service.WbsDependencyService.WbsDependencyResult;
+import com.smarterd.domain.pm.wbs.service.WbsDependencyService.WbsDependencyShiftIssueResult;
+import com.smarterd.domain.pm.wbs.service.WbsDependencyService.WbsDependencyShiftItemResult;
+import com.smarterd.domain.pm.wbs.service.WbsDependencyService.WbsDependencyShiftResult;
 import com.smarterd.domain.pm.wbs.service.WbsDocumentService;
 import com.smarterd.domain.pm.wbs.service.WbsDocumentService.DocumentTagResult;
 import com.smarterd.domain.pm.wbs.service.WbsDocumentService.LinkedDocumentResult;
+import com.smarterd.domain.pm.wbs.service.WbsPlanningService;
 import com.smarterd.domain.pm.wbs.service.WbsService;
 import com.smarterd.domain.pm.wbs.service.WbsService.WbsItemResult;
 import java.math.BigDecimal;
@@ -64,6 +68,9 @@ class WbsControllerMvcTest {
     @Mock
     private WorkItemHistoryService workItemHistoryService;
 
+    @Mock
+    private WbsPlanningService wbsPlanningService;
+
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
@@ -73,6 +80,7 @@ class WbsControllerMvcTest {
             wbsService,
             wbsDependencyService,
             wbsDocumentService,
+            wbsPlanningService,
             workItemHistoryService
         );
         this.mockMvc = MockMvcBuilders.standaloneSetup(controller)
@@ -102,7 +110,33 @@ class WbsControllerMvcTest {
     void createWbsItem_returnsCreated() throws Exception {
         when(
             wbsService.createWbsItem(eq("tester"), eq(1L), eq(10L), any(WbsService.CreateWbsItemCommand.class))
-        ).thenReturn(sampleResult(101L, null, "요구사항 분석", 0, 1));
+        ).thenReturn(
+            new WbsItemResult(
+                101L,
+                null,
+                "요구사항 분석",
+                0,
+                1,
+                null,
+                null,
+                LocalDate.parse("2026-04-20"),
+                LocalDate.parse("2026-04-30"),
+                LocalDate.parse("2026-04-22"),
+                LocalDate.parse("2026-04-29"),
+                20,
+                73,
+                -53,
+                2,
+                -1,
+                new BigDecimal("1.50"),
+                null,
+                null,
+                List.of(),
+                List.of(),
+                Instant.parse("2026-04-14T00:00:00Z"),
+                Instant.parse("2026-04-14T00:00:00Z")
+            )
+        );
 
         mockMvc
             .perform(
@@ -121,6 +155,10 @@ class WbsControllerMvcTest {
                                 "2026-04-20",
                                 "endDate",
                                 "2026-04-30",
+                                "actualStartDate",
+                                "2026-04-22",
+                                "actualEndDate",
+                                "2026-04-29",
                                 "progressRate",
                                 20,
                                 "estimatedMm",
@@ -131,7 +169,13 @@ class WbsControllerMvcTest {
             )
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").value(101))
-            .andExpect(jsonPath("$.name").value("요구사항 분석"));
+            .andExpect(jsonPath("$.name").value("요구사항 분석"))
+            .andExpect(jsonPath("$.actualStartDate[0]").value(2026))
+            .andExpect(jsonPath("$.actualStartDate[1]").value(4))
+            .andExpect(jsonPath("$.actualStartDate[2]").value(22))
+            .andExpect(jsonPath("$.actualEndDate[0]").value(2026))
+            .andExpect(jsonPath("$.actualEndDate[1]").value(4))
+            .andExpect(jsonPath("$.actualEndDate[2]").value(29));
     }
 
     @Test
@@ -187,6 +231,309 @@ class WbsControllerMvcTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").value(501))
             .andExpect(jsonPath("$.dependencyType").value("FS"));
+    }
+
+    @Test
+    void getTemplates_returnsList() throws Exception {
+        when(wbsPlanningService.getTemplates("tester", 1L, 10L))
+            .thenReturn(List.of(new WbsPlanningService.WbsTemplateSummaryResult(1L, "기본 템플릿", "설명", "루트", 3, 1, Instant.now(), Instant.now())));
+
+        mockMvc
+            .perform(
+                get("/api/teams/1/projects/10/wbs/templates").with((request) -> {
+                    request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                    return request;
+                })
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].name").value("기본 템플릿"))
+            .andExpect(jsonPath("$[0].itemCount").value(3));
+    }
+
+    @Test
+    void duplicateSubtree_returnsCreatedTreeAndDependencies() throws Exception {
+        when(
+            wbsPlanningService.duplicateSubtree(
+                eq("tester"),
+                eq(1L),
+                eq(10L),
+                eq(100L),
+                any(WbsPlanningService.DuplicateSubtreeCommand.class)
+            )
+        ).thenReturn(
+            new WbsPlanningService.WbsMutationResult(
+                301L,
+                List.of(
+                    sampleResult(301L, null, "복제 루트", 0, 0),
+                    sampleResult(302L, 301L, "복제 자식", 1, 0)
+                ),
+                List.of(sampleDependency(701L))
+            )
+        );
+
+        mockMvc
+            .perform(
+                post("/api/teams/1/projects/10/wbs/100/duplicate-subtree")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(
+                            java.util.Map.of(
+                                "parentId",
+                                200,
+                                "resetAssignee",
+                                true,
+                                "resetSchedule",
+                                false,
+                                "resetProgress",
+                                true,
+                                "resetMilestone",
+                                true,
+                                "includeDependencies",
+                                true
+                            )
+                        )
+                    )
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.rootItemId").value(301))
+            .andExpect(jsonPath("$.items[1].parentId").value(301))
+            .andExpect(jsonPath("$.dependencies[0].id").value(701));
+    }
+
+    @Test
+    void saveTemplate_returnsCreatedTemplateSummary() throws Exception {
+        when(wbsPlanningService.saveTemplate(eq("tester"), eq(1L), eq(10L), any(WbsPlanningService.SaveTemplateCommand.class)))
+            .thenReturn(
+                new WbsPlanningService.WbsTemplateSummaryResult(
+                    11L,
+                    "운영형 wave",
+                    "반복 업무 골격",
+                    "운영 루트",
+                    4,
+                    2,
+                    Instant.parse("2026-05-06T00:00:00Z"),
+                    Instant.parse("2026-05-06T00:00:00Z")
+                )
+            );
+
+        mockMvc
+            .perform(
+                post("/api/teams/1/projects/10/wbs/templates")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(
+                            java.util.Map.of(
+                                "sourceWbsItemId",
+                                100,
+                                "name",
+                                "운영형 wave",
+                                "description",
+                                "반복 업무 골격"
+                            )
+                        )
+                    )
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(11))
+            .andExpect(jsonPath("$.rootName").value("운영 루트"))
+            .andExpect(jsonPath("$.dependencyCount").value(2));
+    }
+
+    @Test
+    void instantiateTemplate_returnsCreatedTreeAndDependencies() throws Exception {
+        when(
+            wbsPlanningService.instantiateTemplate(
+                eq("tester"),
+                eq(1L),
+                eq(10L),
+                eq(11L),
+                any(WbsPlanningService.InstantiateTemplateCommand.class)
+            )
+        ).thenReturn(
+            new WbsPlanningService.WbsMutationResult(
+                501L,
+                List.of(sampleResult(501L, null, "템플릿 루트", 0, 0)),
+                List.of(sampleDependency(801L))
+            )
+        );
+
+        mockMvc
+            .perform(
+                post("/api/teams/1/projects/10/wbs/templates/11/instantiate")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(
+                            java.util.Map.of(
+                                "parentId",
+                                200,
+                                "resetAssignee",
+                                true,
+                                "resetSchedule",
+                                true,
+                                "resetProgress",
+                                true,
+                                "resetMilestone",
+                                true,
+                                "includeDependencies",
+                                true
+                            )
+                        )
+                    )
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.rootItemId").value(501))
+            .andExpect(jsonPath("$.items[0].name").value("템플릿 루트"))
+            .andExpect(jsonPath("$.dependencies[0].id").value(801));
+    }
+
+    @Test
+    void bulkCreate_returnsCreated() throws Exception {
+        when(wbsPlanningService.bulkCreate(eq("tester"), eq(1L), eq(10L), any(WbsPlanningService.BulkCreateCommand.class)))
+            .thenReturn(
+                new WbsPlanningService.BulkCreateResult(
+                    List.of(new WbsPlanningService.BulkCreateItemResult("task-api-design", sampleResult(301L, null, "API 설계", 0, 0)))
+                )
+            );
+
+        mockMvc
+            .perform(
+                post("/api/teams/1/projects/10/wbs/bulk-create")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(
+                            java.util.Map.of(
+                                "items",
+                                List.of(java.util.Map.of("clientKey", "task-api-design", "name", "API 설계"))
+                            )
+                        )
+                    )
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.items[0].clientKey").value("task-api-design"))
+            .andExpect(jsonPath("$.items[0].item.id").value(301));
+    }
+
+    @Test
+    void previewDependencyShift_returnsValidationSummary() throws Exception {
+        when(wbsDependencyService.previewShift(eq("tester"), eq(1L), eq(10L), any()))
+            .thenReturn(
+                new WbsDependencyShiftResult(
+                    false,
+                    false,
+                    List.of(
+                        new WbsDependencyShiftItemResult(
+                            101L,
+                            LocalDate.parse("2026-05-10"),
+                            LocalDate.parse("2026-05-14"),
+                            LocalDate.parse("2026-05-12"),
+                            LocalDate.parse("2026-05-16"),
+                            true
+                        )
+                    ),
+                    List.of(new WbsDependencyShiftIssueResult(102L, "missing-date", "후행 WBS 일정이 비어 있습니다."))
+                )
+            );
+
+        mockMvc
+            .perform(
+                post("/api/teams/1/projects/10/wbs/dependency-shift-preview")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(
+                            java.util.Map.of(
+                                "anchors",
+                                List.of(
+                                    java.util.Map.of(
+                                        "wbsItemId",
+                                        101,
+                                        "startDate",
+                                        "2026-05-12",
+                                        "endDate",
+                                        "2026-05-16"
+                                    )
+                                )
+                            )
+                        )
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.graphValid").value(false))
+            .andExpect(jsonPath("$.updates[0].wbsItemId").value(101))
+            .andExpect(jsonPath("$.issues[0].code").value("missing-date"));
+    }
+
+    @Test
+    void applyDependencyShift_returnsAppliedResult() throws Exception {
+        when(wbsDependencyService.applyShift(eq("tester"), eq(1L), eq(10L), any()))
+            .thenReturn(
+                new WbsDependencyShiftResult(
+                    true,
+                    true,
+                    List.of(
+                        new WbsDependencyShiftItemResult(
+                            101L,
+                            LocalDate.parse("2026-05-10"),
+                            LocalDate.parse("2026-05-14"),
+                            LocalDate.parse("2026-05-12"),
+                            LocalDate.parse("2026-05-16"),
+                            false
+                        )
+                    ),
+                    List.of()
+                )
+            );
+
+        mockMvc
+            .perform(
+                post("/api/teams/1/projects/10/wbs/dependency-shift-apply")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(
+                            java.util.Map.of(
+                                "anchors",
+                                List.of(
+                                    java.util.Map.of(
+                                        "wbsItemId",
+                                        100,
+                                        "startDate",
+                                        "2026-05-12",
+                                        "endDate",
+                                        "2026-05-16"
+                                    )
+                                )
+                            )
+                        )
+                    )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.graphValid").value(true))
+            .andExpect(jsonPath("$.applied").value(true))
+            .andExpect(jsonPath("$.updates[0].anchor").value(false))
+            .andExpect(jsonPath("$.issues").isEmpty());
     }
 
     @Test
@@ -367,7 +714,13 @@ class WbsControllerMvcTest {
             null,
             null,
             null,
+            null,
+            null,
             0,
+            null,
+            null,
+            null,
+            null,
             null,
             null,
             null,

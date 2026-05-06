@@ -11,14 +11,20 @@ import com.smarterd.domain.pm.wbs.entity.WbsItem;
 import com.smarterd.domain.pm.wbs.repository.WbsDependencyRepository;
 import com.smarterd.domain.pm.wbs.repository.WbsItemRepository;
 import com.smarterd.domain.project.entity.Project;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -123,6 +129,27 @@ public class WbsDependencyService {
         final var context = projectContextLoader.load(loginId, teamId, projectId, true);
         final var dependency = findDependency(context.project(), dependencyId);
         wbsDependencyRepository.delete(dependency);
+    }
+
+    public WbsDependencyShiftResult previewShift(
+        String loginId,
+        Long teamId,
+        Long projectId,
+        List<WbsDependencyShiftAnchorCommand> anchors
+    ) {
+        final var context = projectContextLoader.load(loginId, teamId, projectId, false);
+        return computeShift(context.project(), anchors, false);
+    }
+
+    @Transactional
+    public WbsDependencyShiftResult applyShift(
+        String loginId,
+        Long teamId,
+        Long projectId,
+        List<WbsDependencyShiftAnchorCommand> anchors
+    ) {
+        final var context = projectContextLoader.load(loginId, teamId, projectId, true);
+        return computeShift(context.project(), anchors, true);
     }
 
     private void validateDependency(
@@ -236,6 +263,152 @@ public class WbsDependencyService {
         );
     }
 
+    private WbsDependencyShiftResult computeShift(
+        Project project,
+        List<WbsDependencyShiftAnchorCommand> anchors,
+        boolean apply
+    ) {
+        final var items = wbsItemRepository.findByProjectWithRelations(project);
+        final var itemById = new LinkedHashMap<Long, WbsItem>();
+        items.forEach((item) -> itemById.put(item.getId(), item));
+        final var dependencies = wbsDependencyRepository
+            .findByProjectWithRelations(project)
+            .stream()
+            .sorted(Comparator.comparingInt(WbsDependency::getSortOrder).thenComparing(WbsDependency::getId))
+            .toList();
+
+        final Map<Long, DateRange> originalRanges = new LinkedHashMap<>();
+        final Map<Long, DateRange> workingRanges = new LinkedHashMap<>();
+        for (final var item : items) {
+            final var range = toRange(item.getStartDate(), item.getEndDate());
+            if (range != null) {
+                originalRanges.put(item.getId(), range);
+                workingRanges.put(item.getId(), range);
+            }
+        }
+
+        final var issues = new ArrayList<WbsDependencyShiftIssueResult>();
+        final Set<Long> anchorIds = new java.util.LinkedHashSet<>();
+        for (final var anchor : anchors) {
+            final var item = itemById.get(anchor.wbsItemId());
+            if (item == null) {
+                throw new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_WBS_ITEM.code(), anchor.wbsItemId());
+            }
+            if (anchor.startDate().isAfter(anchor.endDate())) {
+                throw new BusinessException(MessageCode.ERROR_BUSINESS_INVALID_WBS_PERIOD.code());
+            }
+            workingRanges.put(anchor.wbsItemId(), new DateRange(anchor.startDate(), anchor.endDate()));
+            anchorIds.add(anchor.wbsItemId());
+        }
+
+        boolean changed;
+        do {
+            changed = false;
+            for (final var dependency : dependencies) {
+                final var predecessorId = dependency.getPredecessor().getId();
+                final var successorId = dependency.getSuccessor().getId();
+                final var predecessorRange = workingRanges.get(predecessorId);
+                final var successorRange = workingRanges.get(successorId);
+                if (predecessorRange == null) {
+                    issues.add(new WbsDependencyShiftIssueResult(predecessorId, "missing-date", "선행 WBS 일정이 비어 있어 canonical shift를 계산할 수 없습니다."));
+                    continue;
+                }
+                if (successorRange == null) {
+                    issues.add(new WbsDependencyShiftIssueResult(successorId, "missing-date", "후행 WBS 일정이 비어 있어 canonical shift를 계산할 수 없습니다."));
+                    continue;
+                }
+                final var shifted = shiftSuccessorIfNeeded(predecessorRange, successorRange, dependency.getDependencyType());
+                if (shifted != null && !shifted.equals(successorRange)) {
+                    workingRanges.put(successorId, shifted);
+                    changed = true;
+                }
+            }
+        } while (changed);
+
+        final var distinctIssues = issues.stream().distinct().toList();
+        final var updates = new ArrayList<WbsDependencyShiftItemResult>();
+        final var changedItems = new ArrayList<WbsItem>();
+        for (final var item : items) {
+            final var original = originalRanges.get(item.getId());
+            final var current = workingRanges.get(item.getId());
+            if (original == null || current == null || original.equals(current)) {
+                continue;
+            }
+            updates.add(
+                new WbsDependencyShiftItemResult(
+                    item.getId(),
+                    original.startDate(),
+                    original.endDate(),
+                    current.startDate(),
+                    current.endDate(),
+                    anchorIds.contains(item.getId())
+                )
+            );
+            if (apply && distinctIssues.isEmpty()) {
+                item.update(
+                    item.getName(),
+                    item.getAssignee(),
+                    current.startDate(),
+                    current.endDate(),
+                    item.getActualStartDate(),
+                    item.getActualEndDate(),
+                    item.getProgressRate(),
+                    item.getEstimatedMm(),
+                    item.getMilestone()
+                );
+                changedItems.add(item);
+            }
+        }
+        if (apply && !changedItems.isEmpty() && distinctIssues.isEmpty()) {
+            wbsItemRepository.saveAll(changedItems);
+        }
+
+        return new WbsDependencyShiftResult(distinctIssues.isEmpty(), apply && distinctIssues.isEmpty(), List.copyOf(updates), distinctIssues);
+    }
+
+    @Nullable
+    private DateRange shiftSuccessorIfNeeded(DateRange predecessorRange, DateRange successorRange, WbsDependencyType dependencyType) {
+        final long durationDays = ChronoUnit.DAYS.between(successorRange.startDate(), successorRange.endDate());
+        return switch (dependencyType) {
+            case SS -> {
+                if (!successorRange.startDate().isBefore(predecessorRange.startDate())) {
+                    yield null;
+                }
+                final var nextStart = predecessorRange.startDate();
+                yield new DateRange(nextStart, nextStart.plusDays(durationDays));
+            }
+            case FF -> {
+                if (!successorRange.endDate().isBefore(predecessorRange.endDate())) {
+                    yield null;
+                }
+                final var nextEnd = predecessorRange.endDate();
+                yield new DateRange(nextEnd.minusDays(durationDays), nextEnd);
+            }
+            case SF -> {
+                if (!successorRange.endDate().isBefore(predecessorRange.startDate())) {
+                    yield null;
+                }
+                final var nextEnd = predecessorRange.startDate();
+                yield new DateRange(nextEnd.minusDays(durationDays), nextEnd);
+            }
+            case FS -> {
+                if (!successorRange.startDate().isBefore(predecessorRange.endDate())) {
+                    yield null;
+                }
+                final var nextStart = predecessorRange.endDate();
+                yield new DateRange(nextStart, nextStart.plusDays(durationDays));
+            }
+        };
+    }
+
+    @Nullable
+    private DateRange toRange(@Nullable LocalDate startDate, @Nullable LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            return null;
+        }
+        return new DateRange(startDate, endDate);
+    }
+
     /**
      * WBS dependency 생성/수정 커맨드.
      *
@@ -244,6 +417,8 @@ public class WbsDependencyService {
      * @param dependencyType dependency 타입
      */
     public record WbsDependencyCommand(Long predecessorWbsItemId, Long successorWbsItemId, WbsDependencyType dependencyType) {}
+
+    public record WbsDependencyShiftAnchorCommand(Long wbsItemId, LocalDate startDate, LocalDate endDate) {}
 
     /**
      * WBS dependency 조회 결과.
@@ -269,4 +444,24 @@ public class WbsDependencyService {
         Instant createdAt,
         Instant updatedAt
     ) {}
+
+    public record WbsDependencyShiftResult(
+        boolean graphValid,
+        boolean applied,
+        List<WbsDependencyShiftItemResult> updates,
+        List<WbsDependencyShiftIssueResult> issues
+    ) {}
+
+    public record WbsDependencyShiftItemResult(
+        Long wbsItemId,
+        LocalDate originalStartDate,
+        LocalDate originalEndDate,
+        LocalDate startDate,
+        LocalDate endDate,
+        boolean anchor
+    ) {}
+
+    public record WbsDependencyShiftIssueResult(@Nullable Long wbsItemId, String code, String message) {}
+
+    private record DateRange(LocalDate startDate, LocalDate endDate) {}
 }

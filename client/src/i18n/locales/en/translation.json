@@ -970,6 +970,9 @@
       "title": "WBS Items",
       "description": "Manage project work items in a hierarchy with schedule, progress, and milestone mapping."
     },
+    "row": {
+      "level": "L{{level}}"
+    },
     "details": {
       "title": "WBS Context",
       "description": "Review linked documents, comments, and activity history for the selected WBS item.",
@@ -1109,6 +1112,8 @@
         "dependencyCreateFailed": "Failed to add dependency",
         "dependencyDeleted": "Dependency removed",
         "dependencyDeleteFailed": "Failed to remove dependency",
+        "shiftApplied": "Dependency shift applied",
+        "shiftApplyFailed": "Failed to apply dependency shift",
         "commentCreated": "Comment posted",
         "commentCreateFailed": "Failed to post comment"
       }
@@ -1120,7 +1125,104 @@
       "backToProject": "Back to project hub"
     },
     "action": {
-      "create": "Add WBS item"
+      "create": "Add WBS item",
+      "edit": "Edit item",
+      "delete": "Delete item",
+      "duplicate": "Duplicate subtree",
+      "addBelow": "Add below",
+      "addChild": "Add child",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "indent": "Indent",
+      "outdent": "Outdent",
+      "more": "More actions"
+    },
+    "tooltip": {
+      "addBelow": "Insert a sibling directly after this row without opening the full dialog.",
+      "addChild": "Create the first child task under this row and keep the hierarchy intact.",
+      "moveUp": "Swap this row with the previous sibling while keeping its children together.",
+      "moveDown": "Swap this row with the next sibling while keeping its children together.",
+      "indent": "Nest this row under the previous sibling to deepen the structure.",
+      "outdent": "Promote this row one level higher without changing its subtree.",
+      "edit": "Open the full editor for fields that are easier to change outside inline mode.",
+      "delete": "Remove this row and review the subtree impact before confirming.",
+      "more": "Open duplicate and template actions for this subtree."
+    },
+    "view": {
+      "title": "Workspace view",
+      "description": "Switch between structure, schedule, and resourcing lenses without leaving the dedicated WBS page.",
+      "columns": "Columns",
+      "presets": {
+        "structure": "Structure",
+        "schedule": "Schedule",
+        "resourcing": "Resourcing"
+      }
+    },
+    "template": {
+      "picker": "Template picker",
+      "menuTitle": "Row actions",
+      "saveAction": "Save as template",
+      "empty": "No saved templates yet.",
+      "applyNamed": "Apply {{name}}",
+      "applyTargetSelected": "Apply under {{name}}",
+      "applyTargetRoot": "Apply at the root level",
+      "source": "Saved from {{name}}",
+      "storageHint": "Templates are saved to the project and shared across the workspace."
+    },
+    "bulk": {
+      "open": "Bulk create",
+      "title": "Bulk create WBS items",
+      "description": "Paste an outline, review the preview tree, and create a whole branch in one pass.",
+      "instructionsTitle": "Outline rules",
+      "instructions": {
+        "line1": "Use one work item per line.",
+        "line2": "Use two-space indentation, tabs, or bullets to express hierarchy.",
+        "line3": "Indent can only increase one level at a time."
+      },
+      "outline": "Outline",
+      "placeholder": "- Discovery\n  - Requirement workshop\n  - Current-state review\n- Delivery\n  - Build\n  - QA",
+      "targetTitle": "Create target",
+      "parent": {
+        "selected": "Children will be created under {{name}}.",
+        "root": "Items will be created at the root level."
+      },
+      "previewTitle": "Preview label",
+      "previewPlaceholder": "Optional batch label",
+      "previewSummary": "{{count}} item(s) ready",
+      "previewDescription": "This tree shows the hierarchy that will be created.",
+      "previewEmpty": "Paste an outline to see the tree preview.",
+      "creating": "Creating...",
+      "submit": "Create {{count}} item(s)",
+      "validation": {
+        "title": "Fix the outline before creating items",
+        "description": "The parser found line-level issues in the pasted outline.",
+        "emptyName": "Line {{line}} is empty after removing bullets or numbering.",
+        "indentJump": "Line {{line}} jumps more than one level deeper than the previous line.",
+        "depthLimitExceeded": "Line {{line}} exceeds the maximum supported depth."
+      }
+    },
+    "shift": {
+      "open": "Shift downstream",
+      "title": "Shift dependency chain",
+      "description": "Preview how changing {{name}} affects downstream scheduled work.",
+      "descriptionFallback": "Preview how shifting this dependency chain affects downstream scheduled work.",
+      "daysLabel": "Shift by days",
+      "daysHint": "Positive numbers push dates later; negative numbers pull them earlier.",
+      "summary": "{{count}} scheduled item(s) will change",
+      "previewTitle": "Affected schedule",
+      "previewDescription": "The preview includes the selected item and every reachable successor in the dependency graph.",
+      "previewEmpty": "Enter a non-zero shift to preview schedule changes.",
+      "reason": {
+        "anchor": "Selected WBS item",
+        "downstream": "Reached through successor dependency"
+      },
+      "delta": "{{count}} day(s)",
+      "before": "Before",
+      "after": "After",
+      "unscheduled": "Unscheduled",
+      "issuesTitle": "Schedule issues",
+      "apply": "Apply shift",
+      "applying": "Applying..."
     },
     "move": {
       "title": "Move WBS item",
@@ -1142,15 +1244,21 @@
       "name": "Item",
       "assignee": "Assignee",
       "period": "Period",
+      "actualPeriod": "Actual period",
       "progressRate": "Progress",
+      "plannedProgressRate": "Planned progress",
+      "progressVarianceRate": "Variance",
       "estimatedMm": "Est. M/M",
       "milestone": "Milestone",
       "actions": "Actions",
       "unassigned": "Unassigned",
       "noPeriod": "Not set",
+      "noMetric": "-",
       "noEstimatedMm": "Not set",
       "noMilestone": "No milestone",
-      "mmValue": "{{value}} M/M"
+      "mmValue": "{{value}} M/M",
+      "startVarianceDays": "Start {{value}}d",
+      "endVarianceDays": "End {{value}}d"
     },
     "form": {
       "createTitle": "Create WBS item",
@@ -1172,12 +1280,15 @@
       "noMilestone": "No mapping",
       "startDate": "Start date",
       "endDate": "End date",
+      "actualStartDate": "Actual start date",
+      "actualEndDate": "Actual end date",
       "progressRate": "Progress (%)",
       "estimatedMm": "Estimated M/M",
       "estimatedMmPlaceholder": "e.g. 1.5"
     },
     "validation": {
       "dateOrder": "End date must be on or after the start date",
+      "actualDateOrder": "Actual end date must be on or after the actual start date",
       "progressRate": "Progress must be between 0 and 100",
       "estimatedMm": "Estimated M/M must be a number greater than or equal to 0"
     },
@@ -1187,6 +1298,7 @@
     },
     "quickAdd": {
       "root": "Add item at root level",
+      "sibling": "Add item below",
       "child": "Add sub-item",
       "add": "Add",
       "cancel": "Cancel",
@@ -1196,6 +1308,14 @@
     "toast": {
       "created": "WBS item created",
       "createFailed": "Failed to create WBS item",
+      "bulkCreated": "{{count}} WBS item(s) created",
+      "bulkCreateFailed": "Failed to create WBS items from the outline",
+      "duplicated": "WBS subtree duplicated",
+      "duplicateFailed": "Failed to duplicate the selected subtree",
+      "templateSaved": "Template saved",
+      "templateSaveFailed": "Failed to save the selected subtree as a template",
+      "templateApplied": "Applied template {{name}}",
+      "templateApplyFailed": "Failed to apply the selected template",
       "updated": "WBS item updated",
       "updateFailed": "Failed to update WBS item",
       "deleted": "WBS item deleted",
@@ -1226,7 +1346,8 @@
       "editProgress": "Edit progress of WBS item {{name}}",
       "editEstimatedMm": "Edit estimated M/M of WBS item {{name}}",
       "editMilestone": "Edit milestone of WBS item {{name}}",
-      "move": "Move WBS item {{name}}"
+      "move": "Move WBS item {{name}}",
+      "more": "Open more actions for WBS item {{name}}"
     }
   },
   "gantt": {
@@ -1264,9 +1385,23 @@
       "dependencies": "Dependencies",
       "hasDependencies": "Task with dependencies",
       "linkedToMilestone": "Flow converging into a milestone",
+      "actual": "Actual schedule",
+      "actualHint": "The main bar is the planned schedule and the striped baseline is the recorded actual schedule.",
       "milestone": "Milestone",
       "delayed": "Delayed",
       "onTrack": "On track"
+    },
+    "comparison": {
+      "title": "Planned vs actual",
+      "value": "{{count}} WBS item(s) comparable",
+      "hint": "{{delayed}} highlighted as delayed or variant"
+    },
+    "grid": {
+      "planned": "Planned schedule",
+      "actual": "Actual schedule",
+      "progressGap": "Progress gap",
+      "finishVariance": "Finish variance",
+      "daysSuffix": "d"
     },
     "wave": {
       "currentWave": "Current wave",
@@ -1284,7 +1419,8 @@
       "omitted": "{{count}} omitted",
       "dependencies": "{{count}} dependency link(s) across {{connected}} scheduled task(s)",
       "dependencyTasks": "{{count}} connected task(s)",
-      "milestoneFlow": "{{count}} milestone flow link(s)"
+      "milestoneFlow": "{{count}} milestone flow link(s)",
+      "delayedTasks": "{{count}} delayed/variant task(s)"
     },
     "toast": {
       "updateSuccess": "Schedule changes from Gantt were saved",

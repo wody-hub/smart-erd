@@ -3,6 +3,8 @@ package com.smarterd.domain.pm.wbs.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,6 +28,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -54,8 +57,18 @@ class WbsServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private WbsScheduleMetricsService wbsScheduleMetricsService;
+
     @InjectMocks
     private WbsService wbsService;
+
+    @BeforeEach
+    void setUp() {
+        lenient()
+            .when(wbsScheduleMetricsService.calculate(any(), any(), any(), any(), anyInt()))
+            .thenReturn(new WbsScheduleMetricsService.WbsScheduleMetricsResult(null, null, null, null));
+    }
 
     @Test
     @DisplayName("createWbsItem - 부모/담당자/마일스톤을 반영해 생성한다")
@@ -85,6 +98,8 @@ class WbsServiceTest {
             2L,
             LocalDate.parse("2026-04-20"),
             LocalDate.parse("2026-04-30"),
+            LocalDate.parse("2026-04-22"),
+            null,
             40,
             new BigDecimal("1.50"),
             300L
@@ -97,6 +112,7 @@ class WbsServiceTest {
         assertThat(result.sortOrder()).isEqualTo(3);
         assertThat(result.assigneeUserId()).isEqualTo(2L);
         assertThat(result.milestoneId()).isEqualTo(300L);
+        assertThat(result.actualStartDate()).isEqualTo(LocalDate.parse("2026-04-22"));
         verify(wbsItemRepository).save(any(WbsItem.class));
     }
 
@@ -123,6 +139,8 @@ class WbsServiceTest {
             null,
             LocalDate.parse("2026-04-28"),
             LocalDate.parse("2026-04-30"),
+            null,
+            null,
             0,
             new BigDecimal("0.50"),
             null

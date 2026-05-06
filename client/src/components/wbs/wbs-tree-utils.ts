@@ -434,7 +434,7 @@ export function resolveMoveValidationError(
 }
 
 /** inline quick-add row 종류. */
-export type InlineCreatePlacementKind = 'root' | 'child';
+export type InlineCreatePlacementKind = 'root' | 'child' | 'sibling';
 
 /** inline quick-add row 배치 정보. */
 export interface InlineCreatePlacement {
@@ -456,6 +456,31 @@ export interface BuildInlineCreatePlacementsInput {
   hasChildrenById: Map<number, boolean>;
   /** 접힌 항목 ID 집합 */
   collapsedIds: Set<number>;
+}
+
+/** modal-less 구조 이동 액션 종류. */
+export type StructuralMoveKind = 'moveUp' | 'moveDown' | 'indent' | 'outdent';
+
+/** modal-less 구조 이동 계획. */
+export interface StructuralMovePlan {
+  /** 이동 후 부모 ID */
+  nextParentId: number | null;
+  /** 이동 후 sibling index */
+  targetIndex: number;
+}
+
+/** planStructuralMove 입력값. */
+export interface PlanStructuralMoveInput {
+  /** 이동 액션 */
+  action: StructuralMoveKind;
+  /** 이동 대상 항목 ID */
+  activeItemId: number;
+  /** 전체 WBS 항목 */
+  allItems: WbsItem[];
+  /** 부모별 자식 맵 */
+  childrenByParent: Map<ParentKey, WbsItem[]>;
+  /** 항목 ID 맵 */
+  itemById: Map<number, WbsItem>;
 }
 
 /**
@@ -529,6 +554,67 @@ export function buildInlineCreatePlacements(
 }
 
 /**
+ * modal-less 구조 이동에 필요한 부모/인덱스 계획을 계산한다.
+ *
+ * @param input 이동 계산 입력값
+ * @returns 이동 계획 또는 null
+ */
+export function planStructuralMove(input: PlanStructuralMoveInput): StructuralMovePlan | null {
+  const { action, activeItemId, allItems, childrenByParent, itemById } = input;
+  const activeItem =
+    itemById.get(activeItemId) ?? allItems.find((item) => item.id === activeItemId);
+  if (!activeItem) {
+    return null;
+  }
+
+  const siblings = childrenByParent.get(toParentKey(activeItem.parentId)) ?? [];
+  const siblingIndex = siblings.findIndex((item) => item.id === activeItemId);
+  if (siblingIndex < 0) {
+    return null;
+  }
+
+  if (action === 'moveUp') {
+    if (siblingIndex === 0) {
+      return null;
+    }
+    return { nextParentId: activeItem.parentId, targetIndex: siblingIndex - 1 };
+  }
+
+  if (action === 'moveDown') {
+    if (siblingIndex >= siblings.length - 1) {
+      return null;
+    }
+    return { nextParentId: activeItem.parentId, targetIndex: siblingIndex + 1 };
+  }
+
+  if (action === 'indent') {
+    if (siblingIndex === 0) {
+      return null;
+    }
+    const previousSibling = siblings[siblingIndex - 1];
+    if (!previousSibling) {
+      return null;
+    }
+    const childSiblings = childrenByParent.get(previousSibling.id) ?? [];
+    return { nextParentId: previousSibling.id, targetIndex: childSiblings.length };
+  }
+
+  if (activeItem.parentId == null) {
+    return null;
+  }
+
+  const parentItem = itemById.get(activeItem.parentId);
+  const nextParentId = parentItem?.parentId ?? null;
+  const nextSiblings = childrenByParent.get(toParentKey(nextParentId)) ?? [];
+  const parentIndex = parentItem ? nextSiblings.findIndex((item) => item.id === parentItem.id) : -1;
+
+  return {
+    nextParentId,
+    targetIndex: parentIndex < 0 ? nextSiblings.length : parentIndex + 1,
+  };
+}
+
+/**
  * dedicated inline quick-add 생성 payload를 구성한다.
  *
  * Phase 6.1 contract:
@@ -549,6 +635,8 @@ export function buildInlineCreatePayload(
     assigneeUserId: null,
     startDate: null,
     endDate: null,
+    actualStartDate: null,
+    actualEndDate: null,
     progressRate: 0,
     estimatedMm: null,
     milestoneId: null,

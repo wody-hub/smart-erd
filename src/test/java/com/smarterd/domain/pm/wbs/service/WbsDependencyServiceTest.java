@@ -179,6 +179,80 @@ class WbsDependencyServiceTest {
             .hasMessage(MessageCode.ERROR_BUSINESS_WBS_DEPENDENCY_CYCLE.code());
     }
 
+    @Test
+    @DisplayName("previewShift - FS dependency를 따라 후행 작업 일정을 canonical하게 민다")
+    void previewShift_cascadesFsSuccessor() {
+        final var owner = createUser(1L, "tester");
+        final var team = createTeam(10L, owner);
+        final var project = createProject(20L, team);
+        final var predecessor = createWbsItem(100L, project, "요구사항 분석");
+        final var successor = createWbsItem(101L, project, "화면 설계");
+        ReflectionTestUtils.setField(predecessor, "startDate", java.time.LocalDate.parse("2026-05-10"));
+        ReflectionTestUtils.setField(predecessor, "endDate", java.time.LocalDate.parse("2026-05-12"));
+        ReflectionTestUtils.setField(successor, "startDate", java.time.LocalDate.parse("2026-05-11"));
+        ReflectionTestUtils.setField(successor, "endDate", java.time.LocalDate.parse("2026-05-13"));
+        final var dependency = createDependency(201L, project, predecessor, successor);
+
+        when(projectContextLoader.load("tester", 10L, 20L, false)).thenReturn(new ProjectContext(team, project));
+        when(wbsItemRepository.findByProjectWithRelations(project)).thenReturn(List.of(predecessor, successor));
+        when(wbsDependencyRepository.findByProjectWithRelations(project)).thenReturn(List.of(dependency));
+
+        final var result = wbsDependencyService.previewShift(
+            "tester",
+            10L,
+            20L,
+            List.of(
+                new WbsDependencyService.WbsDependencyShiftAnchorCommand(
+                    100L,
+                    java.time.LocalDate.parse("2026-05-15"),
+                    java.time.LocalDate.parse("2026-05-17")
+                )
+            )
+        );
+
+        assertThat(result.graphValid()).isTrue();
+        assertThat(result.applied()).isFalse();
+        assertThat(result.updates())
+            .extracting(WbsDependencyService.WbsDependencyShiftItemResult::wbsItemId)
+            .containsExactlyInAnyOrder(100L, 101L);
+        assertThat(result.updates())
+            .filteredOn((update) -> update.wbsItemId().equals(101L))
+            .singleElement()
+            .satisfies((update) -> assertThat(update.startDate()).isEqualTo(java.time.LocalDate.parse("2026-05-17")));
+    }
+
+    @Test
+    @DisplayName("applyShift - 검증 이슈가 없으면 일정을 저장한다")
+    void applyShift_persistsUpdates() {
+        final var owner = createUser(1L, "tester");
+        final var team = createTeam(10L, owner);
+        final var project = createProject(20L, team);
+        final var predecessor = createWbsItem(100L, project, "요구사항 분석");
+        ReflectionTestUtils.setField(predecessor, "startDate", java.time.LocalDate.parse("2026-05-10"));
+        ReflectionTestUtils.setField(predecessor, "endDate", java.time.LocalDate.parse("2026-05-12"));
+
+        when(projectContextLoader.load("tester", 10L, 20L, true)).thenReturn(new ProjectContext(team, project));
+        when(wbsItemRepository.findByProjectWithRelations(project)).thenReturn(List.of(predecessor));
+        when(wbsDependencyRepository.findByProjectWithRelations(project)).thenReturn(List.of());
+
+        final var result = wbsDependencyService.applyShift(
+            "tester",
+            10L,
+            20L,
+            List.of(
+                new WbsDependencyService.WbsDependencyShiftAnchorCommand(
+                    100L,
+                    java.time.LocalDate.parse("2026-05-12"),
+                    java.time.LocalDate.parse("2026-05-14")
+                )
+            )
+        );
+
+        assertThat(result.applied()).isTrue();
+        assertThat(predecessor.getStartDate()).isEqualTo(java.time.LocalDate.parse("2026-05-12"));
+        verify(wbsItemRepository).saveAll(any());
+    }
+
     private User createUser(Long id, String loginId) {
         final var user = User.builder().loginId(loginId).password("hashed").name(loginId).build();
         ReflectionTestUtils.setField(user, "id", id);

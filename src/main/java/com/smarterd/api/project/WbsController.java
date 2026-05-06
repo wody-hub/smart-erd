@@ -4,17 +4,27 @@ import com.smarterd.api.project.dto.wbs.CreateWbsCommentRequest;
 import com.smarterd.api.project.dto.wbs.CreateWbsDependencyRequest;
 import com.smarterd.api.project.dto.wbs.WbsActivityResponse;
 import com.smarterd.api.project.dto.wbs.WbsCommentResponse;
+import com.smarterd.api.project.dto.wbs.BulkCreateWbsItemsRequest;
+import com.smarterd.api.project.dto.wbs.BulkCreateWbsItemsResponse;
 import com.smarterd.api.project.dto.wbs.CreateWbsItemRequest;
+import com.smarterd.api.project.dto.wbs.DuplicateWbsSubtreeRequest;
+import com.smarterd.api.project.dto.wbs.InstantiateWbsTemplateRequest;
 import com.smarterd.api.project.dto.wbs.ReorderWbsItemsRequest;
+import com.smarterd.api.project.dto.wbs.SaveWbsTemplateRequest;
 import com.smarterd.api.project.dto.wbs.UpdateWbsDependencyRequest;
 import com.smarterd.api.project.dto.wbs.UpdateWbsItemRequest;
 import com.smarterd.api.project.dto.wbs.WbsDependencyResponse;
+import com.smarterd.api.project.dto.wbs.WbsDependencyShiftRequest;
+import com.smarterd.api.project.dto.wbs.WbsDependencyShiftResponse;
 import com.smarterd.api.project.dto.wbs.WbsDocumentResponse;
 import com.smarterd.api.project.dto.wbs.WbsDocumentTagResponse;
 import com.smarterd.api.project.dto.wbs.WbsItemResponse;
+import com.smarterd.api.project.dto.wbs.WbsSubtreeMutationResponse;
+import com.smarterd.api.project.dto.wbs.WbsTemplateResponse;
 import com.smarterd.domain.pm.history.service.WorkItemHistoryService;
 import com.smarterd.domain.pm.wbs.service.WbsDependencyService;
 import com.smarterd.domain.pm.wbs.service.WbsDocumentService;
+import com.smarterd.domain.pm.wbs.service.WbsPlanningService;
 import com.smarterd.domain.pm.wbs.service.WbsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -51,6 +61,7 @@ public class WbsController {
     private final WbsService wbsService;
     private final WbsDependencyService wbsDependencyService;
     private final WbsDocumentService wbsDocumentService;
+    private final WbsPlanningService wbsPlanningService;
     private final WorkItemHistoryService workItemHistoryService;
 
     @Operation(summary = "WBS 트리 조회")
@@ -79,6 +90,165 @@ public class WbsController {
                 .map(WbsDependencyResponse::from)
                 .toList()
         );
+    }
+
+    @Operation(summary = "WBS subtree 복제")
+    @PostMapping("/{wbsItemId}/duplicate-subtree")
+    public ResponseEntity<WbsSubtreeMutationResponse> duplicateSubtree(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Parameter(description = "복제할 subtree 루트 WBS ID") @PathVariable Long wbsItemId,
+        @Valid @RequestBody DuplicateWbsSubtreeRequest request
+    ) {
+        final var result = wbsPlanningService.duplicateSubtree(
+            jwt.getSubject(),
+            teamId,
+            projectId,
+            wbsItemId,
+            new WbsPlanningService.DuplicateSubtreeCommand(
+                request.parentId(),
+                request.resetAssignee(),
+                request.resetSchedule(),
+                request.resetProgress(),
+                request.resetMilestone(),
+                request.includeDependencies()
+            )
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(WbsSubtreeMutationResponse.from(result));
+    }
+
+    @Operation(summary = "WBS 템플릿 목록 조회")
+    @GetMapping("/templates")
+    public ResponseEntity<List<WbsTemplateResponse>> getTemplates(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId
+    ) {
+        return ResponseEntity.ok(
+            wbsPlanningService.getTemplates(jwt.getSubject(), teamId, projectId).stream().map(WbsTemplateResponse::from).toList()
+        );
+    }
+
+    @Operation(summary = "WBS 템플릿 저장")
+    @PostMapping("/templates")
+    public ResponseEntity<WbsTemplateResponse> saveTemplate(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Valid @RequestBody SaveWbsTemplateRequest request
+    ) {
+        final var result = wbsPlanningService.saveTemplate(
+            jwt.getSubject(),
+            teamId,
+            projectId,
+            new WbsPlanningService.SaveTemplateCommand(request.sourceWbsItemId(), request.name(), request.description())
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(WbsTemplateResponse.from(result));
+    }
+
+    @Operation(summary = "WBS 템플릿 적용")
+    @PostMapping("/templates/{templateId}/instantiate")
+    public ResponseEntity<WbsSubtreeMutationResponse> instantiateTemplate(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Parameter(description = "템플릿 ID") @PathVariable Long templateId,
+        @Valid @RequestBody InstantiateWbsTemplateRequest request
+    ) {
+        final var result = wbsPlanningService.instantiateTemplate(
+            jwt.getSubject(),
+            teamId,
+            projectId,
+            templateId,
+            new WbsPlanningService.InstantiateTemplateCommand(
+                request.parentId(),
+                request.resetAssignee(),
+                request.resetSchedule(),
+                request.resetProgress(),
+                request.resetMilestone(),
+                request.includeDependencies()
+            )
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(WbsSubtreeMutationResponse.from(result));
+    }
+
+    @Operation(summary = "WBS 대량 생성")
+    @PostMapping("/bulk-create")
+    public ResponseEntity<BulkCreateWbsItemsResponse> bulkCreate(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Valid @RequestBody BulkCreateWbsItemsRequest request
+    ) {
+        final var result = wbsPlanningService.bulkCreate(
+            jwt.getSubject(),
+            teamId,
+            projectId,
+            new WbsPlanningService.BulkCreateCommand(
+                request
+                    .items()
+                    .stream()
+                    .map((item) ->
+                        new WbsPlanningService.BulkCreateItemCommand(
+                            item.clientKey(),
+                            item.parentId(),
+                            item.parentClientKey(),
+                            item.name(),
+                            item.assigneeUserId(),
+                            item.startDate(),
+                            item.endDate(),
+                            item.progressRate(),
+                            item.estimatedMm(),
+                            item.milestoneId()
+                        )
+                    )
+                    .toList()
+            )
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(BulkCreateWbsItemsResponse.from(result));
+    }
+
+    @Operation(summary = "WBS dependency shift preview")
+    @PostMapping("/dependency-shift-preview")
+    public ResponseEntity<WbsDependencyShiftResponse> previewDependencyShift(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Valid @RequestBody WbsDependencyShiftRequest request
+    ) {
+        final var result = wbsDependencyService.previewShift(
+            jwt.getSubject(),
+            teamId,
+            projectId,
+            request
+                .anchors()
+                .stream()
+                .map((anchor) -> new WbsDependencyService.WbsDependencyShiftAnchorCommand(anchor.wbsItemId(), anchor.startDate(), anchor.endDate()))
+                .toList()
+        );
+        return ResponseEntity.ok(WbsDependencyShiftResponse.from(result));
+    }
+
+    @Operation(summary = "WBS dependency shift apply")
+    @PostMapping("/dependency-shift-apply")
+    public ResponseEntity<WbsDependencyShiftResponse> applyDependencyShift(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "팀 ID") @PathVariable Long teamId,
+        @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
+        @Valid @RequestBody WbsDependencyShiftRequest request
+    ) {
+        final var result = wbsDependencyService.applyShift(
+            jwt.getSubject(),
+            teamId,
+            projectId,
+            request
+                .anchors()
+                .stream()
+                .map((anchor) -> new WbsDependencyService.WbsDependencyShiftAnchorCommand(anchor.wbsItemId(), anchor.startDate(), anchor.endDate()))
+                .toList()
+        );
+        return ResponseEntity.ok(WbsDependencyShiftResponse.from(result));
     }
 
     @Operation(summary = "WBS dependency 생성")
@@ -285,6 +455,8 @@ public class WbsController {
             request.assigneeUserId(),
             request.startDate(),
             request.endDate(),
+            request.actualStartDate(),
+            request.actualEndDate(),
             request.progressRate(),
             request.estimatedMm(),
             request.milestoneId()
@@ -311,6 +483,8 @@ public class WbsController {
             request.assigneeUserId(),
             request.startDate(),
             request.endDate(),
+            request.actualStartDate(),
+            request.actualEndDate(),
             request.progressRate(),
             request.estimatedMm(),
             request.milestoneId()
