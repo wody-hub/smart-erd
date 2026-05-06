@@ -127,6 +127,33 @@ npm run perf:erd:apply:sample  # 저장소 샘플 리포트 갱신 (client/perf-
 npm run test:e2e:smoke:collaboration  # 협업 생성/undo 전파 스모크
 ```
 
+### 백엔드 + 프론트엔드 통합 기동
+
+루트의 `start.sh`/`stop.sh`로 백엔드와 프론트엔드를 함께 기동/종료할 수 있다.
+프로파일별 기본 포트는 기존 개별 실행 설정과 동일하다.
+
+| 실행환경 | 백엔드                         | 프론트엔드                         |
+| -------- | ------------------------------ | ---------------------------------- |
+| `dev`    | `./bootRun-dev.sh` → `:9503`   | `npm run dev` → `:4503`            |
+| `local`  | `./bootRun-local.sh` → `:9501` | `npm run local` → `:4501`          |
+| `test`   | `./bootRun-test.sh` → `:9502`  | `npm run test:frontend` → `:4502`  |
+
+```bash
+./start.sh --env local
+./stop.sh --env local --backend-port 9501 --frontend-port 4501
+```
+
+포트를 임시로 바꿔서 실행할 수도 있다.
+
+```bash
+./start.sh --env local --backend-port 9510 --frontend-port 4510
+./stop.sh --env local --backend-port 9510 --frontend-port 4510
+```
+
+옵션 없이 `./stop.sh`를 실행하면 `.run/`에 기록된 Smart ERD 인스턴스를 모두 종료한다.
+로그는 `logs/backend.<env>-<backend-port>-<frontend-port>.log`,
+`logs/frontend.<env>-<backend-port>-<frontend-port>.log`에 기록된다.
+
 ### 환경변수
 
 | 변수                                                | 설명                                                  | 기본값                                    |
