@@ -32,6 +32,7 @@ import { fetchSharedTodoSummaries } from '@/api/projectTodoApi';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -50,10 +51,19 @@ import { getErrorMessage } from '@/lib/api-error';
 import type { Milestone } from '@/types/milestone';
 import type { SharedTodoSummary } from '@/types/project-todo';
 import type { DiagramSummary } from '@/types/diagram';
+import type { TeamMember } from '@/types/team';
 import type { WorkspaceDocumentType } from '@/types/workspace';
-import type { WbsActivity, WbsActivityEventType, WbsItem } from '@/types/wbs';
+import type { UpdateWbsItemPayload, WbsActivity, WbsActivityEventType, WbsItem } from '@/types/wbs';
 import WbsDependencyShiftDialog from './WbsDependencyShiftDialog';
 import WbsLevelBadge from './WbsLevelBadge';
+import {
+  formatOptionalPercentage,
+  formatPeriod,
+  formatVariance,
+  formatVarianceDays,
+  isDelayedWbsItem,
+} from './sortable-wbs-row-formatters';
+import { parseValidatedInlineProgressValue } from './wbs-inline-editor-utils';
 import { shiftDateByDays } from './wbs-authoring-utils';
 import { buildWbsDependencySummary } from './wbs-dependency-summary';
 import WbsDocumentLinkDialog from './WbsDocumentLinkDialog';
@@ -70,6 +80,9 @@ interface WbsDetailPanelProps {
   allItems: WbsItem[];
   milestones: Milestone[];
   allDocuments: DiagramSummary[];
+  members: TeamMember[];
+  updating: boolean;
+  onUpdateItem: (item: WbsItem, overrides: Partial<UpdateWbsItemPayload>) => Promise<void>;
 }
 
 function toDocumentType(pluginId: string): WorkspaceDocumentType {
@@ -115,6 +128,9 @@ export default function WbsDetailPanel({
   allItems,
   milestones,
   allDocuments,
+  members,
+  updating,
+  onUpdateItem,
 }: WbsDetailPanelProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -127,6 +143,9 @@ export default function WbsDetailPanel({
   const [selectedSuccessorId, setSelectedSuccessorId] = useState(NO_DEPENDENCY_TARGET);
   const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
   const [shiftDaysValue, setShiftDaysValue] = useState('1');
+  const [progressValue, setProgressValue] = useState(
+    item?.progressRate != null ? String(item.progressRate) : '0',
+  );
 
   const linkedDocumentsQuery = useQuery({
     queryKey: queryKeys.wbs.linkedDocuments(teamId, projectId, item?.id ?? null),
@@ -375,7 +394,8 @@ export default function WbsDetailPanel({
       ]);
       toast.success(t('wbs.details.toast.shiftApplied'));
     },
-    onError: (error) => toast.error(getErrorMessage(error, t('wbs.details.toast.shiftApplyFailed'))),
+    onError: (error) =>
+      toast.error(getErrorMessage(error, t('wbs.details.toast.shiftApplyFailed'))),
   });
 
   const activityCounts = useMemo(() => {
@@ -403,10 +423,37 @@ export default function WbsDetailPanel({
   }, [item?.id]);
 
   useEffect(() => {
+    setProgressValue(item?.progressRate != null ? String(item.progressRate) : '0');
+  }, [item?.id, item?.progressRate]);
+
+  useEffect(() => {
     if (!shiftDialogOpen) {
       setShiftDaysValue('1');
     }
   }, [shiftDialogOpen, item?.id]);
+
+  const handleProgressSave = async () => {
+    if (!item) {
+      return;
+    }
+    const parsed = parseValidatedInlineProgressValue(progressValue);
+    if (parsed == null) {
+      toast.error(t('wbs.validation.progressRate'));
+      return;
+    }
+    if (parsed === item.progressRate) {
+      return;
+    }
+    try {
+      await onUpdateItem(item, { progressRate: parsed });
+    } catch (error) {
+      toast.error(getErrorMessage(error, t('wbs.toast.updateFailed')));
+    }
+  };
+
+  const handleProgressReset = () => {
+    setProgressValue(item?.progressRate != null ? String(item.progressRate) : '0');
+  };
 
   if (!item) {
     return (
@@ -431,6 +478,12 @@ export default function WbsDetailPanel({
         dependencySummary.nextMilestone.targetDate,
       ).toLocaleDateString(locale)}`
     : t('wbs.details.dependencies.summary.noMilestone');
+  const isDelayed = isDelayedWbsItem(item);
+  const assigneeName =
+    item.assigneeName ??
+    (item.assigneeUserId == null
+      ? null
+      : (members.find((member) => member.userId === item.assigneeUserId)?.name ?? null));
 
   return (
     <>
@@ -441,15 +494,25 @@ export default function WbsDetailPanel({
               <CardTitle className="text-xl">{item.name}</CardTitle>
               <CardDescription>{t('wbs.details.description')}</CardDescription>
             </div>
-            <WbsLevelBadge
-              label={t('wbs.details.level', { level: item.depth + 1 })}
-              className="text-xs"
-            />
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {isDelayed ? <Badge variant="destructive">{t('wbs.status.delayed')}</Badge> : null}
+              <WbsLevelBadge
+                label={t('wbs.details.level', { level: item.depth + 1 })}
+                className="text-xs"
+              />
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             <span>
               {t('wbs.field.progressRate')}: {item.progressRate}%
+            </span>
+            <span>
+              {t('wbs.field.plannedProgressRate')}:{' '}
+              {formatOptionalPercentage(item.plannedProgressRate, t)}
+            </span>
+            <span>
+              {t('wbs.field.progressVarianceRate')}: {formatVariance(item.progressVarianceRate, t)}
             </span>
             <span>
               {t('wbs.field.estimatedMm')}: {item.estimatedMm ?? '-'}
@@ -461,6 +524,105 @@ export default function WbsDetailPanel({
         </CardHeader>
 
         <CardContent className="space-y-4">
+          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <div className="rounded-xl border border-border/80 bg-secondary/10 p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                {t('wbs.field.assignee')}
+              </p>
+              <p className="mt-2 text-sm font-medium text-foreground">
+                {assigneeName ?? t('wbs.field.unassigned')}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/80 bg-secondary/10 p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                {t('wbs.field.progressRate')}
+              </p>
+              {canEdit ? (
+                <div className="mt-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={progressValue}
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      className="h-9 w-24 tabular-nums"
+                      onChange={(event) => setProgressValue(event.target.value)}
+                      disabled={updating}
+                      aria-label={t('wbs.aria.editProgress', { name: item.name })}
+                    />
+                    <span className="text-sm font-medium text-foreground">%</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => void handleProgressSave()}
+                      disabled={updating}
+                    >
+                      {t('common.button.save')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleProgressReset}
+                      disabled={updating}
+                    >
+                      {t('common.button.cancel')}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm font-medium text-foreground">{item.progressRate}%</p>
+              )}
+            </div>
+            <div className="rounded-xl border border-border/80 bg-secondary/10 p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                {t('wbs.field.actualPeriod')}
+              </p>
+              <p className="mt-2 text-sm font-medium text-foreground">
+                {formatPeriod(item.actualStartDate, item.actualEndDate, locale, t)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/80 bg-secondary/10 p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                {t('wbs.field.plannedProgressRate')}
+              </p>
+              <p className="mt-2 text-sm font-medium text-foreground">
+                {formatOptionalPercentage(item.plannedProgressRate, t)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/80 bg-secondary/10 p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                {t('wbs.field.progressVarianceRate')}
+              </p>
+              <p className="mt-2 text-sm font-medium text-foreground">
+                {formatVariance(item.progressVarianceRate, t)}
+              </p>
+              {item.startVarianceDays != null || item.endVarianceDays != null ? (
+                <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  {formatVarianceDays(item.startVarianceDays, 'start', t) ? (
+                    <p>{formatVarianceDays(item.startVarianceDays, 'start', t)}</p>
+                  ) : null}
+                  {formatVarianceDays(item.endVarianceDays, 'end', t) ? (
+                    <p>{formatVarianceDays(item.endVarianceDays, 'end', t)}</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            <div className="rounded-xl border border-border/80 bg-secondary/10 p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                {t('wbs.details.schedule.status')}
+              </p>
+              <div className="mt-2">
+                <Badge variant={isDelayed ? 'destructive' : 'secondary'}>
+                  {isDelayed ? t('wbs.status.delayed') : t('wbs.status.onTrack')}
+                </Badge>
+              </div>
+            </div>
+          </section>
+
           <section className="space-y-4 rounded-xl border border-border/80 bg-secondary/10 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">

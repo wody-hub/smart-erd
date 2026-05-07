@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  WBS_VIEW_PRESET_COLUMNS,
   buildDependencyShiftPreview,
   parseBulkCreateOutline,
 } from '../../src/components/wbs/wbs-authoring-utils.js';
@@ -57,6 +58,18 @@ test('parseBulkCreateOutline reports line-level indent jumps', () => {
   const result = parseBulkCreateOutline(`- Root\n      - Too deep`);
 
   assert.deepEqual(result.errors, [{ lineNumber: 2, messageKey: 'indentJump' }]);
+});
+
+test('schedule preset exposes assignee alongside schedule tracking columns', () => {
+  assert.deepEqual(WBS_VIEW_PRESET_COLUMNS.schedule, [
+    'assignee',
+    'period',
+    'actualPeriod',
+    'progressRate',
+    'plannedProgressRate',
+    'progressVarianceRate',
+    'milestone',
+  ]);
 });
 
 test('buildDependencyShiftPreview shifts anchor and reachable successors only', () => {

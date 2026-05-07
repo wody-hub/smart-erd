@@ -1,9 +1,10 @@
-import { type KeyboardEvent, useEffect, useState } from 'react';
+import { type FocusEvent, type KeyboardEvent, useEffect, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { TFunction } from 'i18next';
-import { Check, ChevronDown, ChevronRight, GripVertical, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TableCell, TableRow } from '@/components/ui/table';
@@ -17,20 +18,23 @@ import { SortableWbsRowCells } from './SortableWbsRowCells';
 import {
   NO_MILESTONE_VALUE,
   UNASSIGNED_VALUE,
+  formatPeriod,
+  isDelayedWbsItem,
 } from './sortable-wbs-row-formatters';
 import { getWbsRowSurfaceClasses } from './sortable-wbs-row-surface';
 import type { WbsVisibleColumn } from './wbs-authoring-utils';
+import {
+  createWbsInlineDraftState,
+  normalizeInlineName,
+  parseInlineAssigneeValue,
+  parseInlineEstimatedMmValue,
+  parseInlineMilestoneValue,
+  parseValidatedInlineProgressValue,
+  resolveInlineBlurDecision,
+  type WbsInlineEditor,
+} from './wbs-inline-editor-utils';
 import WbsLevelBadge from './WbsLevelBadge';
 import { TREE_INDENT } from './wbs-tree-utils';
-
-type InlineEditor =
-  | 'name'
-  | 'assignee'
-  | 'period'
-  | 'progress'
-  | 'estimatedMm'
-  | 'milestone'
-  | null;
 
 /** SortableWbsRow 컴포넌트 props. */
 export interface SortableWbsRowProps {
@@ -52,6 +56,8 @@ export interface SortableWbsRowProps {
   collapsed: boolean;
   /** 비활성 여부 */
   disabled: boolean;
+  /** 드래그 비활성 여부 */
+  dragDisabled?: boolean;
   /** 강조 상태 */
   highlighted?: boolean;
   /** 번역 함수 */
@@ -125,18 +131,6 @@ export interface SortableWbsRowProps {
   onApplyTemplate?: (template: WbsTemplateSummary, item: WbsItem) => void;
 }
 
-function resetEditorState(item: WbsItem) {
-  return {
-    assigneeValue: item.assigneeUserId == null ? UNASSIGNED_VALUE : String(item.assigneeUserId),
-    endDateValue: item.endDate ?? '',
-    estimatedMmValue: item.estimatedMm == null ? '' : String(item.estimatedMm),
-    milestoneValue: item.milestoneId == null ? NO_MILESTONE_VALUE : String(item.milestoneId),
-    nameValue: item.name,
-    progressValue: String(item.progressRate),
-    startDateValue: item.startDate ?? '',
-  };
-}
-
 /**
  * 정렬 가능한 WBS 행을 렌더링한다.
  *
@@ -153,6 +147,7 @@ export default function SortableWbsRow({
   hasChildren,
   collapsed,
   disabled,
+  dragDisabled = false,
   highlighted = false,
   t,
   members,
@@ -190,7 +185,7 @@ export default function SortableWbsRow({
 }: SortableWbsRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
-    disabled: !canEdit || disabled,
+    disabled: !canEdit || disabled || dragDisabled,
   });
   const surfaceClasses = getWbsRowSurfaceClasses({
     highlighted,
@@ -204,7 +199,12 @@ export default function SortableWbsRow({
       dense={pageAuthoringMode}
     />
   );
-  const [activeEditor, setActiveEditor] = useState<InlineEditor>(null);
+  const delayedBadge = isDelayedWbsItem(item) ? (
+    <Badge variant="destructive" className="shrink-0">
+      {t('wbs.status.delayed')}
+    </Badge>
+  ) : null;
+  const [activeEditor, setActiveEditor] = useState<WbsInlineEditor | null>(null);
   const [nameValue, setNameValue] = useState(item.name);
   const [progressValue, setProgressValue] = useState(String(item.progressRate));
   const [assigneeValue, setAssigneeValue] = useState(
@@ -218,12 +218,21 @@ export default function SortableWbsRow({
   const [milestoneValue, setMilestoneValue] = useState(
     item.milestoneId == null ? NO_MILESTONE_VALUE : String(item.milestoneId),
   );
+  const draftState = {
+    assigneeValue,
+    endDateValue,
+    estimatedMmValue,
+    milestoneValue,
+    nameValue,
+    progressValue,
+    startDateValue,
+  };
 
   useEffect(() => {
     if (activeEditor != null) {
       return;
     }
-    const nextState = resetEditorState(item);
+    const nextState = createWbsInlineDraftState(item);
     setNameValue(nextState.nameValue);
     setProgressValue(nextState.progressValue);
     setAssigneeValue(nextState.assigneeValue);
@@ -233,9 +242,8 @@ export default function SortableWbsRow({
     setMilestoneValue(nextState.milestoneValue);
   }, [activeEditor, item]);
 
-  const closeEditor = () => {
-    const nextState = resetEditorState(item);
-    setActiveEditor(null);
+  const resetDraftState = () => {
+    const nextState = createWbsInlineDraftState(item);
     setNameValue(nextState.nameValue);
     setProgressValue(nextState.progressValue);
     setAssigneeValue(nextState.assigneeValue);
@@ -245,11 +253,62 @@ export default function SortableWbsRow({
     setMilestoneValue(nextState.milestoneValue);
   };
 
-  const startEditor = (editor: Exclude<InlineEditor, null>) => {
+  const closeEditor = () => {
+    setActiveEditor(null);
+    resetDraftState();
+  };
+
+  const startEditor = (editor: WbsInlineEditor) => {
     if (!canEdit || disabled) {
       return;
     }
+    if (activeEditor != null && activeEditor !== editor) {
+      const nextDecision = resolveInlineBlurDecision(
+        activeEditor,
+        item,
+        draftState,
+        () => window.confirm(t('wbs.dialog.inlineBlurConfirm')),
+      );
+      if (nextDecision === 'save') {
+        if (!confirmInlineEdit(activeEditor)) {
+          return;
+        }
+      } else if (nextDecision === 'discard' || nextDecision === 'unchanged') {
+        closeEditor();
+      }
+    }
     setActiveEditor(editor);
+  };
+
+  const inlineInteractionLocked = dragDisabled || activeEditor != null;
+
+  const handleEditorBlur = (editor: WbsInlineEditor, event: FocusEvent<HTMLElement>) => {
+    window.setTimeout(() => {
+      const activeElement = document.activeElement as HTMLElement | null;
+      if (
+        activeElement?.closest('[data-inline-editor-root="true"]') ||
+        activeElement?.closest('[data-inline-editor-actions="true"]') ||
+        activeElement?.closest('[data-inline-editor-portal="true"]')
+      ) {
+        return;
+      }
+      if (activeEditor === editor) {
+        const nextDecision = resolveInlineBlurDecision(
+          editor,
+          item,
+          draftState,
+          () => window.confirm(t('wbs.dialog.inlineBlurConfirm')),
+        );
+        if (nextDecision === 'save') {
+          confirmInlineEdit(editor);
+          return;
+        }
+        if (nextDecision === 'discard' || nextDecision === 'unchanged') {
+          closeEditor();
+        }
+      }
+    }, 0);
+    event.stopPropagation();
   };
 
   const handleEditorKeyDown = (
@@ -268,42 +327,44 @@ export default function SortableWbsRow({
   };
 
   const confirmNameEdit = () => {
-    const trimmed = nameValue.trim();
+    const trimmed = normalizeInlineName(nameValue);
     if (!trimmed) {
-      closeEditor();
-      return;
+      toast.error(t('wbs.validation.nameRequired'));
+      return false;
     }
     if (trimmed !== item.name) {
       onInlineNameSubmit(item, trimmed);
     }
     setActiveEditor(null);
+    return true;
   };
 
   const confirmProgressEdit = () => {
-    const parsed = Number(progressValue);
-    if (Number.isNaN(parsed) || parsed < 0 || parsed > 100) {
+    const parsed = parseValidatedInlineProgressValue(progressValue);
+    if (parsed == null) {
       toast.error(t('wbs.validation.progressRate'));
-      return;
+      return false;
     }
     if (parsed !== item.progressRate) {
       onInlineProgressSubmit(item, parsed);
     }
     setActiveEditor(null);
+    return true;
   };
 
   const confirmAssigneeEdit = () => {
-    const nextAssigneeUserId =
-      assigneeValue === UNASSIGNED_VALUE ? null : Number.parseInt(assigneeValue, 10);
+    const nextAssigneeUserId = parseInlineAssigneeValue(assigneeValue);
     if (nextAssigneeUserId !== item.assigneeUserId) {
       onInlineAssigneeSubmit(item, nextAssigneeUserId);
     }
     setActiveEditor(null);
+    return true;
   };
 
   const confirmPeriodEdit = () => {
     if (!isDateOrderValid(startDateValue, endDateValue)) {
       toast.error(t('wbs.validation.dateOrder'));
-      return;
+      return false;
     }
     const nextStartDate = startDateValue || null;
     const nextEndDate = endDateValue || null;
@@ -314,30 +375,51 @@ export default function SortableWbsRow({
       });
     }
     setActiveEditor(null);
+    return true;
   };
 
   const confirmEstimatedMmEdit = () => {
-    let nextEstimatedMm: number | null = null;
-    if (estimatedMmValue.trim() !== '') {
-      nextEstimatedMm = Number(estimatedMmValue);
-      if (Number.isNaN(nextEstimatedMm) || nextEstimatedMm < 0) {
-        toast.error(t('wbs.validation.estimatedMm'));
-        return;
-      }
+    const nextEstimatedMm = parseInlineEstimatedMmValue(estimatedMmValue);
+    if (nextEstimatedMm != null && (Number.isNaN(nextEstimatedMm) || nextEstimatedMm < 0)) {
+      toast.error(t('wbs.validation.estimatedMm'));
+      return false;
     }
     if (nextEstimatedMm !== item.estimatedMm) {
       onInlineEstimatedMmSubmit(item, nextEstimatedMm);
     }
     setActiveEditor(null);
+    return true;
   };
 
   const confirmMilestoneEdit = () => {
-    const nextMilestoneId =
-      milestoneValue === NO_MILESTONE_VALUE ? null : Number.parseInt(milestoneValue, 10);
+    const nextMilestoneId = parseInlineMilestoneValue(milestoneValue);
     if (nextMilestoneId !== item.milestoneId) {
       onInlineMilestoneSubmit(item, nextMilestoneId);
     }
     setActiveEditor(null);
+    return true;
+  };
+
+  const confirmInlineEdit = (editor: WbsInlineEditor | null = activeEditor) => {
+    if (editor === 'name') {
+      return confirmNameEdit();
+    }
+    if (editor === 'assignee') {
+      return confirmAssigneeEdit();
+    }
+    if (editor === 'period') {
+      return confirmPeriodEdit();
+    }
+    if (editor === 'progress') {
+      return confirmProgressEdit();
+    }
+    if (editor === 'estimatedMm') {
+      return confirmEstimatedMmEdit();
+    }
+    if (editor === 'milestone') {
+      return confirmMilestoneEdit();
+    }
+    return true;
   };
 
   return (
@@ -386,11 +468,12 @@ export default function SortableWbsRow({
               className={cn(
                 'inline-flex shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground',
                 surfaceClasses.compactControl,
+                inlineInteractionLocked && 'cursor-not-allowed opacity-50 hover:bg-transparent',
               )}
               aria-label={t('wbs.aria.drag', { name: item.name })}
-              disabled={disabled}
-              {...attributes}
-              {...listeners}
+              disabled={disabled || inlineInteractionLocked}
+              {...(inlineInteractionLocked ? {} : attributes)}
+              {...(inlineInteractionLocked ? {} : listeners)}
             >
               <GripVertical className="h-4 w-4" />
             </button>
@@ -398,7 +481,11 @@ export default function SortableWbsRow({
 
           <div className="min-w-0 flex-1">
             {activeEditor === 'name' && canEdit ? (
-              <div className={cn('flex items-center gap-2', pageAuthoringMode && 'gap-1.5')}>
+              <div
+                className={cn('flex items-center gap-2', pageAuthoringMode && 'gap-1.5')}
+                data-inline-editor-root="true"
+                onBlurCapture={(event) => handleEditorBlur('name', event)}
+              >
                 <div className="flex min-w-0 flex-1 items-center gap-1">
                   <Input
                     value={nameValue}
@@ -409,29 +496,8 @@ export default function SortableWbsRow({
                     autoFocus
                     aria-label={t('wbs.aria.editName', { name: item.name })}
                   />
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={confirmNameEdit}
-                      disabled={disabled}
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={closeEditor}
-                      disabled={disabled}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
                 </div>
+                {delayedBadge}
                 {levelBadge}
               </div>
             ) : canEdit ? (
@@ -450,6 +516,7 @@ export default function SortableWbsRow({
                 >
                   {item.name}
                 </button>
+                {delayedBadge}
                 {levelBadge}
               </div>
             ) : (
@@ -467,6 +534,7 @@ export default function SortableWbsRow({
                 >
                   {item.name}
                 </button>
+                {delayedBadge}
                 {levelBadge}
               </div>
             )}
@@ -480,6 +548,22 @@ export default function SortableWbsRow({
         assigneeValue={assigneeValue}
         canEdit={canEdit}
         disabled={disabled}
+        displayEstimatedMmLabel={
+          item.estimatedMm != null
+            ? t('wbs.field.mmValue', { value: item.estimatedMm })
+            : t('wbs.field.noEstimatedMm')
+        }
+        displayMilestoneLabel={milestoneName ?? t('wbs.field.noMilestone')}
+        displayPeriodLabel={formatPeriod(item.startDate, item.endDate, locale, t)}
+        displayProgressLabel={`${item.progressRate}%`}
+        editorRootProps={{
+          onBlurCapture: (event) => {
+            if (activeEditor == null || activeEditor === 'name') {
+              return;
+            }
+            handleEditorBlur(activeEditor, event as FocusEvent<HTMLElement>);
+          },
+        }}
         endDateValue={endDateValue}
         estimatedMmValue={estimatedMmValue}
         item={item}
@@ -496,12 +580,6 @@ export default function SortableWbsRow({
         startDateValue={startDateValue}
         t={t}
         visibleColumns={visibleColumns}
-        onCancelEditor={closeEditor}
-        onConfirmAssigneeEdit={confirmAssigneeEdit}
-        onConfirmEstimatedMmEdit={confirmEstimatedMmEdit}
-        onConfirmMilestoneEdit={confirmMilestoneEdit}
-        onConfirmPeriodEdit={confirmPeriodEdit}
-        onConfirmProgressEdit={confirmProgressEdit}
         onEditorKeyDown={(event) => {
           if (activeEditor === 'period') {
             handleEditorKeyDown(event, confirmPeriodEdit);
@@ -533,6 +611,7 @@ export default function SortableWbsRow({
         canMoveUp={canMoveUp}
         canOutdent={canOutdent}
         disabled={disabled}
+        inlineEditing={activeEditor != null}
         item={item}
         pageActionCellClass={surfaceClasses.actionCell}
         pageAuthoringMode={pageAuthoringMode}

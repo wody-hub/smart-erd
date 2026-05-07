@@ -46,3 +46,20 @@ export function formatVarianceDays(
     value: `${value > 0 ? '+' : ''}${value}`,
   });
 }
+
+export function isDelayedWbsItem(item: {
+  progressVarianceRate: number | null;
+  startVarianceDays: number | null;
+  endVarianceDays: number | null;
+}): boolean {
+  if ((item.progressVarianceRate ?? 0) < 0) {
+    return true;
+  }
+  if ((item.startVarianceDays ?? 0) > 0) {
+    return true;
+  }
+  if ((item.endVarianceDays ?? 0) > 0) {
+    return true;
+  }
+  return false;
+}

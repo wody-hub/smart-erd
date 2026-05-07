@@ -17,6 +17,7 @@ export type WbsViewPreset = 'structure' | 'schedule' | 'resourcing';
 export const WBS_VIEW_PRESET_COLUMNS: Record<WbsViewPreset, WbsVisibleColumn[]> = {
   structure: ['milestone'],
   schedule: [
+    'assignee',
     'period',
     'actualPeriod',
     'progressRate',
@@ -75,7 +76,11 @@ const BULK_DEPTH_SPACES = 2;
 const MAX_PREVIEW_DEPTH = 8;
 
 function normalizeLineName(raw: string): string {
-  return raw.trimStart().replace(/^[-*+]\s+/, '').replace(/^\d+[.)]\s+/, '').trim();
+  return raw
+    .trimStart()
+    .replace(/^[-*+]\s+/, '')
+    .replace(/^\d+[.)]\s+/, '')
+    .trim();
 }
 
 function countIndentDepth(raw: string): number {
@@ -191,7 +196,10 @@ export function buildTemplateFromItem(rootItem: WbsItem, allItems: WbsItem[]): W
   };
 }
 
-export function buildBulkCreatePayload(item: ParsedBulkCreateLine, parentId: number | null): CreateWbsItemPayload {
+export function buildBulkCreatePayload(
+  item: ParsedBulkCreateLine,
+  parentId: number | null,
+): CreateWbsItemPayload {
   return {
     name: item.name,
     parentId,
@@ -238,7 +246,10 @@ export function buildTemplateCreatePayload(
   };
 }
 
-export function buildDuplicatePayload(item: WbsItem, parentId: number | null): CreateWbsItemPayload {
+export function buildDuplicatePayload(
+  item: WbsItem,
+  parentId: number | null,
+): CreateWbsItemPayload {
   return {
     name: `${item.name} Copy`,
     parentId,

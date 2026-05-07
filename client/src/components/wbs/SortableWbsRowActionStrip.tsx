@@ -87,6 +87,7 @@ export interface SortableWbsRowActionStripProps {
   canMoveUp: boolean;
   canOutdent: boolean;
   disabled: boolean;
+  inlineEditing?: boolean;
   item: WbsItem;
   pageActionCellClass?: string;
   pageAuthoringMode: boolean;
@@ -116,6 +117,7 @@ export function SortableWbsRowActionStrip({
   canMoveUp,
   canOutdent,
   disabled,
+  inlineEditing = false,
   item,
   pageActionCellClass,
   pageAuthoringMode,
@@ -150,42 +152,42 @@ export function SortableWbsRowActionStrip({
                 label={t('wbs.action.addBelow')}
                 description={t('wbs.tooltip.addBelow')}
                 onClick={() => onAddBelow?.(item)}
-                disabled={disabled || !canAddBelow}
+                disabled={disabled || inlineEditing || !canAddBelow}
               />
               <ActionIconButton
                 icon={<CornerDownRight className="h-3.5 w-3.5" />}
                 label={t('wbs.action.addChild')}
                 description={t('wbs.tooltip.addChild')}
                 onClick={() => onAddChild?.(item)}
-                disabled={disabled || !canAddChild}
+                disabled={disabled || inlineEditing || !canAddChild}
               />
               <ActionIconButton
                 icon={<ArrowUp className="h-3.5 w-3.5" />}
                 label={t('wbs.action.moveUp')}
                 description={t('wbs.tooltip.moveUp')}
                 onClick={() => onMoveUp?.(item)}
-                disabled={disabled || !canMoveUp}
+                disabled={disabled || inlineEditing || !canMoveUp}
               />
               <ActionIconButton
                 icon={<ArrowDown className="h-3.5 w-3.5" />}
                 label={t('wbs.action.moveDown')}
                 description={t('wbs.tooltip.moveDown')}
                 onClick={() => onMoveDown?.(item)}
-                disabled={disabled || !canMoveDown}
+                disabled={disabled || inlineEditing || !canMoveDown}
               />
               <ActionIconButton
                 icon={<ChevronRight className="h-3.5 w-3.5" />}
                 label={t('wbs.action.indent')}
                 description={t('wbs.tooltip.indent')}
                 onClick={() => onIndent?.(item)}
-                disabled={disabled || !canIndent}
+                disabled={disabled || inlineEditing || !canIndent}
               />
               <ActionIconButton
                 icon={<ArrowLeft className="h-3.5 w-3.5" />}
                 label={t('wbs.action.outdent')}
                 description={t('wbs.tooltip.outdent')}
                 onClick={() => onOutdent?.(item)}
-                disabled={disabled || !canOutdent}
+                disabled={disabled || inlineEditing || !canOutdent}
               />
               <span className="mx-0.5 h-4 w-px bg-border/70" aria-hidden />
               <ActionIconButton
@@ -193,14 +195,14 @@ export function SortableWbsRowActionStrip({
                 label={t('wbs.action.edit')}
                 description={t('wbs.tooltip.edit')}
                 onClick={() => onOpenEditDialog(item)}
-                disabled={disabled}
+                disabled={disabled || inlineEditing}
               />
               <ActionIconButton
                 icon={<Trash2 className="h-3.5 w-3.5" />}
                 label={t('wbs.action.delete')}
                 description={t('wbs.tooltip.delete')}
                 onClick={() => onRequestDelete(item)}
-                disabled={disabled}
+                disabled={disabled || inlineEditing}
                 destructive
               />
               <DropdownMenu>
@@ -212,6 +214,7 @@ export function SortableWbsRowActionStrip({
                         size="icon"
                         className="h-6 w-6 rounded-md border border-border/70 bg-transparent text-foreground/80 transition-colors hover:border-border hover:bg-accent/80 hover:text-foreground"
                         aria-label={t('wbs.aria.more', { name: item.name })}
+                        disabled={disabled || inlineEditing}
                       >
                         <MoreHorizontal className="h-3.5 w-3.5" />
                       </Button>
@@ -256,7 +259,7 @@ export function SortableWbsRowActionStrip({
             className="h-8 w-8"
             onClick={() => onOpenMoveDialog(item)}
             aria-label={t('wbs.aria.move', { name: item.name })}
-            disabled={disabled}
+            disabled={disabled || inlineEditing}
           >
             <ArrowRightLeft className="h-4 w-4" />
           </Button>
@@ -269,7 +272,7 @@ export function SortableWbsRowActionStrip({
               className="h-8 w-8"
               onClick={() => onOpenEditDialog(item)}
               aria-label={t('wbs.aria.edit', { name: item.name })}
-              disabled={disabled}
+              disabled={disabled || inlineEditing}
             >
               <Pencil className="h-4 w-4" />
             </Button>
@@ -279,7 +282,7 @@ export function SortableWbsRowActionStrip({
               className="h-8 w-8"
               onClick={() => onRequestDelete(item)}
               aria-label={t('wbs.aria.delete', { name: item.name })}
-              disabled={disabled}
+              disabled={disabled || inlineEditing}
             >
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>

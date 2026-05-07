@@ -977,6 +977,9 @@
       "title": "WBS Context",
       "description": "Review linked documents, comments, and activity history for the selected WBS item.",
       "level": "Level {{level}}",
+      "schedule": {
+        "status": "Schedule status"
+      },
       "tabs": {
         "documents": "Documents {{count}}",
         "comments": "Comments {{count}}",
@@ -1145,8 +1148,13 @@
       "indent": "Nest this row under the previous sibling to deepen the structure.",
       "outdent": "Promote this row one level higher without changing its subtree.",
       "edit": "Open the full editor for fields that are easier to change outside inline mode.",
+      "savePending": "Save the draft that was left behind when you clicked away from the inline editor.",
+      "cancelPending": "Discard the unsaved inline draft and restore the stored row values.",
       "delete": "Remove this row and review the subtree impact before confirming.",
       "more": "Open duplicate and template actions for this subtree."
+    },
+    "dialog": {
+      "inlineBlurConfirm": "Save this inline edit now? Press Cancel to discard the draft."
     },
     "view": {
       "title": "Workspace view",
@@ -1260,6 +1268,13 @@
       "startVarianceDays": "Start {{value}}d",
       "endVarianceDays": "End {{value}}d"
     },
+    "filter": {
+      "all": "All",
+      "delayed": "Delayed only",
+      "hint": "{{count}} delayed item(s)",
+      "emptyTitle": "No delayed WBS items match this view",
+      "emptyDescription": "Switch back to all items or check tasks that have actual schedule or variance data."
+    },
     "form": {
       "createTitle": "Create WBS item",
       "editTitle": "Edit WBS item",
@@ -1332,7 +1347,9 @@
       "readOnlyDescription": "You can review existing WBS items and milestone links, but you need edit access to add or reorder items."
     },
     "status": {
-      "loadFailedTitle": "We couldn't load the WBS workspace"
+      "loadFailedTitle": "We couldn't load the WBS workspace",
+      "onTrack": "On track",
+      "delayed": "Delayed"
     },
     "aria": {
       "edit": "Edit WBS item {{name}}",

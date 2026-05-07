@@ -75,6 +75,7 @@ import WbsBulkCreateDialog from './WbsBulkCreateDialog';
 import WbsInlineCreateRow from './WbsInlineCreateRow';
 import WbsItemFormDialog, { type WbsItemFormValues } from './WbsItemFormDialog';
 import WbsMoveDialog, { type WbsMoveDialogValues } from './WbsMoveDialog';
+import { isDelayedWbsItem } from './sortable-wbs-row-formatters';
 import {
   WBS_VIEW_PRESET_COLUMNS,
   type ParsedBulkCreateLine,
@@ -101,6 +102,7 @@ import {
 const HIGHLIGHT_DURATION_MS = 2200;
 const PAGE_NAME_COLUMN_WIDTH = 280;
 const PAGE_ACTIONS_COLUMN_WIDTH = 260;
+type WbsScheduleFilter = 'all' | 'delayed';
 const PAGE_VISIBLE_COLUMN_WIDTHS: Record<Exclude<WbsVisibleColumn, 'name'>, number> = {
   assignee: 160,
   period: 220,
@@ -124,6 +126,32 @@ function getPageTableMinWidth(visibleColumns: Set<WbsVisibleColumn>): number {
 
 function getTemplateSummaryStorageKey(teamId: string, projectId: string): string {
   return `smart-erd:wbs-template-summaries:${teamId}:${projectId}`;
+}
+
+function buildDelayedVisibleItems(allItems: WbsItem[]): WbsItem[] {
+  const delayedIds = new Set<number>();
+  const itemById = new Map(allItems.map((item) => [item.id, item]));
+
+  allItems.forEach((item) => {
+    if (!isDelayedWbsItem(item)) {
+      return;
+    }
+    delayedIds.add(item.id);
+    let cursorParentId = item.parentId;
+    while (cursorParentId != null) {
+      delayedIds.add(cursorParentId);
+      cursorParentId = itemById.get(cursorParentId)?.parentId ?? null;
+    }
+  });
+
+  if (delayedIds.size === 0) {
+    return [];
+  }
+
+  return flattenTreeItems(
+    buildChildrenByParent(allItems.filter((item) => delayedIds.has(item.id))),
+    new Set<number>(),
+  );
 }
 
 function readStoredTemplateSummaries(teamId: string, projectId: string): WbsTemplateSummary[] {
@@ -198,6 +226,7 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
     const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
     const [batchBusy, setBatchBusy] = useState(false);
     const [viewPreset, setViewPreset] = useState<WbsViewPreset>('structure');
+    const [scheduleFilter, setScheduleFilter] = useState<WbsScheduleFilter>('all');
     const [visibleColumns, setVisibleColumns] = useState<Set<WbsVisibleColumn>>(
       () => new Set(WBS_VIEW_PRESET_COLUMNS.structure),
     );
@@ -349,17 +378,31 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       () => flattenTreeItems(childrenByParent, collapsedIds),
       [childrenByParent, collapsedIds],
     );
+    const delayedVisibleItems = useMemo(() => buildDelayedVisibleItems(allItems), [allItems]);
+    const filteredVisibleItems = useMemo(() => {
+      if (variant !== 'page' || scheduleFilter === 'all') {
+        return visibleItems;
+      }
+      return delayedVisibleItems;
+    }, [delayedVisibleItems, scheduleFilter, variant, visibleItems]);
+    const delayedItemCount = useMemo(
+      () => allItems.filter((item) => isDelayedWbsItem(item)).length,
+      [allItems],
+    );
 
     useEffect(() => {
-      if (visibleItems.length === 0) {
+      if (filteredVisibleItems.length === 0) {
         setSelectedItemId(null);
         return;
       }
-      if (selectedItemId != null && visibleItems.some((item) => item.id === selectedItemId)) {
+      if (
+        selectedItemId != null &&
+        filteredVisibleItems.some((item) => item.id === selectedItemId)
+      ) {
         return;
       }
-      setSelectedItemId(visibleItems[0]?.id ?? null);
-    }, [selectedItemId, visibleItems]);
+      setSelectedItemId(filteredVisibleItems[0]?.id ?? null);
+    }, [filteredVisibleItems, selectedItemId]);
 
     const milestoneNameById = useMemo(
       () =>
@@ -553,6 +596,16 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
       });
     };
 
+    const handleDetailPanelUpdate = async (
+      item: WbsItem,
+      overrides: Partial<UpdateWbsItemPayload>,
+    ) => {
+      await updateMutation.mutateAsync({
+        wbsId: item.id,
+        payload: buildUpdatePayload(item, overrides),
+      });
+    };
+
     /**
      * 접힘 상태를 토글한다.
      *
@@ -742,6 +795,7 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
     const shouldShowPageInlineCreate = variant === 'page' && canEdit;
     const selectedItem = selectedItemId == null ? null : (itemById.get(selectedItemId) ?? null);
     const templates = templatesQuery.data ?? storedTemplates;
+    const isFilteredDelayedView = variant === 'page' && scheduleFilter === 'delayed';
 
     const isColumnVisible = (column: WbsVisibleColumn) => visibleColumns.has(column);
     const pageTableMinWidth = variant === 'page' ? getPageTableMinWidth(visibleColumns) : undefined;
@@ -903,21 +957,28 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
      */
     const renderTable = () => {
       const tableRows: ReactNode[] = [];
+      const displayedItems = filteredVisibleItems;
 
-      if (visibleItems.length === 0 && shouldShowPageInlineCreate) {
+      if (displayedItems.length === 0 && shouldShowPageInlineCreate) {
         tableRows.push(
           <TableRow key="empty-state">
             <TableCell colSpan={tableColumnCount} className="py-6 text-center">
               <div className="space-y-1">
-                <p className="font-medium text-foreground">{t('wbs.empty.title')}</p>
-                <p className="text-sm text-muted-foreground">{t('wbs.empty.description')}</p>
+                <p className="font-medium text-foreground">
+                  {isFilteredDelayedView ? t('wbs.filter.emptyTitle') : t('wbs.empty.title')}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {isFilteredDelayedView
+                    ? t('wbs.filter.emptyDescription')
+                    : t('wbs.empty.description')}
+                </p>
               </div>
             </TableCell>
           </TableRow>,
         );
       }
 
-      visibleItems.forEach((item) => {
+      displayedItems.forEach((item) => {
         const siblings = childrenByParent.get(toParentKey(item.parentId)) ?? [];
         const siblingIndex = siblings.findIndex((sibling) => sibling.id === item.id);
 
@@ -926,6 +987,7 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
             key={`item-${item.id}`}
             item={item}
             canEdit={canEdit}
+            dragDisabled={isFilteredDelayedView}
             locale={locale}
             assigneeName={
               item.assigneeName ??
@@ -1008,7 +1070,7 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
               onDragEnd={handleDragEnd}
             >
               <SortableContext
-                items={visibleItems.map((item) => item.id)}
+                items={displayedItems.map((item) => item.id)}
                 strategy={verticalListSortingStrategy}
               >
                 <Table
@@ -1231,6 +1293,22 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
                     <CopyPlus className="mr-2 h-4 w-4" />
                     {t('wbs.bulk.open')}
                   </Button>
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-background/80 p-1">
+                    {(['all', 'delayed'] as const).map((filter) => (
+                      <Button
+                        key={filter}
+                        type="button"
+                        size="sm"
+                        variant={scheduleFilter === filter ? 'default' : 'ghost'}
+                        onClick={() => setScheduleFilter(filter)}
+                      >
+                        {t(`wbs.filter.${filter}`)}
+                      </Button>
+                    ))}
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {t('wbs.filter.hint', { count: delayedItemCount })}
+                  </span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button type="button" variant="outline">
@@ -1290,6 +1368,9 @@ const WbsWorkspaceContent = forwardRef<WbsWorkspaceContentHandle, WbsWorkspaceCo
                 allItems={allItems}
                 milestones={milestonesQuery.data ?? []}
                 allDocuments={diagramsQuery.data ?? []}
+                members={membersQuery.data ?? []}
+                updating={updateMutation.isPending}
+                onUpdateItem={handleDetailPanelUpdate}
               />
               <MilestonePanel teamId={teamId} projectId={projectId} canEdit={canEdit} />
             </div>

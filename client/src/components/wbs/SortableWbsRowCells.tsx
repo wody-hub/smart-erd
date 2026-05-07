@@ -1,7 +1,5 @@
-import type { KeyboardEventHandler } from 'react';
+import type { FocusEventHandler, KeyboardEventHandler } from 'react';
 import type { TFunction } from 'i18next';
-import { Check, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -27,47 +25,19 @@ import type { WbsVisibleColumn } from './wbs-authoring-utils';
 
 type InlineEditor = 'assignee' | 'estimatedMm' | 'milestone' | 'period' | 'progress' | null;
 
-function InlineActionButtons({
-  disabled,
-  onConfirm,
-  onCancel,
-}: {
-  disabled: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="flex items-center gap-1">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7"
-        onClick={onConfirm}
-        disabled={disabled}
-      >
-        <Check className="h-4 w-4" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7"
-        onClick={onCancel}
-        disabled={disabled}
-      >
-        <X className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-}
-
 export interface SortableWbsRowCellsProps {
   activeEditor: InlineEditor;
   assigneeName: string | null;
   assigneeValue: string;
   canEdit: boolean;
   disabled: boolean;
+  displayEstimatedMmLabel: string;
+  displayMilestoneLabel: string;
+  displayPeriodLabel: string;
+  displayProgressLabel: string;
+  editorRootProps?: {
+    onBlurCapture: FocusEventHandler<HTMLElement>;
+  };
   endDateValue: string;
   estimatedMmValue: string;
   item: WbsItem;
@@ -84,12 +54,6 @@ export interface SortableWbsRowCellsProps {
   startDateValue: string;
   t: TFunction;
   visibleColumns: Set<WbsVisibleColumn>;
-  onCancelEditor: () => void;
-  onConfirmAssigneeEdit: () => void;
-  onConfirmEstimatedMmEdit: () => void;
-  onConfirmMilestoneEdit: () => void;
-  onConfirmPeriodEdit: () => void;
-  onConfirmProgressEdit: () => void;
   onEditorKeyDown: KeyboardEventHandler<HTMLElement>;
   onSetAssigneeValue: (value: string) => void;
   onSetEndDateValue: (value: string) => void;
@@ -106,6 +70,11 @@ export function SortableWbsRowCells({
   assigneeValue,
   canEdit,
   disabled,
+  displayEstimatedMmLabel,
+  displayMilestoneLabel,
+  displayPeriodLabel,
+  displayProgressLabel,
+  editorRootProps,
   endDateValue,
   estimatedMmValue,
   item,
@@ -122,12 +91,6 @@ export function SortableWbsRowCells({
   startDateValue,
   t,
   visibleColumns,
-  onCancelEditor,
-  onConfirmAssigneeEdit,
-  onConfirmEstimatedMmEdit,
-  onConfirmMilestoneEdit,
-  onConfirmPeriodEdit,
-  onConfirmProgressEdit,
   onEditorKeyDown,
   onSetAssigneeValue,
   onSetEndDateValue,
@@ -142,7 +105,7 @@ export function SortableWbsRowCells({
       {visibleColumns.has('assignee') ? (
         <TableCell className={cn(pageDenseCellClass, pageDividerCellClass)}>
           {activeEditor === 'assignee' && canEdit ? (
-            <div className="space-y-1">
+            <div {...editorRootProps}>
               <Select
                 value={assigneeValue}
                 onValueChange={onSetAssigneeValue}
@@ -151,7 +114,7 @@ export function SortableWbsRowCells({
                 <SelectTrigger className="h-8">
                   <SelectValue placeholder={t('wbs.form.assigneePlaceholder')} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent data-inline-editor-portal="true">
                   <SelectItem value={UNASSIGNED_VALUE}>{t('wbs.form.unassigned')}</SelectItem>
                   {members.map((member) => (
                     <SelectItem key={member.userId} value={String(member.userId)}>
@@ -160,11 +123,6 @@ export function SortableWbsRowCells({
                   ))}
                 </SelectContent>
               </Select>
-              <InlineActionButtons
-                disabled={disabled || membersUnavailable}
-                onConfirm={onConfirmAssigneeEdit}
-                onCancel={onCancelEditor}
-              />
             </div>
           ) : canEdit ? (
             <button
@@ -199,7 +157,7 @@ export function SortableWbsRowCells({
           className={cn('text-sm text-muted-foreground', pageDenseCellClass, pageDividerCellClass)}
         >
           {activeEditor === 'period' && canEdit ? (
-            <div className="space-y-1">
+            <div {...editorRootProps}>
               <div className="grid grid-cols-1 gap-1">
                 <Input
                   type="date"
@@ -221,11 +179,6 @@ export function SortableWbsRowCells({
                   aria-label={t('wbs.aria.editPeriod', { name: item.name })}
                 />
               </div>
-              <InlineActionButtons
-                disabled={disabled}
-                onConfirm={onConfirmPeriodEdit}
-                onCancel={onCancelEditor}
-              />
             </div>
           ) : canEdit ? (
             <button
@@ -235,10 +188,10 @@ export function SortableWbsRowCells({
               disabled={disabled}
               aria-label={t('wbs.aria.editPeriod', { name: item.name })}
             >
-              {formatPeriod(item.startDate, item.endDate, locale, t)}
+              {displayPeriodLabel}
             </button>
           ) : (
-            formatPeriod(item.startDate, item.endDate, locale, t)
+            displayPeriodLabel
           )}
         </TableCell>
       ) : null}
@@ -254,7 +207,7 @@ export function SortableWbsRowCells({
       {visibleColumns.has('progressRate') ? (
         <TableCell className={cn('tabular-nums', pageDenseCellClass, pageDividerCellClass)}>
           {activeEditor === 'progress' && canEdit ? (
-            <div className="flex items-center gap-1">
+            <div {...editorRootProps}>
               <Input
                 value={progressValue}
                 type="number"
@@ -268,11 +221,6 @@ export function SortableWbsRowCells({
                 disabled={disabled}
                 aria-label={t('wbs.aria.editProgress', { name: item.name })}
               />
-              <InlineActionButtons
-                disabled={disabled}
-                onConfirm={onConfirmProgressEdit}
-                onCancel={onCancelEditor}
-              />
             </div>
           ) : canEdit ? (
             <button
@@ -281,10 +229,10 @@ export function SortableWbsRowCells({
               onClick={() => onStartEditor('progress')}
               disabled={disabled}
             >
-              {item.progressRate}%
+              {displayProgressLabel}
             </button>
           ) : (
-            `${item.progressRate}%`
+            displayProgressLabel
           )}
         </TableCell>
       ) : null}
@@ -333,7 +281,7 @@ export function SortableWbsRowCells({
       {visibleColumns.has('estimatedMm') ? (
         <TableCell className={cn('tabular-nums', pageDenseCellClass, pageDividerCellClass)}>
           {activeEditor === 'estimatedMm' && canEdit ? (
-            <div className="flex items-center gap-1">
+            <div {...editorRootProps}>
               <Input
                 type="number"
                 min={0}
@@ -346,11 +294,6 @@ export function SortableWbsRowCells({
                 disabled={disabled}
                 aria-label={t('wbs.aria.editEstimatedMm', { name: item.name })}
               />
-              <InlineActionButtons
-                disabled={disabled}
-                onConfirm={onConfirmEstimatedMmEdit}
-                onCancel={onCancelEditor}
-              />
             </div>
           ) : canEdit ? (
             <button
@@ -360,14 +303,12 @@ export function SortableWbsRowCells({
               disabled={disabled}
               aria-label={t('wbs.aria.editEstimatedMm', { name: item.name })}
             >
-              {item.estimatedMm != null
-                ? t('wbs.field.mmValue', { value: item.estimatedMm })
-                : t('wbs.field.noEstimatedMm')}
+              {displayEstimatedMmLabel}
             </button>
           ) : item.estimatedMm != null ? (
-            t('wbs.field.mmValue', { value: item.estimatedMm })
+            displayEstimatedMmLabel
           ) : (
-            t('wbs.field.noEstimatedMm')
+            displayEstimatedMmLabel
           )}
         </TableCell>
       ) : null}
@@ -377,12 +318,12 @@ export function SortableWbsRowCells({
           className={cn('text-sm text-muted-foreground', pageDenseCellClass, pageDividerCellClass)}
         >
           {activeEditor === 'milestone' && canEdit ? (
-            <div className="space-y-1">
+            <div {...editorRootProps}>
               <Select value={milestoneValue} onValueChange={onSetMilestoneValue} disabled={disabled}>
                 <SelectTrigger className="h-8">
                   <SelectValue placeholder={t('wbs.form.milestonePlaceholder')} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent data-inline-editor-portal="true">
                   <SelectItem value={NO_MILESTONE_VALUE}>{t('wbs.form.noMilestone')}</SelectItem>
                   {milestones.map((milestone) => (
                     <SelectItem key={milestone.id} value={String(milestone.id)}>
@@ -391,11 +332,6 @@ export function SortableWbsRowCells({
                   ))}
                 </SelectContent>
               </Select>
-              <InlineActionButtons
-                disabled={disabled}
-                onConfirm={onConfirmMilestoneEdit}
-                onCancel={onCancelEditor}
-              />
             </div>
           ) : canEdit ? (
             <button
@@ -405,10 +341,10 @@ export function SortableWbsRowCells({
               disabled={disabled}
               aria-label={t('wbs.aria.editMilestone', { name: item.name })}
             >
-              {milestoneName ?? t('wbs.field.noMilestone')}
+              {displayMilestoneLabel}
             </button>
           ) : (
-            (milestoneName ?? t('wbs.field.noMilestone'))
+            displayMilestoneLabel
           )}
         </TableCell>
       ) : null}
