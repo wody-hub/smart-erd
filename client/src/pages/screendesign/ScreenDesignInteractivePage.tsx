@@ -71,6 +71,9 @@ export default function ScreenDesignInteractivePage() {
     updateScreenPreset,
     moveScreen,
     deleteScreen,
+    addMaster,
+    updateMaster,
+    deleteMaster,
     addInstance,
     updateInstance,
     deleteInstance,
@@ -398,10 +401,14 @@ export default function ScreenDesignInteractivePage() {
                   selectedScreenId={selectedScreenId}
                   screenInstanceCounts={screenInstanceCounts}
                   groupedLibraryItems={groupedLibraryItems}
+                  defaultAccentColor={screenDesignPalette.surfaceStrokeHex}
                   onAddScreen={handleAddScreen}
                   onSelectScreen={handleSelectScreen}
                   onMoveScreen={moveScreen}
                   onDeleteScreen={handleDeleteScreen}
+                  onAddMaster={(name) => addMaster({ name, categoryId: 'button', tier: 'widget' })}
+                  onUpdateMaster={updateMaster}
+                  onDeleteMaster={deleteMaster}
                   onLibraryDragStart={handleLibraryDragStart}
                   onLibraryDragEnd={handleLibraryDragEnd}
                 />

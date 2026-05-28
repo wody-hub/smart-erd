@@ -119,7 +119,7 @@ export default function ScreenDesignEditorShell({
   const { t } = useTranslation();
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4" data-testid="screen-spec-editor-shell">
       <div className="surface-operational flex flex-col gap-3 rounded-lg px-4 py-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 items-center gap-3">

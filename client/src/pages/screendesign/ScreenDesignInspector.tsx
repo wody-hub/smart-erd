@@ -191,6 +191,7 @@ export default function ScreenDesignInspector({
             <Label htmlFor="screen-spec-screen-name">{t('screenSpec.inspector.screen')}</Label>
             <Input
               id="screen-spec-screen-name"
+              data-testid="screen-spec-screen-name-input"
               aria-label={t('screenSpec.inspector.screen')}
               className="mt-2"
               value={screenNameDraft}
@@ -287,6 +288,7 @@ export default function ScreenDesignInspector({
                 </Label>
                 <Input
                   id="screen-spec-instance-label"
+                  data-testid="screen-spec-instance-label-input"
                   aria-label={t('screenSpec.inspector.labelOverride')}
                   className="mt-2"
                   value={instanceLabelDraft}

@@ -80,6 +80,7 @@ export default function ScreenDesignCanvas({
   return (
     <div
       ref={stageContainerRef}
+      data-testid="screen-spec-canvas-dropzone"
       className="relative h-full w-full cursor-grab active:cursor-grabbing"
       onDragOver={onCanvasDragOver}
       onDragLeave={onCanvasDragLeave}
