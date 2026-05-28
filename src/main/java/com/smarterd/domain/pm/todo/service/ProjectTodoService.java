@@ -6,6 +6,7 @@ import com.smarterd.domain.pm.todo.entity.ProjectTodoPriority;
 import com.smarterd.domain.pm.todo.entity.ProjectTodoStatus;
 import com.smarterd.domain.pm.todo.entity.TodoDocumentVisibility;
 import com.smarterd.domain.pm.todo.repository.ProjectTodoRepository;
+import com.smarterd.domain.pm.todo.repository.TodoDocumentLinkRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -24,6 +25,7 @@ public class ProjectTodoService {
 
     private final ProjectTodoAccessService projectTodoAccessService;
     private final ProjectTodoRepository projectTodoRepository;
+    private final TodoDocumentLinkRepository todoDocumentLinkRepository;
     private final ProjectTodoMapper projectTodoMapper;
     private final ProjectTodoDocumentService projectTodoDocumentService;
     private final ProjectTodoWbsService projectTodoWbsService;
@@ -99,6 +101,7 @@ public class ProjectTodoService {
     public void deleteProjectTodo(String loginId, Long teamId, Long projectId, Long todoId) {
         final var project = projectTodoAccessService.loadProject(loginId, teamId, projectId);
         final var todo = projectTodoAccessService.findOwnedTodo(loginId, project, todoId);
+        todoDocumentLinkRepository.deleteByTodo(todo);
         projectTodoRepository.delete(todo);
     }
 

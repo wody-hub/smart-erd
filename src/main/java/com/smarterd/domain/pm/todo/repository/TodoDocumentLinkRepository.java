@@ -19,6 +19,8 @@ public interface TodoDocumentLinkRepository extends JpaRepository<TodoDocumentLi
 
     Optional<TodoDocumentLink> findByTodoAndDiagram(ProjectTodo todo, Diagram diagram);
 
+    void deleteByTodo(ProjectTodo todo);
+
     void deleteByTodoAndDiagram(ProjectTodo todo, Diagram diagram);
 
     @EntityGraph(attributePaths = { "todo", "todo.owner", "todo.linkedWbsItem", "diagram", "diagram.dictionarySet" })

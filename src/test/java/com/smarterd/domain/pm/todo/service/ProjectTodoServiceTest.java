@@ -9,6 +9,7 @@ import com.smarterd.domain.pm.todo.entity.ProjectTodo;
 import com.smarterd.domain.pm.todo.entity.ProjectTodoPriority;
 import com.smarterd.domain.pm.todo.entity.ProjectTodoStatus;
 import com.smarterd.domain.pm.todo.repository.ProjectTodoRepository;
+import com.smarterd.domain.pm.todo.repository.TodoDocumentLinkRepository;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.user.entity.User;
@@ -31,6 +32,9 @@ class ProjectTodoServiceTest {
 
     @Mock
     private ProjectTodoRepository projectTodoRepository;
+
+    @Mock
+    private TodoDocumentLinkRepository todoDocumentLinkRepository;
 
     @Mock
     private ProjectTodoMapper projectTodoMapper;
@@ -148,6 +152,22 @@ class ProjectTodoServiceTest {
 
         assertThat(result).isEqualTo(expected);
         verify(projectTodoDocumentService).linkDocument("tester", 10L, 20L, 301L, 41L, com.smarterd.domain.pm.todo.entity.TodoDocumentVisibility.PRIVATE);
+    }
+
+    @Test
+    @DisplayName("deleteProjectTodo removes linked documents before deleting the todo")
+    void deleteProjectTodo_removesLinkedDocumentsBeforeDeletingTodo() {
+        final var owner = createUser(1L, "tester", "김개발");
+        final var project = createProject(20L, owner);
+        final var todo = createTodo(301L, project, owner);
+
+        when(projectTodoAccessService.loadProject("tester", 10L, 20L)).thenReturn(project);
+        when(projectTodoAccessService.findOwnedTodo("tester", project, 301L)).thenReturn(todo);
+
+        projectTodoService.deleteProjectTodo("tester", 10L, 20L, 301L);
+
+        verify(todoDocumentLinkRepository).deleteByTodo(todo);
+        verify(projectTodoRepository).delete(todo);
     }
 
     private User createUser(Long id, String loginId, String name) {

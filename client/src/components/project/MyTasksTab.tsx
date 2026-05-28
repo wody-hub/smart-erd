@@ -50,6 +50,17 @@ interface MyTasksTabProps {
   canManagePersonalTodos: boolean;
 }
 
+/**
+ * 개인 TODO와 관련된 React Query 캐시를 무효화한다.
+ *
+ * @param queryClient React Query 클라이언트
+ * @param teamId 팀 ID
+ * @param projectId 프로젝트 ID
+ * @param wbsItemId 현재 연결된 WBS 항목 ID
+ * @param todoId TODO ID
+ * @param previousWbsItemId 이전 WBS 항목 ID
+ * @returns 없음
+ */
 function invalidateTodoRelatedQueries(
   queryClient: ReturnType<typeof useQueryClient>,
   teamId: string,
@@ -80,6 +91,15 @@ function invalidateTodoRelatedQueries(
   }
 }
 
+/**
+ * TODO 목록 캐시에 서버가 반환한 최신 TODO 값을 반영한다.
+ *
+ * @param queryClient React Query 클라이언트
+ * @param teamId 팀 ID
+ * @param projectId 프로젝트 ID
+ * @param todo 갱신된 TODO
+ * @returns 없음
+ */
 function syncProjectTodoInCache(
   queryClient: ReturnType<typeof useQueryClient>,
   teamId: string,
@@ -92,6 +112,17 @@ function syncProjectTodoInCache(
   );
 }
 
+/**
+ * TODO 목록 캐시에 WBS 연결 상태를 낙관적으로 반영한다.
+ *
+ * @param queryClient React Query 클라이언트
+ * @param teamId 팀 ID
+ * @param projectId 프로젝트 ID
+ * @param todoId TODO ID
+ * @param linkedWbsItemId 연결할 WBS 항목 ID
+ * @param linkedWbsItemName 연결할 WBS 항목 이름
+ * @returns 없음
+ */
 function updateProjectTodoWbsInCache(
   queryClient: ReturnType<typeof useQueryClient>,
   teamId: string,
@@ -115,11 +146,18 @@ interface WbsLinkMutationContext {
   previousLinkedWbsItemId: number | null;
 }
 
-export default function MyTasksTab({
-  teamId,
-  projectId,
-  canManagePersonalTodos,
-}: MyTasksTabProps) {
+interface DeleteTodoMutationContext {
+  previousSelectedTodoId: number | null;
+  previousTodos: ProjectTodo[] | undefined;
+}
+
+/**
+ * 개인 TODO 목록, 상세 편집, 문서/WBS 연결을 관리하는 프로젝트 탭.
+ *
+ * @param props 개인 TODO 탭 렌더링 속성
+ * @returns 개인 TODO 탭 JSX
+ */
+export default function MyTasksTab({ teamId, projectId, canManagePersonalTodos }: MyTasksTabProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage ?? i18n.language;
   const queryClient = useQueryClient();
@@ -195,9 +233,16 @@ export default function MyTasksTab({
   const allWbsItems = useMemo(() => wbsQuery.data ?? [], [wbsQuery.data]);
 
   const createMutation = useMutation({
-    mutationFn: (payload: CreateProjectTodoPayload) => createProjectTodo(teamId, projectId, payload),
+    mutationFn: (payload: CreateProjectTodoPayload) =>
+      createProjectTodo(teamId, projectId, payload),
     onSuccess: (createdTodo) => {
-      invalidateTodoRelatedQueries(queryClient, teamId, projectId, createdTodo.linkedWbsItemId, createdTodo.id);
+      invalidateTodoRelatedQueries(
+        queryClient,
+        teamId,
+        projectId,
+        createdTodo.linkedWbsItemId,
+        createdTodo.id,
+      );
       setCreateDialogOpen(false);
       setCreateValues(DEFAULT_EDITOR_VALUES);
       setSelectedTodoId(createdTodo.id);
@@ -210,34 +255,94 @@ export default function MyTasksTab({
     mutationFn: ({ todoId, payload }: { todoId: number; payload: UpdateProjectTodoPayload }) =>
       updateProjectTodo(teamId, projectId, todoId, payload),
     onSuccess: (updatedTodo) => {
-      invalidateTodoRelatedQueries(queryClient, teamId, projectId, updatedTodo.linkedWbsItemId, updatedTodo.id);
+      if (selectedTodo?.id === updatedTodo.id) {
+        setEditorValues(buildEditorValues(updatedTodo));
+      }
+      invalidateTodoRelatedQueries(
+        queryClient,
+        teamId,
+        projectId,
+        updatedTodo.linkedWbsItemId,
+        updatedTodo.id,
+      );
       toast.success(t('myTasks.toast.updated'));
     },
     onError: (error) => toast.error(getErrorMessage(error, t('myTasks.toast.updateFailed'))),
   });
 
   const deleteMutation = useMutation({
+    onMutate: async (todo): Promise<DeleteTodoMutationContext> => {
+      const previousSelectedTodoId = selectedTodoId;
+      const previousTodos = queryClient.getQueryData<ProjectTodo[] | undefined>(
+        projectTodosQueryKey,
+      );
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.projectTodos.documents(teamId, projectId, todo.id),
+      });
+      queryClient.setQueryData<ProjectTodo[] | undefined>(
+        projectTodosQueryKey,
+        (current) => current?.filter((item) => item.id !== todo.id) ?? current,
+      );
+      if (previousSelectedTodoId === todo.id) {
+        setSelectedTodoId(null);
+      }
+      return { previousSelectedTodoId, previousTodos };
+    },
     mutationFn: (todo: ProjectTodo) => deleteProjectTodo(teamId, projectId, todo.id),
     onSuccess: (_, deletedTodo) => {
-      invalidateTodoRelatedQueries(queryClient, teamId, projectId, deletedTodo.linkedWbsItemId, deletedTodo.id);
+      void queryClient.removeQueries({
+        queryKey: queryKeys.projectTodos.documents(teamId, projectId, deletedTodo.id),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.projectTodos.all(teamId, projectId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.projects.businessOverview(teamId, projectId),
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.wbs.all(teamId, projectId) });
+      if (deletedTodo.linkedWbsItemId != null) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.wbs.sharedTodos(teamId, projectId, deletedTodo.linkedWbsItemId),
+        });
+      }
       setDeleteTarget(null);
       setSelectedTodoId((current) => (current === deletedTodo.id ? null : current));
       toast.success(t('myTasks.toast.deleted'));
     },
-    onError: (error) => toast.error(getErrorMessage(error, t('myTasks.toast.deleteFailed'))),
+    onError: (error, deletedTodo, context) => {
+      if (context?.previousTodos) {
+        queryClient.setQueryData(projectTodosQueryKey, context.previousTodos);
+      }
+      if (context?.previousSelectedTodoId === deletedTodo.id) {
+        setSelectedTodoId(deletedTodo.id);
+      }
+      toast.error(getErrorMessage(error, t('myTasks.toast.deleteFailed')));
+    },
   });
 
   const linkWbsMutation = useMutation({
     onMutate: ({ todoId, wbsItemId }): WbsLinkMutationContext => {
-      const previousTodos = queryClient.getQueryData<ProjectTodo[] | undefined>(projectTodosQueryKey);
+      const previousTodos = queryClient.getQueryData<ProjectTodo[] | undefined>(
+        projectTodosQueryKey,
+      );
       const previousLinkedWbsItemId =
         previousTodos?.find((todo) => todo.id === todoId)?.linkedWbsItemId ??
         selectedTodo?.linkedWbsItemId ??
         null;
       const linkedWbsItemName = allWbsItems.find((item) => item.id === wbsItemId)?.name ?? null;
 
-      setEditorValues((current) => ({ ...current, linkedWbsItemId: toLinkedWbsEditorValue(wbsItemId) }));
-      updateProjectTodoWbsInCache(queryClient, teamId, projectId, todoId, wbsItemId, linkedWbsItemName);
+      setEditorValues((current) => ({
+        ...current,
+        linkedWbsItemId: toLinkedWbsEditorValue(wbsItemId),
+      }));
+      updateProjectTodoWbsInCache(
+        queryClient,
+        teamId,
+        projectId,
+        todoId,
+        wbsItemId,
+        linkedWbsItemName,
+      );
 
       return {
         previousEditorLinkedWbsItemId: editorValues.linkedWbsItemId,
@@ -277,7 +382,9 @@ export default function MyTasksTab({
 
   const unlinkWbsMutation = useMutation({
     onMutate: (todoId: number): WbsLinkMutationContext => {
-      const previousTodos = queryClient.getQueryData<ProjectTodo[] | undefined>(projectTodosQueryKey);
+      const previousTodos = queryClient.getQueryData<ProjectTodo[] | undefined>(
+        projectTodosQueryKey,
+      );
       const previousLinkedWbsItemId =
         previousTodos?.find((todo) => todo.id === todoId)?.linkedWbsItemId ??
         selectedTodo?.linkedWbsItemId ??
@@ -335,7 +442,13 @@ export default function MyTasksTab({
       if (!selectedTodo) {
         return;
       }
-      invalidateTodoRelatedQueries(queryClient, teamId, projectId, selectedTodo.linkedWbsItemId, selectedTodo.id);
+      invalidateTodoRelatedQueries(
+        queryClient,
+        teamId,
+        projectId,
+        selectedTodo.linkedWbsItemId,
+        selectedTodo.id,
+      );
       setDocumentDialogOpen(false);
       toast.success(t('myTasks.toast.documentLinked'));
     },
@@ -349,10 +462,17 @@ export default function MyTasksTab({
       if (!selectedTodo) {
         return;
       }
-      invalidateTodoRelatedQueries(queryClient, teamId, projectId, selectedTodo.linkedWbsItemId, selectedTodo.id);
+      invalidateTodoRelatedQueries(
+        queryClient,
+        teamId,
+        projectId,
+        selectedTodo.linkedWbsItemId,
+        selectedTodo.id,
+      );
       toast.success(t('myTasks.toast.documentUnlinked'));
     },
-    onError: (error) => toast.error(getErrorMessage(error, t('myTasks.toast.documentUnlinkFailed'))),
+    onError: (error) =>
+      toast.error(getErrorMessage(error, t('myTasks.toast.documentUnlinkFailed'))),
   });
 
   const isMutating =
@@ -364,6 +484,11 @@ export default function MyTasksTab({
     linkDocumentMutation.isPending ||
     unlinkDocumentMutation.isPending;
 
+  /**
+   * 생성 다이얼로그 값을 검증하고 새 TODO를 생성한다.
+   *
+   * @returns 생성 요청 완료 Promise
+   */
   const handleCreate = async () => {
     const progressRate = parseProgressRate(createValues.progressRate);
     if (!createValues.title.trim()) {
@@ -381,10 +506,16 @@ export default function MyTasksTab({
       priority: createValues.priority,
       targetDate: toNullableDate(createValues.targetDate),
       progressRate,
-      linkedWbsItemId: createValues.linkedWbsItemId === 'none' ? null : Number(createValues.linkedWbsItemId),
+      linkedWbsItemId:
+        createValues.linkedWbsItemId === 'none' ? null : Number(createValues.linkedWbsItemId),
     });
   };
 
+  /**
+   * 상세 패널의 편집 값을 검증하고 선택된 TODO를 저장한다.
+   *
+   * @returns 저장 요청 완료 Promise
+   */
   const handleSave = async () => {
     if (!selectedTodo) {
       return;
@@ -411,6 +542,36 @@ export default function MyTasksTab({
     });
   };
 
+  /**
+   * 목록/보드에서 선택한 TODO 상태를 즉시 변경한다.
+   *
+   * @param todo 상태를 바꿀 TODO
+   * @param status 다음 TODO 상태
+   * @returns 없음
+   */
+  const handleStatusChange = (todo: ProjectTodo, status: ProjectTodo['status']) => {
+    if (!canManagePersonalTodos || todo.status === status || updateMutation.isPending) {
+      return;
+    }
+    void updateMutation.mutateAsync({
+      todoId: todo.id,
+      payload: {
+        title: todo.title,
+        description: todo.description,
+        status,
+        priority: todo.priority,
+        targetDate: todo.targetDate,
+        progressRate: todo.progressRate,
+      },
+    });
+  };
+
+  /**
+   * 선택된 TODO의 WBS 연결 값을 변경한다.
+   *
+   * @param value 선택된 WBS 항목 ID 또는 none
+   * @returns 없음
+   */
   const handleLinkedWbsChange = (value: string) => {
     if (!selectedTodo) {
       return;
@@ -422,6 +583,13 @@ export default function MyTasksTab({
     void linkWbsMutation.mutateAsync({ todoId: selectedTodo.id, wbsItemId: Number(value) });
   };
 
+  /**
+   * 연결된 문서의 공유 범위를 변경한다.
+   *
+   * @param document 공유 범위를 바꿀 문서
+   * @param visibility 다음 공유 범위
+   * @returns 없음
+   */
   const handleDocumentVisibilityChange = (document: TodoDocument, visibility: string) => {
     if (!selectedTodo) {
       return;
@@ -464,6 +632,7 @@ export default function MyTasksTab({
           todos={todosQuery.data ?? []}
           onCreate={() => setCreateDialogOpen(true)}
           onSelectTodo={setSelectedTodoId}
+          onStatusChange={handleStatusChange}
         />
 
         <aside className="space-y-6">

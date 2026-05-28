@@ -70,6 +70,11 @@ export const queryKeys = {
     suggest: (teamId: string, setId: string, keyword: string) =>
       ['teams', teamId, 'dictionary-sets', setId, 'dictionary', 'suggest', keyword] as const,
   },
+  /** 사용자 설정 관련 쿼리 키 */
+  settings: {
+    /** 프로젝트 작업공간 탭 순서 */
+    projectWorkspaceTabs: () => ['settings', 'project-workspace-tabs'] as const,
+  },
   /** 다이어그램 관련 쿼리 키 */
   diagrams: {
     /** 프로젝트별 다이어그램 목록 */

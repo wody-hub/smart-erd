@@ -351,7 +351,8 @@
       "ganttMeta": "Timeline planning mode",
       "staffingMeta": "Planned/actual M/M and labor cost",
       "issuesDescription": "Register project issues, filter the live list by status, priority, and assignee, then export the current result set to Excel.",
-      "issuesMeta": "Excel export for the current filtered list"
+      "issuesMeta": "Excel export for the current filtered list",
+      "tabOrderUpdateFailed": "We couldn't save the tab order"
     },
     "dictionary": {
       "description": "Manage the shared word, term, and domain assets used across ERD and future document types.",
@@ -836,7 +837,12 @@
     },
     "section": {
       "title": "Personal TODOs",
-      "description": "Manage your personal execution list inside the project context and promote only the needed items into WBS."
+      "description": "Manage your personal execution list inside the project context and promote only the needed items into WBS.",
+      "viewMode": {
+        "list": "List",
+        "board": "Board",
+        "moveTo": "Move to"
+      }
     },
     "action": {
       "create": "Add TODO",
