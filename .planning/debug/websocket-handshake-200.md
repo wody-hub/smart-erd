@@ -1,16 +1,16 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: "WebSocket 핸드셰이크가 101 대신 200 OK 반환 — 마크다운 에디터 실시간 협업 실패"
 created: 2026-04-02T00:00:00Z
-updated: 2026-04-02T00:00:00Z
+updated: 2026-05-29T12:18:05+09:00
 ---
 
 ## Current Focus
 
-hypothesis: WsTicketHandshakeInterceptor.beforeHandshake()가 false 반환 시 Spring이 200 OK를 기본 반환하는 문제 + 동시 티켓 발급 시 기존 티켓 삭제로 인한 race condition
-test: 1) 인터셉터에서 명시적 403 설정 2) 서버 로그 강화 3) InMemoryWsTicketStore의 removeByLoginIdAndDiagramId 동작 확인
-expecting: 인터셉터 수정으로 200 대신 403 반환, 로그로 실패 원인 추적 가능
-next_action: WsTicketHandshakeInterceptor에 명시적 HTTP 상태 코드 설정 + 디버그 로깅 강화
+hypothesis: RESOLVED - WsTicketHandshakeInterceptor가 검증 실패 시 명시적으로 403을 설정함
+test: interceptor regression + ticket validation/store regression + invalid-ticket curl handshake
+expecting: 유효하지 않은 WebSocket ticket은 200 OK가 아니라 403으로 거부됨
+next_action: none
 
 ## Symptoms
 
@@ -83,9 +83,19 @@ fix: |
   3. InMemoryWsTicketStore: removeByLoginIdAndDiagramId에서 삭제 발생 시 디버그 로그 추가
   4. WsTicketService: validateAndConsume 실패 시 디버그 로그 추가
   5. ValidateCollaborationTicketUseCase: 각 실패 지점에 구체적 로그 추가 (ticket expired, access policy, resource key mismatch)
-verification:
+verification: 2026-05-29 targeted backend regression and invalid-ticket handshake smoke passed.
 files_changed:
   - src/main/java/com/smarterd/domain/diagram/websocket/transport/WsTicketHandshakeInterceptor.java
   - src/main/java/com/smarterd/domain/diagram/websocket/ticket/InMemoryWsTicketStore.java
   - src/main/java/com/smarterd/domain/diagram/websocket/ticket/WsTicketService.java
   - src/main/java/com/smarterd/application/collaboration/command/ValidateCollaborationTicketUseCase.java
+  - src/test/java/com/smarterd/domain/diagram/websocket/transport/WsTicketHandshakeInterceptorTest.java
+
+## RESOLVED
+
+Verified: 2026-05-29
+
+- `WsTicketHandshakeInterceptor.rejectHandshake()` sets `HttpStatus.FORBIDDEN`.
+- `WsTicketHandshakeInterceptorTest.beforeHandshake_rejectsWhenTicketValidationFails()` now asserts `response.setStatusCode(HttpStatus.FORBIDDEN)`.
+- `./gradlew test --tests com.smarterd.domain.diagram.websocket.transport.WsTicketHandshakeInterceptorTest --tests com.smarterd.application.diagram.command.ValidateDiagramCollaborationHandshakeUseCaseTest --tests com.smarterd.domain.diagram.websocket.ticket.InMemoryWsTicketStoreTest` -> PASS.
+- `curl -i -s -N -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H 'Sec-WebSocket-Version: 13' 'http://localhost:9503/ws/diagram/535?ticket=invalid-ticket'` -> `HTTP/1.1 403`.

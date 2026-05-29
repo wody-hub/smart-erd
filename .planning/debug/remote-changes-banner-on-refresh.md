@@ -1,16 +1,16 @@
 ---
-status: verifying
+status: resolved
 trigger: "Remote changes pending 배너가 단일 사용자 새로고침 시 매번 표시되는 문제"
 created: 2026-04-03T00:00:00Z
-updated: 2026-04-03T00:00:00Z
+updated: 2026-05-29T12:18:05+09:00
 ---
 
 ## Current Focus
 
-hypothesis: CONFIRMED - WebSocket SYNC_STEP2의 'remote' origin이 useBidirectionalCodeSync에서 remote-pending으로 처리됨
-test: canAbsorbInitialSyncRef 플래그로 사용자 편집 전 리비전 변경 흡수
+hypothesis: RESOLVED - WebSocket 초기 sync 리비전 변경은 사용자 편집 전 remote-pending으로 처리하지 않음
+test: canAbsorbInitialSyncRef 플래그 유지 + targeted frontend/backend regression
 expecting: 새로고침 시 배너 미표시, 실제 다른 사용자 변경 시에는 정상 표시
-next_action: 사용자에게 검증 요청
+next_action: none
 
 ## Symptoms
 
@@ -82,3 +82,9 @@ files_changed:
 - ERD-only mode reload: no banner
 - Code-first mode reload: no banner
 - Console errors: none
+
+**Re-verified:** 2026-05-29
+- `client/src/hooks/useBidirectionalCodeSync.ts` still initializes `canAbsorbInitialSyncRef` as true and accepts the first remote revision before any user code edit without setting `pendingRemoteRevision`.
+- `handleUserCodeChange()` still flips `canAbsorbInitialSyncRef` to false so later real remote revisions can surface as `remote-pending`.
+- `cd client && npm run test:unit -- markdown-section-preview code-sync-revision diagram-collaboration-provider-connection diagram-collaboration-provider-events diagram-collaboration-provider-session` -> PASS (`363/363`).
+- `./gradlew test --tests com.smarterd.domain.diagram.websocket.transport.WsTicketHandshakeInterceptorTest --tests com.smarterd.application.diagram.command.ValidateDiagramCollaborationHandshakeUseCaseTest --tests com.smarterd.domain.diagram.websocket.ticket.InMemoryWsTicketStoreTest` -> PASS.

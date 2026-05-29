@@ -1,16 +1,16 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: "PREVIEW 영역 빈 상태 + Remote changes pending 매번 표시"
 created: 2026-04-02T00:00:00Z
-updated: 2026-04-02T00:01:00Z
+updated: 2026-05-29T12:18:05+09:00
 ---
 
 ## Current Focus
 
-hypothesis: CONFIRMED — 두 이슈의 근본 원인 특정 완료
-test: 코드 수정 후 검증
-expecting: 초기 로드 시 프리뷰 표시 + 단일 사용자 진입 시 배너 미표시
-next_action: 사용자 검증 대기 — 마크다운 문서 진입 후 프리뷰 즉시 표시 여부 + 배너 미표시 확인
+hypothesis: RESOLVED — Worker ready/fallback 및 초기 sync remote-event 흡수 로직이 현재 코드에 유지됨
+test: targeted frontend collaboration/preview regression + backend websocket regression + invalid-ticket handshake smoke
+expecting: 초기 로드 시 프리뷰가 빈 문자열로 고착되지 않고, 초기 sync는 단일 사용자 remote-pending으로 표시되지 않음
+next_action: none
 
 ## Symptoms
 
@@ -63,8 +63,21 @@ fix: |
   
   **Issue 2**: collaborationReady가 true로 전환되기 전 remote 이벤트는 무시. collaborationReadyRef를 사용하여 subscribeDocumentChanges 콜백에서 체크.
 
-verification: TypeScript 컴파일 성공, ESLint 성공, Prettier 적용 완료. 사용자 실환경 검증 필요.
+verification: TypeScript 컴파일 성공, ESLint 성공, Prettier 적용 완료. 2026-05-29 targeted regression 재검증 완료.
 files_changed:
   - client/src/lib/markdown-preview-worker.ts
   - client/src/hooks/useMarkdownSectionPreview.ts
   - client/src/pages/document/use-markdown-document-session.ts
+
+## RESOLVED
+
+Verified: 2026-05-29
+
+- `client/src/lib/markdown-preview-worker.ts` still emits `{ type: 'ready' }` after module initialization.
+- `client/src/hooks/useMarkdownSectionPreview.ts` still queues worker requests until ready and renders a main-thread fallback while the module worker is loading.
+- `client/src/pages/document/use-markdown-document-session.ts` still ignores remote document-change events until `collaborationReadyRef` is true.
+- `cd client && npm run test:unit -- markdown-section-preview code-sync-revision diagram-collaboration-provider-connection diagram-collaboration-provider-events diagram-collaboration-provider-session` -> PASS (`363/363`).
+- `./gradlew test --tests com.smarterd.domain.diagram.websocket.transport.WsTicketHandshakeInterceptorTest --tests com.smarterd.application.diagram.command.ValidateDiagramCollaborationHandshakeUseCaseTest --tests com.smarterd.domain.diagram.websocket.ticket.InMemoryWsTicketStoreTest` -> PASS.
+- Invalid-ticket websocket handshake against the running local backend returns `HTTP/1.1 403`, not the old empty `200 OK`.
+
+Browser smoke note: Playwright E2E was attempted but not used as this session's closeout evidence because one test lacked required `SMART_ERD_E2E_LOGIN` env and the markdown collaboration smoke failed at a final persistence assertion unrelated to the worker-ready/initial-sync checks above.

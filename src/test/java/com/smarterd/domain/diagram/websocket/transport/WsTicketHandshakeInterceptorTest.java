@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.web.socket.WebSocketHandler;
@@ -77,5 +78,6 @@ class WsTicketHandshakeInterceptorTest {
         assertThat(accepted).isFalse();
         assertThat(attributes).isEmpty();
         verify(validateDiagramCollaborationHandshakeUseCase).validate("/ws/diagram/42", "ticket-1", 1);
+        verify(response).setStatusCode(HttpStatus.FORBIDDEN);
     }
 }
