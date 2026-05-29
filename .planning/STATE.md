@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: "SI PM MVP"
-status: archived
-last_updated: "2026-05-29T12:20:05+09:00"
-last_activity: "2026-05-29 -- v1.0 milestone archived"
+milestone: v1.1
+milestone_name: AI 업무 실행 Gateway + Local Codex Chatbot
+status: planning
+last_updated: "2026-05-29T05:18:33.788Z"
+last_activity: 2026-05-29
 progress:
-  total_phases: 10
-  completed_phases: 10
-  total_plans: 23
-  completed_plans: 23
-  percent: 100
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -20,16 +20,14 @@ progress:
 See `.planning/PROJECT.md`.
 
 **Core value:** SI 프로젝트에서 발생하는 모든 산출물과 관리 활동을 하나의 실시간 협업 플랫폼에서 일관된 체계로 관리
-**Current focus:** v1.0 archived; ready for next milestone definition
+**Current focus:** v1.1 planning — AI 업무 실행 Gateway + Local Codex Chatbot
 
 ## Current Position
 
-Phase: v1.0 milestone complete
-Plan: all v1.0 tracked plans complete
-Status: Archived
-Last activity: 2026-05-29 -- v1.0 milestone archived
-
-Progress: [████████████████████] 100%
+Phase: 9 next — AI Tool Gateway + Provider Abstraction
+Plan: —
+Status: Milestone requirements and roadmap initialized
+Last activity: 2026-05-29 — Milestone v1.1 started
 
 ## Milestone Archive
 
@@ -37,9 +35,10 @@ Progress: [████████████████████] 100%
 | --- | --- |
 | Roadmap archive | `.planning/milestones/v1.0-ROADMAP.md` |
 | Requirements archive | `.planning/milestones/v1.0-REQUIREMENTS.md` |
+| Phase artifact archive | `.planning/milestones/v1.0-phases/` |
 | Milestone audit | `.planning/v1.0-MILESTONE-AUDIT.md` |
 
-## Completion Evidence
+## v1.0 Completion Evidence
 
 - Open artifact audit: clear
 - v1 requirements: 42/42 complete
@@ -54,11 +53,16 @@ Progress: [████████████████████] 100%
 - v1.0 milestone archive completed after closing historical audit evidence gaps.
 - Historical debug sessions were re-verified and marked resolved instead of deferred.
 - Active `.planning/REQUIREMENTS.md` was archived and removed so the next milestone starts from fresh requirements.
+- v1.1 scope is an app AI chatbot plus AI execution gateway for Smart-ERD project-management data.
+- First runtime is local/Electron using an installed, logged-in Codex CLI through a Local Codex Adapter.
+- Architecture must keep provider abstraction for future OpenAI API, Ollama, Claude, or other provider support.
+- AI writes are limited to approval-gated low-risk create/update actions; delete/destructive actions are excluded.
 
 ## Deferred Items
 
-None at v1.0 close.
+- v1.0 closeout had no deferred required items.
+- v1.1 future candidates include WBS schedule/assignee/progress edits, milestone edits, reports/artifacts/RTM assistance, hosted provider support, and external MCP/API integrations.
 
 ## Next Action
 
-Run `$gsd-new-milestone` to define the next milestone requirements and roadmap.
+Run `$gsd-discuss-phase 9` or start Phase 9 planning for the AI Tool Gateway + Provider Abstraction.
