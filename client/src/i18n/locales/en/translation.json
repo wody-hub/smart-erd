@@ -1314,6 +1314,7 @@
       "estimatedMmPlaceholder": "e.g. 1.5"
     },
     "validation": {
+      "nameRequired": "Enter a WBS item name",
       "dateOrder": "End date must be on or after the start date",
       "actualDateOrder": "Actual end date must be on or after the actual start date",
       "progressRate": "Progress must be between 0 and 100",

@@ -1312,6 +1312,7 @@
       "estimatedMmPlaceholder": "예: 1.5"
     },
     "validation": {
+      "nameRequired": "항목명을 입력해 주세요",
       "dateOrder": "종료일은 시작일 이후여야 합니다",
       "actualDateOrder": "실적 종료일은 실적 시작일 이후여야 합니다",
       "progressRate": "진척률은 0에서 100 사이여야 합니다",

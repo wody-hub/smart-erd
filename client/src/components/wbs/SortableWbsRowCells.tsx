@@ -44,7 +44,6 @@ export interface SortableWbsRowCellsProps {
   locale: string;
   members: TeamMember[];
   membersUnavailable: boolean;
-  milestoneName: string | null;
   milestoneValue: string;
   milestones: Milestone[];
   pageDenseCellClass?: string;
@@ -81,7 +80,6 @@ export function SortableWbsRowCells({
   locale,
   members,
   membersUnavailable,
-  milestoneName,
   milestoneValue,
   milestones,
   pageDenseCellClass,

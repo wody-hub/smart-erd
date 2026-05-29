@@ -570,7 +570,6 @@ export default function SortableWbsRow({
         locale={locale}
         members={members}
         membersUnavailable={membersUnavailable}
-        milestoneName={milestoneName}
         milestoneValue={milestoneValue}
         milestones={milestones}
         pageDenseCellClass={surfaceClasses.denseCell}
