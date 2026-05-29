@@ -1,16 +1,16 @@
 ---
 phase: 3
 slug: 화면기획-플러그인
-status: evidence-collected-build-blocked
-nyquist_compliant: false
+status: complete
+nyquist_compliant: true
 wave_0_complete: true
 created: 2026-05-28
-updated: 2026-05-29T10:15:36+09:00
+updated: 2026-05-29T10:55:28+09:00
 ---
 
 # Phase 3 — Validation Matrix
 
-Phase 3 now has concrete evidence for SPEC-01 through SPEC-04. The phase is not marked complete because the required frontend production build still fails on unrelated WBS TypeScript errors.
+Phase 3 has concrete evidence for SPEC-01 through SPEC-04 and the required frontend production build now passes after resolving the unrelated WBS TypeScript blockers found during closeout.
 
 ## Validation Inputs
 
@@ -27,10 +27,10 @@ Phase 3 now has concrete evidence for SPEC-01 through SPEC-04. The phase is not 
 
 | Requirement | Status | Evidence | Residual Risk |
 | --- | --- | --- | --- |
-| SPEC-01: 마스터 컴포넌트를 정의하고 여러 화면에 인스턴스로 배치 | Evidence PASS | `screen-spec-authoring-export` creates a `screen-spec` document, renames screens, creates a custom master, places instances on two screens, saves, reloads, and rechecks persisted content. Manual dev QA also created `Manual CTA 1780017133-nzws03` and placed it on `Manual Landing 1780017133-nzws03`. | Phase closeout still blocked by unrelated frontend build failure. |
-| SPEC-02: 마스터 수정 시 인스턴스 자동 반영 | Evidence PASS | `screen-spec-authoring-export` updates the master label/color and verifies existing instances inherit `Primary CTA ...` and `#2563eb`; `screen-spec-three-account-collaboration` verifies remote users observe inherited master changes. Unit tests cover mutation applier cascade and override behavior. | None specific to SPEC-02 beyond build gate. |
-| SPEC-03: 협업 코어 위 실시간 협업 | Evidence PASS | `screen-spec-three-account-collaboration` opens owner/member-one/member-two isolated contexts, asserts authorized access, verifies screen/master/instance propagation, checks visible lock status, verifies rejected same-scope rename, deletes the master, and confirms orphan state after reload. Backend and frontend scope resolver coverage backs the lock model. | Browser MCP manual session saw one transient WebSocket console error; strict E2E diagnostics are the canonical console gate and passed. |
-| SPEC-04: PNG/PDF 내보내기 | Evidence PASS | `screen-spec-authoring-export` validates real PNG and PDF downloads. Manual dev QA retained PNG `151277` bytes with signature `89504e470d0a1a0a` and PDF `54764` bytes with `%PDF`, `/Type /Page`, `/Count 1`, and `startxref`. | None specific to SPEC-04 beyond build gate. |
+| SPEC-01: 마스터 컴포넌트를 정의하고 여러 화면에 인스턴스로 배치 | PASS | `screen-spec-authoring-export` creates a `screen-spec` document, renames screens, creates a custom master, places instances on two screens, saves, reloads, and rechecks persisted content. Manual dev QA also created `Manual CTA 1780017133-nzws03` and placed it on `Manual Landing 1780017133-nzws03`. | None. |
+| SPEC-02: 마스터 수정 시 인스턴스 자동 반영 | PASS | `screen-spec-authoring-export` updates the master label/color and verifies existing instances inherit `Primary CTA ...` and `#2563eb`; `screen-spec-three-account-collaboration` verifies remote users observe inherited master changes. Unit tests cover mutation applier cascade and override behavior. | None. |
+| SPEC-03: 협업 코어 위 실시간 협업 | PASS | `screen-spec-three-account-collaboration` opens owner/member-one/member-two isolated contexts, asserts authorized access, verifies screen/master/instance propagation, checks visible lock status, verifies rejected same-scope rename, deletes the master, and confirms orphan state after reload. Backend and frontend scope resolver coverage backs the lock model. | Browser MCP manual session saw one transient WebSocket console error; strict E2E diagnostics are the canonical console gate and passed. |
+| SPEC-04: PNG/PDF 내보내기 | PASS | `screen-spec-authoring-export` validates real PNG and PDF downloads. Manual dev QA retained PNG `151277` bytes with signature `89504e470d0a1a0a` and PDF `54764` bytes with `%PDF`, `/Type /Page`, `/Count 1`, and `startxref`. | None. |
 
 ## Task Verification Map
 
@@ -41,7 +41,7 @@ Phase 3 now has concrete evidence for SPEC-01 through SPEC-04. The phase is not 
 | 03-01-03 | 03-01 | SPEC-04 | T-03-02 | Automated and manual PNG/PDF byte/signature checks | green |
 | 03-02-01 | 03-02 | SPEC-03 | T-03-03 / T-03-04 | Owner/member-one/member-two E2E access and propagation evidence | green |
 | 03-02-02 | 03-02 | SPEC-02, SPEC-03 | T-03-04 | Same-scope lock/rejected-edit UX in E2E, scope resolver tests | green |
-| 03-03-01 | 03-03 | SPEC-01, SPEC-02, SPEC-03, SPEC-04 | T-03-07 / T-03-08 / T-03-09 | `03-VERIFICATION.md` records all commands and manual QA; build remains failed | red |
+| 03-03-01 | 03-03 | SPEC-01, SPEC-02, SPEC-03, SPEC-04 | T-03-07 / T-03-08 / T-03-09 | `03-VERIFICATION.md` records all commands and manual QA; `npm run build` passes after WBS i18n/unused-prop cleanup | green |
 
 ## Command Results
 
@@ -51,7 +51,7 @@ Phase 3 now has concrete evidence for SPEC-01 through SPEC-04. The phase is not 
 | `cd client && npm run test:unit -- screen-spec screen-design` | PASS, 363 tests |
 | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0` | PASS |
 | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-three-account-collaboration.spec.ts --browser=chromium --workers=1 --retries=0` | PASS |
-| `cd client && npm run build` | FAIL, unrelated WBS TypeScript errors |
+| `cd client && npm run build` | PASS, Vite built successfully |
 | `git diff --check` | PASS |
 
 ## DomainValidationHook Policy
@@ -71,7 +71,7 @@ No TODO, backlog item, or backend deep structure-validation implementation is ad
 
 ## Traceability Status
 
-`.planning/REQUIREMENTS.md` and `.planning/ROADMAP.md` statuses were not updated by this 03-03 closeout task. Traceability status updates remain deferred to `$gsd-verify-work` or milestone audit because the production build gate is still red.
+`.planning/REQUIREMENTS.md` and `.planning/ROADMAP.md` are updated by `$gsd-verify-work` to mark SPEC-01 through SPEC-04 and Phase 3 complete.
 
 ## Validation Sign-Off
 
@@ -80,7 +80,7 @@ No TODO, backlog item, or backend deep structure-validation implementation is ad
 - [x] PNG and PDF export evidence both exist.
 - [x] Dev-profile manual browser QA is recorded in `03-VERIFICATION.md`.
 - [x] No watch-mode flags were used.
-- [ ] `npm run build` passes.
-- [ ] `nyquist_compliant: true` set in frontmatter after all gates pass.
+- [x] `npm run build` passes.
+- [x] `nyquist_compliant: true` set in frontmatter after all gates pass.
 
-**Approval:** blocked by unrelated WBS build failure.
+**Approval:** passed.

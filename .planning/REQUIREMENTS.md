@@ -12,12 +12,12 @@
 - [x] **THEME-01**: 사용자가 헤더에서 Paper/Graphite/Midnight 테마를 선택할 수 있다
 - [x] **THEME-02**: 선택한 테마가 앱 전역(ERD, 마크다운, Dialog, Monaco)에 일관되게 적용된다
 - [x] **THEME-03**: 새로고침 후에도 선택한 테마가 유지된다
-- [ ] **SPEC-01**: 화면기획 플러그인에서 마스터 컴포넌트를 정의하고 여러 화면에 인스턴스로 배치할 수 있다
-- [ ] **SPEC-02**: 마스터 컴포넌트를 수정하면 모든 인스턴스에 자동 반영된다
-- [ ] **SPEC-03**: 화면기획 플러그인이 기존 협업 코어(Yjs, ScopeLock, Presence) 위에서 실시간 협업된다
-- [ ] **SPEC-04**: 화면기획 결과를 산출물(PNG/PDF)로 내보낼 수 있다
+- [x] **SPEC-01**: 화면기획 플러그인에서 마스터 컴포넌트를 정의하고 여러 화면에 인스턴스로 배치할 수 있다
+- [x] **SPEC-02**: 마스터 컴포넌트를 수정하면 모든 인스턴스에 자동 반영된다
+- [x] **SPEC-03**: 화면기획 플러그인이 기존 협업 코어(Yjs, ScopeLock, Presence) 위에서 실시간 협업된다
+- [x] **SPEC-04**: 화면기획 결과를 산출물(PNG/PDF)로 내보낼 수 있다
 
-Phase 3 status note (2026-04-23): SPEC-01~04 have substantial code in place, but remain unchecked here until browser/E2E/QA closeout evidence is recorded. See `.planning/phases/03-화면기획-플러그인/SUMMARY.md`.
+Phase 3 status note (2026-05-29): SPEC-01~04 are complete with browser E2E, three-account collaboration, PNG/PDF export, UAT, and build evidence. See `.planning/phases/03-화면기획-플러그인/SUMMARY.md`.
 
 ### 사업 개요
 
@@ -130,10 +130,10 @@ Phase 3 status note (2026-04-23): SPEC-01~04 have substantial code in place, but
 | THEME-01 | Phase 2 | Complete |
 | THEME-02 | Phase 2 | Complete |
 | THEME-03 | Phase 2 | Complete |
-| SPEC-01 | Phase 3 | Implemented, pending browser/E2E closeout |
-| SPEC-02 | Phase 3 | Implemented, pending browser/E2E closeout |
-| SPEC-03 | Phase 3 | Partially verified, pending multi-client E2E |
-| SPEC-04 | Phase 3 | Implemented, pending export smoke/QA |
+| SPEC-01 | Phase 3 | Complete |
+| SPEC-02 | Phase 3 | Complete |
+| SPEC-03 | Phase 3 | Complete |
+| SPEC-04 | Phase 3 | Complete |
 | BIZ-01 | Phase 4 | Complete |
 | BIZ-02 | Phase 4 | Complete |
 | WBS-01 | Phase 5 | Complete |
@@ -175,4 +175,4 @@ Phase 3 status note (2026-04-23): SPEC-01~04 have substantial code in place, but
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-23 after RIS-189 Phase 3 documentation refresh*
+*Last updated: 2026-05-29 after Phase 3 verify-work closeout*

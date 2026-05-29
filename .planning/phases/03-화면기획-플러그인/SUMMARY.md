@@ -1,17 +1,14 @@
 # Phase 03 Summary - 화면기획 플러그인
 
 **Updated:** 2026-05-29
-**Status:** 검증/마감 진행 중 - SPEC evidence present, build gate blocked
+**Status:** Complete - SPEC evidence and build gate passed
 **Roadmap requirements:** SPEC-01, SPEC-02, SPEC-03, SPEC-04
 
 ## Current Verdict
 
-Phase 3 has working screen-spec implementation and concrete evidence for authoring, master propagation, three-account collaboration, lock/rejected-edit UX, persistence, and PNG/PDF export.
+Phase 3 is complete. The screen-spec implementation has concrete evidence for authoring, master propagation, three-account collaboration, lock/rejected-edit UX, persistence, PNG/PDF export, and the frontend production build gate.
 
-The phase is still not marked **Complete** because the required frontend production build fails on unrelated WBS TypeScript errors:
-
-- `client/src/components/wbs/SortableWbsRow.tsx(332,21)` missing typed i18n key `wbs.validation.nameRequired`
-- `client/src/components/wbs/SortableWbsRowCells.tsx(84,3)` unused `milestoneName`
+The unrelated WBS TypeScript blockers discovered during closeout were resolved by adding the missing typed i18n key `wbs.validation.nameRequired` and removing the stale `milestoneName` prop from `SortableWbsRowCells`.
 
 Canonical closeout artifacts:
 
@@ -76,10 +73,10 @@ Canonical closeout artifacts:
 
 | Requirement | Evidence Status | Evidence | Remaining Gap |
 | --- | --- | --- | --- |
-| SPEC-01: 마스터 컴포넌트를 정의하고 여러 화면에 인스턴스로 배치 | Evidence PASS | `screen-spec-authoring-export` creates a `screen-spec` document, renames screens, creates a custom master, places instances on two screens, saves, reloads, and verifies persisted state. Manual dev QA repeated screen rename, master placement, move/resize, save/re-entry. | Phase build gate remains red due unrelated WBS errors. |
-| SPEC-02: 마스터 수정 시 인스턴스 자동 반영 | Evidence PASS | `screen-spec-authoring-export` verifies inherited label/color propagation; `screen-spec-three-account-collaboration` verifies remote users observe inherited updates. Unit tests cover mutation applier cascade behavior. | Phase build gate remains red. |
-| SPEC-03: 협업 코어 위 실시간 협업 | Evidence PASS | `screen-spec-three-account-collaboration` uses owner/member-one/member-two isolated contexts, verifies authorized bootstrap access, propagation, lock status, rejected same-scope rename, master delete orphan state, and reload persistence. | Phase build gate remains red. |
-| SPEC-04: PNG/PDF 내보내기 | Evidence PASS | Automated E2E validates PNG/PDF downloads; manual dev QA retained PNG `151277` bytes with PNG signature and PDF `54764` bytes with `%PDF`, `/Type /Page`, `/Count 1`, `startxref`. | Phase build gate remains red. |
+| SPEC-01: 마스터 컴포넌트를 정의하고 여러 화면에 인스턴스로 배치 | PASS | `screen-spec-authoring-export` creates a `screen-spec` document, renames screens, creates a custom master, places instances on two screens, saves, reloads, and verifies persisted state. Manual dev QA repeated screen rename, master placement, move/resize, save/re-entry. | None. |
+| SPEC-02: 마스터 수정 시 인스턴스 자동 반영 | PASS | `screen-spec-authoring-export` verifies inherited label/color propagation; `screen-spec-three-account-collaboration` verifies remote users observe inherited updates. Unit tests cover mutation applier cascade behavior. | None. |
+| SPEC-03: 협업 코어 위 실시간 협업 | PASS | `screen-spec-three-account-collaboration` uses owner/member-one/member-two isolated contexts, verifies authorized bootstrap access, propagation, lock status, rejected same-scope rename, master delete orphan state, and reload persistence. | None. |
+| SPEC-04: PNG/PDF 내보내기 | PASS | Automated E2E validates PNG/PDF downloads; manual dev QA retained PNG `151277` bytes with PNG signature and PDF `54764` bytes with `%PDF`, `/Type /Page`, `/Count 1`, `startxref`. | None. |
 
 ## Verification Snapshot
 
@@ -87,9 +84,8 @@ Canonical closeout artifacts:
 - PASS `cd client && npm run test:unit -- screen-spec screen-design` (363 tests)
 - PASS `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0`
 - PASS `cd client && npm run test:e2e -- e2e/smoke/screen-spec-three-account-collaboration.spec.ts --browser=chromium --workers=1 --retries=0`
+- PASS `cd client && npm run build`
 - PASS `git diff --check`
-- FAIL `cd client && npm run build`
-  - blocked by the two WBS TypeScript errors listed in Current Verdict
 
 Detailed command output, target document IDs, manual QA notes, and download evidence are in `03-VERIFICATION.md`.
 
@@ -110,11 +106,8 @@ The older design roadmap in `plan/2026-03-25-1445-화면기획-플러그인-설�
 
 ## Remaining Phase 3 Work
 
-1. Fix or explicitly waive the unrelated WBS build blockers.
-2. Re-run `cd client && npm run build`.
-3. Re-run the closeout gate that updates `.planning/REQUIREMENTS.md` and `.planning/ROADMAP.md`, likely via `$gsd-verify-work` or milestone audit.
-4. Only after all gates pass, set `nyquist_compliant: true` and mark Phase 3 Complete.
+None. Phase 3 is ready for milestone completion.
 
 ## Recommended Next Action
 
-Resolve the WBS build errors first, then rerun Phase 3 verification. The screen-spec-specific SPEC evidence is already present and linked from `03-VALIDATION.md` and `03-VERIFICATION.md`.
+Run milestone-level audit or completion packaging for v1.0 if a final release gate is required.

@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: 마크다운 증분 동기화** - Section 단위 증분 동기화 및 증분 프리뷰 렌더링 완성
 - [x] **Phase 2: 테마 선택** - Paper/Graphite/Midnight 큐레이션 테마 전역 적용
-- [ ] **Phase 3: 화면기획 플러그인** - 마스터 컴포넌트+인스턴스 화면 설계 도구 구현 (구현 선행, 검증/마감 필요)
+- [x] **Phase 3: 화면기획 플러그인** - 마스터 컴포넌트+인스턴스 화면 설계 도구 구현
 - [x] **Phase 4: 사업 개요** - 프로젝트 메타(발주처·계약·사업 범위) 등록 및 현황 조회
 - [x] **Phase 5: WBS + 마일스톤** - 계층 작업분해구조 편집과 마일스톤 관리
 - [x] **Phase 6: 간트 차트** - WBS 데이터 기반 타임라인 시각화 및 인터랙션
@@ -68,11 +68,14 @@ Plans:
   2. 마스터 컴포넌트를 수정하면 해당 마스터를 참조하는 모든 인스턴스에 자동으로 반영된다
   3. 두 사용자가 같은 화면기획 문서를 동시에 편집할 때 Yjs 기반 실시간 동기화가 동작한다
   4. 완성된 화면기획을 PNG 또는 PDF 파일로 내보낼 수 있다
-**Plans**: In progress (closeout plan 필요)
+**Plans**: 3/3 complete
 **UI hint**: yes
 
 Summary:
 - `.planning/phases/03-화면기획-플러그인/SUMMARY.md`
+- `.planning/phases/03-화면기획-플러그인/03-VALIDATION.md`
+- `.planning/phases/03-화면기획-플러그인/03-VERIFICATION.md`
+- `.planning/phases/03-화면기획-플러그인/03-UAT.md`
 
 구현 현황 (코드 선행 구현됨):
 - [x] screen-spec 문서 플러그인 골격 (DocumentPlugin, ScopeResolver, MutationApplier, MutationPolicy)
@@ -83,10 +86,10 @@ Summary:
 - [x] PNG/PDF 내보내기 파이프라인
 - [x] BE ScreenSpecCollaborationPlugin 등록 + ScreenSpecScopeResolver 연동
 - [x] 단위 테스트: FE screen-spec bootstrap/mutation/export/document + BE scope resolver
-- [ ] 구조 검증 DomainValidationHook 정책 확정 (현재 no-op)
-- [ ] 화면기획 브라우저 E2E + 다중 세션 협업 검증
-- [ ] PNG/PDF export 브라우저 smoke + QA 검증
-- [ ] Phase 3 closeout plan/validation/verification artifact 작성
+- [x] 구조 검증 DomainValidationHook 정책 확정 (v1 intentional no-op)
+- [x] 화면기획 브라우저 E2E + 다중 세션 협업 검증
+- [x] PNG/PDF export 브라우저 smoke + QA 검증
+- [x] Phase 3 closeout plan/validation/verification/UAT artifact 작성
 
 ### Phase 4: 사업 개요
 **Goal**: 프로젝트에 발주처·계약 기간·계약 금액·사업 범위 등 SI 사업 메타 정보를 등록하고, 사업 개요 화면에서 프로젝트 전체 현황을 한눈에 파악할 수 있다
@@ -283,7 +286,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.1 → 7 �
 |-------|----------------|--------|-----------|
 | 1. 마크다운 증분 동기화 | 7/7 | Complete | 2026-04-03 |
 | 2. 테마 선택 | 3/3 | Complete | 2026-04-03 |
-| 3. 화면기획 플러그인 | summary only | In progress - closeout/verification needed | - |
+| 3. 화면기획 플러그인 | 3/3 | Complete | 2026-05-29 |
 | 4. 사업 개요 | 3/3 | Complete | 2026-04-15 |
 | 5. WBS + 마일스톤 | summary only | Complete | 2026-04-15 |
 | 6. 간트 차트 | 1/1 | Complete | 2026-04-16 |

@@ -1,21 +1,21 @@
 ---
 phase: 03-화면기획-플러그인
 plan: 03
-status: evidence-collected-build-blocked
+status: complete
 created: 2026-05-29
-updated: 2026-05-29T10:15:36+09:00
-nyquist_compliant: false
+updated: 2026-05-29T10:55:28+09:00
+nyquist_compliant: true
 ---
 
 # Phase 03 Verification Evidence
 
-This file records the closeout evidence for SPEC-01 through SPEC-04. The functional screen-spec evidence is present, but Phase 3 remains incomplete because `npm run build` fails on unrelated pre-existing WBS TypeScript errors.
+This file records the closeout evidence for SPEC-01 through SPEC-04. Phase 3 is verified: screen-spec behavior passes targeted backend, unit, browser E2E, manual QA, export, whitespace, and frontend production build gates.
 
 ## Environment
 
 | Item | Value |
 | --- | --- |
-| Date/time | 2026-05-29T10:15:36+09:00 |
+| Date/time | 2026-05-29T10:55:28+09:00 |
 | Backend dev profile | `http://127.0.0.1:9503` / `http://localhost:9503` |
 | Frontend dev profile | `http://localhost:4503` |
 | Browser QA tool | Codex in-app Browser / Playwright MCP |
@@ -28,9 +28,9 @@ This file records the closeout evidence for SPEC-01 through SPEC-04. The functio
 | --- | --- | --- | --- |
 | `./gradlew test --tests '*ScreenSpecScopeResolverTest' --tests '*DiagramServiceTest'` | Local backend/JUnit | PASS | Build successful in 2s; `ScreenSpecScopeResolverTest` and `DiagramServiceTest` executed/covered targeted backend scope and service behavior. |
 | `cd client && npm run test:unit -- screen-spec screen-design` | Node unit tests | PASS | 363 tests passed, 0 failed. Covers screen-spec document normalization, mutation policy/applier, transform/export helpers, and screen-design runtime utilities. |
-| `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0` | Playwright Chromium, resolved dev endpoints `4503/9503` | PASS | 1 smoke passed in 10.8s. Target document `id=662`, `Screen Spec E2E 1780016816610-zgcyfx`. Proves create/rename screen, master create/update, cross-screen inherited propagation, save/re-entry, PNG/PDF export assertions. |
-| `cd client && npm run test:e2e -- e2e/smoke/screen-spec-three-account-collaboration.spec.ts --browser=chromium --workers=1 --retries=0` | Playwright Chromium, resolved dev endpoints `4503/9503` | PASS | 1 smoke passed in 19.1s. Target document `id=663`, `Screen Spec Collab 1780016832678-vzxtgg`. Proves owner/member-one/member-two access, remote propagation, same-scope lock/rejected-edit UX, master delete orphan state, and reload persistence. |
-| `cd client && npm run build` | Frontend TypeScript/Vite build | FAIL | Blocked by unrelated WBS errors: `SortableWbsRow.tsx(332,21)` missing typed i18n key `wbs.validation.nameRequired`; `SortableWbsRowCells.tsx(84,3)` unused `milestoneName`. |
+| `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0` | Playwright Chromium, resolved dev endpoints `4503/9503` | PASS | 1 smoke passed in 10.9s. Proves create/rename screen, master create/update, cross-screen inherited propagation, save/re-entry, PNG/PDF export assertions. Earlier evidence target: `id=662`, `Screen Spec E2E 1780016816610-zgcyfx`. |
+| `cd client && npm run test:e2e -- e2e/smoke/screen-spec-three-account-collaboration.spec.ts --browser=chromium --workers=1 --retries=0` | Playwright Chromium, resolved dev endpoints `4503/9503` | PASS | 1 smoke passed in 19.4s. Proves owner/member-one/member-two access, remote propagation, same-scope lock/rejected-edit UX, master delete orphan state, and reload persistence. Earlier evidence target: `id=663`, `Screen Spec Collab 1780016832678-vzxtgg`. |
+| `cd client && npm run build` | Frontend TypeScript/Vite build | PASS | Vite built successfully in 17.32s after adding `wbs.validation.nameRequired` translations and removing the stale `milestoneName` prop from `SortableWbsRowCells`. |
 | `git diff --check` | Git whitespace check | PASS | No whitespace errors in current diff. |
 
 ## Automated Export Evidence
@@ -88,6 +88,6 @@ Download files retained by Browser MCP:
 | SPEC-03 three-account collaboration and lock/conflict evidence | PASS |
 | SPEC-04 PNG/PDF export evidence | PASS |
 | Dev-profile manual browser QA | PASS |
-| Frontend production build | FAIL |
+| Frontend production build | PASS |
 
-Phase 3 remains **검증/마감 진행 중** until the unrelated WBS build blockers are fixed or explicitly waived by a later verification gate.
+Phase 3 is **검증 완료**. SPEC-01 through SPEC-04 are complete and the closeout gate passes.

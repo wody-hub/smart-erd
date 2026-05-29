@@ -123,7 +123,7 @@ completed: 2026-05-29
 
 ## Issues Encountered
 
-- `npm run build` remains blocked by unrelated WBS TypeScript errors listed above. The 03-02 TypeScript errors discovered during the work were fixed before this summary.
+- `npm run build` was blocked during 03-02 by unrelated WBS TypeScript errors listed above. These were resolved during Phase 3 verify-work; the final build gate now passes.
 - Browser diagnostics intentionally filter only known benign ResizeObserver, exact Yjs pre-integration access, and transient dev StrictMode ticket websocket 403 messages; all other warnings/errors fail the E2E.
 
 ## User Setup Required
@@ -132,7 +132,7 @@ None - no external service configuration required.
 
 ## Next Phase Readiness
 
-03-02 supplies the required SPEC-03 three-account evidence and reinforces SPEC-02 collaboration propagation evidence. Phase 3 can proceed to 03-03 closeout, but final completion still depends on canonical validation/verification artifacts and dev-profile manual browser QA.
+03-02 supplies the required SPEC-03 three-account evidence and reinforces SPEC-02 collaboration propagation evidence. Final Phase 3 completion is recorded in `03-VALIDATION.md`, `03-VERIFICATION.md`, and `03-UAT.md`.
 
 ---
 *Phase: 03-화면기획-플러그인*
