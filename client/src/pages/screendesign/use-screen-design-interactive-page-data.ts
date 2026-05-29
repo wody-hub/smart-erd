@@ -67,6 +67,7 @@ export function useScreenDesignInteractivePageData({
     documentMutationSession,
     projectionVersion,
     collaborationReady,
+    lastDocumentChangeSummary,
   });
 
   return {

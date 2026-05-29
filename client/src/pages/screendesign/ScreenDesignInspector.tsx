@@ -31,6 +31,10 @@ import {
 } from './screen-design-labels';
 import type { UpdateInstanceParams } from './use-screen-design-document';
 import type { ScreenDesignViewportState } from './use-screen-design-viewport';
+import {
+  SCREEN_DESIGN_INSTANCE_MIN_HEIGHT,
+  SCREEN_DESIGN_INSTANCE_MIN_WIDTH,
+} from '@/constants/screen-design';
 
 interface ScreenDesignInspectorProps {
   selectedScreen: ScreenDesignScreen | null;
@@ -42,7 +46,7 @@ interface ScreenDesignInspectorProps {
   rebindCandidates: ScreenDesignLibraryItem[];
   defaultAccentColor: string;
   onRebindMasterIdChange: (value: string) => void;
-  onRenameScreen: (name: string) => void;
+  onRenameScreen: (name: string) => boolean;
   updateInstance: (instanceId: string, updates: UpdateInstanceParams) => void;
   deleteInstance: (instanceId: string) => void;
   moveInstanceLayer: (
@@ -114,7 +118,11 @@ export default function ScreenDesignInspector({
       return;
     }
     if (normalizedName !== selectedScreen.name) {
-      onRenameScreen(normalizedName);
+      const applied = onRenameScreen(normalizedName);
+      if (!applied) {
+        setScreenNameDraft(selectedScreen.name);
+        return;
+      }
     }
     if (normalizedName !== screenNameDraft) {
       setScreenNameDraft(normalizedName);
@@ -164,6 +172,11 @@ export default function ScreenDesignInspector({
     },
     [],
   );
+  /**
+   * 선택 인스턴스의 레이어 순서를 변경한다.
+   *
+   * @param direction 레이어 이동 방향
+   */
   const moveSelectedInstanceLayer = (
     direction: 'forward' | 'backward' | 'front' | 'back',
   ): void => {
@@ -172,12 +185,45 @@ export default function ScreenDesignInspector({
     }
     moveInstanceLayer(selectedScreen.id, selectedInstance.id, direction);
   };
+  /** 선택된 인스턴스를 삭제하고 selection을 비운다. */
   const deleteSelectedInstance = (): void => {
     if (!selectedInstance) {
       return;
     }
     deleteInstance(selectedInstance.id);
     clearSelection();
+  };
+  /**
+   * 선택 인스턴스의 크기를 최소값 이상으로 갱신한다.
+   *
+   * @param key 갱신할 dimension 필드
+   * @param value input 문자열 값
+   * @param minValue 허용 최소값
+   */
+  const updateSelectedInstanceDimension = (
+    key: 'width' | 'height',
+    value: string,
+    minValue: number,
+  ): void => {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+    const nextValue = Math.max(minValue, parsed);
+    updateSelectedInstance(key === 'width' ? { width: nextValue } : { height: nextValue });
+  };
+  /**
+   * 선택 인스턴스의 위치를 숫자 입력값으로 갱신한다.
+   *
+   * @param key 갱신할 position 필드
+   * @param value input 문자열 값
+   */
+  const updateSelectedInstancePosition = (key: 'x' | 'y', value: string): void => {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+    updateSelectedInstance(key === 'x' ? { x: parsed } : { y: parsed });
   };
 
   return (
@@ -322,7 +368,7 @@ export default function ScreenDesignInspector({
                       updateSelectedInstance({ label: null });
                     }}
                     disabled={!selectedInstance.overrideState.label}
-                  >
+                >
                     {t('screenSpec.inspector.resetLabel')}
                   </Button>
                 </div>
@@ -380,9 +426,77 @@ export default function ScreenDesignInspector({
                   disabled={
                     !selectedInstance.overrideState.width && !selectedInstance.overrideState.height
                   }
-                >
+                  >
                   {t('screenSpec.inspector.resetSize')}
                 </Button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="screen-spec-instance-x">X</Label>
+                  <Input
+                    id="screen-spec-instance-x"
+                    data-testid="screen-spec-instance-x-input"
+                    type="number"
+                    className="mt-2"
+                    value={Math.round(selectedInstance.x)}
+                    onChange={(event) => updateSelectedInstancePosition('x', event.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="screen-spec-instance-y">Y</Label>
+                  <Input
+                    id="screen-spec-instance-y"
+                    data-testid="screen-spec-instance-y-input"
+                    type="number"
+                    className="mt-2"
+                    value={Math.round(selectedInstance.y)}
+                    onChange={(event) => updateSelectedInstancePosition('y', event.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="screen-spec-instance-width">
+                    {t('screenSpec.inspector.width')}
+                  </Label>
+                  <Input
+                    id="screen-spec-instance-width"
+                    data-testid="screen-spec-instance-width-input"
+                    type="number"
+                    min={SCREEN_DESIGN_INSTANCE_MIN_WIDTH}
+                    className="mt-2"
+                    value={Math.round(selectedInstance.width)}
+                    onChange={(event) =>
+                      updateSelectedInstanceDimension(
+                        'width',
+                        event.target.value,
+                        SCREEN_DESIGN_INSTANCE_MIN_WIDTH,
+                      )
+                    }
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="screen-spec-instance-height">
+                    {t('screenSpec.inspector.height')}
+                  </Label>
+                  <Input
+                    id="screen-spec-instance-height"
+                    data-testid="screen-spec-instance-height-input"
+                    type="number"
+                    min={SCREEN_DESIGN_INSTANCE_MIN_HEIGHT}
+                    className="mt-2"
+                    value={Math.round(selectedInstance.height)}
+                    onChange={(event) =>
+                      updateSelectedInstanceDimension(
+                        'height',
+                        event.target.value,
+                        SCREEN_DESIGN_INSTANCE_MIN_HEIGHT,
+                      )
+                    }
+                  />
+                </div>
               </div>
             </div>
 

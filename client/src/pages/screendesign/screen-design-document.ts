@@ -563,6 +563,9 @@ export function ensureScreenDesignDocumentStructure(
   }
 
   doc.transact(() => {
+    let shouldNormalizeScreenOrder = true;
+    let createdInstancesMap = false;
+    let createdMastersMap = false;
     const currentSchemaVersion =
       typeof root.get(SCHEMA_VERSION_KEY) === 'number' ? Number(root.get(SCHEMA_VERSION_KEY)) : 0;
     if (currentSchemaVersion < SCHEMA_VERSION) {
@@ -571,6 +574,13 @@ export function ensureScreenDesignDocumentStructure(
 
     const legacyScreens = root.get(SCREENS_KEY);
     if (legacyScreens instanceof Y.Array) {
+      const migratedScreens: Array<{
+        height: number;
+        name: string;
+        screenId: string;
+        width: number;
+      }> = [];
+      const migratedScreenIds = new Set<string>();
       const screensMap = new Y.Map<Y.Map<unknown>>();
       const screenOrder = new Y.Array<string>();
       legacyScreens.forEach((entry) => {
@@ -578,32 +588,43 @@ export function ensureScreenDesignDocumentStructure(
           return;
         }
         const screenId = readString(entry.get('id')) ?? `screen-${crypto.randomUUID().slice(0, 8)}`;
-        if (screensMap.has(screenId)) {
+        if (migratedScreenIds.has(screenId)) {
           return;
         }
-        screensMap.set(
+        migratedScreenIds.add(screenId);
+        migratedScreens.push({
           screenId,
-          createScreenYMap(screenId, {
-            name: readString(entry.get('name')) ?? screenId,
-            width:
-              readNumber(entry.get('width')) ?? resolveScreenDesignFramePreset('desktop').width,
-            height:
-              readNumber(entry.get('height')) ?? resolveScreenDesignFramePreset('desktop').height,
-          }),
-        );
-        screenOrder.push([screenId]);
+          name: readString(entry.get('name')) ?? screenId,
+          width: readNumber(entry.get('width')) ?? resolveScreenDesignFramePreset('desktop').width,
+          height:
+            readNumber(entry.get('height')) ?? resolveScreenDesignFramePreset('desktop').height,
+        });
       });
       root.set(SCREENS_KEY, screensMap);
       root.set(SCREEN_ORDER_KEY, screenOrder);
+      shouldNormalizeScreenOrder = false;
+      migratedScreens.forEach((screen) => {
+        screensMap.set(
+          screen.screenId,
+          createScreenYMap(screen.screenId, {
+            name: screen.name,
+            width: screen.width,
+            height: screen.height,
+          }),
+        );
+        screenOrder.push([screen.screenId]);
+      });
     } else if (!(legacyScreens instanceof Y.Map)) {
       root.set(SCREENS_KEY, new Y.Map<Y.Map<unknown>>());
     }
 
     if (!(root.get(SCREEN_ORDER_KEY) instanceof Y.Array)) {
       root.set(SCREEN_ORDER_KEY, new Y.Array<string>());
+      shouldNormalizeScreenOrder = false;
     }
     if (!(root.get(INSTANCES_KEY) instanceof Y.Map)) {
       root.set(INSTANCES_KEY, new Y.Map<Y.Map<unknown>>());
+      createdInstancesMap = true;
     }
     if (!(root.get(LAYERS_KEY) instanceof Y.Map)) {
       root.set(LAYERS_KEY, new Y.Map<Y.Array<string>>());
@@ -613,6 +634,7 @@ export function ensureScreenDesignDocumentStructure(
     if (!(mastersMap instanceof Y.Map)) {
       mastersMap = new Y.Map<Y.Map<unknown>>();
       root.set(MASTERS_KEY, mastersMap);
+      createdMastersMap = true;
     }
     const resolvedMastersMap = mastersMap as Y.Map<Y.Map<unknown>>;
     const instancesMap = root.get(INSTANCES_KEY);
@@ -628,13 +650,18 @@ export function ensureScreenDesignDocumentStructure(
       root.set(LIBRARY_SEED_VERSION_KEY, LIBRARY_SEED_VERSION);
     }
 
-    if (currentSchemaVersion < SCHEMA_VERSION && resolvedInstancesMap) {
+    if (
+      currentSchemaVersion < SCHEMA_VERSION &&
+      resolvedInstancesMap &&
+      !createdInstancesMap &&
+      !createdMastersMap
+    ) {
       migrateInstancesForMasterOverrides(resolvedInstancesMap, resolvedMastersMap);
     }
 
     const screenOrder = root.get(SCREEN_ORDER_KEY);
     const screensMap = root.get(SCREENS_KEY);
-    if (screenOrder instanceof Y.Array && screensMap instanceof Y.Map) {
+    if (shouldNormalizeScreenOrder && screenOrder instanceof Y.Array && screensMap instanceof Y.Map) {
       normalizeScreenOrderYArray(screensMap, screenOrder);
     }
   }, origin);

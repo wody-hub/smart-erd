@@ -70,6 +70,7 @@ export default function ScreenDesignInteractivePage() {
     handleSave,
     lastDocumentChangeSummary,
     document: screenDocument,
+    collaborationRuntimeStatus,
     selectedScreenId,
     selectedScreen,
     setSelectedScreenId,
@@ -187,7 +188,12 @@ export default function ScreenDesignInteractivePage() {
   });
 
   useEffect(() => {
-    if (!collaborationReady || !sharedDocumentEngine || screenDocument.screens.length > 0) {
+    if (
+      !collaborationReady ||
+      !sharedDocumentEngine ||
+      documentBootstrap?.snapshotAvailable ||
+      screenDocument.screens.length > 0
+    ) {
       return;
     }
     const nextScreenId = addScreen(
@@ -202,6 +208,7 @@ export default function ScreenDesignInteractivePage() {
     activeFramePreset.id,
     addScreen,
     collaborationReady,
+    documentBootstrap?.snapshotAvailable,
     screenDocument.screens.length,
     setSelectedScreenId,
     sharedDocumentEngine,
@@ -268,6 +275,49 @@ export default function ScreenDesignInteractivePage() {
     [currentScreenIndex, handleSelectScreen, screenDocument.screens],
   );
   const collaborationConnected = collaborationReady && !collaborationError;
+  const collaborationStatus = useMemo(() => {
+    if (collaborationRuntimeStatus.commandRejectedAt !== null) {
+      return {
+        label: t('screenSpec.status.editRejected') as string,
+        tone: 'warning' as const,
+      };
+    }
+    if (collaborationRuntimeStatus.remoteLockActive) {
+      return {
+        label: t('screenSpec.status.locked') as string,
+        tone: 'warning' as const,
+      };
+    }
+    if (collaborationError) {
+      return {
+        label: t('screenSpec.aria.connectionIssue') as string,
+        tone: 'error' as const,
+      };
+    }
+    if (!collaborationReady) {
+      return {
+        label: t('screenSpec.status.connecting') as string,
+        tone: 'connecting' as const,
+      };
+    }
+    if (lastDocumentChangeSummary?.origin === 'remote') {
+      return {
+        label: t('screenSpec.status.remoteChanged') as string,
+        tone: 'ready' as const,
+      };
+    }
+    return {
+      label: t('screenSpec.status.ready') as string,
+      tone: 'ready' as const,
+    };
+  }, [
+    collaborationError,
+    collaborationReady,
+    collaborationRuntimeStatus.commandRejectedAt,
+    collaborationRuntimeStatus.remoteLockActive,
+    lastDocumentChangeSummary?.origin,
+    t,
+  ]);
 
   useScreenDesignHotkeys({
     selectedInstanceId,
@@ -392,6 +442,8 @@ export default function ScreenDesignInteractivePage() {
               canNavigateNextScreen={canNavigateNextScreen}
               exportBusy={exportProgress.isExporting}
               savePending={savePending}
+              collaborationStatusLabel={collaborationStatus.label}
+              collaborationStatusTone={collaborationStatus.tone}
               onBack={handleBack}
               onScreenChange={handleSelectScreen}
               onNavigatePreviousScreen={() => navigateScreenByOffset(-1)}
@@ -470,9 +522,9 @@ export default function ScreenDesignInteractivePage() {
                   onRebindMasterIdChange={setRebindMasterId}
                   onRenameScreen={(name) => {
                     if (!selectedScreen) {
-                      return;
+                      return false;
                     }
-                    renameScreen(selectedScreen.id, name);
+                    return renameScreen(selectedScreen.id, name);
                   }}
                   updateInstance={updateInstance}
                   deleteInstance={deleteInstance}

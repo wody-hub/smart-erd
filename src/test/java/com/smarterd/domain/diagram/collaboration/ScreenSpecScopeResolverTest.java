@@ -25,7 +25,22 @@ class ScreenSpecScopeResolverTest {
     void masterUpdate_shouldResolveMasterScope() {
         final var result = resolver.resolve("master:update", Map.of("masterId", "master-1", "width", 640));
 
-        assertThat(result).containsExactly(new ScopeRef("master", "master-1", ScopeLockMode.EXCLUSIVE));
+        assertThat(result)
+            .containsExactly(
+                new ScopeRef("master", "master-1", ScopeLockMode.EXCLUSIVE),
+                new ScopeRef("instance-cascade", "collection", ScopeLockMode.EXCLUSIVE)
+            );
+    }
+
+    @Test
+    void masterDelete_shouldResolveMasterAndCascadeScopes() {
+        final var result = resolver.resolve("master:delete", Map.of("masterId", "master-1"));
+
+        assertThat(result)
+            .containsExactly(
+                new ScopeRef("master", "master-1", ScopeLockMode.EXCLUSIVE),
+                new ScopeRef("instance-cascade", "collection", ScopeLockMode.EXCLUSIVE)
+            );
     }
 
     @Test
@@ -33,6 +48,20 @@ class ScreenSpecScopeResolverTest {
         final var result = resolver.resolve("screen:rename", Map.of("screenId", "screen-1", "name", "Dashboard"));
 
         assertThat(result).containsExactly(new ScopeRef("screen", "screen-1", ScopeLockMode.EXCLUSIVE));
+    }
+
+    @Test
+    void screenUpdateFrame_shouldResolveScreenAndCascadeScopes() {
+        final var result = resolver.resolve(
+            "screen:update-frame",
+            Map.of("screenId", "screen-1", "width", 1440, "height", 900)
+        );
+
+        assertThat(result)
+            .containsExactly(
+                new ScopeRef("screen", "screen-1", ScopeLockMode.EXCLUSIVE),
+                new ScopeRef("instance-cascade", "collection", ScopeLockMode.EXCLUSIVE)
+            );
     }
 
     @Test
@@ -76,6 +105,20 @@ class ScreenSpecScopeResolverTest {
             new ScopeRef("layer", "screen-1", ScopeLockMode.EXCLUSIVE),
             new ScopeRef("instance", "instance-1", ScopeLockMode.SHARED)
         );
+    }
+
+    @Test
+    void malformedKnownCommand_shouldFallbackToDocumentRootScope() {
+        final var result = resolver.resolve("screen:rename", Map.of("screenId", " "));
+
+        assertThat(result).containsExactly(new ScopeRef("document", "root", ScopeLockMode.EXCLUSIVE));
+    }
+
+    @Test
+    void malformedInstancePayload_shouldFallbackToDocumentRootScope() {
+        final var result = resolver.resolve("instance:update", Map.of());
+
+        assertThat(result).containsExactly(new ScopeRef("document", "root", ScopeLockMode.EXCLUSIVE));
     }
 
     @Test

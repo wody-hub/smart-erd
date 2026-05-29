@@ -31,6 +31,9 @@ import {
   type ScreenDesignFramePresetId,
 } from './screen-design-frame-presets';
 import type { ScreenDesignViewportState } from './use-screen-design-viewport';
+import { cn } from '@/lib/utils';
+
+type CollaborationStatusTone = 'ready' | 'connecting' | 'warning' | 'error';
 
 interface ScreenDesignEditorShellProps {
   /** 현재 문서 이름 */
@@ -58,6 +61,10 @@ interface ScreenDesignEditorShellProps {
   exportBusy: boolean;
   /** 현재 저장 동작 진행 여부 */
   savePending: boolean;
+  /** 협업/락 상태 표시 문자열 */
+  collaborationStatusLabel: string;
+  /** 협업/락 상태 표시 tone */
+  collaborationStatusTone?: CollaborationStatusTone;
   /** 문서 허브로 돌아가기 */
   onBack: () => void;
   /** 선택 화면 변경 */
@@ -107,6 +114,8 @@ export default function ScreenDesignEditorShell({
   canNavigateNextScreen,
   exportBusy,
   savePending,
+  collaborationStatusLabel,
+  collaborationStatusTone = 'ready',
   onBack,
   onScreenChange,
   onNavigatePreviousScreen,
@@ -159,7 +168,7 @@ export default function ScreenDesignEditorShell({
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <Select
-                  value={selectedScreenId ?? undefined}
+                  value={selectedScreenId ?? ''}
                   onValueChange={onScreenChange}
                   disabled={screens.length === 0}
                 >
@@ -257,10 +266,14 @@ export default function ScreenDesignEditorShell({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <span className="rounded-md border border-border/70 bg-secondary/70 px-2.5 py-1 text-xs font-medium text-muted-foreground">
-              {collaborationReady
-                ? t('screenSpec.status.ready')
-                : t('screenSpec.status.connecting')}
+            <span
+              data-testid="screen-spec-collaboration-status"
+              className={cn(
+                'rounded-md border px-2.5 py-1 text-xs font-medium',
+                resolveCollaborationStatusToneClass(collaborationStatusTone),
+              )}
+            >
+              {collaborationStatusLabel}
             </span>
           </div>
         </div>
@@ -317,4 +330,20 @@ export default function ScreenDesignEditorShell({
       </div>
     </div>
   );
+}
+
+/**
+ * 협업 상태 표시 tone을 semantic token class로 변환한다.
+ *
+ * @param tone 협업 상태 tone
+ * @returns Tailwind class 문자열
+ */
+function resolveCollaborationStatusToneClass(tone: CollaborationStatusTone): string {
+  if (tone === 'warning') {
+    return 'border-composition-warning-border bg-composition-warning-bg text-composition-warning-foreground';
+  }
+  if (tone === 'error') {
+    return 'border-destructive/40 bg-destructive/10 text-destructive';
+  }
+  return 'border-border/70 bg-secondary/70 text-muted-foreground';
 }

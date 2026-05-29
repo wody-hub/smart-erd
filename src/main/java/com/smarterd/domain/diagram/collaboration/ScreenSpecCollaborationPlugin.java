@@ -78,7 +78,7 @@ public class ScreenSpecCollaborationPlugin implements BaseCollaborationPlugin {
     @NonNull
     public DomainValidationHook validationHook() {
         return (snapshot) -> {
-            // Phase 3-01 skeleton: structural validation is added when the domain schema lands.
+            // Intentional v1 no-op validation hook: frontend model normalization and scope tests close out Phase 3.
         };
     }
 }

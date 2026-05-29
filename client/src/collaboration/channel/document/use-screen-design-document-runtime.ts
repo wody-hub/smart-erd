@@ -17,6 +17,7 @@ import type {
 } from '@/collaboration/core/session/document-mutation-session';
 import type { ResolvedDocumentSessionBootstrap } from '@/collaboration/core/session/document-session-bootstrap';
 import { DocumentPersistenceCoordinator } from '@/collaboration/core/persistence/document-persistence-coordinator';
+import { resolveDocumentChangeOrigin } from '@/collaboration/core/store/document-change-origin';
 import { DocumentRevisionTracker } from '@/collaboration/core/store/document-revision-tracker';
 import { DocumentStore } from '@/collaboration/core/store/document-store';
 import type { YjsSharedDocumentEngine } from '@/collaboration/core/engines/yjs-shared-document-engine';
@@ -235,7 +236,7 @@ export function useScreenDesignDocumentRuntime({
       return;
     }
     return documentStore.subscribe((event) => {
-      if (event.engineOrigin.source === 'local') {
+      if (event.engineOrigin.source !== 'bootstrap') {
         scheduleProjectionRefresh({ scopeHints: event.affectedScopes });
       }
       for (const projector of documentProjectors) {
@@ -251,8 +252,26 @@ export function useScreenDesignDocumentRuntime({
     }
     return sharedDocumentEngine.subscribeUpdates((update) => {
       documentRevisionTracker.handleDocumentUpdated(update);
+      const origin = resolveDocumentChangeOrigin(update.origin);
+      if (origin.source !== 'remote') {
+        return;
+      }
+      const affectedScopes = collectScreenSpecAffectedScopes(sharedDocumentEngine, update);
+      scheduleProjectionRefresh(
+        affectedScopes.length > 0 ? { scopeHints: affectedScopes } : { forceFull: true },
+      );
+      setLastDocumentChangeSummary({
+        revision: documentRevisionTracker.getRevision(),
+        origin: 'remote',
+        affectedScopes: affectedScopes.map((scope) => ({
+          kind: scope.kind,
+          id: scope.id,
+          mode: scope.mode,
+        })),
+        changedAt: Date.now(),
+      });
     });
-  }, [documentRevisionTracker, sharedDocumentEngine]);
+  }, [documentRevisionTracker, scheduleProjectionRefresh, sharedDocumentEngine]);
 
   useEffect(() => {
     documentPersistenceCoordinator?.attach();

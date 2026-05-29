@@ -17,6 +17,12 @@ import org.springframework.lang.Nullable;
 public class ScreenSpecScopeResolver implements ScopeResolver {
 
     private static final ScopeRef MASTERS_SCOPE = new ScopeRef("masters", "collection", ScopeLockMode.SHARED);
+    private static final ScopeRef DOCUMENT_ROOT_SCOPE = new ScopeRef("document", "root", ScopeLockMode.EXCLUSIVE);
+    private static final ScopeRef INSTANCE_CASCADE_SCOPE = new ScopeRef(
+        "instance-cascade",
+        "collection",
+        ScopeLockMode.EXCLUSIVE
+    );
 
     /**
      * command key와 payload를 screen-spec 문서 scope로 해석한다.
@@ -37,17 +43,19 @@ public class ScreenSpecScopeResolver implements ScopeResolver {
         }
 
         if ("master:update".equals(commandKey) || "master:delete".equals(commandKey)) {
-            return masterId == null ? List.of() : List.of(new ScopeRef("master", masterId, ScopeLockMode.EXCLUSIVE));
+            return masterId == null
+                ? List.of(DOCUMENT_ROOT_SCOPE)
+                : List.of(new ScopeRef("master", masterId, ScopeLockMode.EXCLUSIVE), INSTANCE_CASCADE_SCOPE);
         }
 
-        if (
-            "screen:add".equals(commandKey) ||
-            "screen:rename".equals(commandKey) ||
-            "screen:update-frame".equals(commandKey) ||
-            "screen:move".equals(commandKey) ||
-            "screen:delete".equals(commandKey)
-        ) {
-            return screenId == null ? List.of() : List.of(new ScopeRef("screen", screenId, ScopeLockMode.EXCLUSIVE));
+        if ("screen:add".equals(commandKey) || "screen:rename".equals(commandKey) || "screen:move".equals(commandKey)) {
+            return screenId == null ? List.of(DOCUMENT_ROOT_SCOPE) : List.of(new ScopeRef("screen", screenId, ScopeLockMode.EXCLUSIVE));
+        }
+
+        if ("screen:update-frame".equals(commandKey) || "screen:delete".equals(commandKey)) {
+            return screenId == null
+                ? List.of(DOCUMENT_ROOT_SCOPE)
+                : List.of(new ScopeRef("screen", screenId, ScopeLockMode.EXCLUSIVE), INSTANCE_CASCADE_SCOPE);
         }
 
         if (
@@ -55,7 +63,7 @@ public class ScreenSpecScopeResolver implements ScopeResolver {
             "instance:update".equals(commandKey) ||
             "instance:delete".equals(commandKey)
         ) {
-            return Stream.of(
+            final var scopes = Stream.of(
                 screenId == null ? null : new ScopeRef("screen", screenId, ScopeLockMode.SHARED),
                 screenId == null ? null : new ScopeRef("layer", screenId, ScopeLockMode.SHARED),
                 instanceId == null ? null : new ScopeRef("instance", instanceId, ScopeLockMode.EXCLUSIVE),
@@ -63,16 +71,18 @@ public class ScreenSpecScopeResolver implements ScopeResolver {
             )
                 .filter(Objects::nonNull)
                 .toList();
+            return scopes.isEmpty() ? List.of(DOCUMENT_ROOT_SCOPE) : scopes;
         }
 
         if ("layer:move".equals(commandKey)) {
-            return Stream.of(
+            final var scopes = Stream.of(
                 screenId == null ? null : new ScopeRef("screen", screenId, ScopeLockMode.SHARED),
                 screenId == null ? null : new ScopeRef("layer", screenId, ScopeLockMode.EXCLUSIVE),
                 instanceId == null ? null : new ScopeRef("instance", instanceId, ScopeLockMode.SHARED)
             )
                 .filter(Objects::nonNull)
                 .toList();
+            return scopes.isEmpty() ? List.of(DOCUMENT_ROOT_SCOPE) : scopes;
         }
 
         return List.of();

@@ -11,6 +11,8 @@ import { diagramUrl, loginViaUi, type DiagramTarget, type E2EConfig } from './di
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const SCREEN_SPEC_LIBRARY_ITEM_TEST_ID_PREFIX = 'screen-spec-library-item-';
 const SCREEN_DESIGN_LIBRARY_DRAG_MIME = 'application/x-smart-erd-screen-library-item';
+const SCREEN_SPEC_COLLABORATION_TIMEOUT_MS = 20_000;
+const SCREEN_SPEC_INSTANCE_MOVE_STEP = 8;
 
 export async function openScreenSpecDocumentSession(
   context: BrowserContext,
@@ -109,6 +111,16 @@ export async function updateMasterColor(
   await expect(input).toHaveValue(color);
 }
 
+export async function deleteMaster(page: Page, masterName: string): Promise<void> {
+  const masterCard = page.getByTestId(/^screen-spec-master-card-/).filter({ hasText: masterName });
+  await masterCard.getByRole('button').first().click();
+  await page
+    .getByRole('button', { name: /삭제|delete/i })
+    .last()
+    .click();
+  await expect(masterCard).toHaveCount(0);
+}
+
 export async function dragFirstLibraryItemToCanvas(page: Page): Promise<void> {
   const firstItem = page.getByTestId(/^screen-spec-library-item-/).first();
   await expect(firstItem).toBeVisible();
@@ -133,6 +145,25 @@ export async function moveSelectedInstanceByKeyboard(
   dxSteps: number,
   dySteps: number,
 ): Promise<void> {
+  const xInput = page.getByTestId('screen-spec-instance-x-input');
+  const yInput = page.getByTestId('screen-spec-instance-y-input');
+  if ((await xInput.isVisible()) && (await yInput.isVisible())) {
+    const currentX = Number.parseInt(await xInput.inputValue(), 10);
+    const currentY = Number.parseInt(await yInput.inputValue(), 10);
+    const nextX = currentX + dxSteps * SCREEN_SPEC_INSTANCE_MOVE_STEP;
+    const nextY = currentY + dySteps * SCREEN_SPEC_INSTANCE_MOVE_STEP;
+    await xInput.fill(String(nextX));
+    await expect(xInput).toHaveValue(String(nextX));
+    await yInput.fill(String(nextY));
+    await expect(yInput).toHaveValue(String(nextY));
+    return;
+  }
+
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  });
   const horizontalKey = dxSteps >= 0 ? 'ArrowRight' : 'ArrowLeft';
   const verticalKey = dySteps >= 0 ? 'ArrowDown' : 'ArrowUp';
   for (let index = 0; index < Math.abs(dxSteps); index += 1) {
@@ -141,6 +172,21 @@ export async function moveSelectedInstanceByKeyboard(
   for (let index = 0; index < Math.abs(dySteps); index += 1) {
     await page.keyboard.press(verticalKey);
   }
+}
+
+export async function resizeSelectedInstance(
+  page: Page,
+  width: number,
+  height: number,
+): Promise<void> {
+  const widthInput = page.getByTestId('screen-spec-instance-width-input');
+  const heightInput = page.getByTestId('screen-spec-instance-height-input');
+  await expect(widthInput).toBeVisible();
+  await widthInput.fill(String(width));
+  await expect(widthInput).toHaveValue(String(width));
+  await expect(heightInput).toBeVisible();
+  await heightInput.fill(String(height));
+  await expect(heightInput).toHaveValue(String(height));
 }
 
 export async function triggerExportDownload(page: Page, format: 'png' | 'pdf'): Promise<Download> {
@@ -172,7 +218,9 @@ export async function saveScreenSpecDocument(page: Page): Promise<void> {
 }
 
 export async function expectScreenNameVisible(page: Page, name: string): Promise<void> {
-  await expect(page.getByText(name, { exact: true }).first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(name, { exact: true }).first()).toBeVisible({
+    timeout: SCREEN_SPEC_COLLABORATION_TIMEOUT_MS,
+  });
 }
 
 export async function selectScreenByName(page: Page, name: string): Promise<void> {
@@ -189,7 +237,7 @@ export async function expectInstanceCountVisible(page: Page, count: number): Pro
   await expect(
     page.getByText(new RegExp(`인스턴스 ${count}개|${count} instance`, 'i')).first(),
   ).toBeVisible({
-    timeout: 10_000,
+    timeout: SCREEN_SPEC_COLLABORATION_TIMEOUT_MS,
   });
 }
 
@@ -200,6 +248,33 @@ export async function getSelectedInstancePositionText(page: Page): Promise<strin
     .first();
   await expect(positionRow).toBeVisible();
   return (await positionRow.textContent())?.trim() ?? '';
+}
+
+export async function expectSelectedInstanceSize(
+  page: Page,
+  width: number,
+  height: number,
+): Promise<void> {
+  await expect(page.getByTestId('screen-spec-instance-width-input')).toHaveValue(String(width), {
+    timeout: SCREEN_SPEC_COLLABORATION_TIMEOUT_MS,
+  });
+  await expect(page.getByTestId('screen-spec-instance-height-input')).toHaveValue(String(height));
+}
+
+export async function expectCollaborationStatus(
+  page: Page,
+  expected: RegExp,
+  timeout = 20_000,
+): Promise<void> {
+  await expect(page.getByTestId('screen-spec-collaboration-status')).toContainText(expected, {
+    timeout,
+  });
+}
+
+export async function expectSelectedInstanceOrphaned(page: Page): Promise<void> {
+  await expect(page.getByText(/삭제된 마스터|deleted master/i).first()).toBeVisible({
+    timeout: 20_000,
+  });
 }
 
 export async function assertPngDownload(download: Download): Promise<void> {

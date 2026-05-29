@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type * as Y from 'yjs';
 import type { DocumentCommand } from '@/collaboration/core/contracts/document-plugin';
+import type { ScopeRef } from '@/collaboration/core/contracts/document-read-executor';
 import type { DocumentMutationSession } from '@/collaboration/core/session/document-mutation-session';
 import type { DocumentCommandDispatchResult } from '@/collaboration/core/session/document-mutation-session';
 import type { YjsSharedDocumentEngine } from '@/collaboration/core/engines/yjs-shared-document-engine';
+import { resolveDocumentChangeOrigin } from '@/collaboration/core/store/document-change-origin';
 import {
   createScreenSpecCanvasInputAdapter,
   isScreenSpecCanvasInputAdapter,
@@ -11,7 +14,9 @@ import {
 import { ScreenSpecDocumentMutationApplier } from '@/collaboration/plugins/screen-spec/screen-spec-document-mutation-applier';
 import { ScreenSpecMutationPolicy } from '@/collaboration/plugins/screen-spec/screen-spec-mutation-policy';
 import { ScreenSpecScopeResolver } from '@/collaboration/plugins/screen-spec/screen-spec-scope-resolver';
+import { collectScreenSpecAffectedScopesFromTransaction } from '@/collaboration/plugins/screen-spec/screen-spec-yjs-update-scope-collector';
 import { sanitizeMasterDimension } from '@/collaboration/plugins/screen-spec/screen-spec-yjs-helpers';
+import { SCREEN_SPEC_ROOT_KEY } from '@/constants/screen-design';
 import {
   resolveScreenDesignFramePreset,
   type ScreenDesignFramePresetId,
@@ -26,6 +31,9 @@ import {
   type ScreenDesignScreen,
   type ScreenDesignMasterTier,
 } from './screen-design-document';
+import type { DocumentChangeSummary } from '@/types/collaboration';
+
+const REMOTE_SCOPE_LOCK_TTL_MS = 5_000;
 
 export interface AddInstanceParams {
   screenId: string;
@@ -63,13 +71,17 @@ export interface UseScreenDesignDocumentResult {
   document: ScreenDesignDocumentSnapshot;
   selectedScreenId: string | null;
   selectedScreen: ScreenDesignScreen | null;
+  collaborationRuntimeStatus: {
+    remoteLockActive: boolean;
+    commandRejectedAt: number | null;
+  };
   setSelectedScreenId: (screenId: string | null) => void;
   addScreen: (
     name: string,
     presetId?: ScreenDesignFramePresetId,
     screenId?: string,
   ) => string | null;
-  renameScreen: (screenId: string, name: string) => void;
+  renameScreen: (screenId: string, name: string) => boolean;
   updateScreenPreset: (screenId: string, presetId: ScreenDesignFramePresetId) => void;
   moveScreen: (screenId: string, direction: 'up' | 'down') => void;
   deleteScreen: (screenId: string) => void;
@@ -91,6 +103,13 @@ interface UseScreenDesignDocumentParams {
   documentMutationSession: DocumentMutationSession | null;
   projectionVersion: number;
   collaborationReady: boolean;
+  lastDocumentChangeSummary: DocumentChangeSummary | null;
+}
+
+interface RemoteScopeLock {
+  changedAt: number;
+  expiresAt: number;
+  scopes: ScopeRef[];
 }
 
 /**
@@ -104,10 +123,13 @@ export function useScreenDesignDocument(
 ): UseScreenDesignDocumentResult {
   const { sharedDocumentEngine, documentMutationSession, projectionVersion, collaborationReady } =
     params;
+  const { lastDocumentChangeSummary } = params;
   const [document, setDocument] = useState<ScreenDesignDocumentSnapshot>(
     EMPTY_SCREEN_DESIGN_DOCUMENT,
   );
   const [selectedScreenId, setSelectedScreenId] = useState<string | null>(null);
+  const [remoteScopeLock, setRemoteScopeLock] = useState<RemoteScopeLock | null>(null);
+  const [commandRejectedAt, setCommandRejectedAt] = useState<number | null>(null);
   const canvasInputAdapter = useMemo(
     () =>
       isScreenSpecCanvasInputAdapter(documentMutationSession?.inputAdapters?.canvas)
@@ -145,6 +167,82 @@ export function useScreenDesignDocument(
   }, [collaborationReady, projectionVersion, syncSnapshot]);
 
   useEffect(() => {
+    if (!sharedDocumentEngine) {
+      return;
+    }
+
+    const timeoutIds = new Set<number>();
+    const root = sharedDocumentEngine.getDocument().getMap(SCREEN_SPEC_ROOT_KEY);
+    /**
+     * Y.Doc root 변경을 React snapshot과 임시 remote lock 상태로 반영한다.
+     *
+     * @param _events observeDeep 이벤트 목록
+     * @param transaction 변경을 발생시킨 Yjs transaction
+     * @returns 없음
+     */
+    const handleDocumentChange = (_events: unknown, transaction: Y.Transaction) => {
+      syncSnapshot();
+      if (resolveDocumentChangeOrigin(transaction.origin).source !== 'remote') {
+        return;
+      }
+
+      const changedAt = Date.now();
+      const nextLock: RemoteScopeLock = {
+        changedAt,
+        expiresAt: changedAt + REMOTE_SCOPE_LOCK_TTL_MS,
+        scopes: collectScreenSpecAffectedScopesFromTransaction(
+          sharedDocumentEngine.getDocument(),
+          transaction,
+        ),
+      };
+      setRemoteScopeLock(nextLock);
+
+      const timeoutId = window.setTimeout(() => {
+        timeoutIds.delete(timeoutId);
+        setRemoteScopeLock((currentLock) =>
+          currentLock?.changedAt === nextLock.changedAt ? null : currentLock,
+        );
+      }, REMOTE_SCOPE_LOCK_TTL_MS);
+      timeoutIds.add(timeoutId);
+    };
+    root.observeDeep(handleDocumentChange);
+    return () => {
+      root.unobserveDeep(handleDocumentChange);
+      for (const timeoutId of timeoutIds) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [sharedDocumentEngine, syncSnapshot]);
+
+  useEffect(() => {
+    if (
+      lastDocumentChangeSummary?.origin !== 'remote' ||
+      lastDocumentChangeSummary.affectedScopes.length === 0
+    ) {
+      return;
+    }
+
+    const nextLock: RemoteScopeLock = {
+      changedAt: lastDocumentChangeSummary.changedAt,
+      expiresAt: Date.now() + REMOTE_SCOPE_LOCK_TTL_MS,
+      scopes: lastDocumentChangeSummary.affectedScopes.map((scope) => ({
+        kind: scope.kind,
+        id: scope.id,
+        mode: scope.mode,
+      })),
+    };
+    setRemoteScopeLock(nextLock);
+
+    const timeoutId = window.setTimeout(() => {
+      setRemoteScopeLock((currentLock) =>
+        currentLock?.changedAt === nextLock.changedAt ? null : currentLock,
+      );
+    }, REMOTE_SCOPE_LOCK_TTL_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [lastDocumentChangeSummary]);
+
+  useEffect(() => {
     if (document.screens.length === 0) {
       if (selectedScreenId !== null) {
         setSelectedScreenId(null);
@@ -160,6 +258,8 @@ export function useScreenDesignDocument(
     () => document.screens.find((screen) => screen.id === selectedScreenId) ?? null,
     [document.screens, selectedScreenId],
   );
+  const remoteLockActive = Boolean(remoteScopeLock && Date.now() < remoteScopeLock.expiresAt);
+
   const resolveInstanceScreenId = useCallback(
     (instanceId: string) => findScreenIdForInstance(document, instanceId),
     [document],
@@ -195,16 +295,47 @@ export function useScreenDesignDocument(
   );
   const dispatchCommandWithResult = useCallback(
     <T>(command: DocumentCommand): DocumentCommandDispatchResult<T> => {
+      if (
+        hasActiveRemoteScopeConflict(
+          fallbackMutationPolicy.toMutation(command, {
+            origin: {
+              source: 'local',
+            },
+          }).affectedScopes,
+          remoteScopeLock,
+        )
+      ) {
+        setCommandRejectedAt(Date.now());
+        return {
+          status: 'rejected',
+        };
+      }
+
       if (documentMutationSession) {
         const result = documentMutationSession.emitCommandWithResult<T>(command);
         if (result.status === 'applied') {
+          setCommandRejectedAt(null);
           syncSnapshot();
+        } else if (result.status === 'rejected') {
+          setCommandRejectedAt(Date.now());
         }
         return result;
       }
-      return applyFallbackCommandWithResult<T>(command);
+      const result = applyFallbackCommandWithResult<T>(command);
+      if (result.status === 'applied') {
+        setCommandRejectedAt(null);
+      } else if (result.status === 'rejected') {
+        setCommandRejectedAt(Date.now());
+      }
+      return result;
     },
-    [applyFallbackCommandWithResult, documentMutationSession, syncSnapshot],
+    [
+      applyFallbackCommandWithResult,
+      documentMutationSession,
+      fallbackMutationPolicy,
+      remoteScopeLock,
+      syncSnapshot,
+    ],
   );
   const dispatchCommand = useCallback(
     (command: DocumentCommand) => dispatchCommandWithResult(command).status,
@@ -231,9 +362,9 @@ export function useScreenDesignDocument(
     (screenId: string, name: string) => {
       const trimmedName = name.trim();
       if (!trimmedName) {
-        return;
+        return false;
       }
-      void dispatchCommand(commandAdapter.renameScreen(screenId, trimmedName));
+      return dispatchCommand(commandAdapter.renameScreen(screenId, trimmedName)) === 'applied';
     },
     [commandAdapter, dispatchCommand],
   );
@@ -358,6 +489,10 @@ export function useScreenDesignDocument(
     document,
     selectedScreenId,
     selectedScreen,
+    collaborationRuntimeStatus: {
+      remoteLockActive,
+      commandRejectedAt,
+    },
     setSelectedScreenId,
     addScreen,
     renameScreen,
@@ -372,6 +507,34 @@ export function useScreenDesignDocument(
     deleteInstance,
     moveInstanceLayer,
   };
+}
+
+/**
+ * 최근 원격 변경 scope와 충돌하는 로컬 exclusive command인지 확인한다.
+ *
+ * @param localScopes 로컬 command가 요구하는 scope 목록
+ * @param remoteLock 최근 원격 변경으로 형성된 임시 scope lock
+ * @returns 동일 kind/id의 exclusive 로컬 command이면 true
+ */
+function hasActiveRemoteScopeConflict(
+  localScopes: ScopeRef[],
+  remoteLock: RemoteScopeLock | null,
+): boolean {
+  if (!remoteLock || Date.now() >= remoteLock.expiresAt) {
+    return false;
+  }
+
+  if (remoteLock.scopes.length === 0) {
+    return localScopes.some((localScope) => localScope.mode === 'exclusive');
+  }
+
+  return localScopes.some(
+    (localScope) =>
+      localScope.mode === 'exclusive' &&
+      remoteLock.scopes.some(
+        (remoteScope) => remoteScope.kind === localScope.kind && remoteScope.id === localScope.id,
+      ),
+  );
 }
 
 /**

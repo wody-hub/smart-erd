@@ -485,7 +485,10 @@
     "status": {
       "loadFailed": "We couldn't load the Screen Spec document. Try again.",
       "connecting": "Connecting the collaborative canvas...",
-      "ready": "Canvas live"
+      "ready": "Canvas live",
+      "remoteChanged": "Remote changes applied",
+      "locked": "Another user is editing this scope",
+      "editRejected": "Edit rejected. Check the latest state and try again."
     },
     "aria": {
       "connecting": "Connecting the Screen Spec collaborative canvas.",
