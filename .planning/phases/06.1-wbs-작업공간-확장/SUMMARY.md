@@ -1,3 +1,11 @@
+---
+phase: 06.1
+plan: single
+status: done
+one_liner: "전용 WBS 작업공간, 담당자 UX, 전용 inline append를 구현해 WBS 작성 흐름을 확장했다."
+requirements-completed: [WBS-02, WBS-06, WBS-07]
+---
+
 # Phase 06.1 Summary
 
 ## Delivered

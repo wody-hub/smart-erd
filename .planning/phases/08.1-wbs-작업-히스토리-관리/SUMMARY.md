@@ -1,3 +1,11 @@
+---
+phase: 08.1
+plan: single
+status: done
+one_liner: "WBS 문서 연결, 태그 허브, 댓글/활동 히스토리, 개인 TODO 연동을 구현했다."
+requirements-completed: [WHM-01, WHM-02, WHM-03, WHM-04, WHM-05, WHM-06, WHM-07, WHM-08]
+---
+
 # Phase 8.1 Summary: WBS 작업 히스토리 관리
 
 ## Outcome

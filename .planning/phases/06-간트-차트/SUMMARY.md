@@ -3,6 +3,7 @@ phase: 06
 plan: single
 status: done
 one_liner: "프로젝트 허브에 간트 탭을 통합하고 WBS/마일스톤 기반 일정 시각화와 날짜 드래그 저장을 완성했다."
+requirements-completed: [GANTT-01, GANTT-02, GANTT-03, GANTT-04]
 key_files:
   created:
     - client/src/components/gantt/GanttTab.tsx

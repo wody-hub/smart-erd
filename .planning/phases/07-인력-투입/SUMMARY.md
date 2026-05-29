@@ -1,3 +1,11 @@
+---
+phase: 07
+plan: single
+status: done
+one_liner: "프로젝트 허브에 인력 투입 탭과 M/M 계획·실적·인건비 계산 흐름을 구현했다."
+requirements-completed: [HR-01, HR-02, HR-03, HR-04]
+---
+
 # Phase 07 Summary
 
 ## Delivered

@@ -1,10 +1,11 @@
 ---
 phase: 2
 slug: 테마-선택
-status: draft
+status: verified
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-04-03
+updated: 2026-05-29T11:35:20+09:00
 ---
 
 # Phase 2 — Validation Strategy
@@ -38,9 +39,9 @@ created: 2026-04-03
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 02-T1 | 02-01 | 1 | THEME-02, THEME-03 | unit + build | `cd client && npm run test:unit` | ✅ created in task | ⬜ pending |
-| 02-T2 | 02-02 | 2 | THEME-02 | build | `cd client && npm run build` | ✅ existing files modified | ⬜ pending |
-| 02-T3 | 02-03 | 2 | THEME-01, THEME-03 | build | `cd client && npm run build` | ✅ existing files modified | ⬜ pending |
+| 02-T1 | 02-01 | 1 | THEME-02, THEME-03 | unit + build | `cd client && npm run test:unit` | ✅ created in task | ✅ green |
+| 02-T2 | 02-02 | 2 | THEME-02 | build | `cd client && npm run build` | ✅ existing files modified | ✅ green |
+| 02-T3 | 02-03 | 2 | THEME-01, THEME-03 | build | `cd client && npm run build` | ✅ existing files modified | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -49,7 +50,7 @@ created: 2026-04-03
 ## Wave 0 Requirements
 
 - [x] Existing frontend unit/build infrastructure already exists
-- [ ] `client/test/unit/theme-config.test.ts` — theme helper/store fallback regression tests
+- [x] `client/test/unit/theme-config.test.ts` — theme helper/store fallback regression tests
 
 ---
 
@@ -73,4 +74,8 @@ created: 2026-04-03
 - [x] Feedback latency < 30s
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** ready
+
+## Closeout Audit Note
+
+2026-05-29 milestone audit normalization confirmed Phase 2 already has PASS verification in `02-VERIFICATION.md` for THEME-01 through THEME-03. This file now reflects that completed state so the validation frontmatter and task rows match the delivered verification evidence.

@@ -1,3 +1,11 @@
+---
+phase: 08
+plan: single
+status: done
+one_liner: "프로젝트 허브에 이슈 등록, 상태 관리, 필터링, Excel 내보내기를 구현했다."
+requirements-completed: [ISSUE-01, ISSUE-02, ISSUE-03, ISSUE-04]
+---
+
 # Phase 08 - Phase Summary
 
 **Phase:** 08-이슈-트래커

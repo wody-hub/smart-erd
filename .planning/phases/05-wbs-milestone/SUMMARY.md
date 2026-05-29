@@ -3,6 +3,7 @@ phase: 05
 plan: single
 status: done
 one_liner: "WBS/마일스톤 도메인·API·UI와 프로젝트 진척도 연동을 한 번에 구현해 PM 기능을 가동했다."
+requirements-completed: [WBS-01, WBS-03, WBS-04, WBS-05, MILE-01, MILE-02, MILE-03, MILE-04]
 key_files:
   created:
     - src/main/resources/db/migration/V20260414_02__phase5_wbs_milestone_tables.sql
@@ -40,4 +41,3 @@ key_files:
 - WBS/마일스톤 서비스의 중복 권한/소속 검증을 `ProjectContextLoader`로 추출해 동일한 인증 흐름을 강제했다.
 - WBS 재정렬은 서버(`computeDepth`)와 클라이언트(`buildReorderPayload`) 양쪽에서 깊이/부모/정렬 유효성을 방어하도록 설계했다.
 - 마일스톤 지연 판단은 `Clock` 주입 기반 `targetDate < today && achievementRate < 100` 규칙으로 테스트 가능성을 확보했다.
-

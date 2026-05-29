@@ -3,6 +3,7 @@ phase: 04
 plan: 01
 status: done
 one_liner: "Project 엔티티/서비스/API를 확장해 business-overview 조회/수정 백엔드 기능을 도입했다."
+requirements-completed: [BIZ-01, BIZ-02]
 key_files:
   created:
     - src/main/resources/db/migration/V20260414_01__project_business_overview_columns.sql
@@ -31,4 +32,3 @@ key_files:
 - 날짜 순서 불변식은 서비스가 아닌 엔티티(`Project.updateBusinessOverview`)에서 강제해 도메인 경계 내 일관성을 유지했다.
 - 기존 `PUT /projects/{projectId}`와 분리해 사업 개요는 `PATCH /business-overview` 전용 엔드포인트로 관리했다.
 - `ProjectService`가 `TeamMemberRepository`를 직접 주입하지 않고 `TeamService.countMembers()`를 통해 멤버 수를 조회하도록 계층 의존을 유지했다.
-
