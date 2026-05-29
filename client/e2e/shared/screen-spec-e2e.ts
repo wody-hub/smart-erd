@@ -9,6 +9,8 @@ import {
 import { diagramUrl, loginViaUi, type DiagramTarget, type E2EConfig } from './diagram-e2e';
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const SCREEN_SPEC_LIBRARY_ITEM_TEST_ID_PREFIX = 'screen-spec-library-item-';
+const SCREEN_DESIGN_LIBRARY_DRAG_MIME = 'application/x-smart-erd-screen-library-item';
 
 export async function openScreenSpecDocumentSession(
   context: BrowserContext,
@@ -40,6 +42,7 @@ export async function waitForScreenSpecEditorReady(page: Page): Promise<void> {
   await expect(page.getByText(/화면 목록|screens|screen list/i).first()).toBeVisible();
   await expect(page.getByText(/빌딩 블록|building blocks/i).first()).toBeVisible();
   await expect(page.getByText(/인스펙터|inspector/i).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /저장|save/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /내보내기|export/i })).toBeVisible();
 }
 
@@ -151,6 +154,23 @@ export async function triggerExportDownload(page: Page, format: 'png' | 'pdf'): 
   return download;
 }
 
+export async function saveScreenSpecDocument(page: Page): Promise<void> {
+  const saveButton = page.getByRole('button', { name: /저장|save/i });
+  await expect(saveButton).toBeEnabled();
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes('/ydoc-snapshot') &&
+        response.status() >= 200 &&
+        response.status() < 300,
+      { timeout: 30_000 },
+    ),
+    saveButton.click(),
+  ]);
+  await expect(saveButton).toBeEnabled({ timeout: 10_000 });
+}
+
 export async function expectScreenNameVisible(page: Page, name: string): Promise<void> {
   await expect(page.getByText(name, { exact: true }).first()).toBeVisible({ timeout: 10_000 });
 }
@@ -209,11 +229,32 @@ export async function assertPdfDownload(download: Download): Promise<void> {
 async function dragLibraryItemToCanvas(page: Page, item: Locator): Promise<void> {
   const dropzone = page.getByTestId('screen-spec-canvas-dropzone');
   await expect(dropzone).toBeVisible();
-  await item.dragTo(dropzone, {
-    targetPosition: {
-      x: 360,
-      y: 240,
+  const testId = await item.getAttribute('data-testid');
+  const itemId = testId?.startsWith(SCREEN_SPEC_LIBRARY_ITEM_TEST_ID_PREFIX)
+    ? testId.slice(SCREEN_SPEC_LIBRARY_ITEM_TEST_ID_PREFIX.length)
+    : null;
+  if (!itemId) {
+    throw new Error(`Unable to resolve screen-spec library item id from ${testId ?? 'null'}`);
+  }
+  await dropzone.evaluate(
+    (element, { dragMime, masterId }) => {
+      const rect = element.getBoundingClientRect();
+      const dataTransfer = new DataTransfer();
+      dataTransfer.setData(dragMime, masterId);
+      const eventInit = {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.left + 360,
+        clientY: rect.top + 240,
+        dataTransfer,
+      };
+      element.dispatchEvent(new DragEvent('dragover', eventInit));
+      element.dispatchEvent(new DragEvent('drop', eventInit));
     },
-  });
+    {
+      dragMime: SCREEN_DESIGN_LIBRARY_DRAG_MIME,
+      masterId: itemId,
+    },
+  );
   await selectFirstInstance(page);
 }

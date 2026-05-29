@@ -439,6 +439,8 @@ export class YjsProvider {
           this.reconnectAfterError();
           return;
         }
+        this.emitSyncState(true);
+        this.clearSyncRetryTimer();
         break;
       }
       case WS_MSG_TYPE.SNAPSHOT_RESPONSE_V2: {
@@ -449,6 +451,8 @@ export class YjsProvider {
           this.reconnectAfterError();
           return;
         }
+        this.emitSyncState(true);
+        this.clearSyncRetryTimer();
         break;
       }
       case WS_MSG_TYPE.PRESENCE_SNAPSHOT: {

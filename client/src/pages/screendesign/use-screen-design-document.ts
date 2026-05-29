@@ -90,6 +90,7 @@ interface UseScreenDesignDocumentParams {
   sharedDocumentEngine: YjsSharedDocumentEngine | null;
   documentMutationSession: DocumentMutationSession | null;
   projectionVersion: number;
+  collaborationReady: boolean;
 }
 
 /**
@@ -101,7 +102,8 @@ interface UseScreenDesignDocumentParams {
 export function useScreenDesignDocument(
   params: UseScreenDesignDocumentParams,
 ): UseScreenDesignDocumentResult {
-  const { sharedDocumentEngine, documentMutationSession, projectionVersion } = params;
+  const { sharedDocumentEngine, documentMutationSession, projectionVersion, collaborationReady } =
+    params;
   const [document, setDocument] = useState<ScreenDesignDocumentSnapshot>(
     EMPTY_SCREEN_DESIGN_DOCUMENT,
   );
@@ -132,13 +134,15 @@ export function useScreenDesignDocument(
     }
 
     const doc = sharedDocumentEngine.getDocument();
-    ensureScreenDesignDocumentStructure(doc);
-    setDocument(readScreenDesignDocument(doc));
-  }, [sharedDocumentEngine]);
+    if (collaborationReady) {
+      ensureScreenDesignDocumentStructure(doc);
+    }
+    setDocument(readScreenDesignDocument(doc, { ensureStructure: collaborationReady }));
+  }, [collaborationReady, sharedDocumentEngine]);
 
   useEffect(() => {
     syncSnapshot();
-  }, [projectionVersion, syncSnapshot]);
+  }, [collaborationReady, projectionVersion, syncSnapshot]);
 
   useEffect(() => {
     if (document.screens.length === 0) {

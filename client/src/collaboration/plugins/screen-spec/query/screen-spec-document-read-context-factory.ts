@@ -8,6 +8,13 @@ import type { YjsSharedDocumentEngine } from '@/collaboration/core/engines/yjs-s
 import type { DocumentRevisionSource } from '@/collaboration/core/store/document-revision-tracker';
 import { readScreenDesignDocument } from '@/pages/screendesign/screen-design-document';
 
+type ScreenSpecDocumentSnapshot = ReturnType<typeof readScreenDesignDocument>;
+type ScreenSpecLayerSnapshot = {
+  id: string;
+  screenId: string;
+  instanceIds: string[];
+};
+
 export class ScreenSpecDocumentReadContextFactory implements DocumentReadContextFactory {
   constructor(
     private readonly engine: YjsSharedDocumentEngine,
@@ -26,21 +33,24 @@ export class ScreenSpecDocumentReadContextFactory implements DocumentReadContext
 }
 
 class ScreenSpecDocumentReadContext implements DocumentReadContext {
-  private readonly screens = this.snapshot.screens;
-  private readonly masters = this.snapshot.libraryItems;
-  private readonly instances = Object.values(this.snapshot.instancesByScreenId).flat();
-  private readonly layers = this.snapshot.screens.map((screen) => ({
-    id: screen.id,
-    screenId: screen.id,
-    instanceIds: (this.snapshot.instancesByScreenId[screen.id] ?? []).map(
-      (instance) => instance.id,
-    ),
-  }));
+  private readonly screens: ScreenSpecDocumentSnapshot['screens'];
+  private readonly masters: ScreenSpecDocumentSnapshot['libraryItems'];
+  private readonly instances: ScreenSpecDocumentSnapshot['instancesByScreenId'][string];
+  private readonly layers: ScreenSpecLayerSnapshot[];
 
   constructor(
-    private readonly snapshot: ReturnType<typeof readScreenDesignDocument>,
+    private readonly snapshot: ScreenSpecDocumentSnapshot,
     private readonly revision: string,
-  ) {}
+  ) {
+    this.screens = snapshot.screens;
+    this.masters = snapshot.libraryItems;
+    this.instances = Object.values(snapshot.instancesByScreenId).flat();
+    this.layers = snapshot.screens.map((screen) => ({
+      id: screen.id,
+      screenId: screen.id,
+      instanceIds: (snapshot.instancesByScreenId[screen.id] ?? []).map((instance) => instance.id),
+    }));
+  }
 
   /**
    * ref에 해당하는 문서 엔티티를 조회한다.

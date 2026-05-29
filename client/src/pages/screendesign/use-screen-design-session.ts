@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { persistDiagramYdocSnapshot, requestWsTicket } from '@/api/diagramApi';
 import { YjsProvider } from '@/collaboration/YjsProvider';
 import { useScreenDesignDocumentRuntime } from '@/collaboration/channel/document/use-screen-design-document-runtime';
 import { useScreenDesignRuntimeBootstrap } from '@/collaboration/channel/document/use-screen-design-runtime-bootstrap';
+import type { DocumentCheckpointReader } from '@/collaboration/core/contracts/document-checkpoint';
 import type { DocumentMutationSession } from '@/collaboration/core/session/document-mutation-session';
 import type { YjsSharedDocumentEngine } from '@/collaboration/core/engines/yjs-shared-document-engine';
 import { queryKeys } from '@/constants/query-keys';
+import { getErrorMessage } from '@/lib/api-error';
 import type { DiagramDetail } from '@/types/diagram';
 import type { DocumentChangeSummary } from '@/types/collaboration';
 import type { DocumentBootstrapPayload } from '@/types/document';
@@ -23,8 +27,11 @@ interface UseScreenDesignSessionResult {
   collaborationReady: boolean;
   collaborationError: boolean;
   retryCollaborationSetup: () => void;
+  savePending: boolean;
+  handleSave: () => void;
   sharedDocumentEngine: YjsSharedDocumentEngine | null;
   documentMutationSession: DocumentMutationSession | null;
+  documentCheckpointReader: DocumentCheckpointReader | null;
   projectionVersion: number;
   lastDocumentChangeSummary: DocumentChangeSummary | null;
 }
@@ -43,6 +50,7 @@ export function useScreenDesignSession({
   documentBootstrap,
 }: UseScreenDesignSessionParams): UseScreenDesignSessionResult {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [setupAttempt, setSetupAttempt] = useState(0);
   const [collaborationReady, setCollaborationReady] = useState(false);
   const [collaborationError, setCollaborationError] = useState(false);
@@ -58,7 +66,7 @@ export function useScreenDesignSession({
   useEffect(() => {
     snapshotAvailableRef.current = documentBootstrap?.snapshotAvailable === true;
     if (documentBootstrap?.snapshotAvailable) {
-      localBootstrapReadyRef.current = true;
+      localBootstrapReadyRef.current = false;
     }
   }, [documentBootstrap?.snapshotAvailable]);
 
@@ -73,14 +81,18 @@ export function useScreenDesignSession({
     snapshotCodec,
     documentAdapter,
   } = useScreenDesignRuntimeBootstrap(documentDetail, documentBootstrap, setupAttempt);
-  const { documentMutationSession, projectionVersion, lastDocumentChangeSummary } =
-    useScreenDesignDocumentRuntime({
-      documentDetail,
-      resolvedSessionBootstrap,
-      sharedDocumentEngine,
-      snapshotCodec,
-      documentAdapter,
-    });
+  const {
+    documentMutationSession,
+    documentCheckpointReader,
+    projectionVersion,
+    lastDocumentChangeSummary,
+  } = useScreenDesignDocumentRuntime({
+    documentDetail,
+    resolvedSessionBootstrap,
+    sharedDocumentEngine,
+    snapshotCodec,
+    documentAdapter,
+  });
 
   useEffect(() => {
     if (
@@ -157,7 +169,7 @@ export function useScreenDesignSession({
 
     let cancelled = false;
     setCollaborationError(false);
-    setCollaborationReady(snapshotAvailableRef.current || localBootstrapReadyRef.current);
+    setCollaborationReady(localBootstrapReadyRef.current);
 
     const provider = new YjsProvider(sharedDocumentEngine.getDocument(), {
       diagramId,
@@ -169,6 +181,7 @@ export function useScreenDesignSession({
         return;
       }
       setCollaborationError(false);
+      localBootstrapReadyRef.current = true;
       setCollaborationReady(true);
     };
 
@@ -218,12 +231,67 @@ export function useScreenDesignSession({
     setSetupAttempt((currentAttempt) => currentAttempt + 1);
   }, []);
 
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!documentDetail || !sharedDocumentEngine || !snapshotCodec) {
+        throw new Error(t('screenSpec.toast.saveUnavailable'));
+      }
+      const snapshot =
+        documentCheckpointReader?.getLatestCheckpoint().snapshot ??
+        snapshotCodec.encodeForPersistence(sharedDocumentEngine.exportSnapshot());
+      await persistDiagramYdocSnapshot(
+        teamId,
+        projectId,
+        diagramId,
+        documentDetail.contentRevision,
+        snapshot,
+      );
+    },
+    onSuccess: () => {
+      queryClient.setQueryData<DiagramDetail | undefined>(
+        queryKeys.diagrams.detail(teamId, projectId, diagramId),
+        (current) =>
+          current
+            ? {
+                ...current,
+                hasYdocSnapshot: true,
+              }
+            : current,
+      );
+      queryClient.setQueryData<DocumentBootstrapPayload | undefined>(
+        bootstrapQueryKey,
+        (currentBootstrap) =>
+          currentBootstrap
+            ? {
+                ...currentBootstrap,
+                snapshotAvailable: true,
+              }
+            : currentBootstrap,
+      );
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.diagrams.detail(teamId, projectId, diagramId),
+        exact: true,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: bootstrapQueryKey,
+        exact: true,
+      });
+      toast.success(t('screenSpec.toast.saved'));
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, t('screenSpec.toast.saveFailed')));
+    },
+  });
+
   return {
     collaborationReady,
     collaborationError,
     retryCollaborationSetup,
+    savePending: saveMutation.isPending,
+    handleSave: () => saveMutation.mutate(),
     sharedDocumentEngine,
     documentMutationSession,
+    documentCheckpointReader,
     projectionVersion,
     lastDocumentChangeSummary,
   };

@@ -6,6 +6,7 @@ import {
   Download,
   Frame,
   Move,
+  Save,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
@@ -55,6 +56,8 @@ interface ScreenDesignEditorShellProps {
   canNavigateNextScreen: boolean;
   /** 현재 export 동작 진행 여부 */
   exportBusy: boolean;
+  /** 현재 저장 동작 진행 여부 */
+  savePending: boolean;
   /** 문서 허브로 돌아가기 */
   onBack: () => void;
   /** 선택 화면 변경 */
@@ -73,6 +76,8 @@ interface ScreenDesignEditorShellProps {
   onZoomIn: () => void;
   /** 축소 */
   onZoomOut: () => void;
+  /** 현재 Y.Doc 스냅샷 저장 */
+  onSave: () => void;
   /** 현재 화면 PNG export */
   onExportPng: () => void;
   /** 전체 화면 PDF export */
@@ -101,6 +106,7 @@ export default function ScreenDesignEditorShell({
   canNavigatePreviousScreen,
   canNavigateNextScreen,
   exportBusy,
+  savePending,
   onBack,
   onScreenChange,
   onNavigatePreviousScreen,
@@ -110,6 +116,7 @@ export default function ScreenDesignEditorShell({
   onResetToActualSize,
   onZoomIn,
   onZoomOut,
+  onSave,
   onExportPng,
   onExportPdf,
   viewportPane,
@@ -221,6 +228,15 @@ export default function ScreenDesignEditorShell({
               onClick={onZoomIn}
             >
               <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSave}
+              disabled={savePending || !collaborationReady}
+            >
+              <Save className="mr-1 h-4 w-4" />
+              {savePending ? t('common.button.saving') : t('common.button.save')}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

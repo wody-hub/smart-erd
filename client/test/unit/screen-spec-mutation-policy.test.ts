@@ -1,11 +1,53 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as Y from 'yjs';
+import { ScreenSpecDocumentReadContextFactory } from '../../src/collaboration/plugins/screen-spec/query/screen-spec-document-read-context-factory.js';
 import { ScreenSpecMutationPolicy } from '../../src/collaboration/plugins/screen-spec/screen-spec-mutation-policy.js';
 import { ScreenSpecScopeResolver } from '../../src/collaboration/plugins/screen-spec/screen-spec-scope-resolver.js';
 import {
   createScreenSpecDocumentPlugin,
   isScreenSpecCanvasInputAdapter,
 } from '../../src/collaboration/plugins/screen-spec/screen-spec-document-plugin.js';
+import {
+  createScreenYMap,
+  ensureScreenDesignDocumentStructure,
+} from '../../src/pages/screendesign/screen-design-document.js';
+
+test('ScreenSpecDocumentReadContextFactory 는 Y.Doc snapshot으로 read context를 생성한다', () => {
+  const doc = new Y.Doc();
+  ensureScreenDesignDocumentStructure(doc);
+  const root = doc.getMap('screenSpec');
+  const screens = root.get('screens');
+  const screenOrder = root.get('screenOrder');
+  assert.ok(screens instanceof Y.Map);
+  assert.ok(screenOrder instanceof Y.Array);
+
+  doc.transact(() => {
+    screens.set(
+      'screen-read-context',
+      createScreenYMap('screen-read-context', {
+        name: 'Read Context',
+        width: 1440,
+        height: 960,
+      }),
+    );
+    screenOrder.push(['screen-read-context']);
+  }, 'test-read-context');
+
+  const factory = new ScreenSpecDocumentReadContextFactory(
+    { getDocument: () => doc } as never,
+    { getRevision: () => 'revision-1' } as never,
+  );
+  const context = factory.create();
+
+  assert.deepEqual(context.findByKind('screen'), [
+    {
+      kind: 'screen',
+      id: 'screen-read-context',
+    },
+  ]);
+  assert.equal(context.getRevision(), 'revision-1');
+});
 
 test('screen spec canvas adapter 는 screen/add 와 instance/add command 를 생성한다', () => {
   const plugin = createScreenSpecDocumentPlugin();

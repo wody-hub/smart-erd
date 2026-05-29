@@ -24,6 +24,43 @@ test('ensureScreenDesignDocumentStructure 는 기본 마스터 라이브러리�
   assert.ok(snapshot.libraryItems.some((item) => item.id === 'button-group'));
 });
 
+test('readScreenDesignDocument 는 ensureStructure=false 일 때 remote handoff 전 nested root를 만들지 않는다', () => {
+  const remoteDoc = new Y.Doc();
+  ensureScreenDesignDocumentStructure(remoteDoc);
+  const remoteRoot = remoteDoc.getMap('screenSpec');
+  const remoteScreens = remoteRoot.get('screens');
+  const remoteScreenOrder = remoteRoot.get('screenOrder');
+  assert.ok(remoteScreens instanceof Y.Map);
+  assert.ok(remoteScreenOrder instanceof Y.Array);
+
+  remoteDoc.transact(() => {
+    remoteScreens.set(
+      'screen-remote',
+      createScreenYMap('screen-remote', {
+        name: 'Remote Handoff',
+        width: 1440,
+        height: 1024,
+      }),
+    );
+    remoteScreenOrder.push(['screen-remote']);
+  }, 'test-remote-seed');
+
+  const localDoc = new Y.Doc();
+  const emptySnapshot = readScreenDesignDocument(localDoc, { ensureStructure: false });
+  const localRoot = localDoc.getMap('screenSpec');
+  assert.equal(emptySnapshot.screens.length, 0);
+  assert.equal(localRoot.get('screens'), undefined);
+  assert.equal(localRoot.get('screenOrder'), undefined);
+
+  Y.applyUpdate(localDoc, Y.encodeStateAsUpdate(remoteDoc), 'remote');
+  const restoredSnapshot = readScreenDesignDocument(localDoc);
+
+  assert.deepEqual(
+    restoredSnapshot.screens.map((screen) => screen.name),
+    ['Remote Handoff'],
+  );
+});
+
 test('librarySeedVersion 이 있으면 빈 masters map을 다시 시드하지 않는다', () => {
   const doc = new Y.Doc();
   ensureScreenDesignDocumentStructure(doc);

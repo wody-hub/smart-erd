@@ -50,6 +50,8 @@ export function useScreenDesignInteractivePageData({
     collaborationReady,
     collaborationError,
     sharedDocumentEngine,
+    savePending,
+    handleSave,
     documentMutationSession,
     projectionVersion,
     lastDocumentChangeSummary,
@@ -64,6 +66,7 @@ export function useScreenDesignInteractivePageData({
     sharedDocumentEngine,
     documentMutationSession,
     projectionVersion,
+    collaborationReady,
   });
 
   return {
@@ -77,6 +80,8 @@ export function useScreenDesignInteractivePageData({
     collaborationReady,
     collaborationError,
     sharedDocumentEngine,
+    savePending,
+    handleSave,
     lastDocumentChangeSummary,
     ...documentState,
   };

@@ -32,6 +32,11 @@ import { useScreenDesignExport } from './use-screen-design-export';
 import { useScreenDesignHotkeys } from './use-screen-design-hotkeys';
 import { useScreenDesignInteractivePageData } from './use-screen-design-interactive-page-data';
 
+/**
+ * 화면기획 협업 에디터 페이지를 렌더링한다.
+ *
+ * @returns 화면기획 에디터 페이지 JSX
+ */
 export default function ScreenDesignInteractivePage() {
   const { teamId, projectId, diagramId } = useParams<{
     teamId: string;
@@ -61,6 +66,8 @@ export default function ScreenDesignInteractivePage() {
     collaborationReady,
     collaborationError,
     sharedDocumentEngine,
+    savePending,
+    handleSave,
     lastDocumentChangeSummary,
     document: screenDocument,
     selectedScreenId,
@@ -180,7 +187,7 @@ export default function ScreenDesignInteractivePage() {
   });
 
   useEffect(() => {
-    if (!sharedDocumentEngine || screenDocument.screens.length > 0) {
+    if (!collaborationReady || !sharedDocumentEngine || screenDocument.screens.length > 0) {
       return;
     }
     const nextScreenId = addScreen(
@@ -194,6 +201,7 @@ export default function ScreenDesignInteractivePage() {
   }, [
     activeFramePreset.id,
     addScreen,
+    collaborationReady,
     screenDocument.screens.length,
     setSelectedScreenId,
     sharedDocumentEngine,
@@ -307,10 +315,12 @@ export default function ScreenDesignInteractivePage() {
     t,
   ]);
 
+  /** 문서 허브 화면으로 이동한다. */
   const handleBack = (): void => {
     void navigate(ROUTES.DIAGRAMS(resolvedTeamId, resolvedProjectId));
   };
 
+  /** 현재 문서에 새 화면을 추가하고 선택한다. */
   const handleAddScreen = (): void => {
     const nextScreenId = addScreen(
       t('screenSpec.screen.defaultName', { index: screenDocument.screens.length + 1 }),
@@ -322,6 +332,11 @@ export default function ScreenDesignInteractivePage() {
     }
   };
 
+  /**
+   * 화면을 삭제하고 선택 상태를 정리한다.
+   *
+   * @param screenId 삭제할 화면 ID
+   */
   const handleDeleteScreen = (screenId: string): void => {
     deleteScreen(screenId);
     if (selectedScreenId === screenId) {
@@ -376,6 +391,7 @@ export default function ScreenDesignInteractivePage() {
               canNavigatePreviousScreen={canNavigatePreviousScreen}
               canNavigateNextScreen={canNavigateNextScreen}
               exportBusy={exportProgress.isExporting}
+              savePending={savePending}
               onBack={handleBack}
               onScreenChange={handleSelectScreen}
               onNavigatePreviousScreen={() => navigateScreenByOffset(-1)}
@@ -393,6 +409,7 @@ export default function ScreenDesignInteractivePage() {
               onResetToActualSize={resetToActualSize}
               onZoomIn={zoomIn}
               onZoomOut={zoomOut}
+              onSave={handleSave}
               onExportPng={() => void exportPng()}
               onExportPdf={() => void exportPdf()}
               libraryPane={

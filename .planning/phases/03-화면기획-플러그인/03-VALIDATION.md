@@ -38,9 +38,9 @@ created: 2026-05-28
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 03-01-01 | 03-01 | 0 | SPEC-01, SPEC-04 | T-03-01 / T-03-02 | Test fixtures create isolated screen-spec docs and do not reuse credentials across runs | unit/e2e helper | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0` | ❌ W0 | ⬜ pending |
-| 03-01-02 | 03-01 | 1 | SPEC-01 | T-03-01 | User-visible authoring state persists after save/re-entry | e2e | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0` | ❌ W0 | ⬜ pending |
-| 03-01-03 | 03-01 | 1 | SPEC-04 | T-03-02 | Exported files are generated only through authenticated document access and are non-empty | e2e download | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0` | ❌ W0 | ⬜ pending |
+| 03-01-01 | 03-01 | 0 | SPEC-01, SPEC-04 | T-03-01 / T-03-02 | Test fixtures create isolated screen-spec docs and do not reuse credentials across runs | unit/e2e helper | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0` | ✅ W1 | ✅ green |
+| 03-01-02 | 03-01 | 1 | SPEC-01 | T-03-01 | User-visible authoring state persists after save/re-entry | e2e | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0` | ✅ W1 | ✅ green |
+| 03-01-03 | 03-01 | 1 | SPEC-04 | T-03-02 | Exported files are generated only through authenticated document access and are non-empty | e2e download | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0` | ✅ W1 | ✅ green |
 | 03-02-01 | 03-02 | 1 | SPEC-03 | T-03-03 / T-03-04 | Three distinct accounts share only team-authorized document access | e2e | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-three-account-collaboration.spec.ts --browser=chromium --workers=1 --retries=0` | ❌ W0 | ⬜ pending |
 | 03-02-02 | 03-02 | 1 | SPEC-02, SPEC-03 | T-03-04 | Scope lock/conflict UX prevents silent same-scope overwrites | e2e + unit | `./gradlew test --tests '*ScreenSpecScopeResolverTest' && cd client && npm run test:e2e -- e2e/smoke/screen-spec-three-account-collaboration.spec.ts --browser=chromium --workers=1 --retries=0` | ❌ W0 | ⬜ pending |
 | 03-03-01 | 03-03 | 2 | SPEC-01, SPEC-02, SPEC-03, SPEC-04 | — | Evidence artifacts accurately describe residual risk and no-op validation policy | docs + commands | `git diff --check && cd client && npm run build` | ✅ | ⬜ pending |
@@ -51,10 +51,28 @@ created: 2026-05-28
 
 ## Wave 0 Requirements
 
-- [ ] `client/e2e/smoke/screen-spec-authoring-export.spec.ts` — browser evidence for SPEC-01 and SPEC-04.
+- [x] `client/e2e/smoke/screen-spec-authoring-export.spec.ts` — browser evidence for SPEC-01 and SPEC-04.
 - [ ] `client/e2e/smoke/screen-spec-three-account-collaboration.spec.ts` — three-account collaboration evidence for SPEC-02 and SPEC-03.
-- [ ] `client/e2e/shared/screen-spec-e2e.ts` or equivalent helper extraction — stable screen-spec locators and actions.
-- [ ] Minimal stable test selectors on screen-spec UI primitives if semantic role/text locators are not enough.
+- [x] `client/e2e/shared/screen-spec-e2e.ts` or equivalent helper extraction — stable screen-spec locators and actions.
+- [x] Minimal stable test selectors on screen-spec UI primitives if semantic role/text locators are not enough.
+
+## Execution Evidence
+
+### 03-01 Automated Evidence
+
+- **Command:** `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0`
+  - **Result:** ✅ 1 passed on 2026-05-29.
+  - **Covers:** SPEC-01 custom master definition, cross-screen instance placement, master label/color propagation, save/re-entry persistence, PNG download signature, PDF structural sanity.
+- **Command:** `cd client && npm run test:unit -- screen-design`
+  - **Result:** ✅ 363 tests passed on 2026-05-29.
+- **Command:** `cd client && npm run test:unit -- screen-spec`
+  - **Result:** ✅ 362 tests passed on 2026-05-29.
+- **Command:** `cd client && npm run lint:docs`
+  - **Result:** ✅ Passed on 2026-05-29.
+- **Command:** `cd client && npm run build`
+  - **Result:** ❌ blocked by pre-existing WBS issues outside Phase 3 scope:
+    - `client/src/components/wbs/SortableWbsRow.tsx(332,21)` missing typed i18n key `wbs.validation.nameRequired`
+    - `client/src/components/wbs/SortableWbsRowCells.tsx(84,3)` unused `milestoneName`
 
 ---
 
@@ -95,4 +113,3 @@ Execution must not add a Phase 3 TODO or backlog item for backend deep structure
 - [ ] `nyquist_compliant: true` set in frontmatter after evidence is complete.
 
 **Approval:** pending
-

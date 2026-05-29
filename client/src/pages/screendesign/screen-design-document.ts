@@ -215,6 +215,10 @@ export interface ScreenDesignDocumentSnapshot {
   mastersAvailable: boolean;
 }
 
+interface ReadScreenDesignDocumentOptions {
+  ensureStructure?: boolean;
+}
+
 export const SCREEN_DESIGN_LIBRARY_CATEGORIES: ScreenDesignLibraryCategory[] = [
   {
     id: 'layout',
@@ -762,10 +766,16 @@ export function applyScreenDesignContentToDoc(
  * Y.Doc에서 화면기획 스냅샷을 읽는다.
  *
  * @param doc 대상 Y.Doc
+ * @param options 읽기 전 Y.Doc 구조 보정 여부
  * @returns 화면/인스턴스/라이브러리 스냅샷
  */
-export function readScreenDesignDocument(doc: Y.Doc): ScreenDesignDocumentSnapshot {
-  ensureScreenDesignDocumentStructure(doc);
+export function readScreenDesignDocument(
+  doc: Y.Doc,
+  options: ReadScreenDesignDocumentOptions = {},
+): ScreenDesignDocumentSnapshot {
+  if (options.ensureStructure !== false) {
+    ensureScreenDesignDocumentStructure(doc);
+  }
 
   const root = doc.getMap(ROOT_KEY);
   const screensMap = root.get(SCREENS_KEY);
@@ -1564,10 +1574,22 @@ function readRenderKind(value: unknown): ScreenDesignMasterRenderKind | null {
     : null;
 }
 
+/**
+ * unknown 값이 JSON object 형태인지 판별한다.
+ *
+ * @param value 판별할 값
+ * @returns plain record이면 true
+ */
 function isJsonRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+/**
+ * legacy content JSON에서 화면기획 seed를 복원한다.
+ *
+ * @param content 저장된 content 문자열
+ * @returns 복원 가능한 화면기획 seed 또는 null
+ */
 function parsePersistedScreenDesignContent(
   content: string | null | undefined,
 ): PersistedScreenDesignSeed | null {
@@ -1676,6 +1698,12 @@ function parsePersistedScreenDesignContent(
   };
 }
 
+/**
+ * persisted 화면 목록을 배열/맵 양쪽 포맷에서 읽는다.
+ *
+ * @param value persisted screens 값
+ * @returns 복원된 화면 목록
+ */
 function readPersistedScreens(value: unknown): ScreenDesignScreen[] {
   if (Array.isArray(value)) {
     return value
@@ -1694,6 +1722,13 @@ function readPersistedScreens(value: unknown): ScreenDesignScreen[] {
   return [];
 }
 
+/**
+ * persisted 화면 엔트리 하나를 읽는다.
+ *
+ * @param value 화면 저장 record
+ * @param fallbackId id 누락 시 사용할 식별자
+ * @returns 복원된 화면 또는 null
+ */
 function readPersistedScreen(
   value: Record<string, unknown>,
   fallbackId: string,
@@ -1711,6 +1746,12 @@ function readPersistedScreen(
   };
 }
 
+/**
+ * persisted master 후보들을 여러 legacy source에서 병합해 읽는다.
+ *
+ * @param candidate 화면기획 persisted root 후보
+ * @returns 복원된 master seed 목록
+ */
 function readPersistedMasters(
   candidate: Record<string, unknown>,
 ): PersistedScreenDesignSeed['masters'] {
@@ -1747,6 +1788,13 @@ function readPersistedMasters(
   return Array.from(masterMap.values());
 }
 
+/**
+ * persisted master 엔트리 하나를 읽는다.
+ *
+ * @param value master 저장 record
+ * @param fallbackId id 누락 시 사용할 식별자
+ * @returns 복원된 master seed 또는 null
+ */
 function readPersistedMaster(
   value: Record<string, unknown>,
   fallbackId: string,
@@ -1771,6 +1819,12 @@ function readPersistedMaster(
   };
 }
 
+/**
+ * screenId별 bucket 구조의 persisted instance를 읽는다.
+ *
+ * @param value instancesByScreenId 저장값
+ * @returns instance seed와 화면별 layer 순서
+ */
 function readPersistedInstanceBuckets(value: unknown): {
   instances: PersistedScreenDesignSeed['instances'];
   layersByScreenId: Record<string, string[]>;
@@ -1810,6 +1864,12 @@ function readPersistedInstanceBuckets(value: unknown): {
   };
 }
 
+/**
+ * flat collection 구조의 persisted instance를 읽는다.
+ *
+ * @param value instances 저장값
+ * @returns instance seed와 화면별 layer 순서
+ */
 function readPersistedInstanceCollection(value: unknown): {
   instances: PersistedScreenDesignSeed['instances'];
   layersByScreenId: Record<string, string[]>;
@@ -1817,6 +1877,13 @@ function readPersistedInstanceCollection(value: unknown): {
   const instances: PersistedScreenDesignSeed['instances'] = [];
   const layersByScreenId: Record<string, string[]> = {};
 
+  /**
+   * instance record를 seed 목록과 layer bucket에 추가한다.
+   *
+   * @param entry instance 저장 record
+   * @param fallbackId id 누락 시 사용할 식별자
+   * @returns 없음
+   */
   const pushInstance = (entry: Record<string, unknown>, fallbackId: string) => {
     const instance = readPersistedInstance(entry, null, fallbackId);
     if (!instance) {
@@ -1864,6 +1931,14 @@ function readPersistedInstanceCollection(value: unknown): {
   };
 }
 
+/**
+ * persisted instance 엔트리 하나를 읽는다.
+ *
+ * @param value instance 저장 record
+ * @param fallbackScreenId screenId 누락 시 사용할 화면 식별자
+ * @param fallbackId id 누락 시 사용할 식별자
+ * @returns 복원된 instance seed 또는 null
+ */
 function readPersistedInstance(
   value: Record<string, unknown>,
   fallbackScreenId: string | null,
@@ -1921,6 +1996,12 @@ function readPersistedInstance(
   };
 }
 
+/**
+ * persisted instance master snapshot을 읽는다.
+ *
+ * @param value master snapshot 저장값
+ * @returns 복원된 master snapshot 또는 null
+ */
 function readPersistedInstanceMasterSnapshot(
   value: unknown,
 ): ScreenDesignInstanceMasterSnapshot | null {
@@ -1941,6 +2022,12 @@ function readPersistedInstanceMasterSnapshot(
   };
 }
 
+/**
+ * persisted layer 순서를 배열/맵 양쪽 포맷에서 읽는다.
+ *
+ * @param value persisted layers 값
+ * @returns 화면별 instance id 순서
+ */
 function readPersistedLayers(value: unknown): Record<string, string[]> {
   if (Array.isArray(value)) {
     return Object.fromEntries(
@@ -1967,6 +2054,12 @@ function readPersistedLayers(value: unknown): Record<string, string[]> {
   return {};
 }
 
+/**
+ * 문자열 배열 저장값을 중복 없는 문자열 배열로 정규화한다.
+ *
+ * @param value 정규화할 값
+ * @returns 정규화된 문자열 배열
+ */
 function normalizeStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
@@ -1976,6 +2069,12 @@ function normalizeStringArray(value: unknown): string[] {
   );
 }
 
+/**
+ * 문자열 목록의 최초 등장 순서를 유지하며 중복을 제거한다.
+ *
+ * @param values 중복 제거할 문자열 목록
+ * @returns 중복 제거된 문자열 목록
+ */
 function dedupeOrderedStrings(values: string[]): string[] {
   const seen = new Set<string>();
   const ordered: string[] = [];
@@ -1989,6 +2088,12 @@ function dedupeOrderedStrings(values: string[]): string[] {
   return ordered;
 }
 
+/**
+ * 명시된 id와 파생 id 목록을 하나의 ordered set으로 합친다.
+ *
+ * @param sources 병합할 id 목록들
+ * @returns 중복 제거된 id 목록
+ */
 function mergeExplicitAndDerivedIds(...sources: string[][]): string[] {
   return dedupeOrderedStrings(sources.flat());
 }

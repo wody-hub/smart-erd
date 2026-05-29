@@ -477,7 +477,10 @@
   "screenSpec": {
     "toast": {
       "created": "Screen Spec document created",
-      "createFailed": "Failed to create the Screen Spec document"
+      "createFailed": "Failed to create the Screen Spec document",
+      "saved": "Screen Spec document saved",
+      "saveFailed": "Failed to save the Screen Spec document",
+      "saveUnavailable": "The Screen Spec document is not ready to save"
     },
     "status": {
       "loadFailed": "We couldn't load the Screen Spec document. Try again.",
