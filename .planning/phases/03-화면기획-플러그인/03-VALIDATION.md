@@ -1,89 +1,58 @@
 ---
 phase: 3
 slug: 화면기획-플러그인
-status: draft
+status: evidence-collected-build-blocked
 nyquist_compliant: false
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-05-28
+updated: 2026-05-29T10:15:36+09:00
 ---
 
-# Phase 3 — Validation Strategy
+# Phase 3 — Validation Matrix
 
-> Per-phase validation contract for screen-spec closeout execution. This is a planning-time strategy; execution must update it with actual evidence before Phase 3 is marked complete.
+Phase 3 now has concrete evidence for SPEC-01 through SPEC-04. The phase is not marked complete because the required frontend production build still fails on unrelated WBS TypeScript errors.
 
----
+## Validation Inputs
 
-## Test Infrastructure
+| Source | Purpose |
+| --- | --- |
+| `03-01-SUMMARY.md` | Single-user authoring, persistence, and PNG/PDF export smoke evidence |
+| `03-02-SUMMARY.md` | Three-account collaboration, lock/rejected-edit UX, and scope resolver evidence |
+| `03-VERIFICATION.md` | Exact closeout command/manual QA log |
+| `client/e2e/smoke/screen-spec-authoring-export.spec.ts` | SPEC-01, SPEC-02, SPEC-04 browser evidence |
+| `client/e2e/smoke/screen-spec-three-account-collaboration.spec.ts` | SPEC-02, SPEC-03 browser collaboration evidence |
+| `src/test/java/com/smarterd/domain/diagram/collaboration/ScreenSpecScopeResolverTest.java` | Backend scope resolver lock/cascade baseline |
 
-| Property | Value |
-|----------|-------|
-| **Framework** | JUnit 5 / Node test / Playwright |
-| **Config file** | `build.gradle`, `client/package.json`, `client/playwright.config.ts` |
-| **Quick run command** | `./gradlew test --tests '*ScreenSpecScopeResolverTest' --tests '*DiagramServiceTest' && cd client && npm run test:unit -- screen-spec screen-design` |
-| **Full suite command** | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts e2e/smoke/screen-spec-three-account-collaboration.spec.ts --browser=chromium --workers=1 --retries=0 && cd .. && ./gradlew test --tests '*ScreenSpecScopeResolverTest' --tests '*DiagramServiceTest'` |
-| **Estimated runtime** | ~300 seconds |
+## Requirement Evidence Matrix
 
----
+| Requirement | Status | Evidence | Residual Risk |
+| --- | --- | --- | --- |
+| SPEC-01: 마스터 컴포넌트를 정의하고 여러 화면에 인스턴스로 배치 | Evidence PASS | `screen-spec-authoring-export` creates a `screen-spec` document, renames screens, creates a custom master, places instances on two screens, saves, reloads, and rechecks persisted content. Manual dev QA also created `Manual CTA 1780017133-nzws03` and placed it on `Manual Landing 1780017133-nzws03`. | Phase closeout still blocked by unrelated frontend build failure. |
+| SPEC-02: 마스터 수정 시 인스턴스 자동 반영 | Evidence PASS | `screen-spec-authoring-export` updates the master label/color and verifies existing instances inherit `Primary CTA ...` and `#2563eb`; `screen-spec-three-account-collaboration` verifies remote users observe inherited master changes. Unit tests cover mutation applier cascade and override behavior. | None specific to SPEC-02 beyond build gate. |
+| SPEC-03: 협업 코어 위 실시간 협업 | Evidence PASS | `screen-spec-three-account-collaboration` opens owner/member-one/member-two isolated contexts, asserts authorized access, verifies screen/master/instance propagation, checks visible lock status, verifies rejected same-scope rename, deletes the master, and confirms orphan state after reload. Backend and frontend scope resolver coverage backs the lock model. | Browser MCP manual session saw one transient WebSocket console error; strict E2E diagnostics are the canonical console gate and passed. |
+| SPEC-04: PNG/PDF 내보내기 | Evidence PASS | `screen-spec-authoring-export` validates real PNG and PDF downloads. Manual dev QA retained PNG `151277` bytes with signature `89504e470d0a1a0a` and PDF `54764` bytes with `%PDF`, `/Type /Page`, `/Count 1`, and `startxref`. | None specific to SPEC-04 beyond build gate. |
 
-## Sampling Rate
+## Task Verification Map
 
-- **After every task commit:** Run targeted unit tests touched by that task.
-- **After every plan wave:** Run the screen-spec Playwright smoke spec(s) added in that wave.
-- **Before `$gsd-verify-work`:** Full suite and dev-profile manual QA evidence must be recorded in `03-VERIFICATION.md`.
-- **Max feedback latency:** 300 seconds for targeted validation; longer export/collaboration runs are acceptable only at wave boundaries.
+| Task ID | Plan | Requirement | Threat Ref | Evidence | Status |
+| --- | --- | --- | --- | --- | --- |
+| 03-01-01 | 03-01 | SPEC-01, SPEC-04 | T-03-01 / T-03-02 | `screen-spec-authoring-export` fixture creates isolated `screen-spec` docs and validates exports | green |
+| 03-01-02 | 03-01 | SPEC-01 | T-03-01 | Save/re-entry persistence in `screen-spec-authoring-export` and manual dev QA | green |
+| 03-01-03 | 03-01 | SPEC-04 | T-03-02 | Automated and manual PNG/PDF byte/signature checks | green |
+| 03-02-01 | 03-02 | SPEC-03 | T-03-03 / T-03-04 | Owner/member-one/member-two E2E access and propagation evidence | green |
+| 03-02-02 | 03-02 | SPEC-02, SPEC-03 | T-03-04 | Same-scope lock/rejected-edit UX in E2E, scope resolver tests | green |
+| 03-03-01 | 03-03 | SPEC-01, SPEC-02, SPEC-03, SPEC-04 | T-03-07 / T-03-08 / T-03-09 | `03-VERIFICATION.md` records all commands and manual QA; build remains failed | red |
 
----
+## Command Results
 
-## Per-Task Verification Map
-
-| Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 03-01-01 | 03-01 | 0 | SPEC-01, SPEC-04 | T-03-01 / T-03-02 | Test fixtures create isolated screen-spec docs and do not reuse credentials across runs | unit/e2e helper | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0` | ✅ W1 | ✅ green |
-| 03-01-02 | 03-01 | 1 | SPEC-01 | T-03-01 | User-visible authoring state persists after save/re-entry | e2e | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0` | ✅ W1 | ✅ green |
-| 03-01-03 | 03-01 | 1 | SPEC-04 | T-03-02 | Exported files are generated only through authenticated document access and are non-empty | e2e download | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0` | ✅ W1 | ✅ green |
-| 03-02-01 | 03-02 | 1 | SPEC-03 | T-03-03 / T-03-04 | Three distinct accounts share only team-authorized document access | e2e | `cd client && npm run test:e2e -- e2e/smoke/screen-spec-three-account-collaboration.spec.ts --browser=chromium --workers=1 --retries=0` | ❌ W0 | ⬜ pending |
-| 03-02-02 | 03-02 | 1 | SPEC-02, SPEC-03 | T-03-04 | Scope lock/conflict UX prevents silent same-scope overwrites | e2e + unit | `./gradlew test --tests '*ScreenSpecScopeResolverTest' && cd client && npm run test:e2e -- e2e/smoke/screen-spec-three-account-collaboration.spec.ts --browser=chromium --workers=1 --retries=0` | ❌ W0 | ⬜ pending |
-| 03-03-01 | 03-03 | 2 | SPEC-01, SPEC-02, SPEC-03, SPEC-04 | — | Evidence artifacts accurately describe residual risk and no-op validation policy | docs + commands | `git diff --check && cd client && npm run build` | ✅ | ⬜ pending |
-
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
-
----
-
-## Wave 0 Requirements
-
-- [x] `client/e2e/smoke/screen-spec-authoring-export.spec.ts` — browser evidence for SPEC-01 and SPEC-04.
-- [ ] `client/e2e/smoke/screen-spec-three-account-collaboration.spec.ts` — three-account collaboration evidence for SPEC-02 and SPEC-03.
-- [x] `client/e2e/shared/screen-spec-e2e.ts` or equivalent helper extraction — stable screen-spec locators and actions.
-- [x] Minimal stable test selectors on screen-spec UI primitives if semantic role/text locators are not enough.
-
-## Execution Evidence
-
-### 03-01 Automated Evidence
-
-- **Command:** `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0`
-  - **Result:** ✅ 1 passed on 2026-05-29.
-  - **Covers:** SPEC-01 custom master definition, cross-screen instance placement, master label/color propagation, save/re-entry persistence, PNG download signature, PDF structural sanity.
-- **Command:** `cd client && npm run test:unit -- screen-design`
-  - **Result:** ✅ 363 tests passed on 2026-05-29.
-- **Command:** `cd client && npm run test:unit -- screen-spec`
-  - **Result:** ✅ 362 tests passed on 2026-05-29.
-- **Command:** `cd client && npm run lint:docs`
-  - **Result:** ✅ Passed on 2026-05-29.
-- **Command:** `cd client && npm run build`
-  - **Result:** ❌ blocked by pre-existing WBS issues outside Phase 3 scope:
-    - `client/src/components/wbs/SortableWbsRow.tsx(332,21)` missing typed i18n key `wbs.validation.nameRequired`
-    - `client/src/components/wbs/SortableWbsRowCells.tsx(84,3)` unused `milestoneName`
-
----
-
-## Manual-Only Verifications
-
-| Behavior | Requirement | Why Manual | Test Instructions |
-|----------|-------------|------------|-------------------|
-| Dev-profile browser QA over currently running `4503/9503` servers | SPEC-01, SPEC-02, SPEC-03, SPEC-04 | The user requested dev-profile manual QA in addition to automated test-profile E2E | Open the screen-spec document in dev profile, perform authoring/collaboration/export checks, and record browser target, account labels, document ID, screenshots or notes in `03-VERIFICATION.md`. |
-| UX-strict lock/remote-state judgment | SPEC-03 | Some collaboration UX quality issues may not be fully captured by final-state assertions | During three-account QA, mark propagation delay, missing lock indicator, or confusing remote-state display as failure even if persisted content converges. |
-
----
+| Command | Result |
+| --- | --- |
+| `./gradlew test --tests '*ScreenSpecScopeResolverTest' --tests '*DiagramServiceTest'` | PASS |
+| `cd client && npm run test:unit -- screen-spec screen-design` | PASS, 363 tests |
+| `cd client && npm run test:e2e -- e2e/smoke/screen-spec-authoring-export.spec.ts --browser=chromium --workers=1 --retries=0` | PASS |
+| `cd client && npm run test:e2e -- e2e/smoke/screen-spec-three-account-collaboration.spec.ts --browser=chromium --workers=1 --retries=0` | PASS |
+| `cd client && npm run build` | FAIL, unrelated WBS TypeScript errors |
+| `git diff --check` | PASS |
 
 ## DomainValidationHook Policy
 
@@ -95,21 +64,23 @@ Validation safety for this phase is provided by:
 - Snapshot reads through `readScreenDesignDocument()`.
 - Screen-spec mutation policy/applier unit coverage.
 - Frontend and backend scope resolver coverage.
-- Three-account browser E2E for the actual collaboration lifecycle.
+- Three-account browser E2E for the actual Yjs/ScopeLock/Presence path.
 - PNG/PDF browser download smoke checks for generated artifacts.
 
-Execution must not add a Phase 3 TODO or backlog item for backend deep structure validation unless the user explicitly reopens scope.
+No TODO, backlog item, or backend deep structure-validation implementation is added in this phase.
 
----
+## Traceability Status
+
+`.planning/REQUIREMENTS.md` and `.planning/ROADMAP.md` statuses were not updated by this 03-03 closeout task. Traceability status updates remain deferred to `$gsd-verify-work` or milestone audit because the production build gate is still red.
 
 ## Validation Sign-Off
 
-- [ ] All tasks have automated verification or Wave 0 dependencies.
-- [ ] SPEC-01 through SPEC-04 each have at least one concrete evidence item.
-- [ ] Three-account collaboration evidence exists.
-- [ ] PNG and PDF export evidence both exist.
-- [ ] Dev-profile manual QA is recorded in `03-VERIFICATION.md`.
-- [ ] No watch-mode flags.
-- [ ] `nyquist_compliant: true` set in frontmatter after evidence is complete.
+- [x] SPEC-01 through SPEC-04 each have concrete evidence.
+- [x] Three-account collaboration evidence exists.
+- [x] PNG and PDF export evidence both exist.
+- [x] Dev-profile manual browser QA is recorded in `03-VERIFICATION.md`.
+- [x] No watch-mode flags were used.
+- [ ] `npm run build` passes.
+- [ ] `nyquist_compliant: true` set in frontmatter after all gates pass.
 
-**Approval:** pending
+**Approval:** blocked by unrelated WBS build failure.
