@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: AI 업무 실행 Gateway + Local Codex Chatbot
 status: planning
-last_updated: "2026-05-29T05:18:33.788Z"
-last_activity: 2026-05-29
+last_updated: "2026-06-01T07:03:33Z"
+last_activity: 2026-06-01
 progress:
   total_phases: 4
   completed_phases: 0
@@ -26,8 +26,8 @@ See `.planning/PROJECT.md`.
 
 Phase: 9 next — AI Tool Gateway + Provider Abstraction
 Plan: —
-Status: Milestone requirements and roadmap initialized
-Last activity: 2026-05-29 — Milestone v1.1 started
+Status: Phase 9 context updated with hardened AI gateway decisions
+Last activity: 2026-06-01 — Phase 9 context updated after external Codex architecture review
 
 ## Milestone Archive
 
@@ -57,6 +57,8 @@ Last activity: 2026-05-29 — Milestone v1.1 started
 - First runtime is local/Electron using an installed, logged-in Codex CLI through a Local Codex Adapter.
 - Architecture must keep provider abstraction for future OpenAI API, Ollama, Claude, or other provider support.
 - AI writes are limited to approval-gated low-risk create/update actions; delete/destructive actions are excluded.
+- Phase 9 runtime is a local Spring backend Codex gateway over HTTP for Web/Electron; Electron IPC is not used in Phase 9.
+- Phase 9 context now fixes the Codex process security contract, authorization preflight, minimal provider status surface, action draft safety, 60 second timeout default, and 15 minute status retention default.
 
 ## Deferred Items
 
@@ -65,4 +67,4 @@ Last activity: 2026-05-29 — Milestone v1.1 started
 
 ## Next Action
 
-Run `$gsd-discuss-phase 9` or start Phase 9 planning for the AI Tool Gateway + Provider Abstraction.
+Run `$gsd-plan-phase 9` for the AI Tool Gateway + Provider Abstraction.

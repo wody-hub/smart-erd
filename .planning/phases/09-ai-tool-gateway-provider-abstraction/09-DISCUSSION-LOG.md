@@ -209,10 +209,29 @@
 
 ---
 
+## Follow-up Architecture Review Hardening
+
+**Date:** 2026-06-01
+**Trigger:** User reran `$gsd-discuss-phase 9` and selected "Update it" for the existing Phase 9 context.
+**Source:** A separate read-only Codex session reviewed `docs/superpowers/specs/2026-05-29-phase-9-ai-execution-gateway-architecture-design.md`.
+
+| Finding | Decision Applied |
+|---------|------------------|
+| Secret and environment boundary was too implicit. | Context now requires an allowlisted child process environment and forbids request headers, JWTs, session cookies, DB credentials, `SMART_ERD_*`, `SPRING_*`, arbitrary host env vars, raw stdout/stderr, and Codex auth material in prompts/output/audit/logs/frontend responses. |
+| Authorization timing needed to be explicit. | Context now requires `teamId`, `projectId`, and `selectedResource` checks before prompt rendering, provider input creation, process start, or audit detail creation. |
+| `AI-RUN-01` needed a visible Phase 9 artifact. | Context now requires a minimal provider status surface or reusable provider status hook, while keeping the final app chat UI out of scope. |
+| `codex exec` process contract needed hard constraints. | Context now requires argv-array command building, no shell, non-interactive `codex exec`, fresh temp cwd, sandbox `workspace-write`, approval `never`, structured output request behavior, and stdin/controlled-temp-file input. |
+| Action drafts could become an accidental execution path. | Context now requires `requiresApproval=true`, known non-destructive risk levels, destructive/delete/bulk destructive rejection, unsupported treatment for unknown types, and empty default Noop actions. |
+| Retention and cancel races were underspecified. | Context now fixes 15 minute default retention, not-found behavior for expired/unknown executions, immutable terminal states, repeated-cancel behavior, first-terminal-transition-wins race handling, and matching tests. |
+
+**User's choice:** Update the existing Phase 9 context with the hardened architecture decisions.
+
+---
+
 ## the agent's Discretion
 
 - Exact package/class names.
-- Exact timeout default and short retention duration, as long as documented and tested.
+- Implementation mechanics for timeout and status retention, while preserving the fixed defaults captured in CONTEXT.md.
 - Exact audit table column names, as long as metadata-only policy is preserved.
 
 ## Deferred Ideas
