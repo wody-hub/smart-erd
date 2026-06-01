@@ -12,6 +12,7 @@ public enum MessageCode {
     ERROR_ACCESS_DENIED_VIEWER_READONLY("error.access-denied.viewer-readonly"),
     ERROR_ACCESS_DENIED_DIAGRAM_CHANNEL_TYPE("error.access-denied.diagram-channel-type"),
     ERROR_ACCESS_DENIED_DIAGRAM_RESOURCE_ID("error.access-denied.diagram-resource-id"),
+    ERROR_ACCESS_DENIED_AI_EXECUTION("error.access-denied.ai-execution"),
     ERROR_BULK_CONCURRENT_DUPLICATE("error.bulk.concurrent-duplicate"),
     ERROR_BULK_EMPTY_FILE("error.bulk.empty-file"),
     ERROR_BULK_MISSING_COLUMNS("error.bulk.missing-columns"),
@@ -63,6 +64,8 @@ public enum MessageCode {
     ERROR_BUSINESS_PROJECT_TODO_TITLE_TOO_LONG("error.business.project-todo-title-too-long"),
     ERROR_BUSINESS_PROJECT_TODO_DESCRIPTION_TOO_LONG("error.business.project-todo-description-too-long"),
     ERROR_BUSINESS_PROJECT_TODO_PROGRESS_RATE_OUT_OF_RANGE("error.business.project-todo-progress-rate-out-of-range"),
+    ERROR_BUSINESS_AI_OUTPUT_VALIDATION_FAILED("error.business.ai-output-validation-failed"),
+    ERROR_BUSINESS_AI_SELECTED_RESOURCE_UNSUPPORTED("error.business.ai-selected-resource-unsupported"),
     ERROR_BUSINESS_WORK_COMMENT_CONTENT_REQUIRED("error.business.work-comment-content-required"),
     ERROR_BUSINESS_WORK_COMMENT_CONTENT_TOO_LONG("error.business.work-comment-content-too-long"),
     ERROR_BUSINESS_INVALID_STAFFING_PERIOD("error.business.invalid-staffing-period"),
@@ -115,6 +118,7 @@ public enum MessageCode {
     ERROR_NOT_FOUND_WBS_ITEM("error.not-found.wbs-item"),
     ERROR_NOT_FOUND_WORD("error.not-found.word"),
     ERROR_NOT_FOUND_USER("error.not-found.user"),
+    ERROR_NOT_FOUND_AI_EXECUTION("error.not-found.ai-execution"),
     ERROR_VALIDATION_FAILED("error.validation.failed"),
     ERROR_UNEXPECTED("error.unexpected");
 

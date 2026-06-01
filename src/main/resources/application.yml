@@ -63,6 +63,14 @@ smart-erd:
   dictionary:
     bulk-validation:
       store: in-memory # in-memory | redis (redis 사용 시: docker compose --profile redis up -d)
+  ai:
+    provider: ${SMART_ERD_AI_PROVIDER:noop}
+    execution:
+      timeout: ${SMART_ERD_AI_TIMEOUT:60s}
+      retention: ${SMART_ERD_AI_RETENTION:15m}
+    codex:
+      executable: ${SMART_ERD_AI_CODEX_EXECUTABLE:codex}
+      smoke-enabled: ${SMART_ERD_AI_CODEX_SMOKE_ENABLED:false}
   websocket:
     max-sessions-per-room: 10
     max-messages-per-second: 100
