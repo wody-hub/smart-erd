@@ -75,6 +75,13 @@ export const queryKeys = {
     /** 프로젝트 작업공간 탭 순서 */
     projectWorkspaceTabs: () => ['settings', 'project-workspace-tabs'] as const,
   },
+  /** AI provider gateway 관련 쿼리 키 */
+  aiProvider: {
+    /** AI provider 상태 */
+    status: () => ['ai-provider', 'status'] as const,
+    /** AI 실행 상세 */
+    execution: (executionId: string) => ['ai-provider', 'executions', executionId] as const,
+  },
   /** 다이어그램 관련 쿼리 키 */
   diagrams: {
     /** 프로젝트별 다이어그램 목록 */

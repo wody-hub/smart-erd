@@ -29,6 +29,21 @@
       "enterName": "Enter a name for the resource you want to create."
     }
   },
+  "aiProvider": {
+    "statusLabel": "AI: {{status}}",
+    "aria": {
+      "status": "AI runtime status: {{status}}"
+    },
+    "availability": {
+      "available": "Available",
+      "notConfigured": "Setup needed",
+      "codexNotFound": "Codex missing",
+      "codexNotLoggedIn": "Login needed",
+      "unsupportedEnvironment": "Unsupported",
+      "checking": "Checking",
+      "unknown": "Check failed"
+    }
+  },
   "guide": {
     "entry": {
       "auth": "Open product guide",

@@ -20,6 +20,7 @@ import ConfirmDialog from '@/components/ui/confirm-dialog';
 import MembersDialog from '@/components/team/MembersDialog';
 import TeamSettingsDialog from '@/components/team/TeamSettingsDialog';
 import ProjectSettingsDialog from '@/components/project/ProjectSettingsDialog';
+import AiProviderStatusBadge from '@/components/ai/AiProviderStatusBadge';
 import { fetchTeam } from '@/api/teamApi';
 import { fetchProjects } from '@/api/projectApi';
 import { queryKeys } from '@/constants/query-keys';
@@ -118,6 +119,7 @@ export default function ProjectsPage() {
             utilityActions={
               <>
                 <div className="flex flex-wrap items-center gap-2">
+                  <AiProviderStatusBadge />
                   <Button
                     variant="outline"
                     onClick={() => {

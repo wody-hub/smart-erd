@@ -29,6 +29,21 @@
       "enterName": "생성할 리소스 이름을 입력하세요."
     }
   },
+  "aiProvider": {
+    "statusLabel": "AI: {{status}}",
+    "aria": {
+      "status": "AI 런타임 상태: {{status}}"
+    },
+    "availability": {
+      "available": "사용 가능",
+      "notConfigured": "설정 필요",
+      "codexNotFound": "Codex 없음",
+      "codexNotLoggedIn": "로그인 필요",
+      "unsupportedEnvironment": "지원 불가",
+      "checking": "확인 중",
+      "unknown": "확인 실패"
+    }
+  },
   "guide": {
     "entry": {
       "auth": "제품 가이드 보기",
