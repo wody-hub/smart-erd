@@ -38,17 +38,17 @@ created: 2026-06-01
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 09-01-01 | 01 | 1 | AI-RUN-02 | T-09-01 | Provider abstraction and Noop path avoid UI/domain coupling to Codex | unit | `./gradlew test --tests "com.smarterd.application.ai.*"` | ✅ | ⬜ pending |
-| 09-01-02 | 01 | 1 | AI-RUN-04 | T-09-02 | Invalid output/action drafts fail closed | unit | `./gradlew test --tests "com.smarterd.application.ai.validation.*"` | ✅ | ⬜ pending |
-| 09-01-03 | 01 | 1 | AI-SEC-01 | T-09-03 | Audit persists metadata only | unit | `./gradlew test --tests "com.smarterd.domain.ai.*"` | ✅ | ⬜ pending |
-| 09-01-04 | 01 | 1 | AI-RUN-01/02/04 | T-09-04 | API exposes status/execute/lookup/cancel with existing auth error path | mvc | `./gradlew test --tests "com.smarterd.api.ai.*"` | ✅ | ⬜ pending |
-| 09-02-01 | 02 | 2 | AI-RUN-03 | T-09-05 | Codex runner uses argv/no shell/temp cwd/sandbox/output schema | unit | `./gradlew test --tests "com.smarterd.application.ai.provider.*"` | ✅ | ⬜ pending |
-| 09-02-02 | 02 | 2 | AI-SEC-01 | T-09-06 | Child env excludes secrets and broad backend env vars | unit | `./gradlew test --tests "com.smarterd.application.ai.provider.*"` | ✅ | ⬜ pending |
-| 09-02-03 | 02 | 2 | AI-RUN-04 | T-09-07 | Timeout/cancel/process completion races resolve to one terminal state | unit | `./gradlew test --tests "com.smarterd.application.ai.*"` | ✅ | ⬜ pending |
-| 09-03-01 | 03 | 3 | AI-RUN-01 | T-09-08 | Frontend maps provider status and displays minimal user-visible status | build | `cd client && npm run build` | ✅ | ⬜ pending |
-| 09-03-02 | 03 | 3 | AI-RUN-01/02/03/04/AI-SEC-01 | T-09-09 | Full contract is covered before execution handoff | full | `./gradlew test && cd client && npm run build` | ✅ | ⬜ pending |
+| 09-01-01 | 01 | 1 | AI-RUN-02 | T-09-01 | Provider abstraction and Noop path avoid UI/domain coupling to Codex | unit | `./gradlew test --tests "com.smarterd.application.ai.*"` | ✅ | ✅ passed |
+| 09-01-02 | 01 | 1 | AI-RUN-04 | T-09-02 | Invalid output/action drafts fail closed | unit | `./gradlew test --tests "com.smarterd.application.ai.validation.*"` | ✅ | ✅ passed |
+| 09-01-03 | 01 | 1 | AI-SEC-01 | T-09-03 | Audit persists metadata only | unit | `./gradlew test --tests "com.smarterd.domain.ai.*"` | ✅ | ✅ passed |
+| 09-01-04 | 01 | 1 | AI-RUN-01/02/04 | T-09-04 | API exposes status/execute/lookup/cancel with existing auth error path | mvc | `./gradlew test --tests "com.smarterd.api.ai.*"` | ✅ | ✅ passed |
+| 09-02-01 | 02 | 2 | AI-RUN-03 | T-09-05 | Codex runner uses argv/no shell/temp cwd/sandbox/output schema | unit | `./gradlew test --tests "com.smarterd.application.ai.provider.*"` | ✅ | ✅ passed |
+| 09-02-02 | 02 | 2 | AI-SEC-01 | T-09-06 | Child env excludes secrets and broad backend env vars | unit | `./gradlew test --tests "com.smarterd.application.ai.provider.*"` | ✅ | ✅ passed |
+| 09-02-03 | 02 | 2 | AI-RUN-04 | T-09-07 | Timeout/cancel/process completion races resolve to one terminal state | unit | `./gradlew test --tests "com.smarterd.application.ai.*"` | ✅ | ✅ passed |
+| 09-03-01 | 03 | 3 | AI-RUN-01 | T-09-08 | Frontend maps provider status and displays minimal user-visible status | build | `cd client && npm run build` | ✅ | ✅ passed |
+| 09-03-02 | 03 | 3 | AI-RUN-01/02/03/04/AI-SEC-01 | T-09-09 | Full contract is covered before execution handoff | full | `./gradlew test && cd client && npm run build` | ✅ | ✅ passed |
 
-*Status: pending until execute-phase records results.*
+*Status: complete. See `VERIFICATION.md` for command results and residual risks.*
 
 ---
 

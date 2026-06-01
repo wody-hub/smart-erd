@@ -13,7 +13,7 @@ The milestone is deliberately approval-gated. AI can read scoped project context
 
 ## Phases
 
-- [ ] **Phase 9: AI Tool Gateway + Provider Abstraction** — provider contract, Local Codex Adapter, structured output schema, execution status, timeout/cancel/error handling
+- [x] **Phase 9: AI Tool Gateway + Provider Abstraction** — provider contract, Local Codex Adapter, structured output schema, execution status, timeout/cancel/error handling (completed 2026-06-01)
 - [ ] **Phase 10: App AI Chat UI + Read-Only Context Tools** — in-app chatbot shell, project context selection, read tools for project overview, WBS, milestones, issues, TODOs, and work history
 - [ ] **Phase 11: Approval Preview + Audit Execution Pipeline** — action proposal schema, preview/diff, approval/cancel flow, execution boundary, audit log and history
 - [ ] **Phase 12: Low-Risk Write Tools MVP** — issue create/update, personal TODO create/update, WBS comment/work memo add, all approval-gated
@@ -30,7 +30,7 @@ The milestone is deliberately approval-gated. AI can read scoped project context
   3. Local Codex Adapter runs `codex exec` non-interactively and requests structured JSON output.
   4. Provider calls enforce timeout, cancellation, output validation, error mapping, and log redaction.
   5. Raw access tokens, session cookies, and database credentials are never inserted into model prompts.
-**Plans**: TBD
+**Plans**: 09-01 ✅, 09-02 ✅, 09-03 ✅
 **UI hint**: no
 
 ### Phase 10: App AI Chat UI + Read-Only Context Tools
@@ -76,11 +76,11 @@ The milestone is deliberately approval-gated. AI can read scoped project context
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AI-RUN-01 | Phase 9 | Planned |
-| AI-RUN-02 | Phase 9 | Planned |
-| AI-RUN-03 | Phase 9 | Planned |
-| AI-RUN-04 | Phase 9 | Planned |
-| AI-SEC-01 | Phase 9 | Planned |
+| AI-RUN-01 | Phase 9 | Complete |
+| AI-RUN-02 | Phase 9 | Complete |
+| AI-RUN-03 | Phase 9 | Complete |
+| AI-RUN-04 | Phase 9 | Complete |
+| AI-SEC-01 | Phase 9 | Complete |
 | AI-CHAT-01 | Phase 10 | Planned |
 | AI-CHAT-02 | Phase 10 | Planned |
 | AI-READ-01 | Phase 10 | Planned |

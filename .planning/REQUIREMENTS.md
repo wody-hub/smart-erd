@@ -14,11 +14,11 @@ AI는 Smart-ERD 서버가 제공하는 도구로만 프로젝트 데이터를 �
 
 ### AI Runtime Gateway
 
-- [ ] **AI-RUN-01**: 앱은 Local Codex runtime의 사용 가능 여부를 확인하고 사용자에게 상태를 표시할 수 있다.
-- [ ] **AI-RUN-02**: 시스템은 provider abstraction을 통해 AI provider를 호출하며, UI나 업무 로직이 Codex CLI에 직접 결합되지 않는다.
-- [ ] **AI-RUN-03**: Local Codex Adapter는 `codex exec`를 비대화식으로 실행하고 structured JSON output schema를 요청한다.
-- [ ] **AI-RUN-04**: Provider call은 timeout, cancellation, error mapping, retry 가능성 판단, output validation을 적용한다.
-- [ ] **AI-SEC-01**: Raw access token, session cookie, DB credential, arbitrary shell command는 model prompt나 model output 실행 경로에 노출되지 않는다.
+- [x] **AI-RUN-01**: 앱은 Local Codex runtime의 사용 가능 여부를 확인하고 사용자에게 상태를 표시할 수 있다.
+- [x] **AI-RUN-02**: 시스템은 provider abstraction을 통해 AI provider를 호출하며, UI나 업무 로직이 Codex CLI에 직접 결합되지 않는다.
+- [x] **AI-RUN-03**: Local Codex Adapter는 `codex exec`를 비대화식으로 실행하고 structured JSON output schema를 요청한다.
+- [x] **AI-RUN-04**: Provider call은 timeout, cancellation, error mapping, retry 가능성 판단, output validation을 적용한다.
+- [x] **AI-SEC-01**: Raw access token, session cookie, DB credential, arbitrary shell command는 model prompt나 model output 실행 경로에 노출되지 않는다.
 
 ### App Chat + Read Tools
 
@@ -74,11 +74,11 @@ AI는 Smart-ERD 서버가 제공하는 도구로만 프로젝트 데이터를 �
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AI-RUN-01 | Phase 9 | Planned |
-| AI-RUN-02 | Phase 9 | Planned |
-| AI-RUN-03 | Phase 9 | Planned |
-| AI-RUN-04 | Phase 9 | Planned |
-| AI-SEC-01 | Phase 9 | Planned |
+| AI-RUN-01 | Phase 9 | Complete |
+| AI-RUN-02 | Phase 9 | Complete |
+| AI-RUN-03 | Phase 9 | Complete |
+| AI-RUN-04 | Phase 9 | Complete |
+| AI-SEC-01 | Phase 9 | Complete |
 | AI-CHAT-01 | Phase 10 | Planned |
 | AI-CHAT-02 | Phase 10 | Planned |
 | AI-READ-01 | Phase 10 | Planned |
