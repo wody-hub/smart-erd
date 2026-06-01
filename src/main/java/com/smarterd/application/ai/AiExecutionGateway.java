@@ -54,6 +54,7 @@ public class AiExecutionGateway {
             providerStatus.provider(),
             PROMPT_VERSION
         );
+        executionRegistry.registerCancelHandler(execution.executionId(), () -> aiProvider.cancel(execution.executionId()));
         executionRegistry.markRunning(execution.executionId());
 
         AiProviderResult result;

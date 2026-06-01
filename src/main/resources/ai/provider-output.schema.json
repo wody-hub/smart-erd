@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "answer": {
+      "type": ["string", "null"],
+      "maxLength": 4000
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "type": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "summary": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "riskLevel": { "type": "string", "enum": ["LOW", "MEDIUM"] },
+          "requiresApproval": { "type": "boolean", "const": true },
+          "payload": { "type": "object" }
+        },
+        "required": ["id", "type", "title", "summary", "riskLevel", "requiresApproval", "payload"]
+      },
+      "default": []
+    },
+    "error": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "detail": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "retryable": { "type": "boolean" }
+      },
+      "required": ["type", "title", "detail", "retryable"]
+    }
+  },
+  "required": ["actions"]
+}
