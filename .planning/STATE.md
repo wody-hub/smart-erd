@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: AI 업무 실행 Gateway + Local Codex Chatbot
 status: executing
-last_updated: "2026-06-02T06:19:41.454Z"
+last_updated: "2026-06-02T06:35:23.139Z"
 last_activity: 2026-06-02
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 10
-  completed_plans: 4
-  percent: 25
+  completed_plans: 5
+  percent: 50
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See `.planning/PROJECT.md`.
 ## Current Position
 
 Phase: 10 (app-ai-chat-ui-read-only-context-tools) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Ready to execute
 Last activity: 2026-06-02
 
@@ -59,6 +59,9 @@ Last activity: 2026-06-02
 - AI writes are limited to approval-gated low-risk create/update actions; delete/destructive actions are excluded.
 - Phase 9 runtime is a local Spring backend Codex gateway over HTTP for Web/Electron; Electron IPC is not used in Phase 9.
 - Phase 9 context now fixes the Codex process security contract, authorization preflight, minimal provider status surface, action draft safety, 60 second timeout default, and 15 minute status retention default.
+- Phase 10 Plan 2 limits project-name auto-resolution to exact/manual IDs and normalized exact names; contains and fuzzy candidates remain confirmation-only.
+- Phase 10 Plan 2 uses aggregate-only member TODO reads that expose owner/status/count only.
+- Phase 10 Plan 2 enforces read-context caps before provider-context serialization and records cap metadata.
 
 ## Deferred Items
 
