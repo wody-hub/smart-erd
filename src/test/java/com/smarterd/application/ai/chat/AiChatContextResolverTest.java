@@ -3,6 +3,7 @@ package com.smarterd.application.ai.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.stream.LongStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -20,6 +21,7 @@ class AiChatContextResolverTest {
 
         assertThat(result.status()).isEqualTo(AiChatContextResolver.ScopeStatus.NEEDS_CONFIRMATION);
         assertThat(result.needsConfirmation()).isNotEmpty();
+        assertThat(result.confirmationReason()).isEqualTo(AiChatContextResolver.ConfirmationReason.WEAK_SCOPE);
     }
 
     @Test
@@ -56,6 +58,69 @@ class AiChatContextResolverTest {
 
         assertThat(result.status()).isEqualTo(AiChatContextResolver.ScopeStatus.NEEDS_CONFIRMATION);
         assertThat(result.confirmationCandidates()).containsExactly(alpha, alphaOps);
+        assertThat(result.confirmationReason()).isEqualTo(AiChatContextResolver.ConfirmationReason.FUZZY_PROJECT);
+    }
+
+    @Test
+    @DisplayName("10-02 named project resolves only on normalized exact match")
+    void namedProjectResolvesOnlyOnNormalizedExactMatch() {
+        final var target = new AiChatContextResolver.ProjectCandidate(1L, 10L, "Alpha_Renewal");
+        final var other = new AiChatContextResolver.ProjectCandidate(1L, 11L, "Alpha Operations");
+
+        final var result = resolver.resolve(
+            "tester",
+            new AiChatContextResolver.ResolveCommand(
+                1L,
+                null,
+                "team-route",
+                List.of(target, other),
+                " alpha-renewal ",
+                false,
+                false
+            )
+        );
+
+        assertThat(result.status()).isEqualTo(AiChatContextResolver.ScopeStatus.RESOLVED);
+        assertThat(result.projectIds()).containsExactly(10L);
+    }
+
+    @Test
+    @DisplayName("10-02 contains-only project names require confirmation")
+    void containsOnlyProjectNameRequiresConfirmation() {
+        final var candidate = new AiChatContextResolver.ProjectCandidate(1L, 10L, "Alpha Renewal");
+
+        final var result = resolver.resolve(
+            "tester",
+            new AiChatContextResolver.ResolveCommand(1L, null, "team-route", List.of(candidate), "Alpha", false, false)
+        );
+
+        assertThat(result.status()).isEqualTo(AiChatContextResolver.ScopeStatus.NEEDS_CONFIRMATION);
+        assertThat(result.confirmationCandidates()).containsExactly(candidate);
+        assertThat(result.confirmationReason()).isEqualTo(AiChatContextResolver.ConfirmationReason.AMBIGUOUS_PROJECT);
+    }
+
+    @Test
+    @DisplayName("10-02 duplicate normalized exact project names require confirmation")
+    void duplicateNormalizedExactProjectNamesRequireConfirmation() {
+        final var first = new AiChatContextResolver.ProjectCandidate(1L, 10L, "Alpha Renewal");
+        final var second = new AiChatContextResolver.ProjectCandidate(1L, 11L, "alpha_renewal");
+
+        final var result = resolver.resolve(
+            "tester",
+            new AiChatContextResolver.ResolveCommand(
+                1L,
+                null,
+                "team-route",
+                List.of(first, second),
+                "alpha-renewal",
+                false,
+                false
+            )
+        );
+
+        assertThat(result.status()).isEqualTo(AiChatContextResolver.ScopeStatus.NEEDS_CONFIRMATION);
+        assertThat(result.confirmationCandidates()).containsExactly(first, second);
+        assertThat(result.confirmationReason()).isEqualTo(AiChatContextResolver.ConfirmationReason.AMBIGUOUS_PROJECT);
     }
 
     @Test
@@ -82,6 +147,24 @@ class AiChatContextResolverTest {
     }
 
     @Test
+    @DisplayName("10-02 current team fanout over 20 projects requires narrowing")
+    void currentTeamFanoutOverTwentyProjectsRequiresNarrowScopeConfirmation() {
+        final var projects = LongStream
+            .rangeClosed(1, 21)
+            .mapToObj(id -> new AiChatContextResolver.ProjectCandidate(1L, id, "Project " + id))
+            .toList();
+
+        final var result = resolver.resolve(
+            "tester",
+            new AiChatContextResolver.ResolveCommand(1L, null, "team-route", projects, null, true, true)
+        );
+
+        assertThat(result.status()).isEqualTo(AiChatContextResolver.ScopeStatus.NEEDS_CONFIRMATION);
+        assertThat(result.projectIds()).isEmpty();
+        assertThat(result.confirmationReason()).isEqualTo(AiChatContextResolver.ConfirmationReason.TOO_MANY_PROJECTS);
+    }
+
+    @Test
     @DisplayName("10-W0-01 conflicting named project and route project requires confirmation")
     void w0_10_W0_01_conflictingRouteAndNamedProjectRequiresConfirmation() {
         final var mentioned = new AiChatContextResolver.ProjectCandidate(1L, 20L, "Named Project");
@@ -101,5 +184,18 @@ class AiChatContextResolverTest {
 
         assertThat(result.status()).isEqualTo(AiChatContextResolver.ScopeStatus.NEEDS_CONFIRMATION);
         assertThat(result.confirmationCandidates()).containsExactly(mentioned);
+        assertThat(result.confirmationReason()).isEqualTo(AiChatContextResolver.ConfirmationReason.CONFLICTING_PROJECT);
+    }
+
+    @Test
+    @DisplayName("10-02 all-team scope is rejected before read context")
+    void allTeamScopeIsDeniedBeforeReadContext() {
+        final var result = resolver.resolve(
+            "tester",
+            new AiChatContextResolver.ResolveCommand(null, null, "all-teams", List.of(), null, false, true)
+        );
+
+        assertThat(result.status()).isEqualTo(AiChatContextResolver.ScopeStatus.DENIED);
+        assertThat(result.confirmationReason()).isEqualTo(AiChatContextResolver.ConfirmationReason.UNSUPPORTED_ALL_TEAM);
     }
 }
