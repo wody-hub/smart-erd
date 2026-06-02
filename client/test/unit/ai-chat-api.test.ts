@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import axiosInstance from '../../src/api/axiosInstance.js';
-import { AI_CHAT_BASE_PATH, executeAiChat } from '../../src/api/aiChatApi.js';
+import {
+  AI_CHAT_BASE_PATH,
+  executeAiChat,
+  setAiChatHttpClientForTesting,
+} from '../../src/api/aiChatApi.js';
 import type { AiChatRequest, AiChatResponse } from '../../src/types/ai-chat.js';
 
 test('executeAiChat posts typed request to chat endpoint and forwards abort signal', async () => {
@@ -44,12 +47,13 @@ test('executeAiChat posts typed request to chat endpoint and forwards abort sign
     errorState: null,
   };
 
-  const originalPost = axiosInstance.post;
   const calls: unknown[][] = [];
-  axiosInstance.post = (async (...args: unknown[]) => {
-    calls.push(args);
-    return { data: response };
-  }) as typeof axiosInstance.post;
+  const restore = setAiChatHttpClientForTesting({
+    post: async (...args: unknown[]) => {
+      calls.push(args);
+      return { data: response };
+    },
+  });
 
   try {
     const result = await executeAiChat(request, controller.signal);
@@ -61,6 +65,6 @@ test('executeAiChat posts typed request to chat endpoint and forwards abort sign
     assert.deepEqual(calls[0]?.[1], request);
     assert.deepEqual(calls[0]?.[2], { signal: controller.signal });
   } finally {
-    axiosInstance.post = originalPost;
+    restore();
   }
 });

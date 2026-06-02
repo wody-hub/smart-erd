@@ -19,9 +19,9 @@ export type AiChatToolLabel =
 
 export interface AiChatContext {
   kind: AiChatContextKind;
-  teamId: string | null;
+  teamId: string | number | null;
   teamName: string | null;
-  projectId: string | null;
+  projectId: string | number | null;
   projectName: string | null;
   source: AiChatContextSource;
   capturedAt: string;
@@ -31,11 +31,21 @@ export interface AiChatContext {
 
 export type AiChatContextSnapshot = AiChatContext;
 
+export interface AiSelectedResourceRequest {
+  type: string;
+  id: string | number;
+}
+
 export interface AiChatRequest {
   message: string;
+  teamId?: string | number | null;
+  projectId?: string | number | null;
+  projectName?: string | null;
+  scopeMode?: string | null;
   locale?: string | null;
   context: AiChatContext | null;
   selectedContext?: AiChatContext | null;
+  selectedResource?: AiSelectedResourceRequest | null;
 }
 
 export interface AiChatSourceChip {
@@ -43,7 +53,7 @@ export interface AiChatSourceChip {
   tool: AiChatToolLabel;
   count: number;
   teamName?: string | null;
-  projectId?: string | null;
+  projectId?: string | number | null;
 }
 
 export interface AiChatAnswerSections {
@@ -57,9 +67,9 @@ export interface AiChatConfirmationCandidate {
   id: string;
   label: string;
   kind: Extract<AiChatContextKind, 'team' | 'project' | 'multi-project'>;
-  teamId: string | null;
+  teamId: string | number | null;
   teamName?: string | null;
-  projectId?: string | null;
+  projectId?: string | number | null;
   projectName?: string | null;
   reason?: string | null;
 }
@@ -70,10 +80,22 @@ export interface AiChatErrorState {
   retryable: boolean;
 }
 
+export interface AiChatResponseContext {
+  kind: string;
+  teamId: string | number | null;
+  projectIds: Array<string | number>;
+  label: string;
+  toolsUsed: string[];
+  caps: Record<string, unknown>;
+}
+
 export interface AiChatResponse extends AiChatAnswerSections {
   status: AiChatResponseStatus;
+  requiresConfirmation?: boolean;
+  confirmationReason?: string | null;
   sourceChips: AiChatSourceChip[];
   confirmationCandidates?: AiChatConfirmationCandidate[];
+  context?: AiChatResponseContext | null;
   executionId?: string | null;
   error?: string | null;
   errorState?: AiChatErrorState | null;

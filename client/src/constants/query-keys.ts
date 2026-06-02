@@ -82,6 +82,13 @@ export const queryKeys = {
     /** AI 실행 상세 */
     execution: (executionId: string) => ['ai-provider', 'executions', executionId] as const,
   },
+  /** AI chat 관련 쿼리/뮤테이션 키 */
+  aiChat: {
+    /** AI chat 전송 */
+    send: () => ['ai-chat', 'send'] as const,
+    /** AI chat 전송 부가 메타데이터 */
+    metadata: (threadId: string) => ['ai-chat', 'metadata', threadId] as const,
+  },
   /** 다이어그램 관련 쿼리 키 */
   diagrams: {
     /** 프로젝트별 다이어그램 목록 */
