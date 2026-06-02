@@ -81,10 +81,10 @@ AI는 Smart-ERD 서버가 제공하는 도구로만 프로젝트 데이터를 �
 | AI-SEC-01 | Phase 9 | Complete |
 | AI-CHAT-01 | Phase 10 | Complete |
 | AI-CHAT-02 | Phase 10 | Complete |
-| AI-READ-01 | Phase 10 | Planned |
-| AI-READ-02 | Phase 10 | Planned |
-| AI-READ-03 | Phase 10 | Planned |
-| AI-READ-04 | Phase 10 | Planned |
+| AI-READ-01 | Phase 10 | Complete |
+| AI-READ-02 | Phase 10 | Complete |
+| AI-READ-03 | Phase 10 | Complete |
+| AI-READ-04 | Phase 10 | Complete |
 | AI-ACT-01 | Phase 11 | Planned |
 | AI-APP-01 | Phase 11 | Planned |
 | AI-APP-02 | Phase 11 | Planned |

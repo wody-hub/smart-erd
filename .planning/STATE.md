@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: AI 업무 실행 Gateway + Local Codex Chatbot
-status: executing
-stopped_at: Completed 10-06-PLAN.md
-last_updated: "2026-06-02T07:41:17.365Z"
+status: verifying
+stopped_at: Completed 10-07-PLAN.md
+last_updated: "2026-06-02T07:53:06.203Z"
 last_activity: 2026-06-02
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 10
-  completed_plans: 9
-  percent: 25
+  completed_plans: 10
+  percent: 50
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See `.planning/PROJECT.md`.
 
 ## Current Position
 
-Phase: 10 (app-ai-chat-ui-read-only-context-tools) — EXECUTING
+Phase: 10 (app-ai-chat-ui-read-only-context-tools) — VERIFYING
 Plan: 7 of 7
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-02
 
 ## Milestone Archive
@@ -68,6 +68,9 @@ Last activity: 2026-06-02
 - Phase 10 Plan 5 copies backend confirmation candidates into presentation state without browser-side derivation or raw payload storage.
 - Phase 10 Plan 6 lazy-loads typed `fetchTeams`/`fetchProjects` context option APIs to preserve authorized selector data while keeping pure AI presentation helpers importable in Node unit tests.
 - Phase 10 Plan 6 presentation components use shared `i18next` `aiChat.*` keys, semantic token styling, and composer stop-waiting only without provider cancellation claims.
+- Phase 10 Plan 7 mounts `AuthenticatedAiChatShell` inside `ProtectedRoute` so the drawer remains authenticated without importing the auth store in the shell.
+- Phase 10 Plan 7 uses a distinct shell fallback opener name to avoid duplicate `AI에게 질문` role matches while preserving header trigger determinism.
+- Phase 10 Plan 7 keeps chat stop behavior local to `useAiChatExecution.stopWaiting` without provider cancellation.
 
 ## Performance Metrics
 
@@ -75,11 +78,12 @@ Last activity: 2026-06-02
 | --- | --- | --- | --- |
 | Phase 10 P05 | 11min | 2 tasks | 10 files |
 | Phase 10 P06 | 15min | 3 tasks | 10 files |
+| Phase 10 P07 | 9min | 3 tasks | 8 files |
 
 ## Session Info
 
-Last session: 2026-06-02T07:41:17.335Z
-Stopped At: Completed 10-06-PLAN.md
+Last session: 2026-06-02T07:53:06.197Z
+Stopped At: Completed 10-07-PLAN.md
 Resume File: None
 
 ## Deferred Items
@@ -89,4 +93,4 @@ Resume File: None
 
 ## Next Action
 
-Continue with Phase 10 Plan 7 (`10-07-PLAN.md`) for drawer integration on top of the Phase 10 chat store, execution hook, and presentation components.
+Run Phase 10 verification/audit. After acceptance, proceed to Phase 11 action proposal and approval planning.
