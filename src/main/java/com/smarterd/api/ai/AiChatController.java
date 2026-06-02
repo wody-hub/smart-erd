@@ -19,13 +19,13 @@ import org.springframework.web.bind.annotation.RestController;
  * Read-only AI chat REST controller.
  */
 @RestController
-@RequestMapping("/api/ai")
+@RequestMapping("/api/ai/chat")
 @RequiredArgsConstructor
 public class AiChatController {
 
     private final AiChatExecutionService aiChatExecutionService;
 
-    @PostMapping("/chat")
+    @PostMapping
     public ResponseEntity<AiChatResponse> chat(
         @AuthenticationPrincipal Jwt jwt,
         @Valid @RequestBody AiChatRequest request
