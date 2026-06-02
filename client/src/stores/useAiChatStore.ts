@@ -76,6 +76,13 @@ function readOptionalString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+function readOptionalId(value: unknown): string | number | null {
+  if (typeof value === 'string' || typeof value === 'number') {
+    return value;
+  }
+  return null;
+}
+
 function readStringList(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
@@ -99,9 +106,9 @@ function sanitizeContext(value: unknown): AiChatContextSnapshot | null {
   const confidence = readOptionalString(value.confidence);
   return {
     kind: kind as AiChatContextSnapshot['kind'],
-    teamId: readOptionalString(value.teamId),
+    teamId: readOptionalId(value.teamId),
     teamName: readOptionalString(value.teamName),
-    projectId: readOptionalString(value.projectId),
+    projectId: readOptionalId(value.projectId),
     projectName: readOptionalString(value.projectName),
     source: ['route', 'manual', 'required'].includes(source)
       ? (source as AiChatContextSnapshot['source'])
@@ -128,7 +135,7 @@ function sanitizeSourceChip(value: unknown): AiChatSourceChip | null {
     tool: tool as AiChatToolLabel,
     count,
     teamName: readOptionalString(value.teamName),
-    projectId: readOptionalString(value.projectId),
+    projectId: readOptionalId(value.projectId),
   };
 }
 
@@ -144,9 +151,9 @@ function sanitizeConfirmationCandidate(value: unknown): AiChatConfirmationCandid
     id: readString(value.id),
     label: readString(value.label),
     kind: kind as AiChatConfirmationCandidate['kind'],
-    teamId: readOptionalString(value.teamId),
+    teamId: readOptionalId(value.teamId),
     teamName: readOptionalString(value.teamName),
-    projectId: readOptionalString(value.projectId),
+    projectId: readOptionalId(value.projectId),
     projectName: readOptionalString(value.projectName),
     reason: readOptionalString(value.reason),
   };

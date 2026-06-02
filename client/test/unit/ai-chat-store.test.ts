@@ -124,6 +124,28 @@ test('10-W0-04 serializes drawer presentation state without running execution st
   assert.equal(restored.runningExecutionId, null);
 });
 
+test('10-W0-04 preserves numeric backend confirmation candidate ids in presentation state', () => {
+  const state = {
+    ...openAiChatDrawer(createInitialAiChatState()),
+    confirmationCandidates: [
+      {
+        id: 'project-10',
+        label: 'Alpha Project',
+        kind: 'project' as const,
+        teamId: 1,
+        projectId: 10,
+        projectName: 'Alpha Project',
+        reason: 'exact-name',
+      },
+    ],
+  };
+
+  const restored = deserializeAiChatConversation(serializeAiChatConversation(state));
+
+  assert.equal(restored.confirmationCandidates[0]?.teamId, 1);
+  assert.equal(restored.confirmationCandidates[0]?.projectId, 10);
+});
+
 test('10-W0-04 conversation persists by login and resets only through new conversation', () => {
   const { storage } = createStorage();
   const initial = openAiChatDrawer(createInitialAiChatState());

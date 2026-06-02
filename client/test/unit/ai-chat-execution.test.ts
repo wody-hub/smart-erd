@@ -27,9 +27,7 @@ function projectContext(): AiChatContextSnapshot {
   };
 }
 
-function response(
-  candidates: AiChatConfirmationCandidate[] = [],
-): AiChatResponse {
+function response(candidates: AiChatConfirmationCandidate[] = []): AiChatResponse {
   return {
     status: candidates.length > 0 ? 'NEEDS_CONFIRMATION' : 'ANSWER',
     executionId: 'exec-1',
@@ -85,6 +83,19 @@ test('resolveAiChatCanSend blocks empty message unavailable provider weak contex
   };
 
   assert.equal(resolveAiChatCanSend(base).canSend, true);
+  assert.equal(
+    resolveAiChatCanSend({
+      ...base,
+      context: {
+        ...projectContext(),
+        kind: 'team',
+        projectId: null,
+        projectName: null,
+        scopeRequired: true,
+      },
+    }).canSend,
+    true,
+  );
   assert.equal(resolveAiChatCanSend({ ...base, message: '   ' }).canSend, false);
   assert.equal(
     resolveAiChatCanSend({ ...base, providerAvailability: 'CODEX_NOT_FOUND' }).reason,
@@ -108,6 +119,7 @@ test('chat execution appends normalized user and assistant messages and copies c
       label: 'Alpha Project',
       kind: 'project',
       teamId: '1',
+      teamName: null,
       projectId: '10',
       projectName: 'Alpha Project',
       reason: 'exact-name',
