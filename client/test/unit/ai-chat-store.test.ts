@@ -59,7 +59,10 @@ test('10-W0-04 storage key is isolated by authenticated login id', () => {
     buildAiChatConversationStorageKey('tester@example.com'),
     'smart-erd-ai-chat-conversation:tester@example.com',
   );
-  assert.equal(createAiChatStorageKey('tester@example.com'), buildAiChatConversationStorageKey('tester@example.com'));
+  assert.equal(
+    createAiChatStorageKey('tester@example.com'),
+    buildAiChatConversationStorageKey('tester@example.com'),
+  );
   assert.notEqual(
     buildAiChatConversationStorageKey('tester@example.com'),
     buildAiChatConversationStorageKey('other@example.com'),
@@ -138,8 +141,14 @@ test('10-W0-04 conversation persists by login and resets only through new conver
 
 test('10-W0-04 switching authenticated users hydrates the matching namespace only', () => {
   const { storage } = createStorage();
-  const loginAState = appendAiChatMessage(openAiChatDrawer(createInitialAiChatState()), message('1', 'login-a'));
-  const loginBState = appendAiChatMessage(openAiChatDrawer(createInitialAiChatState()), message('2', 'login-b'));
+  const loginAState = appendAiChatMessage(
+    openAiChatDrawer(createInitialAiChatState()),
+    message('1', 'login-a'),
+  );
+  const loginBState = appendAiChatMessage(
+    openAiChatDrawer(createInitialAiChatState()),
+    message('2', 'login-b'),
+  );
 
   saveAiChatConversation('loginA', loginAState, storage);
   saveAiChatConversation('loginB', loginBState, storage);

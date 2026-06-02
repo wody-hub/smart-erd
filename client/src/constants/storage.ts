@@ -28,4 +28,6 @@ export const STORAGE_KEYS = {
   THEME: 'smart-erd-theme',
   /** Electron 전용 서버 URL */
   SERVER_URL: 'smart-erd-server-url',
+  /** AI 채팅 대화 저장 prefix */
+  AI_CHAT_CONVERSATION_PREFIX: 'smart-erd-ai-chat-conversation',
 } as const;

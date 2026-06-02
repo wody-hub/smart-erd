@@ -3,6 +3,10 @@ import { create } from 'zustand';
 import { STORAGE_KEYS } from '@/constants/storage';
 import { clearAuthState } from '@/lib/auth-refresh';
 import { getApiBaseUrl } from '@/lib/platform';
+import {
+  clearActiveAiChatConversation,
+  hydrateActiveAiChatConversation,
+} from '@/stores/useAiChatStore';
 
 /**
  * 인증 상태를 관리하는 Zustand 스토어의 상태 인터페이스.
@@ -47,13 +51,16 @@ const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem(STORAGE_KEYS.LOGIN_ID, loginId);
     localStorage.setItem(STORAGE_KEYS.NAME, name);
     set({ accessToken, refreshToken, loginId, name });
+    hydrateActiveAiChatConversation(loginId);
   },
 
   logout: () => {
     const rt = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+    const loginId = localStorage.getItem(STORAGE_KEYS.LOGIN_ID);
     if (rt) {
       axios.post(`${getApiBaseUrl()}/auth/logout`, { refreshToken: rt }).catch(() => {});
     }
+    clearActiveAiChatConversation(loginId);
     clearAuthState();
   },
 }));
