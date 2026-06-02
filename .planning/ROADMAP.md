@@ -60,7 +60,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 10-03-PLAN.md — Backend `/api/ai/chat` HTTP contract and read-only chat orchestration
-- [ ] 10-05-PLAN.md — Frontend typed chat API and send/cancel execution hook
+- [x] 10-05-PLAN.md — Frontend typed chat API and send/cancel execution hook
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -113,8 +113,8 @@ Plans:
 | AI-RUN-03 | Phase 9 | Complete |
 | AI-RUN-04 | Phase 9 | Complete |
 | AI-SEC-01 | Phase 9 | Complete |
-| AI-CHAT-01 | Phase 10 | Planned |
-| AI-CHAT-02 | Phase 10 | Planned |
+| AI-CHAT-01 | Phase 10 | Complete |
+| AI-CHAT-02 | Phase 10 | Complete |
 | AI-READ-01 | Phase 10 | Planned |
 | AI-READ-02 | Phase 10 | Planned |
 | AI-READ-03 | Phase 10 | Planned |
