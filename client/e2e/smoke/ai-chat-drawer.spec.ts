@@ -80,4 +80,8 @@ test('AI chat drawer opens globally and keeps context while routes change @smoke
   await expect(drawer.getByText(`${target.projectName} 지연 이슈를 먼저 확인해야 합니다.`)).toBeVisible();
   await expect(drawer.getByText(`${target.projectName} - issues 12`)).toBeVisible();
   await expect(drawer.getByText(/확인된 사실|AI 응답을 만들지 못했습니다/)).toBeVisible();
+
+  await page.goto(`${config.baseUrl}/teams`, { waitUntil: 'domcontentloaded' });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByText(`${target.projectName} - issues 12`)).toBeVisible();
 });
