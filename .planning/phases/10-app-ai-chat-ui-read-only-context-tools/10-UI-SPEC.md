@@ -105,7 +105,7 @@ All user-facing prose must be stored in `client/src/i18n/locales/{ko,en}/transla
 | Needs confirmation heading | `확인이 필요합니다` |
 | Source chips label | `사용한 자료` |
 | New conversation label | `새 대화` |
-| Cancel running label | `응답 중지` |
+| Stop waiting label | `응답 중지` |
 
 Copy tone:
 - 결론 먼저, 그다음 위험/지연/다음 확인을 짧게 쓴다.
@@ -144,7 +144,7 @@ No third-party registry blocks are approved for Phase 10. If a planner/executor 
 - Header row: title, provider availability compact status, close icon button, and local-only "새 대화" icon/text action.
 - Persistent context bar: always visible under the header. It shows current scope, a manual context selector, and a short confidence/source status.
 - Transcript: vertical list of user messages and assistant answer cards. Use neutral surfaces; do not nest cards inside cards.
-- Composer: fixed bottom region with textarea, send button, optional cancel-running button, and a short context hint. It must remain usable while the transcript scrolls.
+- Composer: fixed bottom region with textarea, send button, optional stop-waiting button, and a short context hint. It must remain usable while the transcript scrolls.
 
 ### Context Behavior
 
@@ -161,7 +161,7 @@ No third-party registry blocks are approved for Phase 10. If a planner/executor 
 
 - Send is disabled when the message is empty, the provider is unavailable, required context is missing, or an execution is already running.
 - While running, show `Loader2` animation on the send area and an `aria-live="polite"` status such as `응답을 작성하는 중입니다`.
-- `응답 중지` is available during a running execution and maps to the Phase 9 cancel API. It must not clear the user's message or local transcript.
+- `응답 중지` is available while the synchronous `/api/ai/chat` HTTP request is in flight. In Phase 10 it aborts the local HTTP request and stops waiting; it does not call the Phase 9 provider cancel API or guarantee server-side provider cancellation. It must not clear the user's message or local transcript.
 - Runtime failure adds an assistant error card and also shows `toast.error(getErrorMessage(err, t('aiChat.error.fallback')))`.
 - Successful answers append a structured answer card with source chips and sectioned content.
 
@@ -199,7 +199,7 @@ Rules:
 ## Component Inventory
 
 Reuse:
-- `Button` for trigger, send, cancel-running, context picker actions, and new conversation confirmation actions.
+- `Button` for trigger, send, stop-waiting, context picker actions, and new conversation confirmation actions.
 - `Badge` for provider status summaries and source chips.
 - `Card` only for top-level answer cards. Do not put cards inside answer cards.
 - `Dialog` or a new local `Sheet` primitive for the right-side drawer, using Radix focus trap and the existing close-button/i18n pattern.
@@ -236,10 +236,10 @@ Add:
 ## Accessibility Contract
 
 - Drawer uses `role="dialog"` with an accessible title and Radix focus trap behavior.
-- Trigger, close, new conversation, send, cancel-running, and context selector buttons have visible text or `aria-label` plus tooltip.
+- Trigger, close, new conversation, send, stop-waiting, and context selector buttons have visible text or `aria-label` plus tooltip.
 - The context bar announces scope changes with `aria-live="polite"`.
 - Running, cancelled, failed, and completed response states are announced through a polite live region.
-- Keyboard order: trigger → drawer close/new conversation → context selector → transcript → composer → send/cancel.
+- Keyboard order: trigger -> drawer close/new conversation -> context selector -> transcript -> composer -> send/stop-waiting.
 - Source chips are readable text, not color-only indicators.
 - Error cards use `role="alert"` when appended after a failed execution.
 
