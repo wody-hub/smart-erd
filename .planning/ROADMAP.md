@@ -14,7 +14,7 @@ The milestone is deliberately approval-gated. AI can read scoped project context
 ## Phases
 
 - [x] **Phase 9: AI Tool Gateway + Provider Abstraction** — provider contract, Local Codex Adapter, structured output schema, execution status, timeout/cancel/error handling (completed 2026-06-01)
-- [x] **Phase 10: App AI Chat UI + Read-Only Context Tools** — in-app chatbot shell, project context selection, read tools for project overview, WBS, milestones, issues, TODOs, and work history (completed 2026-06-02)
+- [ ] **Phase 10: App AI Chat UI + Read-Only Context Tools** — in-app chatbot shell, project context selection, read tools for project overview, WBS, milestones, issues, TODOs, and work history (verification gaps found 2026-06-02)
 - [ ] **Phase 11: Approval Preview + Audit Execution Pipeline** — action proposal schema, preview/diff, approval/cancel flow, execution boundary, audit log and history
 - [ ] **Phase 12: Low-Risk Write Tools MVP** — issue create/update, personal TODO create/update, WBS comment/work memo add, all approval-gated
 
@@ -113,12 +113,12 @@ Plans:
 | AI-RUN-03 | Phase 9 | Complete |
 | AI-RUN-04 | Phase 9 | Complete |
 | AI-SEC-01 | Phase 9 | Complete |
-| AI-CHAT-01 | Phase 10 | Complete |
-| AI-CHAT-02 | Phase 10 | Complete |
-| AI-READ-01 | Phase 10 | Complete |
-| AI-READ-02 | Phase 10 | Complete |
-| AI-READ-03 | Phase 10 | Complete |
-| AI-READ-04 | Phase 10 | Complete |
+| AI-CHAT-01 | Phase 10 | Partial |
+| AI-CHAT-02 | Phase 10 | Blocked |
+| AI-READ-01 | Phase 10 | Partial |
+| AI-READ-02 | Phase 10 | Partial |
+| AI-READ-03 | Phase 10 | Blocked |
+| AI-READ-04 | Phase 10 | Blocked |
 | AI-ACT-01 | Phase 11 | Planned |
 | AI-APP-01 | Phase 11 | Planned |
 | AI-APP-02 | Phase 11 | Planned |

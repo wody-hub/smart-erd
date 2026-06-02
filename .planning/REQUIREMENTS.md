@@ -22,12 +22,12 @@ AI는 Smart-ERD 서버가 제공하는 도구로만 프로젝트 데이터를 �
 
 ### App Chat + Read Tools
 
-- [x] **AI-CHAT-01**: 사용자는 앱 내 AI 챗봇에서 Smart-ERD 업무 질문을 입력하고 응답을 받을 수 있다.
-- [x] **AI-CHAT-02**: 챗봇은 현재 team/project context를 명확히 사용하거나 사용자가 context를 선택할 수 있게 한다.
-- [x] **AI-READ-01**: AI는 사업 개요와 프로젝트 요약 정보를 조회할 수 있다.
-- [x] **AI-READ-02**: AI는 WBS와 마일스톤 정보를 조회할 수 있다.
-- [x] **AI-READ-03**: AI는 이슈, 개인 TODO, WBS 작업 히스토리/댓글 정보를 조회할 수 있다.
-- [x] **AI-READ-04**: 모든 read tool 호출은 기존 사용자, 팀, 프로젝트, 리소스 권한과 scope를 검증한다.
+- [ ] **AI-CHAT-01**: 사용자는 앱 내 AI 챗봇에서 Smart-ERD 업무 질문을 입력하고 응답을 받을 수 있다. *(Phase 10 verification: partial)*
+- [ ] **AI-CHAT-02**: 챗봇은 현재 team/project context를 명확히 사용하거나 사용자가 context를 선택할 수 있게 한다. *(Phase 10 verification: blocked)*
+- [ ] **AI-READ-01**: AI는 사업 개요와 프로젝트 요약 정보를 조회할 수 있다. *(Phase 10 verification: partial)*
+- [ ] **AI-READ-02**: AI는 WBS와 마일스톤 정보를 조회할 수 있다. *(Phase 10 verification: partial)*
+- [ ] **AI-READ-03**: AI는 이슈, 개인 TODO, WBS 작업 히스토리/댓글 정보를 조회할 수 있다. *(Phase 10 verification: blocked)*
+- [ ] **AI-READ-04**: 모든 read tool 호출은 기존 사용자, 팀, 프로젝트, 리소스 권한과 scope를 검증한다. *(Phase 10 verification: blocked)*
 
 ### Action Proposal + Approval
 
@@ -79,12 +79,12 @@ AI는 Smart-ERD 서버가 제공하는 도구로만 프로젝트 데이터를 �
 | AI-RUN-03 | Phase 9 | Complete |
 | AI-RUN-04 | Phase 9 | Complete |
 | AI-SEC-01 | Phase 9 | Complete |
-| AI-CHAT-01 | Phase 10 | Complete |
-| AI-CHAT-02 | Phase 10 | Complete |
-| AI-READ-01 | Phase 10 | Complete |
-| AI-READ-02 | Phase 10 | Complete |
-| AI-READ-03 | Phase 10 | Complete |
-| AI-READ-04 | Phase 10 | Complete |
+| AI-CHAT-01 | Phase 10 | Partial |
+| AI-CHAT-02 | Phase 10 | Blocked |
+| AI-READ-01 | Phase 10 | Partial |
+| AI-READ-02 | Phase 10 | Partial |
+| AI-READ-03 | Phase 10 | Blocked |
+| AI-READ-04 | Phase 10 | Blocked |
 | AI-ACT-01 | Phase 11 | Planned |
 | AI-APP-01 | Phase 11 | Planned |
 | AI-APP-02 | Phase 11 | Planned |
