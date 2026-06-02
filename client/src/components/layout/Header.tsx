@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Settings } from 'lucide-react';
+import AiChatTrigger from '@/components/ai/AiChatTrigger';
 import { Button } from '@/components/ui/button';
 import useAuthStore from '@/stores/useAuthStore';
 import { ROUTES } from '@/constants/routes';
@@ -51,6 +52,7 @@ export default function Header({ workspaceContext, title, rightSlot }: HeaderPro
         <div className="header-utility-rail">
           {rightSlot}
           <div className="header-utility-group">
+            {isAuthenticated && <AiChatTrigger />}
             <ThemeSwitcher />
             <LanguageSwitcher />
             {isElectron() && (

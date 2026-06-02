@@ -84,6 +84,10 @@ function AssistantMessage({ message }: { message: AiChatMessage }) {
   );
 }
 
+function translateAiChatKey(t: (key: never) => string, key: string): string {
+  return t(key as never);
+}
+
 function Transcript({ messages }: { messages: AiChatMessage[] }) {
   const { t } = useTranslation();
 
@@ -204,7 +208,7 @@ export default function AiChatDrawer() {
             <header className="flex shrink-0 items-start gap-3 border-b border-border/80 bg-card px-4 py-4">
               <div className="min-w-0 flex-1 space-y-1">
                 <DialogPrimitive.Title className="text-xl font-semibold leading-[1.2] text-foreground">
-                  {t(model.titleKey)}
+                  {translateAiChatKey(t, model.titleKey)}
                 </DialogPrimitive.Title>
                 <DialogPrimitive.Description className="text-sm leading-6 text-muted-foreground">
                   {model.contextRequired

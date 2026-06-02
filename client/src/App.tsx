@@ -1,8 +1,9 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, type ReactNode } from 'react';
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/query-client';
 import { isElectron, getServerUrl } from '@/lib/platform';
+import AuthenticatedAiChatShell from './components/ai/AuthenticatedAiChatShell';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { Toaster } from './components/ui/sonner';
 import Spinner from './components/ui/spinner';
@@ -24,6 +25,14 @@ const Router = isElectron() ? HashRouter : BrowserRouter;
 
 /** Electron 환경 여부 (렌더링 분기용 캐시) */
 const isElectronEnv = isElectron();
+
+function protectedAppElement(children: ReactNode) {
+  return (
+    <ProtectedRoute>
+      <AuthenticatedAiChatShell>{children}</AuthenticatedAiChatShell>
+    </ProtectedRoute>
+  );
+}
 
 /**
  * 애플리케이션 루트 컴포넌트.
@@ -66,51 +75,27 @@ export default function App() {
               {/* ── 인증 필요 라우트 ── */}
               <Route
                 path={ROUTES.TEAMS}
-                element={
-                  <ProtectedRoute>
-                    <TeamsPage />
-                  </ProtectedRoute>
-                }
+                element={protectedAppElement(<TeamsPage />)}
               />
               <Route
                 path={ROUTES.PROJECTS_PATTERN}
-                element={
-                  <ProtectedRoute>
-                    <ProjectsPage />
-                  </ProtectedRoute>
-                }
+                element={protectedAppElement(<ProjectsPage />)}
               />
               <Route
                 path={ROUTES.DICTIONARY_PATTERN}
-                element={
-                  <ProtectedRoute>
-                    <DictionaryPage />
-                  </ProtectedRoute>
-                }
+                element={protectedAppElement(<DictionaryPage />)}
               />
               <Route
                 path={ROUTES.DIAGRAMS_PATTERN}
-                element={
-                  <ProtectedRoute>
-                    <DiagramsPage />
-                  </ProtectedRoute>
-                }
+                element={protectedAppElement(<DiagramsPage />)}
               />
               <Route
                 path={ROUTES.PROJECT_WBS_PATTERN}
-                element={
-                  <ProtectedRoute>
-                    <ProjectWbsPage />
-                  </ProtectedRoute>
-                }
+                element={protectedAppElement(<ProjectWbsPage />)}
               />
               <Route
                 path={ROUTES.DIAGRAM_PATTERN}
-                element={
-                  <ProtectedRoute>
-                    <DocumentEditorRoute />
-                  </ProtectedRoute>
-                }
+                element={protectedAppElement(<DocumentEditorRoute />)}
               />
               <Route path="/" element={<Navigate to={ROUTES.TEAMS} replace />} />
               <Route path="*" element={<Navigate to={ROUTES.TEAMS} replace />} />

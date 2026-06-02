@@ -22,6 +22,10 @@ export function buildAiChatTriggerPresentation(isOpen: boolean): AiChatTriggerPr
   };
 }
 
+function translateAiChatKey(t: (key: never) => string, key: string): string {
+  return t(key as never);
+}
+
 /**
  * Shared authenticated header trigger for the global AI chat drawer.
  */
@@ -37,7 +41,7 @@ export default function AiChatTrigger({ className }: AiChatTriggerProps) {
       variant="ghost"
       size="sm"
       onClick={openDrawer}
-      aria-label={t(presentation.ariaLabelKey)}
+      aria-label={translateAiChatKey(t, presentation.ariaLabelKey)}
       aria-pressed={presentation.isActive}
       className={cn(
         'header-text-button h-8 gap-2 px-3',
@@ -46,7 +50,7 @@ export default function AiChatTrigger({ className }: AiChatTriggerProps) {
       )}
     >
       <Bot className="h-4 w-4" aria-hidden="true" />
-      <span>{t(presentation.labelKey)}</span>
+      <span>{translateAiChatKey(t, presentation.labelKey)}</span>
     </Button>
   );
 }
