@@ -59,7 +59,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 10-03-PLAN.md — Backend `/api/ai/chat` HTTP contract and read-only chat orchestration
+- [x] 10-03-PLAN.md — Backend `/api/ai/chat` HTTP contract and read-only chat orchestration
 - [ ] 10-05-PLAN.md — Frontend typed chat API and send/cancel execution hook
 
 **Wave 3** *(blocked on Wave 2 completion)*
