@@ -25,6 +25,14 @@ function renderNode(node: ReactNode): ReactNode {
   };
 }
 
+function renderedElement(node: ReactNode): ReactElement<Record<string, unknown>> {
+  const rendered = renderNode(node);
+  if (!rendered || typeof rendered !== 'object' || !('props' in rendered)) {
+    assert.fail('Expected rendered React element');
+  }
+  return rendered as ReactElement<Record<string, unknown>>;
+}
+
 function textContent(node: ReactNode): string {
   const rendered = renderNode(node);
   if (typeof rendered === 'string' || typeof rendered === 'number') {
@@ -40,6 +48,12 @@ function textContent(node: ReactNode): string {
   return textContent(element.props.children);
 }
 
+function indexOfText(node: ReactNode, text: RegExp): number {
+  const content = textContent(node);
+  const match = text.exec(content);
+  return match?.index ?? -1;
+}
+
 const response: AiChatResponse = {
   status: 'ANSWER',
   conclusion: 'Delayed issues need attention.',
@@ -50,13 +64,18 @@ const response: AiChatResponse = {
 };
 
 test('10-W0-06 source chips render project tool and count labels', () => {
-  const text = textContent(AiSourceChips({ chips: response.sourceChips }));
+  const chips = AiSourceChips({ chips: response.sourceChips });
+  const element = renderedElement(chips);
+  const text = textContent(chips);
 
+  assert.equal(element.props['aria-label'], '사용한 자료');
   assert.match(text, /Alpha Project\s*-\s*issues\s*12/);
+  assert.doesNotMatch(String(element.props.className), /bg-gray|text-blue|bg-emerald|#[0-9A-Fa-f]/);
 });
 
 test('10-W0-06 answer card separates conclusion facts interpretation and confirmation sections', () => {
-  const text = textContent(AiAnswerCard({ response }));
+  const card = AiAnswerCard({ response });
+  const text = textContent(card);
 
   assert.match(text, /Delayed issues need attention/);
   assert.match(text, /확인된 사실/);
@@ -65,11 +84,31 @@ test('10-W0-06 answer card separates conclusion facts interpretation and confirm
   assert.match(text, /API work is the main risk/);
   assert.match(text, /확인이 필요합니다/);
   assert.match(text, /Confirm the reporting period/);
+  assert.ok(indexOfText(card, /Delayed issues need attention/) < indexOfText(card, /Alpha Project/));
+  assert.ok(indexOfText(card, /Alpha Project/) < indexOfText(card, /확인된 사실/));
+  assert.ok(indexOfText(card, /확인된 사실/) < indexOfText(card, /해석/));
+  assert.ok(indexOfText(card, /해석/) < indexOfText(card, /확인이 필요합니다/));
+});
+
+test('10-W0-06 answer card does not fabricate empty fact sections', () => {
+  const text = textContent(
+    AiAnswerCard({
+      response: {
+        ...response,
+        confirmedFacts: [],
+        interpretation: '',
+        needsConfirmation: ['Select a project before asking about project data.'],
+      },
+    }),
+  );
+
+  assert.doesNotMatch(text, /확인된 사실/);
+  assert.match(text, /확인이 필요합니다/);
+  assert.match(text, /Select a project before asking about project data/);
 });
 
 test('10-W0-06 error card exposes localized error state', () => {
-  const text = textContent(
-    AiAnswerCard({
+  const errorCard = AiAnswerCard({
       response: {
         status: 'ERROR',
         conclusion: '',
@@ -79,9 +118,11 @@ test('10-W0-06 error card exposes localized error state', () => {
         sourceChips: [],
         error: 'AI 응답을 만들지 못했습니다.',
       },
-    }),
-  );
+    });
+  const element = renderedElement(errorCard);
+  const text = textContent(errorCard);
 
+  assert.equal(element.props.role, 'alert');
   assert.match(text, /AI 응답을 만들지 못했습니다/);
 });
 
