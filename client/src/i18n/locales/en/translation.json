@@ -45,6 +45,15 @@
     }
   },
   "aiChat": {
+    "drawer": {
+      "triggerLabel": "Ask AI",
+      "title": "AI work question",
+      "close": "Close AI chat"
+    },
+    "empty": {
+      "heading": "Enter a project question",
+      "body": "Check the current context, then ask about WBS, milestones, issues, TODOs, and work history status."
+    },
     "answer": {
       "confirmedFacts": "Confirmed facts",
       "interpretation": "Interpretation",
@@ -56,7 +65,14 @@
     },
     "error": {
       "title": "AI response error",
-      "fallback": "Could not create an AI response."
+      "fallback": "Could not create an AI response. Check the runtime status and selected context, then try again."
+    },
+    "newConversation": {
+      "label": "New chat",
+      "title": "Start a new chat",
+      "body": "Only this browser-saved conversation will be cleared. Project data will not change. Start a new chat?",
+      "confirm": "Start new chat",
+      "cancel": "Keep chatting"
     },
     "context": {
       "label": "Current scope",
@@ -73,6 +89,8 @@
       "confirmationGroup": "Confirmation choices",
       "loadingOptions": "Loading scopes.",
       "clearManual": "Clear manual scope",
+      "manualSelectorTitle": "Choose question scope",
+      "manualSelectorBody": "Only teams or projects you can access are available.",
       "requiredHeading": "Choose a question scope first",
       "requiredBody": "This screen cannot infer a project scope. Select a team or project, then ask again.",
       "ambiguousProject": "Multiple projects match that name. Choose the project to use."
@@ -89,6 +107,16 @@
         "provider": "The AI runtime is unavailable.",
         "context": "Choose a question scope first."
       }
+    },
+    "aria": {
+      "drawer": "AI work question dialog",
+      "trigger": "Open AI question drawer",
+      "close": "Close AI chat",
+      "newConversation": "Start a new chat",
+      "contextSelector": "Select AI question scope",
+      "transcript": "AI conversation history",
+      "send": "Send question",
+      "stopWaiting": "Stop waiting"
     }
   },
   "guide": {

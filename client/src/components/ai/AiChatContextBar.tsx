@@ -51,6 +51,10 @@ function contextLabel(context: AiChatContextSnapshot | null): string {
   return context.projectName || context.teamName || 'aiChat.context.scopeRequired';
 }
 
+function translateAiChatKey(key: string): string {
+  return i18next.t(key as never) as string;
+}
+
 function candidateOption(candidate: AiChatConfirmationCandidate): AiChatContextOption {
   return {
     id: `candidate:${candidate.id}`,
@@ -170,7 +174,7 @@ export default function AiChatContextBar({
         </span>
         <span className="min-w-0 flex-1 truncate font-medium">
           {model.currentLabel.startsWith('aiChat.')
-            ? t(model.currentLabel)
+            ? translateAiChatKey(model.currentLabel)
             : model.currentLabel}
         </span>
         <span
@@ -181,7 +185,7 @@ export default function AiChatContextBar({
               : 'border-border/80 text-muted-foreground',
           )}
         >
-          {t(model.stateKey)}
+          {translateAiChatKey(model.stateKey)}
         </span>
 
         <Popover open={open} onOpenChange={setOpen}>

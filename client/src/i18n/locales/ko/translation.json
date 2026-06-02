@@ -45,6 +45,15 @@
     }
   },
   "aiChat": {
+    "drawer": {
+      "triggerLabel": "AI에게 질문",
+      "title": "AI 업무 질문",
+      "close": "AI 대화 닫기"
+    },
+    "empty": {
+      "heading": "프로젝트 질문을 입력하세요",
+      "body": "현재 컨텍스트를 확인한 뒤 WBS, 마일스톤, 이슈, TODO, 작업 히스토리 상태를 물어볼 수 있습니다."
+    },
     "answer": {
       "confirmedFacts": "확인된 사실",
       "interpretation": "해석",
@@ -56,7 +65,14 @@
     },
     "error": {
       "title": "AI 응답 오류",
-      "fallback": "AI 응답을 만들지 못했습니다."
+      "fallback": "AI 응답을 만들지 못했습니다. 런타임 상태와 선택한 컨텍스트를 확인한 뒤 다시 시도하세요."
+    },
+    "newConversation": {
+      "label": "새 대화",
+      "title": "새 대화 시작",
+      "body": "현재 브라우저에 저장된 이 대화만 지워집니다. 프로젝트 데이터는 변경되지 않습니다. 새 대화를 시작할까요?",
+      "confirm": "새 대화 시작",
+      "cancel": "계속 대화하기"
     },
     "context": {
       "label": "현재 범위",
@@ -73,6 +89,8 @@
       "confirmationGroup": "확인 후보",
       "loadingOptions": "범위를 불러오는 중입니다.",
       "clearManual": "직접 선택한 범위 해제",
+      "manualSelectorTitle": "질문 범위 선택",
+      "manualSelectorBody": "접근 권한이 있는 팀 또는 프로젝트만 선택할 수 있습니다.",
       "requiredHeading": "먼저 질문 범위를 선택하세요",
       "requiredBody": "이 화면에서는 프로젝트 범위를 추정할 수 없습니다. 팀 또는 프로젝트를 선택한 뒤 다시 질문하세요.",
       "ambiguousProject": "프로젝트 이름이 여러 개와 일치합니다. 사용할 프로젝트를 선택하세요."
@@ -89,6 +107,16 @@
         "provider": "AI 런타임을 사용할 수 없습니다.",
         "context": "먼저 질문 범위를 선택하세요."
       }
+    },
+    "aria": {
+      "drawer": "AI 업무 질문 대화상자",
+      "trigger": "AI에게 질문 열기",
+      "close": "AI 대화 닫기",
+      "newConversation": "새 대화 시작",
+      "contextSelector": "AI 질문 범위 선택",
+      "transcript": "AI 대화 내역",
+      "send": "질문 보내기",
+      "stopWaiting": "응답 중지"
     }
   },
   "guide": {

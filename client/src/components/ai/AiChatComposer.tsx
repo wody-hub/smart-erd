@@ -34,6 +34,10 @@ export interface AiChatComposerState {
   statusKey: string;
 }
 
+function translateAiChatKey(key: string): string {
+  return i18next.t(key as never) as string;
+}
+
 export function resolveAiChatComposerState({
   message,
   providerAvailability,
@@ -136,7 +140,7 @@ export default function AiChatComposer({
                 type="submit"
                 className="h-11 shrink-0 gap-2"
                 disabled={state.sendDisabled && !state.showStopWaiting}
-                aria-label={t(state.buttonLabelKey)}
+                aria-label={translateAiChatKey(state.buttonLabelKey)}
               >
                 {state.showStopWaiting ? (
                   <>
@@ -155,12 +159,12 @@ export default function AiChatComposer({
                 )}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{t(state.buttonLabelKey)}</TooltipContent>
+            <TooltipContent>{translateAiChatKey(state.buttonLabelKey)}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>
       <p className="mt-2 text-[12px] leading-[1.3] text-muted-foreground" aria-live="polite">
-        {t(state.statusKey)}
+        {translateAiChatKey(state.statusKey)}
       </p>
     </form>
   );
