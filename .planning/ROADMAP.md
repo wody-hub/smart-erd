@@ -43,7 +43,15 @@ The milestone is deliberately approval-gated. AI can read scoped project context
   3. AI read tools can retrieve project overview, WBS, milestones, issues, TODOs, and WBS work history through server-controlled APIs.
   4. Every read tool validates the current user, team, project, and resource scope before returning data.
   5. Chat responses distinguish available project facts from model inference.
-**Plans**: TBD
+**Plans**: 7 plans
+Plans:
+- [ ] 10-01-PLAN.md — Wave 0 validation contract for backend, frontend, and drawer smoke coverage
+- [ ] 10-02-PLAN.md — Backend scope resolver and summary-first read context services
+- [ ] 10-03-PLAN.md — Backend `/api/ai/chat` HTTP contract and read-only chat orchestration
+- [ ] 10-04-PLAN.md — Frontend chat types, safe local persistence, and route-context hints
+- [ ] 10-05-PLAN.md — Frontend typed chat API and send/cancel execution hook
+- [ ] 10-06-PLAN.md — Sectioned answer, source chip, context bar, and composer UI components
+- [ ] 10-07-PLAN.md — Global authenticated drawer mounting and final phase verification
 **UI hint**: yes
 
 ### Phase 11: Approval Preview + Audit Execution Pipeline
