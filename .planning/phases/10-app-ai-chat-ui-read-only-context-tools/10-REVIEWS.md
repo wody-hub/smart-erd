@@ -1,7 +1,8 @@
 ---
 phase: 10
 reviewers: [codex]
-reviewed_at: 2026-06-02T05:47:37Z
+reviewed_at: 2026-06-02T06:00:34Z
+reviewed_commit: 803a29b
 plans_reviewed:
   - 10-01-PLAN.md
   - 10-02-PLAN.md
@@ -10,240 +11,87 @@ plans_reviewed:
   - 10-05-PLAN.md
   - 10-06-PLAN.md
   - 10-07-PLAN.md
-cycle: 1
+cycle: 2
 max_cycles: 3
-current_high_unresolved: 8
+previous_high_unresolved: 8
+current_high_unresolved: 0
 ---
 
 # Cross-AI Plan Review - Phase 10
 
 ## Codex Review
 
+CYCLE_SUMMARY: current_high=0
+## Current HIGH Concerns
+None.
+
 ## Summary
+Reviewed replanned commit `803a29b`. The replan resolves the prior 8 HIGH concerns with concrete, verification-ready changes: compile-safe Wave 0 skeletons, hard read-context caps, deterministic project matching, explicit provider-runner extraction, synchronous no-server-cancel chat semantics, per-login persistence helpers, authenticated shell-level drawer access, and deterministic Playwright mocking. No HIGH concerns remain. Overall risk is now **MEDIUM**, driven by implementation complexity rather than plan-invalidating gaps.
 
-The plan set is strong and mostly phase-complete. It respects the core safety boundary: frontend never runs Codex, backend owns scope/read authorization, Phase 10 stays read-only, and source chips/facts come from server-read data. The main risks are not conceptual. They are execution-contract risks: synchronous chat vs cancel UI, ambiguous reuse of `AiExecutionGateway`, login-scoped local persistence mechanics, and read-context fanout/performance.
+## Strengths
+- The server-only read boundary is now clear: scope resolution, read selection, source chips, and facts stay backend-owned.
+- The chat/provider split is much stronger. `AiProviderExecutionRunner` gives Phase 10 a reusable provider path without forcing multi-project chat through the Phase 9 single-project gateway.
+- Cancellation semantics are no longer contradictory. Phase 10 is synchronous; `응답 중지` means HTTP abort/stop waiting only.
+- Local persistence is now deliberately per-login, manually serialized, capped to 50 messages, and tested against secret/raw-context storage.
+- Final E2E is deterministic through `/api/ai/provider/status` and `/api/ai/chat` route mocks or explicit noop error mode.
 
-Overall risk: **MEDIUM-HIGH** until those contracts are tightened.
+## Plan Notes
+### 10-01
+**Risk: LOW-MEDIUM.** The skeleton-first RED contract fixes the prior compile-noise issue. Main residual risk is test brittleness from locking exact class/module names early, but that is acceptable because later plans depend on those names.
 
-## 10-01-PLAN.md
+### 10-02
+**Risk: MEDIUM.** Caps and deterministic matching are fixed well. Remaining concern is **MEDIUM:** member-wide TODO authorization still says “authorization permits” more than it defines the exact role/policy. Since existing TODO reads are owner-only and shared WBS TODO summaries can expose titles/documents, implementation must strip to member/status/count aggregates and test that directly.
 
-### Strengths
+### 10-03
+**Risk: MEDIUM-HIGH implementation complexity, not HIGH plan risk.** Runner extraction is the right architecture but touches Phase 9 gateway, registry, validation, audit, timeout, and cancel behavior. Keep regression tests around existing Phase 9 controller/gateway behavior tight.
 
-- Good Wave 0 posture. It forces auth, scope, privacy, read-only, and UI contracts before implementation.
-- Covers backend, frontend unit, and Playwright smoke.
-- Explicitly blocks Phase 11/12 write/proposal scope from leaking into Phase 10.
+### 10-04
+**Risk: MEDIUM.** Explicit storage helpers resolve cross-user bleed. Watch for import cycles when wiring chat cleanup into `useAuthStore.logout`; using an injected cleanup callback similar to `auth-refresh.ts` would be cleaner than direct store coupling.
 
-### Concerns
+### 10-05
+**Risk: LOW-MEDIUM.** The frontend API/hook contract now matches synchronous chat. Good call not using Phase 9 cancel. Tests should assert abort preserves transcript and does not persist raw response JSON.
 
-- **HIGH:** Tests target exact production class names before skeletons exist. Gradle/TS compilation may fail as setup noise, not useful RED behavior.
-- **MEDIUM:** Several references use the wrong `ProviderOutputValidator` package. It currently lives under `com.smarterd.application.ai.validation`.
-- **LOW:** Backend task text says "three files compile" while creating four backend files.
+### 10-06
+**Risk: MEDIUM.** Component scope is clean and read-only. Layout risk remains because dense drawer UI, chips, and composer controls need real viewport validation, but 10-07 now covers that.
 
-### Suggestions
+### 10-07
+**Risk: MEDIUM.** Shell-level trigger/fallback resolves global availability. Make the protected-route audit explicit in the summary, and ensure Playwright mocks match the actual axios-resolved paths in web and Electron/hash routing modes.
 
-- Add minimal production skeletons in Wave 0, or state clearly that compile failure is acceptable until 10-02/10-03.
-- Fix `ProviderOutputValidator` references.
-- Extract/reuse a test JWT resolver helper instead of duplicating private inner classes.
+## Suggestions
+- In 10-02, define member TODO visibility as a named policy, for example: “project member may see aggregate counts only; no titles, descriptions, linked docs, or target dates.”
+- In 10-03, add one regression test proving Phase 9 `/api/ai/provider/execute`, status, get execution, and cancel still work after runner extraction.
+- In 10-04, prefer dependency-injected auth cleanup over importing the chat store directly inside `useAuthStore`.
+- In 10-07, make the Playwright fixture assert source chips remain unchanged after route/context changes, as the plan already says.
 
-### Risk Assessment
-
-**MEDIUM.** Good validation strategy, but brittle RED setup can slow every later plan.
-
-## 10-02-PLAN.md
-
-### Strengths
-
-- Correctly makes backend scope resolution authoritative.
-- Strong TODO privacy stance: own TODOs by default, member summaries only when explicit.
-- Source chips are tied to actual read results, not model prose.
-
-### Concerns
-
-- **HIGH:** Multi-project read context can become N+1 and too large. No explicit caps for projects, WBS rows, issue rows, history rows, or provider-context size.
-- **HIGH:** Misspelled/ambiguous project matching is unspecified. Fuzzy scope logic without deterministic thresholds is a future bug.
-- **MEDIUM:** "Existing authorization permits member TODO summary" is too broad. It needs a concrete role/policy rule.
-- **MEDIUM:** Keyword-based tool selection may miss Korean phrasing and SI PM synonyms.
-
-### Suggestions
-
-- Define hard caps: max projects per team query, max recent history rows, max detailed items, max provider context bytes.
-- Use typed read summary records instead of loose `Map<String,Object>` where possible.
-- Make project-name matching deterministic: exact, normalized exact, contains, then confirmation. Avoid silent fuzzy guesses.
-- Add role-specific tests for member TODO summary visibility.
-
-### Risk Assessment
-
-**MEDIUM-HIGH.** Security boundary is good, but data-volume and matching rules need sharper contracts.
-
-## 10-03-PLAN.md
-
-### Strengths
-
-- Clean separation between product chat API and Phase 9 provider API.
-- Correct ordering: resolve scope, build read context, then provider.
-- Keeps Phase 9 provider schema intact and assembles chat sections server-side.
-
-### Concerns
-
-- **HIGH:** Provider execution strategy is undecided. "Use `AiExecutionGateway` if possible, otherwise inject provider/registry" is too vague for a core path. Current `src/main/java/com/smarterd/application/ai/AiExecutionGateway.java` assumes a single `teamId/projectId` and builds its own sanitized context, which does not naturally support multi-project chat facts.
-- **HIGH:** Cancel lifecycle conflicts with synchronous `POST /api/ai/chat`. If the frontend only receives `executionId` after the request completes, "cancel running" cannot cancel the running provider call.
-- **MEDIUM:** Non-empty provider actions should be an explicit validation failure or redacted chat failure, not silently omitted.
-
-### Suggestions
-
-- Decide the gateway shape now. Best option: extract a lower-level provider execution runner shared by Phase 9 and chat, while chat owns scope/read assembly.
-- Either make chat async with start/status/cancel, or remove cancel-running from Phase 10 UI. Do not pretend synchronous HTTP supports server-side cancellation.
-- Add a test proving provider action drafts produce a safe read-only failure marker.
-
-### Risk Assessment
-
-**HIGH.** This is the main architectural risk in the set.
-
-## 10-04-PLAN.md
-
-### Strengths
-
-- Good client boundary: route context is only a hint.
-- Login-scoped persistence and 50-message cap are the right constraints.
-- Explicitly avoids raw provider/read payload persistence.
-
-### Concerns
-
-- **HIGH:** Zustand `persist` with a login-scoped key is tricky because the key is often static at store creation. User switching can still bleed state unless the storage adapter or hydration logic is deliberate.
-- **MEDIUM:** Logout clearing is planned, but existing auth logout does not automatically know about future AI chat keys.
-- **LOW:** Regex-based forbidden-field checks can false-positive on comments/imports and miss nested unsafe data.
-
-### Suggestions
-
-- Implement an explicit per-login storage adapter or manual load/save keyed by `STORAGE_KEYS.AI_CHAT_CONVERSATION_PREFIX + loginId`.
-- Wire chat namespace cleanup into logout/user-switch behavior.
-- Test the serialized storage payload directly, not just source text.
-
-### Risk Assessment
-
-**MEDIUM.** Good intent, but local persistence is easy to get subtly wrong.
-
-## 10-05-PLAN.md
-
-### Strengths
-
-- Correctly centralizes `/ai/chat` access in one typed API module.
-- React Query + store normalization is the right client pattern.
-- Confirmation candidates flow from backend response into UI state.
-
-### Concerns
-
-- **HIGH:** Same cancel problem as 10-03. `cancelRunning` needs an execution ID while the chat request is still in flight.
-- **MEDIUM:** 10-05 does not depend on 10-03, but it relies on `AiChatResponse` fields defined there. Parallel implementation can drift.
-- **MEDIUM:** Unit coverage is underspecified for API response normalization and failure states.
-
-### Suggestions
-
-- Add dependency on 10-03, or create a shared contract fixture before both plans proceed.
-- Define whether cancel means HTTP abort only or provider cancellation. If provider cancellation, chat must become async.
-- Add tests for confirmation response, provider-safe failure, auth failure, and stale/running execution behavior.
-
-### Risk Assessment
-
-**MEDIUM-HIGH.** Mostly sound, blocked by the cancel/API contract.
-
-## 10-06-PLAN.md
-
-### Strengths
-
-- Good component decomposition: context bar, composer, answer card, source chips.
-- Localized copy and no write/action controls are correctly enforced.
-- Manual context uses authorized team/project APIs, not AI read tools.
-
-### Concerns
-
-- **MEDIUM:** "Work-report tone" cannot be guaranteed by UI components alone. Backend prompt/assembler behavior must own most of that.
-- **MEDIUM:** No visual/mobile verification until 10-07, despite dense drawer UI and chip wrapping risks.
-- **LOW:** Node-only component tests may be weak if they do not actually render TSX output.
-
-### Suggestions
-
-- Add render-to-static-markup or equivalent tests for `AiAnswerCard` section order and absence of controls.
-- Add a mobile/wide viewport smoke check for chip wrapping and composer layout in 10-07.
-- Move tone guarantees into backend prompt/assembler tests, not only UI acceptance text.
-
-### Risk Assessment
-
-**MEDIUM.** UI plan is good, but needs stronger layout verification.
-
-## 10-07-PLAN.md
-
-### Strengths
-
-- Correct final integration: global authenticated drawer, header trigger, route-independent host.
-- Keeps provider status badge separate from chat trigger.
-- Final verification includes build, unit, backend, grep, and Playwright smoke.
-
-### Concerns
-
-- **HIGH:** Header trigger availability assumes every authenticated screen renders `Header`. The drawer host can be global, but opening it may not be.
-- **HIGH:** Playwright smoke depends on "real or safely mocked/noop provider" but does not define the backend/provider setup. This can become flaky.
-- **MEDIUM:** Auth gating by local access token can briefly render stale authenticated UI before validation.
-- **MEDIUM:** Source chips must be message snapshots from send-time response context. The final smoke should explicitly test they do not change after route/context changes.
-
-### Suggestions
-
-- Add a test or audit that every protected route has access to the trigger, or mount a global trigger in the app shell.
-- Define a deterministic E2E provider mode: noop expected error card or mocked `/api/ai/chat` response.
-- Add Playwright checks for route change while drawer stays open, source chip immutability, and weak-context send disabled state.
-
-### Risk Assessment
-
-**MEDIUM.** Integration is clear, but E2E determinism and global trigger coverage need tightening.
-
-## Overall Suggestions
-
-- Decide the chat execution model before implementation: synchronous no-cancel, or async start/status/cancel. Current plans mix both.
-- Refactor or extend the Phase 9 provider boundary explicitly. Do not duplicate gateway internals ad hoc.
-- Add read-context caps and typed summary DTOs before provider prompting.
-- Fix the `ProviderOutputValidator` package references in plans.
-- Make local persistence serialization a first-class tested function.
-
-## Overall Risk Assessment
-
-**MEDIUM-HIGH.** The plan achieves the phase goals on paper and has strong security instincts. The remaining risks are concentrated in a few contracts that affect multiple waves: provider gateway reuse, cancellation semantics, read-context size, and user-scoped persistence. Tighten those now and the rest of the phase looks executable.
-
+## Risk Assessment
+Overall risk: **MEDIUM**. The plan is executable and the previous HIGH blockers are resolved. The remaining risk is concentrated in careful implementation of privacy-preserving TODO aggregation, provider runner refactor regression coverage, and drawer layout/E2E stability.
 ---
 
 ## Consensus Summary
 
-Only the Codex reviewer was requested for this cycle, so this section synthesizes recurring themes within that review instead of cross-reviewer agreement.
+Only the Codex reviewer was requested for convergence cycle 2, so this summary synthesizes recurring themes within the requested review rather than cross-reviewer agreement.
 
 ### Agreed Strengths
 
-- Phase 10 maintains the intended read-only boundary: frontend does not execute Codex, backend owns authorization, and write/action proposal scope is kept for later phases.
-- The wave structure is mostly coherent: backend scope/read services precede chat orchestration, frontend API and UI follow, and final verification closes with drawer integration and smoke checks.
-- Source chips and fact/inference separation are well-aligned with the requirement that answers be grounded in authorized project data.
+- The replanned Phase 10 plans directly address all 8 prior HIGH concerns with explicit contracts and verification hooks.
+- The phase boundary remains read-only: frontend calls typed Spring APIs, backend owns authorization/read assembly, and action proposal/write scope stays out of Phase 10.
+- Provider execution, chat cancellation semantics, local persistence, route-independent drawer access, and deterministic E2E setup are now specific enough to guide implementation.
 
 ### Agreed Concerns
 
-- **HIGH:** Chat execution and cancellation semantics are inconsistent across 10-03 and 10-05. The plans must choose synchronous no-cancel behavior or an async start/status/cancel API before implementation.
-- **HIGH:** Provider boundary reuse is under-specified. Chat should not duplicate `AiExecutionGateway` internals, but the current gateway shape does not naturally support multi-project chat context.
-- **HIGH:** Read context needs hard caps and deterministic matching rules before provider prompting, or multi-project queries can become expensive and ambiguous.
-- **HIGH:** Local persistence needs deliberate per-login storage mechanics to avoid cross-user conversation bleed.
-- **HIGH:** Final E2E provider behavior must be deterministic, or Phase 10 smoke coverage can become flaky and fail to prove the drawer workflow.
+- **MEDIUM:** Member-wide TODO authorization should be tightened into a named policy with aggregate-only output and direct tests.
+- **MEDIUM:** Extracting `AiProviderExecutionRunner` touches Phase 9 execution, registry, validation, audit, timeout, and cancel behavior, so regression coverage must stay tight.
+- **MEDIUM:** Drawer layout and source-chip behavior still need real viewport and route/context-change verification in 10-07.
 
 ### Divergent Views
 
 - No divergent reviewer views were available because this cycle used a single requested reviewer (`--codex`).
-- The reviewer judged the overall plan set as executable after contract tightening, while identifying 10-03 as the highest architectural risk.
+- The reviewer judged all prior HIGH concerns fully resolved at the plan level, with remaining risk downgraded to MEDIUM implementation complexity.
 
 ## Current HIGH Concerns
 
-- 10-01 validation tests reference exact production class names before skeletons exist, creating compile-noise risk instead of useful RED behavior.
-- 10-02 read context lacks caps for project fanout, row counts, recent history, and provider-context size.
-- 10-02 project-name matching does not define deterministic handling for misspellings or ambiguous fuzzy matches.
-- 10-03 provider execution strategy is undecided; current `AiExecutionGateway` assumptions do not fit multi-project chat facts cleanly.
-- 10-03/10-05 cancellation semantics conflict with synchronous `POST /api/ai/chat`, so running provider calls cannot be cancelled as planned.
-- 10-04 login-scoped Zustand persistence may use a static key and leak state across user switches unless storage/hydration is explicit.
-- 10-07 AI drawer trigger availability assumes every authenticated screen renders `Header`, which may leave some protected routes without an opener.
-- 10-07 Playwright smoke depends on an undefined real/mocked/noop provider setup, making final verification potentially flaky.
+None.
 
 ## Cycle Summary
 
-CYCLE_SUMMARY: current_high=8
+CYCLE_SUMMARY: current_high=0
