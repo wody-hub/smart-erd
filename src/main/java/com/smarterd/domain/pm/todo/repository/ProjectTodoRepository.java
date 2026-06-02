@@ -16,6 +16,9 @@ public interface ProjectTodoRepository extends JpaRepository<ProjectTodo, Long> 
     @EntityGraph(attributePaths = { "owner", "linkedWbsItem" })
     List<ProjectTodo> findByProjectAndOwnerOrderByCreatedAtDescIdDesc(Project project, User owner);
 
+    @EntityGraph(attributePaths = { "owner" })
+    List<ProjectTodo> findByProjectOrderByCreatedAtDescIdDesc(Project project);
+
     @EntityGraph(attributePaths = { "owner", "linkedWbsItem" })
     Optional<ProjectTodo> findByProjectAndId(Project project, Long id);
 

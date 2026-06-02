@@ -9,7 +9,9 @@ import com.smarterd.domain.pm.todo.repository.ProjectTodoRepository;
 import com.smarterd.domain.pm.todo.repository.TodoDocumentLinkRepository;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -140,6 +142,28 @@ public class ProjectTodoService {
         return projectTodoWbsService.getSharedTodoSummariesByWbs(loginId, teamId, projectId, wbsItemId);
     }
 
+    public List<MemberTodoSummaryResult> getMemberTodoSummaries(String loginId, Long teamId, Long projectId) {
+        final var project = projectTodoAccessService.loadProject(loginId, teamId, projectId);
+        final Map<MemberTodoSummaryKey, Long> counts = new LinkedHashMap<>();
+        for (final var todo : projectTodoRepository.findByProjectOrderByCreatedAtDescIdDesc(project)) {
+            final var owner = todo.getOwner();
+            final var key = new MemberTodoSummaryKey(owner.getId(), owner.getName(), todo.getStatus());
+            counts.merge(key, 1L, Long::sum);
+        }
+        return counts
+            .entrySet()
+            .stream()
+            .map(entry ->
+                new MemberTodoSummaryResult(
+                    entry.getKey().ownerUserId(),
+                    entry.getKey().ownerDisplayName(),
+                    entry.getKey().status(),
+                    entry.getValue()
+                )
+            )
+            .toList();
+    }
+
     public record CreateProjectTodoCommand(
         String title,
         @Nullable String description,
@@ -199,4 +223,13 @@ public class ProjectTodoService {
         String ownerName,
         List<TodoDocumentResult> sharedDocuments
     ) {}
+
+    public record MemberTodoSummaryResult(
+        Long ownerUserId,
+        String ownerDisplayName,
+        ProjectTodoStatus status,
+        long count
+    ) {}
+
+    private record MemberTodoSummaryKey(Long ownerUserId, String ownerDisplayName, ProjectTodoStatus status) {}
 }
