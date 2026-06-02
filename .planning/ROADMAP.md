@@ -55,7 +55,7 @@ Plans:
 
 - [x] 10-01-PLAN.md — Wave 0 validation contract for backend, frontend, and drawer smoke coverage
 - [x] 10-02-PLAN.md — Backend scope resolver and summary-first read context services
-- [ ] 10-04-PLAN.md — Frontend chat types, safe local persistence, and route-context hints
+- [x] 10-04-PLAN.md — Frontend chat types, safe local persistence, and route-context hints
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

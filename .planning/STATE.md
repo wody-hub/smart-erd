@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: AI 업무 실행 Gateway + Local Codex Chatbot
 status: executing
-last_updated: "2026-06-02T06:35:23.139Z"
+last_updated: "2026-06-02T06:47:59.979Z"
 last_activity: 2026-06-02
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 10
-  completed_plans: 5
-  percent: 50
+  completed_plans: 6
+  percent: 25
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See `.planning/PROJECT.md`.
 ## Current Position
 
 Phase: 10 (app-ai-chat-ui-read-only-context-tools) — EXECUTING
-Plan: 3 of 7
+Plan: 4 of 7
 Status: Ready to execute
 Last activity: 2026-06-02
 
