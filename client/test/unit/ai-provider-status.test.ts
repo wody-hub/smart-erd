@@ -33,3 +33,9 @@ test('ai provider query keys are stable and isolated from project resources', ()
     'exec-1',
   ]);
 });
+
+test('ai chat query keys are stable and isolated from provider executions', () => {
+  assert.deepEqual(queryKeys.aiChat.send(), ['ai-chat', 'send']);
+  assert.deepEqual(queryKeys.aiChat.metadata('thread-1'), ['ai-chat', 'metadata', 'thread-1']);
+  assert.notDeepEqual(queryKeys.aiChat.send(), queryKeys.aiProvider.status());
+});
