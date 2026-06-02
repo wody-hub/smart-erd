@@ -27,7 +27,8 @@
     "discuss_mode": "discuss",
     "skip_discuss": false,
     "_auto_chain_active": false,
-    "plan_review_convergence": true
+    "plan_review_convergence": true,
+    "use_worktrees": false
   },
   "hooks": {
     "context_warnings": true
