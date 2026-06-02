@@ -64,7 +64,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 10-06-PLAN.md — Sectioned answer, source chip, context bar, and composer UI components
+- [x] 10-06-PLAN.md — Sectioned answer, source chip, context bar, and composer UI components
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
