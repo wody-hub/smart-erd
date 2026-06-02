@@ -1,12 +1,7 @@
 package com.smarterd.application.ai;
 
 import com.smarterd.application.ai.provider.AiActionDraft;
-import com.smarterd.application.ai.provider.AiProvider;
 import com.smarterd.application.ai.provider.AiProviderError;
-import com.smarterd.application.ai.provider.AiProviderRequest;
-import com.smarterd.application.ai.provider.AiProviderResult;
-import com.smarterd.application.ai.validation.ProviderOutputValidator;
-import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.pm.common.ProjectContextLoader;
 import java.time.Instant;
 import java.util.List;
@@ -26,13 +21,10 @@ public class AiExecutionGateway {
 
     private final ProjectContextLoader projectContextLoader;
     private final SelectedResourceValidator selectedResourceValidator;
-    private final AiExecutionAuditService auditService;
-    private final AiProvider aiProvider;
-    private final AiExecutionRegistry executionRegistry;
-    private final ProviderOutputValidator outputValidator;
+    private final AiProviderExecutionRunner providerExecutionRunner;
 
     public AiProviderStatusView status() {
-        final var status = aiProvider.status();
+        final var status = providerExecutionRunner.status();
         return new AiProviderStatusView(
             status.provider(),
             status.availability().name(),
@@ -46,63 +38,25 @@ public class AiExecutionGateway {
         final var context = projectContextLoader.load(loginId, command.teamId(), command.projectId(), false);
         selectedResourceValidator.validate(loginId, context.project(), command.selectedResource());
 
-        final var providerStatus = aiProvider.status();
-        final var execution = executionRegistry.create(
+        return providerExecutionRunner.execute(
             loginId,
-            command.teamId(),
-            command.projectId(),
-            providerStatus.provider(),
-            PROMPT_VERSION
+            new AiProviderExecutionRunner.RunCommand(
+                command.teamId(),
+                command.projectId(),
+                command.userMessage(),
+                command.locale(),
+                PROMPT_VERSION,
+                sanitizedContext(loginId, command)
+            )
         );
-        executionRegistry.registerCancelHandler(execution.executionId(), () -> aiProvider.cancel(execution.executionId()));
-        executionRegistry.markRunning(execution.executionId());
-
-        AiProviderResult result;
-        try {
-            result = outputValidator.validate(
-                aiProvider.execute(
-                    new AiProviderRequest(
-                        execution.executionId(),
-                        PROMPT_VERSION,
-                        command.userMessage(),
-                        command.locale(),
-                        sanitizedContext(loginId, command)
-                    )
-                )
-            );
-        } catch (BusinessException ex) {
-            result = AiProviderResult.failed(
-                new AiProviderError(
-                    "OUTPUT_VALIDATION_FAILED",
-                    "Provider output validation failed",
-                    "The AI provider returned invalid structured output.",
-                    false
-                )
-            );
-        } catch (RuntimeException ex) {
-            result = AiProviderResult.failed(
-                new AiProviderError("PROVIDER_FAILED", "Provider execution failed", "The AI provider failed safely.", true)
-            );
-        }
-
-        if (result.error() == null) {
-            executionRegistry.markSucceeded(execution.executionId(), result);
-        } else {
-            executionRegistry.markFailed(execution.executionId(), result);
-        }
-        final var completed = executionRegistry.get(execution.executionId(), loginId);
-        auditService.record(completed);
-        return AiExecutionView.from(completed);
     }
 
     public AiExecutionView getExecution(String loginId, String executionId) {
-        return AiExecutionView.from(executionRegistry.get(executionId, loginId));
+        return providerExecutionRunner.getExecution(loginId, executionId);
     }
 
     public AiExecutionView cancelExecution(String loginId, String executionId) {
-        final var execution = executionRegistry.cancel(executionId, loginId);
-        auditService.record(execution);
-        return AiExecutionView.from(execution);
+        return providerExecutionRunner.cancelExecution(loginId, executionId);
     }
 
     private Map<String, Object> sanitizedContext(String loginId, ExecuteCommand command) {

@@ -32,9 +32,7 @@ class AiExecutionGatewayCancellationTest {
         final var auditService = Mockito.mock(AiExecutionAuditService.class);
         final var provider = Mockito.mock(AiProvider.class);
         final var registry = new AiExecutionRegistry(Duration.ofMinutes(15), Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
-        final var gateway = new AiExecutionGateway(
-            contextLoader,
-            resourceValidator,
+        final var providerExecutionRunner = new AiProviderExecutionRunner(
             auditService,
             provider,
             registry,
@@ -43,6 +41,11 @@ class AiExecutionGatewayCancellationTest {
                 Validation.buildDefaultValidatorFactory().getValidator(),
                 new ActionDraftValidator()
             )
+        );
+        final var gateway = new AiExecutionGateway(
+            contextLoader,
+            resourceValidator,
+            providerExecutionRunner
         );
         final var owner = User.builder().loginId("owner").password("encoded").name("Owner").build();
         final var team = Team.builder().name("team").owner(owner).build();
