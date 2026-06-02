@@ -54,6 +54,7 @@ created: 2026-06-02
 | 10-W0-01 | validation | 0 | AI-CHAT-02, AI-READ-04 | T10-02 | Context resolver denies weak, ambiguous, conflicting, and unauthorized scope before provider execution | backend unit | `./gradlew test --tests "*AiChatContext*"` | ❌ W0 | ⬜ pending |
 | 10-W0-02 | validation | 0 | AI-READ-01, AI-READ-02, AI-READ-03, AI-READ-04 | T10-01 / T10-02 / T10-03 | Read context service assembles summary-first authorized facts only and never exposes raw payloads | backend unit | `./gradlew test --tests "*AiReadContext*"` | ❌ W0 | ⬜ pending |
 | 10-W0-03 | validation | 0 | AI-CHAT-01, AI-CHAT-02, AI-READ-04 | T10-02 / T10-04 / T10-05 | Chat HTTP boundary requires authentication, validates request context, and returns read-only structured response/error contracts | backend MVC | `./gradlew test --tests "*AiChatController*"` | ❌ W0 | ⬜ pending |
+| 10-W0-08 | validation | 0 | AI-CHAT-01, AI-CHAT-02, AI-READ-01, AI-READ-02, AI-READ-03, AI-READ-04 | T10-03 / T10-04 / T10-05 | Chat execution service assembles server facts/source/context/confirmation sections, maps provider answer only to interpretation, and rejects or omits provider actions | backend unit | `./gradlew test --tests "*AiChatExecutionService*"` | ❌ W0 | ⬜ pending |
 | 10-W0-04 | validation | 0 | AI-CHAT-01, AI-CHAT-02 | T10-03 / T10-06 | Local chat store persists route-independent presentation state only and resets only through explicit new conversation/logout handling | frontend unit | `cd client && npm run test:unit` | ❌ W0 | ⬜ pending |
 | 10-W0-05 | validation | 0 | AI-CHAT-02 | T10-02 | Frontend context resolver derives route scope, blocks weak-context questions, and records send-time context without rewriting prior messages | frontend unit | `cd client && npm run test:unit` | ❌ W0 | ⬜ pending |
 | 10-W0-06 | validation | 0 | AI-CHAT-01, AI-READ-01, AI-READ-02, AI-READ-03 | T10-04 / T10-05 | Answer card separates conclusion, source chips, confirmed facts, interpretation, and confirmation needs without action UI | frontend unit | `cd client && npm run test:unit` | ❌ W0 | ⬜ pending |
@@ -67,6 +68,7 @@ created: 2026-06-02
 
 - [ ] `src/test/java/com/smarterd/application/ai/chat/AiChatContextResolverTest.java` - covers AI-CHAT-02 and T10-02 weak, ambiguous, conflicting, and unauthorized scope.
 - [ ] `src/test/java/com/smarterd/application/ai/chat/AiReadContextServiceTest.java` - covers AI-READ-01 through AI-READ-04 and T10-01/T10-03 summary-only data assembly.
+- [ ] `src/test/java/com/smarterd/application/ai/chat/AiChatExecutionServiceTest.java` - covers server-side chat section assembly, existing provider-output validation, provider-answer-to-interpretation mapping, server-generated conclusion/needs-confirmation, and provider action rejection/omission.
 - [ ] `src/test/java/com/smarterd/api/ai/AiChatControllerMvcTest.java` - covers AI-CHAT-01, AI-CHAT-02, authenticated chat endpoint, provider failure, and denial paths.
 - [ ] `client/test/unit/ai-chat-store.test.ts` - covers route-independent persistence, explicit reset, logout clearing behavior, retention cap, and no-secret persistence.
 - [ ] `client/test/unit/ai-chat-context.test.ts` - covers route-derived context, manual override, weak-context requirement, and ambiguous project confirmation state.
@@ -79,11 +81,11 @@ created: 2026-06-02
 
 | Requirement | Automated Coverage | Manual/E2E Coverage | Required Evidence |
 |-------------|--------------------|---------------------|-------------------|
-| AI-CHAT-01 | `AiChatControllerMvcTest`, `ai-chat-store.test.ts`, `ai-chat-response-cards.test.ts` | `ai-chat-drawer.spec.ts` | Chat drawer can send a question and render response/error state |
+| AI-CHAT-01 | `AiChatControllerMvcTest`, `AiChatExecutionServiceTest`, `ai-chat-store.test.ts`, `ai-chat-response-cards.test.ts` | `ai-chat-drawer.spec.ts` | Chat drawer can send a question and render response/error state |
 | AI-CHAT-02 | `AiChatContextResolverTest`, `ai-chat-context.test.ts` | `ai-chat-drawer.spec.ts` | Route context, manual context, weak-context blocking, and ambiguous confirmation are observable |
-| AI-READ-01 | `AiReadContextServiceTest` | Optional seeded-data smoke | Business overview/project summary facts appear in source-backed answer |
-| AI-READ-02 | `AiReadContextServiceTest` | Optional seeded-data smoke | WBS/milestone counts, status, risk, and delay summaries are source-backed |
-| AI-READ-03 | `AiReadContextServiceTest` | Optional seeded-data smoke | Issues, own TODOs, authorized member TODO summaries, and recent history/comment summaries are question-selected |
+| AI-READ-01 | `AiReadContextServiceTest`, `AiChatExecutionServiceTest` | Optional seeded-data smoke | Business overview/project summary facts appear in source-backed answer |
+| AI-READ-02 | `AiReadContextServiceTest`, `AiChatExecutionServiceTest` | Optional seeded-data smoke | WBS/milestone counts, status, risk, and delay summaries are source-backed |
+| AI-READ-03 | `AiReadContextServiceTest`, `AiChatExecutionServiceTest` | Optional seeded-data smoke | Issues, own TODOs, authorized member TODO summaries, and recent history/comment summaries are question-selected |
 | AI-READ-04 | `AiChatContextResolverTest`, `AiReadContextServiceTest`, `AiChatControllerMvcTest` | Unauthorized-scope browser smoke if feasible | Cross-team/project/resource/TODO-owner reads are denied before provider execution |
 
 ---
