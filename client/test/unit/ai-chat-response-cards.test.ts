@@ -1,9 +1,40 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import i18next from 'i18next';
 import type { ReactElement, ReactNode } from 'react';
 import AiAnswerCard from '../../src/components/ai/AiAnswerCard.js';
 import AiSourceChips from '../../src/components/ai/AiSourceChips.js';
 import type { AiChatResponse } from '../../src/types/ai-chat.js';
+
+const aiChatTestTranslations = {
+  aiChat: {
+    answer: {
+      confirmedFacts: '확인된 사실',
+      interpretation: '해석',
+      needsConfirmation: '확인이 필요합니다',
+    },
+    sourceChips: {
+      label: '사용한 자료',
+      currentScope: '현재 범위',
+    },
+    error: {
+      title: 'AI 응답 오류',
+      fallback: 'AI 응답을 만들지 못했습니다.',
+    },
+  },
+};
+
+if (!i18next.isInitialized) {
+  await i18next.init({
+    lng: 'ko',
+    fallbackLng: 'ko',
+    resources: { ko: { translation: aiChatTestTranslations } },
+    interpolation: { escapeValue: false },
+  });
+} else {
+  i18next.addResourceBundle('ko', 'translation', aiChatTestTranslations, true, true);
+  await i18next.changeLanguage('ko');
+}
 
 function renderNode(node: ReactNode): ReactNode {
   if (!node || typeof node !== 'object' || !('type' in node) || !('props' in node)) {

@@ -44,6 +44,21 @@
       "unknown": "확인 실패"
     }
   },
+  "aiChat": {
+    "answer": {
+      "confirmedFacts": "확인된 사실",
+      "interpretation": "해석",
+      "needsConfirmation": "확인이 필요합니다"
+    },
+    "sourceChips": {
+      "label": "사용한 자료",
+      "currentScope": "현재 범위"
+    },
+    "error": {
+      "title": "AI 응답 오류",
+      "fallback": "AI 응답을 만들지 못했습니다."
+    }
+  },
   "guide": {
     "entry": {
       "auth": "제품 가이드 보기",

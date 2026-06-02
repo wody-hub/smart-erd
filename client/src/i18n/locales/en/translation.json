@@ -44,6 +44,21 @@
       "unknown": "Check failed"
     }
   },
+  "aiChat": {
+    "answer": {
+      "confirmedFacts": "Confirmed facts",
+      "interpretation": "Interpretation",
+      "needsConfirmation": "Needs confirmation"
+    },
+    "sourceChips": {
+      "label": "Sources used",
+      "currentScope": "Current scope"
+    },
+    "error": {
+      "title": "AI response error",
+      "fallback": "Could not create an AI response."
+    }
+  },
   "guide": {
     "entry": {
       "auth": "Open product guide",
