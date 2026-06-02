@@ -1,15 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { AiChatMessage } from '../../src/types/ai-chat.js';
+import type { AiChatMessage, AiChatResponse } from '../../src/types/ai-chat.js';
 import {
   appendAiChatMessage,
   buildAiChatConversationStorageKey,
   clearAiChatConversation,
   closeAiChatDrawer,
+  createAiChatStorageKey,
   createInitialAiChatState,
+  deserializeAiChatConversation,
+  hydrateAiChatConversationForLogin,
   loadAiChatConversation,
   openAiChatDrawer,
   saveAiChatConversation,
+  serializeAiChatConversation,
   startNewAiChatConversation,
 } from '../../src/stores/useAiChatStore.js';
 
@@ -55,11 +59,66 @@ test('10-W0-04 storage key is isolated by authenticated login id', () => {
     buildAiChatConversationStorageKey('tester@example.com'),
     'smart-erd-ai-chat-conversation:tester@example.com',
   );
+  assert.equal(createAiChatStorageKey('tester@example.com'), buildAiChatConversationStorageKey('tester@example.com'));
   assert.notEqual(
     buildAiChatConversationStorageKey('tester@example.com'),
     buildAiChatConversationStorageKey('other@example.com'),
   );
   assert.equal(buildAiChatConversationStorageKey(null), null);
+});
+
+test('10-W0-04 serializes drawer presentation state without running execution state', () => {
+  const response: AiChatResponse = {
+    status: 'NEEDS_CONFIRMATION',
+    conclusion: '',
+    interpretation: '',
+    confirmedFacts: [],
+    needsConfirmation: ['프로젝트 범위를 선택하세요'],
+    sourceChips: [],
+    confirmationCandidates: [
+      {
+        id: 'project-10',
+        label: 'Alpha Project',
+        kind: 'project',
+        teamId: '1',
+        projectId: '10',
+        reason: 'exact',
+      },
+    ],
+    error: null,
+  };
+  const state = {
+    ...openAiChatDrawer(createInitialAiChatState()),
+    messages: [
+      {
+        ...message('1'),
+        role: 'assistant' as const,
+        content: '확인이 필요합니다',
+        response,
+      },
+    ],
+    selectedContext: {
+      kind: 'project' as const,
+      teamId: '1',
+      teamName: 'Platform Team',
+      projectId: '10',
+      projectName: 'Alpha Project',
+      source: 'manual' as const,
+      capturedAt: '2026-06-02T00:00:00Z',
+    },
+    confirmationCandidates: response.confirmationCandidates,
+    runningExecutionId: 'exec-running',
+  };
+
+  const serialized = serializeAiChatConversation(state);
+  const restored = deserializeAiChatConversation(serialized);
+
+  assert.equal(serialized.includes('exec-running'), false);
+  assert.equal(restored.isOpen, true);
+  assert.equal(restored.messages[0]?.response?.confirmationCandidates?.[0]?.projectId, '10');
+  assert.equal(restored.selectedContext?.projectName, 'Alpha Project');
+  assert.equal(restored.confirmationCandidates.length, 1);
+  assert.equal(restored.runningExecutionId, null);
 });
 
 test('10-W0-04 conversation persists by login and resets only through new conversation', () => {
@@ -75,6 +134,23 @@ test('10-W0-04 conversation persists by login and resets only through new conver
   saveAiChatConversation('tester', reset.messages, storage);
 
   assert.deepEqual(loadAiChatConversation('tester', storage), []);
+});
+
+test('10-W0-04 switching authenticated users hydrates the matching namespace only', () => {
+  const { storage } = createStorage();
+  const loginAState = appendAiChatMessage(openAiChatDrawer(createInitialAiChatState()), message('1', 'login-a'));
+  const loginBState = appendAiChatMessage(openAiChatDrawer(createInitialAiChatState()), message('2', 'login-b'));
+
+  saveAiChatConversation('loginA', loginAState, storage);
+  saveAiChatConversation('loginB', loginBState, storage);
+
+  const hydratedB = hydrateAiChatConversationForLogin(loginAState, 'loginB', storage);
+  const hydratedMissing = hydrateAiChatConversationForLogin(loginBState, 'loginC', storage);
+
+  assert.equal(hydratedB.messages.length, 1);
+  assert.equal(hydratedB.messages[0]?.content, 'login-b');
+  assert.equal(hydratedMissing.messages.length, 0);
+  assert.equal(hydratedMissing.runningExecutionId, null);
 });
 
 test('10-W0-04 logout clearing removes only the current user conversation', () => {
