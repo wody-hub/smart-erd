@@ -57,6 +57,38 @@
     "error": {
       "title": "AI response error",
       "fallback": "Could not create an AI response."
+    },
+    "context": {
+      "label": "Current scope",
+      "scopeRequired": "Scope selection required",
+      "inherited": "Current screen",
+      "team": "Current team",
+      "manual": "Manual",
+      "required": "Selection needed",
+      "change": "Change scope",
+      "selectorLabel": "Select AI question scope",
+      "searchPlaceholder": "Search teams or projects",
+      "emptyOptions": "No scopes are available.",
+      "authorizedGroup": "Accessible scopes",
+      "confirmationGroup": "Confirmation choices",
+      "loadingOptions": "Loading scopes.",
+      "clearManual": "Clear manual scope",
+      "requiredHeading": "Choose a question scope first",
+      "requiredBody": "This screen cannot infer a project scope. Select a team or project, then ask again.",
+      "ambiguousProject": "Multiple projects match that name. Choose the project to use."
+    },
+    "composer": {
+      "placeholder": "Enter a project question",
+      "inputLabel": "AI question input",
+      "send": "Send question",
+      "stopWaiting": "Stop waiting",
+      "running": "Writing the response.",
+      "ready": "Questions use the selected project-data scope.",
+      "disabled": {
+        "empty": "Enter a question.",
+        "provider": "The AI runtime is unavailable.",
+        "context": "Choose a question scope first."
+      }
     }
   },
   "guide": {
