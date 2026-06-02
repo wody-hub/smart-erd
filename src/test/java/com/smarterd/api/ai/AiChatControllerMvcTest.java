@@ -30,6 +30,8 @@ import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 
 @ExtendWith(MockitoExtension.class)
 class AiChatControllerMvcTest {
@@ -52,6 +54,17 @@ class AiChatControllerMvcTest {
             .setCustomArgumentResolvers(new TestJwtArgumentResolver())
             .build();
         this.objectMapper = new ObjectMapper();
+    }
+
+    @Test
+    @DisplayName("10-W0-03 controller owns chat-specific request mapping")
+    void w0_10_W0_03_controllerOwnsChatSpecificRequestMapping() throws Exception {
+        final var classMapping = AiChatController.class.getAnnotation(RequestMapping.class);
+        final var method = AiChatController.class.getDeclaredMethod("chat", Jwt.class, com.smarterd.api.ai.dto.AiChatRequest.class);
+        final var postMapping = method.getAnnotation(PostMapping.class);
+
+        org.assertj.core.api.Assertions.assertThat(classMapping.value()).containsExactly("/api/ai/chat");
+        org.assertj.core.api.Assertions.assertThat(postMapping.value()).isEmpty();
     }
 
     @Test
