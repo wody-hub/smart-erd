@@ -62,7 +62,7 @@ export default function AiProposalPreview({ proposal }: AiProposalPreviewProps) 
       {hasWarnings ? (
         <section className="space-y-1.5">
           {proposal.warnings.filter(hasText).map((warning) => (
-            <p key={warning} className="flex items-start gap-2 text-xs leading-5 text-amber-700">
+            <p key={warning} className="flex items-start gap-2 text-xs leading-5 text-erd-warning">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>{warning}</span>
             </p>

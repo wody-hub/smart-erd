@@ -69,7 +69,8 @@
     },
     "proposals": {
       "sectionLabel": "AI proposals",
-      "approve": "Approve",
+      "itemLabel": "Execution proposal: {{title}}",
+      "approve": "Approve and execute",
       "cancel": "Cancel",
       "target": "Target",
       "risk": "Risk {{risk}}",
@@ -78,7 +79,7 @@
       "content": "Content",
       "emptyValue": "No value",
       "noPreview": "No preview items to show.",
-      "unsupported": "This action is not executable yet. You can only review its status.",
+      "unsupported": "This action type does not have a registered executor yet. Project data will not change.",
       "status": {
         "pending": "Pending",
         "cancelled": "Cancelled",

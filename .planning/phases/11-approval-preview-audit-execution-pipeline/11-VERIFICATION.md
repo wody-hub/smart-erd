@@ -5,7 +5,6 @@ status: passed
 score: 7/7 requirements verified
 overrides_applied: 0
 warnings:
-  - "Security enforcement is enabled, but no 11-SECURITY.md exists yet. Run $gsd-secure-phase 11 before advancing if the security gate is enforced for this milestone."
   - "Codebase drift gate returned warn-level historical drift across archived/planning paths; it is non-blocking by workflow contract."
 ---
 
@@ -47,6 +46,8 @@ During the required code review gate, a critical proposal access gap was found a
 | `client/src/stores/useAiChatStore.ts` | Sanitized route-persistent proposal state | VERIFIED | Whitelist sanitizer drops unknown nested data and preserves terminal cards across hydration. |
 | `client/src/components/project/ProjectAiHistoryTab.tsx` | Read-only project AI history tab | VERIFIED | Loading, empty, error, and populated read-only states with dense audit rows. |
 | `.planning/phases/11-approval-preview-audit-execution-pipeline/11-HANDOFF-PHASE12.md` | Phase 12 executor handoff | VERIFIED | Exact action types and service boundaries documented for `issue.create`, `issue.update`, `todo.create`, `todo.update`, `wbs.comment.add`, and `wbs.memo.add`. |
+| `.planning/phases/11-approval-preview-audit-execution-pipeline/11-SECURITY.md` | Phase 11 threat verification | VERIFIED | All 21 STRIDE threats are closed or accepted with `threats_open: 0`. |
+| `.planning/phases/11-approval-preview-audit-execution-pipeline/11-UI-REVIEW.md` | Phase 11 UI review | VERIFIED | UI review score 24/24 after semantic color, mono typography, copy, and accessibility fixes. |
 
 ## Requirements Coverage
 
@@ -79,12 +80,14 @@ During the required code review gate, a critical proposal access gap was found a
 | Report | Status | Notes |
 |---|---|---|
 | `11-REVIEW.md` | clean | One critical issue was fixed during review: proposal project access revalidation before get/approve/cancel. No remaining findings. |
+| `11-SECURITY.md` | verified | All Phase 11 STRIDE threats closed or accepted; `threats_open: 0`. |
+| `11-UI-REVIEW.md` | passed | Four UI contract issues were fixed during closeout; no open UI findings remain. |
 
 ## Drift and Security Notes
 
 - Schema drift: none.
 - Codebase drift: warn-level result over historical archived/planning paths; workflow marks this non-blocking.
-- Security gate: `workflow.security_enforcement=true` and no `11-SECURITY.md` exists. Run `$gsd-secure-phase 11` before advancing if this milestone requires a separate security report.
+- Security gate: `workflow.security_enforcement=true`; `11-SECURITY.md` now verifies all Phase 11 STRIDE threats with `threats_open: 0`.
 
 ## Human Verification Required
 

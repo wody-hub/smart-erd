@@ -9,12 +9,12 @@ interface AiProposalStatusBadgeProps {
 }
 
 const STATUS_CLASS_NAMES: Record<AiProposalStatus, string> = {
-  PENDING: 'border-amber-300/70 bg-amber-50 text-amber-800',
-  CANCELLED: 'border-slate-300/80 bg-slate-50 text-slate-700',
-  EXPIRED: 'border-slate-300/80 bg-slate-50 text-slate-700',
-  REJECTED: 'border-rose-300/70 bg-rose-50 text-rose-800',
-  EXECUTED: 'border-emerald-300/70 bg-emerald-50 text-emerald-800',
-  FAILED: 'border-rose-300/70 bg-rose-50 text-rose-800',
+  PENDING: 'border-erd-warning/40 bg-secondary text-erd-warning',
+  CANCELLED: 'border-border/80 bg-card/80 text-muted-foreground',
+  EXPIRED: 'border-border/80 bg-card/80 text-muted-foreground',
+  REJECTED: 'border-destructive/35 bg-destructive/5 text-destructive',
+  EXECUTED: 'border-success/35 bg-success/10 text-success',
+  FAILED: 'border-destructive/35 bg-destructive/5 text-destructive',
 };
 
 function StatusIcon({ status }: AiProposalStatusBadgeProps) {

@@ -154,7 +154,7 @@ export function ProjectAiHistoryList({
                 </td>
                 <td className="px-3 py-2">
                   <div className="space-y-1">
-                    <span className="font-medium text-foreground">
+                    <span className="font-mono text-xs font-medium text-foreground">
                       {displayValue(item.actionType)}
                     </span>
                     <span className="block text-xs text-muted-foreground">
@@ -174,13 +174,13 @@ export function ProjectAiHistoryList({
                 </td>
                 <td className="px-3 py-2 text-foreground">{displayValue(item.requestedBy)}</td>
                 <td className="px-3 py-2 text-foreground">{displayValue(item.decisionBy)}</td>
-                <td className="px-3 py-2 text-muted-foreground">
+                <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
                   {formatHistoryTimestamp(item.createdAt, locale)}
                 </td>
-                <td className="px-3 py-2 text-muted-foreground">
+                <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
                   {formatHistoryTimestamp(item.decidedAt, locale)}
                 </td>
-                <td className="px-3 py-2 text-xs leading-5 text-muted-foreground">
+                <td className="px-3 py-2 font-mono text-xs leading-5 text-muted-foreground">
                   <div>{displayValue(item.executionId)}</div>
                   <div>{displayValue(item.proposalId)}</div>
                   <div>{displayValue(item.promptVersion)}</div>

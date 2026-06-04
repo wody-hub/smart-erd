@@ -39,16 +39,18 @@ export default function AiProposalPanel({ proposals, messageId }: AiProposalPane
       {proposals.map((proposal) => {
         const canDecide =
           proposal.status === 'PENDING' && proposal.executable && Boolean(messageId);
+        const labelTitle = proposal.title || proposal.summary || proposal.actionType;
         return (
           <section
             key={proposal.proposalId}
             className="space-y-3 rounded-md border border-border/80 bg-secondary/25 p-3"
+            aria-label={t('aiChat.proposals.itemLabel', { title: labelTitle })}
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <AiProposalStatusBadge status={proposal.status} />
-                  <span className="text-xs font-medium text-muted-foreground">
+                  <span className="font-mono text-xs font-medium text-muted-foreground">
                     {proposal.proposalId}
                   </span>
                   {proposal.riskLevel ? (
@@ -112,7 +114,7 @@ export default function AiProposalPanel({ proposals, messageId }: AiProposalPane
               </p>
             ) : null}
             {proposal.redactedErrorTitle ? (
-              <p className="text-xs leading-5 text-rose-700">
+              <p className="text-xs leading-5 text-destructive">
                 {proposal.redactedErrorTitle}
                 {proposal.redactedErrorDetail ? ` - ${proposal.redactedErrorDetail}` : ''}
               </p>
