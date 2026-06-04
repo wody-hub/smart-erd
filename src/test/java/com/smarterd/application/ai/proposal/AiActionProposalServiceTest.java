@@ -1,6 +1,7 @@
 package com.smarterd.application.ai.proposal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -14,6 +15,8 @@ import com.smarterd.application.ai.provider.AiActionRiskLevel;
 import com.smarterd.domain.ai.AiActionProposal;
 import com.smarterd.domain.ai.AiActionProposalRepository;
 import com.smarterd.domain.ai.AiActionProposalStatus;
+import com.smarterd.domain.common.exception.DomainAccessDeniedException;
+import com.smarterd.domain.pm.common.ProjectContextLoader;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +37,9 @@ class AiActionProposalServiceTest {
 
     @Mock
     private AiExecutionAuditService auditService;
+
+    @Mock
+    private ProjectContextLoader projectContextLoader;
 
     @Test
     void createProposals_persistsSanitizedIndependentPendingProposals() {
@@ -75,8 +81,35 @@ class AiActionProposalServiceTest {
 
         assertThat(view.status()).isEqualTo(AiActionProposalStatus.REJECTED);
         assertThat(view.redactedErrorTitle()).isEqualTo("Unsupported action");
+        verify(projectContextLoader).load("tester", 1L, 10L, false);
         verify(executor, never()).execute(any(), any());
         verify(auditService).recordProposalDecision(proposal);
+    }
+
+    @Test
+    void getProposal_revalidatesProjectAccessBeforeReturningPreview() {
+        final var service = service(new AiActionExecutorRegistry(List.of()));
+        final var proposal = proposal("proposal-1", "issue.create");
+        when(proposalRepository.findByProposalId("proposal-1")).thenReturn(Optional.of(proposal));
+
+        final var view = service.getProposal("tester", "proposal-1");
+
+        assertThat(view.proposalId()).isEqualTo("proposal-1");
+        verify(projectContextLoader).load("tester", 1L, 10L, false);
+    }
+
+    @Test
+    void approve_propagatesProjectAccessDeniedBeforeTransitionOrAudit() {
+        final var service = service(new AiActionExecutorRegistry(List.of()));
+        final var proposal = proposal("proposal-1", "issue.create");
+        when(proposalRepository.findByProposalId("proposal-1")).thenReturn(Optional.of(proposal));
+        when(projectContextLoader.load("intruder", 1L, 10L, false)).thenThrow(new DomainAccessDeniedException("denied"));
+
+        assertThatThrownBy(() -> service.approve("intruder", "proposal-1")).isInstanceOf(DomainAccessDeniedException.class);
+
+        assertThat(proposal.getStatus()).isEqualTo(AiActionProposalStatus.PENDING);
+        verify(executor, never()).execute(any(), any());
+        verify(auditService, never()).recordProposalDecision(any(AiActionProposal.class));
     }
 
     @Test
@@ -181,6 +214,7 @@ class AiActionProposalServiceTest {
             new AiActionPreviewService(),
             registry,
             auditService,
+            projectContextLoader,
             new ObjectMapper().findAndRegisterModules()
         );
     }

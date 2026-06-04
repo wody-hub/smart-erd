@@ -9,6 +9,7 @@ import com.smarterd.domain.ai.AiActionProposalRepository;
 import com.smarterd.domain.ai.AiActionProposalStatus;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.domain.pm.common.ProjectContextLoader;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -36,6 +37,7 @@ public class AiActionProposalService {
     private final AiActionPreviewService previewService;
     private final AiActionExecutorRegistry executorRegistry;
     private final AiExecutionAuditService auditService;
+    private final ProjectContextLoader projectContextLoader;
     private final ObjectMapper objectMapper;
 
     /**
@@ -67,7 +69,7 @@ public class AiActionProposalService {
      */
     @Transactional(readOnly = true)
     public AiActionProposalView getProposal(String loginId, String proposalId) {
-        return toView(load(proposalId));
+        return toView(loadAccessible(loginId, proposalId));
     }
 
     /**
@@ -79,7 +81,7 @@ public class AiActionProposalService {
      */
     @Transactional
     public AiActionProposalView cancel(String loginId, String proposalId) {
-        final var proposal = load(proposalId);
+        final var proposal = loadAccessible(loginId, proposalId);
         final var wasPending = proposal.isPending();
         proposal.cancel(loginId, Instant.now());
         if (wasPending) {
@@ -97,7 +99,7 @@ public class AiActionProposalService {
      */
     @Transactional
     public AiActionProposalView approve(String loginId, String proposalId) {
-        final var proposal = load(proposalId);
+        final var proposal = loadAccessible(loginId, proposalId);
         if (!proposal.isPending()) {
             return toView(proposal);
         }
@@ -199,6 +201,19 @@ public class AiActionProposalService {
         return proposalRepository
             .findByProposalId(proposalId)
             .orElseThrow(() -> new BusinessException(MessageCode.ERROR_NOT_FOUND_AI_PROPOSAL.code()));
+    }
+
+    /**
+     * Loads one proposal and verifies the actor can access its project.
+     *
+     * @param loginId requester login id
+     * @param proposalId public proposal id
+     * @return authorized proposal entity
+     */
+    private AiActionProposal loadAccessible(String loginId, String proposalId) {
+        final var proposal = load(proposalId);
+        projectContextLoader.load(loginId, proposal.getTeamId(), proposal.getProjectId(), false);
+        return proposal;
     }
 
     /**
