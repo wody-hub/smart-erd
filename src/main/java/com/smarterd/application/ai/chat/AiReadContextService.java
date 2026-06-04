@@ -134,7 +134,9 @@ public class AiReadContextService {
         final var capMetadata = capMetadata(command.projectIds().size(), projectIds.size(), detailedProjectIds.size(), facts.size());
         final var sourceChips = sourceChipFactory.fromToolResults(toolResults);
         final var sanitizedContext = sanitizedContext(cappedFacts, sourceChips, selectedTools, capMetadata, toolData);
-        final var providerContext = truncateProviderContext(serializeProviderContext(cappedFacts, sourceChips, capMetadata));
+        final var providerContext = truncateProviderContext(
+            serializeProviderContext(cappedFacts, sourceChips, capMetadata, toolData)
+        );
 
         return new ReadContext(
             cappedFacts,
@@ -430,7 +432,8 @@ public class AiReadContextService {
     private static String serializeProviderContext(
         List<String> facts,
         List<SourceChip> sourceChips,
-        Map<String, Object> capMetadata
+        Map<String, Object> capMetadata,
+        Map<String, Object> toolData
     ) {
         final var builder = new StringBuilder();
         builder.append("facts:\n");
@@ -447,6 +450,10 @@ public class AiReadContextService {
                 .append(' ')
                 .append(chip.count())
                 .append('\n');
+        }
+        builder.append("summaries:\n");
+        for (final var entry : toolData.entrySet()) {
+            builder.append("- ").append(entry.getKey()).append(": ").append(entry.getValue()).append('\n');
         }
         builder.append("caps: ").append(capMetadata);
         return builder.toString();

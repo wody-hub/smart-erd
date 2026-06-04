@@ -103,7 +103,27 @@ class AiChatExecutionServiceTest {
                     List.of("Delayed issues: 2", "WBS risk count: 1"),
                     List.of(new AiReadContextService.SourceChip("Alpha Project", "issues", 12)),
                     List.of(),
-                    Map.of("teamId", 1L, "projectIds", List.of(10L))
+                    Map.of("teamId", 1L, "projectIds", List.of(10L)),
+                    """
+                    facts:
+                    - Delayed issues: 2
+                    summaries:
+                    - overview:10: {memberCount=5}
+                    - wbs:10: {count=1}
+                    - milestones:10: {count=2}
+                    - issues:10: {count=12}
+                    - todo:10: {count=3}
+                    - history:10: {count=4}
+                    """,
+                    java.util.Set.of(
+                        AiReadContextService.ReadTool.OVERVIEW,
+                        AiReadContextService.ReadTool.WBS,
+                        AiReadContextService.ReadTool.MILESTONES,
+                        AiReadContextService.ReadTool.ISSUES,
+                        AiReadContextService.ReadTool.TODO,
+                        AiReadContextService.ReadTool.HISTORY
+                    ),
+                    Map.of("providerContextMaxChars", AiReadContextService.MAX_PROVIDER_CONTEXT_CHARS)
                 )
             );
         when(providerExecutionRunner.execute(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
@@ -122,6 +142,13 @@ class AiChatExecutionServiceTest {
         verify(providerExecutionRunner).execute(org.mockito.ArgumentMatchers.eq("tester"), commandCaptor.capture());
         assertThat(commandCaptor.getValue().providerContext()).containsKey("readContext");
         assertThat(commandCaptor.getValue().providerContext()).containsEntry("teamId", 1L);
+        assertThat(commandCaptor.getValue().providerContext().get("readContext").toString())
+            .contains("overview:10")
+            .contains("wbs:10")
+            .contains("milestones:10")
+            .contains("issues:10")
+            .contains("todo:10")
+            .contains("history:10");
     }
 
     @Test

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.smarterd.domain.pm.todo.entity.ProjectTodoStatus;
 import com.smarterd.domain.pm.todo.service.ProjectTodoService;
+import com.smarterd.domain.project.service.ProjectService;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.LongStream;
@@ -23,10 +24,19 @@ class AiReadContextServiceTest {
     @Mock
     private ProjectTodoService projectTodoService;
 
+    @Mock
+    private ProjectService projectService;
+
     @Test
     @DisplayName("10-W0-02 overview WBS milestone issue TODO and history summaries are source backed")
     void w0_10_W0_02_summaryFirstReadToolsReturnFactsAndSourceChips() {
-        final var result = readContextService.read(
+        when(projectService.getProject("tester", 1L, 10L))
+            .thenReturn(new ProjectService.ProjectResult(10L, "Alpha", "", 1L, null, null));
+        when(projectService.getBusinessOverview("tester", 1L, 10L))
+            .thenReturn(new ProjectService.BusinessOverviewResult(10L, "Alpha", null, null, null, null, null, null, 5L, 2L, 40));
+        final var service = new AiReadContextService(projectService, null, null, null, null, null, new AiSourceChipFactory());
+
+        final var result = service.read(
             "tester",
             new AiReadContextService.ReadCommand(
                 1L,
@@ -56,6 +66,26 @@ class AiReadContextServiceTest {
         assertThat(result.sourceChips())
             .extracting(AiReadContextService.SourceChip::tool)
             .containsExactlyInAnyOrder("overview", "WBS", "milestones", "issues", "TODO", "history");
+        assertThat(result.sanitizedProviderContext())
+            .contains("summaries:")
+            .contains("overview:10")
+            .contains("memberCount")
+            .contains("wbs:10")
+            .contains("milestones:10")
+            .contains("issues:10")
+            .contains("todo:10")
+            .contains("history:10")
+            .doesNotContain("rawPrompt")
+            .doesNotContain("rawProviderOutput")
+            .doesNotContain("accessToken")
+            .doesNotContain("refreshToken")
+            .doesNotContain("cookie")
+            .doesNotContain("password")
+            .doesNotContain("stdout")
+            .doesNotContain("stderr");
+        assertThat(result.sanitizedProviderContext()).hasSizeLessThanOrEqualTo(
+            AiReadContextService.MAX_PROVIDER_CONTEXT_CHARS
+        );
     }
 
     @Test
