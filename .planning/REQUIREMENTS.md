@@ -31,16 +31,16 @@ AI는 Smart-ERD 서버가 제공하는 도구로만 프로젝트 데이터를 �
 
 ### Action Proposal + Approval
 
-- [ ] **AI-ACT-01**: AI는 등록/수정 의도를 free-form text가 아니라 typed structured action proposal로 반환한다.
-- [ ] **AI-APP-01**: 시스템은 action proposal을 실행 전 preview/diff로 보여준다.
-- [ ] **AI-APP-02**: 사용자는 각 action proposal을 승인하거나 취소할 수 있으며, 승인 전에는 데이터가 변경되지 않는다.
-- [ ] **AI-APP-03**: 승인된 write action만 기존 application service 또는 API boundary를 통해 실행된다.
+- [x] **AI-ACT-01**: AI는 등록/수정 의도를 free-form text가 아니라 typed structured action proposal로 반환한다.
+- [x] **AI-APP-01**: 시스템은 action proposal을 실행 전 preview/diff로 보여준다.
+- [x] **AI-APP-02**: 사용자는 각 action proposal을 승인하거나 취소할 수 있으며, 승인 전에는 데이터가 변경되지 않는다.
+- [x] **AI-APP-03**: 승인된 write action만 기존 application service 또는 API boundary를 통해 실행된다.
 
 ### Audit + Safety
 
-- [ ] **AI-AUD-01**: Prompt metadata, tool calls, action proposals, approval/cancel decision, execution result, error가 audit log에 기록된다.
-- [ ] **AI-AUD-02**: Audit log와 provider log는 민감정보 redaction을 적용한다.
-- [ ] **AI-AUD-03**: 사용자는 프로젝트별 AI 실행 이력과 결과를 조회할 수 있다.
+- [x] **AI-AUD-01**: Prompt metadata, tool calls, action proposals, approval/cancel decision, execution result, error가 audit log에 기록된다.
+- [x] **AI-AUD-02**: Audit log와 provider log는 민감정보 redaction을 적용한다.
+- [x] **AI-AUD-03**: 사용자는 프로젝트별 AI 실행 이력과 결과를 조회할 수 있다.
 
 ### Low-Risk Write MVP
 
@@ -85,13 +85,13 @@ AI는 Smart-ERD 서버가 제공하는 도구로만 프로젝트 데이터를 �
 | AI-READ-02 | Phase 10 | Complete |
 | AI-READ-03 | Phase 10 | Complete |
 | AI-READ-04 | Phase 10 | Complete |
-| AI-ACT-01 | Phase 11 | Planned |
-| AI-APP-01 | Phase 11 | Planned |
-| AI-APP-02 | Phase 11 | Planned |
-| AI-APP-03 | Phase 11 | Planned |
-| AI-AUD-01 | Phase 11 | Planned |
-| AI-AUD-02 | Phase 11 | Planned |
-| AI-AUD-03 | Phase 11 | Planned |
+| AI-ACT-01 | Phase 11 | Complete |
+| AI-APP-01 | Phase 11 | Complete |
+| AI-APP-02 | Phase 11 | Complete |
+| AI-APP-03 | Phase 11 | Complete |
+| AI-AUD-01 | Phase 11 | Complete |
+| AI-AUD-02 | Phase 11 | Complete |
+| AI-AUD-03 | Phase 11 | Complete |
 | AI-WRITE-01 | Phase 12 | Planned |
 | AI-WRITE-02 | Phase 12 | Planned |
 | AI-WRITE-03 | Phase 12 | Planned |

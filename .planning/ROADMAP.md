@@ -15,7 +15,7 @@ The milestone is deliberately approval-gated. AI can read scoped project context
 
 - [x] **Phase 9: AI Tool Gateway + Provider Abstraction** — provider contract, Local Codex Adapter, structured output schema, execution status, timeout/cancel/error handling (completed 2026-06-01)
 - [x] **Phase 10: App AI Chat UI + Read-Only Context Tools** — in-app chatbot shell, project context selection, read tools for project overview, WBS, milestones, issues, TODOs, and work history (gap closure planned 2026-06-04) (completed 2026-06-04)
-- [ ] **Phase 11: Approval Preview + Audit Execution Pipeline** — action proposal schema, preview/diff, approval/cancel flow, execution boundary, audit log and history
+- [x] **Phase 11: Approval Preview + Audit Execution Pipeline** — action proposal schema, preview/diff, approval/cancel flow, execution boundary, audit log and history (completed 2026-06-04)
 - [ ] **Phase 12: Low-Risk Write Tools MVP** — issue create/update, personal TODO create/update, WBS comment/work memo add, all approval-gated
 
 ## Phase Details
@@ -92,11 +92,11 @@ Plans:
   5. Prompt metadata, tool calls, proposals, approvals, cancellations, execution results, and errors are audit logged.
 
 **Plans**:
-- [ ] 11-01-PLAN.md — Backend proposal persistence and lifecycle core
-- [ ] 11-02-PLAN.md — Backend chat proposal conversion, approve/cancel API, and proposal audit
-- [ ] 11-03-PLAN.md — Backend project AI history API and privacy filtering
-- [ ] 11-04-PLAN.md — Frontend proposal cards, approve/cancel mutations, and sanitized drawer persistence
-- [ ] 11-05-PLAN.md — Project AI history UI, final redaction checks, and Phase 12 executor handoff
+- [x] 11-01-PLAN.md — Backend proposal persistence and lifecycle core
+- [x] 11-02-PLAN.md — Backend chat proposal conversion, approve/cancel API, and proposal audit
+- [x] 11-03-PLAN.md — Backend project AI history API and privacy filtering
+- [x] 11-04-PLAN.md — Frontend proposal cards, approve/cancel mutations, and sanitized drawer persistence
+- [x] 11-05-PLAN.md — Project AI history UI, final redaction checks, and Phase 12 executor handoff
 **UI hint**: yes
 
 ### Phase 12: Low-Risk Write Tools MVP
@@ -130,13 +130,13 @@ Plans:
 | AI-READ-02 | Phase 10 | Complete |
 | AI-READ-03 | Phase 10 | Complete |
 | AI-READ-04 | Phase 10 | Complete |
-| AI-ACT-01 | Phase 11 | Planned |
-| AI-APP-01 | Phase 11 | Planned |
-| AI-APP-02 | Phase 11 | Planned |
-| AI-APP-03 | Phase 11 | Planned |
-| AI-AUD-01 | Phase 11 | Planned |
-| AI-AUD-02 | Phase 11 | Planned |
-| AI-AUD-03 | Phase 11 | Planned |
+| AI-ACT-01 | Phase 11 | Complete |
+| AI-APP-01 | Phase 11 | Complete |
+| AI-APP-02 | Phase 11 | Complete |
+| AI-APP-03 | Phase 11 | Complete |
+| AI-AUD-01 | Phase 11 | Complete |
+| AI-AUD-02 | Phase 11 | Complete |
+| AI-AUD-03 | Phase 11 | Complete |
 | AI-WRITE-01 | Phase 12 | Planned |
 | AI-WRITE-02 | Phase 12 | Planned |
 | AI-WRITE-03 | Phase 12 | Planned |
