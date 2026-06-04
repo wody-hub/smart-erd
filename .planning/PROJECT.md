@@ -7,7 +7,7 @@
 
 Smart-ERD is a validated SI project-management collaboration platform. The v1.0 milestone delivered the document/editor foundation plus SI PM workflows: business overview, WBS and milestones, Gantt visualization, dedicated WBS workspace, staffing M/M, issue tracking, and WBS work history.
 
-The v1.1 milestone extends those project-management workflows with an in-app AI chatbot and a controlled AI execution gateway. The first implementation targets a local/Electron MVP that can invoke an installed, logged-in Codex CLI without requiring an OpenAI API key. The design must keep a provider abstraction so the runtime can later switch to OpenAI API, Ollama, Claude, or another model provider.
+The v1.1 milestone extends those project-management workflows with an in-app AI chatbot and a controlled AI execution gateway. Phases 9-11 are complete: the provider gateway, read-only chat context tools, and approval-preview/audit proposal shell are validated. The next active work is Phase 12, which registers concrete low-risk write executors for issue, TODO, and WBS comment/memo actions.
 
 Closeout evidence:
 
@@ -40,6 +40,9 @@ SI 프로젝트에서 발생하는 모든 산출물과 관리 활동을 하나�
 - Staffing M/M plan/actual matrix and labor-cost calculation
 - Issue tracker with state management, filters, and Excel export
 - WBS work documents, tags, comments/activity history, and private TODO linkage policy
+- AI provider gateway with Local Codex Adapter availability, structured output validation, timeout/error handling, and metadata-only audit
+- In-app authenticated AI chat drawer with authorized project/team context, read-only project tools, and grounded answer sections
+- Persisted AI action proposals with server-generated preview, approve/cancel lifecycle, project AI history, redacted audit metadata, and no production write executors before Phase 12
 
 ## Architecture
 
@@ -96,4 +99,4 @@ Explicitly excluded from v1.1:
 
 ---
 
-*Last updated: 2026-05-29 for v1.1 milestone start*
+*Last updated: 2026-06-04 after Phase 11 completion*
