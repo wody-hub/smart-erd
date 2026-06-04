@@ -27,7 +27,7 @@ AI는 Smart-ERD 서버가 제공하는 도구로만 프로젝트 데이터를 �
 - [x] **AI-READ-01**: AI는 사업 개요와 프로젝트 요약 정보를 조회할 수 있다. *(Phase 10 verification: partial)*
 - [x] **AI-READ-02**: AI는 WBS와 마일스톤 정보를 조회할 수 있다. *(Phase 10 verification: partial)*
 - [x] **AI-READ-03**: AI는 이슈, 개인 TODO, WBS 작업 히스토리/댓글 정보를 조회할 수 있다. *(Phase 10 verification: blocked)*
-- [ ] **AI-READ-04**: 모든 read tool 호출은 기존 사용자, 팀, 프로젝트, 리소스 권한과 scope를 검증한다. *(Phase 10 verification: blocked)*
+- [x] **AI-READ-04**: 모든 read tool 호출은 기존 사용자, 팀, 프로젝트, 리소스 권한과 scope를 검증한다. *(Phase 10 verification: blocked)*
 
 ### Action Proposal + Approval
 

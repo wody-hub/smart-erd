@@ -72,8 +72,8 @@ Plans:
 
 **Gap Closure Wave** *(planned after Phase 10 verification gaps)*
 
-- [ ] 10-08-PLAN.md — Provider grounding summaries and shared provider context privacy
-- [ ] 10-09-PLAN.md — Member TODO aggregate privacy and required scope authorization dependency
+- [x] 10-08-PLAN.md — Provider grounding summaries and shared provider context privacy
+- [x] 10-09-PLAN.md — Member TODO aggregate privacy and required scope authorization dependency
 - [ ] 10-10-PLAN.md — Team MULTI_PROJECT chat contract and unsupported selectedResource removal
 
 **UI hint**: yes
