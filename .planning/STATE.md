@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: AI 업무 실행 Gateway + Local Codex Chatbot
 status: planning
-stopped_at: Phase 11 context gathered
-last_updated: "2026-06-04T03:15:31.452Z"
+stopped_at: Phase 11 UI-SPEC required before planning
+last_updated: "2026-06-04T03:24:26.801Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 4
@@ -88,9 +88,9 @@ Last activity: 2026-06-04
 
 ## Session Info
 
-Last session: 2026-06-04T03:15:31.443Z
-Stopped At: Phase 11 context gathered
-Resume File: .planning/phases/11-approval-preview-audit-execution-pipeline/11-CONTEXT.md
+Last session: 2026-06-04T03:24:26.788Z
+Stopped At: Phase 11 UI-SPEC required before planning
+Resume File: .planning/phases/11-approval-preview-audit-execution-pipeline/11-RESEARCH.md
 
 ## Deferred Items
 
