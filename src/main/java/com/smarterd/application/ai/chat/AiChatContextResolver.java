@@ -19,19 +19,14 @@ public class AiChatContextResolver {
 
     public static final int MAX_TEAM_PROJECTS = 20;
 
-    @Nullable
     private final ProjectContextLoader projectContextLoader;
 
     @Nullable
     private final ProjectService projectService;
 
-    public AiChatContextResolver() {
-        this(null, null);
-    }
-
     @Autowired
     public AiChatContextResolver(
-        @Nullable ProjectContextLoader projectContextLoader,
+        ProjectContextLoader projectContextLoader,
         @Nullable ProjectService projectService
     ) {
         this.projectContextLoader = projectContextLoader;
@@ -155,9 +150,6 @@ public class AiChatContextResolver {
     }
 
     private ResolvedContext authorizeSingleProject(String loginId, Long teamId, Long projectId) {
-        if (projectContextLoader == null) {
-            return ResolvedContext.resolved(teamId, List.of(projectId), "project");
-        }
         try {
             final var context = projectContextLoader.load(loginId, teamId, projectId, false);
             return ResolvedContext.resolved(context.team().getId(), List.of(context.project().getId()), context.project().getName());

@@ -1,15 +1,36 @@
 package com.smarterd.application.ai.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.smarterd.domain.common.exception.DomainAccessDeniedException;
+import com.smarterd.domain.pm.common.ProjectContextLoader;
+import com.smarterd.domain.project.entity.Project;
 import java.util.List;
 import java.util.stream.LongStream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+import com.smarterd.domain.team.entity.Team;
+import com.smarterd.domain.user.entity.User;
 
+@ExtendWith(MockitoExtension.class)
 class AiChatContextResolverTest {
 
-    private final AiChatContextResolver resolver = new AiChatContextResolver();
+    @Mock
+    private ProjectContextLoader projectContextLoader;
+
+    private AiChatContextResolver resolver;
+
+    @BeforeEach
+    void setUp() {
+        resolver = new AiChatContextResolver(projectContextLoader, null);
+    }
 
     @Test
     @DisplayName("10-W0-01 weak context asks for explicit scope before provider execution")
@@ -27,6 +48,8 @@ class AiChatContextResolverTest {
     @Test
     @DisplayName("10-W0-01 current route team/project scope resolves without confirmation")
     void w0_10_W0_01_currentRouteProjectScopeResolves() {
+        when(projectContextLoader.load("tester", 1L, 10L, false)).thenReturn(projectContext(1L, 10L, "Authorized Project"));
+
         final var result = resolver.resolve(
             "tester",
             new AiChatContextResolver.ResolveCommand(1L, 10L, "project-route", List.of(), null, false, false)
@@ -35,6 +58,8 @@ class AiChatContextResolverTest {
         assertThat(result.status()).isEqualTo(AiChatContextResolver.ScopeStatus.RESOLVED);
         assertThat(result.teamId()).isEqualTo(1L);
         assertThat(result.projectIds()).containsExactly(10L);
+        assertThat(result.label()).isEqualTo("Authorized Project");
+        verify(projectContextLoader).load("tester", 1L, 10L, false);
     }
 
     @Test
@@ -66,6 +91,7 @@ class AiChatContextResolverTest {
     void namedProjectResolvesOnlyOnNormalizedExactMatch() {
         final var target = new AiChatContextResolver.ProjectCandidate(1L, 10L, "Alpha_Renewal");
         final var other = new AiChatContextResolver.ProjectCandidate(1L, 11L, "Alpha Operations");
+        when(projectContextLoader.load("tester", 1L, 10L, false)).thenReturn(projectContext(1L, 10L, "Alpha_Renewal"));
 
         final var result = resolver.resolve(
             "tester",
@@ -82,6 +108,23 @@ class AiChatContextResolverTest {
 
         assertThat(result.status()).isEqualTo(AiChatContextResolver.ScopeStatus.RESOLVED);
         assertThat(result.projectIds()).containsExactly(10L);
+    }
+
+    @Test
+    @DisplayName("10-09 single-project scope returns DENIED when ProjectContextLoader rejects access")
+    void singleProjectScopeReturnsDeniedWhenProjectContextLoaderRejectsAccess() {
+        when(projectContextLoader.load("tester", 1L, 10L, false))
+            .thenThrow(new DomainAccessDeniedException("error.access-denied.not-member"));
+
+        final var result = resolver.resolve(
+            "tester",
+            new AiChatContextResolver.ResolveCommand(1L, 10L, "project-route", List.of(), null, false, false)
+        );
+
+        assertThat(result.status()).isEqualTo(AiChatContextResolver.ScopeStatus.DENIED);
+        assertThat(result.projectIds()).isEmpty();
+        assertThat(result.confirmationReason()).isEqualTo(AiChatContextResolver.ConfirmationReason.UNAUTHORIZED_SCOPE);
+        verify(projectContextLoader).load("tester", 1L, 10L, false);
     }
 
     @Test
@@ -197,5 +240,14 @@ class AiChatContextResolverTest {
 
         assertThat(result.status()).isEqualTo(AiChatContextResolver.ScopeStatus.DENIED);
         assertThat(result.confirmationReason()).isEqualTo(AiChatContextResolver.ConfirmationReason.UNSUPPORTED_ALL_TEAM);
+    }
+
+    private ProjectContextLoader.ProjectContext projectContext(Long teamId, Long projectId, String projectName) {
+        final var owner = User.builder().loginId("owner").password("encoded").name("Owner").build();
+        final var team = Team.builder().name("Team").owner(owner).build();
+        ReflectionTestUtils.setField(team, "id", teamId);
+        final var project = Project.builder().team(team).name(projectName).description("desc").build();
+        ReflectionTestUtils.setField(project, "id", projectId);
+        return new ProjectContextLoader.ProjectContext(team, project);
     }
 }
