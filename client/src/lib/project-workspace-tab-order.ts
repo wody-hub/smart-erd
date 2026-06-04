@@ -7,6 +7,7 @@ export const PROJECT_WORKSPACE_TAB_VALUES = [
   'gantt',
   'staffing',
   'issues',
+  'aiHistory',
 ] as const;
 
 export type ProjectWorkspaceTabValue = (typeof PROJECT_WORKSPACE_TAB_VALUES)[number];

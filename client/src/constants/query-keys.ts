@@ -96,6 +96,12 @@ export const queryKeys = {
     /** AI proposal 취소 */
     proposalCancel: (proposalId: string) => ['ai-chat', 'proposal', proposalId, 'cancel'] as const,
   },
+  /** AI history 관련 쿼리 키 */
+  aiHistory: {
+    /** 프로젝트 AI history */
+    project: (teamId: string, projectId: string, limit: number) =>
+      ['teams', teamId, 'projects', projectId, 'ai-history', limit] as const,
+  },
   /** 다이어그램 관련 쿼리 키 */
   diagrams: {
     /** 프로젝트별 다이어그램 목록 */

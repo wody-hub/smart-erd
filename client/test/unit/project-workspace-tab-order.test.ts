@@ -12,6 +12,7 @@ test('resolveProjectWorkspaceTabOrder appends missing defaults', () => {
     'myTasks',
     'gantt',
     'staffing',
+    'aiHistory',
   ]);
 });
 
@@ -25,6 +26,7 @@ test('resolveProjectWorkspaceTabOrder drops duplicates and unknown values', () =
     'gantt',
     'staffing',
     'issues',
+    'aiHistory',
   ]);
 });
 
@@ -32,6 +34,21 @@ test('resolveProjectWorkspaceTabOrder falls back to default order', () => {
   assert.deepEqual(resolveProjectWorkspaceTabOrder([]), [
     'overview',
     'documents',
+    'tags',
+    'wbs',
+    'myTasks',
+    'gantt',
+    'staffing',
+    'issues',
+    'aiHistory',
+  ]);
+});
+
+test('11-W4-05 resolveProjectWorkspaceTabOrder appends aiHistory once for saved arrays', () => {
+  assert.deepEqual(resolveProjectWorkspaceTabOrder(['documents', 'aiHistory', 'documents']), [
+    'documents',
+    'aiHistory',
+    'overview',
     'tags',
     'wbs',
     'myTasks',

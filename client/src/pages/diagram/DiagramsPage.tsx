@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   BookOpen,
+  BotMessageSquare,
   CalendarRange,
   CircleAlert,
   ClipboardList,
@@ -41,6 +42,7 @@ import { fetchTeam } from '@/api/teamApi';
 import Header from '@/components/layout/Header';
 import BusinessOverviewTab from '@/components/project/BusinessOverviewTab';
 import MyTasksTab from '@/components/project/MyTasksTab';
+import ProjectAiHistoryTab from '@/components/project/ProjectAiHistoryTab';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import GanttTab from '@/components/gantt/GanttTab';
@@ -180,7 +182,11 @@ export default function DiagramsPage() {
         })
       : ROUTES.GUIDE_ENTRY({
           source:
-            activeTab === 'tags' ? 'documents' : activeTab === 'myTasks' ? 'overview' : activeTab,
+            activeTab === 'tags'
+              ? 'documents'
+              : activeTab === 'myTasks' || activeTab === 'aiHistory'
+                ? 'overview'
+                : activeTab,
           teamId: teamId!,
           projectId: projectId!,
           hash: 'guide-project-hub',
@@ -243,13 +249,21 @@ export default function DiagramsPage() {
                       description: t('staffing.section.description'),
                       metaDetail: t('workspace.projectHub.staffingMeta'),
                     }
-                  : {
-                      section: 'projects' as const,
-                      tone: 'projects' as const,
-                      eyebrow: t('issues.tab.title'),
-                      description: t('issues.section.description'),
-                      metaDetail: t('workspace.projectHub.issuesMeta'),
-                    };
+                  : activeTab === 'aiHistory'
+                    ? {
+                        section: 'projects' as const,
+                        tone: 'projects' as const,
+                        eyebrow: t('aiHistory.title'),
+                        description: t('workspace.projectHub.aiHistoryDescription'),
+                        metaDetail: t('workspace.projectHub.aiHistoryMeta'),
+                      }
+                    : {
+                        section: 'projects' as const,
+                        tone: 'projects' as const,
+                        eyebrow: t('issues.tab.title'),
+                        description: t('issues.section.description'),
+                        metaDetail: t('workspace.projectHub.issuesMeta'),
+                      };
 
   const tabs: DiagramsTabConfig[] = useMemo(
     () => [
@@ -367,6 +381,14 @@ export default function DiagramsPage() {
           <IssuesTab teamId={currentTeamId} projectId={currentProjectId} canEdit={currentCanEdit} />
         ),
       },
+      {
+        value: 'aiHistory',
+        label: t('aiHistory.tab.title'),
+        icon: BotMessageSquare,
+        renderContent: ({ teamId: currentTeamId, projectId: currentProjectId }) => (
+          <ProjectAiHistoryTab teamId={currentTeamId} projectId={currentProjectId} />
+        ),
+      },
     ],
     [role, t],
   );
@@ -442,7 +464,10 @@ export default function DiagramsPage() {
         <div
           className={cn(
             'workspace-container',
-            activeTab === 'gantt' || activeTab === 'staffing' || activeTab === 'issues'
+            activeTab === 'gantt' ||
+              activeTab === 'staffing' ||
+              activeTab === 'issues' ||
+              activeTab === 'aiHistory'
               ? 'max-w-none'
               : 'max-w-5xl',
           )}

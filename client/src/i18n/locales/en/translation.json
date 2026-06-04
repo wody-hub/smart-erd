@@ -140,6 +140,32 @@
       "stopWaiting": "Stop waiting"
     }
   },
+  "aiHistory": {
+    "tab": {
+      "title": "AI History"
+    },
+    "title": "AI History",
+    "description": "Review project-scoped AI executions, proposals, approval decisions, and error history in read-only mode.",
+    "loading": "Loading AI history...",
+    "empty": "No AI history yet",
+    "emptyDescription": "AI proposals and approval decisions will appear here after they occur.",
+    "error": "We couldn't load AI history",
+    "errorDescription": "Try loading the AI history again.",
+    "resultCount": "Showing {{count}} of up to {{limit}} record(s)",
+    "hasMore": "More history is available",
+    "emptyValue": "-",
+    "column": {
+      "status": "Status / Risk",
+      "action": "Action / Provider",
+      "target": "Target",
+      "requester": "Requester",
+      "decision": "Decision actor",
+      "created": "Created",
+      "decided": "Decided",
+      "ids": "IDs",
+      "error": "Summary / Error"
+    }
+  },
   "guide": {
     "entry": {
       "auth": "Open product guide",
@@ -463,6 +489,8 @@
       "staffingMeta": "Planned/actual M/M and labor cost",
       "issuesDescription": "Register project issues, filter the live list by status, priority, and assignee, then export the current result set to Excel.",
       "issuesMeta": "Excel export for the current filtered list",
+      "aiHistoryDescription": "Review project-scoped AI proposals, approval decisions, execution audit records, and redacted errors in read-only mode.",
+      "aiHistoryMeta": "Proposal, approval, and error audit history",
       "tabOrderUpdateFailed": "We couldn't save the tab order"
     },
     "dictionary": {

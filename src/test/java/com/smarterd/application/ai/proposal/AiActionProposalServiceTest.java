@@ -80,6 +80,45 @@ class AiActionProposalServiceTest {
     }
 
     @Test
+    void approve_rejectsPhase12ActionTypesUntilExecutorsAreRegistered() {
+        final var service = service(new AiActionExecutorRegistry(List.of()));
+        final var actionTypes = List.of(
+            "issue.create",
+            "issue.update",
+            "todo.create",
+            "todo.update",
+            "wbs.comment.add",
+            "wbs.memo.add"
+        );
+
+        for (final var actionType : actionTypes) {
+            final var proposal = proposal("proposal-" + actionType, actionType);
+            when(proposalRepository.findByProposalId("proposal-" + actionType)).thenReturn(Optional.of(proposal));
+
+            final var view = service.approve("tester", "proposal-" + actionType);
+
+            assertThat(view.status()).isEqualTo(AiActionProposalStatus.REJECTED);
+            assertThat(view.redactedErrorTitle()).isEqualTo("Unsupported action");
+            verify(auditService).recordProposalDecision(proposal);
+        }
+        verify(executor, never()).execute(any(), any());
+    }
+
+    @Test
+    void approve_expiresStaleProposalBeforeExecutorLookup() {
+        when(executor.actionType()).thenReturn("issue.create");
+        final var service = service(new AiActionExecutorRegistry(List.of(executor)));
+        final var proposal = proposal("proposal-1", "issue.create", Instant.EPOCH);
+        when(proposalRepository.findByProposalId("proposal-1")).thenReturn(Optional.of(proposal));
+
+        final var view = service.approve("tester", "proposal-1");
+
+        assertThat(view.status()).isEqualTo(AiActionProposalStatus.EXPIRED);
+        verify(executor, never()).execute(any(), any());
+        verify(auditService).recordProposalDecision(proposal);
+    }
+
+    @Test
     void cancel_isIdempotentForTerminalProposal() {
         final var service = service(new AiActionExecutorRegistry(List.of()));
         final var proposal = proposal("proposal-1", "issue.create");
@@ -170,6 +209,10 @@ class AiActionProposalServiceTest {
     }
 
     private AiActionProposal proposal(String proposalId, String actionType) {
+        return proposal(proposalId, actionType, Instant.now().plusSeconds(900));
+    }
+
+    private AiActionProposal proposal(String proposalId, String actionType, Instant expiresAt) {
         return new AiActionProposal(
             proposalId,
             "exec-1",
@@ -185,7 +228,7 @@ class AiActionProposalServiceTest {
             "Create issue",
             "Create a proposal",
             "tester",
-            Instant.now().plusSeconds(900),
+            expiresAt,
             "{\"targetType\":\"issue\",\"targetId\":\"ISS-1\",\"targetLabel\":\"Risk issue\"}",
             "{}"
         );
