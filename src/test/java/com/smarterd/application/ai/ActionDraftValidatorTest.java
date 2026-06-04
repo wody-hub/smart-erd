@@ -37,6 +37,17 @@ class ActionDraftValidatorTest {
     }
 
     @Test
+    void validate_rejectsBulkSqlAndCommandDrafts() {
+        final var drafts = List.of(
+            new AiActionDraft("a1", "todo.bulk-update", "Bulk TODO", "Unsafe", AiActionRiskLevel.LOW, true, Map.of()),
+            new AiActionDraft("a2", "report.sql", "SQL", "Unsafe", AiActionRiskLevel.LOW, true, Map.of()),
+            new AiActionDraft("a3", "shell.command", "Command", "Unsafe", AiActionRiskLevel.LOW, true, Map.of())
+        );
+
+        assertThatThrownBy(() -> validator.validate(drafts)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
     void validate_rejectsDraftWithoutExplicitApprovalFlag() {
         final var drafts = List.of(
             new AiActionDraft("a1", "todo.update", "Update TODO", "Missing approval", AiActionRiskLevel.LOW, false, Map.of())
