@@ -2,6 +2,8 @@ package com.smarterd.application.ai.chat;
 
 import com.smarterd.application.ai.AiExecutionGateway;
 import com.smarterd.application.ai.AiProviderExecutionRunner;
+import com.smarterd.application.ai.proposal.AiActionProposalService;
+import com.smarterd.application.ai.proposal.AiActionProposalView;
 import com.smarterd.application.ai.provider.AiProviderError;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -19,7 +21,15 @@ public class AiChatExecutionService {
     private final AiChatContextResolver contextResolver;
     private final AiReadContextService readContextService;
     private final AiProviderExecutionRunner providerExecutionRunner;
+    private final AiActionProposalService proposalService;
 
+    /**
+     * Resolves chat scope, runs the provider, and returns an answer with optional proposals.
+     *
+     * @param loginId requester login id
+     * @param command chat command
+     * @return chat view for the API layer
+     */
     public AiChatView execute(String loginId, ChatCommand command) {
         final var context = contextResolver.resolve(loginId, command.toResolveCommand());
         if (context.status() == AiChatContextResolver.ScopeStatus.DENIED) {
@@ -60,9 +70,7 @@ public class AiChatExecutionService {
         if (execution.error() != null) {
             return providerFailure(execution, readContext, context);
         }
-        if (!execution.actions().isEmpty()) {
-            return readOnlyActionRejected(execution, readContext, context);
-        }
+        final var proposals = createProposals(loginId, execution, context);
         return new AiChatView(
             "ANSWER",
             execution.executionId(),
@@ -75,6 +83,7 @@ public class AiChatExecutionService {
             readContext.needsConfirmation(),
             readContext.sourceChips(),
             List.of(),
+            proposals,
             null,
             null
         );
@@ -91,6 +100,16 @@ public class AiChatExecutionService {
         boolean currentTeamMode,
         boolean multiProjectQuestion
     ) {
+        /**
+         * Creates a command from the legacy route-level chat fields.
+         *
+         * @param teamId team id
+         * @param projectId project id
+         * @param userMessage user prompt
+         * @param locale requested locale
+         * @param routeSource route source label
+         * @return initialized chat command
+         */
         public ChatCommand(Long teamId, Long projectId, String userMessage, String locale, String routeSource) {
             this(teamId, projectId, userMessage, locale, routeSource, null, null, false, false);
         }
@@ -118,6 +137,11 @@ public class AiChatExecutionService {
             );
         }
 
+        /**
+         * Detects when the question asks for member or team TODO aggregation.
+         *
+         * @return true when member TODO aggregation is requested
+         */
         private boolean memberTodoSummaryRequested() {
             final var text = userMessage == null ? "" : userMessage.toLowerCase(java.util.Locale.ROOT);
             return text.contains("member todo") || text.contains("team todo") || text.contains("멤버") || text.contains("팀원");
@@ -136,9 +160,23 @@ public class AiChatExecutionService {
         List<String> needsConfirmation,
         List<AiReadContextService.SourceChip> sourceChips,
         List<AiChatConfirmationCandidateView> confirmationCandidates,
+        List<AiActionProposalView> proposals,
         String error,
         AiChatErrorView errorState
     ) {
+        /**
+         * Creates a backward-compatible view for older tests and callers.
+         *
+         * @param status chat status
+         * @param conclusion leading conclusion text
+         * @param interpretation provider answer text
+         * @param confirmedFacts confirmed facts
+         * @param needsConfirmation missing confirmation items
+         * @param sourceChips source chips
+         * @param confirmationCandidates project confirmation candidates
+         * @param error safe error text
+         * @return initialized chat view
+         */
         public AiChatView(
             String status,
             String conclusion,
@@ -161,6 +199,7 @@ public class AiChatExecutionService {
                 needsConfirmation,
                 sourceChips,
                 confirmationCandidates.stream().map(AiChatConfirmationCandidateView::from).toList(),
+                List.of(),
                 error,
                 error == null ? null : new AiChatErrorView("AI_CHAT_ERROR", error, false)
             );
@@ -172,8 +211,16 @@ public class AiChatExecutionService {
             sourceChips = sourceChips == null ? List.of() : List.copyOf(sourceChips);
             confirmationCandidates =
                 confirmationCandidates == null ? List.of() : List.copyOf(confirmationCandidates);
+            proposals = proposals == null ? List.of() : List.copyOf(proposals);
         }
 
+        /**
+         * Creates a scope-confirmation response without project candidates.
+         *
+         * @param needsConfirmation missing confirmation items
+         * @param candidates project confirmation candidates
+         * @return confirmation chat view
+         */
         public static AiChatView needsConfirmation(
             List<String> needsConfirmation,
             List<AiChatContextResolver.ProjectCandidate> candidates
@@ -181,6 +228,14 @@ public class AiChatExecutionService {
             return needsConfirmation(needsConfirmation, candidates, null);
         }
 
+        /**
+         * Creates a scope-confirmation response with a stable reason code.
+         *
+         * @param needsConfirmation missing confirmation items
+         * @param candidates project confirmation candidates
+         * @param confirmationReason stable confirmation reason
+         * @return confirmation chat view
+         */
         public static AiChatView needsConfirmation(
             List<String> needsConfirmation,
             List<AiChatContextResolver.ProjectCandidate> candidates,
@@ -202,11 +257,21 @@ public class AiChatExecutionService {
                 safeNeedsConfirmation,
                 List.of(),
                 safeCandidates.stream().map(AiChatConfirmationCandidateView::from).toList(),
+                List.of(),
                 null,
                 null
             );
         }
 
+        /**
+         * Creates a structured chat error response.
+         *
+         * @param code error code
+         * @param message safe error message
+         * @param retryable retry hint
+         * @param needsConfirmation missing confirmation items
+         * @return error chat view
+         */
         public static AiChatView error(String code, String message, boolean retryable, List<String> needsConfirmation) {
             return new AiChatView(
                 "ERROR",
@@ -218,6 +283,7 @@ public class AiChatExecutionService {
                 "",
                 List.of(),
                 needsConfirmation,
+                List.of(),
                 List.of(),
                 List.of(),
                 message,
@@ -267,14 +333,34 @@ public class AiChatExecutionService {
 
     public record AiChatErrorView(String code, String message, boolean retryable) {}
 
+    /**
+     * Converts a resolver confirmation reason to its wire value.
+     *
+     * @param context resolved chat context
+     * @return confirmation reason name or null
+     */
     private static String confirmationReason(AiChatContextResolver.ResolvedContext context) {
         return context.confirmationReason() == null ? null : context.confirmationReason().name();
     }
 
+    /**
+     * Picks the first resolved project id for provider execution metadata.
+     *
+     * @param context resolved chat context
+     * @return representative project id or null
+     */
     private static Long representativeProjectId(AiChatContextResolver.ResolvedContext context) {
         return context.projectIds().isEmpty() ? null : context.projectIds().getFirst();
     }
 
+    /**
+     * Builds the sanitized provider context from resolved scope and read data.
+     *
+     * @param command chat command
+     * @param context resolved chat context
+     * @param readContext sanitized read context
+     * @return provider context map
+     */
     private static Map<String, Object> providerContext(
         ChatCommand command,
         AiChatContextResolver.ResolvedContext context,
@@ -294,6 +380,13 @@ public class AiChatExecutionService {
         return Map.copyOf(map);
     }
 
+    /**
+     * Builds the resolved scope section returned to the browser.
+     *
+     * @param context resolved chat context
+     * @param readContext sanitized read context
+     * @return chat context view
+     */
     private static AiChatContextView contextView(
         AiChatContextResolver.ResolvedContext context,
         AiReadContextService.ReadContext readContext
@@ -308,6 +401,12 @@ public class AiChatExecutionService {
         );
     }
 
+    /**
+     * Chooses the leading answer conclusion from confirmed read facts.
+     *
+     * @param readContext sanitized read context
+     * @return conclusion text
+     */
     private static String conclusion(AiReadContextService.ReadContext readContext) {
         if (!readContext.confirmedFacts().isEmpty()) {
             return readContext.confirmedFacts().getFirst();
@@ -315,6 +414,14 @@ public class AiChatExecutionService {
         return "확인된 프로젝트 요약을 기준으로 답변했습니다.";
     }
 
+    /**
+     * Maps provider failure into the safe chat error response.
+     *
+     * @param execution provider execution view
+     * @param readContext sanitized read context
+     * @param context resolved chat context
+     * @return error chat view
+     */
     private static AiChatView providerFailure(
         AiExecutionGateway.AiExecutionView execution,
         AiReadContextService.ReadContext readContext,
@@ -333,34 +440,47 @@ public class AiChatExecutionService {
             readContext.needsConfirmation(),
             readContext.sourceChips(),
             List.of(),
+            List.of(),
             error.detail(),
             errorView(error)
         );
     }
 
-    private static AiChatView readOnlyActionRejected(
+    /**
+     * Persists provider action drafts as sanitized approval proposals.
+     *
+     * @param loginId requester login id
+     * @param execution provider execution view
+     * @param context resolved chat context
+     * @return sanitized proposal views
+     */
+    private List<AiActionProposalView> createProposals(
+        String loginId,
         AiExecutionGateway.AiExecutionView execution,
-        AiReadContextService.ReadContext readContext,
         AiChatContextResolver.ResolvedContext context
     ) {
-        final var message = "Provider returned action drafts, which are not allowed in read-only chat.";
-        return new AiChatView(
-            "ERROR",
-            execution.executionId(),
-            false,
-            null,
-            contextView(context, readContext),
-            conclusion(readContext),
-            "",
-            readContext.confirmedFacts(),
-            readContext.needsConfirmation(),
-            readContext.sourceChips(),
-            List.of(),
-            message,
-            new AiChatErrorView("READ_ONLY_PROVIDER_ACTION_REJECTED", message, false)
+        if (execution.actions().isEmpty()) {
+            return List.of();
+        }
+        return proposalService.createProposals(
+            new AiActionProposalService.CreateCommand(
+                execution.executionId(),
+                execution.provider(),
+                execution.promptVersion(),
+                context.teamId(),
+                representativeProjectId(context),
+                loginId,
+                execution.actions()
+            )
         );
     }
 
+    /**
+     * Maps provider error metadata into the chat error card.
+     *
+     * @param error provider error metadata
+     * @return chat error view
+     */
     private static AiChatErrorView errorView(AiProviderError error) {
         return new AiChatErrorView(error.type(), error.detail(), error.retryable());
     }

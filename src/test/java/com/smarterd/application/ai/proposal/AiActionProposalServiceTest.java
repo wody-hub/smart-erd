@@ -3,10 +3,12 @@ package com.smarterd.application.ai.proposal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smarterd.application.ai.AiExecutionAuditService;
 import com.smarterd.application.ai.provider.AiActionDraft;
 import com.smarterd.application.ai.provider.AiActionRiskLevel;
 import com.smarterd.domain.ai.AiActionProposal;
@@ -29,6 +31,9 @@ class AiActionProposalServiceTest {
 
     @Mock
     private AiActionExecutor executor;
+
+    @Mock
+    private AiExecutionAuditService auditService;
 
     @Test
     void createProposals_persistsSanitizedIndependentPendingProposals() {
@@ -57,6 +62,7 @@ class AiActionProposalServiceTest {
             assertThat(view.target().type()).isEqualTo("issue");
             assertThat(view.expiresAt()).isAfter(Instant.now().plusSeconds(14 * 60));
         });
+        verify(auditService, times(2)).recordProposalCreated(any(AiActionProposal.class));
     }
 
     @Test
@@ -70,6 +76,7 @@ class AiActionProposalServiceTest {
         assertThat(view.status()).isEqualTo(AiActionProposalStatus.REJECTED);
         assertThat(view.redactedErrorTitle()).isEqualTo("Unsupported action");
         verify(executor, never()).execute(any(), any());
+        verify(auditService).recordProposalDecision(proposal);
     }
 
     @Test
@@ -84,6 +91,19 @@ class AiActionProposalServiceTest {
 
         assertThat(first.status()).isEqualTo(AiActionProposalStatus.CANCELLED);
         assertThat(second.status()).isEqualTo(AiActionProposalStatus.CANCELLED);
+        verify(auditService, never()).recordProposalDecision(proposal);
+    }
+
+    @Test
+    void cancel_recordsPendingDecisionAudit() {
+        final var service = service(new AiActionExecutorRegistry(List.of()));
+        final var proposal = proposal("proposal-1", "issue.create");
+        when(proposalRepository.findByProposalId("proposal-1")).thenReturn(Optional.of(proposal));
+
+        final var view = service.cancel("tester", "proposal-1");
+
+        assertThat(view.status()).isEqualTo(AiActionProposalStatus.CANCELLED);
+        verify(auditService).recordProposalDecision(proposal);
     }
 
     @Test
@@ -111,6 +131,7 @@ class AiActionProposalServiceTest {
 
         assertThat(count).isEqualTo(1);
         assertThat(pending.getStatus()).isEqualTo(AiActionProposalStatus.EXPIRED);
+        verify(auditService).recordProposalDecision(pending);
     }
 
     private AiActionProposalService service(AiActionExecutorRegistry registry) {
@@ -120,6 +141,7 @@ class AiActionProposalServiceTest {
             new AiActionProposalValidator(),
             new AiActionPreviewService(),
             registry,
+            auditService,
             new ObjectMapper().findAndRegisterModules()
         );
     }

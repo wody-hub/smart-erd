@@ -72,6 +72,10 @@ public enum MessageCode {
     ERROR_BUSINESS_AI_CHAT_ALL_TEAM_UNSUPPORTED("error.business.ai-chat.all-team-unsupported"),
     ERROR_BUSINESS_AI_OUTPUT_VALIDATION_FAILED("error.business.ai-output-validation-failed"),
     ERROR_BUSINESS_AI_SELECTED_RESOURCE_UNSUPPORTED("error.business.ai-selected-resource-unsupported"),
+    ERROR_BUSINESS_AI_PROPOSAL_EXPIRED("error.business.ai-proposal.expired"),
+    ERROR_BUSINESS_AI_PROPOSAL_UNSUPPORTED_ACTION("error.business.ai-proposal.unsupported-action"),
+    ERROR_BUSINESS_AI_PROPOSAL_INVALID_OR_STALE("error.business.ai-proposal.invalid-or-stale"),
+    ERROR_BUSINESS_AI_PROPOSAL_TERMINAL("error.business.ai-proposal.terminal"),
     ERROR_ACCESS_DENIED_AI_CHAT_SCOPE("error.access-denied.ai-chat-scope"),
     ERROR_BUSINESS_WORK_COMMENT_CONTENT_REQUIRED("error.business.work-comment-content-required"),
     ERROR_BUSINESS_WORK_COMMENT_CONTENT_TOO_LONG("error.business.work-comment-content-too-long"),
@@ -126,6 +130,7 @@ public enum MessageCode {
     ERROR_NOT_FOUND_WORD("error.not-found.word"),
     ERROR_NOT_FOUND_USER("error.not-found.user"),
     ERROR_NOT_FOUND_AI_EXECUTION("error.not-found.ai-execution"),
+    ERROR_NOT_FOUND_AI_PROPOSAL("error.not-found.ai-proposal"),
     ERROR_VALIDATION_FAILED("error.validation.failed"),
     ERROR_UNEXPECTED("error.unexpected");
 

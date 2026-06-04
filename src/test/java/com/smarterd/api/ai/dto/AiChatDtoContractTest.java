@@ -125,6 +125,7 @@ class AiChatDtoContractTest {
             List.of("Delayed issues: 2"),
             "Risk is concentrated in API work.",
             List.of(),
+            List.of(),
             null,
             null
         );
@@ -135,6 +136,8 @@ class AiChatDtoContractTest {
         assertThat(json.get("requiresConfirmation").asBoolean()).isFalse();
         assertThat(json.get("context").get("label").asText()).isEqualTo("Alpha Project");
         assertThat(json.get("sourceChips").get(0).get("tool").asText()).isEqualTo("issues");
+        assertThat(json.get("proposals").isArray()).isTrue();
+        assertThat(json.get("proposals")).isEmpty();
         assertThat(json.has("actions")).isFalse();
         assertThat(json.has("proposal")).isFalse();
         assertThat(json.has("approval")).isFalse();

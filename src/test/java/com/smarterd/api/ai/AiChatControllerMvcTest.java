@@ -9,8 +9,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.api.common.GlobalExceptionHandler;
 import com.smarterd.application.ai.chat.AiChatExecutionService;
+import com.smarterd.application.ai.proposal.AiActionProposalView;
+import com.smarterd.application.ai.provider.AiActionRiskLevel;
+import com.smarterd.domain.ai.AiActionProposalStatus;
 import com.smarterd.domain.common.exception.DomainAccessDeniedException;
 import com.smarterd.domain.common.message.MessageCode;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -102,6 +106,55 @@ class AiChatControllerMvcTest {
     }
 
     @Test
+    @DisplayName("11-W2-01 chat response exposes sanitized proposal previews")
+    void w2_11_W2_01_chatResponseExposesSanitizedProposalPreviews() throws Exception {
+        when(aiChatExecutionService.execute(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
+            .thenReturn(
+                new AiChatExecutionService.AiChatView(
+                    "ANSWER",
+                    "exec-1",
+                    false,
+                    null,
+                    null,
+                    "Issue summary loaded",
+                    "Create a follow-up issue.",
+                    List.of("Issue summary loaded"),
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    List.of(proposalView()),
+                    null,
+                    null
+                )
+            );
+
+        final var response = mockMvc
+            .perform(
+                post("/api/ai/chat")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "create?")))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.proposals[0].proposalId").value("proposal-1"))
+            .andExpect(jsonPath("$.proposals[0].status").value("PENDING"))
+            .andExpect(jsonPath("$.proposals[0].target.type").value("issue"))
+            .andExpect(jsonPath("$.proposals[0].fields[0].afterValue").value("Follow-up"))
+            .andExpect(jsonPath("$.actions").doesNotExist())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        org.assertj.core.api.Assertions.assertThat(response)
+            .doesNotContain("rawPrompt")
+            .doesNotContain("rawContext")
+            .doesNotContain("providerOutput");
+    }
+
+    @Test
     @DisplayName("10-W0-03 anonymous chat execution is rejected")
     void w0_10_W0_03_anonymousChatIsRejected() throws Exception {
         mockMvc
@@ -190,6 +243,25 @@ class AiChatControllerMvcTest {
 
     private Jwt jwt(String subject) {
         return Jwt.withTokenValue("token").header("alg", "none").subject(subject).build();
+    }
+
+    private AiActionProposalView proposalView() {
+        return new AiActionProposalView(
+            "proposal-1",
+            AiActionProposalStatus.PENDING,
+            false,
+            "ISSUE_CREATE",
+            AiActionRiskLevel.LOW,
+            new AiActionProposalView.Target("issue", "ISS-1", "Follow-up", 1L, 10L),
+            "Create issue",
+            "Create a project issue",
+            List.of(new AiActionProposalView.FieldChange("Title", null, "Follow-up", "ADD")),
+            "",
+            List.of(),
+            Instant.EPOCH.plusSeconds(900),
+            null,
+            null
+        );
     }
 
     private static final class TestJwtArgumentResolver implements HandlerMethodArgumentResolver {

@@ -8,10 +8,13 @@ import static org.mockito.Mockito.when;
 import com.smarterd.application.ai.AiExecutionGateway;
 import com.smarterd.application.ai.AiExecutionState;
 import com.smarterd.application.ai.AiProviderExecutionRunner;
+import com.smarterd.application.ai.proposal.AiActionProposalService;
+import com.smarterd.application.ai.proposal.AiActionProposalView;
 import com.smarterd.application.ai.provider.AiActionDraft;
 import com.smarterd.application.ai.provider.AiActionRiskLevel;
 import com.smarterd.application.ai.provider.AiProviderError;
 import com.smarterd.application.ai.provider.AiProviderResult;
+import com.smarterd.domain.ai.AiActionProposalStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -35,11 +38,19 @@ class AiChatExecutionServiceTest {
     @Mock
     private AiProviderExecutionRunner providerExecutionRunner;
 
+    @Mock
+    private AiActionProposalService proposalService;
+
     private AiChatExecutionService executionService;
 
     @BeforeEach
     void setUp() {
-        executionService = new AiChatExecutionService(contextResolver, readContextService, providerExecutionRunner);
+        executionService = new AiChatExecutionService(
+            contextResolver,
+            readContextService,
+            providerExecutionRunner,
+            proposalService
+        );
     }
 
     @Test
@@ -152,8 +163,8 @@ class AiChatExecutionServiceTest {
     }
 
     @Test
-    @DisplayName("10-W0-08 provider actions are rejected or omitted from read-only chat response")
-    void w0_10_W0_08_providerActionsAreOmittedFromChatResponse() {
+    @DisplayName("11-W2-01 provider actions become sanitized pending proposals")
+    void w2_11_W2_01_providerActionsBecomePendingProposals() {
         when(contextResolver.resolve(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
             .thenReturn(
                 new AiChatContextResolver.ResolvedContext(
@@ -187,22 +198,36 @@ class AiChatExecutionServiceTest {
                                 "Create a project issue",
                                 AiActionRiskLevel.LOW,
                                 true,
-                                Map.of("title", "Follow-up")
+                                Map.of(
+                                    "targetType",
+                                    "issue",
+                                    "targetId",
+                                    "ISS-1",
+                                    "targetLabel",
+                                    "Follow-up",
+                                    "fields",
+                                    List.of(Map.of("label", "Title", "afterValue", "Follow-up"))
+                                )
                             )
                         ),
                         null
                     )
                 )
             );
+        when(proposalService.createProposals(org.mockito.ArgumentMatchers.any()))
+            .thenReturn(List.of(proposalView("proposal-1")));
 
         final var result = executionService.execute(
             "tester",
             new AiChatExecutionService.ChatCommand(1L, 10L, "Create follow-up?", "ko", "project-route")
         );
 
-        assertThat(result.status()).isEqualTo("ERROR");
-        assertThat(result.errorState().code()).isEqualTo("READ_ONLY_PROVIDER_ACTION_REJECTED");
-        assertThat(result.toString()).doesNotContain("ISSUE_CREATE").doesNotContain("Follow-up");
+        assertThat(result.status()).isEqualTo("ANSWER");
+        assertThat(result.proposals()).hasSize(1);
+        assertThat(result.proposals().getFirst().proposalId()).isEqualTo("proposal-1");
+        assertThat(result.proposals().getFirst().title()).isEqualTo("Create issue");
+        assertThat(result.errorState()).isNull();
+        verify(proposalService).createProposals(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -252,6 +277,25 @@ class AiChatExecutionServiceTest {
             result.answer(),
             result.actions(),
             result.error()
+        );
+    }
+
+    private AiActionProposalView proposalView(String proposalId) {
+        return new AiActionProposalView(
+            proposalId,
+            AiActionProposalStatus.PENDING,
+            false,
+            "ISSUE_CREATE",
+            AiActionRiskLevel.LOW,
+            new AiActionProposalView.Target("issue", "ISS-1", "Follow-up", 1L, 10L),
+            "Create issue",
+            "Create a project issue",
+            List.of(new AiActionProposalView.FieldChange("Title", null, "Follow-up", "ADD")),
+            "",
+            List.of(),
+            Instant.EPOCH.plusSeconds(900),
+            null,
+            null
         );
     }
 }

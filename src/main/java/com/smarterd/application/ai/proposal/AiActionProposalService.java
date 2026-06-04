@@ -2,6 +2,7 @@ package com.smarterd.application.ai.proposal;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smarterd.application.ai.AiExecutionAuditService;
 import com.smarterd.application.ai.provider.AiActionDraft;
 import com.smarterd.domain.ai.AiActionProposal;
 import com.smarterd.domain.ai.AiActionProposalRepository;
@@ -34,8 +35,15 @@ public class AiActionProposalService {
     private final AiActionProposalValidator validator;
     private final AiActionPreviewService previewService;
     private final AiActionExecutorRegistry executorRegistry;
+    private final AiExecutionAuditService auditService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Creates sanitized pending proposals from provider action drafts.
+     *
+     * @param command proposal creation command
+     * @return sanitized proposal views
+     */
     @Transactional
     public List<AiActionProposalView> createProposals(CreateCommand command) {
         if (command.actions() == null || command.actions().isEmpty()) {
@@ -50,18 +58,43 @@ public class AiActionProposalService {
             .toList();
     }
 
+    /**
+     * Returns one proposal as a sanitized preview view.
+     *
+     * @param loginId requester login id
+     * @param proposalId public proposal id
+     * @return sanitized proposal view
+     */
     @Transactional(readOnly = true)
     public AiActionProposalView getProposal(String loginId, String proposalId) {
         return toView(load(proposalId));
     }
 
+    /**
+     * Cancels a pending proposal idempotently and records a decision audit.
+     *
+     * @param loginId requester login id
+     * @param proposalId public proposal id
+     * @return sanitized proposal view after cancellation attempt
+     */
     @Transactional
     public AiActionProposalView cancel(String loginId, String proposalId) {
         final var proposal = load(proposalId);
+        final var wasPending = proposal.isPending();
         proposal.cancel(loginId, Instant.now());
+        if (wasPending) {
+            auditService.recordProposalDecision(proposal);
+        }
         return toView(proposal);
     }
 
+    /**
+     * Approves a pending proposal and executes it when an executor exists.
+     *
+     * @param loginId requester login id
+     * @param proposalId public proposal id
+     * @return sanitized proposal view after approval attempt
+     */
     @Transactional
     public AiActionProposalView approve(String loginId, String proposalId) {
         final var proposal = load(proposalId);
@@ -71,12 +104,14 @@ public class AiActionProposalService {
         final var now = Instant.now();
         if (proposal.getExpiresAt() != null && !proposal.getExpiresAt().isAfter(now)) {
             proposal.expire(now);
+            auditService.recordProposalDecision(proposal);
             return toView(proposal);
         }
         try {
             validator.validateApproval(proposal, now);
         } catch (BusinessException ex) {
             proposal.reject(loginId, now, "INVALID_PROPOSAL", "Invalid proposal", "Proposal can no longer be approved.");
+            auditService.recordProposalDecision(proposal);
             return toView(proposal);
         }
         final var executor = executorRegistry.find(proposal.getActionType());
@@ -88,6 +123,7 @@ public class AiActionProposalService {
                 "Unsupported action",
                 "No executor is registered for this action type."
             );
+            auditService.recordProposalDecision(proposal);
             return toView(proposal);
         }
         try {
@@ -96,16 +132,34 @@ public class AiActionProposalService {
         } catch (RuntimeException ex) {
             proposal.markFailed(loginId, now, ex.getClass().getSimpleName(), "Execution failed", safeDetail(ex.getMessage()));
         }
+        auditService.recordProposalDecision(proposal);
         return toView(proposal);
     }
 
+    /**
+     * Expires all pending proposals whose expiry time has passed.
+     *
+     * @param now current timestamp for expiry comparison
+     * @return number of expired proposals
+     */
     @Transactional
     public int expirePending(Instant now) {
         final var proposals = proposalRepository.findByStatusAndExpiresAtBefore(AiActionProposalStatus.PENDING, now);
-        proposals.forEach(proposal -> proposal.expire(now));
+        proposals.forEach(proposal -> {
+            proposal.expire(now);
+            auditService.recordProposalDecision(proposal);
+        });
         return proposals.size();
     }
 
+    /**
+     * Sanitizes, validates, previews, persists, and audits a single action draft.
+     *
+     * @param command proposal creation command
+     * @param draft provider action draft
+     * @param now creation timestamp
+     * @return persisted proposal entity
+     */
     private AiActionProposal createProposal(CreateCommand command, AiActionDraft draft, Instant now) {
         final var sanitizedPayload = sanitizer.sanitize(draft.payload());
         validator.validateDraft(draft, sanitizedPayload);
@@ -130,15 +184,29 @@ public class AiActionProposalService {
             writeJson(previewJson(preview))
         );
         proposal.initializeAuditActor(command.requestedBy());
-        return proposalRepository.save(proposal);
+        final var saved = proposalRepository.save(proposal);
+        auditService.recordProposalCreated(saved);
+        return saved;
     }
 
+    /**
+     * Loads one proposal by public proposal id.
+     *
+     * @param proposalId public proposal id
+     * @return proposal entity
+     */
     private AiActionProposal load(String proposalId) {
         return proposalRepository
             .findByProposalId(proposalId)
-            .orElseThrow(() -> new BusinessException(MessageCode.ERROR_NOT_FOUND_AI_EXECUTION.code()));
+            .orElseThrow(() -> new BusinessException(MessageCode.ERROR_NOT_FOUND_AI_PROPOSAL.code()));
     }
 
+    /**
+     * Rehydrates sanitized payload JSON into a browser-safe preview view.
+     *
+     * @param proposal proposal entity
+     * @return sanitized proposal view
+     */
     private AiActionProposalView toView(AiActionProposal proposal) {
         final var payload = readMap(proposal.getSanitizedPayloadJson());
         final var preview = previewService.preview(proposal.getTeamId(), proposal.getProjectId(), payload);
@@ -167,6 +235,12 @@ public class AiActionProposalService {
         );
     }
 
+    /**
+     * Serializes sanitized proposal metadata for persistence.
+     *
+     * @param value metadata value
+     * @return JSON string or empty object on failure
+     */
     private String writeJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -175,6 +249,12 @@ public class AiActionProposalService {
         }
     }
 
+    /**
+     * Converts preview data into the persisted preview JSON shape.
+     *
+     * @param preview sanitized preview data
+     * @return JSON-ready preview map
+     */
     private Map<String, Object> previewJson(AiActionPreviewService.PreviewData preview) {
         final var json = new LinkedHashMap<String, Object>();
         json.put("fields", preview.fields());
@@ -183,6 +263,12 @@ public class AiActionProposalService {
         return json;
     }
 
+    /**
+     * Parses persisted JSON maps defensively for preview reconstruction.
+     *
+     * @param json persisted JSON string
+     * @return parsed map or empty map
+     */
     private Map<String, Object> readMap(String json) {
         if (json == null || json.isBlank()) {
             return Map.of();
@@ -194,6 +280,12 @@ public class AiActionProposalService {
         }
     }
 
+    /**
+     * Caps executor error detail before storing it in proposal metadata.
+     *
+     * @param value error detail
+     * @return capped safe detail
+     */
     private String safeDetail(String value) {
         if (value == null || value.isBlank()) {
             return "Execution failed.";

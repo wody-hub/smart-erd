@@ -2,6 +2,7 @@ package com.smarterd.application.ai;
 
 import com.smarterd.domain.ai.AiExecutionAudit;
 import com.smarterd.domain.ai.AiExecutionAuditRepository;
+import com.smarterd.domain.ai.AiActionProposal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -27,10 +28,75 @@ public class AiExecutionAuditService {
             execution.requestedBy(),
             execution.teamId(),
             execution.projectId(),
-            error == null ? null : error.title(),
-            error == null ? null : error.detail()
+            error == null ? null : safe(error.title(), 200),
+            error == null ? null : safe(error.detail(), 500)
         );
         audit.initializeAuditActor(execution.requestedBy());
         auditRepository.save(audit);
+    }
+
+    /**
+     * Records creation of a sanitized proposal without storing raw provider content.
+     *
+     * @param proposal sanitized proposal entity
+     */
+    public void recordProposalCreated(AiActionProposal proposal) {
+        recordProposal("PROPOSAL_CREATED", proposal);
+    }
+
+    /**
+     * Records the terminal decision state for a sanitized proposal.
+     *
+     * @param proposal sanitized proposal entity
+     */
+    public void recordProposalDecision(AiActionProposal proposal) {
+        recordProposal("PROPOSAL_" + proposal.getStatus().name(), proposal);
+    }
+
+    /**
+     * Persists proposal audit metadata shared by creation and decision rows.
+     *
+     * @param status audit status value
+     * @param proposal sanitized proposal entity
+     */
+    private void recordProposal(String status, AiActionProposal proposal) {
+        final var audit = new AiExecutionAudit(
+            proposal.getExecutionId(),
+            proposal.getProvider(),
+            proposal.getPromptVersion(),
+            status,
+            null,
+            proposal.getRedactedErrorType(),
+            null,
+            proposal.getRequestedBy(),
+            proposal.getTeamId(),
+            proposal.getProjectId(),
+            safe(proposal.getRedactedErrorTitle(), 200),
+            safe(proposal.getRedactedErrorDetail(), 500),
+            proposal.getProposalId(),
+            proposal.getActionType(),
+            proposal.getRiskLevel() == null ? null : proposal.getRiskLevel().name(),
+            proposal.getTargetType(),
+            proposal.getTargetId(),
+            safe(proposal.getTargetLabel(), 200),
+            proposal.getDecisionBy(),
+            proposal.getDecidedAt()
+        );
+        audit.initializeAuditActor(proposal.getRequestedBy());
+        auditRepository.save(audit);
+    }
+
+    /**
+     * Trims nullable metadata so audit rows fit the column contract.
+     *
+     * @param value metadata value
+     * @param maxLength maximum column length
+     * @return trimmed metadata or null
+     */
+    private String safe(String value, int maxLength) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 }
