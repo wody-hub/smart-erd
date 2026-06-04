@@ -20,6 +20,9 @@ public interface ProjectTodoRepository extends JpaRepository<ProjectTodo, Long> 
     List<ProjectTodo> findByProjectOrderByCreatedAtDescIdDesc(Project project);
 
     @EntityGraph(attributePaths = { "owner", "linkedWbsItem" })
+    List<ProjectTodo> findByProjectAndLinkedWbsItemIsNotNullOrderByCreatedAtDescIdDesc(Project project);
+
+    @EntityGraph(attributePaths = { "owner", "linkedWbsItem" })
     Optional<ProjectTodo> findByProjectAndId(Project project, Long id);
 
     @EntityGraph(attributePaths = { "owner", "linkedWbsItem" })

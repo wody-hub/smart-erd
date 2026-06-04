@@ -145,7 +145,7 @@ public class ProjectTodoService {
     public List<MemberTodoSummaryResult> getMemberTodoSummaries(String loginId, Long teamId, Long projectId) {
         final var project = projectTodoAccessService.loadProject(loginId, teamId, projectId);
         final Map<MemberTodoSummaryKey, Long> counts = new LinkedHashMap<>();
-        for (final var todo : projectTodoRepository.findByProjectOrderByCreatedAtDescIdDesc(project)) {
+        for (final var todo : projectTodoRepository.findByProjectAndLinkedWbsItemIsNotNullOrderByCreatedAtDescIdDesc(project)) {
             final var owner = todo.getOwner();
             final var key = new MemberTodoSummaryKey(owner.getId(), owner.getName(), todo.getStatus());
             counts.merge(key, 1L, Long::sum);

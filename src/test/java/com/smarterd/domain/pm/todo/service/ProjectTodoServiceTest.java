@@ -2,6 +2,7 @@ package com.smarterd.domain.pm.todo.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -10,6 +11,7 @@ import com.smarterd.domain.pm.todo.entity.ProjectTodoPriority;
 import com.smarterd.domain.pm.todo.entity.ProjectTodoStatus;
 import com.smarterd.domain.pm.todo.repository.ProjectTodoRepository;
 import com.smarterd.domain.pm.todo.repository.TodoDocumentLinkRepository;
+import com.smarterd.domain.pm.wbs.entity.WbsItem;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.user.entity.User;
@@ -170,6 +172,32 @@ class ProjectTodoServiceTest {
         verify(projectTodoRepository).delete(todo);
     }
 
+    @Test
+    @DisplayName("getMemberTodoSummaries counts only WBS-linked project-visible TODOs")
+    void getMemberTodoSummaries_countsOnlyWbsLinkedTodos() {
+        final var owner = createUser(1L, "tester", "김개발");
+        final var other = createUser(2L, "member", "박기획");
+        final var project = createProject(20L, owner);
+        final var linkedTodo = createLinkedTodo(301L, project, owner, ProjectTodoStatus.TODO);
+        final var linkedDone = createLinkedTodo(302L, project, owner, ProjectTodoStatus.DONE);
+        final var unlinkedPrivate = createTodo(303L, project, other);
+
+        when(projectTodoAccessService.loadProject("tester", 10L, 20L)).thenReturn(project);
+        when(projectTodoRepository.findByProjectAndLinkedWbsItemIsNotNullOrderByCreatedAtDescIdDesc(project))
+            .thenReturn(List.of(linkedTodo, linkedDone));
+
+        final var result = projectTodoService.getMemberTodoSummaries("tester", 10L, 20L);
+
+        assertThat(result)
+            .containsExactly(
+                new ProjectTodoService.MemberTodoSummaryResult(1L, "김개발", ProjectTodoStatus.TODO, 1L),
+                new ProjectTodoService.MemberTodoSummaryResult(1L, "김개발", ProjectTodoStatus.DONE, 1L)
+            );
+        assertThat(result).noneMatch(summary -> summary.ownerUserId().equals(unlinkedPrivate.getOwner().getId()));
+        verify(projectTodoRepository).findByProjectAndLinkedWbsItemIsNotNullOrderByCreatedAtDescIdDesc(project);
+        verify(projectTodoRepository, never()).findByProjectOrderByCreatedAtDescIdDesc(project);
+    }
+
     private User createUser(Long id, String loginId, String name) {
         final var user = User.builder().loginId(loginId).password("encoded").name(name).build();
         ReflectionTestUtils.setField(user, "id", id);
@@ -192,6 +220,23 @@ class ProjectTodoServiceTest {
             .priority(ProjectTodoPriority.HIGH)
             .title("응답 계약 정리")
             .description("private note")
+            .progressRate(20)
+            .build();
+        ReflectionTestUtils.setField(todo, "id", id);
+        return todo;
+    }
+
+    private ProjectTodo createLinkedTodo(Long id, Project project, User owner, ProjectTodoStatus status) {
+        final var wbsItem = WbsItem.builder().project(project).name("WBS").depth(0).sortOrder(1).progressRate(0).build();
+        ReflectionTestUtils.setField(wbsItem, "id", 700L + id);
+        final var todo = ProjectTodo.builder()
+            .project(project)
+            .owner(owner)
+            .linkedWbsItem(wbsItem)
+            .status(status)
+            .priority(ProjectTodoPriority.HIGH)
+            .title("공개 TODO " + id)
+            .description("linked")
             .progressRate(20)
             .build();
         ReflectionTestUtils.setField(todo, "id", id);
