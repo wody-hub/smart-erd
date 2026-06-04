@@ -282,7 +282,7 @@ public class AiReadContextService {
         final var count = projectTodoService == null
             ? MAX_OWN_TODO_ROWS
             : Math.min(projectTodoService.getProjectTodos(loginId, command.teamId(), projectId).size(), MAX_OWN_TODO_ROWS);
-        toolData.put("todo:" + projectId, Map.of("projectId", projectId, "owner", loginId, "count", count));
+        toolData.put("todo:" + projectId, Map.of("projectId", projectId, "scope", "currentUser", "count", count));
         toolResults.add(new ToolReadResult(projectLabel, "TODO", count));
     }
 
