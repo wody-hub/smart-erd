@@ -14,7 +14,7 @@ The milestone is deliberately approval-gated. AI can read scoped project context
 ## Phases
 
 - [x] **Phase 9: AI Tool Gateway + Provider Abstraction** — provider contract, Local Codex Adapter, structured output schema, execution status, timeout/cancel/error handling (completed 2026-06-01)
-- [ ] **Phase 10: App AI Chat UI + Read-Only Context Tools** — in-app chatbot shell, project context selection, read tools for project overview, WBS, milestones, issues, TODOs, and work history (verification gaps found 2026-06-02)
+- [ ] **Phase 10: App AI Chat UI + Read-Only Context Tools** — in-app chatbot shell, project context selection, read tools for project overview, WBS, milestones, issues, TODOs, and work history (gap closure planned 2026-06-04)
 - [ ] **Phase 11: Approval Preview + Audit Execution Pipeline** — action proposal schema, preview/diff, approval/cancel flow, execution boundary, audit log and history
 - [ ] **Phase 12: Low-Risk Write Tools MVP** — issue create/update, personal TODO create/update, WBS comment/work memo add, all approval-gated
 
@@ -49,7 +49,7 @@ The milestone is deliberately approval-gated. AI can read scoped project context
   4. Every read tool validates the current user, team, project, and resource scope before returning data.
   5. Chat responses distinguish available project facts from model inference.
 
-**Plans**: 7 plans
+**Plans**: 10 plans (7 executed, 3 gap closure planned)
 Plans:
 **Wave 1**
 
@@ -69,6 +69,12 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 10-07-PLAN.md — Global authenticated drawer mounting and final phase verification
+
+**Gap Closure Wave** *(planned after Phase 10 verification gaps)*
+
+- [ ] 10-08-PLAN.md — Provider grounding summaries and shared provider context privacy
+- [ ] 10-09-PLAN.md — Member TODO aggregate privacy and required scope authorization dependency
+- [ ] 10-10-PLAN.md — Team MULTI_PROJECT chat contract and unsupported selectedResource removal
 
 **UI hint**: yes
 
