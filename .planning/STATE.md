@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: AI 업무 실행 Gateway + Local Codex Chatbot
-status: executing
-stopped_at: Completed 10-10-PLAN.md
-last_updated: "2026-06-04T01:48:37.220Z"
+status: ready_to_plan
+stopped_at: Phase 10 complete (10/10) — ready to discuss Phase 11
+last_updated: 2026-06-04T02:04:20.870Z
 last_activity: 2026-06-04
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 13
-  completed_plans: 12
-  percent: 25
+  completed_plans: 13
+  percent: 50
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See `.planning/PROJECT.md`.
 
 **Core value:** SI 프로젝트에서 발생하는 모든 산출물과 관리 활동을 하나의 실시간 협업 플랫폼에서 일관된 체계로 관리
-**Current focus:** Phase 10 — app-ai-chat-ui-read-only-context-tools
+**Current focus:** Phase 11 — approval preview + audit execution pipeline
 
 ## Current Position
 
-Phase: 10 (app-ai-chat-ui-read-only-context-tools) — EXECUTING
-Plan: 10 of 10
-Status: Ready to execute
+Phase: 11
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-06-04
 
 ## Milestone Archive
@@ -71,6 +71,9 @@ Last activity: 2026-06-04
 - Phase 10 Plan 7 mounts `AuthenticatedAiChatShell` inside `ProtectedRoute` so the drawer remains authenticated without importing the auth store in the shell.
 - Phase 10 Plan 7 uses a distinct shell fallback opener name to avoid duplicate `AI에게 질문` role matches while preserving header trigger determinism.
 - Phase 10 Plan 7 keeps chat stop behavior local to `useAiChatExecution.stopWaiting` without provider cancellation.
+- Phase 10 gap closure serializes sanitized read summaries into provider `readContext` while excluding login IDs from provider-visible context.
+- Phase 10 gap closure restricts member TODO aggregates to WBS-linked project-visible rows and requires loader-backed project scope authorization.
+- Phase 10 gap closure removes unsupported `selectedResource` from the chat contract and maps team context sends to `MULTI_PROJECT`.
 
 ## Performance Metrics
 
@@ -96,4 +99,4 @@ Resume File: None
 
 ## Next Action
 
-Run `$gsd-execute-phase 10 --gaps-only` to execute remediation plans 10-08 through 10-10 before advancing to Phase 11.
+Run `$gsd-discuss-phase 11` to start Approval Preview + Audit Execution Pipeline planning.

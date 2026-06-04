@@ -1,81 +1,18 @@
 ---
 phase: 10-app-ai-chat-ui-read-only-context-tools
-verified: 2026-06-02T08:06:47Z
-status: gaps_found
-score: 6/11 must-haves verified
+verified: 2026-06-04T02:02:04Z
+status: passed
+score: 11/11 must-haves verified
 overrides_applied: 0
-gaps:
-  - truth: "AI read tools retrieve project overview, WBS, milestones, issues, TODOs, and WBS work history in a way that grounds provider answers."
-    status: failed
-    reason: "AiReadContextService builds sanitized summary toolData, but sanitizedProviderContext omits it; AiChatExecutionService prefers that string, so the provider receives generic loaded facts and source counts instead of the actual summary fields."
-    artifacts:
-      - path: "src/main/java/com/smarterd/application/ai/chat/AiReadContextService.java"
-        issue: "Line 137 serializes only facts/source chips/caps; lines 409-427 include summaries in sanitizedContext but those summaries are not serialized into sanitizedProviderContext."
-      - path: "src/main/java/com/smarterd/application/ai/chat/AiChatExecutionService.java"
-        issue: "Lines 291-293 prefer sanitizedProviderContext whenever non-blank, dropping sanitizedContext.summaries from the provider request."
-      - path: "src/test/java/com/smarterd/application/ai/chat/AiChatExecutionServiceTest.java"
-        issue: "Lines 117-124 assert only that readContext exists, not that representative overview/WBS/issue/TODO/history summary fields reach the provider."
-    missing:
-      - "Serialize sanitized toolData/summaries into the provider context string under the existing cap."
-      - "Add a test proving the provider RunCommand contains representative sanitized summary fields, not only generic loaded facts."
-  - truth: "Every read tool validates current user, team, project, and resource scope before returning data."
-    status: failed
-    reason: "Member TODO summary reads aggregate all project TODOs, including private unlinked personal TODOs, and chat accepts selectedResource without validating or applying it."
-    artifacts:
-      - path: "src/main/java/com/smarterd/domain/pm/todo/service/ProjectTodoService.java"
-        issue: "Lines 145-164 aggregate every TODO from findByProjectOrderByCreatedAtDescIdDesc(project) after only project membership validation."
-      - path: "src/main/java/com/smarterd/domain/pm/todo/repository/ProjectTodoRepository.java"
-        issue: "Line 20 exposes all project TODOs by project, not owner-scoped and not limited to linked/shared WBS-visible TODOs."
-      - path: "src/main/java/com/smarterd/api/ai/dto/AiChatRequest.java"
-        issue: "Lines 20-43 accept selectedResource and carry it into ChatCommand."
-      - path: "src/main/java/com/smarterd/application/ai/chat/AiChatExecutionService.java"
-        issue: "Lines 112-120 build ReadCommand without selectedResource; no SelectedResourceValidator is injected or called in the chat path."
-    missing:
-      - "Restrict member TODO summaries to an explicitly authorized/project-visible aggregate policy, or require a role that can see member-level personal TODO aggregates."
-      - "Validate selectedResource through SelectedResourceValidator before read context construction, or remove selectedResource from the chat DTO until resource-specific reads are implemented."
-      - "Add tests for unlinked personal TODO exclusion and rejected cross-project/unauthorized selected resources."
-  - truth: "Users can select or inherit active team/project context for AI questions."
-    status: failed
-    reason: "The client enables team-context sends, but the request uses scopeMode 'team' with no projectId; server multi-project resolution requires MULTI_PROJECT or multi-project, so current-team questions fall back to weak-scope confirmation."
-    artifacts:
-      - path: "client/src/hooks/useAiChatExecution.ts"
-        issue: "Lines 147-160 allow any non-weak context, including kind 'team'; lines 163-174 send scopeMode as context.kind."
-      - path: "src/main/java/com/smarterd/api/ai/dto/AiChatRequest.java"
-        issue: "Lines 58-72 make 'team' currentTeamMode=true but multiProjectMode=false."
-      - path: "src/main/java/com/smarterd/application/ai/chat/AiChatContextResolver.java"
-        issue: "Lines 58-64 resolve team scope only when currentTeamMode and multiProjectQuestion are both true; otherwise missing projectId returns WEAK_SCOPE."
-      - path: "client/test/unit/ai-chat-execution.test.ts"
-        issue: "Lines 85-98 assert team context can send, but no cross-layer test proves the resulting HTTP request resolves server-side."
-    missing:
-      - "Either disable team sends until a project is selected, or encode team fanout as the server contract expects, for example MULTI_PROJECT."
-      - "Add an integration/unit test for a request generated from /teams/:teamId/projects."
-  - truth: "Provider/runtime context excludes unnecessary user-identifying values."
-    status: failed
-    reason: "The shared Phase 9 provider gateway still includes loginId in providerContext and its test asserts that behavior. This is not on the Phase 10 chat path, which uses AiProviderExecutionRunner directly, but it is a real provider-runtime privacy gap in code touched by the phase."
-    artifacts:
-      - path: "src/main/java/com/smarterd/application/ai/AiExecutionGateway.java"
-        issue: "Lines 62-72 include loginId in sanitizedContext."
-      - path: "src/test/java/com/smarterd/application/ai/AiExecutionGatewayTest.java"
-        issue: "Line 76 asserts providerContext contains loginId."
-      - path: "src/main/java/com/smarterd/application/ai/AiProviderExecutionRunner.java"
-        issue: "Lines 63-73 pass RunCommand.providerContext directly into AiProviderRequest.context()."
-    missing:
-      - "Remove loginId from provider prompt context and keep identity only in registry/audit ownership state."
-      - "Update tests to assert loginId is absent from providerContext."
-  - truth: "Security-sensitive scope resolution cannot silently authorize when dependencies are missing."
-    status: partial
-    reason: "Production Spring wiring should inject ProjectContextLoader, but AiChatContextResolver exposes a public no-arg constructor and nullable dependencies; if constructed without ProjectContextLoader, single-project scopes resolve without authorization."
-    artifacts:
-      - path: "src/main/java/com/smarterd/application/ai/chat/AiChatContextResolver.java"
-        issue: "Lines 28-39 allow null ProjectContextLoader; lines 157-160 authorize a single project when the loader is null."
-      - path: "src/test/java/com/smarterd/application/ai/chat/AiChatContextResolverTest.java"
-        issue: "Line 12 uses the no-arg resolver, so core resolver tests exercise the authorization-bypass construction path."
-    missing:
-      - "Make ProjectContextLoader a required production dependency and move no-dependency construction to test fixtures or explicit fakes."
 re_verification:
-  previous_status: none
-  previous_score: none
-  gaps_closed: []
+  previous_status: gaps_found
+  previous_score: 6/11
+  gaps_closed:
+    - "Provider read context now serializes sanitized overview/WBS/milestone/issue/TODO/history summaries into provider-visible readContext."
+    - "Provider prompt context no longer exposes chat/gateway loginId values."
+    - "Member TODO aggregate path now counts only WBS-linked project-visible TODO rows and stays aggregate-only."
+    - "Phase 10 chat request DTO and frontend type no longer expose selectedResource."
+    - "Team-context sends now map to backend MULTI_PROJECT fanout and resolver no longer has a null-loader authorization fallback."
   gaps_remaining: []
   regressions: []
 ---
@@ -83,82 +20,88 @@ re_verification:
 # Phase 10: App AI Chat UI + Read-Only Context Tools Verification Report
 
 **Phase Goal:** A user can ask project-management questions inside Smart-ERD and receive answers grounded in authorized project data.
-**Verified:** 2026-06-02T08:06:47Z
-**Status:** gaps_found
-**Re-verification:** No - initial verification
+**Verified:** 2026-06-04T02:02:04Z
+**Status:** passed
+**Re-verification:** Yes - after gap closure execution
 
 ## Goal Achievement
 
-The phase is not achieved. The visible chat drawer, typed API path, project-scope response rendering, local persistence, and many tests exist and pass. The goal fails at the data-flow and authorization layers: actual read-tool summary data is not included in the provider context string used by chat execution, member TODO aggregate reads can expose private per-member TODO counts, team-scope sends are enabled but cannot resolve through the server contract, selected resources are accepted but not validated or used, and the shared provider gateway still forwards login IDs to provider context.
+Phase 10 is achieved after gap closure. The app exposes the authenticated AI drawer, routes chat questions through the Spring `/api/ai/chat` boundary, resolves project/team scope server-side, assembles authorized read-only project summaries, sends those summaries to the provider runtime without login IDs, and renders structured facts/source chips separately from model interpretation.
 
 ## Observable Truths
 
 | # | Truth | Status | Evidence |
 |---|---|---|---|
-| 1 | The app exposes an authenticated AI chatbot surface suitable for the local/Electron MVP. | VERIFIED | `AuthenticatedAiChatShell` wraps protected routes in `client/src/App.tsx:29-34`; `AiChatDrawer` provides the right-side dialog; `Header` adds `AiChatTrigger`. |
-| 2 | Users can inherit or select active team/project context for AI questions. | FAILED | Project context is supported, but team context is send-enabled while server resolution falls to weak scope. Spot-check produced `canSend: true` and `scopeMode: "team"` with `projectId: null`; server `AiChatRequest.isMultiProjectMode` does not treat `team` as multi-project. |
-| 3 | Authenticated clients can send chat questions through a Spring HTTP endpoint and receive structured responses. | VERIFIED | `AiChatController` maps `POST /api/ai/chat`; `aiChatApi` posts to `/ai/chat` through the typed axios module; controller and frontend unit tests pass. |
-| 4 | AI read tools retrieve overview, WBS, milestones, issues, TODOs, and history through server-controlled services. | FAILED | Service methods call existing server services, but actual `toolData` summaries are omitted from `sanitizedProviderContext`, which chat prefers before provider execution. Provider answers are therefore not grounded in the detailed read data. |
-| 5 | Every read tool validates user, team, project, and resource scope before returning data. | FAILED | Member TODO summary aggregates all project TODOs; selectedResource is accepted but never validated; resolver has a null-dependency authorization fallback. |
-| 6 | Read context is summary-first, question-selected, and capped. | VERIFIED | `selectTools`, cap constants, source-chip factory, and `AiReadContextServiceTest` cover tool selection and caps. |
-| 7 | Chat responses distinguish confirmed facts from provider/model interpretation. | VERIFIED | `AiChatExecutionService` maps server facts to `confirmedFacts`/`conclusion` and provider answer to `interpretation`; `AiAnswerCard` renders separate sections. |
-| 8 | Phase 10 remains read-only and omits action/write controls. | VERIFIED | Provider actions produce `READ_ONLY_PROVIDER_ACTION_REJECTED`; UI grep found no `proposal`, `approval`, `diff`, or provider cancel path in chat components. |
-| 9 | Browser-local conversation persistence is login-scoped and sanitized. | VERIFIED | `useAiChatStore` uses `AI_CHAT_CONVERSATION_PREFIX:{loginId}`, caps messages to 50, sanitizes persisted message shape, and unit tests reject secret/raw context fields. |
-| 10 | Frontend never calls Codex, Electron IPC, provider runtime, or read tools directly. | VERIFIED | Frontend chat path uses `executeAiChat` and authorized team/project option APIs only; grep found no `codex`, `electron`, or `ipc` matches in chat API/hooks/components. |
-| 11 | Provider/runtime context excludes unnecessary user-identifying values. | FAILED | The chat path does not add loginId to provider context, but shared `AiExecutionGateway.sanitizedContext` still includes `loginId` and tests assert it. |
+| 1 | The app exposes an authenticated AI chatbot surface suitable for the local/Electron MVP. | VERIFIED | `client/src/App.tsx:29-34` wraps protected routes in `AuthenticatedAiChatShell`; `AuthenticatedAiChatShell.tsx:62-68` mounts `AiChatDrawer` and fallback trigger; `Header.tsx:55` renders `AiChatTrigger` for authenticated users. |
+| 2 | Users can inherit or select active team/project context for AI questions. | VERIFIED | `AiChatContextBar.tsx:132-160` loads authorized context options and confirmation candidates; `useAiChatExecution.ts:163-187` preserves selected context and maps team/multi-project scope correctly. |
+| 3 | Authenticated clients can send chat questions through a Spring HTTP endpoint and receive structured responses. | VERIFIED | `AiChatController.java:28-36` requires JWT and delegates to `AiChatExecutionService`; `aiChatApi.ts:30-36` posts typed requests to `/ai/chat`; backend controller tests passed. |
+| 4 | AI read tools retrieve overview, WBS, milestones, issues, TODOs, and history through server-controlled services and ground provider answers. | VERIFIED | `AiReadContextService.java:93-130` invokes each selected read collector; `toolData` is included in sanitized context at lines 136-139 and serialized under `summaries:` at lines 432-459; `AiChatExecutionService.java:278-294` sends that provider `readContext`. |
+| 5 | Every read tool validates current user, team, project, and resource scope before returning data. | VERIFIED | Single-project chat scope calls `ProjectContextLoader.load` in `AiChatContextResolver.java:152-158`; PM read service calls pass `loginId/teamId/projectId`; `ProjectTodoService.java:145-164` validates project membership and uses the linked-only aggregate query. Unsupported `selectedResource` is absent from Phase 10 chat DTO/command. |
+| 6 | Read context is summary-first, question-selected, and capped. | VERIFIED | Tool selection lives in `AiReadContextService.java:152-177`; caps are constants at lines 29-40 and applied at lines 85-149; cap tests passed. |
+| 7 | Chat responses distinguish confirmed facts from provider/model interpretation. | VERIFIED | `AiChatExecutionService.java:66-80` maps read facts to `confirmedFacts`/`conclusion` and provider answer to `interpretation`; `AiAnswerCard.tsx:83-118` renders facts, interpretation, and confirmation sections separately. |
+| 8 | Phase 10 remains read-only and omits action/write controls. | VERIFIED | Provider actions are rejected by `AiChatExecutionService.java:63-65` and `341-361`; `AiChatDtoContractTest.java:97-142` asserts no `actions`, `proposal`, `approval`, or `diff`; frontend grep found no direct action/cancel/delete UI path in chat components. |
+| 9 | Browser-local conversation persistence is login-scoped and sanitized. | VERIFIED | `useAiChatStore.ts:54-65` scopes storage by active login; sanitizers at lines 97-204 admit only presentation fields; message cap is enforced at lines 93-95 and tested by frontend unit suite. |
+| 10 | Frontend never calls Codex, Electron IPC, provider runtime, or read tools directly. | VERIFIED | Frontend chat path is `executeAiChat` only; grep for `codex|electron|ipc|fetchWbs|fetchIssues|fetchTodos|fetchMilestones|providerContext` in chat hook/API/tests returned no Phase 10 frontend direct-provider/read-tool calls. |
+| 11 | Provider/runtime context excludes unnecessary user-identifying loginId values. | VERIFIED | `AiExecutionGateway.java:62-70` provider context includes only teamId/projectId/locale; `AiChatExecutionService.java:278-294` includes scope/read metadata only; tests assert provider context has no `loginId` key or `tester` value and read provider context does not contain `tester`. |
 
-**Score:** 6/11 truths verified
+**Score:** 11/11 truths verified
 
 ## Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |---|---|---|---|
-| `src/main/java/com/smarterd/application/ai/chat/AiChatContextResolver.java` | Server-authoritative scope resolution | PARTIAL | Exists and substantive; wired into chat service. Fails null-dependency authorization fallback and team-scope cross-layer contract. |
-| `src/main/java/com/smarterd/application/ai/chat/AiReadContextService.java` | Authorized summary-first read context | FAILED | Exists and wired; calls read services, but provider context drops the actual `summaries` map. |
-| `src/main/java/com/smarterd/application/ai/chat/AiChatExecutionService.java` | Chat orchestration | PARTIAL | Resolves scope, reads context, calls runner, rejects actions. Drops selectedResource and prefers incomplete provider context string. |
-| `src/main/java/com/smarterd/api/ai/AiChatController.java` | Authenticated HTTP boundary | VERIFIED | Requires JWT and delegates to execution service. |
-| `client/src/api/aiChatApi.ts` | Typed chat client | VERIFIED | Posts typed request through axios module. |
-| `client/src/hooks/useAiChatExecution.ts` | Send/stop lifecycle | PARTIAL | Correct API/abort/store plumbing; team context request contract is misaligned. |
-| `client/src/stores/useAiChatStore.ts` | Safe local persistence | VERIFIED | Login-scoped storage, sanitization, cap, explicit reset. |
-| `client/src/components/ai/*` | Drawer, context bar, composer, answer/source cards | VERIFIED | Wired and substantive; no write/action controls found. |
-| `client/e2e/smoke/ai-chat-drawer.spec.ts` | Global drawer smoke | UNCERTAIN | Spec exists and deterministic route mocks exist; local run skipped due missing credentials. |
+| `src/main/java/com/smarterd/application/ai/chat/AiReadContextService.java` | Authorized summary-first read context with provider grounding | VERIFIED | Exists, substantive, wired; `serializeProviderContext` includes `summaries:` from sanitized `toolData` for overview/WBS/milestones/issues/TODO/history. |
+| `src/main/java/com/smarterd/application/ai/chat/AiChatExecutionService.java` | Read-only chat orchestration and provider boundary | VERIFIED | Resolves scope before reads, reads before provider, sends capped readContext, rejects provider actions, and has no selectedResource field in `ChatCommand`. |
+| `src/main/java/com/smarterd/application/ai/AiExecutionGateway.java` | Shared provider gateway without prompt-visible login identity | VERIFIED | `sanitizedContext` excludes `loginId`; runner still receives loginId separately for ownership/audit. |
+| `src/main/java/com/smarterd/domain/pm/todo/repository/ProjectTodoRepository.java` | Linked/project-visible TODO aggregate query | VERIFIED | Adds `findByProjectAndLinkedWbsItemIsNotNullOrderByCreatedAtDescIdDesc` with owner/WBS entity graph. |
+| `src/main/java/com/smarterd/domain/pm/todo/service/ProjectTodoService.java` | Member TODO summaries remain linked-only and detail-free | VERIFIED | `getMemberTodoSummaries` validates project scope and returns only owner id/display name/status/count. |
+| `src/main/java/com/smarterd/application/ai/chat/AiChatContextResolver.java` | Required ProjectContextLoader-backed resolver | VERIFIED | Constructor requires `ProjectContextLoader`; no no-arg or nullable loader path exists; single-project authorization catches loader denial as DENIED. |
+| `src/main/java/com/smarterd/api/ai/dto/AiChatRequest.java` | Chat request DTO without selectedResource; MULTI_PROJECT mapping | VERIFIED | Record components exclude `selectedResource`; `toCommand` maps current team/multi-project flags. |
+| `client/src/types/ai-chat.ts` | Frontend chat contract without selectedResource | VERIFIED | `AiChatRequest` includes message/context/scope fields only; no selectedResource property. |
+| `client/src/hooks/useAiChatExecution.ts` | Send/cancel lifecycle and team-to-MULTI_PROJECT request mapping | VERIFIED | `resolveAiChatScopeMode` maps team and multi-project context to `MULTI_PROJECT`; request builder nulls `projectId` for fanout. |
+| `client/src/components/ai/*` and `client/src/stores/useAiChatStore.ts` | Drawer, context bar, answer/source cards, safe persistence | VERIFIED | Mounted globally for protected routes; components are substantive; unit suite covers drawer, response sections, context, and store sanitization. |
 
 ## Key Link Verification
 
 | From | To | Via | Status | Details |
 |---|---|---|---|---|
-| `AiChatController` | `AiChatExecutionService` | JWT subject + DTO | WIRED | `AiChatController.chat()` calls `execute(jwt.getSubject(), request.toCommand())`. |
-| `AiChatExecutionService` | `AiChatContextResolver` | scope preflight | WIRED | Resolver runs before read/provider calls. |
-| `AiChatExecutionService` | `AiReadContextService` | read context before provider | WIRED | `readContextService.read()` runs before provider execution. |
-| `AiChatExecutionService` | `AiProviderExecutionRunner` | Phase 9 provider boundary | WIRED | Uses shared runner directly, not frontend/provider direct calls. |
-| `AiReadContextService` | PM read services | authorized reads | PARTIAL | Calls existing services, but member TODO aggregate uses all project TODOs and provider context omits summary payloads. |
-| `AiChatRequest` | `SelectedResourceValidator` | resource scope validation | NOT WIRED | selectedResource is accepted and carried into command but no validator is called in chat path. |
-| `AiChatDrawer` | `useAiChatStore/useAiRouteContext/useAiChatExecution` | drawer composition | WIRED | Drawer imports and uses all three. |
-| `AiChatContextBar` | authorized team/project option APIs | React Query option lookup | WIRED | `useAiChatContextOptions` lazy-loads `fetchTeams` and `fetchProjects`. |
-| `Header` | `AiChatTrigger` | authenticated utility rail | WIRED | Header renders trigger when authenticated. |
+| `AiChatController` | `AiChatExecutionService` | JWT subject + DTO command | WIRED | `AiChatController.chat()` calls `execute(jwt.getSubject(), request.toCommand())`. |
+| `AiChatExecutionService` | `AiChatContextResolver` | scope preflight | WIRED | Resolver runs before read/provider execution. |
+| `AiChatExecutionService` | `AiReadContextService` | read context before provider | WIRED | `readContextService.read()` runs only after resolved scope. |
+| `AiReadContextService` | provider `readContext` | `ReadContext.sanitizedProviderContext` | WIRED | `verify.key-links` for `10-08-PLAN.md` passed; source shows provider context uses the serialized string when non-blank. |
+| `AiReadContextService` | PM read services | authorized service reads | WIRED | Overview/WBS/milestone/issue/TODO/history collectors call server services with `loginId/teamId/projectId`. |
+| `ProjectTodoService` | `ProjectTodoRepository` | linked-only aggregate query | WIRED | Member summaries iterate `findByProjectAndLinkedWbsItemIsNotNullOrderByCreatedAtDescIdDesc`; old all-project aggregate path is not used. |
+| `AiChatContextResolver` | `ProjectContextLoader` | `authorizeSingleProject` | WIRED | `verify.key-links` for `10-09-PLAN.md` passed; source calls `projectContextLoader.load`. |
+| `useAiChatExecution` | `AiChatRequest` | `scopeMode: MULTI_PROJECT` | WIRED | `verify.key-links` for `10-10-PLAN.md` passed; frontend and backend tests assert the contract. |
+| `AiChatDrawer` | store/route context/execution hook | drawer composition | WIRED | Drawer imports and uses route context, store, provider status, context bar, composer, and execution hook. |
+| `Header` and protected app shell | AI drawer trigger | authenticated route shell | WIRED | Header trigger and fallback trigger both open the same global drawer store. |
 
 ## Data-Flow Trace (Level 4)
 
 | Artifact | Data Variable | Source | Produces Real Data | Status |
 |---|---|---|---|---|
-| `AiReadContextService` | `toolData` / `sanitizedContext.summaries` | Existing PM services (`getBusinessOverview`, `getWbsItems`, `getMilestones`, `getProjectIssues`, TODO/history services) | Yes inside service map, but not serialized into provider context | FAILED |
-| `AiChatExecutionService` | provider `readContext` | `readContext.sanitizedProviderContext()` | No, because non-blank string omits `summaries` | FAILED |
-| `ProjectTodoService.getMemberTodoSummaries` | member TODO counts | `findByProjectOrderByCreatedAtDescIdDesc(project)` | Real data, but overbroad/private aggregate | FAILED |
-| `useAiChatStore` | persisted messages | login-scoped localStorage key | Yes, sanitized presentation state only | VERIFIED |
-| `AiChatDrawer` | messages/context/confirmation candidates | global Zustand store + route context + backend response | Yes for UI state | VERIFIED |
-| `AiSourceChips` | response source chips | backend `AiChatResponse.sourceChips` captured at send-time message | Yes for UI rendering | VERIFIED |
+| `AiReadContextService` | `toolData` / `sanitizedProviderContext` | Existing PM services: `ProjectService`, `WbsService`, `MilestoneService`, `ProjectIssueService`, `ProjectTodoService`, `WorkItemHistoryService` | Yes | VERIFIED - collectors populate sanitized summary maps, and `serializeProviderContext` emits them under `summaries:`. |
+| `AiChatExecutionService` | provider `readContext` | `readContext.sanitizedProviderContext()` | Yes | VERIFIED - provider command captures summary fields; `AiChatExecutionServiceTest` asserts overview/WBS/milestone/issue/TODO/history fields in provider context. |
+| `ProjectTodoService.getMemberTodoSummaries` | member owner/status counts | `findByProjectAndLinkedWbsItemIsNotNullOrderByCreatedAtDescIdDesc(project)` | Yes | VERIFIED - only WBS-linked TODO rows count; output is owner/status/count only and tests assert unlinked private TODO exclusion. |
+| `useAiChatExecution.buildAiChatRequest` | request `scopeMode/projectId` | active route or manually selected context | Yes | VERIFIED - team context becomes `MULTI_PROJECT` with null `projectId`, enabling backend current-team fanout. |
+| `AiChatRequest.toCommand` | `currentTeamMode` and `multiProjectQuestion` | request scopeMode/context kind | Yes | VERIFIED - backend DTO maps `MULTI_PROJECT` to both flags; tests assert fanout command values. |
+| `AiChatContextResolver` | current-team project ids | `ProjectService.getProjects` or already-authorized candidates | Yes | VERIFIED - current-team fanout filters by team and caps at 20; single-project scope requires loader authorization. |
+| `useAiChatStore` | persisted messages | login-scoped browser storage | Yes | VERIFIED - hydrated state is sanitized and capped; no raw provider context fields survive persistence tests. |
 
 ## Behavioral Spot-Checks
 
 | Behavior | Command | Result | Status |
 |---|---|---|---|
-| Backend test suite | `./gradlew test --rerun-tasks` | `BUILD SUCCESSFUL in 19s`, 4 tasks executed | PASS |
-| Frontend production build | `cd client && npm run build` | Passed; Vite built successfully with existing circular chunk warning | PASS |
-| Frontend unit suite | `cd client && npm run test:unit` | Passed; `tests 398`, `pass 398`, `fail 0` | PASS |
-| Drawer smoke | `cd client && npx playwright test client/e2e/smoke/ai-chat-drawer.spec.ts` | `1 skipped` because `SMART_ERD_E2E_LOGIN` and `SMART_ERD_E2E_PASSWORD` are absent | SKIP |
-| Team-context send contract | Node import from `client/.tmp-test/src/hooks/useAiChatExecution.js` | `canSend: true`, request has `scopeMode: "team"` and `projectId: null` | FAIL |
+| Targeted backend gap-closure tests | `./gradlew test --tests "com.smarterd.application.ai.chat.AiReadContextServiceTest" --tests "com.smarterd.application.ai.chat.AiChatExecutionServiceTest" --tests "com.smarterd.application.ai.AiExecutionGatewayTest" --tests "com.smarterd.domain.pm.todo.service.ProjectTodoServiceTest" --tests "com.smarterd.application.ai.chat.AiChatContextResolverTest" --tests "com.smarterd.api.ai.dto.AiChatDtoContractTest" --tests "com.smarterd.api.ai.AiChatControllerMvcTest"` | `BUILD SUCCESSFUL in 3s` | PASS |
+| Full backend tests | `./gradlew test` | `BUILD SUCCESSFUL in 18s` | PASS |
+| Frontend unit suite | `cd client && npm run test:unit` | `tests 399`, `pass 399`, `fail 0` | PASS |
+| Frontend production build | `cd client && npm run build` | Vite build passed; existing circular chunk warning remains | PASS |
+| Gap-closure artifact verification | `gsd-sdk query verify.artifacts` for `10-08`, `10-09`, `10-10` | All 9/9 plan artifacts passed | PASS |
+| Gap-closure key-link verification | `gsd-sdk query verify.key-links` for `10-08`, `10-09`, `10-10` | All 6/6 links verified | PASS |
+| selectedResource absence | `rg "selectedResource" AiChatRequest.java AiChatExecutionService.java ai-chat.ts useAiChatExecution.ts ...` | No matches in Phase 10 chat contract files | PASS |
+| Read-only frontend boundary | `rg "codex|electron|ipc|proposal|approval|diff|delete|cancelAiExecution|cancelRunning" client/src/components/ai client/src/hooks/useAiChatExecution.ts client/src/api/aiChatApi.ts ...` | No matches | PASS |
 | Debt markers | `rg "TBD|FIXME|XXX" ...` on Phase 10 critical files | No matches | PASS |
-| Probe discovery | `find scripts -path '*/tests/probe-*.sh'` and phase grep | No probes found | SKIP |
+| Probe discovery | `find scripts -path '*/tests/probe-*.sh'` and phase grep | No probes found or declared | SKIP |
 
 ## Probe Execution
 
@@ -170,71 +113,39 @@ The phase is not achieved. The visible chat drawer, typed API path, project-scop
 
 | Requirement | Source Plan | Description | Status | Evidence |
 |---|---|---|---|---|
-| AI-CHAT-01 | 10-01, 10-03, 10-04, 10-05, 10-06, 10-07 | User can ask Smart-ERD work questions in an in-app chatbot and receive responses. | PARTIAL | UI/API path exists and tests pass; E2E smoke skipped; response grounding gap remains. |
-| AI-CHAT-02 | 10-01 through 10-07 | Chatbot clearly uses current team/project context or lets user select context. | BLOCKED | Project context works, but team context is send-enabled and unresolved server-side. |
-| AI-READ-01 | 10-01, 10-02, 10-03, 10-06, 10-07 | AI can read business overview/project summary. | PARTIAL | Service calls `getBusinessOverview`, but actual overview summary data is omitted from provider context string. |
-| AI-READ-02 | 10-01, 10-02, 10-03, 10-06, 10-07 | AI can read WBS and milestones. | PARTIAL | Service counts WBS/milestones through server services, but provider receives generic facts/counts rather than the summary payload. |
-| AI-READ-03 | 10-01, 10-02, 10-03, 10-06, 10-07 | AI can read issues, personal TODOs, WBS history/comments. | BLOCKED | Issue/TODO/history service calls exist, but provider context drops summary payloads; member TODO aggregate privacy gap exists. |
-| AI-READ-04 | 10-01, 10-02, 10-03, 10-07 | All read tool calls validate existing user/team/project/resource auth and scope. | BLOCKED | Member TODO aggregate overbroad; selectedResource accepted but not validated; resolver null-dependency fallback can authorize without loader. |
+| AI-CHAT-01 | 10-01, 10-03, 10-04, 10-05, 10-06, 10-07, 10-08 | User can ask Smart-ERD work questions in an in-app chatbot and receive responses. | VERIFIED | Authenticated drawer, typed API, backend controller, chat execution, response cards, provider grounding, backend tests, frontend unit tests, and build all pass. |
+| AI-CHAT-02 | 10-01 through 10-07, 10-10 | Chatbot clearly uses current team/project context or lets user select context. | VERIFIED | Context bar selects authorized context; route context is inherited; team context sends `MULTI_PROJECT` and backend DTO/resolver maps it to current-team fanout. |
+| AI-READ-01 | 10-01, 10-02, 10-03, 10-06, 10-07, 10-08 | AI can read business overview and project summary information. | VERIFIED | `collectOverview` calls `ProjectService.getBusinessOverview`, serializes `overview:{projectId}` with `memberCount/documentCount/progressRate`, and provider context tests assert overview fields. |
+| AI-READ-02 | 10-01, 10-02, 10-03, 10-06, 10-07, 10-08 | AI can read WBS and milestone information. | VERIFIED | WBS and milestone collectors count authorized service results, source chips expose counts, and provider context tests assert `wbs:10` and `milestones:10`. |
+| AI-READ-03 | 10-01, 10-02, 10-03, 10-06, 10-07, 10-08, 10-09 | AI can read issues, personal TODOs, and WBS work history/comments. | VERIFIED | Issue/TODO/history collectors run through existing services; current-user TODO context uses `scope=currentUser`; member TODO aggregation is linked-only and detail-free. |
+| AI-READ-04 | 10-01, 10-02, 10-03, 10-07, 10-09, 10-10 | All read tool calls validate existing user/team/project/resource auth and scope. | VERIFIED | Scope resolver requires `ProjectContextLoader`; selectedResource false contract is removed; member TODO aggregate validates project membership and excludes unlinked private TODOs. |
 
-No Phase 10 requirement IDs are orphaned: all six requested IDs appear in plan frontmatter and `REQUIREMENTS.md`.
-
-## Code Review Claim Verification
-
-| Claim | Verdict | Evidence |
-|---|---|---|
-| CR-01 member TODO aggregate privacy leak | REAL BLOCKER | `ProjectTodoService.getMemberTodoSummaries` aggregates all TODOs from a project-wide repository method, not only owner/shared/project-visible TODOs. |
-| CR-02 provider context drops actual read-tool data | REAL BLOCKER | `toolData` is only in `sanitizedContext`; `sanitizedProviderContext` omits it and is preferred by chat execution. |
-| CR-03 team scope enabled in client but unresolved server-side | REAL BLOCKER | Module spot-check shows team context can send with `scopeMode: "team"` and `projectId: null`; server does not treat that as multi-project. |
-| CR-04 login IDs sent to provider runtime | REAL, INDIRECT | Real for shared `AiExecutionGateway`; false for Phase 10 chat path specifically. Still needs remediation because provider gateway forwards `providerContext` directly. |
-| WR-01 selectedResource accepted but unused | REAL BLOCKER | DTO accepts selectedResource; chat execution drops it and never calls `SelectedResourceValidator`. |
-| WR-02 resolver no-arg/null dependency authorization fallback | REAL WARNING | Public no-arg resolver resolves single project without authorization if loader is null. Production wiring likely injects the loader, but the security-sensitive fallback exists. |
+No Phase 10 requirement IDs are orphaned. All requested IDs are represented in Phase 10 plan frontmatter and have verified implementation evidence.
 
 ## Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |---|---:|---|---|---|
-| `AiReadContextService.java` | 137 | Incomplete data-flow serialization | BLOCKER | Provider misses actual sanitized read summaries. |
-| `AiChatExecutionService.java` | 291 | Prefers incomplete string provider context | BLOCKER | Drops `sanitizedContext.summaries` before provider invocation. |
-| `ProjectTodoService.java` | 148 | Overbroad project-wide TODO aggregate | BLOCKER | Exposes member TODO status/count aggregates for private personal TODOs. |
-| `useAiChatExecution.ts` | 157 | Team context send enabled without server contract | BLOCKER | User can submit current-team questions that cannot resolve as current-team reads. |
-| `AiChatExecutionService.java` | 112 | selectedResource dropped | BLOCKER | Resource scope is not validated or applied. |
-| `AiExecutionGateway.java` | 68 | loginId in provider context | WARNING | Shared provider path sends user identifier to runtime context; not direct Phase 10 chat path. |
-| `AiChatContextResolver.java` | 157 | Null-dependency authorization fallback | WARNING | Misconstructed resolver can authorize without `ProjectContextLoader`. |
+| None | - | No unreferenced `TBD`, `FIXME`, or `XXX` markers found in Phase 10 critical files | - | - |
 
-No unreferenced `TBD`, `FIXME`, or `XXX` markers were found in the Phase 10 critical files scanned.
+The broader placeholder/null scan found only normal UI input placeholders and guard-return helpers, not unfinished implementations or hollow data paths.
 
 ## Human Verification Required
 
-These do not change the `gaps_found` status, because blockers already exist.
-
-### 1. Drawer Visual Fit
-
-**Test:** Open the authenticated app at desktop and mobile widths; inspect the AI drawer.
-**Expected:** Right drawer width, fixed header/context/composer, transcript scrolling, wrapped source chips, focus order, and no overlapping text.
-**Why human:** Visual layout quality and focus feel are not fully verified by grep/unit tests.
-
-### 2. Real Credential E2E
-
-**Test:** Set `SMART_ERD_E2E_LOGIN` and `SMART_ERD_E2E_PASSWORD`, start the local app/backend, and run `cd client && npx playwright test client/e2e/smoke/ai-chat-drawer.spec.ts`.
-**Expected:** The smoke opens the drawer after login, sends a mocked chat request, renders structured answer/source chips, changes route, and keeps send-time chips.
-**Why human:** Current environment lacks the credential variables, so the automated smoke skipped.
-
-### 3. Provider Unavailable UX
-
-**Test:** Run with the local provider unavailable or invalid, open the drawer, and try a project-context question.
-**Expected:** Send is disabled or a localized safe error/status copy appears without raw runtime diagnostics.
-**Why human:** Unit tests mock provider states; actual local runtime configuration and user-visible copy need integration inspection.
-
-## Deferred Items
-
-No blocking gaps above are clearly deferred by later roadmap phases. Phase 11 covers action proposals, preview/diff, approval, and audit history; Phase 12 covers approved write tools. The current gaps are read-only Phase 10 scope, grounding, and privacy defects.
+None for this re-verification. The prior blocking gaps were code/data-flow/contract issues and are now covered by source inspection plus passing automated backend/frontend tests.
 
 ## Gaps Summary
 
-Phase 10 should not proceed as achieved. The implemented UI shell and API plumbing are substantive, but the phase goal requires grounded, authorized project-data answers. That is not true until the provider receives the actual sanitized read summaries, TODO member aggregates respect privacy boundaries, team context either resolves or is disabled, selected resources are validated or removed from the contract, and the shared provider gateway stops forwarding login IDs.
+No gaps remain. The previous failures are closed:
+
+- Provider grounding now includes representative sanitized summaries for overview, WBS, milestones, issues, TODO, and history in provider-visible `readContext`.
+- Chat/gateway provider context excludes prompt-visible login IDs while retaining loginId only as the runner/audit owner argument.
+- Member TODO aggregates are restricted to linked/project-visible TODO rows and remain summary-only.
+- The unsupported `selectedResource` field is removed from the Phase 10 chat contract.
+- Team context maps through `MULTI_PROJECT`, and the resolver has no null-loader fail-open path.
+- Earlier Phase 10 UI/API/read-only behavior still passes regression checks.
 
 ---
 
-_Verified: 2026-06-02T08:06:47Z_
+_Verified: 2026-06-04T02:02:04Z_
 _Verifier: the agent (gsd-verifier)_
