@@ -2,7 +2,6 @@ package com.smarterd.application.ai.chat;
 
 import com.smarterd.application.ai.AiExecutionGateway;
 import com.smarterd.application.ai.AiProviderExecutionRunner;
-import com.smarterd.application.ai.AiSelectedResource;
 import com.smarterd.application.ai.provider.AiProviderError;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -90,11 +89,10 @@ public class AiChatExecutionService {
         String mentionedProjectName,
         String scopeMode,
         boolean currentTeamMode,
-        boolean multiProjectQuestion,
-        AiSelectedResource selectedResource
+        boolean multiProjectQuestion
     ) {
         public ChatCommand(Long teamId, Long projectId, String userMessage, String locale, String routeSource) {
-            this(teamId, projectId, userMessage, locale, routeSource, null, null, false, false, null);
+            this(teamId, projectId, userMessage, locale, routeSource, null, null, false, false);
         }
 
         AiChatContextResolver.ResolveCommand toResolveCommand() {

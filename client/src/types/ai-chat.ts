@@ -31,11 +31,6 @@ export interface AiChatContext {
 
 export type AiChatContextSnapshot = AiChatContext;
 
-export interface AiSelectedResourceRequest {
-  type: string;
-  id: string | number;
-}
-
 export interface AiChatRequest {
   message: string;
   teamId?: string | number | null;
@@ -45,7 +40,6 @@ export interface AiChatRequest {
   locale?: string | null;
   context: AiChatContext | null;
   selectedContext?: AiChatContext | null;
-  selectedResource?: AiSelectedResourceRequest | null;
 }
 
 export interface AiChatSourceChip {

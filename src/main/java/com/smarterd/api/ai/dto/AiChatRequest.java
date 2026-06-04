@@ -18,8 +18,7 @@ public record AiChatRequest(
     @Size(max = 40) String scopeMode,
     @Size(max = 20) String locale,
     @Valid AiChatContextRequest context,
-    @Valid AiChatContextRequest selectedContext,
-    @Valid AiSelectedResourceRequest selectedResource
+    @Valid AiChatContextRequest selectedContext
 ) {
     public AiChatExecutionService.ChatCommand toCommand() {
         final var effectiveContext = selectedContext == null ? context : selectedContext;
@@ -39,8 +38,7 @@ public record AiChatRequest(
             effectiveProjectName,
             effectiveScopeMode,
             isCurrentTeamMode(effectiveScopeMode, contextKind),
-            isMultiProjectMode(effectiveScopeMode, contextKind),
-            selectedResource == null ? null : selectedResource.toCommand()
+            isMultiProjectMode(effectiveScopeMode, contextKind)
         );
     }
 
