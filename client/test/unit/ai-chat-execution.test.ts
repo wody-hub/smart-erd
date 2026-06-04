@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildAiChatRequest,
   createAiChatExecutionController,
   resolveAiChatCanSend,
 } from '../../src/hooks/useAiChatExecution.js';
@@ -24,6 +25,20 @@ function projectContext(): AiChatContextSnapshot {
     capturedAt: '2026-06-02T00:00:00Z',
     confidence: 'strong',
     scopeRequired: false,
+  };
+}
+
+function teamContext(): AiChatContextSnapshot {
+  return {
+    kind: 'team',
+    teamId: '1',
+    teamName: 'Platform Team',
+    projectId: null,
+    projectName: null,
+    source: 'route',
+    capturedAt: '2026-06-02T00:00:00Z',
+    confidence: 'team',
+    scopeRequired: true,
   };
 }
 
@@ -86,13 +101,7 @@ test('resolveAiChatCanSend blocks empty message unavailable provider weak contex
   assert.equal(
     resolveAiChatCanSend({
       ...base,
-      context: {
-        ...projectContext(),
-        kind: 'team',
-        projectId: null,
-        projectName: null,
-        scopeRequired: true,
-      },
+      context: teamContext(),
     }).canSend,
     true,
   );
@@ -109,6 +118,20 @@ test('resolveAiChatCanSend blocks empty message unavailable provider weak contex
     'context-required',
   );
   assert.equal(resolveAiChatCanSend({ ...base, isRunning: true }).reason, 'running');
+});
+
+test('buildAiChatRequest maps team context to MULTI_PROJECT contract', () => {
+  const request = buildAiChatRequest({
+    message: '  팀 전체 TODO 현황 알려줘  ',
+    context: teamContext(),
+    locale: 'ko',
+  });
+
+  assert.equal(request.message, '팀 전체 TODO 현황 알려줘');
+  assert.equal(request.scopeMode, 'MULTI_PROJECT');
+  assert.equal(request.teamId, '1');
+  assert.equal(request.projectId, null);
+  assert.equal(request.context?.kind, 'team');
 });
 
 test('chat execution appends normalized user and assistant messages and copies confirmation candidates', async () => {

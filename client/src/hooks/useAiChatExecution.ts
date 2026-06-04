@@ -160,14 +160,26 @@ export function resolveAiChatCanSend(input: AiChatCanSendInput): AiChatCanSendRe
   return { canSend: true, reason: null };
 }
 
+export function resolveAiChatScopeMode(context: AiChatContextSnapshot | null): string | null {
+  if (!context) {
+    return null;
+  }
+  if (context.kind === 'team' || context.kind === 'multi-project') {
+    return 'MULTI_PROJECT';
+  }
+  return context.kind;
+}
+
 export function buildAiChatRequest(input: AiChatExecutionSendInput): AiChatRequest {
   const context = input.selectedContext ?? input.context;
+  const scopeMode = resolveAiChatScopeMode(context);
+  const isMultiProjectScope = scopeMode === 'MULTI_PROJECT';
   return {
     message: input.message.trim(),
     teamId: context?.teamId ?? null,
-    projectId: context?.projectId ?? null,
+    projectId: isMultiProjectScope ? null : (context?.projectId ?? null),
     projectName: context?.projectName ?? null,
-    scopeMode: context?.kind ?? null,
+    scopeMode,
     locale: input.locale ?? null,
     context,
     selectedContext: input.selectedContext ?? null,
