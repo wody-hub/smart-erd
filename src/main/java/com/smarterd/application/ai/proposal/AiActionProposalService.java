@@ -245,8 +245,24 @@ public class AiActionProposalService {
             preview.content(),
             preview.warnings(),
             proposal.getExpiresAt(),
+            resultView(proposal.getResultJson()),
             proposal.getRedactedErrorTitle(),
             proposal.getRedactedErrorDetail()
+        );
+    }
+
+    private AiActionProposalView.Result resultView(String json) {
+        final var result = readMap(json);
+        if (result.isEmpty()) {
+            return null;
+        }
+        return new AiActionProposalView.Result(
+            stringValue(result.get("actionType")),
+            stringValue(result.get("resourceType")),
+            stringValue(result.get("resourceId")),
+            stringValue(result.get("targetLabel")),
+            stringValue(result.get("status")),
+            stringValue(result.get("summary"))
         );
     }
 
@@ -306,6 +322,10 @@ public class AiActionProposalService {
             return "Execution failed.";
         }
         return value.length() <= 500 ? value : value.substring(0, 500);
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     public record CreateCommand(

@@ -34,9 +34,14 @@ const aiChatTestTranslations = {
       expiresAt: '만료',
       fields: '변경 필드',
       content: '내용',
+      result: '실행 결과',
+      summary: '요약',
+      actionType: '작업 유형',
+      resourceId: '리소스 ID',
       emptyValue: '값 없음',
       noPreview: '표시할 미리보기 항목이 없습니다.',
       unsupported: '아직 실행 가능한 작업이 아닙니다.',
+      validationFailed: '검증 실패로 실행하지 않았습니다.',
       status: {
         pending: '대기',
         cancelled: '취소됨',
@@ -137,6 +142,17 @@ function proposal(
     content: 'Follow-up content',
     warnings: ['Review duplicate risk'],
     expiresAt: '2026-06-04T00:00:00Z',
+    result:
+      status === 'EXECUTED'
+        ? {
+            actionType: 'issue.create',
+            resourceType: 'issue',
+            resourceId: '123',
+            targetLabel: 'Follow-up',
+            status: 'created',
+            summary: 'Issue created.',
+          }
+        : null,
     redactedErrorTitle: status === 'REJECTED' ? 'Unsupported action' : null,
     redactedErrorDetail: null,
   };
@@ -243,4 +259,21 @@ test('11-W3-04 answer card renders proposal panels inside existing answer sectio
   assert.match(text, /승인/);
   assert.match(text, /취소/);
   assert.doesNotMatch(text, /payload|sanitizedPayloadJson|rawPrompt|stdout/);
+});
+
+test('12-05 executed proposal renders safe result metadata only', () => {
+  const card = AiAnswerCard({
+    response: {
+      ...response,
+      proposals: [proposal('proposal-3', 'EXECUTED')],
+    },
+    message: assistantMessage,
+  });
+  const text = textContent(card);
+
+  assert.match(text, /실행 결과/);
+  assert.match(text, /Issue created/);
+  assert.match(text, /issue\.create/);
+  assert.match(text, /123/);
+  assert.doesNotMatch(text, /resultJson|sanitizedPayloadJson|rawProviderOutput|stdout|stderr/);
 });

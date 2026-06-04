@@ -85,6 +85,7 @@ function proposal(status: AiActionProposalCard['status'] = 'PENDING'): AiActionP
     content: '',
     warnings: [],
     expiresAt: null,
+    result: null,
     redactedErrorTitle: null,
     redactedErrorDetail: null,
   };

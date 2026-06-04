@@ -16,7 +16,7 @@ The milestone is deliberately approval-gated. AI can read scoped project context
 - [x] **Phase 9: AI Tool Gateway + Provider Abstraction** — provider contract, Local Codex Adapter, structured output schema, execution status, timeout/cancel/error handling (completed 2026-06-01)
 - [x] **Phase 10: App AI Chat UI + Read-Only Context Tools** — in-app chatbot shell, project context selection, read tools for project overview, WBS, milestones, issues, TODOs, and work history (gap closure planned 2026-06-04) (completed 2026-06-04)
 - [x] **Phase 11: Approval Preview + Audit Execution Pipeline** — action proposal schema, preview/diff, approval/cancel flow, execution boundary, audit log and history (completed 2026-06-04)
-- [ ] **Phase 12: Low-Risk Write Tools MVP** — issue create/update, personal TODO create/update, WBS comment/work memo add, all approval-gated
+- [x] **Phase 12: Low-Risk Write Tools MVP** — issue create/update, personal TODO create/update, WBS comment/work memo add, all approval-gated (completed 2026-06-04)
 
 ## Phase Details
 
@@ -112,7 +112,12 @@ Plans:
   4. Delete and destructive action proposals are rejected before approval.
   5. Invalid, unauthorized, or rejected proposals do not mutate project data.
 
-**Plans**: TBD
+**Plans**:
+- [x] 12-01-PLAN.md — Executor payload/result infrastructure and safe result DTO exposure
+- [x] 12-02-PLAN.md — Issue create/update executors
+- [x] 12-03-PLAN.md — Personal TODO create/update executors
+- [x] 12-04-PLAN.md — WBS comment/work memo executors
+- [x] 12-05-PLAN.md — Proposal result UI, query refresh, and final verification
 **UI hint**: yes
 
 ## Traceability
@@ -137,8 +142,8 @@ Plans:
 | AI-AUD-01 | Phase 11 | Complete |
 | AI-AUD-02 | Phase 11 | Complete |
 | AI-AUD-03 | Phase 11 | Complete |
-| AI-WRITE-01 | Phase 12 | Planned |
-| AI-WRITE-02 | Phase 12 | Planned |
-| AI-WRITE-03 | Phase 12 | Planned |
-| AI-WRITE-04 | Phase 12 | Planned |
-| AI-WRITE-05 | Phase 12 | Planned |
+| AI-WRITE-01 | Phase 12 | Complete |
+| AI-WRITE-02 | Phase 12 | Complete |
+| AI-WRITE-03 | Phase 12 | Complete |
+| AI-WRITE-04 | Phase 12 | Complete |
+| AI-WRITE-05 | Phase 12 | Complete |

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.application.ai.provider.AiActionRiskLevel;
 import com.smarterd.domain.ai.AiActionProposal;
 import com.smarterd.domain.ai.AiActionProposalRepository;
@@ -39,7 +40,12 @@ class AiProjectHistoryServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AiProjectHistoryService(projectContextLoader, proposalRepository, auditRepository);
+        service = new AiProjectHistoryService(
+            projectContextLoader,
+            proposalRepository,
+            auditRepository,
+            new ObjectMapper().findAndRegisterModules()
+        );
     }
 
     @Test

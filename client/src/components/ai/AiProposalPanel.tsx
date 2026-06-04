@@ -1,7 +1,9 @@
-import { Check, X } from 'lucide-react';
+import { Check, CircleCheck, X } from 'lucide-react';
 import i18next from 'i18next';
 import { approveAiProposal, cancelAiProposal } from '@/api/aiChatApi';
 import { Button } from '@/components/ui/button';
+import { queryKeys } from '@/constants/query-keys';
+import { queryClient } from '@/lib/query-client';
 import useAiChatStore from '@/stores/useAiChatStore';
 import type { AiActionProposalCard } from '@/types/ai-chat';
 import AiProposalPreview from './AiProposalPreview';
@@ -16,6 +18,35 @@ function hasText(value: string | null | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function invalidateExecutedProposal(proposal: AiActionProposalCard) {
+  const teamId = proposal.target?.teamId == null ? null : String(proposal.target.teamId);
+  const projectId = proposal.target?.projectId == null ? null : String(proposal.target.projectId);
+  if (!teamId || !projectId) {
+    return;
+  }
+
+  void queryClient.invalidateQueries({
+    queryKey: ['teams', teamId, 'projects', projectId, 'ai-history'],
+  });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.aiChat.proposal(proposal.proposalId) });
+
+  const resourceType = proposal.result?.resourceType ?? proposal.target?.type ?? proposal.actionType;
+  if (resourceType?.includes('issue')) {
+    void queryClient.invalidateQueries({ queryKey: ['teams', teamId, 'projects', projectId, 'issues'] });
+  }
+  if (resourceType?.includes('todo')) {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.projectTodos.all(teamId, projectId) });
+  }
+  if (resourceType?.includes('wbs')) {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.wbs.all(teamId, projectId) });
+    const wbsId = proposal.target?.id == null ? null : Number(proposal.target.id);
+    if (Number.isFinite(wbsId)) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.wbs.comments(teamId, projectId, wbsId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.wbs.activities(teamId, projectId, wbsId) });
+    }
+  }
+}
+
 async function decideProposal(
   messageId: string | undefined,
   proposalId: string,
@@ -25,6 +56,9 @@ async function decideProposal(
     action === 'approve' ? await approveAiProposal(proposalId) : await cancelAiProposal(proposalId);
   if (messageId) {
     useAiChatStore.getState().updateProposalInMessage(messageId, decision.proposal);
+  }
+  if (decision.proposal.status === 'EXECUTED') {
+    invalidateExecutedProposal(decision.proposal);
   }
 }
 
@@ -118,6 +152,53 @@ export default function AiProposalPanel({ proposals, messageId }: AiProposalPane
                 {proposal.redactedErrorTitle}
                 {proposal.redactedErrorDetail ? ` - ${proposal.redactedErrorDetail}` : ''}
               </p>
+            ) : null}
+            {proposal.status === 'FAILED' || proposal.status === 'REJECTED' ? (
+              <p className="text-xs leading-5 text-muted-foreground">
+                {t('aiChat.proposals.validationFailed')}
+              </p>
+            ) : null}
+            {proposal.status === 'EXECUTED' && proposal.result ? (
+              <section className="space-y-2 border-l-2 border-success/35 pl-3" aria-live="polite">
+                <h5 className="flex items-center gap-2 text-xs font-semibold leading-5 text-success">
+                  <CircleCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('aiChat.proposals.result')}
+                </h5>
+                <dl className="grid gap-2 text-xs leading-5 sm:grid-cols-2">
+                  {hasText(proposal.result.summary) ? (
+                    <div className="sm:col-span-2">
+                      <dt className="font-medium text-muted-foreground">
+                        {t('aiChat.proposals.summary')}
+                      </dt>
+                      <dd className="text-foreground">{proposal.result.summary}</dd>
+                    </div>
+                  ) : null}
+                  {hasText(proposal.result.actionType) ? (
+                    <div>
+                      <dt className="font-medium text-muted-foreground">
+                        {t('aiChat.proposals.actionType')}
+                      </dt>
+                      <dd className="font-mono text-foreground">{proposal.result.actionType}</dd>
+                    </div>
+                  ) : null}
+                  {hasText(proposal.result.resourceId) ? (
+                    <div>
+                      <dt className="font-medium text-muted-foreground">
+                        {t('aiChat.proposals.resourceId')}
+                      </dt>
+                      <dd className="font-mono text-foreground">{proposal.result.resourceId}</dd>
+                    </div>
+                  ) : null}
+                  {hasText(proposal.result.targetLabel) ? (
+                    <div>
+                      <dt className="font-medium text-muted-foreground">
+                        {t('aiChat.proposals.target')}
+                      </dt>
+                      <dd className="text-foreground">{proposal.result.targetLabel}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </section>
             ) : null}
 
             <AiProposalPreview proposal={proposal} />

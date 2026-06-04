@@ -21,6 +21,7 @@ public record AiActionProposalView(
     String content,
     List<String> warnings,
     Instant expiresAt,
+    Result result,
     String redactedErrorTitle,
     String redactedErrorDetail
 ) {
@@ -32,4 +33,13 @@ public record AiActionProposalView(
     public record Target(String type, String id, String label, Long teamId, Long projectId) {}
 
     public record FieldChange(String label, String beforeValue, String afterValue, String changeType) {}
+
+    public record Result(
+        String actionType,
+        String resourceType,
+        String resourceId,
+        String targetLabel,
+        String status,
+        String summary
+    ) {}
 }

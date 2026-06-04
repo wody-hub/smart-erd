@@ -295,6 +295,7 @@ class AiChatExecutionServiceTest {
             List.of(),
             Instant.EPOCH.plusSeconds(900),
             null,
+            null,
             null
         );
     }

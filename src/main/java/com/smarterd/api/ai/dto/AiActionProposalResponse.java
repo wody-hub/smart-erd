@@ -19,6 +19,7 @@ public record AiActionProposalResponse(
     String content,
     List<String> warnings,
     Instant expiresAt,
+    ResultResponse result,
     String redactedErrorTitle,
     String redactedErrorDetail
 ) {
@@ -50,6 +51,7 @@ public record AiActionProposalResponse(
             view.content(),
             view.warnings(),
             view.expiresAt(),
+            ResultResponse.from(view.result()),
             view.redactedErrorTitle(),
             view.redactedErrorDetail()
         );
@@ -79,6 +81,29 @@ public record AiActionProposalResponse(
          */
         private static FieldChangeResponse from(AiActionProposalView.FieldChange field) {
             return new FieldChangeResponse(field.label(), field.beforeValue(), field.afterValue(), field.changeType());
+        }
+    }
+
+    public record ResultResponse(
+        String actionType,
+        String resourceType,
+        String resourceId,
+        String targetLabel,
+        String status,
+        String summary
+    ) {
+        private static ResultResponse from(AiActionProposalView.Result result) {
+            if (result == null) {
+                return null;
+            }
+            return new ResultResponse(
+                result.actionType(),
+                result.resourceType(),
+                result.resourceId(),
+                result.targetLabel(),
+                result.status(),
+                result.summary()
+            );
         }
     }
 }

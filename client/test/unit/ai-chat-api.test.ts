@@ -97,6 +97,7 @@ test('11-W3-04 proposal API helpers use proposal id paths without request bodies
     content: '',
     warnings: [],
     expiresAt: null,
+    result: null,
     redactedErrorTitle: null,
     redactedErrorDetail: null,
   };

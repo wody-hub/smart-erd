@@ -64,6 +64,20 @@ public class ProjectIssueService {
     }
 
     /**
+     * 프로젝트 이슈 단건을 조회한다.
+     *
+     * @param loginId 로그인 사용자 ID
+     * @param teamId 팀 ID
+     * @param projectId 프로젝트 ID
+     * @param issueId 이슈 ID
+     * @return 프로젝트 이슈
+     */
+    public ProjectIssueResult getProjectIssue(String loginId, Long teamId, Long projectId, Long issueId) {
+        final var context = projectContextLoader.load(loginId, teamId, projectId, false);
+        return toResult(findByProjectAndId(context.project(), issueId));
+    }
+
+    /**
      * 프로젝트 이슈를 생성한다.
      *
      * @param loginId 로그인 사용자 ID

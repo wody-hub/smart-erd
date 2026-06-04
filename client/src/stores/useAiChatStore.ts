@@ -132,6 +132,20 @@ function sanitizeProposalField(value: unknown): AiActionProposalCard['fields'][n
   };
 }
 
+function sanitizeProposalResult(value: unknown): AiActionProposalCard['result'] {
+  if (!isRecord(value)) {
+    return null;
+  }
+  return {
+    actionType: readOptionalString(value.actionType),
+    resourceType: readOptionalString(value.resourceType),
+    resourceId: readOptionalString(value.resourceId),
+    targetLabel: readOptionalString(value.targetLabel),
+    status: readOptionalString(value.status),
+    summary: readOptionalString(value.summary),
+  };
+}
+
 export function sanitizeAiActionProposalCard(value: unknown): AiActionProposalCard | null {
   if (!isRecord(value)) {
     return null;
@@ -160,6 +174,7 @@ export function sanitizeAiActionProposalCard(value: unknown): AiActionProposalCa
     content: readString(value.content),
     warnings: readStringList(value.warnings),
     expiresAt: readOptionalString(value.expiresAt),
+    result: sanitizeProposalResult(value.result),
     redactedErrorTitle: readOptionalString(value.redactedErrorTitle),
     redactedErrorDetail: readOptionalString(value.redactedErrorDetail),
   };

@@ -1,5 +1,7 @@
 package com.smarterd.application.ai.history;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.domain.ai.AiActionProposal;
 import com.smarterd.domain.ai.AiActionProposalRepository;
 import com.smarterd.domain.ai.AiExecutionAudit;
@@ -27,11 +29,13 @@ public class AiProjectHistoryService {
     public static final int DEFAULT_LIMIT = 50;
     public static final int MAX_LIMIT = 100;
 
+    private static final TypeReference<java.util.Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
     private static final String HIDDEN_PERSONAL_TODO_SUMMARY = "Personal TODO detail hidden";
 
     private final ProjectContextLoader projectContextLoader;
     private final AiActionProposalRepository proposalRepository;
     private final AiExecutionAuditRepository auditRepository;
+    private final ObjectMapper objectMapper;
 
     /**
      * Returns authorized, redacted AI history rows for one project.
@@ -103,7 +107,7 @@ public class AiProjectHistoryService {
             proposal.getTargetType(),
             privateTodo ? null : proposal.getTargetId(),
             privateTodo ? null : proposal.getTargetLabel(),
-            privateTodo ? HIDDEN_PERSONAL_TODO_SUMMARY : proposal.getSummary(),
+            privateTodo ? HIDDEN_PERSONAL_TODO_SUMMARY : proposalSummary(proposal),
             proposal.getRequestedBy(),
             proposal.getDecisionBy(),
             proposal.getCreatedAt(),
@@ -167,6 +171,27 @@ public class AiProjectHistoryService {
             return audit.getTargetLabel();
         }
         return audit.getStatus();
+    }
+
+    private String proposalSummary(AiActionProposal proposal) {
+        final var resultSummary = resultSummary(proposal.getResultJson());
+        return resultSummary == null ? proposal.getSummary() : resultSummary;
+    }
+
+    private String resultSummary(String resultJson) {
+        if (resultJson == null || resultJson.isBlank()) {
+            return null;
+        }
+        try {
+            final var result = objectMapper.readValue(resultJson, MAP_TYPE);
+            final var summary = result.get("summary");
+            if (summary == null || String.valueOf(summary).isBlank()) {
+                return null;
+            }
+            return String.valueOf(summary);
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     /**

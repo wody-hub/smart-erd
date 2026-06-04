@@ -82,6 +82,15 @@ export interface AiProposalPreviewField {
   changeType: string | null;
 }
 
+export interface AiProposalResult {
+  actionType: string | null;
+  resourceType: string | null;
+  resourceId: string | null;
+  targetLabel: string | null;
+  status: string | null;
+  summary: string | null;
+}
+
 export interface AiActionProposalCard {
   proposalId: string;
   status: AiProposalStatus;
@@ -95,6 +104,7 @@ export interface AiActionProposalCard {
   content: string;
   warnings: string[];
   expiresAt: string | null;
+  result: AiProposalResult | null;
   redactedErrorTitle: string | null;
   redactedErrorDetail: string | null;
 }

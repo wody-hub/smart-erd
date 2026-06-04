@@ -63,6 +63,7 @@ function proposal(status: AiActionProposalCard['status'] = 'PENDING'): AiActionP
     content: 'Follow-up content',
     warnings: [],
     expiresAt: null,
+    result: null,
     redactedErrorTitle: null,
     redactedErrorDetail: null,
   };

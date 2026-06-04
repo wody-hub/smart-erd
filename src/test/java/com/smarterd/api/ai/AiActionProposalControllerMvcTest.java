@@ -184,6 +184,7 @@ class AiActionProposalControllerMvcTest {
             "",
             List.of(),
             Instant.EPOCH.plusSeconds(900),
+            null,
             status == AiActionProposalStatus.REJECTED ? "Unsupported action" : null,
             status == AiActionProposalStatus.REJECTED ? "No executor is registered for this action type." : null
         );
