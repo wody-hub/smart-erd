@@ -46,7 +46,7 @@ public class AiExecutionGateway {
                 command.userMessage(),
                 command.locale(),
                 PROMPT_VERSION,
-                sanitizedContext(loginId, command)
+                sanitizedContext(command)
             )
         );
     }
@@ -59,14 +59,12 @@ public class AiExecutionGateway {
         return providerExecutionRunner.cancelExecution(loginId, executionId);
     }
 
-    private Map<String, Object> sanitizedContext(String loginId, ExecuteCommand command) {
+    private Map<String, Object> sanitizedContext(ExecuteCommand command) {
         return Map.of(
             "teamId",
             command.teamId(),
             "projectId",
             command.projectId(),
-            "loginId",
-            loginId,
             "locale",
             command.locale() == null ? "" : command.locale()
         );

@@ -73,7 +73,12 @@ class AiExecutionGatewayTest {
         assertThat(commandCaptor.getValue().teamId()).isEqualTo(1L);
         assertThat(commandCaptor.getValue().projectId()).isEqualTo(10L);
         assertThat(commandCaptor.getValue().promptVersion()).isEqualTo(AiExecutionGateway.PROMPT_VERSION);
-        assertThat(commandCaptor.getValue().providerContext()).containsEntry("loginId", "tester");
+        assertThat(commandCaptor.getValue().providerContext())
+            .containsEntry("teamId", 1L)
+            .containsEntry("projectId", 10L)
+            .containsEntry("locale", "ko")
+            .doesNotContainKey("loginId");
+        assertThat(commandCaptor.getValue().providerContext().values()).doesNotContain("tester");
     }
 
     @Test
