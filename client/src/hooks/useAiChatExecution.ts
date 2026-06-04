@@ -1,10 +1,12 @@
 import { useCallback, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { executeAiChat } from '@/api/aiChatApi';
+import { approveAiProposal, cancelAiProposal, executeAiChat } from '@/api/aiChatApi';
 import { queryKeys } from '@/constants/query-keys';
 import { getErrorMessage } from '@/lib/api-error';
-import useAiChatStore from '@/stores/useAiChatStore';
+import useAiChatStore, { sanitizeAiActionProposalCard } from '@/stores/useAiChatStore';
 import type {
+  AiActionProposalCard,
+  AiActionProposalDecisionResponse,
   AiChatConfirmationCandidate,
   AiChatContextSnapshot,
   AiChatMessage,
@@ -42,8 +44,31 @@ export interface AiChatExecutionSendInput {
 
 export interface AiChatExecutionStoreAdapter {
   appendMessage: (message: AiChatMessage) => void;
+  updateProposalInMessage?: (messageId: string, proposal: AiActionProposalCard) => void;
   setConfirmationCandidates: (candidates: AiChatConfirmationCandidate[]) => void;
   setRunningExecutionId: (executionId: string | null) => void;
+}
+
+export interface AiProposalDecisionStoreAdapter {
+  updateProposalInMessage: (messageId: string, proposal: AiActionProposalCard) => void;
+}
+
+export interface AiProposalDecisionControllerOptions {
+  messageId: string;
+  store: AiProposalDecisionStoreAdapter;
+  approve?: (proposalId: string) => Promise<AiActionProposalDecisionResponse>;
+  cancel?: (proposalId: string) => Promise<AiActionProposalDecisionResponse>;
+}
+
+export interface AiProposalDecisionController {
+  approve: (proposalId: string) => Promise<AiActionProposalDecisionResponse>;
+  cancel: (proposalId: string) => Promise<AiActionProposalDecisionResponse>;
+}
+
+export interface UseAiProposalDecisionResult {
+  approve: (proposalId: string) => Promise<AiActionProposalDecisionResponse>;
+  cancel: (proposalId: string) => Promise<AiActionProposalDecisionResponse>;
+  isPending: boolean;
 }
 
 export interface AiChatExecutionControllerOptions {
@@ -128,6 +153,10 @@ function normalizeConfirmationCandidate(
   };
 }
 
+function normalizeProposalCard(proposal: AiActionProposalCard): AiActionProposalCard | null {
+  return sanitizeAiActionProposalCard(proposal);
+}
+
 function normalizeResponseContext(
   context: AiChatResponseContext | null | undefined,
 ): AiChatResponseContext | null {
@@ -200,6 +229,9 @@ export function normalizeAiChatResponse(response: AiChatResponse): AiChatRespons
     confirmationCandidates,
     context: normalizeResponseContext(response.context),
     sourceChips: (response.sourceChips ?? []).map(normalizeSourceChip),
+    proposals: (response.proposals ?? [])
+      .map(normalizeProposalCard)
+      .filter((proposal): proposal is AiActionProposalCard => proposal !== null),
     conclusion: normalizeText(response.conclusion),
     confirmedFacts: normalizeStringList(response.confirmedFacts),
     interpretation: normalizeText(response.interpretation),
@@ -259,6 +291,7 @@ function localStopResponse(message: string): AiChatResponse {
     confirmedFacts: [],
     interpretation: '',
     needsConfirmation: [],
+    proposals: [],
     error: message,
     errorState: {
       code: 'LOCAL_STOP_WAITING',
@@ -281,11 +314,31 @@ function errorResponse(error: unknown, fallback: string): AiChatResponse {
     confirmedFacts: [],
     interpretation: '',
     needsConfirmation: [],
+    proposals: [],
     error: message,
     errorState: {
       code: 'CHAT_REQUEST_FAILED',
       message,
       retryable: true,
+    },
+  };
+}
+
+export function createAiProposalDecisionController(
+  options: AiProposalDecisionControllerOptions,
+): AiProposalDecisionController {
+  const approve = options.approve ?? approveAiProposal;
+  const cancel = options.cancel ?? cancelAiProposal;
+  return {
+    async approve(proposalId) {
+      const decision = await approve(proposalId);
+      options.store.updateProposalInMessage(options.messageId, decision.proposal);
+      return decision;
+    },
+    async cancel(proposalId) {
+      const decision = await cancel(proposalId);
+      options.store.updateProposalInMessage(options.messageId, decision.proposal);
+      return decision;
     },
   };
 }
@@ -394,6 +447,7 @@ export function createAiChatExecutionController(
 
 export function useAiChatExecution(options: UseAiChatExecutionOptions): UseAiChatExecutionResult {
   const appendMessage = useAiChatStore((state) => state.appendMessage);
+  const updateProposalInMessage = useAiChatStore((state) => state.updateProposalInMessage);
   const setConfirmationCandidates = useAiChatStore((state) => state.setConfirmationCandidates);
   const setRunningExecutionId = useAiChatStore((state) => state.setRunningExecutionId);
   const runningExecutionId = useAiChatStore((state) => state.runningExecutionId);
@@ -407,11 +461,13 @@ export function useAiChatExecution(options: UseAiChatExecutionOptions): UseAiCha
   mutationRef.current = mutation.mutateAsync;
   const storeRef = useRef<AiChatExecutionStoreAdapter>({
     appendMessage,
+    updateProposalInMessage,
     setConfirmationCandidates,
     setRunningExecutionId,
   });
   storeRef.current = {
     appendMessage,
+    updateProposalInMessage,
     setConfirmationCandidates,
     setRunningExecutionId,
   };
@@ -421,6 +477,8 @@ export function useAiChatExecution(options: UseAiChatExecutionOptions): UseAiCha
       execute: (request, signal) => mutationRef.current({ request, signal }),
       store: {
         appendMessage: (message) => storeRef.current.appendMessage(message),
+        updateProposalInMessage: (messageId, proposal) =>
+          storeRef.current.updateProposalInMessage?.(messageId, proposal),
         setConfirmationCandidates: (candidates) =>
           storeRef.current.setConfirmationCandidates(candidates),
         setRunningExecutionId: (executionId) => storeRef.current.setRunningExecutionId(executionId),
@@ -455,5 +513,29 @@ export function useAiChatExecution(options: UseAiChatExecutionOptions): UseAiCha
     disabledReason: canSendState.reason,
     send,
     stopWaiting,
+  };
+}
+
+export function useAiProposalDecision(messageId: string): UseAiProposalDecisionResult {
+  const updateProposalInMessage = useAiChatStore((state) => state.updateProposalInMessage);
+  const approveMutation = useMutation({
+    mutationKey: queryKeys.aiChat.proposalApprove(messageId),
+    mutationFn: approveAiProposal,
+  });
+  const cancelMutation = useMutation({
+    mutationKey: queryKeys.aiChat.proposalCancel(messageId),
+    mutationFn: cancelAiProposal,
+  });
+  const controllerRef = useRef<AiProposalDecisionController | null>(null);
+  controllerRef.current = createAiProposalDecisionController({
+    messageId,
+    store: { updateProposalInMessage },
+    approve: (proposalId) => approveMutation.mutateAsync(proposalId),
+    cancel: (proposalId) => cancelMutation.mutateAsync(proposalId),
+  });
+  return {
+    approve: (proposalId) => controllerRef.current!.approve(proposalId),
+    cancel: (proposalId) => controllerRef.current!.cancel(proposalId),
+    isPending: approveMutation.isPending || cancelMutation.isPending,
   };
 }

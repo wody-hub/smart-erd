@@ -4,7 +4,11 @@ import i18next from 'i18next';
 import type { ReactElement, ReactNode } from 'react';
 import AiAnswerCard from '../../src/components/ai/AiAnswerCard.js';
 import AiSourceChips from '../../src/components/ai/AiSourceChips.js';
-import type { AiChatResponse } from '../../src/types/ai-chat.js';
+import type {
+  AiActionProposalCard,
+  AiChatMessage,
+  AiChatResponse,
+} from '../../src/types/ai-chat.js';
 
 const aiChatTestTranslations = {
   aiChat: {
@@ -20,6 +24,27 @@ const aiChatTestTranslations = {
     error: {
       title: 'AI 응답 오류',
       fallback: 'AI 응답을 만들지 못했습니다.',
+    },
+    proposals: {
+      sectionLabel: 'AI 제안 목록',
+      approve: '승인',
+      cancel: '취소',
+      target: '대상',
+      risk: '위험도 {{risk}}',
+      expiresAt: '만료',
+      fields: '변경 필드',
+      content: '내용',
+      emptyValue: '값 없음',
+      noPreview: '표시할 미리보기 항목이 없습니다.',
+      unsupported: '아직 실행 가능한 작업이 아닙니다.',
+      status: {
+        pending: '대기',
+        cancelled: '취소됨',
+        expired: '만료됨',
+        rejected: '거절됨',
+        executed: '실행됨',
+        failed: '실패',
+      },
     },
   },
 };
@@ -92,6 +117,37 @@ const response: AiChatResponse = {
   confirmedFacts: ['Delayed issues: 2', 'WBS risk count: 1'],
   needsConfirmation: ['Confirm the reporting period.'],
   sourceChips: [{ projectName: 'Alpha Project', tool: 'issues', count: 12 }],
+  proposals: [],
+};
+
+function proposal(
+  id: string,
+  status: AiActionProposalCard['status'] = 'PENDING',
+): AiActionProposalCard {
+  return {
+    proposalId: id,
+    status,
+    executable: status === 'PENDING',
+    actionType: 'issue.create',
+    riskLevel: 'LOW',
+    target: { type: 'issue', id: 'ISS-1', label: 'Risk issue', teamId: '1', projectId: '10' },
+    title: 'Create issue',
+    summary: 'Create a follow-up issue',
+    fields: [{ label: 'Title', beforeValue: null, afterValue: 'Follow-up', changeType: 'ADD' }],
+    content: 'Follow-up content',
+    warnings: ['Review duplicate risk'],
+    expiresAt: '2026-06-04T00:00:00Z',
+    redactedErrorTitle: status === 'REJECTED' ? 'Unsupported action' : null,
+    redactedErrorDetail: null,
+  };
+}
+
+const assistantMessage: AiChatMessage = {
+  id: 'assistant-1',
+  role: 'assistant',
+  content: 'Delayed issues need attention.',
+  createdAt: '2026-06-04T00:00:00Z',
+  context: null,
 };
 
 test('10-W0-06 source chips render project tool and count labels', () => {
@@ -115,7 +171,9 @@ test('10-W0-06 answer card separates conclusion facts interpretation and confirm
   assert.match(text, /API work is the main risk/);
   assert.match(text, /확인이 필요합니다/);
   assert.match(text, /Confirm the reporting period/);
-  assert.ok(indexOfText(card, /Delayed issues need attention/) < indexOfText(card, /Alpha Project/));
+  assert.ok(
+    indexOfText(card, /Delayed issues need attention/) < indexOfText(card, /Alpha Project/),
+  );
   assert.ok(indexOfText(card, /Alpha Project/) < indexOfText(card, /확인된 사실/));
   assert.ok(indexOfText(card, /확인된 사실/) < indexOfText(card, /해석/));
   assert.ok(indexOfText(card, /해석/) < indexOfText(card, /확인이 필요합니다/));
@@ -140,16 +198,17 @@ test('10-W0-06 answer card does not fabricate empty fact sections', () => {
 
 test('10-W0-06 error card exposes localized error state', () => {
   const errorCard = AiAnswerCard({
-      response: {
-        status: 'ERROR',
-        conclusion: '',
-        interpretation: '',
-        confirmedFacts: [],
-        needsConfirmation: [],
-        sourceChips: [],
-        error: 'AI 응답을 만들지 못했습니다.',
-      },
-    });
+    response: {
+      status: 'ERROR',
+      conclusion: '',
+      interpretation: '',
+      confirmedFacts: [],
+      needsConfirmation: [],
+      sourceChips: [],
+      proposals: [],
+      error: 'AI 응답을 만들지 못했습니다.',
+    },
+  });
   const element = renderedElement(errorCard);
   const text = textContent(errorCard);
 
@@ -157,9 +216,31 @@ test('10-W0-06 error card exposes localized error state', () => {
   assert.match(text, /AI 응답을 만들지 못했습니다/);
 });
 
-test('10-W0-06 answer card never renders action proposal approval or delete controls', () => {
-  const text = textContent(AiAnswerCard({ response }));
+test('11-W3-04 answer card renders proposal panels inside existing answer sections', () => {
+  const card = AiAnswerCard({
+    response: {
+      ...response,
+      proposals: [proposal('proposal-1'), proposal('proposal-2', 'REJECTED')],
+    },
+    message: assistantMessage,
+  });
+  const text = textContent(card);
 
-  assert.doesNotMatch(text, /approval|approve|preview|diff|execute|delete|destructive/i);
-  assert.doesNotMatch(text, /승인|실행|삭제|미리보기/);
+  assert.match(text, /Delayed issues need attention/);
+  assert.match(text, /확인된 사실/);
+  assert.match(text, /해석/);
+  assert.match(text, /proposal-1/);
+  assert.match(text, /proposal-2/);
+  assert.match(text, /Create a follow-up issue/);
+  assert.match(text, /Risk issue/);
+  assert.match(text, /위험도 LOW/);
+  assert.match(text, /Title/);
+  assert.match(text, /Follow-up/);
+  assert.match(text, /Follow-up content/);
+  assert.match(text, /Review duplicate risk/);
+  assert.match(text, /거절됨/);
+  assert.match(text, /Unsupported action/);
+  assert.match(text, /승인/);
+  assert.match(text, /취소/);
+  assert.doesNotMatch(text, /payload|sanitizedPayloadJson|rawPrompt|stdout/);
 });

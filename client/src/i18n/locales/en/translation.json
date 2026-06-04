@@ -67,6 +67,27 @@
       "title": "AI response error",
       "fallback": "Could not create an AI response. Check the runtime status and selected context, then try again."
     },
+    "proposals": {
+      "sectionLabel": "AI proposals",
+      "approve": "Approve",
+      "cancel": "Cancel",
+      "target": "Target",
+      "risk": "Risk {{risk}}",
+      "expiresAt": "Expires",
+      "fields": "Changed fields",
+      "content": "Content",
+      "emptyValue": "No value",
+      "noPreview": "No preview items to show.",
+      "unsupported": "This action is not executable yet. You can only review its status.",
+      "status": {
+        "pending": "Pending",
+        "cancelled": "Cancelled",
+        "expired": "Expired",
+        "rejected": "Rejected",
+        "executed": "Executed",
+        "failed": "Failed"
+      }
+    },
     "newConversation": {
       "label": "New chat",
       "title": "Start a new chat",

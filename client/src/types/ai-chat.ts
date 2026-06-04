@@ -57,6 +57,57 @@ export interface AiChatAnswerSections {
   needsConfirmation: string[];
 }
 
+export type AiProposalStatus =
+  | 'PENDING'
+  | 'CANCELLED'
+  | 'EXPIRED'
+  | 'REJECTED'
+  | 'EXECUTED'
+  | 'FAILED';
+
+export type AiProposalRiskLevel = 'LOW' | 'MEDIUM';
+
+export interface AiProposalTarget {
+  type: string | null;
+  id: string | null;
+  label: string | null;
+  teamId: string | number | null;
+  projectId: string | number | null;
+}
+
+export interface AiProposalPreviewField {
+  label: string;
+  beforeValue: string | null;
+  afterValue: string | null;
+  changeType: string | null;
+}
+
+export interface AiActionProposalCard {
+  proposalId: string;
+  status: AiProposalStatus;
+  executable: boolean;
+  actionType: string;
+  riskLevel: AiProposalRiskLevel | null;
+  target: AiProposalTarget | null;
+  title: string;
+  summary: string;
+  fields: AiProposalPreviewField[];
+  content: string;
+  warnings: string[];
+  expiresAt: string | null;
+  redactedErrorTitle: string | null;
+  redactedErrorDetail: string | null;
+}
+
+export type AiProposalDecision = 'APPROVE' | 'CANCEL' | 'REFRESH' | 'IDEMPOTENT';
+
+export interface AiActionProposalDecisionResponse {
+  proposal: AiActionProposalCard;
+  decision: AiProposalDecision;
+  terminal: boolean;
+  message: string;
+}
+
 export interface AiChatConfirmationCandidate {
   id: string;
   label: string;
@@ -91,6 +142,7 @@ export interface AiChatResponse extends AiChatAnswerSections {
   confirmationCandidates?: AiChatConfirmationCandidate[];
   context?: AiChatResponseContext | null;
   executionId?: string | null;
+  proposals: AiActionProposalCard[];
   error?: string | null;
   errorState?: AiChatErrorState | null;
 }

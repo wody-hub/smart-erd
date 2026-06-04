@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { AiChatMessage, AiChatResponse } from '../../src/types/ai-chat.js';
+import type {
+  AiActionProposalCard,
+  AiChatMessage,
+  AiChatResponse,
+} from '../../src/types/ai-chat.js';
 import {
   appendAiChatMessage,
   buildAiChatConversationStorageKey,
@@ -14,7 +18,9 @@ import {
   openAiChatDrawer,
   saveAiChatConversation,
   serializeAiChatConversation,
+  sanitizeAiActionProposalCard,
   startNewAiChatConversation,
+  updateProposalInAiChatMessage,
 } from '../../src/stores/useAiChatStore.js';
 
 function createStorage() {
@@ -40,6 +46,25 @@ function message(id: string, content = `message-${id}`): AiChatMessage {
     content,
     createdAt: `2026-06-02T00:00:${id.padStart(2, '0')}Z`,
     context: null,
+  };
+}
+
+function proposal(status: AiActionProposalCard['status'] = 'PENDING'): AiActionProposalCard {
+  return {
+    proposalId: 'proposal-1',
+    status,
+    executable: status === 'PENDING',
+    actionType: 'issue.create',
+    riskLevel: 'LOW',
+    target: { type: 'issue', id: 'ISS-1', label: 'Risk issue', teamId: '1', projectId: '10' },
+    title: 'Create issue',
+    summary: 'Create a follow-up issue',
+    fields: [{ label: 'Title', beforeValue: null, afterValue: 'Follow-up', changeType: 'ADD' }],
+    content: 'Follow-up content',
+    warnings: [],
+    expiresAt: null,
+    redactedErrorTitle: null,
+    redactedErrorDetail: null,
   };
 }
 
@@ -78,6 +103,7 @@ test('10-W0-04 serializes drawer presentation state without running execution st
     confirmedFacts: [],
     needsConfirmation: ['프로젝트 범위를 선택하세요'],
     sourceChips: [],
+    proposals: [],
     confirmationCandidates: [
       {
         id: 'project-10',
@@ -122,6 +148,50 @@ test('10-W0-04 serializes drawer presentation state without running execution st
   assert.equal(restored.selectedContext?.projectName, 'Alpha Project');
   assert.equal(restored.confirmationCandidates.length, 1);
   assert.equal(restored.runningExecutionId, null);
+});
+
+test('11-W3-04 proposal terminal state updates inside the original assistant message', () => {
+  const assistant: AiChatMessage = {
+    ...message('assistant', 'Create a follow-up issue'),
+    role: 'assistant',
+    response: {
+      status: 'ANSWER',
+      conclusion: '리스크 1건',
+      interpretation: '후속 이슈가 필요합니다.',
+      confirmedFacts: ['지연 이슈 1건'],
+      needsConfirmation: [],
+      sourceChips: [],
+      proposals: [proposal('PENDING')],
+    },
+  };
+  const state = appendAiChatMessage(createInitialAiChatState(), assistant);
+  const updated = updateProposalInAiChatMessage(state, 'assistant', proposal('EXECUTED'));
+
+  assert.equal(updated.messages.length, 1);
+  assert.equal(updated.messages[0]?.response?.proposals[0]?.status, 'EXECUTED');
+});
+
+test('11-W3-04 proposal storage keeps sanitized terminal cards across hydration', () => {
+  const { storage } = createStorage();
+  const state = appendAiChatMessage(createInitialAiChatState(), {
+    ...message('assistant', 'Create a follow-up issue'),
+    role: 'assistant',
+    response: {
+      status: 'ANSWER',
+      conclusion: '리스크 1건',
+      interpretation: '후속 이슈가 필요합니다.',
+      confirmedFacts: ['지연 이슈 1건'],
+      needsConfirmation: [],
+      sourceChips: [],
+      proposals: [proposal('CANCELLED')],
+    },
+  });
+
+  saveAiChatConversation('tester', state, storage);
+  const restored = hydrateAiChatConversationForLogin(createInitialAiChatState(), 'tester', storage);
+
+  assert.equal(restored.messages[0]?.response?.proposals[0]?.status, 'CANCELLED');
+  assert.equal(restored.messages[0]?.response?.proposals[0]?.proposalId, 'proposal-1');
 });
 
 test('10-W0-04 preserves numeric backend confirmation candidate ids in presentation state', () => {
@@ -233,6 +303,45 @@ test('10-W0-04 local persistence rejects secret and raw context shaped fields', 
     'rawPrompt',
     'rawContext',
     'rawProviderOutput',
+    'env',
+    'toolPayload',
+  ]) {
+    assert.equal(serialized.includes(forbidden), false, `${forbidden} must not be persisted`);
+  }
+});
+
+test('11-W3-04 proposal sanitizer strips unrecognized nested fields before persistence', () => {
+  const unsafe = {
+    ...proposal(),
+    payload: { value: 'hidden' },
+    rawPrompt: 'hidden',
+    rawContext: 'hidden',
+    rawProviderOutput: 'hidden',
+    stdout: 'hidden',
+    stderr: 'hidden',
+    accessToken: 'hidden',
+    refreshToken: 'hidden',
+    cookie: 'hidden',
+    password: 'hidden',
+    env: 'hidden',
+    toolPayload: 'hidden',
+  } as unknown as AiActionProposalCard;
+
+  const sanitized = sanitizeAiActionProposalCard(unsafe);
+
+  assert.equal(sanitized?.proposalId, 'proposal-1');
+  const serialized = JSON.stringify(sanitized);
+  for (const forbidden of [
+    'payload',
+    'rawPrompt',
+    'rawContext',
+    'rawProviderOutput',
+    'stdout',
+    'stderr',
+    'accessToken',
+    'refreshToken',
+    'cookie',
+    'password',
     'env',
     'toolPayload',
   ]) {

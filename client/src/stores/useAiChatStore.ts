@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { STORAGE_KEYS } from '@/constants/storage';
 import type {
+  AiActionProposalCard,
   AiChatConfirmationCandidate,
   AiChatContextSnapshot,
   AiChatConversationSnapshot,
@@ -9,10 +10,21 @@ import type {
   AiChatResponseStatus,
   AiChatSourceChip,
   AiChatToolLabel,
+  AiProposalRiskLevel,
+  AiProposalStatus,
 } from '@/types/ai-chat';
 
 const MAX_RENDERED_MESSAGES = 50;
 const RESPONSE_STATUSES = new Set<AiChatResponseStatus>(['ANSWER', 'NEEDS_CONFIRMATION', 'ERROR']);
+const PROPOSAL_STATUSES = new Set<AiProposalStatus>([
+  'PENDING',
+  'CANCELLED',
+  'EXPIRED',
+  'REJECTED',
+  'EXECUTED',
+  'FAILED',
+]);
+const PROPOSAL_RISK_LEVELS = new Set<AiProposalRiskLevel>(['LOW', 'MEDIUM']);
 const TOOL_LABELS = new Set<AiChatToolLabel>([
   'overview',
   'WBS',
@@ -41,6 +53,7 @@ export interface AiChatZustandState extends AiChatStoreState {
   openDrawer: () => void;
   closeDrawer: () => void;
   appendMessage: (message: AiChatMessage) => void;
+  updateProposalInMessage: (messageId: string, proposal: AiActionProposalCard) => void;
   setSelectedContext: (context: AiChatContextSnapshot | null) => void;
   setConfirmationCandidates: (candidates: AiChatConfirmationCandidate[]) => void;
   setRunningExecutionId: (executionId: string | null) => void;
@@ -83,11 +96,82 @@ function readOptionalId(value: unknown): string | number | null {
   return null;
 }
 
+function readBoolean(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : false;
+}
+
 function readStringList(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
   return value.filter((item): item is string => typeof item === 'string');
+}
+
+function sanitizeProposalTarget(value: unknown): AiActionProposalCard['target'] {
+  if (!isRecord(value)) {
+    return null;
+  }
+  return {
+    type: readOptionalString(value.type),
+    id: readOptionalString(value.id),
+    label: readOptionalString(value.label),
+    teamId: readOptionalId(value.teamId),
+    projectId: readOptionalId(value.projectId),
+  };
+}
+
+function sanitizeProposalField(value: unknown): AiActionProposalCard['fields'][number] | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  return {
+    label: readString(value.label),
+    beforeValue: readOptionalString(value.beforeValue),
+    afterValue: readOptionalString(value.afterValue),
+    changeType: readOptionalString(value.changeType),
+  };
+}
+
+export function sanitizeAiActionProposalCard(value: unknown): AiActionProposalCard | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const status = readString(value.status);
+  if (!PROPOSAL_STATUSES.has(status as AiProposalStatus)) {
+    return null;
+  }
+  const riskLevel = readOptionalString(value.riskLevel);
+  return {
+    proposalId: readString(value.proposalId),
+    status: status as AiProposalStatus,
+    executable: readBoolean(value.executable),
+    actionType: readString(value.actionType),
+    riskLevel: PROPOSAL_RISK_LEVELS.has(riskLevel as AiProposalRiskLevel)
+      ? (riskLevel as AiProposalRiskLevel)
+      : null,
+    target: sanitizeProposalTarget(value.target),
+    title: readString(value.title),
+    summary: readString(value.summary),
+    fields: Array.isArray(value.fields)
+      ? value.fields
+          .map(sanitizeProposalField)
+          .filter((field): field is AiActionProposalCard['fields'][number] => field !== null)
+      : [],
+    content: readString(value.content),
+    warnings: readStringList(value.warnings),
+    expiresAt: readOptionalString(value.expiresAt),
+    redactedErrorTitle: readOptionalString(value.redactedErrorTitle),
+    redactedErrorDetail: readOptionalString(value.redactedErrorDetail),
+  };
+}
+
+function sanitizeProposalCards(value: unknown): AiActionProposalCard[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map(sanitizeAiActionProposalCard)
+    .filter((proposal): proposal is AiActionProposalCard => proposal !== null);
 }
 
 function capMessages(messages: AiChatMessage[]): AiChatMessage[] {
@@ -196,6 +280,7 @@ function sanitizeResponse(value: unknown): AiChatResponse | null {
     confirmedFacts: readStringList(value.confirmedFacts),
     needsConfirmation: readStringList(value.needsConfirmation),
     sourceChips,
+    proposals: sanitizeProposalCards(value.proposals),
     confirmationCandidates,
     executionId: readOptionalString(value.executionId),
     error: safeError,
@@ -314,6 +399,35 @@ export function appendAiChatMessage(
         (item): item is AiChatMessage => item !== null,
       ),
     ),
+  };
+}
+
+export function updateProposalInAiChatMessage(
+  state: AiChatStoreState,
+  messageId: string,
+  proposal: AiActionProposalCard,
+): AiChatStoreState {
+  const safeProposal = sanitizeAiActionProposalCard(proposal);
+  if (!safeProposal) {
+    return state;
+  }
+  return {
+    ...state,
+    messages: state.messages.map((message) => {
+      if (message.id !== messageId || !message.response) {
+        return message;
+      }
+      const proposals = message.response.proposals.map((item) =>
+        item.proposalId === safeProposal.proposalId ? safeProposal : item,
+      );
+      return {
+        ...message,
+        response: {
+          ...message.response,
+          proposals,
+        },
+      };
+    }),
   };
 }
 
@@ -436,6 +550,12 @@ const useAiChatStore = create<AiChatZustandState>((set) => ({
   appendMessage: (message) =>
     set((state) => {
       const next = appendAiChatMessage(state, message);
+      persistActiveConversation(next);
+      return next;
+    }),
+  updateProposalInMessage: (messageId, proposal) =>
+    set((state) => {
+      const next = updateProposalInAiChatMessage(state, messageId, proposal);
       persistActiveConversation(next);
       return next;
     }),

@@ -88,6 +88,13 @@ export const queryKeys = {
     send: () => ['ai-chat', 'send'] as const,
     /** AI chat 전송 부가 메타데이터 */
     metadata: (threadId: string) => ['ai-chat', 'metadata', threadId] as const,
+    /** AI proposal 상세 */
+    proposal: (proposalId: string) => ['ai-chat', 'proposal', proposalId] as const,
+    /** AI proposal 승인 */
+    proposalApprove: (proposalId: string) =>
+      ['ai-chat', 'proposal', proposalId, 'approve'] as const,
+    /** AI proposal 취소 */
+    proposalCancel: (proposalId: string) => ['ai-chat', 'proposal', proposalId, 'cancel'] as const,
   },
   /** 다이어그램 관련 쿼리 키 */
   diagrams: {

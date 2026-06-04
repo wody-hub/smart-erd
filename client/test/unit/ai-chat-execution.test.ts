@@ -3,9 +3,12 @@ import test from 'node:test';
 import {
   buildAiChatRequest,
   createAiChatExecutionController,
+  createAiProposalDecisionController,
   resolveAiChatCanSend,
 } from '../../src/hooks/useAiChatExecution.js';
 import type {
+  AiActionProposalCard,
+  AiActionProposalDecisionResponse,
   AiChatConfirmationCandidate,
   AiChatContextSnapshot,
   AiChatMessage,
@@ -62,8 +65,28 @@ function response(candidates: AiChatConfirmationCandidate[] = []): AiChatRespons
     confirmedFacts: candidates.length > 0 ? [] : ['지연 이슈 3건'],
     interpretation: candidates.length > 0 ? '' : '일정 점검이 필요합니다.',
     needsConfirmation: candidates.length > 0 ? ['프로젝트 범위를 선택하세요'] : [],
+    proposals: [],
     error: null,
     errorState: null,
+  };
+}
+
+function proposal(status: AiActionProposalCard['status'] = 'PENDING'): AiActionProposalCard {
+  return {
+    proposalId: 'proposal-1',
+    status,
+    executable: status === 'PENDING',
+    actionType: 'issue.create',
+    riskLevel: 'LOW',
+    target: { type: 'issue', id: 'ISS-1', label: 'Risk issue', teamId: '1', projectId: '10' },
+    title: 'Create issue',
+    summary: 'Create a follow-up issue',
+    fields: [],
+    content: '',
+    warnings: [],
+    expiresAt: null,
+    redactedErrorTitle: null,
+    redactedErrorDetail: null,
   };
 }
 
@@ -218,4 +241,30 @@ test('stopWaiting aborts the current request clears running state and preserves 
   assert.equal(recorder.messages[0]?.role, 'user');
   assert.equal(recorder.messages[0]?.content, '응답을 중지할 질문');
   assert.equal(recorder.messages.at(-1)?.response?.errorState?.code, 'LOCAL_STOP_WAITING');
+});
+
+test('11-W3-04 proposal decision controller updates a single existing proposal', async () => {
+  const updates: Array<{ messageId: string; proposal: AiActionProposalCard }> = [];
+  const decision: AiActionProposalDecisionResponse = {
+    proposal: proposal('EXECUTED'),
+    decision: 'APPROVE',
+    terminal: true,
+    message: 'ai.proposal.executed',
+  };
+  const controller = createAiProposalDecisionController({
+    messageId: 'assistant-1',
+    store: {
+      updateProposalInMessage: (messageId, nextProposal) => {
+        updates.push({ messageId, proposal: nextProposal });
+      },
+    },
+    approve: async () => decision,
+  });
+
+  const result = await controller.approve('proposal-1');
+
+  assert.deepEqual(result, decision);
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0]?.messageId, 'assistant-1');
+  assert.equal(updates[0]?.proposal.status, 'EXECUTED');
 });
