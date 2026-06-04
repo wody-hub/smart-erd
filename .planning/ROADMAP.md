@@ -91,7 +91,12 @@ Plans:
   4. Approved writes execute only through existing service/API boundaries.
   5. Prompt metadata, tool calls, proposals, approvals, cancellations, execution results, and errors are audit logged.
 
-**Plans**: TBD
+**Plans**:
+- [ ] 11-01-PLAN.md — Backend proposal persistence and lifecycle core
+- [ ] 11-02-PLAN.md — Backend chat proposal conversion, approve/cancel API, and proposal audit
+- [ ] 11-03-PLAN.md — Backend project AI history API and privacy filtering
+- [ ] 11-04-PLAN.md — Frontend proposal cards, approve/cancel mutations, and sanitized drawer persistence
+- [ ] 11-05-PLAN.md — Project AI history UI, final redaction checks, and Phase 12 executor handoff
 **UI hint**: yes
 
 ### Phase 12: Low-Risk Write Tools MVP
