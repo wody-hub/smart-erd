@@ -49,7 +49,7 @@ export default function SettingsPage() {
   }, []);
 
   /**
-   * 서버 연결을 테스트한다. GET {url}/api/health를 호출하여 성공 여부를 확인.
+   * 서버 연결을 테스트한다. GET {url}/api/auth/health를 호출하여 성공 여부를 확인.
    */
   const handleTestConnection = async () => {
     const trimmedUrl = serverUrl.trim().replace(/\/+$/, '');

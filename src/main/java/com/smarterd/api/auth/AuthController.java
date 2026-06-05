@@ -15,10 +15,12 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -43,6 +45,19 @@ public class AuthController {
 
     /** 회원가입 요청 유효성 검사기 */
     private final SignupRequestValidator signupRequestValidator;
+
+    /**
+     * 인증 API 서버 도달 여부를 확인한다.
+     *
+     * @return 서버 상태 응답
+     */
+    @Operation(summary = "인증 API 헬스 체크", description = "인증 API 서버에 도달 가능한지 확인한다.")
+    @ApiResponse(responseCode = "200", description = "서버 도달 가능")
+    @SecurityRequirements
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, String>> health() {
+        return ResponseEntity.ok(Map.of("status", "ok"));
+    }
 
     /**
      * 커스텀 Validator를 등록한다.
