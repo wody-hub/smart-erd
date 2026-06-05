@@ -59,6 +59,10 @@
       "interpretation": "해석",
       "needsConfirmation": "확인이 필요합니다"
     },
+    "pending": {
+      "title": "AI가 답변을 준비 중입니다",
+      "body": "프로젝트 데이터를 확인하고 실행 제안 가능 여부를 검토하고 있습니다."
+    },
     "sourceChips": {
       "label": "사용한 자료",
       "currentScope": "현재 범위"

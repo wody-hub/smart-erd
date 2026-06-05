@@ -59,6 +59,10 @@
       "interpretation": "Interpretation",
       "needsConfirmation": "Needs confirmation"
     },
+    "pending": {
+      "title": "AI is preparing a response",
+      "body": "Checking project data and whether execution proposals are available."
+    },
     "sourceChips": {
       "label": "Sources used",
       "currentScope": "Current scope"

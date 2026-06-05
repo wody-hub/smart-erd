@@ -1,6 +1,6 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Bot, Plus, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Bot, Loader2, Plus, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AiAnswerCard from '@/components/ai/AiAnswerCard';
 import AiChatComposer from '@/components/ai/AiChatComposer';
@@ -73,6 +73,34 @@ function UserMessage({ message }: { message: AiChatMessage }) {
 }
 
 function AssistantMessage({ message }: { message: AiChatMessage }) {
+  const { t } = useTranslation();
+
+  if (message.pending) {
+    return (
+      <article
+        className="max-w-[92%] rounded-md border border-primary/20 bg-primary/5 px-3 py-3 text-sm leading-6 text-foreground shadow-sm"
+        aria-live="polite"
+        aria-busy="true"
+        role="status"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" aria-hidden="true" />
+          <span className="min-w-0 font-medium">{t('aiChat.pending.title')}</span>
+          <span className="flex shrink-0 items-center gap-1" aria-hidden="true">
+            {[0, 1, 2].map((index) => (
+              <span
+                key={index}
+                className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/70"
+                style={{ animationDelay: `${index * 120}ms` }}
+              />
+            ))}
+          </span>
+        </div>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{t('aiChat.pending.body')}</p>
+      </article>
+    );
+  }
+
   if (message.response) {
     return <AiAnswerCard response={message.response} message={message} />;
   }
@@ -134,6 +162,7 @@ export default function AiChatDrawer() {
   const { t, i18n } = useTranslation();
   const [draftMessage, setDraftMessage] = useState('');
   const [newConversationOpen, setNewConversationOpen] = useState(false);
+  const transcriptScrollRef = useRef<HTMLElement | null>(null);
   const isOpen = useAiChatStore((state) => state.isOpen);
   const messages = useAiChatStore((state) => state.messages);
   const selectedContext = useAiChatStore((state) => state.selectedContext);
@@ -171,6 +200,31 @@ export default function AiChatDrawer() {
       selectedContext,
     ],
   );
+  const latestMessageKey = useMemo(() => {
+    const latest = messages.length > 0 ? messages[messages.length - 1] : undefined;
+    if (!latest) {
+      return 'empty';
+    }
+    return [
+      latest.id,
+      latest.pending ? 'pending' : 'settled',
+      latest.content,
+      latest.response?.status ?? '',
+    ].join(':');
+  }, [messages]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    const element = transcriptScrollRef.current;
+    if (!element) {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
+    });
+  }, [execution.isRunning, isOpen, latestMessageKey]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) {
@@ -262,6 +316,7 @@ export default function AiChatDrawer() {
             />
 
             <main
+              ref={transcriptScrollRef}
               className="min-h-0 flex-1 overflow-y-auto bg-background"
               aria-label={t('aiChat.aria.transcript')}
             >

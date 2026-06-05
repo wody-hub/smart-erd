@@ -101,7 +101,12 @@ function createStoreRecorder() {
     runningExecutionIds,
     store: {
       appendMessage: (message: AiChatMessage) => {
-        messages.push(message);
+        const existingIndex = messages.findIndex((item) => item.id === message.id);
+        if (existingIndex >= 0) {
+          messages[existingIndex] = message;
+        } else {
+          messages.push(message);
+        }
       },
       setConfirmationCandidates: (candidates: AiChatConfirmationCandidate[]) => {
         confirmationCandidates.push(candidates);
@@ -203,6 +208,46 @@ test('chat execution appends normalized user and assistant messages and copies c
   assert.deepEqual(recorder.confirmationCandidates.at(-1), candidates);
   assert.deepEqual(recorder.runningExecutionIds, ['msg-2', null]);
   assert.equal(JSON.stringify(recorder.messages).includes('rawProviderOutput'), false);
+});
+
+test('chat execution shows an assistant pending message before the response resolves', async () => {
+  const recorder = createStoreRecorder();
+  const deferred: { resolve?: (value: AiChatResponse) => void } = {};
+  const controller = createAiChatExecutionController({
+    execute: async () =>
+      new Promise<AiChatResponse>((resolve) => {
+        deferred.resolve = resolve;
+      }),
+    store: recorder.store,
+    createId: (() => {
+      let next = 1;
+      return () => `msg-${next++}`;
+    })(),
+    now: () => '2026-06-02T00:00:00Z',
+  });
+
+  const sendPromise = controller.send({
+    message: 'AI 처리 상태를 보여줘',
+    context: projectContext(),
+    locale: 'ko',
+  });
+  await Promise.resolve();
+
+  assert.equal(recorder.messages.length, 2);
+  assert.equal(recorder.messages[0]?.role, 'user');
+  assert.equal(recorder.messages[1]?.id, 'msg-2');
+  assert.equal(recorder.messages[1]?.role, 'assistant');
+  assert.equal(recorder.messages[1]?.pending, true);
+
+  assert.ok(deferred.resolve);
+  deferred.resolve(response());
+  await sendPromise;
+
+  assert.equal(recorder.messages.length, 2);
+  assert.equal(recorder.messages[1]?.id, 'msg-2');
+  assert.equal(recorder.messages[1]?.pending, false);
+  assert.equal(recorder.messages[1]?.content, '리스크 3건');
+  assert.equal(recorder.messages[1]?.response?.status, 'ANSWER');
 });
 
 test('stopWaiting aborts the current request clears running state and preserves transcript', async () => {

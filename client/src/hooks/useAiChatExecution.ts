@@ -274,8 +274,24 @@ function createAssistantMessage(
     content: assistantContent(normalized),
     createdAt,
     context,
+    pending: false,
     response: normalized,
     executionId: normalized.executionId ?? undefined,
+  };
+}
+
+function createPendingAssistantMessage(
+  id: string,
+  context: AiChatContextSnapshot | null,
+  createdAt: string,
+): AiChatMessage {
+  return {
+    id,
+    role: 'assistant',
+    content: 'aiChat.pending.title',
+    createdAt,
+    context,
+    pending: true,
   };
 }
 
@@ -383,6 +399,9 @@ export function createAiChatExecutionController(
       };
       running = execution;
       options.store.setRunningExecutionId(assistantMessageId);
+      options.store.appendMessage(
+        createPendingAssistantMessage(assistantMessageId, context, now()),
+      );
 
       try {
         const response = await options.execute(

@@ -320,6 +320,9 @@ function sanitizeMessage(value: unknown): AiChatMessage | null {
   };
   const response = sanitizeResponse(value.response);
   const executionId = readOptionalString(value.executionId);
+  if (typeof value.pending === 'boolean') {
+    message.pending = value.pending;
+  }
   if (response) {
     message.response = response;
   }
@@ -407,13 +410,19 @@ export function appendAiChatMessage(
   state: AiChatStoreState,
   message: AiChatMessage,
 ): AiChatStoreState {
+  const safeMessage = sanitizeMessage(message);
+  if (!safeMessage) {
+    return state;
+  }
+  const existingIndex = state.messages.findIndex((item) => item.id === safeMessage.id);
+  const messages =
+    existingIndex >= 0
+      ? state.messages.map((item, index) => (index === existingIndex ? safeMessage : item))
+      : [...state.messages, safeMessage];
+
   return {
     ...state,
-    messages: capMessages(
-      [...state.messages, sanitizeMessage(message)].filter(
-        (item): item is AiChatMessage => item !== null,
-      ),
-    ),
+    messages: capMessages(messages),
   };
 }
 
@@ -459,7 +468,7 @@ export function serializeAiChatConversation(input: ConversationInput): string {
   const state = toConversationState(input);
   const snapshot: AiChatConversationSnapshot = {
     isOpen: state.isOpen,
-    messages: state.messages,
+    messages: state.messages.filter((message) => message.pending !== true),
     selectedContext: state.selectedContext,
     confirmationCandidates: state.confirmationCandidates,
     savedAt: new Date().toISOString(),

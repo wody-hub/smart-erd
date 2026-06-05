@@ -172,6 +172,54 @@ test('11-W3-04 proposal terminal state updates inside the original assistant mes
   assert.equal(updated.messages[0]?.response?.proposals[0]?.status, 'EXECUTED');
 });
 
+test('11-W3-04 appending the same chat message id replaces the transient pending bubble', () => {
+  const pendingAssistant: AiChatMessage = {
+    ...message('assistant', 'aiChat.pending.title'),
+    role: 'assistant',
+    pending: true,
+  };
+  const finalAssistant: AiChatMessage = {
+    ...message('assistant', '리스크 1건'),
+    role: 'assistant',
+    pending: false,
+    response: {
+      status: 'ANSWER',
+      conclusion: '리스크 1건',
+      interpretation: '',
+      confirmedFacts: [],
+      needsConfirmation: [],
+      sourceChips: [],
+      proposals: [],
+    },
+  };
+
+  const state = appendAiChatMessage(createInitialAiChatState(), pendingAssistant);
+  const updated = appendAiChatMessage(state, finalAssistant);
+
+  assert.equal(updated.messages.length, 1);
+  assert.equal(updated.messages[0]?.id, 'assistant');
+  assert.equal(updated.messages[0]?.pending, false);
+  assert.equal(updated.messages[0]?.response?.status, 'ANSWER');
+});
+
+test('11-W3-04 pending assistant bubbles are excluded from browser persistence', () => {
+  const pendingAssistant: AiChatMessage = {
+    ...message('assistant', 'aiChat.pending.title'),
+    role: 'assistant',
+    pending: true,
+  };
+  const state = {
+    ...openAiChatDrawer(createInitialAiChatState()),
+    messages: [message('1', '질문'), pendingAssistant],
+  };
+
+  const restored = deserializeAiChatConversation(serializeAiChatConversation(state));
+
+  assert.equal(restored.messages.length, 1);
+  assert.equal(restored.messages[0]?.content, '질문');
+  assert.equal(JSON.stringify(restored).includes('aiChat.pending.title'), false);
+});
+
 test('11-W3-04 proposal storage keeps sanitized terminal cards across hydration', () => {
   const { storage } = createStorage();
   const state = appendAiChatMessage(createInitialAiChatState(), {

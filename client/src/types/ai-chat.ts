@@ -163,6 +163,7 @@ export interface AiChatMessage {
   content: string;
   createdAt: string;
   context: AiChatContextSnapshot | null;
+  pending?: boolean;
   response?: AiChatResponse | null;
   executionId?: string | null;
 }
