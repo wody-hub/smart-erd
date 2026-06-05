@@ -1,6 +1,8 @@
 package com.smarterd.application.ai.chat;
 
 import com.smarterd.domain.pm.history.service.WorkItemHistoryService;
+import com.smarterd.domain.pm.history.service.WorkItemHistoryService.WorkActivityResult;
+import com.smarterd.domain.pm.history.service.WorkItemHistoryService.WorkCommentResult;
 import com.smarterd.domain.pm.issue.service.ProjectIssueService;
 import com.smarterd.domain.pm.milestone.service.MilestoneService;
 import com.smarterd.domain.pm.todo.entity.ProjectTodoStatus;
@@ -8,6 +10,7 @@ import com.smarterd.domain.pm.todo.service.ProjectTodoService;
 import com.smarterd.domain.pm.wbs.service.WbsService;
 import com.smarterd.domain.project.service.ProjectService;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -38,6 +41,7 @@ public class AiReadContextService {
     public static final int MAX_HISTORY_ROWS = 25;
     public static final int MAX_FACTS = 200;
     public static final int MAX_PROVIDER_CONTEXT_CHARS = 12_000;
+    private static final int MAX_PROVIDER_FIELD_CHARS = 250;
 
     @Nullable
     private final ProjectService projectService;
@@ -130,7 +134,7 @@ public class AiReadContextService {
             }
         }
 
-        final var cappedFacts = List.copyOf(facts.stream().limit(MAX_FACTS).toList());
+        final var cappedFacts = List.copyOf(facts.stream().limit(MAX_FACTS).map(AiReadContextService::truncateText).toList());
         final var capMetadata = capMetadata(command.projectIds().size(), projectIds.size(), detailedProjectIds.size(), facts.size());
         final var sourceChips = sourceChipFactory.fromToolResults(toolResults);
         final var sanitizedContext = sanitizedContext(cappedFacts, sourceChips, selectedTools, capMetadata, toolData);
@@ -222,11 +226,17 @@ public class AiReadContextService {
     ) {
         facts.add("WBS risk summary loaded");
         final var maxRows = wantsDetail(question) ? MAX_WBS_DETAIL_ROWS : MAX_WBS_SUMMARY_ROWS;
-        final var count = wbsService == null
-            ? maxRows
-            : Math.min(wbsService.getWbsItems(loginId, teamId, projectId).size(), maxRows);
-        toolData.put("wbs:" + projectId, Map.of("projectId", projectId, "count", count, "maxRows", maxRows));
-        toolResults.add(new ToolReadResult(projectLabel, "WBS", count));
+        if (wbsService == null) {
+            toolData.put("wbs:" + projectId, fallbackToolData(projectId, maxRows));
+            toolResults.add(new ToolReadResult(projectLabel, "WBS", maxRows));
+            return;
+        }
+
+        final var wbsItems = wbsService.getWbsItems(loginId, teamId, projectId);
+        final var rows = wbsItems.stream().limit(maxRows).map(AiReadContextService::wbsRow).toList();
+        facts.add(projectLabel + " WBS rows loaded: returned=" + rows.size() + " total=" + wbsItems.size());
+        toolData.put("wbs:" + projectId, rowsToolData(projectId, wbsItems.size(), maxRows, rows));
+        toolResults.add(new ToolReadResult(projectLabel, "WBS", rows.size()));
     }
 
     private void collectMilestones(
@@ -239,11 +249,17 @@ public class AiReadContextService {
         Map<String, Object> toolData
     ) {
         facts.add("Milestone delay summary loaded");
-        final var count = milestoneService == null
-            ? MAX_MILESTONE_ROWS
-            : Math.min(milestoneService.getMilestones(loginId, teamId, projectId).size(), MAX_MILESTONE_ROWS);
-        toolData.put("milestones:" + projectId, Map.of("projectId", projectId, "count", count));
-        toolResults.add(new ToolReadResult(projectLabel, "milestones", count));
+        if (milestoneService == null) {
+            toolData.put("milestones:" + projectId, fallbackToolData(projectId, MAX_MILESTONE_ROWS));
+            toolResults.add(new ToolReadResult(projectLabel, "milestones", MAX_MILESTONE_ROWS));
+            return;
+        }
+
+        final var milestones = milestoneService.getMilestones(loginId, teamId, projectId);
+        final var rows = milestones.stream().limit(MAX_MILESTONE_ROWS).map(AiReadContextService::milestoneRow).toList();
+        facts.add(projectLabel + " milestone rows loaded: returned=" + rows.size() + " total=" + milestones.size());
+        toolData.put("milestones:" + projectId, rowsToolData(projectId, milestones.size(), MAX_MILESTONE_ROWS, rows));
+        toolResults.add(new ToolReadResult(projectLabel, "milestones", rows.size()));
     }
 
     private void collectIssues(
@@ -258,11 +274,17 @@ public class AiReadContextService {
     ) {
         facts.add("Issue status summary loaded");
         final var maxRows = wantsDetail(question) ? MAX_ISSUE_DETAIL_ROWS : MAX_ISSUE_SUMMARY_ROWS;
-        final var count = projectIssueService == null
-            ? maxRows
-            : Math.min(projectIssueService.getProjectIssues(loginId, teamId, projectId, null).size(), maxRows);
-        toolData.put("issues:" + projectId, Map.of("projectId", projectId, "count", count, "maxRows", maxRows));
-        toolResults.add(new ToolReadResult(projectLabel, "issues", count));
+        if (projectIssueService == null) {
+            toolData.put("issues:" + projectId, fallbackToolData(projectId, maxRows));
+            toolResults.add(new ToolReadResult(projectLabel, "issues", maxRows));
+            return;
+        }
+
+        final var issues = projectIssueService.getProjectIssues(loginId, teamId, projectId, null);
+        final var rows = issues.stream().limit(maxRows).map(AiReadContextService::issueRow).toList();
+        facts.add(projectLabel + " issue rows loaded: returned=" + rows.size() + " total=" + issues.size());
+        toolData.put("issues:" + projectId, rowsToolData(projectId, issues.size(), maxRows, rows));
+        toolResults.add(new ToolReadResult(projectLabel, "issues", rows.size()));
     }
 
     private void collectTodos(
@@ -279,11 +301,21 @@ public class AiReadContextService {
             return;
         }
         facts.add("Current user TODO summary loaded");
-        final var count = projectTodoService == null
-            ? MAX_OWN_TODO_ROWS
-            : Math.min(projectTodoService.getProjectTodos(loginId, command.teamId(), projectId).size(), MAX_OWN_TODO_ROWS);
-        toolData.put("todo:" + projectId, Map.of("projectId", projectId, "scope", "currentUser", "count", count));
-        toolResults.add(new ToolReadResult(projectLabel, "TODO", count));
+        if (projectTodoService == null) {
+            final var fallback = fallbackToolData(projectId, MAX_OWN_TODO_ROWS);
+            fallback.put("scope", "currentUser");
+            toolData.put("todo:" + projectId, fallback);
+            toolResults.add(new ToolReadResult(projectLabel, "TODO", MAX_OWN_TODO_ROWS));
+            return;
+        }
+
+        final var todos = projectTodoService.getProjectTodos(loginId, command.teamId(), projectId);
+        final var rows = todos.stream().limit(MAX_OWN_TODO_ROWS).map(AiReadContextService::todoRow).toList();
+        facts.add(projectLabel + " current-user TODO rows loaded: returned=" + rows.size() + " total=" + todos.size());
+        final var todoData = rowsToolData(projectId, todos.size(), MAX_OWN_TODO_ROWS, rows);
+        todoData.put("scope", "currentUser");
+        toolData.put("todo:" + projectId, todoData);
+        toolResults.add(new ToolReadResult(projectLabel, "TODO", rows.size()));
     }
 
     private void collectMemberTodoSummary(
@@ -306,7 +338,6 @@ public class AiReadContextService {
         final var summaries = projectTodoService
             .getMemberTodoSummaries(loginId, command.teamId(), projectId)
             .stream()
-            .limit(MAX_MEMBER_TODO_OWNERS * (long) ProjectTodoStatus.values().length)
             .toList();
         final var byOwner = new LinkedHashMap<String, EnumMap<ProjectTodoStatus, Long>>();
         for (final var summary : summaries) {
@@ -315,19 +346,49 @@ public class AiReadContextService {
                 .put(summary.status(), summary.count());
         }
         var totalCount = 0L;
+        final var ownerRows = new ArrayList<Map<String, Object>>();
+        var ownerIndex = 0;
         for (final var entry : byOwner.entrySet()) {
             final var statusCounts = entry.getValue();
             final var ownerTotal = statusCounts.values().stream().mapToLong(Long::longValue).sum();
             totalCount += ownerTotal;
+            if (ownerIndex < MAX_MEMBER_TODO_OWNERS) {
+                facts.add(
+                    entry.getKey() +
+                    " TODO summary: total=" +
+                    ownerTotal +
+                    " done=" +
+                    statusCounts.getOrDefault(ProjectTodoStatus.DONE, 0L)
+                );
+            }
+            ownerIndex++;
+            if (ownerRows.size() >= MAX_MEMBER_TODO_OWNERS) {
+                continue;
+            }
+            final var ownerRow = new LinkedHashMap<String, Object>();
+            ownerRow.put("ownerName", truncateText(entry.getKey()));
+            ownerRow.put("totalCount", ownerTotal);
+            ownerRow.put("statusCounts", statusCounts);
+            ownerRows.add(ownerRow);
+        }
+        if (byOwner.size() > MAX_MEMBER_TODO_OWNERS) {
             facts.add(
-                entry.getKey() +
-                " TODO summary: total=" +
-                ownerTotal +
-                " done=" +
-                statusCounts.getOrDefault(ProjectTodoStatus.DONE, 0L)
+                "Member TODO owner summaries truncated: returned=" +
+                MAX_MEMBER_TODO_OWNERS +
+                " totalOwners=" +
+                byOwner.size()
             );
         }
-        toolData.put("memberTodo:" + projectId, Map.of("owners", byOwner.size(), "total", totalCount));
+        final var summary = new LinkedHashMap<String, Object>();
+        summary.put("projectId", projectId);
+        summary.put("scope", "memberAggregate");
+        summary.put("owners", ownerRows.size());
+        summary.put("returnedOwners", ownerRows.size());
+        summary.put("totalOwners", byOwner.size());
+        summary.put("ownerTruncated", byOwner.size() > ownerRows.size());
+        summary.put("total", totalCount);
+        summary.put("items", ownerRows);
+        toolData.put("memberTodo:" + projectId, summary);
         toolResults.add(new ToolReadResult(projectLabel, "TODO", Math.toIntExact(Math.min(Integer.MAX_VALUE, totalCount))));
     }
 
@@ -341,24 +402,29 @@ public class AiReadContextService {
         Map<String, Object> toolData
     ) {
         facts.add("Recent history/comment summary loaded");
-        final var count = workItemHistoryService == null || wbsService == null
-            ? MAX_HISTORY_ROWS
-            : countRecentHistoryRows(loginId, teamId, projectId);
-        toolData.put("history:" + projectId, Map.of("projectId", projectId, "count", count));
-        toolResults.add(new ToolReadResult(projectLabel, "history", count));
-    }
-
-    private int countRecentHistoryRows(String loginId, Long teamId, Long projectId) {
-        var count = 0;
-        final var wbsItems = wbsService.getWbsItems(loginId, teamId, projectId).stream().limit(MAX_WBS_DETAIL_ROWS).toList();
-        for (final var item : wbsItems) {
-            count += workItemHistoryService.getWbsComments(loginId, teamId, projectId, item.id()).size();
-            count += workItemHistoryService.getWbsActivities(loginId, teamId, projectId, item.id()).size();
-            if (count >= MAX_HISTORY_ROWS) {
-                return MAX_HISTORY_ROWS;
-            }
+        if (workItemHistoryService == null || wbsService == null) {
+            toolData.put("history:" + projectId, fallbackToolData(projectId, MAX_HISTORY_ROWS));
+            toolResults.add(new ToolReadResult(projectLabel, "history", MAX_HISTORY_ROWS));
+            return;
         }
-        return count;
+
+        final var historyData = collectRecentHistoryRows(loginId, teamId, projectId);
+        facts.add(
+            projectLabel +
+            " recent history rows loaded: returned=" +
+            historyData.rows().size() +
+            " total=" +
+            historyData.totalCount()
+        );
+        final var historyToolData = rowsToolData(projectId, historyData.totalCount(), MAX_HISTORY_ROWS, historyData.rows());
+        historyToolData.put("wbsScannedCount", historyData.scannedContainerCount());
+        historyToolData.put("wbsTotalCount", historyData.totalContainerCount());
+        historyToolData.put("wbsScanTruncated", historyData.scanTruncated());
+        if (historyData.scanTruncated()) {
+            historyToolData.put("truncated", true);
+        }
+        toolData.put("history:" + projectId, historyToolData);
+        toolResults.add(new ToolReadResult(projectLabel, "history", historyData.rows().size()));
     }
 
     private String projectLabel(String loginId, Long teamId, Long projectId) {
@@ -408,6 +474,176 @@ public class AiReadContextService {
         );
     }
 
+    private static LinkedHashMap<String, Object> fallbackToolData(Long projectId, int maxRows) {
+        final var data = new LinkedHashMap<String, Object>();
+        data.put("projectId", projectId);
+        data.put("count", maxRows);
+        data.put("maxRows", maxRows);
+        data.put("items", List.of());
+        return data;
+    }
+
+    private static LinkedHashMap<String, Object> rowsToolData(
+        Long projectId,
+        int totalCount,
+        int maxRows,
+        List<Map<String, Object>> rows
+    ) {
+        final var data = new LinkedHashMap<String, Object>();
+        data.put("projectId", projectId);
+        data.put("count", rows.size());
+        data.put("returnedCount", rows.size());
+        data.put("totalCount", totalCount);
+        data.put("maxRows", maxRows);
+        data.put("truncated", totalCount > rows.size());
+        data.put("items", rows);
+        return data;
+    }
+
+    private static Map<String, Object> wbsRow(WbsService.WbsItemResult item) {
+        final var row = baseRow(item.id(), item.name());
+        put(row, "parentId", item.parentId());
+        row.put("depth", item.depth());
+        put(row, "assigneeName", item.assigneeName());
+        put(row, "startDate", item.startDate());
+        put(row, "endDate", item.endDate());
+        put(row, "actualStartDate", item.actualStartDate());
+        put(row, "actualEndDate", item.actualEndDate());
+        row.put("progressRate", item.progressRate());
+        put(row, "plannedProgressRate", item.plannedProgressRate());
+        put(row, "progressVarianceRate", item.progressVarianceRate());
+        put(row, "startVarianceDays", item.startVarianceDays());
+        put(row, "endVarianceDays", item.endVarianceDays());
+        put(row, "estimatedMm", item.estimatedMm());
+        put(row, "milestoneId", item.milestoneId());
+        put(row, "milestoneName", item.milestoneName());
+        put(row, "predecessorIds", item.predecessorIds());
+        put(row, "successorIds", item.successorIds());
+        put(row, "updatedAt", item.updatedAt());
+        return row;
+    }
+
+    private static Map<String, Object> milestoneRow(MilestoneService.MilestoneResult milestone) {
+        final var row = baseRow(milestone.id(), milestone.name());
+        put(row, "targetDate", milestone.targetDate());
+        put(row, "description", milestone.description());
+        row.put("type", milestone.type().name());
+        put(row, "ownerName", milestone.ownerName());
+        put(row, "readinessNote", milestone.readinessNote());
+        row.put("linkedWbsItemCount", milestone.linkedWbsItemCount());
+        row.put("linkedWbsCompletedCount", milestone.linkedWbsCompletedCount());
+        row.put("achievementRate", milestone.achievementRate());
+        row.put("inboundDependencyCount", milestone.inboundDependencyCount());
+        row.put("outboundDependencyCount", milestone.outboundDependencyCount());
+        row.put("nextWaveWbsCount", milestone.nextWaveWbsCount());
+        row.put("isDelayed", milestone.isDelayed());
+        put(row, "updatedAt", milestone.updatedAt());
+        return row;
+    }
+
+    private static Map<String, Object> issueRow(ProjectIssueService.ProjectIssueResult issue) {
+        final var row = baseRow(issue.id(), issue.title());
+        put(row, "title", issue.title());
+        put(row, "description", issue.description());
+        row.put("priority", issue.priority().name());
+        row.put("status", issue.status().name());
+        put(row, "assigneeName", issue.assigneeName());
+        put(row, "createdAt", issue.createdAt());
+        put(row, "updatedAt", issue.updatedAt());
+        return row;
+    }
+
+    private static Map<String, Object> todoRow(ProjectTodoService.ProjectTodoResult todo) {
+        final var row = baseRow(todo.id(), todo.title());
+        put(row, "title", todo.title());
+        put(row, "description", todo.description());
+        row.put("status", todo.status().name());
+        row.put("priority", todo.priority().name());
+        put(row, "targetDate", todo.targetDate());
+        row.put("progressRate", todo.progressRate());
+        put(row, "linkedWbsItemId", todo.linkedWbsItemId());
+        put(row, "linkedWbsItemName", todo.linkedWbsItemName());
+        put(row, "updatedAt", todo.updatedAt());
+        return row;
+    }
+
+    private RowReadData collectRecentHistoryRows(String loginId, Long teamId, Long projectId) {
+        final var rows = new ArrayList<HistoryRow>();
+        final var allWbsItems = wbsService.getWbsItems(loginId, teamId, projectId);
+        final var wbsItems = allWbsItems.stream().limit(MAX_WBS_DETAIL_ROWS).toList();
+        for (final var item : wbsItems) {
+            workItemHistoryService
+                .getWbsComments(loginId, teamId, projectId, item.id())
+                .forEach(comment -> rows.add(historyCommentRow(item, comment)));
+            workItemHistoryService
+                .getWbsActivities(loginId, teamId, projectId, item.id())
+                .forEach(activity -> rows.add(historyActivityRow(item, activity)));
+        }
+        final var cappedRows = rows
+            .stream()
+            .sorted(Comparator.comparing(HistoryRow::occurredAt, Comparator.nullsLast(Comparator.reverseOrder())))
+            .limit(MAX_HISTORY_ROWS)
+            .map(HistoryRow::data)
+            .toList();
+        return new RowReadData(cappedRows, rows.size(), wbsItems.size(), allWbsItems.size());
+    }
+
+    private static HistoryRow historyCommentRow(WbsService.WbsItemResult item, WorkCommentResult comment) {
+        final var row = baseHistoryRow(item, "comment", comment.id(), comment.createdAt());
+        put(row, "content", comment.content());
+        put(row, "actorName", comment.actorName());
+        return new HistoryRow(row, comment.createdAt());
+    }
+
+    private static HistoryRow historyActivityRow(WbsService.WbsItemResult item, WorkActivityResult activity) {
+        final var row = baseHistoryRow(item, "activity", activity.id(), activity.occurredAt());
+        row.put("eventType", activity.eventType().name());
+        put(row, "subjectType", activity.subjectType() == null ? null : activity.subjectType().name());
+        put(row, "subjectId", activity.subjectId());
+        put(row, "subjectLabel", activity.subjectLabel());
+        put(row, "previousValue", activity.previousValue());
+        put(row, "currentValue", activity.currentValue());
+        put(row, "detail", activity.detail());
+        put(row, "actorName", activity.actorName());
+        return new HistoryRow(row, activity.occurredAt());
+    }
+
+    private static LinkedHashMap<String, Object> baseHistoryRow(
+        WbsService.WbsItemResult item,
+        String type,
+        Long id,
+        @Nullable Object occurredAt
+    ) {
+        final var row = new LinkedHashMap<String, Object>();
+        row.put("id", id);
+        row.put("type", type);
+        row.put("targetType", "WBS");
+        row.put("targetId", item.id());
+        row.put("targetName", item.name());
+        put(row, "occurredAt", occurredAt);
+        return row;
+    }
+
+    private static LinkedHashMap<String, Object> baseRow(Long id, String name) {
+        final var row = new LinkedHashMap<String, Object>();
+        row.put("id", id);
+        row.put("name", truncateText(name));
+        return row;
+    }
+
+    private static void put(Map<String, Object> row, String key, @Nullable Object value) {
+        if (value != null) {
+            row.put(key, value instanceof String text ? truncateText(text) : value);
+        }
+    }
+
+    private static String truncateText(String value) {
+        if (value.length() <= MAX_PROVIDER_FIELD_CHARS) {
+            return value;
+        }
+        return value.substring(0, MAX_PROVIDER_FIELD_CHARS) + "...[truncated]";
+    }
+
     private static Map<String, Object> sanitizedContext(
         List<String> facts,
         List<SourceChip> sourceChips,
@@ -438,7 +674,7 @@ public class AiReadContextService {
         final var builder = new StringBuilder();
         builder.append("facts:\n");
         for (final var fact : facts) {
-            builder.append("- ").append(fact).append('\n');
+            builder.append("- ").append(truncateText(fact)).append('\n');
         }
         builder.append("sources:\n");
         for (final var chip : sourceChips) {
@@ -452,18 +688,65 @@ public class AiReadContextService {
                 .append('\n');
         }
         builder.append("summaries:\n");
-        for (final var entry : toolData.entrySet()) {
-            builder.append("- ").append(entry.getKey()).append(": ").append(entry.getValue()).append('\n');
+        final var capsComplete = "caps: " + providerContextCaps(capMetadata, false);
+        final var completeLength = builder.length() +
+            toolData.entrySet().stream().mapToInt(entry -> summaryLine(entry).length()).sum() +
+            capsComplete.length();
+        if (completeLength <= MAX_PROVIDER_CONTEXT_CHARS) {
+            for (final var entry : toolData.entrySet()) {
+                builder.append(summaryLine(entry));
+            }
+            builder.append(capsComplete);
+            return builder.toString();
         }
-        builder.append("caps: ").append(capMetadata);
-        return builder.toString();
+
+        final var capsTruncated = "caps: " + providerContextCaps(capMetadata, true);
+        final var marker = "\n- providerContextTruncated: true\n";
+        if (builder.length() + marker.length() + capsTruncated.length() > MAX_PROVIDER_CONTEXT_CHARS) {
+            return appendTruncationFooter(builder, marker, capsTruncated);
+        }
+        final var maxSummariesLength = Math.max(
+            0,
+            MAX_PROVIDER_CONTEXT_CHARS - builder.length() - marker.length() - capsTruncated.length()
+        );
+        var summariesLength = 0;
+        for (final var entry : toolData.entrySet()) {
+            final var line = summaryLine(entry);
+            if (summariesLength + line.length() > maxSummariesLength) {
+                break;
+            }
+            builder.append(line);
+            summariesLength += line.length();
+        }
+        return appendTruncationFooter(builder, marker, capsTruncated);
+    }
+
+    private static String summaryLine(Map.Entry<String, Object> entry) {
+        return "- " + entry.getKey() + ": " + entry.getValue() + '\n';
+    }
+
+    private static Map<String, Object> providerContextCaps(Map<String, Object> capMetadata, boolean providerContextTruncated) {
+        final var caps = new LinkedHashMap<String, Object>(capMetadata);
+        caps.put("providerContextTruncated", providerContextTruncated);
+        return caps;
+    }
+
+    private static String appendTruncationFooter(StringBuilder builder, String marker, String caps) {
+        final var maxPrefixLength = Math.max(0, MAX_PROVIDER_CONTEXT_CHARS - marker.length() - caps.length());
+        final var prefix = builder.length() <= maxPrefixLength ? builder.toString() : builder.substring(0, maxPrefixLength);
+        return prefix + marker + caps;
     }
 
     private static String truncateProviderContext(String providerContext) {
         if (providerContext.length() <= MAX_PROVIDER_CONTEXT_CHARS) {
             return providerContext;
         }
-        return providerContext.substring(0, MAX_PROVIDER_CONTEXT_CHARS);
+        final var marker = "\nproviderContextTruncated=true";
+        final var footer = marker +
+            "\ncaps: {providerContextMaxChars=" +
+            MAX_PROVIDER_CONTEXT_CHARS +
+            ", providerContextTruncated=true}";
+        return providerContext.substring(0, Math.max(0, MAX_PROVIDER_CONTEXT_CHARS - footer.length())) + footer;
     }
 
     public enum ReadTool {
@@ -502,6 +785,19 @@ public class AiReadContextService {
     public record SourceChip(String projectName, String tool, int count) {}
 
     public record ToolReadResult(String projectName, String tool, int count) {}
+
+    private record RowReadData(
+        List<Map<String, Object>> rows,
+        int totalCount,
+        int scannedContainerCount,
+        int totalContainerCount
+    ) {
+        private boolean scanTruncated() {
+            return totalContainerCount > scannedContainerCount;
+        }
+    }
+
+    private record HistoryRow(Map<String, Object> data, @Nullable java.time.Instant occurredAt) {}
 
     public record ReadContext(
         List<String> confirmedFacts,
