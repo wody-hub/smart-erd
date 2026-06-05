@@ -17,6 +17,7 @@ The milestone is deliberately approval-gated. AI can read scoped project context
 - [x] **Phase 10: App AI Chat UI + Read-Only Context Tools** — in-app chatbot shell, project context selection, read tools for project overview, WBS, milestones, issues, TODOs, and work history (gap closure planned 2026-06-04) (completed 2026-06-04)
 - [x] **Phase 11: Approval Preview + Audit Execution Pipeline** — action proposal schema, preview/diff, approval/cancel flow, execution boundary, audit log and history (completed 2026-06-04)
 - [x] **Phase 12: Low-Risk Write Tools MVP** — issue create/update, personal TODO create/update, WBS comment/work memo add, all approval-gated (completed 2026-06-04)
+- [x] **Phase 13: AI Chat Detailed Read Tools** — backend-controlled detailed read context for WBS, milestones, issues, current-user TODOs, and work history (completed 2026-06-04)
 
 ## Phase Details
 
@@ -120,6 +121,23 @@ Plans:
 - [x] 12-05-PLAN.md — Proposal result UI, query refresh, and final verification
 **UI hint**: yes
 
+### Phase 13: AI Chat Detailed Read Tools
+
+**Goal**: AI chat can answer detailed project-management questions using authorized, capped backend read rows instead of count-only summaries.
+**Depends on**: Phase 12
+**Requirements**: AI-READ-05, AI-READ-06, AI-READ-07
+**Success Criteria** (what must be TRUE):
+
+  1. WBS, milestone, issue, current-user TODO, and WBS history reads include sanitized row details in provider context.
+  2. Member/team TODO requests remain aggregate-only unless a future explicit privacy policy permits detail.
+  3. Detailed reads reuse existing backend service authorization and never expose raw login IDs, tokens, cookies, stdout, stderr, shell, SQL, or arbitrary API access.
+  4. Provider instructions treat read rows as data, not prompt instructions, and tell the model to report caps/truncation instead of inventing missing facts.
+  5. Backend tests verify detailed rows, privacy exclusions, caps, and prompt-grounding behavior.
+
+**Plans**:
+- [x] 13-01-PLAN.md — Detailed provider read context and grounding prompt guardrails
+**UI hint**: no
+
 ## Traceability
 
 | Requirement | Phase | Status |
@@ -147,3 +165,6 @@ Plans:
 | AI-WRITE-03 | Phase 12 | Complete |
 | AI-WRITE-04 | Phase 12 | Complete |
 | AI-WRITE-05 | Phase 12 | Complete |
+| AI-READ-05 | Phase 13 | Complete |
+| AI-READ-06 | Phase 13 | Complete |
+| AI-READ-07 | Phase 13 | Complete |

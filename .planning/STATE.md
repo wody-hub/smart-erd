@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: AI 업무 실행 Gateway + Local Codex Chatbot
 status: completed
-stopped_at: "Progress checked: v1.1 milestone ready to complete"
-last_updated: "2026-06-04T06:44:47.896Z"
+stopped_at: "Phase 13 completed: AI Chat Detailed Read Tools"
+last_updated: "2026-06-04T17:54:26+09:00"
 last_activity: 2026-06-04
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 23
-  completed_plans: 23
+  total_phases: 5
+  completed_phases: 5
+  total_plans: 24
+  completed_plans: 24
   percent: 100
 ---
 
@@ -21,11 +21,11 @@ progress:
 See `.planning/PROJECT.md`.
 
 **Core value:** SI 프로젝트에서 발생하는 모든 산출물과 관리 활동을 하나의 실시간 협업 플랫폼에서 일관된 체계로 관리
-**Current focus:** Phase 12 — low risk write tools mvp
+**Current focus:** Phase 13 — AI chat detailed read tools
 
 ## Current Position
 
-Phase: 12
+Phase: 13
 Plan: Complete
 Status: Complete
 Last activity: 2026-06-04
@@ -76,6 +76,9 @@ Last activity: 2026-06-04
 - Phase 10 gap closure removes unsupported `selectedResource` from the chat contract and maps team context sends to `MULTI_PROJECT`.
 - Phase 11 implements persisted sanitized action proposals, approval/cancel lifecycle, project AI history, and Phase 12 executor handoff while keeping production executors unregistered.
 - Phase 11 code review found and fixed proposal project-access revalidation for refresh/approve/cancel before phase verification.
+- Phase 13 uses backend-controlled detailed read context instead of allowing AI to call arbitrary APIs directly.
+- Phase 13 serializes capped WBS, milestone, issue, current-user TODO, and WBS history rows into provider context while keeping member TODO aggregate-only.
+- Phase 13 provider context now preserves explicit truncation/cap metadata and marks partial WBS history scans.
 
 ## Performance Metrics
 
@@ -92,17 +95,18 @@ Last activity: 2026-06-04
 | Phase 11 P03 | 25min | 2 tasks | 7 files |
 | Phase 11 P04 | 33min | 3 tasks | 15 files |
 | Phase 11 P05 | 9min | 3 tasks | 13 files |
+| Phase 13 P01 | 20min | 6 tasks | 7 files |
 
 ## Session Info
 
-Last session: 2026-06-04T06:44:47.889Z
-Stopped At: Progress checked: v1.1 milestone ready to complete
-Resume File: .planning/phases/12-low-risk-write-tools-mvp/12-VERIFICATION.md
+Last session: 2026-06-04T17:54:26+09:00
+Stopped At: Phase 13 completed: AI Chat Detailed Read Tools
+Resume File: .planning/phases/13-ai-chat-detailed-read-tools/13-VERIFICATION.md
 
 ## Deferred Items
 
 - v1.0 closeout had no deferred required items.
-- v1.1 future candidates include WBS schedule/assignee/progress edits, milestone edits, reports/artifacts/RTM assistance, hosted provider support, and external MCP/API integrations.
+- v1.1 future candidates include WBS schedule/assignee/progress edits, milestone edits, reports/artifacts/RTM assistance, hosted provider support, external MCP/API integrations, and a two-pass AI ReadPlan/tool-loop with persisted read-tool audit metadata.
 
 ## Next Action
 
