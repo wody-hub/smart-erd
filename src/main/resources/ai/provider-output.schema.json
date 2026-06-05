@@ -4,7 +4,7 @@
   "additionalProperties": false,
   "properties": {
     "answer": {
-      "type": ["string", "null"],
+      "type": "string",
       "maxLength": 4000
     },
     "actions": {
@@ -14,16 +14,76 @@
         "additionalProperties": false,
         "properties": {
           "id": { "type": "string", "minLength": 1, "maxLength": 80 },
-          "type": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "type": {
+            "type": "string",
+            "enum": [
+              "issue.create",
+              "issue.update",
+              "todo.create",
+              "todo.update",
+              "wbs.comment.add",
+              "wbs.memo.add"
+            ]
+          },
           "title": { "type": "string", "minLength": 1, "maxLength": 200 },
           "summary": { "type": "string", "minLength": 1, "maxLength": 500 },
           "riskLevel": { "type": "string", "enum": ["LOW", "MEDIUM"] },
           "requiresApproval": { "type": "boolean", "const": true },
-          "payload": { "type": "object" }
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "targetType": { "type": ["string", "null"], "enum": ["issue", "todo", "wbs", null] },
+              "targetId": { "type": ["string", "null"], "maxLength": 80 },
+              "targetLabel": { "type": ["string", "null"], "maxLength": 200 },
+              "projectId": { "type": ["string", "null"], "maxLength": 80 },
+              "teamId": { "type": ["string", "null"], "maxLength": 80 },
+              "fields": {
+                "type": "array",
+                "maxItems": 20,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": { "type": ["string", "null"], "maxLength": 80 },
+                    "key": { "type": ["string", "null"], "maxLength": 80 },
+                    "field": { "type": ["string", "null"], "maxLength": 80 },
+                    "label": { "type": ["string", "null"], "maxLength": 120 },
+                    "beforeValue": { "type": ["string", "number", "boolean", "null"] },
+                    "afterValue": { "type": ["string", "number", "boolean", "null"] },
+                    "value": { "type": ["string", "number", "boolean", "null"] }
+                  },
+                  "required": ["name", "key", "field", "label", "beforeValue", "afterValue", "value"]
+                }
+              },
+              "content": { "type": ["string", "null"], "maxLength": 2000 },
+              "assumptions": {
+                "type": "array",
+                "maxItems": 10,
+                "items": { "type": "string", "maxLength": 300 }
+              },
+              "labels": {
+                "type": "array",
+                "maxItems": 20,
+                "items": { "type": "string", "maxLength": 120 }
+              }
+            },
+            "required": [
+              "targetType",
+              "targetId",
+              "targetLabel",
+              "projectId",
+              "teamId",
+              "fields",
+              "content",
+              "assumptions",
+              "labels"
+            ]
+          }
         },
         "required": ["id", "type", "title", "summary", "riskLevel", "requiresApproval", "payload"]
       },
-      "default": []
+      "minItems": 0
     },
     "error": {
       "type": ["object", "null"],
@@ -37,5 +97,5 @@
       "required": ["type", "title", "detail", "retryable"]
     }
   },
-  "required": ["actions"]
+  "required": ["answer", "actions", "error"]
 }

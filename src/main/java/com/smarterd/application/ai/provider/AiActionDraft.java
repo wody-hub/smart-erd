@@ -3,6 +3,8 @@ package com.smarterd.application.ai.provider;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -26,6 +28,6 @@ public record AiActionDraft(
     Map<String, Object> payload
 ) {
     public AiActionDraft {
-        payload = payload == null ? Map.of() : Map.copyOf(payload);
+        payload = payload == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(payload));
     }
 }

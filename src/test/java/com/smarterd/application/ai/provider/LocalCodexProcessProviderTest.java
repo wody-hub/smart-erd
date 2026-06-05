@@ -40,7 +40,7 @@ class LocalCodexProcessProviderTest {
     @Test
     void executeValidatesRunnerStdout() {
         when(runner.run(Mockito.any()))
-            .thenReturn(new CodexProcessResult(CodexProcessResult.Status.SUCCEEDED, "{\"answer\":\"ok\",\"actions\":[]}", null));
+            .thenReturn(new CodexProcessResult(CodexProcessResult.Status.SUCCEEDED, "{\"answer\":\"ok\",\"actions\":[],\"error\":null}", null));
 
         final var result = provider.execute(request());
 

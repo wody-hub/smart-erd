@@ -32,8 +32,11 @@ class CodexProcessRunnerTest {
         assertThat(launcher.request.command()).containsExactly(
             "codex",
             "exec",
+            "--skip-git-repo-check",
             "--cd",
             launcher.request.cwd().toString(),
+            "--output-last-message",
+            launcher.request.cwd().resolve("codex-output.json").toString(),
             "--sandbox",
             "workspace-write",
             "-c",
@@ -45,6 +48,20 @@ class CodexProcessRunnerTest {
         assertThat(launcher.request.command()).doesNotContain("/bin/sh", "cmd", "/c");
         assertThat(launcher.request.cwd().toString()).contains("smart-erd-ai-");
         assertThat(launcher.request.stdin()).isEqualTo("prompt");
+    }
+
+    @Test
+    void runPrefersCodexOutputLastMessageFileOverStdoutLogs() {
+        final var launcher = new OutputFileLauncher(
+            "codex log\n{\"answer\":\"from-stdout\",\"actions\":[],\"error\":null}",
+            "{\"answer\":\"from-file\",\"actions\":[],\"error\":null}"
+        );
+        final var runner = new CodexProcessRunner(launcher);
+
+        final var result = runner.run(request("exec-output"));
+
+        assertThat(result.status()).isEqualTo(CodexProcessResult.Status.SUCCEEDED);
+        assertThat(result.stdout()).isEqualTo("{\"answer\":\"from-file\",\"actions\":[],\"error\":null}");
     }
 
     @Test
@@ -134,5 +151,29 @@ class CodexProcessRunnerTest {
         public void cancel(String executionId) {
             this.cancelledExecutionId = executionId;
         }
+    }
+
+    private static final class OutputFileLauncher implements ProcessLauncher {
+
+        private final String stdout;
+        private final String outputFileContent;
+
+        private OutputFileLauncher(String stdout, String outputFileContent) {
+            this.stdout = stdout;
+            this.outputFileContent = outputFileContent;
+        }
+
+        @Override
+        public Result launch(LaunchRequest request) {
+            try {
+                java.nio.file.Files.writeString(request.cwd().resolve("codex-output.json"), outputFileContent);
+            } catch (java.io.IOException ex) {
+                throw new IllegalStateException(ex);
+            }
+            return new Result(0, stdout, "", false, false);
+        }
+
+        @Override
+        public void cancel(String executionId) {}
     }
 }

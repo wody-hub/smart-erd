@@ -52,7 +52,7 @@ public class AiProviderConfig {
         CodexProcessRunner codexProcessRunner,
         ProviderOutputValidator outputValidator
     ) {
-        if ("local-codex".equalsIgnoreCase(properties.getProvider())) {
+        if (isLocalCodexProvider(properties.getProvider())) {
             final var executable = properties.getCodex().getExecutable();
             final var probe = new CodexAvailabilityProbe(executable, aiProcessLauncher, aiClock);
             return new LocalCodexProcessProvider(
@@ -66,6 +66,10 @@ public class AiProviderConfig {
             );
         }
         return new NoopAiProvider(aiClock);
+    }
+
+    private boolean isLocalCodexProvider(String provider) {
+        return "local-codex".equalsIgnoreCase(provider) || "codex".equalsIgnoreCase(provider);
     }
 
     private Path resolveSchemaPath() {

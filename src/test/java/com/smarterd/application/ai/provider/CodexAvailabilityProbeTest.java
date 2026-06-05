@@ -20,6 +20,7 @@ class CodexAvailabilityProbeTest {
         assertThat(status.provider()).isEqualTo("local-codex");
         assertThat(status.availability()).isEqualTo(AiProviderAvailability.AVAILABLE);
         assertThat(launcher.request.command()).isEqualTo(List.of("codex", "--version"));
+        assertThat(launcher.request.environment()).containsKey("PATH");
         assertThat(status.message()).doesNotContain("/Users", "stderr", "stdout");
     }
 

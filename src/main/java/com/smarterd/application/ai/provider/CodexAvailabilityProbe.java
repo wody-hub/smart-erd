@@ -5,11 +5,28 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Safe local Codex runtime availability probe.
  */
 public class CodexAvailabilityProbe {
+
+    private static final Set<String> ENV_ALLOWLIST = Set.of(
+        "PATH",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "SHELL",
+        "TMPDIR",
+        "TEMP",
+        "TMP",
+        "CODEX_HOME",
+        "XDG_CONFIG_HOME",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR"
+    );
 
     private final String executable;
     private final ProcessLauncher processLauncher;
@@ -27,7 +44,7 @@ public class CodexAvailabilityProbe {
                 "codex-probe",
                 List.of(executable, "--version"),
                 Path.of(System.getProperty("java.io.tmpdir")),
-                Map.of(),
+                safeHostEnvironment(),
                 "",
                 Duration.ofSeconds(5)
             )
@@ -54,5 +71,13 @@ public class CodexAvailabilityProbe {
             "Codex executable could not be used non-interactively.",
             clock.instant()
         );
+    }
+
+    private Map<String, String> safeHostEnvironment() {
+        return System.getenv()
+            .entrySet()
+            .stream()
+            .filter((entry) -> ENV_ALLOWLIST.contains(entry.getKey()))
+            .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 }

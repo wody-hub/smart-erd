@@ -77,4 +77,39 @@ class ProviderOutputValidatorTest {
                 """)
         ).isInstanceOf(BusinessException.class);
     }
+
+    @Test
+    void validate_acceptsActionDraftPayloadWithNullValues() {
+        final var result = validator.validate("""
+            {
+              "answer": "승인하면 TODO를 생성하겠습니다.",
+              "actions": [
+                {
+                  "id": "a1",
+                  "type": "todo.create",
+                  "title": "QA 확인 TODO 생성",
+                  "summary": "프로젝트에 QA 확인 TODO를 추가합니다.",
+                  "riskLevel": "LOW",
+                  "requiresApproval": true,
+                  "payload": {
+                    "targetType": "todo",
+                    "targetId": null,
+                    "targetLabel": "QA 확인",
+                    "fields": [
+                      {
+                        "name": "title",
+                        "beforeValue": null,
+                        "afterValue": "QA 확인"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "error": null
+            }
+            """);
+
+        assertThat(result.actions()).hasSize(1);
+        assertThat(result.actions().getFirst().payload()).containsEntry("targetId", null);
+    }
 }

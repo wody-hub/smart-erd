@@ -40,17 +40,18 @@ public class CodexProcessRunner {
         Path cwd = null;
         try {
             cwd = Files.createTempDirectory("smart-erd-ai-");
+            final var outputPath = cwd.resolve("codex-output.json");
             final var launchResult = processLauncher.launch(
                 new ProcessLauncher.LaunchRequest(
                     request.executionId(),
-                    buildCommand(request, cwd),
+                    buildCommand(request, cwd, outputPath),
                     cwd,
                     filterEnvironment(request.hostEnvironment()),
                     request.prompt(),
                     request.timeout()
                 )
             );
-            return mapResult(launchResult);
+            return mapResult(launchResult, outputPath);
         } catch (IOException ex) {
             return new CodexProcessResult(CodexProcessResult.Status.UNSUPPORTED_ENVIRONMENT, "", "UNSUPPORTED_ENVIRONMENT");
         } finally {
@@ -62,12 +63,15 @@ public class CodexProcessRunner {
         processLauncher.cancel(executionId);
     }
 
-    private List<String> buildCommand(CodexProcessRequest request, Path cwd) {
+    private List<String> buildCommand(CodexProcessRequest request, Path cwd, Path outputPath) {
         final var command = new ArrayList<String>();
         command.add(request.executable());
         command.add("exec");
+        command.add("--skip-git-repo-check");
         command.add("--cd");
         command.add(cwd.toString());
+        command.add("--output-last-message");
+        command.add(outputPath.toString());
         command.add("--sandbox");
         command.add("workspace-write");
         command.add("-c");
@@ -103,7 +107,7 @@ public class CodexProcessRunner {
         );
     }
 
-    private CodexProcessResult mapResult(ProcessLauncher.Result result) {
+    private CodexProcessResult mapResult(ProcessLauncher.Result result, Path outputPath) {
         if (result.cancelled()) {
             return new CodexProcessResult(CodexProcessResult.Status.CANCELLED, "", "CANCELLED");
         }
@@ -116,7 +120,21 @@ public class CodexProcessRunner {
         if (result.exitCode() != 0) {
             return new CodexProcessResult(CodexProcessResult.Status.FAILED, "", "CODEX_EXEC_FAILED");
         }
-        return new CodexProcessResult(CodexProcessResult.Status.SUCCEEDED, result.stdout(), null);
+        return new CodexProcessResult(CodexProcessResult.Status.SUCCEEDED, readFinalOutput(outputPath, result.stdout()), null);
+    }
+
+    private String readFinalOutput(Path outputPath, String fallback) {
+        try {
+            if (Files.isRegularFile(outputPath)) {
+                final var output = Files.readString(outputPath);
+                if (!output.isBlank()) {
+                    return output;
+                }
+            }
+        } catch (IOException ignored) {
+            // Fall back to stdout for test fakes and older Codex binaries.
+        }
+        return fallback;
     }
 
     private void cleanup(Path cwd) {
