@@ -36,6 +36,8 @@ interface UseIdleCursorActionOptions {
   }) => void;
   /** 보조 팝업 닫기 함수 */
   closeAssistPopup: () => void;
+  /** 다음 content change에서 typing 자동 보조 팝업 예약을 1회 억제한다. */
+  suppressNextTypingAssistRef?: React.MutableRefObject<boolean>;
   /** 내부 동기화 중 여부 판별 함수 */
   isSyncing: () => boolean;
 }
@@ -54,6 +56,7 @@ export function useIdleCursorAction({
   canEdit,
   openAssistPopup,
   closeAssistPopup,
+  suppressNextTypingAssistRef,
   isSyncing,
 }: UseIdleCursorActionOptions): void {
   /** 자동 보조 팝업 타이머 */
@@ -165,6 +168,13 @@ export function useIdleCursorAction({
       };
 
       const changeDisposable = editor.onDidChangeModelContent(() => {
+        if (suppressNextTypingAssistRef?.current) {
+          suppressNextTypingAssistRef.current = false;
+          pendingTypingCursorRef.current = false;
+          clearAutoAssistTimer();
+          callbacksRef.current.closeAssistPopup();
+          return;
+        }
         pendingTypingCursorRef.current = true;
         if (callbacksRef.current.isSyncing()) {
           clearAutoAssistTimer();
@@ -255,5 +265,11 @@ export function useIdleCursorAction({
       clearAutoAssistTimer();
       disposables.forEach((disposable) => disposable.dispose());
     };
-  }, [canEdit, clearAutoAssistTimer, editorInstanceVersion, editorRef]);
+  }, [
+    canEdit,
+    clearAutoAssistTimer,
+    editorInstanceVersion,
+    editorRef,
+    suppressNextTypingAssistRef,
+  ]);
 }

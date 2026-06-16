@@ -194,4 +194,10 @@ test('code-first DSL autocomplete opens via Ctrl+Space and idle typing @smoke', 
 
   await page.waitForTimeout(400);
   await expect(listbox).toBeVisible();
+
+  await page.keyboard.press('Enter');
+  await expect(listbox).toHaveCount(0);
+
+  await page.waitForTimeout(1_200);
+  await expect(listbox).toHaveCount(0);
 });

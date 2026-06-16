@@ -320,6 +320,8 @@ export default function DslCodeEditorPanel({
   const monacoRef = useRef<typeof Monaco | null>(null);
   /** Monaco flush content change listener */
   const editorFlushChangeDisposableRef = useRef<Monaco.IDisposable | null>(null);
+  /** Assist 선택 직후 idle typing 자동완성 1회를 억제한다. */
+  const suppressNextIdleTypingAssistRef = useRef(false);
   /** 최신 편집 가능 여부 */
   const canEditRef = useRef(canEdit);
   /** Monaco mount 완료 여부 */
@@ -2135,6 +2137,9 @@ export default function DslCodeEditorPanel({
     getCurrentText: () => dslTextValueRef.current,
     buildAssistItems,
     onSyncInsertedText: handleUserCodeChange,
+    onBeforeAssistEdit: () => {
+      suppressNextIdleTypingAssistRef.current = true;
+    },
     onRegisterTerm: handleQuickRegisterTerm,
     onRegisterDomain: handleQuickRegisterDomain,
   });
@@ -2146,6 +2151,7 @@ export default function DslCodeEditorPanel({
     canEdit,
     openAssistPopup,
     closeAssistPopup,
+    suppressNextTypingAssistRef: suppressNextIdleTypingAssistRef,
     isSyncing,
   });
 

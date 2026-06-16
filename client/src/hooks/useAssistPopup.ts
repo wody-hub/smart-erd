@@ -32,6 +32,8 @@ interface UseAssistPopupOptions {
   ) => AssistPopupItem[];
   /** Monaco executeEdits 이후 controlled 상태가 비동기 누락되면 동기화한다. */
   onSyncInsertedText?: (nextText: string) => void;
+  /** Assist 항목 삽입 직전 호출된다. */
+  onBeforeAssistEdit?: () => void;
   /** 용어 등록 요청 핸들러 */
   onRegisterTerm: (logicalName: string, lineNumber?: number | null) => void;
   /** 도메인 등록 요청 핸들러 */
@@ -78,6 +80,7 @@ export function useAssistPopup({
   getCurrentText,
   buildAssistItems,
   onSyncInsertedText,
+  onBeforeAssistEdit,
   onRegisterTerm,
   onRegisterDomain,
 }: UseAssistPopupOptions): UseAssistPopupReturn {
@@ -95,6 +98,7 @@ export function useAssistPopup({
   const callbacksRef = useRef({
     getCurrentText,
     onSyncInsertedText,
+    onBeforeAssistEdit,
     onRegisterTerm,
     onRegisterDomain,
   });
@@ -107,10 +111,11 @@ export function useAssistPopup({
     callbacksRef.current = {
       getCurrentText,
       onSyncInsertedText,
+      onBeforeAssistEdit,
       onRegisterTerm,
       onRegisterDomain,
     };
-  }, [getCurrentText, onRegisterDomain, onRegisterTerm, onSyncInsertedText]);
+  }, [getCurrentText, onBeforeAssistEdit, onRegisterDomain, onRegisterTerm, onSyncInsertedText]);
 
   /** 보조 팝업 상태를 ref/state에 동기 반영한다. */
   const setAssistPopupSync = useCallback((next: AssistPopupState | null) => {
@@ -257,6 +262,7 @@ export function useAssistPopup({
         return;
       }
       const insertText = item.insertText;
+      callbacks.onBeforeAssistEdit?.();
       editor.executeEdits('dsl-assist', [
         {
           range: new monaco.Range(
@@ -293,6 +299,10 @@ export function useAssistPopup({
     assistPopupRef.current = assistPopup;
     assistPopupVisibleKeyRef.current?.set(Boolean(assistPopup));
   }, [assistPopup]);
+
+  useEffect(() => {
+    closeAssistPopup();
+  }, [closeAssistPopup, editorInstanceVersion]);
 
   /** 선택 항목이 바뀌면 리스트를 자동 스크롤한다. */
   useEffect(() => {
