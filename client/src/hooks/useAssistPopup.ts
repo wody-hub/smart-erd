@@ -17,6 +17,8 @@ interface UseAssistPopupOptions {
   editorRef: React.MutableRefObject<Monaco.editor.IStandaloneCodeEditor | null>;
   /** Monaco 네임스페이스 ref */
   monacoRef: React.MutableRefObject<typeof Monaco | null>;
+  /** Monaco editor 인스턴스 교체 감지용 버전 */
+  editorInstanceVersion?: number;
   /** 편집 가능 여부 */
   canEdit: boolean;
   /** 현재 controlled 코드 텍스트를 읽는다. */
@@ -71,6 +73,7 @@ interface UseAssistPopupReturn {
 export function useAssistPopup({
   editorRef,
   monacoRef,
+  editorInstanceVersion = 0,
   canEdit,
   getCurrentText,
   buildAssistItems,
@@ -404,6 +407,7 @@ export function useAssistPopup({
   }, [
     canEdit,
     closeAssistPopup,
+    editorInstanceVersion,
     editorRef,
     executeAssistPopupItem,
     monacoRef,
@@ -530,6 +534,7 @@ export function useAssistPopup({
   }, [
     canEdit,
     closeAssistPopup,
+    editorInstanceVersion,
     editorRef,
     executeAssistPopupItem,
     monacoRef,

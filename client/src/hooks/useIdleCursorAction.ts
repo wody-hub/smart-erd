@@ -25,6 +25,8 @@ function isTypingAssistContext(
 interface UseIdleCursorActionOptions {
   /** Monaco 에디터 인스턴스 ref */
   editorRef: React.MutableRefObject<Monaco.editor.IStandaloneCodeEditor | null>;
+  /** Monaco editor 인스턴스 교체 감지용 버전 */
+  editorInstanceVersion?: number;
   /** 편집 가능 여부 */
   canEdit: boolean;
   /** 보조 팝업 열기 함수 */
@@ -48,6 +50,7 @@ interface UseIdleCursorActionOptions {
  */
 export function useIdleCursorAction({
   editorRef,
+  editorInstanceVersion = 0,
   canEdit,
   openAssistPopup,
   closeAssistPopup,
@@ -252,5 +255,5 @@ export function useIdleCursorAction({
       clearAutoAssistTimer();
       disposables.forEach((disposable) => disposable.dispose());
     };
-  }, [canEdit, clearAutoAssistTimer, editorRef]);
+  }, [canEdit, clearAutoAssistTimer, editorInstanceVersion, editorRef]);
 }

@@ -324,6 +324,8 @@ export default function DslCodeEditorPanel({
   const canEditRef = useRef(canEdit);
   /** Monaco mount 완료 여부 */
   const [monacoReady, setMonacoReady] = useState(false);
+  /** Monaco editor 인스턴스 교체 감지용 버전 */
+  const [editorInstanceVersion, setEditorInstanceVersion] = useState(0);
   /** code 모드 최종 저장 시 apply 선행 필요 여부 */
   const [requiresApplyBeforeFinalize, setRequiresApplyBeforeFinalize] = useState(false);
   /** code 모드 최종 저장 시 published save가 남아 있는지 여부 */
@@ -2128,6 +2130,7 @@ export default function DslCodeEditorPanel({
   } = useAssistPopup({
     editorRef,
     monacoRef,
+    editorInstanceVersion,
     canEdit,
     getCurrentText: () => dslTextValueRef.current,
     buildAssistItems,
@@ -2139,6 +2142,7 @@ export default function DslCodeEditorPanel({
   // --- Idle Cursor Action (extracted hook) ---
   useIdleCursorAction({
     editorRef,
+    editorInstanceVersion,
     canEdit,
     openAssistPopup,
     closeAssistPopup,
@@ -2182,6 +2186,7 @@ export default function DslCodeEditorPanel({
     editorRef.current = editor;
     monacoRef.current = monaco;
     setMonacoReady(true);
+    setEditorInstanceVersion((version) => version + 1);
     attachEditorFlushChangeListener(editor);
 
     const modelText = editor.getModel()?.getValue() ?? '';
