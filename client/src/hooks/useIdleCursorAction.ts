@@ -3,6 +3,23 @@ import type * as Monaco from 'monaco-editor';
 import { AUTO_ASSIST_TRIGGER_DELAY_MS, type AssistPopupTrigger } from '@/lib/dsl-assist';
 
 type AutoAssistTrigger = Exclude<AssistPopupTrigger, 'manual'>;
+/** Monaco mount 이후 ref 준비를 기다리는 재시도 간격 */
+const IDLE_CURSOR_ATTACH_RETRY_MS = 50;
+const TYPING_ASSIST_CONTEXT_REGEX = /[\p{L}\p{N}_]$/u;
+
+function isTypingAssistContext(
+  editor: Monaco.editor.IStandaloneCodeEditor,
+  position: Monaco.IPosition,
+): boolean {
+  const model = editor.getModel();
+  if (!model) {
+    return false;
+  }
+  const textBeforeCursor = model
+    .getLineContent(position.lineNumber)
+    .slice(0, Math.max(0, position.column - 1));
+  return TYPING_ASSIST_CONTEXT_REGEX.test(textBeforeCursor);
+}
 
 /** useIdleCursorAction 훅 옵션 */
 interface UseIdleCursorActionOptions {
@@ -74,128 +91,166 @@ export function useIdleCursorAction({
   }, []);
 
   useEffect(() => {
-    const editor = editorRef.current;
-    if (!editor || !canEdit) {
-      clearAutoAssistTimer();
-      callbacksRef.current.closeAssistPopup();
-      return;
-    }
+    let disposed = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let disposables: Monaco.IDisposable[] = [];
 
-    /**
-     * 트리거 유형별 자동 보조 팝업을 예약한다.
-     */
-    const scheduleAutoAssist = (trigger: AutoAssistTrigger, position: Monaco.IPosition) => {
-      clearAutoAssistTimer();
-      const snapshot = {
-        trigger,
-        position: { lineNumber: position.lineNumber, column: position.column },
-      };
-      scheduledAssistRef.current = snapshot;
+    const attachIdleCursorAction = () => {
+      if (disposed) {
+        return;
+      }
 
-      autoAssistTimerRef.current = setTimeout(() => {
-        const current = scheduledAssistRef.current;
-        if (!current || current.trigger !== trigger) {
-          return;
-        }
-
-        if (trigger === 'hover') {
-          if (
-            current.position.lineNumber !== snapshot.position.lineNumber ||
-            current.position.column !== snapshot.position.column
-          ) {
-            return;
-          }
-          callbacksRef.current.openAssistPopup({ position: current.position, trigger });
-          return;
-        }
-
-        const currentPos = editor.getPosition();
-        if (!currentPos) {
-          return;
-        }
-        if (
-          currentPos.lineNumber !== snapshot.position.lineNumber ||
-          currentPos.column !== snapshot.position.column
-        ) {
-          return;
-        }
-
-        callbacksRef.current.openAssistPopup({ position: currentPos, trigger });
-      }, AUTO_ASSIST_TRIGGER_DELAY_MS[trigger]);
-    };
-
-    const changeDisposable = editor.onDidChangeModelContent(() => {
-      pendingTypingCursorRef.current = true;
-      if (callbacksRef.current.isSyncing()) {
+      const editor = editorRef.current;
+      if (!canEdit) {
         clearAutoAssistTimer();
         callbacksRef.current.closeAssistPopup();
         return;
       }
-      callbacksRef.current.closeAssistPopup();
-      const pos = editor.getPosition();
-      if (pos) {
-        scheduleAutoAssist('typing', pos);
-      }
-    });
-    const cursorDisposable = editor.onDidChangeCursorPosition(() => {
-      if (pendingTypingCursorRef.current) {
-        pendingTypingCursorRef.current = false;
+      if (!editor) {
+        retryTimer = setTimeout(attachIdleCursorAction, IDLE_CURSOR_ATTACH_RETRY_MS);
         return;
       }
-      callbacksRef.current.closeAssistPopup();
-      clearAutoAssistTimer();
-    });
-    const mouseDownDisposable = editor.onMouseDown(() => {
-      pendingMouseFocusRef.current = true;
-      suppressHoverUntilMoveRef.current = true;
-      clearAutoAssistTimer();
-      callbacksRef.current.closeAssistPopup();
-    });
-    const focusDisposable = editor.onDidFocusEditorText(() => {
-      if (!pendingMouseFocusRef.current) {
-        return;
-      }
-      pendingMouseFocusRef.current = false;
-      const pos = editor.getPosition();
-      if (pos) {
-        scheduleAutoAssist('focus', pos);
-      }
-    });
-    const mouseMoveDisposable = editor.onMouseMove((event) => {
-      const pos = event.target.position;
-      if (!pos) {
-        return;
-      }
-      if (suppressHoverUntilMoveRef.current) {
+
+      /**
+       * 트리거 유형별 자동 보조 팝업을 예약한다.
+       */
+      const scheduleAutoAssist = (trigger: AutoAssistTrigger, position: Monaco.IPosition) => {
+        clearAutoAssistTimer();
+        const snapshot = {
+          trigger,
+          position: { lineNumber: position.lineNumber, column: position.column },
+        };
+        scheduledAssistRef.current = snapshot;
+
+        autoAssistTimerRef.current = setTimeout(() => {
+          const current = scheduledAssistRef.current;
+          if (!current || current.trigger !== trigger) {
+            return;
+          }
+
+          if (trigger === 'hover') {
+            if (
+              current.position.lineNumber !== snapshot.position.lineNumber ||
+              current.position.column !== snapshot.position.column
+            ) {
+              return;
+            }
+            callbacksRef.current.openAssistPopup({ position: current.position, trigger });
+            return;
+          }
+
+          const currentPos = editor.getPosition();
+          if (!currentPos) {
+            return;
+          }
+          if (
+            trigger !== 'typing' &&
+            (currentPos.lineNumber !== snapshot.position.lineNumber ||
+              currentPos.column !== snapshot.position.column)
+          ) {
+            return;
+          }
+
+          if (trigger === 'typing') {
+            pendingTypingCursorRef.current = false;
+            if (!isTypingAssistContext(editor, currentPos)) {
+              return;
+            }
+          }
+          callbacksRef.current.openAssistPopup({ position: currentPos, trigger });
+        }, AUTO_ASSIST_TRIGGER_DELAY_MS[trigger]);
+      };
+
+      const changeDisposable = editor.onDidChangeModelContent(() => {
+        pendingTypingCursorRef.current = true;
+        if (callbacksRef.current.isSyncing()) {
+          clearAutoAssistTimer();
+          callbacksRef.current.closeAssistPopup();
+          return;
+        }
+        callbacksRef.current.closeAssistPopup();
+        const pos = editor.getPosition();
+        if (pos) {
+          scheduleAutoAssist('typing', pos);
+        }
+      });
+      const cursorDisposable = editor.onDidChangeCursorPosition(() => {
+        if (pendingTypingCursorRef.current) {
+          pendingTypingCursorRef.current = false;
+          const pos = editor.getPosition();
+          if (pos && scheduledAssistRef.current?.trigger === 'typing') {
+            scheduleAutoAssist('typing', pos);
+          }
+          return;
+        }
+        callbacksRef.current.closeAssistPopup();
+        clearAutoAssistTimer();
+      });
+      const mouseDownDisposable = editor.onMouseDown(() => {
+        pendingMouseFocusRef.current = true;
+        suppressHoverUntilMoveRef.current = true;
+        clearAutoAssistTimer();
+        callbacksRef.current.closeAssistPopup();
+      });
+      const focusDisposable = editor.onDidFocusEditorText(() => {
+        if (!pendingMouseFocusRef.current) {
+          return;
+        }
+        pendingMouseFocusRef.current = false;
+        const pos = editor.getPosition();
+        if (pos) {
+          scheduleAutoAssist('focus', pos);
+        }
+      });
+      const mouseMoveDisposable = editor.onMouseMove((event) => {
+        const pos = event.target.position;
+        if (!pos) {
+          return;
+        }
+        if (suppressHoverUntilMoveRef.current) {
+          suppressHoverUntilMoveRef.current = false;
+          return;
+        }
+        scheduleAutoAssist('hover', pos);
+      });
+      const mouseLeaveDisposable = editor.onMouseLeave(() => {
+        clearAutoAssistTimer();
+      });
+      const scrollDisposable = editor.onDidScrollChange((event) => {
+        if (!event.scrollTopChanged && !event.scrollLeftChanged) {
+          return;
+        }
+        clearAutoAssistTimer();
+        callbacksRef.current.closeAssistPopup();
+      });
+      const blurDisposable = editor.onDidBlurEditorText(() => {
+        pendingMouseFocusRef.current = false;
         suppressHoverUntilMoveRef.current = false;
-        return;
-      }
-      scheduleAutoAssist('hover', pos);
-    });
-    const mouseLeaveDisposable = editor.onMouseLeave(() => {
-      clearAutoAssistTimer();
-    });
-    const scrollDisposable = editor.onDidScrollChange(() => {
-      clearAutoAssistTimer();
-      callbacksRef.current.closeAssistPopup();
-    });
-    const blurDisposable = editor.onDidBlurEditorText(() => {
-      pendingMouseFocusRef.current = false;
-      suppressHoverUntilMoveRef.current = false;
-      clearAutoAssistTimer();
-      callbacksRef.current.closeAssistPopup();
-    });
+        clearAutoAssistTimer();
+        callbacksRef.current.closeAssistPopup();
+      });
+
+      disposables = [
+        changeDisposable,
+        cursorDisposable,
+        mouseDownDisposable,
+        focusDisposable,
+        mouseMoveDisposable,
+        mouseLeaveDisposable,
+        scrollDisposable,
+        blurDisposable,
+      ];
+    };
+
+    attachIdleCursorAction();
 
     return () => {
+      disposed = true;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
       clearAutoAssistTimer();
-      changeDisposable.dispose();
-      cursorDisposable.dispose();
-      mouseDownDisposable.dispose();
-      focusDisposable.dispose();
-      mouseMoveDisposable.dispose();
-      mouseLeaveDisposable.dispose();
-      scrollDisposable.dispose();
-      blurDisposable.dispose();
+      disposables.forEach((disposable) => disposable.dispose());
     };
   }, [canEdit, clearAutoAssistTimer, editorRef]);
 }

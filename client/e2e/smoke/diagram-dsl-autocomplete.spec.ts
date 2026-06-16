@@ -181,7 +181,7 @@ test('code-first DSL autocomplete opens via Ctrl+Space and idle typing @smoke', 
 
   const listbox = page.getByRole('listbox');
   await expect(listbox).toBeVisible({ timeout: 3_000 });
-  await expect(page.getByRole('option', { name: /사용자/ })).toBeVisible();
+  await expect(page.getByRole('option', { name: '사용자 user', exact: true })).toBeVisible();
 
   await page.keyboard.press('Escape');
   await expect(listbox).toHaveCount(0);
@@ -190,7 +190,7 @@ test('code-first DSL autocomplete opens via Ctrl+Space and idle typing @smoke', 
   await page.keyboard.type('사');
 
   await expect(listbox).toBeVisible({ timeout: 2_500 });
-  await expect(page.getByRole('option', { name: /사용자/ })).toBeVisible();
+  await expect(page.getByRole('option', { name: '사용자 user', exact: true })).toBeVisible();
 
   await page.waitForTimeout(400);
   await expect(listbox).toBeVisible();

@@ -8,6 +8,8 @@ import { filterAssistItemsForTrigger, type AssistPopupTrigger } from '@/lib/dsl-
 const ASSIST_POPUP_INITIAL_VISIBLE = 10;
 /** 보조 팝업 더보기 증가 건수 */
 const ASSIST_POPUP_VISIBLE_STEP = 10;
+/** Monaco mount 이후 ref 준비를 기다리는 재시도 간격 */
+const ASSIST_ATTACH_RETRY_MS = 50;
 
 /** useAssistPopup 훅 옵션 */
 interface UseAssistPopupOptions {
@@ -306,77 +308,99 @@ export function useAssistPopup({
 
   // Ctrl+Space는 팝업 오픈 트리거로 유지한다.
   useEffect(() => {
-    const editor = editorRef.current;
-    const monaco = monacoRef.current;
-    if (!editor || !monaco || !canEdit) {
-      closeAssistPopup();
-      return;
-    }
+    let disposed = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let keyDownDisposable: Monaco.IDisposable | null = null;
 
-    const keyDownDisposable = editor.onKeyDown((event) => {
-      const browserEvent = event.browserEvent;
-      /**
-       * 현재 키 이벤트를 Monaco/브라우저 양쪽에서 소비 처리한다.
-       */
-      const consume = () => {
-        event.preventDefault();
-        event.stopPropagation();
-        browserEvent.preventDefault();
-        browserEvent.stopPropagation();
-        browserEvent.stopImmediatePropagation?.();
-      };
-
-      const isCtrlSpace =
-        event.keyCode === monaco.KeyCode.Space && (browserEvent.ctrlKey || browserEvent.metaKey);
-      if (isCtrlSpace) {
-        consume();
-        openAssistPopup({ trigger: 'manual' });
+    const attachKeyDown = () => {
+      if (disposed) {
         return;
       }
 
-      const popup = assistPopupRef.current;
-      if (!popup || popup.items.length === 0) {
-        return;
-      }
-      const visibleCount = Math.max(1, Math.min(popup.visibleCount, popup.items.length));
-      if (browserEvent.isComposing) {
-        return;
-      }
-      if (browserEvent.altKey || browserEvent.ctrlKey || browserEvent.metaKey) {
-        return;
-      }
-
-      if (event.keyCode === monaco.KeyCode.DownArrow) {
-        consume();
-        setAssistPopupSelectedIndex((popup.selectedIndex + 1) % visibleCount);
-        return;
-      }
-
-      if (event.keyCode === monaco.KeyCode.UpArrow) {
-        consume();
-        setAssistPopupSelectedIndex((popup.selectedIndex - 1 + visibleCount) % visibleCount);
-        return;
-      }
-
-      if (
-        (event.keyCode === monaco.KeyCode.Enter && !browserEvent.shiftKey) ||
-        event.keyCode === monaco.KeyCode.Tab
-      ) {
-        consume();
-        const selected = popup.items[popup.selectedIndex] ?? popup.items[0];
-        if (selected) {
-          executeAssistPopupItem(selected);
-        }
-        return;
-      }
-
-      if (event.keyCode === monaco.KeyCode.Escape) {
-        consume();
+      const editor = editorRef.current;
+      const monaco = monacoRef.current;
+      if (!canEdit) {
         closeAssistPopup();
+        return;
       }
-    });
+      if (!editor || !monaco) {
+        retryTimer = setTimeout(attachKeyDown, ASSIST_ATTACH_RETRY_MS);
+        return;
+      }
 
-    return () => keyDownDisposable.dispose();
+      keyDownDisposable = editor.onKeyDown((event) => {
+        const browserEvent = event.browserEvent;
+        /**
+         * 현재 키 이벤트를 Monaco/브라우저 양쪽에서 소비 처리한다.
+         */
+        const consume = () => {
+          event.preventDefault();
+          event.stopPropagation();
+          browserEvent.preventDefault();
+          browserEvent.stopPropagation();
+          browserEvent.stopImmediatePropagation?.();
+        };
+
+        const isCtrlSpace =
+          event.keyCode === monaco.KeyCode.Space && (browserEvent.ctrlKey || browserEvent.metaKey);
+        if (isCtrlSpace) {
+          consume();
+          openAssistPopup({ trigger: 'manual' });
+          return;
+        }
+
+        const popup = assistPopupRef.current;
+        if (!popup || popup.items.length === 0) {
+          return;
+        }
+        const visibleCount = Math.max(1, Math.min(popup.visibleCount, popup.items.length));
+        if (browserEvent.isComposing) {
+          return;
+        }
+        if (browserEvent.altKey || browserEvent.ctrlKey || browserEvent.metaKey) {
+          return;
+        }
+
+        if (event.keyCode === monaco.KeyCode.DownArrow) {
+          consume();
+          setAssistPopupSelectedIndex((popup.selectedIndex + 1) % visibleCount);
+          return;
+        }
+
+        if (event.keyCode === monaco.KeyCode.UpArrow) {
+          consume();
+          setAssistPopupSelectedIndex((popup.selectedIndex - 1 + visibleCount) % visibleCount);
+          return;
+        }
+
+        if (
+          (event.keyCode === monaco.KeyCode.Enter && !browserEvent.shiftKey) ||
+          event.keyCode === monaco.KeyCode.Tab
+        ) {
+          consume();
+          const selected = popup.items[popup.selectedIndex] ?? popup.items[0];
+          if (selected) {
+            executeAssistPopupItem(selected);
+          }
+          return;
+        }
+
+        if (event.keyCode === monaco.KeyCode.Escape) {
+          consume();
+          closeAssistPopup();
+        }
+      });
+    };
+
+    attachKeyDown();
+
+    return () => {
+      disposed = true;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
+      keyDownDisposable?.dispose();
+    };
   }, [
     canEdit,
     closeAssistPopup,
@@ -389,97 +413,117 @@ export function useAssistPopup({
 
   // 팝업 표시 중 방향키/선택/닫기를 Monaco 키바인딩으로 선점한다.
   useEffect(() => {
-    const editor = editorRef.current;
-    const monaco = monacoRef.current;
-    if (!editor || !monaco || !canEdit) {
-      return;
-    }
+    let disposed = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let disposables: Monaco.IDisposable[] = [];
 
-    assistPopupVisibleKeyRef.current = editor.createContextKey('dslAssistPopupVisible', false);
-    assistPopupVisibleKeyRef.current.set(Boolean(assistPopupRef.current));
-    const keyModWithWinCtrl = monaco.KeyMod as typeof monaco.KeyMod & { WinCtrl?: number };
-    const manualOpenKeybindings = [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Space];
-    if (typeof keyModWithWinCtrl.WinCtrl === 'number') {
-      manualOpenKeybindings.push(keyModWithWinCtrl.WinCtrl | monaco.KeyCode.Space);
-    }
-
-    /**
-     * 보조 팝업 선택 인덱스를 delta만큼 순환 이동한다.
-     *
-     * @param delta 이동량 (양수: 아래, 음수: 위)
-     */
-    const moveSelection = (delta: number) => {
-      const popup = assistPopupRef.current;
-      if (!popup || popup.items.length === 0) {
+    const attachActions = () => {
+      if (disposed) {
         return;
       }
-      const count = Math.max(1, Math.min(popup.visibleCount, popup.items.length));
-      const nextIndex =
-        delta > 0
-          ? (popup.selectedIndex + delta) % count
-          : (popup.selectedIndex + delta + count) % count;
-      setAssistPopupSelectedIndex(nextIndex);
-    };
 
-    /**
-     * 현재 선택된 보조 팝업 항목을 실행한다.
-     */
-    const executeSelected = () => {
-      const popup = assistPopupRef.current;
-      if (!popup) {
+      const editor = editorRef.current;
+      const monaco = monacoRef.current;
+      if (!canEdit) {
         return;
       }
-      const selected = popup.items[popup.selectedIndex] ?? popup.items[0];
-      if (selected) {
-        executeAssistPopupItem(selected);
+      if (!editor || !monaco) {
+        retryTimer = setTimeout(attachActions, ASSIST_ATTACH_RETRY_MS);
+        return;
       }
+
+      assistPopupVisibleKeyRef.current = editor.createContextKey('dslAssistPopupVisible', false);
+      assistPopupVisibleKeyRef.current.set(Boolean(assistPopupRef.current));
+      const keyModWithWinCtrl = monaco.KeyMod as typeof monaco.KeyMod & { WinCtrl?: number };
+      const manualOpenKeybindings = [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Space];
+      if (typeof keyModWithWinCtrl.WinCtrl === 'number') {
+        manualOpenKeybindings.push(keyModWithWinCtrl.WinCtrl | monaco.KeyCode.Space);
+      }
+
+      /**
+       * 보조 팝업 선택 인덱스를 delta만큼 순환 이동한다.
+       *
+       * @param delta 이동량 (양수: 아래, 음수: 위)
+       */
+      const moveSelection = (delta: number) => {
+        const popup = assistPopupRef.current;
+        if (!popup || popup.items.length === 0) {
+          return;
+        }
+        const count = Math.max(1, Math.min(popup.visibleCount, popup.items.length));
+        const nextIndex =
+          delta > 0
+            ? (popup.selectedIndex + delta) % count
+            : (popup.selectedIndex + delta + count) % count;
+        setAssistPopupSelectedIndex(nextIndex);
+      };
+
+      /**
+       * 현재 선택된 보조 팝업 항목을 실행한다.
+       */
+      const executeSelected = () => {
+        const popup = assistPopupRef.current;
+        if (!popup) {
+          return;
+        }
+        const selected = popup.items[popup.selectedIndex] ?? popup.items[0];
+        if (selected) {
+          executeAssistPopupItem(selected);
+        }
+      };
+
+      disposables = [
+        editor.addAction({
+          id: 'dsl-assist-popup-open',
+          label: 'DSL Assist Popup Open',
+          keybindings: manualOpenKeybindings,
+          run: () => openAssistPopup({ trigger: 'manual' }),
+        }),
+        editor.addAction({
+          id: 'dsl-assist-popup-up',
+          label: 'DSL Assist Popup Up',
+          precondition: 'dslAssistPopupVisible',
+          keybindings: [monaco.KeyCode.UpArrow],
+          run: () => moveSelection(-1),
+        }),
+        editor.addAction({
+          id: 'dsl-assist-popup-down',
+          label: 'DSL Assist Popup Down',
+          precondition: 'dslAssistPopupVisible',
+          keybindings: [monaco.KeyCode.DownArrow],
+          run: () => moveSelection(1),
+        }),
+        editor.addAction({
+          id: 'dsl-assist-popup-accept-enter',
+          label: 'DSL Assist Popup Accept Enter',
+          precondition: 'dslAssistPopupVisible',
+          keybindings: [monaco.KeyCode.Enter],
+          run: () => executeSelected(),
+        }),
+        editor.addAction({
+          id: 'dsl-assist-popup-accept-tab',
+          label: 'DSL Assist Popup Accept Tab',
+          precondition: 'dslAssistPopupVisible',
+          keybindings: [monaco.KeyCode.Tab],
+          run: () => executeSelected(),
+        }),
+        editor.addAction({
+          id: 'dsl-assist-popup-close',
+          label: 'DSL Assist Popup Close',
+          precondition: 'dslAssistPopupVisible',
+          keybindings: [monaco.KeyCode.Escape],
+          run: () => closeAssistPopup(),
+        }),
+      ];
     };
 
-    const disposables: Monaco.IDisposable[] = [
-      editor.addAction({
-        id: 'dsl-assist-popup-open',
-        label: 'DSL Assist Popup Open',
-        keybindings: manualOpenKeybindings,
-        run: () => openAssistPopup({ trigger: 'manual' }),
-      }),
-      editor.addAction({
-        id: 'dsl-assist-popup-up',
-        label: 'DSL Assist Popup Up',
-        precondition: 'dslAssistPopupVisible',
-        keybindings: [monaco.KeyCode.UpArrow],
-        run: () => moveSelection(-1),
-      }),
-      editor.addAction({
-        id: 'dsl-assist-popup-down',
-        label: 'DSL Assist Popup Down',
-        precondition: 'dslAssistPopupVisible',
-        keybindings: [monaco.KeyCode.DownArrow],
-        run: () => moveSelection(1),
-      }),
-      editor.addAction({
-        id: 'dsl-assist-popup-accept-enter',
-        label: 'DSL Assist Popup Accept Enter',
-        precondition: 'dslAssistPopupVisible',
-        keybindings: [monaco.KeyCode.Enter],
-        run: () => executeSelected(),
-      }),
-      editor.addAction({
-        id: 'dsl-assist-popup-accept-tab',
-        label: 'DSL Assist Popup Accept Tab',
-        precondition: 'dslAssistPopupVisible',
-        keybindings: [monaco.KeyCode.Tab],
-        run: () => executeSelected(),
-      }),
-      editor.addAction({
-        id: 'dsl-assist-popup-close',
-        label: 'DSL Assist Popup Close',
-        precondition: 'dslAssistPopupVisible',
-        keybindings: [monaco.KeyCode.Escape],
-        run: () => closeAssistPopup(),
-      }),
-    ];
+    attachActions();
 
     return () => {
+      disposed = true;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
       disposables.forEach((disposable) => disposable.dispose());
       assistPopupVisibleKeyRef.current = null;
     };
