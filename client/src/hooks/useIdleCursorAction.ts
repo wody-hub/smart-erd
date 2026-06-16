@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import type * as Monaco from 'monaco-editor';
 import { AUTO_ASSIST_TRIGGER_DELAY_MS, type AssistPopupTrigger } from '@/lib/dsl-assist';
 
@@ -79,7 +79,7 @@ export function useIdleCursorAction({
     isSyncing,
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     callbacksRef.current = {
       openAssistPopup,
       closeAssistPopup,

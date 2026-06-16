@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import type * as Monaco from 'monaco-editor';
 import type { AssistPopupItem } from '@/hooks/useDslEditorCompletion';
 import type { AssistPopupState } from '@/components/erd/DslAssistPopup';
@@ -300,12 +300,12 @@ export function useAssistPopup({
     assistPopupVisibleKeyRef.current?.set(Boolean(assistPopup));
   }, [assistPopup]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     closeAssistPopup();
   }, [closeAssistPopup, editorInstanceVersion]);
 
   /** 선택 항목이 바뀌면 리스트를 자동 스크롤한다. */
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!assistPopup) {
       return;
     }
@@ -320,7 +320,7 @@ export function useAssistPopup({
   }, [assistPopup]);
 
   // Ctrl+Space는 팝업 오픈 트리거로 유지한다.
-  useEffect(() => {
+  useLayoutEffect(() => {
     let disposed = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let keyDownDisposable: Monaco.IDisposable | null = null;

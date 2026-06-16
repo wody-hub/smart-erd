@@ -320,6 +320,8 @@ export default function DslCodeEditorPanel({
   const monacoRef = useRef<typeof Monaco | null>(null);
   /** Monaco flush content change listener */
   const editorFlushChangeDisposableRef = useRef<Monaco.IDisposable | null>(null);
+  /** Monaco mount 직후 Ctrl+Space 선점 listener */
+  const assistImmediateKeyDownDisposableRef = useRef<Monaco.IDisposable | null>(null);
   /** Assist 선택 직후 idle typing 자동완성 1회를 억제한다. */
   const suppressNextIdleTypingAssistRef = useRef(false);
   /** 최신 편집 가능 여부 */
@@ -2143,6 +2145,11 @@ export default function DslCodeEditorPanel({
     onRegisterTerm: handleQuickRegisterTerm,
     onRegisterDomain: handleQuickRegisterDomain,
   });
+  const openAssistPopupRef = useRef(openAssistPopup);
+
+  useEffect(() => {
+    openAssistPopupRef.current = openAssistPopup;
+  }, [openAssistPopup]);
 
   // --- Idle Cursor Action (extracted hook) ---
   useIdleCursorAction({
@@ -2183,7 +2190,39 @@ export default function DslCodeEditorPanel({
   };
 
   /**
-   * onMount — editorRef/monacoRef 저장 (CompletionProvider 등록은 useEffect에 위임).
+   * Monaco 기본 suggest보다 먼저 Ctrl+Space를 소비한다.
+   *
+   * useAssistPopup의 effect가 붙기 전 첫 프레임에서도 DSL assist가 열리도록
+   * editor onMount 시점에 즉시 구독한다.
+   *
+   * @param editor Monaco editor 인스턴스
+   * @param monaco Monaco 네임스페이스
+   * @returns 없음
+   */
+  const attachImmediateAssistShortcut = useCallback(
+    (editor: Monaco.editor.IStandaloneCodeEditor, monaco: typeof Monaco) => {
+      assistImmediateKeyDownDisposableRef.current?.dispose();
+      assistImmediateKeyDownDisposableRef.current = editor.onKeyDown((event) => {
+        const browserEvent = event.browserEvent;
+        const isCtrlSpace =
+          event.keyCode === monaco.KeyCode.Space && (browserEvent.ctrlKey || browserEvent.metaKey);
+        if (!isCtrlSpace || !canEditRef.current) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        browserEvent.preventDefault();
+        browserEvent.stopPropagation();
+        browserEvent.stopImmediatePropagation?.();
+        openAssistPopupRef.current({ trigger: 'manual' });
+      });
+    },
+    [],
+  );
+
+  /**
+   * onMount — editorRef/monacoRef 저장.
    *
    * @param editor Monaco editor 인스턴스
    * @param monaco Monaco 네임스페이스
@@ -2191,6 +2230,7 @@ export default function DslCodeEditorPanel({
   const handleOnMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+    attachImmediateAssistShortcut(editor, monaco);
     setMonacoReady(true);
     setEditorInstanceVersion((version) => version + 1);
     attachEditorFlushChangeListener(editor);
@@ -2247,6 +2287,8 @@ export default function DslCodeEditorPanel({
     return () => {
       editorFlushChangeDisposableRef.current?.dispose();
       editorFlushChangeDisposableRef.current = null;
+      assistImmediateKeyDownDisposableRef.current?.dispose();
+      assistImmediateKeyDownDisposableRef.current = null;
     };
   }, [attachEditorFlushChangeListener]);
 

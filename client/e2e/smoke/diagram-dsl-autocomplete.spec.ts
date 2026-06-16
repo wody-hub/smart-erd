@@ -79,6 +79,14 @@ async function seedDslEditor(page: Page, text: string): Promise<void> {
   }, text);
 }
 
+async function waitForMonacoEditor(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => Boolean(window.monaco?.editor?.getEditors?.()[0]?.getModel()),
+    undefined,
+    { timeout: 15_000 },
+  );
+}
+
 async function provisionDictionaryTerms(
   request: APIRequestContext,
   apiBaseUrl: string,
@@ -181,6 +189,7 @@ test('code-first DSL autocomplete opens via Ctrl+Space and idle typing @smoke', 
 
   const listbox = page.getByRole('listbox');
   await expect(listbox).toBeVisible({ timeout: 3_000 });
+  await expect(page.getByText('No suggestions.')).toHaveCount(0);
   await expect(page.getByRole('option', { name: '사용자 user', exact: true })).toBeVisible();
 
   await page.keyboard.press('Escape');
@@ -200,4 +209,28 @@ test('code-first DSL autocomplete opens via Ctrl+Space and idle typing @smoke', 
 
   await page.waitForTimeout(1_200);
   await expect(listbox).toHaveCount(0);
+});
+
+test('code-first DSL autocomplete binds Ctrl+Space on the first editor frame @smoke', async ({
+  page,
+  request,
+}) => {
+  const config = getE2EProvisioningConfig();
+  const fixture = await provisionCollaborationFixture(config);
+  const token = await loginViaUi(page, { ...config, ...fixture });
+
+  await provisionDictionaryTerms(request, config.apiBaseUrl, fixture.target.teamId, token);
+
+  await page.goto(diagramUrl(config, fixture.target), { waitUntil: 'domcontentloaded' });
+  await expectDiagramHeaderVisible(page, fixture.target);
+  await switchWorkMode(page, /코드 우선|code-first/i);
+  await waitForMonacoEditor(page);
+
+  await seedDslEditor(page, 'Table 사');
+  await page.keyboard.press('Control+Space');
+
+  await expect(page.getByText('No suggestions.')).toHaveCount(0);
+  await expect(page.getByRole('option', { name: '사용자 user', exact: true })).toBeVisible({
+    timeout: 1_000,
+  });
 });
