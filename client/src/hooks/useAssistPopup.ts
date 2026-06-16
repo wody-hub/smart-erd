@@ -84,6 +84,28 @@ export function useAssistPopup({
   const assistPopupVisibleKeyRef = useRef<Monaco.editor.IContextKey<boolean> | null>(null);
   /** 보조 팝업 리스트 DOM ref */
   const assistPopupListRef = useRef<HTMLUListElement | null>(null);
+  /** 최신 자동완성 빌더를 안정 콜백에서 참조한다. */
+  const buildAssistItemsRef = useRef(buildAssistItems);
+  /** 최신 외부 콜백을 안정 콜백에서 참조한다. */
+  const callbacksRef = useRef({
+    getCurrentText,
+    onSyncInsertedText,
+    onRegisterTerm,
+    onRegisterDomain,
+  });
+
+  useEffect(() => {
+    buildAssistItemsRef.current = buildAssistItems;
+  }, [buildAssistItems]);
+
+  useEffect(() => {
+    callbacksRef.current = {
+      getCurrentText,
+      onSyncInsertedText,
+      onRegisterTerm,
+      onRegisterDomain,
+    };
+  }, [getCurrentText, onRegisterDomain, onRegisterTerm, onSyncInsertedText]);
 
   /** 보조 팝업 상태를 ref/state에 동기 반영한다. */
   const setAssistPopupSync = useCallback((next: AssistPopupState | null) => {
@@ -165,7 +187,7 @@ export function useAssistPopup({
       const trigger = options?.trigger ?? 'manual';
       const preview = trigger !== 'manual';
       const items = filterAssistItemsForTrigger(
-        buildAssistItems(model, position, true, trigger),
+        buildAssistItemsRef.current(model, position, true, trigger),
         trigger,
       );
       if (preview && assistPopupRef.current && !assistPopupRef.current.preview) {
@@ -202,7 +224,7 @@ export function useAssistPopup({
         visibleCount: Math.min(ASSIST_POPUP_INITIAL_VISIBLE, items.length),
       });
     },
-    [buildAssistItems, closeAssistPopup, editorRef, setAssistPopupSync],
+    [closeAssistPopup, editorRef, setAssistPopupSync],
   );
 
   /** 보조 팝업 선택 항목을 실행한다. */
@@ -210,18 +232,19 @@ export function useAssistPopup({
     (item: AssistPopupItem) => {
       const editor = editorRef.current;
       const monaco = monacoRef.current;
+      const callbacks = callbacksRef.current;
       if (!editor) {
         return;
       }
 
       if (item.type === 'registerTerm') {
         closeAssistPopup();
-        onRegisterTerm(item.name ?? '', item.lineNumber);
+        callbacks.onRegisterTerm(item.name ?? '', item.lineNumber);
         return;
       }
       if (item.type === 'registerDomain') {
         closeAssistPopup();
-        onRegisterDomain(item.name ?? '');
+        callbacks.onRegisterDomain(item.name ?? '');
         return;
       }
 
@@ -242,25 +265,22 @@ export function useAssistPopup({
         },
       ]);
       const nextModelText = editor.getModel()?.getValue();
-      if (nextModelText != null && onSyncInsertedText && getCurrentText) {
+      if (nextModelText != null) {
         queueMicrotask(() => {
-          if (getCurrentText() !== nextModelText) {
-            onSyncInsertedText(nextModelText);
+          const latestCallbacks = callbacksRef.current;
+          if (
+            latestCallbacks.getCurrentText &&
+            latestCallbacks.onSyncInsertedText &&
+            latestCallbacks.getCurrentText() !== nextModelText
+          ) {
+            latestCallbacks.onSyncInsertedText(nextModelText);
           }
         });
       }
       editor.focus();
       closeAssistPopup();
     },
-    [
-      closeAssistPopup,
-      editorRef,
-      getCurrentText,
-      monacoRef,
-      onRegisterDomain,
-      onRegisterTerm,
-      onSyncInsertedText,
-    ],
+    [closeAssistPopup, editorRef, monacoRef],
   );
 
   /** 최신 보조 팝업 상태를 ref로 유지한다. */
