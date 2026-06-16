@@ -31,48 +31,54 @@ export function resolveCompactTableRenderingMode(
 }
 
 export function resolveInteractiveCompactTableMode(
-  baseMode: CompactTableRenderingMode,
-  options: {
+  _baseMode: CompactTableRenderingMode,
+  _options: {
     selected: boolean;
     isEditing: boolean;
     fkMode: boolean;
     expanded: boolean;
   },
 ): CompactTableRenderingMode {
-  if (
-    baseMode === 'off' ||
-    options.selected ||
-    options.isEditing ||
-    options.fkMode ||
-    options.expanded
-  ) {
-    return 'off';
-  }
-  return baseMode;
+  // Zoom/node-count 기반 compact table 렌더링은 가독성 이슈로 일시 비활성화한다.
+  // if (
+  //   baseMode === 'off' ||
+  //   options.selected ||
+  //   options.isEditing ||
+  //   options.fkMode ||
+  //   options.expanded
+  // ) {
+  //   return 'off';
+  // }
+  // return baseMode;
+  return 'off';
 }
 
 export function resolvePreviewCompactTableMode(
-  baseMode: CompactTableRenderingMode,
-  options?: {
+  _baseMode: CompactTableRenderingMode,
+  _options?: {
     override?: CompactTableRenderingMode;
     ghost?: boolean;
   },
 ): CompactTableRenderingMode {
-  if (options?.ghost) {
-    return 'off';
-  }
-  return options?.override ?? baseMode;
+  // Zoom/node-count 기반 compact table 렌더링은 가독성 이슈로 일시 비활성화한다.
+  // if (options?.ghost) {
+  //   return 'off';
+  // }
+  // return options?.override ?? baseMode;
+  return 'off';
 }
 
 export function selectCompactOverviewColumns<T extends { id: string }>(
   columns: T[],
-  connectedColumnIds: Set<string>,
+  _connectedColumnIds: Set<string>,
 ): T[] {
-  const connectedColumns = columns.filter((column) => connectedColumnIds.has(column.id));
-  if (connectedColumns.length > 0) {
-    return connectedColumns;
-  }
-  return columns.slice(0, MAX_OVERVIEW_UNCONNECTED_COLUMNS);
+  // Zoom/node-count 기반 compact table 렌더링은 가독성 이슈로 일시 비활성화한다.
+  // const connectedColumns = columns.filter((column) => connectedColumnIds.has(column.id));
+  // if (connectedColumns.length > 0) {
+  //   return connectedColumns;
+  // }
+  // return columns.slice(0, MAX_OVERVIEW_UNCONNECTED_COLUMNS);
+  return columns;
 }
 
 export function CompactTableRenderingProvider({
