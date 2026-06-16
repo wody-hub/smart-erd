@@ -1,6 +1,8 @@
 package com.smarterd.api.common.dto;
 
+import com.smarterd.utils.AppStringUtils;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Objects;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -15,10 +17,18 @@ import org.springframework.lang.Nullable;
  * @param size    페이지 크기 (기본값 20, 최대값은 서비스별 MAX_PAGE_SIZE에 의해 결정)
  * @param keyword 복합 검색어 (nullable)
  */
+@Schema(description = "페이지네이션 + 검색 공통 요청")
 public record PageSearchRequest(
-    @Parameter(description = "페이지 번호 (0-base)") int page,
-    @Parameter(description = "페이지 크기") int size,
-    @Nullable @Parameter(description = "복합 검색어") String keyword
+    @Parameter(description = "페이지 번호 (0-base)")
+    @Schema(description = "페이지 번호 (0-base)", example = "0")
+    int page,
+
+    @Parameter(description = "페이지 크기") @Schema(description = "페이지 크기", example = "20") int size,
+
+    @Nullable
+    @Parameter(description = "복합 검색어")
+    @Schema(description = "복합 검색어", example = "customer")
+    String keyword
 ) {
     /**
      * 기본값이 적용된 인스턴스를 생성한다.
@@ -48,10 +58,6 @@ public record PageSearchRequest(
      */
     @Nullable
     public String normalizedKeyword() {
-        if (keyword == null) {
-            return null;
-        }
-        final var trimmed = keyword.trim();
-        return trimmed.isEmpty() ? null : trimmed;
+        return AppStringUtils.trimToNull(keyword);
     }
 }

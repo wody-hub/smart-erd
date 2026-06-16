@@ -1,13 +1,16 @@
 package com.smarterd.api.ai.dto;
 
-import com.smarterd.application.ai.history.AiProjectHistoryService;
-import java.time.Instant;
+import com.smarterd.application.ai.history.AiProjectHistoryView;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
+@Schema(description = "Project AI activity history response")
 public record AiProjectHistoryResponse(
-    List<ItemResponse> items,
-    int limit,
-    boolean hasMore
+    @Schema(description = "History items") List<AiProjectHistoryItemResponse> items,
+
+    @Schema(description = "Effective item limit", example = "50") int limit,
+
+    @Schema(description = "Whether more items exist", example = "false") boolean hasMore
 ) {
     /**
      * Normalizes nullable item collections.
@@ -27,63 +30,11 @@ public record AiProjectHistoryResponse(
      * @param view sanitized history view
      * @return API history response
      */
-    public static AiProjectHistoryResponse from(AiProjectHistoryService.AiProjectHistoryView view) {
+    public static AiProjectHistoryResponse from(AiProjectHistoryView view) {
         return new AiProjectHistoryResponse(
-            view.items().stream().map(ItemResponse::from).toList(),
+            view.items().stream().map(AiProjectHistoryItemResponse::from).toList(),
             view.limit(),
             view.hasMore()
         );
-    }
-
-    public record ItemResponse(
-        String kind,
-        String executionId,
-        String proposalId,
-        String provider,
-        String promptVersion,
-        String actionType,
-        String riskLevel,
-        String status,
-        String targetType,
-        String targetId,
-        String targetLabel,
-        String summary,
-        String requestedBy,
-        String decisionBy,
-        Instant createdAt,
-        Instant decidedAt,
-        String redactedErrorTitle,
-        String redactedErrorDetail,
-        Instant activityAt
-    ) {
-        /**
-         * Maps one sanitized history item into the API response.
-         *
-         * @param item sanitized history item
-         * @return API item response
-         */
-        private static ItemResponse from(AiProjectHistoryService.AiProjectHistoryItemView item) {
-            return new ItemResponse(
-                item.kind(),
-                item.executionId(),
-                item.proposalId(),
-                item.provider(),
-                item.promptVersion(),
-                item.actionType(),
-                item.riskLevel(),
-                item.status(),
-                item.targetType(),
-                item.targetId(),
-                item.targetLabel(),
-                item.summary(),
-                item.requestedBy(),
-                item.decisionBy(),
-                item.createdAt(),
-                item.decidedAt(),
-                item.redactedErrorTitle(),
-                item.redactedErrorDetail(),
-                item.activityAt()
-            );
-        }
     }
 }

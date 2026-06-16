@@ -8,5 +8,5 @@ public enum MilestoneType {
     APPROVAL,
     RELEASE,
     HANDOFF,
-    DECISION
+    DECISION,
 }

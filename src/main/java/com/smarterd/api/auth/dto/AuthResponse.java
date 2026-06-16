@@ -1,5 +1,6 @@
 package com.smarterd.api.auth.dto;
 
+import com.smarterd.domain.user.service.AuthResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -19,4 +20,14 @@ public record AuthResponse(
     @Schema(description = "로그인 ID", example = "hong") String loginId,
 
     @Schema(description = "사용자 이름", example = "홍길동") String name
-) {}
+) {
+    /**
+     * Maps the domain authentication result into the REST response contract.
+     *
+     * @param result domain authentication result
+     * @return REST authentication response
+     */
+    public static AuthResponse from(AuthResult result) {
+        return new AuthResponse(result.accessToken(), result.refreshToken(), result.loginId(), result.name());
+    }
+}

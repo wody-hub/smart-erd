@@ -13,13 +13,9 @@ function sourceChipScopeLabel(chip: AiChatSourceChip): string {
 }
 
 function sourceChipKey(chip: AiChatSourceChip, index: number): string {
-  return [
-    chip.projectId ?? chip.projectName,
-    chip.teamName,
-    chip.tool,
-    chip.count,
-    index,
-  ].join(':');
+  return [chip.projectId ?? chip.projectName, chip.teamName, chip.tool, chip.count, index].join(
+    ':',
+  );
 }
 
 /**

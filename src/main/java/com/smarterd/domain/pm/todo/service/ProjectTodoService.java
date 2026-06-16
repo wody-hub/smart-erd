@@ -73,7 +73,13 @@ public class ProjectTodoService {
                 .build()
         );
         if (linkedWbsItem != null) {
-            workItemHistoryService.recordTodoWbsLinked(project, todo.getId(), linkedWbsItem.getId(), linkedWbsItem.getName(), loginId);
+            workItemHistoryService.recordTodoWbsLinked(
+                project,
+                todo.getId(),
+                linkedWbsItem.getId(),
+                linkedWbsItem.getName(),
+                loginId
+            );
         }
         return projectTodoMapper.toProjectTodoResult(todo);
     }
@@ -138,14 +144,30 @@ public class ProjectTodoService {
         return projectTodoWbsService.unlinkTodoFromWbs(loginId, teamId, projectId, todoId);
     }
 
-    public List<SharedTodoSummaryResult> getSharedTodoSummariesByWbs(String loginId, Long teamId, Long projectId, Long wbsItemId) {
+    /**
+     * Lists TODO summaries linked to a WBS item.
+     *
+     * @param loginId actor login ID
+     * @param teamId team ID
+     * @param projectId project ID
+     * @param wbsItemId WBS item ID
+     * @return linked TODO summaries
+     */
+    public List<SharedTodoSummaryResult> getSharedTodoSummariesByWbs(
+        String loginId,
+        Long teamId,
+        Long projectId,
+        Long wbsItemId
+    ) {
         return projectTodoWbsService.getSharedTodoSummariesByWbs(loginId, teamId, projectId, wbsItemId);
     }
 
     public List<MemberTodoSummaryResult> getMemberTodoSummaries(String loginId, Long teamId, Long projectId) {
         final var project = projectTodoAccessService.loadProject(loginId, teamId, projectId);
         final Map<MemberTodoSummaryKey, Long> counts = new LinkedHashMap<>();
-        for (final var todo : projectTodoRepository.findByProjectAndLinkedWbsItemIsNotNullOrderByCreatedAtDescIdDesc(project)) {
+        for (final var todo : projectTodoRepository.findByProjectAndLinkedWbsItemIsNotNullOrderByCreatedAtDescIdDesc(
+            project
+        )) {
             final var owner = todo.getOwner();
             final var key = new MemberTodoSummaryKey(owner.getId(), owner.getName(), todo.getStatus());
             counts.merge(key, 1L, Long::sum);
@@ -153,7 +175,7 @@ public class ProjectTodoService {
         return counts
             .entrySet()
             .stream()
-            .map(entry ->
+            .map((entry) ->
                 new MemberTodoSummaryResult(
                     entry.getKey().ownerUserId(),
                     entry.getKey().ownerDisplayName(),

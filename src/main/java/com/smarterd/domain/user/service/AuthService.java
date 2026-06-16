@@ -1,9 +1,5 @@
 package com.smarterd.domain.user.service;
 
-import com.smarterd.api.auth.dto.AuthResponse;
-import com.smarterd.api.auth.dto.LoginRequest;
-import com.smarterd.api.auth.dto.RefreshRequest;
-import com.smarterd.api.auth.dto.SignupRequest;
 import com.smarterd.config.security.AuthSecurityProperties;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
@@ -26,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>로그인 시 {@link AuthenticationManager}를 통해 자격 증명을 검증하고,
  * 회원가입 시 사용자를 생성한다.
- * 두 경우 모두 Access Token과 Refresh Token을 발급하여 {@link AuthResponse}로 반환한다.</p>
+ * 두 경우 모두 Access Token과 Refresh Token을 발급하여 {@link AuthResult}로 반환한다.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -53,59 +49,58 @@ public class AuthService {
     /**
      * 사용자 로그인을 수행한다.
      *
-     * @param request 로그인 요청 DTO
-     * @param clientIp 클라이언트 IP
+     * @param command 로그인 명령
      * @return 인증 응답 (Access Token, Refresh Token, 로그인 ID, 이름)
      */
     @Transactional
-    public AuthResponse login(LoginRequest request, String clientIp) {
+    public AuthResult login(AuthLoginCommand command) {
         if (authSecurityProperties.getTestSupport().isSkipPasswordVerification()) {
-            loginRateLimitService.reset(request.loginId(), clientIp);
-            return issueTokens(findUserByLoginId(request.loginId()));
+            loginRateLimitService.reset(command.loginId(), command.clientIp());
+            return issueTokens(findUserByLoginId(command.loginId()));
         }
 
-        if (loginRateLimitService.isBlocked(request.loginId(), clientIp)) {
+        if (loginRateLimitService.isBlocked(command.loginId(), command.clientIp())) {
             throw new TooManyRequestsException(MessageCode.ERROR_AUTH_LOGIN_RATE_LIMITED.code());
         }
 
         try {
             authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.loginId(), request.password())
+                new UsernamePasswordAuthenticationToken(command.loginId(), command.password())
             );
         } catch (AuthenticationException e) {
             try {
-                loginRateLimitService.recordFailure(request.loginId(), clientIp);
+                loginRateLimitService.recordFailure(command.loginId(), command.clientIp());
             } catch (RuntimeException rateLimitException) {
                 // rate-limit 기록 실패가 인증 실패 응답을 500으로 바꾸지 않도록 방어한다.
-                log.warn("Failed to record login rate-limit state. loginId={}", request.loginId(), rateLimitException);
+                log.warn("Failed to record login rate-limit state. loginId={}", command.loginId(), rateLimitException);
             }
             throw e;
         }
 
-        loginRateLimitService.reset(request.loginId(), clientIp);
+        loginRateLimitService.reset(command.loginId(), command.clientIp());
 
-        final var user = findUserByLoginId(request.loginId());
+        final var user = findUserByLoginId(command.loginId());
         return issueTokens(user);
     }
 
     /**
      * 신규 사용자 회원가입을 수행한다.
      *
-     * @param request 회원가입 요청 DTO
+     * @param command 회원가입 명령
      * @return 인증 응답 (Access Token, Refresh Token, 로그인 ID, 이름)
      */
     @Transactional
-    public AuthResponse signup(SignupRequest request) {
-        if (userRepository.existsByLoginId(request.loginId())) {
-            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_LOGIN_ID.code(), request.loginId());
+    public AuthResult signup(AuthSignupCommand command) {
+        if (existsByLoginId(command.loginId())) {
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_LOGIN_ID.code(), command.loginId());
         }
 
         final var user = User.builder()
-            .loginId(request.loginId())
-            .password(passwordEncoder.encode(request.password()))
-            .name(request.name())
+            .loginId(command.loginId())
+            .password(passwordEncoder.encode(command.password()))
+            .name(command.name())
             .build();
-        user.initializeAuditActor(request.loginId());
+        user.initializeAuditActor(command.loginId());
 
         userRepository.save(Objects.requireNonNull(user));
 
@@ -115,12 +110,12 @@ public class AuthService {
     /**
      * Refresh Token으로 새로운 Access Token과 Refresh Token을 발급한다 (토큰 회전).
      *
-     * @param request Refresh Token 요청 DTO
+     * @param command Refresh Token 명령
      * @return 새로운 인증 응답
      */
     @Transactional
-    public AuthResponse refresh(RefreshRequest request) {
-        final var refreshToken = jwtTokenService.validateRefreshTokenForRefresh(request.refreshToken());
+    public AuthResult refresh(AuthRefreshTokenCommand command) {
+        final var refreshToken = jwtTokenService.validateRefreshTokenForRefresh(command.refreshToken());
         final var user = refreshToken.getUser();
 
         jwtTokenService.consumeRefreshToken(refreshToken);
@@ -131,11 +126,11 @@ public class AuthService {
     /**
      * 로그아웃 시 해당 Refresh Token을 삭제한다.
      *
-     * @param request Refresh Token 요청 DTO
+     * @param command Refresh Token 명령
      */
     @Transactional
-    public void logout(RefreshRequest request) {
-        final var refreshToken = jwtTokenService.validateRefreshTokenForLogout(request.refreshToken());
+    public void logout(AuthRefreshTokenCommand command) {
+        final var refreshToken = jwtTokenService.validateRefreshTokenForLogout(command.refreshToken());
         jwtTokenService.deleteRefreshToken(refreshToken);
     }
 
@@ -153,14 +148,24 @@ public class AuthService {
     }
 
     /**
+     * Checks whether a login id is already registered.
+     *
+     * @param loginId login id
+     * @return true when the login id already exists
+     */
+    public boolean existsByLoginId(String loginId) {
+        return userRepository.existsByLoginId(loginId);
+    }
+
+    /**
      * Access Token과 Refresh Token을 함께 발급한다.
      *
      * @param user 대상 사용자
      * @return 인증 응답
      */
-    private AuthResponse issueTokens(User user) {
+    private AuthResult issueTokens(User user) {
         final var accessToken = jwtTokenService.generateAccessToken(user.getLoginId());
         final var refreshToken = jwtTokenService.createRefreshToken(user);
-        return new AuthResponse(accessToken, refreshToken, user.getLoginId(), user.getName());
+        return new AuthResult(accessToken, refreshToken, user.getLoginId(), user.getName());
     }
 }

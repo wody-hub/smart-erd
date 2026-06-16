@@ -46,7 +46,14 @@ public class WbsCommentAddActionExecutor implements AiActionExecutor {
             payload.requireContent()
         );
         return new ExecutionResult(
-            resultWriter.write(ACTION_TYPE, "wbs-comment", result.id(), proposal.getTargetLabel(), "created", "WBS comment added.")
+            resultWriter.write(
+                ACTION_TYPE,
+                "wbs-comment",
+                result.id(),
+                proposal.getTargetLabel(),
+                "created",
+                "WBS comment added."
+            )
         );
     }
 }

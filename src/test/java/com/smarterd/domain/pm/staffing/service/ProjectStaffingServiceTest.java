@@ -99,10 +99,9 @@ class ProjectStaffingServiceTest {
 
         verify(projectContextLoader).load("tester", 10L, 20L, false);
         assertThat(result.resources()).hasSize(2);
-        assertThat(result.resources()).extracting(ProjectStaffingService.ProjectStaffingResourceResult::memberName).containsExactly(
-            "Kim",
-            "Lee"
-        );
+        assertThat(result.resources())
+            .extracting(ProjectStaffingService.ProjectStaffingResourceResult::memberName)
+            .containsExactly("Kim", "Lee");
         assertThat(result.summary().plannedMm()).isEqualByComparingTo("1.98");
         assertThat(result.summary().actualMm()).isEqualByComparingTo("0.50");
         assertThat(result.summary().deltaMm()).isEqualByComparingTo("-1.48");

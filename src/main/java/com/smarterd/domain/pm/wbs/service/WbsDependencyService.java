@@ -11,9 +11,9 @@ import com.smarterd.domain.pm.wbs.entity.WbsItem;
 import com.smarterd.domain.pm.wbs.repository.WbsDependencyRepository;
 import com.smarterd.domain.pm.wbs.repository.WbsItemRepository;
 import com.smarterd.domain.project.entity.Project;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -67,7 +67,12 @@ public class WbsDependencyService {
      * @return 생성된 dependency 결과
      */
     @Transactional
-    public WbsDependencyResult createDependency(String loginId, Long teamId, Long projectId, WbsDependencyCommand command) {
+    public WbsDependencyResult createDependency(
+        String loginId,
+        Long teamId,
+        Long projectId,
+        WbsDependencyCommand command
+    ) {
         final var context = projectContextLoader.load(loginId, teamId, projectId, true);
         final var predecessor = findWbsItem(context.project(), command.predecessorWbsItemId());
         final var successor = findWbsItem(context.project(), command.successorWbsItemId());
@@ -197,10 +202,11 @@ public class WbsDependencyService {
             .findByProjectWithRelations(project)
             .stream()
             .filter((dependency) -> !Objects.equals(dependency.getId(), excludedDependencyId))
-            .anyMatch((dependency) ->
-                Objects.equals(dependency.getPredecessor().getId(), predecessor.getId()) &&
-                Objects.equals(dependency.getSuccessor().getId(), successor.getId()) &&
-                dependency.getDependencyType() == dependencyType
+            .anyMatch(
+                (dependency) ->
+                    Objects.equals(dependency.getPredecessor().getId(), predecessor.getId()) &&
+                    Objects.equals(dependency.getSuccessor().getId(), successor.getId()) &&
+                    dependency.getDependencyType() == dependencyType
             );
     }
 
@@ -244,8 +250,8 @@ public class WbsDependencyService {
     private WbsDependency findDependency(Project project, Long dependencyId) {
         return wbsDependencyRepository
             .findByProjectAndId(project, dependencyId)
-            .orElseThrow(
-                () -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_WBS_DEPENDENCY.code(), dependencyId)
+            .orElseThrow(() ->
+                new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_WBS_DEPENDENCY.code(), dependencyId)
             );
     }
 
@@ -310,14 +316,30 @@ public class WbsDependencyService {
                 final var predecessorRange = workingRanges.get(predecessorId);
                 final var successorRange = workingRanges.get(successorId);
                 if (predecessorRange == null) {
-                    issues.add(new WbsDependencyShiftIssueResult(predecessorId, "missing-date", "선행 WBS 일정이 비어 있어 canonical shift를 계산할 수 없습니다."));
+                    issues.add(
+                        new WbsDependencyShiftIssueResult(
+                            predecessorId,
+                            "missing-date",
+                            "선행 WBS 일정이 비어 있어 canonical shift를 계산할 수 없습니다."
+                        )
+                    );
                     continue;
                 }
                 if (successorRange == null) {
-                    issues.add(new WbsDependencyShiftIssueResult(successorId, "missing-date", "후행 WBS 일정이 비어 있어 canonical shift를 계산할 수 없습니다."));
+                    issues.add(
+                        new WbsDependencyShiftIssueResult(
+                            successorId,
+                            "missing-date",
+                            "후행 WBS 일정이 비어 있어 canonical shift를 계산할 수 없습니다."
+                        )
+                    );
                     continue;
                 }
-                final var shifted = shiftSuccessorIfNeeded(predecessorRange, successorRange, dependency.getDependencyType());
+                final var shifted = shiftSuccessorIfNeeded(
+                    predecessorRange,
+                    successorRange,
+                    dependency.getDependencyType()
+                );
                 if (shifted != null && !shifted.equals(successorRange)) {
                     workingRanges.put(successorId, shifted);
                     changed = true;
@@ -363,11 +385,28 @@ public class WbsDependencyService {
             wbsItemRepository.saveAll(changedItems);
         }
 
-        return new WbsDependencyShiftResult(distinctIssues.isEmpty(), apply && distinctIssues.isEmpty(), List.copyOf(updates), distinctIssues);
+        return new WbsDependencyShiftResult(
+            distinctIssues.isEmpty(),
+            apply && distinctIssues.isEmpty(),
+            List.copyOf(updates),
+            distinctIssues
+        );
     }
 
+    /**
+     * Returns a shifted successor range when dependency constraints require it.
+     *
+     * @param predecessorRange predecessor schedule range
+     * @param successorRange successor schedule range
+     * @param dependencyType dependency relationship type
+     * @return shifted successor range, or null when no shift is required
+     */
     @Nullable
-    private DateRange shiftSuccessorIfNeeded(DateRange predecessorRange, DateRange successorRange, WbsDependencyType dependencyType) {
+    private DateRange shiftSuccessorIfNeeded(
+        DateRange predecessorRange,
+        DateRange successorRange,
+        WbsDependencyType dependencyType
+    ) {
         final long durationDays = ChronoUnit.DAYS.between(successorRange.startDate(), successorRange.endDate());
         return switch (dependencyType) {
             case SS -> {
@@ -416,7 +455,11 @@ public class WbsDependencyService {
      * @param successorWbsItemId 후행 WBS 항목 ID
      * @param dependencyType dependency 타입
      */
-    public record WbsDependencyCommand(Long predecessorWbsItemId, Long successorWbsItemId, WbsDependencyType dependencyType) {}
+    public record WbsDependencyCommand(
+        Long predecessorWbsItemId,
+        Long successorWbsItemId,
+        WbsDependencyType dependencyType
+    ) {}
 
     public record WbsDependencyShiftAnchorCommand(Long wbsItemId, LocalDate startDate, LocalDate endDate) {}
 

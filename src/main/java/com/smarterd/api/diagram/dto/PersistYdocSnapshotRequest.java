@@ -17,11 +17,11 @@ import jakarta.validation.constraints.Size;
  */
 @Schema(description = "현재 Y.Doc 스냅샷 영속화 요청")
 public record PersistYdocSnapshotRequest(
-    @NotBlank
+    @NotBlank(message = "{validation.not-blank.content-revision}")
     @Schema(description = "클라이언트가 기준으로 삼은 contentRevision", example = "12")
     String expectedContentRevision,
 
-    @NotNull
+    @NotNull(message = "{validation.not-null.ydoc-snapshot}")
     @Size(max = CollaborationLimits.MAX_SNAPSHOT_BYTES, message = "{validation.size.ydoc-snapshot}")
     @Schema(description = "현재 Y.Doc 전체 상태 update 바이트(base64)", format = "byte")
     byte[] ydocSnapshot,

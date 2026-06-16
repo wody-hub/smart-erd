@@ -28,7 +28,11 @@ class ProjectTodoDocumentService {
     ) {
         final var project = projectTodoAccessService.loadProject(loginId, teamId, projectId);
         final var todo = projectTodoAccessService.findOwnedTodo(loginId, project, todoId);
-        return todoDocumentLinkRepository.findByTodoOrderByCreatedAtDescIdDesc(todo).stream().map(projectTodoMapper::toTodoDocumentResult).toList();
+        return todoDocumentLinkRepository
+            .findByTodoOrderByCreatedAtDescIdDesc(todo)
+            .stream()
+            .map(projectTodoMapper::toTodoDocumentResult)
+            .toList();
     }
 
     @Transactional
@@ -66,6 +70,12 @@ class ProjectTodoDocumentService {
             return;
         }
         todoDocumentLinkRepository.deleteByTodoAndDiagram(todo, document);
-        workItemHistoryService.recordTodoDocumentUnlinked(project, todoId, document.getId(), document.getName(), loginId);
+        workItemHistoryService.recordTodoDocumentUnlinked(
+            project,
+            todoId,
+            document.getId(),
+            document.getName(),
+            loginId
+        );
     }
 }

@@ -15,5 +15,8 @@ public record SaveWbsTemplateRequest(
     @Size(max = 200, message = "{validation.size.wbs-name}")
     @Schema(description = "템플릿 이름", example = "기본 운영 wave")
     String name,
-    @Nullable @Size(max = 1000) @Schema(description = "템플릿 설명", example = "반복 사용하는 운영형 작업 골격") String description
+    @Nullable
+    @Size(max = 1000, message = "{validation.size.wbs-template-description}")
+    @Schema(description = "템플릿 설명", example = "반복 사용하는 운영형 작업 골격")
+    String description
 ) {}

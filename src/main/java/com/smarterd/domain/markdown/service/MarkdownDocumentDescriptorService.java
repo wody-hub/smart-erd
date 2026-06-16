@@ -1,5 +1,6 @@
 package com.smarterd.domain.markdown.service;
 
+import com.smarterd.utils.AppStringUtils;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +37,7 @@ public class MarkdownDocumentDescriptorService {
      */
     @NonNull
     public MarkdownTemplateDescriptor describe(@Nullable String content) {
-        if (content == null || content.isBlank()) {
+        if (AppStringUtils.isBlank(content)) {
             return new MarkdownTemplateDescriptor(null, null, null, List.of());
         }
 
@@ -56,7 +57,7 @@ public class MarkdownDocumentDescriptorService {
     }
 
     private Map<String, Object> parseFrontmatter(@Nullable String frontmatter) {
-        if (frontmatter == null || frontmatter.isBlank()) {
+        if (AppStringUtils.isBlank(frontmatter)) {
             return Map.of();
         }
         try {
@@ -81,8 +82,7 @@ public class MarkdownDocumentDescriptorService {
         if (value == null) {
             return null;
         }
-        final var normalized = value.toString().trim();
-        return normalized.isBlank() ? null : normalized;
+        return AppStringUtils.trimToNull(value.toString());
     }
 
     private List<String> extractTags(@Nullable Object value) {
@@ -95,11 +95,12 @@ public class MarkdownDocumentDescriptorService {
                 }
             }
         } else if (value != null) {
-            final var raw = value.toString().trim();
-            if (!raw.isBlank()) {
-                final var parts = raw.startsWith("[") && raw.endsWith("]")
-                    ? raw.substring(1, raw.length() - 1).split(",")
-                    : new String[] { raw };
+            final var raw = AppStringUtils.trimToEmpty(value.toString());
+            if (AppStringUtils.isNotBlank(raw)) {
+                final var parts =
+                    raw.startsWith("[") && raw.endsWith("]")
+                        ? raw.substring(1, raw.length() - 1).split(",")
+                        : new String[] { raw };
                 for (final var part : parts) {
                     final var normalized = normalizeTag(part);
                     if (normalized != null) {
@@ -116,18 +117,17 @@ public class MarkdownDocumentDescriptorService {
         if (value == null) {
             return null;
         }
-        final var normalized = value.toString().trim().toLowerCase(java.util.Locale.ROOT);
-        return normalized.isBlank() ? null : normalized;
+        return AppStringUtils.lowerTrimToNull(value.toString());
     }
 
     @Nullable
     private String extractSummary(String body) {
-        if (body == null || body.isBlank()) {
+        if (AppStringUtils.isBlank(body)) {
             return null;
         }
         for (String rawLine : body.split("\\R")) {
-            final var line = rawLine.trim();
-            if (line.isBlank()) {
+            final var line = AppStringUtils.trimToEmpty(rawLine);
+            if (AppStringUtils.isBlank(line)) {
                 continue;
             }
             if (line.startsWith("#")) {

@@ -1,5 +1,6 @@
 package com.smarterd.api.diagram.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
 /**
@@ -7,4 +8,9 @@ import jakarta.validation.constraints.NotNull;
  *
  * @param diagramId 접속 대상 다이어그램 ID
  */
-public record WsTicketRequest(@NotNull Long diagramId) {}
+@Schema(description = "WebSocket ticket 발급 요청")
+public record WsTicketRequest(
+    @Schema(description = "접속 대상 다이어그램 ID", example = "1")
+    @NotNull(message = "{validation.not-null.ws-ticket-diagram-id}")
+    Long diagramId
+) {}

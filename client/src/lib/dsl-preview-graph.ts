@@ -557,7 +557,7 @@ function applyPreviewPersistedLayout(
   const maxPersistedRight = Math.max(
     ...persistedNodes.map((node) => node.position.x + PREVIEW_NODE_WIDTH),
   );
-  let nextX = maxPersistedRight + PREVIEW_NODE_SEPARATION;
+  const nextX = maxPersistedRight + PREVIEW_NODE_SEPARATION;
   let nextY = PREVIEW_LAYOUT_MARGIN;
 
   for (const node of nextNodes) {

@@ -44,8 +44,14 @@ class TodoActionExecutorTest {
 
     @Test
     void todoCreate_callsProjectTodoServiceWithoutOwnerPayload() throws Exception {
-        when(projectTodoService.createProjectTodo(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(todo(55L, "My TODO", ProjectTodoStatus.TODO, ProjectTodoPriority.HIGH, 20));
+        when(
+            projectTodoService.createProjectTodo(
+                org.mockito.ArgumentMatchers.eq("tester"),
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(todo(55L, "My TODO", ProjectTodoStatus.TODO, ProjectTodoPriority.HIGH, 20));
 
         final var result = createExecutor.execute(
             "tester",
@@ -67,7 +73,12 @@ class TodoActionExecutorTest {
         );
 
         final var command = ArgumentCaptor.forClass(ProjectTodoService.CreateProjectTodoCommand.class);
-        verify(projectTodoService).createProjectTodo(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), command.capture());
+        verify(projectTodoService).createProjectTodo(
+            org.mockito.ArgumentMatchers.eq("tester"),
+            org.mockito.ArgumentMatchers.eq(1L),
+            org.mockito.ArgumentMatchers.eq(10L),
+            command.capture()
+        );
         assertThat(command.getValue().title()).isEqualTo("My TODO");
         assertThat(command.getValue().priority()).isEqualTo(ProjectTodoPriority.HIGH);
         assertThat(command.getValue().progressRate()).isEqualTo(20);
@@ -76,8 +87,9 @@ class TodoActionExecutorTest {
 
     @Test
     void todoUpdate_rejectsStaleBeforeValueWithoutMutation() throws Exception {
-        when(projectTodoService.getProjectTodo("tester", 1L, 10L, 55L))
-            .thenReturn(todo(55L, "Current", ProjectTodoStatus.TODO, ProjectTodoPriority.MEDIUM, 0));
+        when(projectTodoService.getProjectTodo("tester", 1L, 10L, 55L)).thenReturn(
+            todo(55L, "Current", ProjectTodoStatus.TODO, ProjectTodoPriority.MEDIUM, 0)
+        );
 
         final var proposal = proposal(
             TodoUpdateActionExecutor.ACTION_TYPE,
@@ -93,9 +105,16 @@ class TodoActionExecutorTest {
             )
         );
 
-        assertThatThrownBy(() -> updateExecutor.execute("tester", proposal)).isInstanceOf(IllegalArgumentException.class);
-        verify(projectTodoService, never())
-            .updateProjectTodo(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        assertThatThrownBy(() -> updateExecutor.execute("tester", proposal)).isInstanceOf(
+            IllegalArgumentException.class
+        );
+        verify(projectTodoService, never()).updateProjectTodo(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any()
+        );
     }
 
     @Test
@@ -107,9 +126,15 @@ class TodoActionExecutorTest {
             Map.of("targetType", "todo", "fields", List.of(Map.of("name", "ownerUserId", "afterValue", "99")))
         );
 
-        assertThatThrownBy(() -> createExecutor.execute("tester", proposal)).isInstanceOf(IllegalArgumentException.class);
-        verify(projectTodoService, never())
-            .createProjectTodo(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        assertThatThrownBy(() -> createExecutor.execute("tester", proposal)).isInstanceOf(
+            IllegalArgumentException.class
+        );
+        verify(projectTodoService, never()).createProjectTodo(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any()
+        );
     }
 
     private ProjectTodoService.ProjectTodoResult todo(
@@ -134,8 +159,12 @@ class TodoActionExecutorTest {
         );
     }
 
-    private AiActionProposal proposal(String actionType, String targetType, String targetId, Map<String, Object> payload)
-        throws Exception {
+    private AiActionProposal proposal(
+        String actionType,
+        String targetType,
+        String targetId,
+        Map<String, Object> payload
+    ) throws Exception {
         return new AiActionProposal(
             "proposal-1",
             "exec-1",

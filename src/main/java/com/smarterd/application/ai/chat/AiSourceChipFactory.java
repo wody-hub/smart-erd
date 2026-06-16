@@ -15,7 +15,7 @@ public class AiSourceChipFactory {
         }
         return results
             .stream()
-            .map(result -> new AiReadContextService.SourceChip(result.projectName(), result.tool(), result.count()))
+            .map((result) -> new AiReadContextService.SourceChip(result.projectName(), result.tool(), result.count()))
             .toList();
     }
 }

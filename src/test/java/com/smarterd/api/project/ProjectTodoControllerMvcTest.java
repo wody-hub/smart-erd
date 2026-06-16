@@ -50,8 +50,10 @@ class ProjectTodoControllerMvcTest {
 
     @BeforeEach
     void setUp() {
-        this.mockMvc = MockMvcBuilders
-            .standaloneSetup(new ProjectTodoController(projectTodoService), new WbsTodoController(projectTodoService))
+        this.mockMvc = MockMvcBuilders.standaloneSetup(
+            new ProjectTodoController(projectTodoService),
+            new WbsTodoController(projectTodoService)
+        )
             .setCustomArgumentResolvers(new TestJwtArgumentResolver())
             .build();
         this.objectMapper = new ObjectMapper();
@@ -76,7 +78,12 @@ class ProjectTodoControllerMvcTest {
     @Test
     void createProjectTodo_returnsCreated() throws Exception {
         when(
-            projectTodoService.createProjectTodo(eq("tester"), eq(1L), eq(10L), any(ProjectTodoService.CreateProjectTodoCommand.class))
+            projectTodoService.createProjectTodo(
+                eq("tester"),
+                eq(1L),
+                eq(10L),
+                any(ProjectTodoService.CreateProjectTodoCommand.class)
+            )
         ).thenReturn(sampleTodo());
 
         mockMvc
@@ -89,7 +96,16 @@ class ProjectTodoControllerMvcTest {
                     .contentType(APPLICATION_JSON)
                     .content(
                         objectMapper.writeValueAsString(
-                            java.util.Map.of("title", "응답 계약 정리", "status", "TODO", "priority", "HIGH", "progressRate", 20)
+                            java.util.Map.of(
+                                "title",
+                                "응답 계약 정리",
+                                "status",
+                                "TODO",
+                                "priority",
+                                "HIGH",
+                                "progressRate",
+                                20
+                            )
                         )
                     )
             )
@@ -100,8 +116,9 @@ class ProjectTodoControllerMvcTest {
 
     @Test
     void linkDocument_returnsUpdatedDocument() throws Exception {
-        when(projectTodoService.linkDocument("tester", 1L, 10L, 301L, 42L, TodoDocumentVisibility.PROJECT_SHARED))
-            .thenReturn(sampleDocument(42L, TodoDocumentVisibility.PROJECT_SHARED));
+        when(
+            projectTodoService.linkDocument("tester", 1L, 10L, 301L, 42L, TodoDocumentVisibility.PROJECT_SHARED)
+        ).thenReturn(sampleDocument(42L, TodoDocumentVisibility.PROJECT_SHARED));
 
         mockMvc
             .perform(
@@ -135,8 +152,9 @@ class ProjectTodoControllerMvcTest {
 
     @Test
     void getSharedTodoSummaries_returnsSharedProjection() throws Exception {
-        when(projectTodoService.getSharedTodoSummariesByWbs("tester", 1L, 10L, 100L))
-            .thenReturn(List.of(sampleSharedSummary()));
+        when(projectTodoService.getSharedTodoSummariesByWbs("tester", 1L, 10L, 100L)).thenReturn(
+            List.of(sampleSharedSummary())
+        );
 
         mockMvc
             .perform(
@@ -218,9 +236,13 @@ class ProjectTodoControllerMvcTest {
     }
 
     private static final class TestJwtArgumentResolver implements HandlerMethodArgumentResolver {
+
         @Override
         public boolean supportsParameter(MethodParameter parameter) {
-            return parameter.hasParameterAnnotation(AuthenticationPrincipal.class) && Jwt.class.isAssignableFrom(parameter.getParameterType());
+            return (
+                parameter.hasParameterAnnotation(AuthenticationPrincipal.class) &&
+                Jwt.class.isAssignableFrom(parameter.getParameterType())
+            );
         }
 
         @Override
@@ -230,7 +252,9 @@ class ProjectTodoControllerMvcTest {
             NativeWebRequest webRequest,
             WebDataBinderFactory binderFactory
         ) {
-            return webRequest.getNativeRequest(jakarta.servlet.http.HttpServletRequest.class).getAttribute(TEST_JWT_REQUEST_ATTRIBUTE);
+            return webRequest
+                .getNativeRequest(jakarta.servlet.http.HttpServletRequest.class)
+                .getAttribute(TEST_JWT_REQUEST_ATTRIBUTE);
         }
     }
 }

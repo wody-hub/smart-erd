@@ -16,7 +16,10 @@ class AiExecutionRegistryTest {
 
     @Test
     void terminalStateIsImmutable() {
-        final var registry = new AiExecutionRegistry(Duration.ofMinutes(15), Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+        final var registry = new AiExecutionRegistry(
+            Duration.ofMinutes(15),
+            Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)
+        );
         final var execution = registry.create("tester", 1L, 10L, "noop", "provider-response-v1");
 
         assertThat(registry.markSucceeded(execution.executionId(), null)).isTrue();
@@ -28,7 +31,10 @@ class AiExecutionRegistryTest {
     @Test
     void repeatedCancelOnTerminalExecutionReturnsCurrentStateWithoutInvokingCancelHandle() {
         final var cancelCount = new AtomicInteger();
-        final var registry = new AiExecutionRegistry(Duration.ofMinutes(15), Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+        final var registry = new AiExecutionRegistry(
+            Duration.ofMinutes(15),
+            Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)
+        );
         final var execution = registry.create("tester", 1L, 10L, "noop", "provider-response-v1");
         registry.registerCancelHandler(execution.executionId(), cancelCount::incrementAndGet);
 
@@ -42,11 +48,15 @@ class AiExecutionRegistryTest {
 
     @Test
     void lookupRejectsOtherUser() {
-        final var registry = new AiExecutionRegistry(Duration.ofMinutes(15), Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+        final var registry = new AiExecutionRegistry(
+            Duration.ofMinutes(15),
+            Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)
+        );
         final var execution = registry.create("tester", 1L, 10L, "noop", "provider-response-v1");
 
-        assertThatThrownBy(() -> registry.get(execution.executionId(), "other"))
-            .isInstanceOf(DomainAccessDeniedException.class);
+        assertThatThrownBy(() -> registry.get(execution.executionId(), "other")).isInstanceOf(
+            DomainAccessDeniedException.class
+        );
     }
 
     @Test
@@ -58,7 +68,9 @@ class AiExecutionRegistryTest {
 
         clock.advance(Duration.ofSeconds(6));
 
-        assertThatThrownBy(() -> registry.get(execution.executionId(), "tester")).isInstanceOf(EntityNotFoundException.class);
+        assertThatThrownBy(() -> registry.get(execution.executionId(), "tester")).isInstanceOf(
+            EntityNotFoundException.class
+        );
     }
 
     private static final class MutableClock extends Clock {

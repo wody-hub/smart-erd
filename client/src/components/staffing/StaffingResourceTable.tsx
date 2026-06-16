@@ -1,7 +1,14 @@
 import { Pencil, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { formatCurrency } from '@/lib/format';
 import type { StaffingGrade, ProjectStaffingResource } from '@/types/staffing';
 
@@ -78,14 +85,20 @@ export default function StaffingResourceTable({
               <TableHead className="min-w-[120px]">{t('staffing.field.grade')}</TableHead>
               <TableHead className="min-w-[150px]">{t('staffing.field.monthlyRate')}</TableHead>
               <TableHead className="min-w-[220px]">{t('staffing.field.plannedPeriod')}</TableHead>
-              <TableHead className="min-w-[120px]">{t('staffing.field.plannedParticipation')}</TableHead>
+              <TableHead className="min-w-[120px]">
+                {t('staffing.field.plannedParticipation')}
+              </TableHead>
               <TableHead className="min-w-[120px]">{t('staffing.field.plannedMm')}</TableHead>
               <TableHead className="min-w-[220px]">{t('staffing.field.actualPeriod')}</TableHead>
-              <TableHead className="min-w-[120px]">{t('staffing.field.actualParticipation')}</TableHead>
+              <TableHead className="min-w-[120px]">
+                {t('staffing.field.actualParticipation')}
+              </TableHead>
               <TableHead className="min-w-[120px]">{t('staffing.field.actualMm')}</TableHead>
               <TableHead className="min-w-[120px]">{t('staffing.field.deltaMm')}</TableHead>
               <TableHead className="min-w-[190px]">{t('staffing.field.cost')}</TableHead>
-              {canEdit ? <TableHead className="min-w-[104px]">{t('staffing.field.actions')}</TableHead> : null}
+              {canEdit ? (
+                <TableHead className="min-w-[104px]">{t('staffing.field.actions')}</TableHead>
+              ) : null}
             </TableRow>
           </TableHeader>
 
@@ -108,13 +121,17 @@ export default function StaffingResourceTable({
 
                   <TableCell>{gradeLabelByValue[resource.grade]}</TableCell>
 
-                  <TableCell className="tabular-nums">{formatCurrency(resource.monthlyRate)}</TableCell>
+                  <TableCell className="tabular-nums">
+                    {formatCurrency(resource.monthlyRate)}
+                  </TableCell>
 
                   <TableCell className="tabular-nums">
                     {formatPeriod(resource.plannedStartDate, resource.plannedEndDate)}
                   </TableCell>
 
-                  <TableCell className="tabular-nums">{resource.plannedParticipationRate}%</TableCell>
+                  <TableCell className="tabular-nums">
+                    {resource.plannedParticipationRate}%
+                  </TableCell>
 
                   <TableCell className="tabular-nums">{formatMm(resource.plannedMm)}</TableCell>
 
@@ -131,7 +148,9 @@ export default function StaffingResourceTable({
                   </TableCell>
 
                   <TableCell className="tabular-nums">
-                    {hasActualTotals ? formatMm(resource.actualMm) : t('staffing.status.actualNotEntered')}
+                    {hasActualTotals
+                      ? formatMm(resource.actualMm)
+                      : t('staffing.status.actualNotEntered')}
                   </TableCell>
 
                   <TableCell className="tabular-nums">{formatSignedMm(resource.deltaMm)}</TableCell>
@@ -139,7 +158,8 @@ export default function StaffingResourceTable({
                   <TableCell className="tabular-nums">
                     <div className="space-y-1 text-xs">
                       <p>
-                        {t('staffing.summary.plannedCost')}: <span>{formatCurrency(resource.plannedCost)}</span>
+                        {t('staffing.summary.plannedCost')}:{' '}
+                        <span>{formatCurrency(resource.plannedCost)}</span>
                       </p>
                       <p>
                         {t('staffing.summary.actualCost')}:{' '}

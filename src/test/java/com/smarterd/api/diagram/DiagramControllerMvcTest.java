@@ -72,16 +72,25 @@ class DiagramControllerMvcTest {
 
     @BeforeEach
     void setUp() {
-        final var controller = new DiagramController(
-            diagramService,
+        final var diagramController = new DiagramController(diagramService);
+        final var diagramContentController = new DiagramContentController(
             saveDiagramUseCase,
-            persistDiagramSnapshotUseCase,
+            persistDiagramSnapshotUseCase
+        );
+        final var diagramExportController = new DiagramExportController(
             diagramTableDefinitionExportService,
             diagramColumnDefinitionExportService,
             diagramIndexDefinitionExportService,
+            diagramService,
             markdownExportService
         );
-        this.mockMvc = MockMvcBuilders.standaloneSetup(controller)
+        final var diagramMutationController = new DiagramMutationController(diagramService);
+        this.mockMvc = MockMvcBuilders.standaloneSetup(
+            diagramController,
+            diagramContentController,
+            diagramExportController,
+            diagramMutationController
+        )
             .setCustomArgumentResolvers(new TestJwtArgumentResolver())
             .build();
         this.objectMapper = new ObjectMapper();

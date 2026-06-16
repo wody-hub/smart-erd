@@ -9,7 +9,6 @@ import com.smarterd.domain.project.repository.ProjectRepository;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.service.AuthService;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
@@ -275,52 +274,4 @@ public class ProjectService {
             progressRate
         );
     }
-
-    /**
-     * 프로젝트 사업 개요 응답용 서비스 결과.
-     *
-     * @param projectId         프로젝트 ID
-     * @param projectName       프로젝트 이름
-     * @param clientCompany     발주사
-     * @param contractorCompany 수주사
-     * @param contractAmount    계약 금액
-     * @param projectStartDate  프로젝트 시작일
-     * @param projectEndDate    프로젝트 종료일
-     * @param projectScope      사업 범위
-     * @param memberCount       프로젝트 팀 멤버 수
-     * @param documentCount     프로젝트 문서(다이어그램) 수
-     * @param progressRate      진행률 (WBS 평균 진척률, WBS 항목이 없으면 null)
-     */
-    public record BusinessOverviewResult(
-        Long projectId,
-        String projectName,
-        @Nullable String clientCompany,
-        @Nullable String contractorCompany,
-        @Nullable Long contractAmount,
-        @Nullable LocalDate projectStartDate,
-        @Nullable LocalDate projectEndDate,
-        @Nullable String projectScope,
-        long memberCount,
-        long documentCount,
-        @Nullable Integer progressRate
-    ) {}
-
-    /**
-     * 프로젝트 응답용 서비스 결과.
-     *
-     * @param id 프로젝트 ID
-     * @param name 프로젝트 이름
-     * @param description 프로젝트 설명
-     * @param teamId 팀 ID
-     * @param createdAt 생성 시각
-     * @param updatedAt 수정 시각
-     */
-    public record ProjectResult(
-        Long id,
-        String name,
-        String description,
-        Long teamId,
-        Instant createdAt,
-        Instant updatedAt
-    ) {}
 }

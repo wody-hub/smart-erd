@@ -6,7 +6,12 @@ import { getEdgesMap, getGroupsMap, getTablesMap } from '@/collaboration/yjsBrid
 import { readString } from '@/lib/yjs-read-utils';
 import { buildErdColumnEntityId } from './erd-column-entity-id';
 
-type AnyYType = Y.AbstractType<any>;
+type ParentSubReadable = {
+  parent?: unknown;
+  _item?: {
+    parentSub?: unknown;
+  } | null;
+};
 
 export function collectErdAffectedScopes(
   engine: YjsSharedDocumentEngine,
@@ -42,7 +47,7 @@ export function collectErdAffectedScopesFromTransaction(
   const affectedScopes = new Map<string, ScopeRef>();
 
   for (const [type, subs] of transaction.changed) {
-    const changedType = type as AnyYType;
+    const changedType = type as ParentSubReadable;
     if (isSameType(changedType, tablesMap)) {
       for (const key of readChangedSubKeys(subs)) {
         addAffectedScope(affectedScopes, 'table', key);
@@ -123,7 +128,13 @@ function readChangedSubKeys(subs: Set<unknown>): string[] {
   return result;
 }
 
-function readParentSub(type: AnyYType): string | null {
+/**
+ * Reads the Yjs parentSub value used to identify nested ERD document scopes.
+ *
+ * @param type Yjs type metadata that may contain parentSub.
+ * @returns The non-empty parentSub value, or null when it is unavailable.
+ */
+function readParentSub(type: ParentSubReadable): string | null {
   return typeof type._item?.parentSub === 'string' && type._item.parentSub.length > 0
     ? type._item.parentSub
     : null;

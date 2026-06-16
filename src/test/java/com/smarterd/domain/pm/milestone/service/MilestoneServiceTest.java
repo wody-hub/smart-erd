@@ -87,12 +87,7 @@ class MilestoneServiceTest {
             )
         );
         when(wbsItemRepository.aggregateProgressByMilestone(project)).thenReturn(
-            Map.of(
-                100L,
-                new MilestoneProgressAggregate(2, 1, 75),
-                101L,
-                new MilestoneProgressAggregate(1, 1, 100)
-            )
+            Map.of(100L, new MilestoneProgressAggregate(2, 1, 75), 101L, new MilestoneProgressAggregate(1, 1, 100))
         );
 
         final var result = milestoneService.getMilestones("tester", 10L, 20L);

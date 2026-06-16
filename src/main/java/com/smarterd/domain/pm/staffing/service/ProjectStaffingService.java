@@ -12,6 +12,7 @@ import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.team.repository.TeamMemberRepository;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.repository.UserRepository;
+import com.smarterd.utils.AppStringUtils;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -19,7 +20,6 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -59,7 +59,9 @@ public class ProjectStaffingService {
         final var summary = toSummary(resources);
         final var months = resources
             .stream()
-            .flatMap((resource) -> resource.monthlyAllocations().stream().map(ProjectStaffingMonthlyAllocationResult::month))
+            .flatMap((resource) ->
+                resource.monthlyAllocations().stream().map(ProjectStaffingMonthlyAllocationResult::month)
+            )
             .distinct()
             .sorted()
             .toList();
@@ -79,10 +81,7 @@ public class ProjectStaffingService {
         verifyTeamMembership(context.team(), user);
 
         if (projectStaffingRepository.existsByProjectAndUser(context.project(), user)) {
-            throw new DuplicateException(
-                MessageCode.ERROR_DUPLICATE_PROJECT_STAFFING_MEMBER.code(),
-                user.getLoginId()
-            );
+            throw new DuplicateException(MessageCode.ERROR_DUPLICATE_PROJECT_STAFFING_MEMBER.code(), user.getLoginId());
         }
 
         final var staffing = Objects.requireNonNull(
@@ -163,8 +162,8 @@ public class ProjectStaffingService {
     private ProjectStaffing findByProjectAndId(com.smarterd.domain.project.entity.Project project, Long staffingId) {
         return projectStaffingRepository
             .findByProjectAndId(project, Objects.requireNonNull(staffingId))
-            .orElseThrow(
-                () -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_PROJECT_STAFFING.code(), staffingId)
+            .orElseThrow(() ->
+                new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_PROJECT_STAFFING.code(), staffingId)
             );
     }
 
@@ -292,7 +291,7 @@ public class ProjectStaffingService {
     }
 
     private boolean isProjectMemberUniqueConstraintViolation(DataIntegrityViolationException ex) {
-        final var mostSpecificCause = getMostSpecificCauseMessage(ex).toLowerCase(Locale.ROOT);
+        final var mostSpecificCause = AppStringUtils.lowerCaseToEmpty(getMostSpecificCauseMessage(ex));
         return (
             mostSpecificCause.contains("uk_project_staffing_project_user") ||
             (mostSpecificCause.contains("project_staffing") &&

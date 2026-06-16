@@ -9,6 +9,7 @@ import java.util.List;
  *
  * @param tabOrder 저장된 탭 순서
  */
+@Schema(description = "프로젝트 작업공간 탭 순서 응답")
 public record ProjectWorkspaceTabOrderResponse(
     @Schema(
         description = "정규화된 프로젝트 작업공간 탭 순서",

@@ -317,7 +317,11 @@ export function SortableWbsRowCells({
         >
           {activeEditor === 'milestone' && canEdit ? (
             <div {...editorRootProps}>
-              <Select value={milestoneValue} onValueChange={onSetMilestoneValue} disabled={disabled}>
+              <Select
+                value={milestoneValue}
+                onValueChange={onSetMilestoneValue}
+                disabled={disabled}
+              >
                 <SelectTrigger className="h-8">
                   <SelectValue placeholder={t('wbs.form.milestonePlaceholder')} />
                 </SelectTrigger>

@@ -44,8 +44,14 @@ class IssueActionExecutorTest {
 
     @Test
     void issueCreate_callsProjectIssueServiceWithAllowlistedFields() throws Exception {
-        when(projectIssueService.createProjectIssue(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(issue(33L, "Follow-up", "Body", ProjectIssuePriority.HIGH, null));
+        when(
+            projectIssueService.createProjectIssue(
+                org.mockito.ArgumentMatchers.eq("tester"),
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(issue(33L, "Follow-up", "Body", ProjectIssuePriority.HIGH, null));
 
         final var result = createExecutor.execute(
             "tester",
@@ -67,7 +73,12 @@ class IssueActionExecutorTest {
         );
 
         final var command = ArgumentCaptor.forClass(ProjectIssueService.CreateProjectIssueCommand.class);
-        verify(projectIssueService).createProjectIssue(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), command.capture());
+        verify(projectIssueService).createProjectIssue(
+            org.mockito.ArgumentMatchers.eq("tester"),
+            org.mockito.ArgumentMatchers.eq(1L),
+            org.mockito.ArgumentMatchers.eq(10L),
+            command.capture()
+        );
         assertThat(command.getValue().title()).isEqualTo("Follow-up");
         assertThat(command.getValue().priority()).isEqualTo(ProjectIssuePriority.HIGH);
         assertThat(result.resultJson()).contains("\"resourceId\":\"33\"").contains("Issue created.");
@@ -75,8 +86,9 @@ class IssueActionExecutorTest {
 
     @Test
     void issueUpdate_mergesCurrentStateAndRejectsStaleBeforeValue() throws Exception {
-        when(projectIssueService.getProjectIssue("tester", 1L, 10L, 44L))
-            .thenReturn(issue(44L, "Current", "Body", ProjectIssuePriority.MEDIUM, 7L));
+        when(projectIssueService.getProjectIssue("tester", 1L, 10L, 44L)).thenReturn(
+            issue(44L, "Current", "Body", ProjectIssuePriority.MEDIUM, 7L)
+        );
 
         final var proposal = proposal(
             IssueUpdateActionExecutor.ACTION_TYPE,
@@ -92,9 +104,16 @@ class IssueActionExecutorTest {
             )
         );
 
-        assertThatThrownBy(() -> updateExecutor.execute("tester", proposal)).isInstanceOf(IllegalArgumentException.class);
-        verify(projectIssueService, never())
-            .updateProjectIssue(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        assertThatThrownBy(() -> updateExecutor.execute("tester", proposal)).isInstanceOf(
+            IllegalArgumentException.class
+        );
+        verify(projectIssueService, never()).updateProjectIssue(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any()
+        );
     }
 
     @Test
@@ -106,7 +125,9 @@ class IssueActionExecutorTest {
             Map.of("targetType", "issue", "fields", List.of(Map.of("name", "status", "afterValue", "DONE")))
         );
 
-        assertThatThrownBy(() -> createExecutor.execute("tester", proposal)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> createExecutor.execute("tester", proposal)).isInstanceOf(
+            IllegalArgumentException.class
+        );
         verifyNoInteractions(projectIssueService);
     }
 
@@ -131,8 +152,12 @@ class IssueActionExecutorTest {
         );
     }
 
-    private AiActionProposal proposal(String actionType, String targetType, String targetId, Map<String, Object> payload)
-        throws Exception {
+    private AiActionProposal proposal(
+        String actionType,
+        String targetType,
+        String targetId,
+        Map<String, Object> payload
+    ) throws Exception {
         return new AiActionProposal(
             "proposal-1",
             "exec-1",

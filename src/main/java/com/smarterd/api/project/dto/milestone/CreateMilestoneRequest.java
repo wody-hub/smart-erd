@@ -31,9 +31,7 @@ public record CreateMilestoneRequest(
     @NotNull(message = "{validation.not-null.milestone-type}")
     MilestoneType type,
 
-    @Schema(description = "담당자 사용자 ID", example = "7")
-    @Nullable
-    Long ownerUserId,
+    @Schema(description = "담당자 사용자 ID", example = "7") @Nullable Long ownerUserId,
 
     @Schema(description = "게이트 준비 메모", example = "승인 전 검토자료 배포 필요")
     @Nullable

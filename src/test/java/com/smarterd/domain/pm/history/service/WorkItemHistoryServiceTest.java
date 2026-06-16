@@ -116,8 +116,13 @@ class WorkItemHistoryServiceTest {
 
         when(projectContextLoader.load("tester", 10L, 20L, false)).thenReturn(new ProjectContext(team, project));
         when(wbsItemRepository.findByProjectAndId(project, 100L)).thenReturn(Optional.of(wbsItem));
-        when(workActivityRepository.findByProjectAndTargetTypeAndTargetIdOrderByCreatedAtDescIdDesc(project, WorkTargetType.WBS, 100L))
-            .thenReturn(List.of(activity));
+        when(
+            workActivityRepository.findByProjectAndTargetTypeAndTargetIdOrderByCreatedAtDescIdDesc(
+                project,
+                WorkTargetType.WBS,
+                100L
+            )
+        ).thenReturn(List.of(activity));
         when(userRepository.findByLoginIdIn(List.of("tester"))).thenReturn(List.of(actor));
 
         final var result = workItemHistoryService.getWbsActivities("tester", 10L, 20L, 100L);

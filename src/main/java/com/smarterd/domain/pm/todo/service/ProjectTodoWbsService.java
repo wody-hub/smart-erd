@@ -45,13 +45,33 @@ class ProjectTodoWbsService {
                     loginId
                 );
             }
-            workItemHistoryService.recordTodoWbsLinked(project, todoId, nextWbsItem.getId(), nextWbsItem.getName(), loginId);
+            workItemHistoryService.recordTodoWbsLinked(
+                project,
+                todoId,
+                nextWbsItem.getId(),
+                nextWbsItem.getName(),
+                loginId
+            );
         }
         return projectTodoMapper.toProjectTodoResult(todo);
     }
 
+    /**
+     * Removes the WBS link from an owned TODO item.
+     *
+     * @param loginId actor login ID
+     * @param teamId team ID
+     * @param projectId project ID
+     * @param todoId TODO item ID
+     * @return updated TODO result
+     */
     @Transactional
-    public ProjectTodoService.ProjectTodoResult unlinkTodoFromWbs(String loginId, Long teamId, Long projectId, Long todoId) {
+    public ProjectTodoService.ProjectTodoResult unlinkTodoFromWbs(
+        String loginId,
+        Long teamId,
+        Long projectId,
+        Long todoId
+    ) {
         final var project = projectTodoAccessService.loadProject(loginId, teamId, projectId);
         final var todo = projectTodoAccessService.findOwnedTodo(loginId, project, todoId);
         final var previousWbsItem = todo.getLinkedWbsItem();
@@ -76,7 +96,10 @@ class ProjectTodoWbsService {
     ) {
         final var project = projectTodoAccessService.loadProject(loginId, teamId, projectId);
         final var wbsItem = projectTodoAccessService.findWbsItem(project, wbsItemId);
-        final var todos = projectTodoRepository.findByProjectAndLinkedWbsItemOrderByCreatedAtDescIdDesc(project, wbsItem);
+        final var todos = projectTodoRepository.findByProjectAndLinkedWbsItemOrderByCreatedAtDescIdDesc(
+            project,
+            wbsItem
+        );
         if (todos.isEmpty()) {
             return List.of();
         }
@@ -86,7 +109,11 @@ class ProjectTodoWbsService {
             .findByTodoInAndVisibility(todos, TodoDocumentVisibility.PROJECT_SHARED)
             .stream()
             .map(projectTodoMapper::toTodoDocumentResult)
-            .forEach((result) -> sharedDocumentsByTodoId.computeIfAbsent(result.todoId(), (key) -> new java.util.ArrayList<>()).add(result));
+            .forEach((result) ->
+                sharedDocumentsByTodoId
+                    .computeIfAbsent(result.todoId(), (key) -> new java.util.ArrayList<>())
+                    .add(result)
+            );
 
         return todos
             .stream()

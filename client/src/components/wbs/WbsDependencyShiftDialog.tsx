@@ -103,9 +103,7 @@ export default function WbsDependencyShiftDialog({
               <Route className="mt-0.5 h-5 w-5 text-muted-foreground" />
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">{t('wbs.shift.previewTitle')}</p>
-                <p className="text-sm text-muted-foreground">
-                  {t('wbs.shift.previewDescription')}
-                </p>
+                <p className="text-sm text-muted-foreground">{t('wbs.shift.previewDescription')}</p>
               </div>
             </div>
 
@@ -113,7 +111,9 @@ export default function WbsDependencyShiftDialog({
               {previewLoading ? (
                 <div className="p-4 text-sm text-muted-foreground">{t('common.loading')}</div>
               ) : previewRows.length === 0 ? (
-                <div className="p-4 text-sm text-muted-foreground">{t('wbs.shift.previewEmpty')}</div>
+                <div className="p-4 text-sm text-muted-foreground">
+                  {t('wbs.shift.previewEmpty')}
+                </div>
               ) : (
                 <div className="divide-y divide-border/60">
                   {previewRows.map((entry) => (
@@ -175,7 +175,9 @@ export default function WbsDependencyShiftDialog({
               <p className="text-sm font-medium text-destructive">{t('wbs.shift.issuesTitle')}</p>
               <div className="mt-2 space-y-1 text-sm text-destructive/90">
                 {previewIssues.map((issue, index) => (
-                  <p key={`${issue.code}-${issue.wbsItemId ?? 'global'}-${index}`}>{issue.message}</p>
+                  <p key={`${issue.code}-${issue.wbsItemId ?? 'global'}-${index}`}>
+                    {issue.message}
+                  </p>
                 ))}
               </div>
             </div>

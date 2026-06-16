@@ -28,13 +28,12 @@ interface WbsBulkCreateDialogProps {
   onSubmit: (items: ParsedBulkCreateLine[], parentId: number | null) => Promise<void>;
 }
 
-function ErrorLine({
-  error,
-  t,
-}: {
-  error: BulkCreateValidationError;
-  t: TFunction;
-}) {
+/**
+ * Renders a single localized bulk-create validation error.
+ *
+ * @returns A list item containing the localized validation message.
+ */
+function ErrorLine({ error, t }: { error: BulkCreateValidationError; t: TFunction }) {
   const message = String(t(`wbs.bulk.validation.${error.messageKey}`, { line: error.lineNumber }));
   return (
     <li className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -85,7 +84,9 @@ export default function WbsBulkCreateDialog({
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
           <section className="space-y-3">
             <div className="rounded-xl border border-border/80 bg-secondary/10 p-4">
-              <p className="text-sm font-medium text-foreground">{t('wbs.bulk.instructionsTitle')}</p>
+              <p className="text-sm font-medium text-foreground">
+                {t('wbs.bulk.instructionsTitle')}
+              </p>
               <ul className="mt-2 space-y-1 text-sm leading-6 text-muted-foreground">
                 <li>{t('wbs.bulk.instructions.line1')}</li>
                 <li>{t('wbs.bulk.instructions.line2')}</li>
@@ -120,7 +121,10 @@ export default function WbsBulkCreateDialog({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="wbs-bulk-template-name">
+              <label
+                className="text-sm font-medium text-foreground"
+                htmlFor="wbs-bulk-template-name"
+              >
                 {t('wbs.bulk.previewTitle')}
               </label>
               <Input
@@ -146,7 +150,11 @@ export default function WbsBulkCreateDialog({
                 </div>
                 <ul className="space-y-2">
                   {parsed.errors.map((error) => (
-                    <ErrorLine key={`${error.lineNumber}-${error.messageKey}`} error={error} t={t} />
+                    <ErrorLine
+                      key={`${error.lineNumber}-${error.messageKey}`}
+                      error={error}
+                      t={t}
+                    />
                   ))}
                 </ul>
               </div>
@@ -197,7 +205,9 @@ export default function WbsBulkCreateDialog({
             onClick={() => onSubmit(parsed.items, selectedParent?.id ?? null)}
             disabled={loading || parsed.items.length === 0 || parsed.errors.length > 0}
           >
-            {loading ? t('wbs.bulk.creating') : t('wbs.bulk.submit', { count: parsed.items.length })}
+            {loading
+              ? t('wbs.bulk.creating')
+              : t('wbs.bulk.submit', { count: parsed.items.length })}
           </Button>
         </DialogFooter>
       </DialogContent>

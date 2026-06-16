@@ -1,6 +1,7 @@
 package com.smarterd.api.ai;
 
 import static org.mockito.Mockito.when;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -82,8 +83,13 @@ class AiActionProposalControllerMvcTest {
     @DisplayName("11-W2-02 proposal endpoints require authentication")
     void w2_11_W2_02_proposalEndpointsRequireAuthentication() throws Exception {
         mockMvc.perform(get("/api/ai/proposals/proposal-1")).andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/ai/proposals/proposal-1/approve")).andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/ai/proposals/proposal-1/cancel")).andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                post("/api/ai/proposals/proposal-1/decisions")
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"decision\":\"APPROVE\"}")
+            )
+            .andExpect(status().isForbidden());
     }
 
     @Test
@@ -94,10 +100,13 @@ class AiActionProposalControllerMvcTest {
 
         mockMvc
             .perform(
-                post("/api/ai/proposals/proposal-1/approve").with((request) -> {
-                    request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
-                    return request;
-                })
+                post("/api/ai/proposals/proposal-1/decisions")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"decision\":\"APPROVE\"}")
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.message").value(MessageCode.ERROR_BUSINESS_AI_PROPOSAL_UNSUPPORTED_ACTION.code()))
@@ -114,10 +123,13 @@ class AiActionProposalControllerMvcTest {
 
         mockMvc
             .perform(
-                post("/api/ai/proposals/proposal-1/approve").with((request) -> {
-                    request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
-                    return request;
-                })
+                post("/api/ai/proposals/proposal-1/decisions")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"decision\":\"APPROVE\"}")
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.message").value(MessageCode.ERROR_BUSINESS_AI_PROPOSAL_TERMINAL.code()))
@@ -134,10 +146,13 @@ class AiActionProposalControllerMvcTest {
 
         mockMvc
             .perform(
-                post("/api/ai/proposals/proposal-1/cancel").with((request) -> {
-                    request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
-                    return request;
-                })
+                post("/api/ai/proposals/proposal-1/decisions")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"decision\":\"CANCEL\"}")
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.message").value("ai.proposal.cancelled"))
@@ -149,15 +164,20 @@ class AiActionProposalControllerMvcTest {
     @Test
     @DisplayName("11-W2-02 repeated cancel returns idempotent terminal response")
     void w2_11_W2_02_repeatedCancelReturnsIdempotentTerminalResponse() throws Exception {
-        when(proposalService.getProposal("tester", "proposal-1")).thenReturn(proposal(AiActionProposalStatus.CANCELLED));
+        when(proposalService.getProposal("tester", "proposal-1")).thenReturn(
+            proposal(AiActionProposalStatus.CANCELLED)
+        );
         when(proposalService.cancel("tester", "proposal-1")).thenReturn(proposal(AiActionProposalStatus.CANCELLED));
 
         mockMvc
             .perform(
-                post("/api/ai/proposals/proposal-1/cancel").with((request) -> {
-                    request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
-                    return request;
-                })
+                post("/api/ai/proposals/proposal-1/decisions")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"decision\":\"CANCEL\"}")
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.message").value(MessageCode.ERROR_BUSINESS_AI_PROPOSAL_TERMINAL.code()))

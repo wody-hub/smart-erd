@@ -32,7 +32,7 @@ public final class DomainLogicalNameSupport {
         @Nullable Integer dataScale
     ) {
         final var normalizedDomainName = normalizeDomainName(domainName);
-        if (normalizedDomainName == null || AppStringUtils.isBlank(dataType)) {
+        if (AppStringUtils.isBlank(normalizedDomainName) || AppStringUtils.isBlank(dataType)) {
             return null;
         }
 
@@ -111,7 +111,7 @@ public final class DomainLogicalNameSupport {
         final var expectedSuffix = "_" + suffixText;
         if (
             normalizedLogicalName.length() > expectedSuffix.length() &&
-            normalizedLogicalName.toUpperCase().endsWith(expectedSuffix.toUpperCase())
+            AppStringUtils.endsWithIgnoreCase(normalizedLogicalName, expectedSuffix)
         ) {
             return normalizedLogicalName.substring(0, normalizedLogicalName.length() - expectedSuffix.length());
         }
@@ -129,7 +129,7 @@ public final class DomainLogicalNameSupport {
     }
 
     private static boolean endsWithTypeSuffix(String domainName, String suffix) {
-        return domainName.toUpperCase().endsWith(("_" + suffix).toUpperCase());
+        return AppStringUtils.endsWithIgnoreCase(domainName, "_" + suffix);
     }
 
     @Nullable
@@ -162,7 +162,7 @@ public final class DomainLogicalNameSupport {
         if (normalized == null) {
             return null;
         }
-        final var upperCased = normalized.toUpperCase();
+        final var upperCased = AppStringUtils.upperCaseToEmpty(normalized);
         if ("VARCHAR".equals(upperCased)) {
             return "V";
         }

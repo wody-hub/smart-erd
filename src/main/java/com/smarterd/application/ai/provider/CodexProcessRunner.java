@@ -1,12 +1,12 @@
 package com.smarterd.application.ai.provider;
 
+import com.smarterd.utils.AppStringUtils;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -53,7 +53,11 @@ public class CodexProcessRunner {
             );
             return mapResult(launchResult, outputPath);
         } catch (IOException ex) {
-            return new CodexProcessResult(CodexProcessResult.Status.UNSUPPORTED_ENVIRONMENT, "", "UNSUPPORTED_ENVIRONMENT");
+            return new CodexProcessResult(
+                CodexProcessResult.Status.UNSUPPORTED_ENVIRONMENT,
+                "",
+                "UNSUPPORTED_ENVIRONMENT"
+            );
         } finally {
             cleanup(cwd);
         }
@@ -94,7 +98,7 @@ public class CodexProcessRunner {
     }
 
     private boolean isSensitiveName(String name) {
-        final var upper = name.toUpperCase(Locale.ROOT);
+        final var upper = AppStringUtils.upperCaseToEmpty(name);
         return (
             upper.startsWith("SMART_ERD_") ||
             upper.startsWith("SPRING_") ||
@@ -120,14 +124,18 @@ public class CodexProcessRunner {
         if (result.exitCode() != 0) {
             return new CodexProcessResult(CodexProcessResult.Status.FAILED, "", "CODEX_EXEC_FAILED");
         }
-        return new CodexProcessResult(CodexProcessResult.Status.SUCCEEDED, readFinalOutput(outputPath, result.stdout()), null);
+        return new CodexProcessResult(
+            CodexProcessResult.Status.SUCCEEDED,
+            readFinalOutput(outputPath, result.stdout()),
+            null
+        );
     }
 
     private String readFinalOutput(Path outputPath, String fallback) {
         try {
             if (Files.isRegularFile(outputPath)) {
                 final var output = Files.readString(outputPath);
-                if (!output.isBlank()) {
+                if (AppStringUtils.isNotBlank(output)) {
                     return output;
                 }
             }
@@ -142,13 +150,15 @@ public class CodexProcessRunner {
             return;
         }
         try (var stream = Files.walk(cwd)) {
-            stream.sorted(Comparator.reverseOrder()).forEach((path) -> {
-                try {
-                    Files.deleteIfExists(path);
-                } catch (IOException ignored) {
-                    // Best-effort temp cleanup only.
-                }
-            });
+            stream
+                .sorted(Comparator.reverseOrder())
+                .forEach((path) -> {
+                    try {
+                        Files.deleteIfExists(path);
+                    } catch (IOException ignored) {
+                        // Best-effort temp cleanup only.
+                    }
+                });
         } catch (IOException ignored) {
             // Best-effort temp cleanup only.
         }

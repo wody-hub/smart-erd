@@ -10,5 +10,8 @@ import java.util.List;
  */
 @Schema(description = "WBS 대량 생성 요청")
 public record BulkCreateWbsItemsRequest(
-    @Valid @NotEmpty @Schema(description = "생성할 항목 목록") List<BulkCreateWbsItemRequest> items
+    @Valid
+    @NotEmpty(message = "{validation.not-empty.wbs-items}")
+    @Schema(description = "생성할 항목 목록")
+    List<BulkCreateWbsItemRequest> items
 ) {}

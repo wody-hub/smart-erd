@@ -1,5 +1,6 @@
 package com.smarterd.api.dictionary;
 
+import com.smarterd.api.dictionary.dto.SuggestMatch;
 import com.smarterd.api.dictionary.dto.SuggestRequest;
 import com.smarterd.api.dictionary.dto.SuggestResponse;
 import com.smarterd.domain.dictionary.service.DictionarySuggestService;
@@ -85,12 +86,7 @@ public class DictionarySuggestController {
      * @param result 서비스 계층 결과
      * @return HTTP 응답 DTO
      */
-    private com.smarterd.api.dictionary.dto.SuggestMatch toSuggestMatch(SuggestMatchResult result) {
-        return new com.smarterd.api.dictionary.dto.SuggestMatch(
-            result.token(),
-            result.matched(),
-            result.physicalName(),
-            result.matchType()
-        );
+    private SuggestMatch toSuggestMatch(SuggestMatchResult result) {
+        return new SuggestMatch(result.token(), result.matched(), result.physicalName(), result.matchType());
     }
 }

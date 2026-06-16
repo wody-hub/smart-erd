@@ -14,6 +14,6 @@ public record CodexProcessResult(Status status, String stdout, String errorType)
         CODEX_NOT_FOUND,
         TIMED_OUT,
         CANCELLED,
-        UNSUPPORTED_ENVIRONMENT
+        UNSUPPORTED_ENVIRONMENT,
     }
 }

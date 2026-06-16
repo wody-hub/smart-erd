@@ -1,6 +1,5 @@
 package com.smarterd.application.ai.proposal;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.application.ai.AiExecutionAuditService;
 import com.smarterd.application.ai.provider.AiActionDraft;
@@ -12,9 +11,7 @@ import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.pm.common.ProjectContextLoader;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,12 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
  * Creates and transitions sanitized AI action proposals.
  */
 @Service
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class AiActionProposalService {
 
     public static final Duration DEFAULT_EXPIRY = Duration.ofMinutes(15);
-
-    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     private final AiActionProposalRepository proposalRepository;
     private final AiActionProposalSanitizer sanitizer;
@@ -47,7 +43,7 @@ public class AiActionProposalService {
      * @return sanitized proposal views
      */
     @Transactional
-    public List<AiActionProposalView> createProposals(CreateCommand command) {
+    public List<AiActionProposalView> createProposals(AiActionProposalCreateCommand command) {
         if (command.actions() == null || command.actions().isEmpty()) {
             return List.of();
         }
@@ -55,7 +51,7 @@ public class AiActionProposalService {
         return command
             .actions()
             .stream()
-            .map(draft -> createProposal(command, draft, now))
+            .map((draft) -> createProposal(command, draft, now))
             .map(this::toView)
             .toList();
     }
@@ -67,7 +63,6 @@ public class AiActionProposalService {
      * @param proposalId public proposal id
      * @return sanitized proposal view
      */
-    @Transactional(readOnly = true)
     public AiActionProposalView getProposal(String loginId, String proposalId) {
         return toView(loadAccessible(loginId, proposalId));
     }
@@ -112,7 +107,13 @@ public class AiActionProposalService {
         try {
             validator.validateApproval(proposal, now);
         } catch (BusinessException ex) {
-            proposal.reject(loginId, now, "INVALID_PROPOSAL", "Invalid proposal", "Proposal can no longer be approved.");
+            proposal.reject(
+                loginId,
+                now,
+                "INVALID_PROPOSAL",
+                "Invalid proposal",
+                "Proposal can no longer be approved."
+            );
             auditService.recordProposalDecision(proposal);
             return toView(proposal);
         }
@@ -132,7 +133,13 @@ public class AiActionProposalService {
             final var result = executor.get().execute(loginId, proposal);
             proposal.markExecuted(loginId, now, result == null ? null : result.resultJson());
         } catch (RuntimeException ex) {
-            proposal.markFailed(loginId, now, ex.getClass().getSimpleName(), "Execution failed", safeDetail(ex.getMessage()));
+            proposal.markFailed(
+                loginId,
+                now,
+                ex.getClass().getSimpleName(),
+                "Execution failed",
+                AiActionProposalJsonSupport.safeDetail(ex.getMessage())
+            );
         }
         auditService.recordProposalDecision(proposal);
         return toView(proposal);
@@ -147,7 +154,7 @@ public class AiActionProposalService {
     @Transactional
     public int expirePending(Instant now) {
         final var proposals = proposalRepository.findByStatusAndExpiresAtBefore(AiActionProposalStatus.PENDING, now);
-        proposals.forEach(proposal -> {
+        proposals.forEach((proposal) -> {
             proposal.expire(now);
             auditService.recordProposalDecision(proposal);
         });
@@ -162,7 +169,7 @@ public class AiActionProposalService {
      * @param now creation timestamp
      * @return persisted proposal entity
      */
-    private AiActionProposal createProposal(CreateCommand command, AiActionDraft draft, Instant now) {
+    private AiActionProposal createProposal(AiActionProposalCreateCommand command, AiActionDraft draft, Instant now) {
         final var sanitizedPayload = sanitizer.sanitize(draft.payload());
         validator.validateDraft(draft, sanitizedPayload);
         final var preview = previewService.preview(command.teamId(), command.projectId(), sanitizedPayload);
@@ -182,8 +189,8 @@ public class AiActionProposalService {
             draft.summary(),
             command.requestedBy(),
             now.plus(DEFAULT_EXPIRY),
-            writeJson(sanitizedPayload),
-            writeJson(previewJson(preview))
+            AiActionProposalJsonSupport.writeJson(objectMapper, sanitizedPayload),
+            AiActionProposalJsonSupport.writeJson(objectMapper, AiActionProposalJsonSupport.previewJson(preview))
         );
         proposal.initializeAuditActor(command.requestedBy());
         final var saved = proposalRepository.save(proposal);
@@ -223,7 +230,7 @@ public class AiActionProposalService {
      * @return sanitized proposal view
      */
     private AiActionProposalView toView(AiActionProposal proposal) {
-        final var payload = readMap(proposal.getSanitizedPayloadJson());
+        final var payload = AiActionProposalJsonSupport.readMap(objectMapper, proposal.getSanitizedPayloadJson());
         final var preview = previewService.preview(proposal.getTeamId(), proposal.getProjectId(), payload);
         final var executable = proposal.isPending() && executorRegistry.find(proposal.getActionType()).isPresent();
         return new AiActionProposalView(
@@ -245,100 +252,9 @@ public class AiActionProposalService {
             preview.content(),
             preview.warnings(),
             proposal.getExpiresAt(),
-            resultView(proposal.getResultJson()),
+            AiActionProposalJsonSupport.resultView(objectMapper, proposal.getResultJson()),
             proposal.getRedactedErrorTitle(),
             proposal.getRedactedErrorDetail()
         );
-    }
-
-    private AiActionProposalView.Result resultView(String json) {
-        final var result = readMap(json);
-        if (result.isEmpty()) {
-            return null;
-        }
-        return new AiActionProposalView.Result(
-            stringValue(result.get("actionType")),
-            stringValue(result.get("resourceType")),
-            stringValue(result.get("resourceId")),
-            stringValue(result.get("targetLabel")),
-            stringValue(result.get("status")),
-            stringValue(result.get("summary"))
-        );
-    }
-
-    /**
-     * Serializes sanitized proposal metadata for persistence.
-     *
-     * @param value metadata value
-     * @return JSON string or empty object on failure
-     */
-    private String writeJson(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception ex) {
-            return "{}";
-        }
-    }
-
-    /**
-     * Converts preview data into the persisted preview JSON shape.
-     *
-     * @param preview sanitized preview data
-     * @return JSON-ready preview map
-     */
-    private Map<String, Object> previewJson(AiActionPreviewService.PreviewData preview) {
-        final var json = new LinkedHashMap<String, Object>();
-        json.put("fields", preview.fields());
-        json.put("content", preview.content());
-        json.put("warnings", preview.warnings());
-        return json;
-    }
-
-    /**
-     * Parses persisted JSON maps defensively for preview reconstruction.
-     *
-     * @param json persisted JSON string
-     * @return parsed map or empty map
-     */
-    private Map<String, Object> readMap(String json) {
-        if (json == null || json.isBlank()) {
-            return Map.of();
-        }
-        try {
-            return objectMapper.readValue(json, MAP_TYPE);
-        } catch (Exception ex) {
-            return Map.of();
-        }
-    }
-
-    /**
-     * Caps executor error detail before storing it in proposal metadata.
-     *
-     * @param value error detail
-     * @return capped safe detail
-     */
-    private String safeDetail(String value) {
-        if (value == null || value.isBlank()) {
-            return "Execution failed.";
-        }
-        return value.length() <= 500 ? value : value.substring(0, 500);
-    }
-
-    private String stringValue(Object value) {
-        return value == null ? null : String.valueOf(value);
-    }
-
-    public record CreateCommand(
-        String executionId,
-        String provider,
-        String promptVersion,
-        Long teamId,
-        Long projectId,
-        String requestedBy,
-        List<AiActionDraft> actions
-    ) {
-        public CreateCommand {
-            actions = actions == null ? List.of() : List.copyOf(actions);
-        }
     }
 }

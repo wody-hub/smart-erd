@@ -25,22 +25,20 @@ class ScreenSpecScopeResolverTest {
     void masterUpdate_shouldResolveMasterScope() {
         final var result = resolver.resolve("master:update", Map.of("masterId", "master-1", "width", 640));
 
-        assertThat(result)
-            .containsExactly(
-                new ScopeRef("master", "master-1", ScopeLockMode.EXCLUSIVE),
-                new ScopeRef("instance-cascade", "collection", ScopeLockMode.EXCLUSIVE)
-            );
+        assertThat(result).containsExactly(
+            new ScopeRef("master", "master-1", ScopeLockMode.EXCLUSIVE),
+            new ScopeRef("instance-cascade", "collection", ScopeLockMode.EXCLUSIVE)
+        );
     }
 
     @Test
     void masterDelete_shouldResolveMasterAndCascadeScopes() {
         final var result = resolver.resolve("master:delete", Map.of("masterId", "master-1"));
 
-        assertThat(result)
-            .containsExactly(
-                new ScopeRef("master", "master-1", ScopeLockMode.EXCLUSIVE),
-                new ScopeRef("instance-cascade", "collection", ScopeLockMode.EXCLUSIVE)
-            );
+        assertThat(result).containsExactly(
+            new ScopeRef("master", "master-1", ScopeLockMode.EXCLUSIVE),
+            new ScopeRef("instance-cascade", "collection", ScopeLockMode.EXCLUSIVE)
+        );
     }
 
     @Test
@@ -57,11 +55,10 @@ class ScreenSpecScopeResolverTest {
             Map.of("screenId", "screen-1", "width", 1440, "height", 900)
         );
 
-        assertThat(result)
-            .containsExactly(
-                new ScopeRef("screen", "screen-1", ScopeLockMode.EXCLUSIVE),
-                new ScopeRef("instance-cascade", "collection", ScopeLockMode.EXCLUSIVE)
-            );
+        assertThat(result).containsExactly(
+            new ScopeRef("screen", "screen-1", ScopeLockMode.EXCLUSIVE),
+            new ScopeRef("instance-cascade", "collection", ScopeLockMode.EXCLUSIVE)
+        );
     }
 
     @Test

@@ -20,12 +20,14 @@ class ProviderOutputValidatorTest {
 
     @Test
     void validate_acceptsAnswerOnlyJson() {
-        final var result = validator.validate("""
+        final var result = validator.validate(
+            """
             {
               "answer": "Local Codex is not configured yet.",
               "actions": []
             }
-            """);
+            """
+        );
 
         assertThat(result.answer()).isEqualTo("Local Codex is not configured yet.");
         assertThat(result.actions()).isEmpty();
@@ -34,7 +36,8 @@ class ProviderOutputValidatorTest {
 
     @Test
     void validate_acceptsProviderErrorJson() {
-        final var result = validator.validate("""
+        final var result = validator.validate(
+            """
             {
               "actions": [],
               "error": {
@@ -44,7 +47,8 @@ class ProviderOutputValidatorTest {
                 "retryable": false
               }
             }
-            """);
+            """
+        );
 
         assertThat(result.error()).isNotNull();
         assertThat(result.error().type()).isEqualTo("NOT_CONFIGURED");
@@ -52,14 +56,14 @@ class ProviderOutputValidatorTest {
 
     @Test
     void validate_rejectsInvalidJsonWithoutRawTextFallback() {
-        assertThatThrownBy(() -> validator.validate("plain text"))
-            .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> validator.validate("plain text")).isInstanceOf(BusinessException.class);
     }
 
     @Test
     void validate_rejectsUnsafeActionDraft() {
         assertThatThrownBy(() ->
-            validator.validate("""
+            validator.validate(
+                """
                 {
                   "answer": "I can delete it.",
                   "actions": [
@@ -74,13 +78,15 @@ class ProviderOutputValidatorTest {
                     }
                   ]
                 }
-                """)
+                """
+            )
         ).isInstanceOf(BusinessException.class);
     }
 
     @Test
     void validate_acceptsActionDraftPayloadWithNullValues() {
-        final var result = validator.validate("""
+        final var result = validator.validate(
+            """
             {
               "answer": "승인하면 TODO를 생성하겠습니다.",
               "actions": [
@@ -107,7 +113,8 @@ class ProviderOutputValidatorTest {
               ],
               "error": null
             }
-            """);
+            """
+        );
 
         assertThat(result.actions()).hasSize(1);
         assertThat(result.actions().getFirst().payload()).containsEntry("targetId", null);

@@ -95,26 +95,30 @@ export function buildAiChatContextOptions({
 }: BuildAiChatContextOptionsInput): AiChatContextOption[] {
   const teamNameById = new Map(teams.map((team) => [team.id, team.name]));
   return [
-    ...teams.map((team): AiChatContextOption => ({
-      id: `team:${team.id}`,
-      label: team.name,
-      kind: 'team',
-      teamId: team.id,
-      teamName: team.name,
-      projectId: null,
-      projectName: null,
-      source: 'authorized',
-    })),
-    ...projects.map((project): AiChatContextOption => ({
-      id: `project:${project.teamId}:${project.id}`,
-      label: project.name,
-      kind: 'project',
-      teamId: project.teamId,
-      teamName: teamNameById.get(project.teamId) ?? null,
-      projectId: project.id,
-      projectName: project.name,
-      source: 'authorized',
-    })),
+    ...teams.map(
+      (team): AiChatContextOption => ({
+        id: `team:${team.id}`,
+        label: team.name,
+        kind: 'team',
+        teamId: team.id,
+        teamName: team.name,
+        projectId: null,
+        projectName: null,
+        source: 'authorized',
+      }),
+    ),
+    ...projects.map(
+      (project): AiChatContextOption => ({
+        id: `project:${project.teamId}:${project.id}`,
+        label: project.name,
+        kind: 'project',
+        teamId: project.teamId,
+        teamName: teamNameById.get(project.teamId) ?? null,
+        projectId: project.id,
+        projectName: project.name,
+        source: 'authorized',
+      }),
+    ),
     ...confirmationCandidates.map(candidateOption),
   ];
 }

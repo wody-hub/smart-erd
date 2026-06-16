@@ -39,8 +39,13 @@ class LocalCodexProcessProviderTest {
 
     @Test
     void executeValidatesRunnerStdout() {
-        when(runner.run(Mockito.any()))
-            .thenReturn(new CodexProcessResult(CodexProcessResult.Status.SUCCEEDED, "{\"answer\":\"ok\",\"actions\":[],\"error\":null}", null));
+        when(runner.run(Mockito.any())).thenReturn(
+            new CodexProcessResult(
+                CodexProcessResult.Status.SUCCEEDED,
+                "{\"answer\":\"ok\",\"actions\":[],\"error\":null}",
+                null
+            )
+        );
 
         final var result = provider.execute(request());
 
@@ -50,7 +55,9 @@ class LocalCodexProcessProviderTest {
 
     @Test
     void executeMapsInvalidJsonToOutputValidationError() {
-        when(runner.run(Mockito.any())).thenReturn(new CodexProcessResult(CodexProcessResult.Status.SUCCEEDED, "plain", null));
+        when(runner.run(Mockito.any())).thenReturn(
+            new CodexProcessResult(CodexProcessResult.Status.SUCCEEDED, "plain", null)
+        );
 
         final var result = provider.execute(request());
 
@@ -60,7 +67,9 @@ class LocalCodexProcessProviderTest {
 
     @Test
     void executeMapsTimeoutToSafeProviderError() {
-        when(runner.run(Mockito.any())).thenReturn(new CodexProcessResult(CodexProcessResult.Status.TIMED_OUT, "", null));
+        when(runner.run(Mockito.any())).thenReturn(
+            new CodexProcessResult(CodexProcessResult.Status.TIMED_OUT, "", null)
+        );
 
         final var result = provider.execute(request());
 

@@ -46,7 +46,14 @@ public class WbsMemoAddActionExecutor implements AiActionExecutor {
             payload.requireContent()
         );
         return new ExecutionResult(
-            resultWriter.write(ACTION_TYPE, "wbs-memo", result.id(), proposal.getTargetLabel(), "created", "WBS work memo added.")
+            resultWriter.write(
+                ACTION_TYPE,
+                "wbs-memo",
+                result.id(),
+                proposal.getTargetLabel(),
+                "created",
+                "WBS work memo added."
+            )
         );
     }
 }

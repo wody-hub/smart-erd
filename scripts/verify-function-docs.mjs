@@ -12,10 +12,12 @@ const FUNCTION_DOC_RULE = 'DOCS001';
 const PARAM_DOC_RULE = 'DOCS002';
 const RETURN_DOC_RULE = 'DOCS003';
 const FILE_READ_RULE = 'DOCS004';
+const JAVA_DOC_ORDER_RULE = 'DOCS005';
 const REPO_ROOT = detectRepoRoot();
 
 const args = parseArgs(process.argv.slice(2));
 const targetFiles = collectTargetFiles(args);
+const changedLineFilters = collectChangedLineFilters(args, targetFiles);
 
 if (targetFiles.length === 0) {
   console.log('[verify-function-docs] No target files found.');
@@ -37,28 +39,24 @@ for (const filePath of targetFiles) {
   }
 
   if (isJavaFile(filePath)) {
-    issues.push(...validateJavaFile(filePath, content));
+    issues.push(...validateJavaFile(filePath, content, changedLineFilters.get(filePath)));
     continue;
   }
 
   if (isFrontendFile(filePath)) {
-    issues.push(...(await validateTypeScriptFile(filePath, content)));
+    issues.push(...(await validateTypeScriptFile(filePath, content, changedLineFilters.get(filePath))));
   }
 }
 
 if (issues.length > 0) {
   console.error('[verify-function-docs] Function documentation violations found:');
   for (const issue of issues) {
-    console.error(
-      ` - [${issue.rule}] ${issue.file}:${issue.line} ${issue.message}`,
-    );
+    console.error(` - [${issue.rule}] ${issue.file}:${issue.line} ${issue.message}`);
   }
   process.exit(1);
 }
 
-console.log(
-  `[verify-function-docs] Passed (${targetFiles.length} files checked, no violations).`,
-);
+console.log(`[verify-function-docs] Passed (${targetFiles.length} files checked, no violations).`);
 process.exit(0);
 
 function parseArgs(argv) {
@@ -102,13 +100,9 @@ function parseArgs(argv) {
 }
 
 function collectTargetFiles(options) {
-  const candidateFiles = options.scanAll
-    ? listAllTrackedFiles()
-    : listChangedFiles(options);
+  const candidateFiles = options.scanAll ? listAllTrackedFiles() : listChangedFiles(options);
 
-  return candidateFiles.filter((filePath) =>
-    shouldCheckFile(filePath, options.frontendOnly, options.backendOnly),
-  );
+  return candidateFiles.filter((filePath) => shouldCheckFile(filePath, options.frontendOnly, options.backendOnly));
 }
 
 function listAllTrackedFiles() {
@@ -117,31 +111,62 @@ function listAllTrackedFiles() {
 
 function listChangedFiles(options) {
   if (options.staged) {
-    const staged = uniqueLines(
-      runCommand('git diff --cached --name-only --diff-filter=ACMRTUXB'),
-    );
-    const untracked = uniqueLines(
-      runCommand('git ls-files --others --exclude-standard'),
-    );
+    const staged = uniqueLines(runCommand('git diff --cached --name-only --diff-filter=ACMRTUXB'));
+    const untracked = uniqueLines(runCommand('git ls-files --others --exclude-standard'));
     return [...new Set([...staged, ...untracked])];
   }
 
   const tracked = options.baseRef
-    ? uniqueLines(
-        runCommand(
-          `git diff --name-only --diff-filter=ACMRTUXB ${options.baseRef}...HEAD`,
-        ),
-      )
+    ? uniqueLines(runCommand(`git diff --name-only --diff-filter=ACMRTUXB ${options.baseRef}...HEAD`))
     : [
         ...uniqueLines(runCommand('git diff --name-only --diff-filter=ACMRTUXB')),
-        ...uniqueLines(
-          runCommand('git diff --cached --name-only --diff-filter=ACMRTUXB'),
-        ),
+        ...uniqueLines(runCommand('git diff --cached --name-only --diff-filter=ACMRTUXB')),
       ];
-  const untracked = uniqueLines(
-    runCommand('git ls-files --others --exclude-standard'),
-  );
+  const untracked = uniqueLines(runCommand('git ls-files --others --exclude-standard'));
   return [...new Set([...tracked, ...untracked])];
+}
+
+function collectChangedLineFilters(options, files) {
+  if (options.scanAll) {
+    return new Map(files.map((filePath) => [filePath, null]));
+  }
+
+  const untracked = new Set(uniqueLines(runCommand('git ls-files --others --exclude-standard')));
+  const filters = new Map();
+  for (const filePath of files) {
+    if (untracked.has(filePath)) {
+      filters.set(filePath, null);
+      continue;
+    }
+
+    const lineNumbers = new Set();
+    const diffCommands = options.baseRef
+      ? [`git diff --unified=0 ${shellQuote(options.baseRef)}...HEAD -- ${shellQuote(filePath)}`]
+      : [`git diff --unified=0 -- ${shellQuote(filePath)}`, `git diff --cached --unified=0 -- ${shellQuote(filePath)}`];
+    for (const command of diffCommands) {
+      addChangedLinesFromDiff(runCommand(command), lineNumbers);
+    }
+    filters.set(filePath, lineNumbers);
+  }
+  return filters;
+}
+
+function addChangedLinesFromDiff(diffText, lineNumbers) {
+  for (const line of diffText.split('\n')) {
+    const match = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
+    if (!match) {
+      continue;
+    }
+    const startLine = Number.parseInt(match[1], 10);
+    const lineCount = match[2] == null ? 1 : Number.parseInt(match[2], 10);
+    for (let offset = 0; offset < lineCount; offset += 1) {
+      lineNumbers.add(startLine + offset);
+    }
+  }
+}
+
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
 
 function shouldCheckFile(filePath, frontendOnly, backendOnly) {
@@ -165,10 +190,7 @@ function isJavaFile(filePath) {
 }
 
 function isFrontendFile(filePath) {
-  return (
-    filePath.startsWith(FRONTEND_ROOT) &&
-    (filePath.endsWith('.ts') || filePath.endsWith('.tsx'))
-  );
+  return filePath.startsWith(FRONTEND_ROOT) && (filePath.endsWith('.ts') || filePath.endsWith('.tsx'));
 }
 
 function readFileSafe(filePath) {
@@ -180,7 +202,7 @@ function readFileSafe(filePath) {
   }
 }
 
-function validateJavaFile(filePath, content) {
+function validateJavaFile(filePath, content, changedLineFilter) {
   const lines = content.split(/\r?\n/);
   const className = path.basename(filePath, '.java');
   const issues = [];
@@ -220,6 +242,11 @@ function validateJavaFile(filePath, content) {
       continue;
     }
 
+    if (!shouldValidateLineRange(changedLineFilter, lineIndex + 1, endLine + 1)) {
+      lineIndex = endLine;
+      continue;
+    }
+
     if (methodInfo.isConstructor) {
       lineIndex = endLine;
       continue;
@@ -235,6 +262,15 @@ function validateJavaFile(filePath, content) {
       });
       lineIndex = endLine;
       continue;
+    }
+
+    if (isJavaDocBelowAnnotation(lines, javadocInfo)) {
+      issues.push({
+        rule: JAVA_DOC_ORDER_RULE,
+        file: filePath,
+        line: javadocInfo.startLine + 1,
+        message: `Javadoc must be placed before method annotations for method '${methodInfo.methodName}'.`,
+      });
     }
 
     for (const paramName of methodInfo.params) {
@@ -261,6 +297,18 @@ function validateJavaFile(filePath, content) {
   }
 
   return issues;
+}
+
+function shouldValidateLineRange(changedLineFilter, startLine, endLine) {
+  if (changedLineFilter == null) {
+    return true;
+  }
+  for (let line = startLine; line <= endLine; line += 1) {
+    if (changedLineFilter.has(line)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function startsWithVisibility(line) {
@@ -381,7 +429,10 @@ function extractJavaReturnType(beforeParen, methodName) {
   prefix = prefix.replace(/\b(static|final|synchronized|abstract|default|native|strictfp)\b/g, '');
   prefix = prefix.replace(/@\w+(?:\([^)]*\))?\s*/g, ' ');
   prefix = prefix.replace(/^<[^>]+>\s*/, '');
-  const tokens = prefix.trim().split(/\s+/).filter((token) => token.length > 0);
+  const tokens = prefix
+    .trim()
+    .split(/\s+/)
+    .filter((token) => token.length > 0);
   if (tokens.length === 0) {
     return 'void';
   }
@@ -430,6 +481,16 @@ function findJavaDoc(lines, declarationLine) {
   return null;
 }
 
+function isJavaDocBelowAnnotation(lines, javadocInfo) {
+  let cursor = javadocInfo.startLine - 1;
+
+  while (cursor >= 0 && lines[cursor].trim().length === 0) {
+    cursor -= 1;
+  }
+
+  return cursor >= 0 && isAnnotationLikeLine(lines[cursor].trim());
+}
+
 function isAnnotationLikeLine(trimmedLine) {
   if (trimmedLine.startsWith('@')) {
     return true;
@@ -452,7 +513,7 @@ function includesReturnTag(javadocText) {
   return /@return\b/.test(javadocText);
 }
 
-async function validateTypeScriptFile(filePath, content) {
+async function validateTypeScriptFile(filePath, content, changedLineFilter) {
   const ts = await loadTypeScript();
   if (!ts) {
     return [];
@@ -472,11 +533,16 @@ async function validateTypeScriptFile(filePath, content) {
       return;
     }
 
+    const startLine = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+    if (!shouldValidateLineRange(changedLineFilter, startLine, startLine)) {
+      return;
+    }
+
     if (!hasTypeScriptJSDoc(ts, node)) {
       issues.push({
         rule: FUNCTION_DOC_RULE,
         file: filePath,
-        line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+        line: startLine,
         message: `Missing JSDoc for function '${functionName}'.`,
       });
       return;
@@ -489,9 +555,7 @@ async function validateTypeScriptFile(filePath, content) {
       .filter((name) => typeof name === 'string');
 
     const parameterNames = node.parameters
-      ?.map((param) =>
-        param.name && ts.isIdentifier(param.name) ? param.name.text : null,
-      )
+      ?.map((param) => (param.name && ts.isIdentifier(param.name) ? param.name.text : null))
       .filter((name) => typeof name === 'string');
 
     for (const paramName of parameterNames ?? []) {
@@ -499,7 +563,7 @@ async function validateTypeScriptFile(filePath, content) {
         issues.push({
           rule: PARAM_DOC_RULE,
           file: filePath,
-          line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+          line: startLine,
           message: `Missing '@param ${paramName}' in function '${functionName}'.`,
         });
       }
@@ -509,7 +573,7 @@ async function validateTypeScriptFile(filePath, content) {
       issues.push({
         rule: RETURN_DOC_RULE,
         file: filePath,
-        line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+        line: startLine,
         message: `Missing '@returns' in function '${functionName}'.`,
       });
     }
@@ -520,10 +584,7 @@ async function validateTypeScriptFile(filePath, content) {
 
 async function loadTypeScript() {
   try {
-    const modulePath = path.resolve(
-      REPO_ROOT,
-      'client/node_modules/typescript/lib/typescript.js',
-    );
+    const modulePath = path.resolve(REPO_ROOT, 'client/node_modules/typescript/lib/typescript.js');
     const tsModule = await import(modulePath);
     return tsModule.default ?? tsModule;
   } catch (firstError) {
@@ -531,9 +592,7 @@ async function loadTypeScript() {
       const tsModule = await import('typescript');
       return tsModule.default ?? tsModule;
     } catch (secondError) {
-      console.error(
-        '[verify-function-docs] TypeScript module not found. Install client dependencies first.',
-      );
+      console.error('[verify-function-docs] TypeScript module not found. Install client dependencies first.');
       return null;
     }
   }
@@ -613,7 +672,14 @@ function uniqueLines(text) {
   if (text.length === 0) {
     return [];
   }
-  return [...new Set(text.split('\n').map((line) => line.trim()).filter((line) => line.length > 0))];
+  return [
+    ...new Set(
+      text
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0),
+    ),
+  ];
 }
 
 function countChar(text, char) {

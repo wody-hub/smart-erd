@@ -50,7 +50,15 @@ class ActionDraftValidatorTest {
     @Test
     void validate_rejectsDraftWithoutExplicitApprovalFlag() {
         final var drafts = List.of(
-            new AiActionDraft("a1", "todo.update", "Update TODO", "Missing approval", AiActionRiskLevel.LOW, false, Map.of())
+            new AiActionDraft(
+                "a1",
+                "todo.update",
+                "Update TODO",
+                "Missing approval",
+                AiActionRiskLevel.LOW,
+                false,
+                Map.of()
+            )
         );
 
         assertThatThrownBy(() -> validator.validate(drafts)).isInstanceOf(BusinessException.class);

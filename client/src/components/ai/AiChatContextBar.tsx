@@ -210,7 +210,11 @@ export default function AiChatContextBar({
                   <>
                     <CommandGroup heading={t('aiChat.context.confirmationGroup')}>
                       {confirmationOptions.map((option) => (
-                        <CommandItem key={option.id} value={option.label} onSelect={() => selectOption(option)}>
+                        <CommandItem
+                          key={option.id}
+                          value={option.label}
+                          onSelect={() => selectOption(option)}
+                        >
                           <Check
                             className={cn(
                               'h-4 w-4',
@@ -227,7 +231,11 @@ export default function AiChatContextBar({
                 ) : null}
                 <CommandGroup heading={t('aiChat.context.authorizedGroup')}>
                   {authorizedOptions.map((option) => (
-                    <CommandItem key={option.id} value={option.label} onSelect={() => selectOption(option)}>
+                    <CommandItem
+                      key={option.id}
+                      value={option.label}
+                      onSelect={() => selectOption(option)}
+                    >
                       <Check
                         className={cn(
                           'h-4 w-4',

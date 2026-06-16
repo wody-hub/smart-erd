@@ -15,4 +15,4 @@ export interface DocumentCheckpointReader {
   getLatestCheckpoint(): DocumentCheckpoint;
 }
 
-export interface PersistedDocument extends DocumentCheckpoint {}
+export type PersistedDocument = DocumentCheckpoint;

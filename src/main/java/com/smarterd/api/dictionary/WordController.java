@@ -1,32 +1,18 @@
 package com.smarterd.api.dictionary;
 
 import com.smarterd.api.common.dto.PageResponse;
-import com.smarterd.api.dictionary.dto.BulkSaveResponse;
-import com.smarterd.api.dictionary.dto.BulkValidationResponse;
-import com.smarterd.api.dictionary.dto.BulkValidationRow;
-import com.smarterd.api.dictionary.dto.BulkWordSaveRequest;
 import com.smarterd.api.dictionary.dto.CreateWordRequest;
 import com.smarterd.api.dictionary.dto.UpdateWordRequest;
 import com.smarterd.api.dictionary.dto.WordResponse;
-import com.smarterd.domain.dictionary.service.BulkModels.BulkSaveResult;
-import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationResult;
-import com.smarterd.domain.dictionary.service.BulkModels.BulkValidationRowResult;
-import com.smarterd.domain.dictionary.service.WordBulkService;
-import com.smarterd.domain.dictionary.service.WordDictionaryExportService;
+import com.smarterd.domain.dictionary.service.WordResult;
 import com.smarterd.domain.dictionary.service.WordService;
-import com.smarterd.domain.dictionary.service.WordService.WordResult;
-import com.smarterd.utils.ExcelUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import java.io.IOException;
-import java.util.Locale;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,7 +27,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 단어 사전 REST 컨트롤러.
@@ -53,8 +38,6 @@ import org.springframework.web.multipart.MultipartFile;
 public class WordController {
 
     private final WordService wordService;
-    private final WordBulkService wordBulkService;
-    private final WordDictionaryExportService wordDictionaryExportService;
 
     @Operation(summary = "단어 생성")
     @ApiResponse(
@@ -62,6 +45,8 @@ public class WordController {
         description = "단어 생성 성공",
         content = @Content(schema = @Schema(implementation = WordResponse.class))
     )
+    @ApiResponse(responseCode = "400", description = "잘못된 요청", content = @Content)
+    @ApiResponse(responseCode = "409", description = "논리명 중복", content = @Content)
     @PostMapping
     public ResponseEntity<WordResponse> createWord(
         @AuthenticationPrincipal Jwt jwt,
@@ -81,6 +66,8 @@ public class WordController {
     }
 
     @Operation(summary = "단어 목록 조회")
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @ApiResponse(responseCode = "400", description = "팀 또는 사전 세트가 존재하지 않거나 접근 권한 없음")
     @GetMapping
     public ResponseEntity<PageResponse<WordResponse>> getWords(
         @AuthenticationPrincipal Jwt jwt,
@@ -99,95 +86,9 @@ public class WordController {
         return ResponseEntity.ok(PageResponse.from(resultPage));
     }
 
-    @Operation(summary = "단어 업로드 검증", description = "엑셀/CSV 파일의 단어 데이터를 검증한다.")
-    @PostMapping("/upload/validate")
-    public ResponseEntity<BulkValidationResponse> validateUpload(
-        @AuthenticationPrincipal Jwt jwt,
-        @Parameter(description = "팀 ID") @PathVariable Long teamId,
-        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
-        @RequestParam("file") MultipartFile file,
-        Locale locale
-    ) {
-        return ResponseEntity.ok(
-            toBulkValidationResponse(wordBulkService.validateUpload(jwt.getSubject(), teamId, setId, file, locale))
-        );
-    }
-
-    @Operation(summary = "단어 일괄 저장", description = "검증 통과한 단어를 일괄 저장한다.")
-    @PostMapping("/upload")
-    public ResponseEntity<BulkSaveResponse> bulkSave(
-        @AuthenticationPrincipal Jwt jwt,
-        @Parameter(description = "팀 ID") @PathVariable Long teamId,
-        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
-        @Valid @RequestBody BulkWordSaveRequest request
-    ) {
-        return ResponseEntity.ok(
-            toBulkSaveResponse(
-                wordBulkService.bulkSave(
-                    jwt.getSubject(),
-                    teamId,
-                    setId,
-                    request.validationToken(),
-                    request.excludedRowNumbers()
-                )
-            )
-        );
-    }
-
-    @Operation(
-        summary = "단어 업로드 오류 엑셀 다운로드",
-        description = "단어 업로드 검증 오류 행을 엑셀로 다운로드한다."
-    )
-    @GetMapping("/upload/errors")
-    public void downloadErrorReport(
-        @AuthenticationPrincipal Jwt jwt,
-        @Parameter(description = "팀 ID") @PathVariable Long teamId,
-        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
-        @Parameter(description = "검증 세션 토큰") @RequestParam("validationToken") String validationToken,
-        Locale locale,
-        HttpServletResponse response
-    ) throws IOException {
-        final var excelData = wordBulkService.generateErrorReport(
-            jwt.getSubject(),
-            teamId,
-            setId,
-            validationToken,
-            Objects.requireNonNull(locale)
-        );
-        ExcelUtils.download(excelData, response, "word-upload-errors");
-    }
-
-    @Operation(summary = "단어 템플릿 다운로드", description = "단어 일괄 업로드용 엑셀 템플릿을 다운로드한다.")
-    @GetMapping("/upload/template")
-    public void downloadTemplate(
-        @AuthenticationPrincipal Jwt jwt,
-        @Parameter(description = "팀 ID") @PathVariable Long teamId,
-        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
-        Locale locale,
-        HttpServletResponse response
-    ) throws IOException {
-        final var excelData = wordBulkService.generateTemplate(
-            jwt.getSubject(),
-            teamId,
-            setId,
-            Objects.requireNonNull(locale)
-        );
-        ExcelUtils.download(excelData, response, "word-template");
-    }
-
-    @Operation(summary = "단어 사전 엑셀 다운로드", description = "현재 사전 세트의 단어 사전을 엑셀로 다운로드한다.")
-    @GetMapping("/download/excel")
-    public void downloadWordDictionary(
-        @AuthenticationPrincipal Jwt jwt,
-        @Parameter(description = "팀 ID") @PathVariable Long teamId,
-        @Parameter(description = "사전 세트 ID") @PathVariable Long setId,
-        HttpServletResponse response
-    ) throws IOException {
-        final var excelData = wordDictionaryExportService.generateWordDictionary(jwt.getSubject(), teamId, setId);
-        ExcelUtils.download(excelData, response);
-    }
-
     @Operation(summary = "단어 상세 조회")
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @ApiResponse(responseCode = "400", description = "단어 미존재 또는 접근 권한 없음")
     @GetMapping("/{wordId}")
     public ResponseEntity<WordResponse> getWord(
         @AuthenticationPrincipal Jwt jwt,
@@ -199,6 +100,9 @@ public class WordController {
     }
 
     @Operation(summary = "단어 수정")
+    @ApiResponse(responseCode = "200", description = "수정 성공")
+    @ApiResponse(responseCode = "400", description = "잘못된 요청")
+    @ApiResponse(responseCode = "409", description = "논리명 중복")
     @PutMapping("/{wordId}")
     public ResponseEntity<WordResponse> updateWord(
         @AuthenticationPrincipal Jwt jwt,
@@ -223,6 +127,8 @@ public class WordController {
     }
 
     @Operation(summary = "단어 삭제")
+    @ApiResponse(responseCode = "204", description = "삭제 성공")
+    @ApiResponse(responseCode = "400", description = "단어 미존재 또는 접근 권한 없음")
     @DeleteMapping("/{wordId}")
     public ResponseEntity<Void> deleteWord(
         @AuthenticationPrincipal Jwt jwt,
@@ -251,42 +157,5 @@ public class WordController {
             result.createdAt(),
             result.updatedAt()
         );
-    }
-
-    /**
-     * 서비스 계층 벌크 검증 결과를 HTTP 응답 DTO로 변환한다.
-     *
-     * @param result 서비스 계층 결과
-     * @return HTTP 응답 DTO
-     */
-    private BulkValidationResponse toBulkValidationResponse(BulkValidationResult result) {
-        return new BulkValidationResponse(
-            result.validationToken(),
-            result.totalCount(),
-            result.validCount(),
-            result.errorCount(),
-            result.previewTruncated(),
-            result.rows().stream().map(this::toBulkValidationRow).toList()
-        );
-    }
-
-    /**
-     * 서비스 계층 벌크 검증 행을 HTTP 응답 DTO로 변환한다.
-     *
-     * @param result 서비스 계층 결과 행
-     * @return HTTP 응답 DTO
-     */
-    private BulkValidationRow toBulkValidationRow(BulkValidationRowResult result) {
-        return new BulkValidationRow(result.rowNumber(), result.valid(), result.errors(), result.data());
-    }
-
-    /**
-     * 서비스 계층 벌크 저장 결과를 HTTP 응답 DTO로 변환한다.
-     *
-     * @param result 서비스 계층 결과
-     * @return HTTP 응답 DTO
-     */
-    private BulkSaveResponse toBulkSaveResponse(BulkSaveResult result) {
-        return new BulkSaveResponse(result.savedCount(), result.failedCount());
     }
 }

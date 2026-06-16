@@ -197,7 +197,7 @@ public class DiagramTableDefinitionExportService {
         if (node == null || node.isNull()) {
             return "";
         }
-        return AppStringUtils.defaultIfBlank(node.asText(null), "").trim();
+        return AppStringUtils.trimToEmpty(node.asText(null));
     }
 
     private DiagramExportMetadata resolveExportMetadata(JsonNode rootNode) {

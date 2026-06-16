@@ -33,7 +33,10 @@ export default function StaffingSummaryStrip({ summary }: StaffingSummaryStripPr
         : 'text-foreground';
 
   return (
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label={t('staffing.section.title')}>
+    <section
+      className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
+      aria-label={t('staffing.section.title')}
+    >
       <article className="rounded-lg border border-border/80 bg-card p-4 shadow-operational">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           {t('staffing.summary.plannedMm')}

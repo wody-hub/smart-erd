@@ -61,3 +61,6 @@ client/test-results/
 logs/
 .run/
 .gstack/
+
+# Local archive backups
+.claude/archive/**/*.orig

@@ -368,7 +368,7 @@ export default function ScreenDesignInspector({
                       updateSelectedInstance({ label: null });
                     }}
                     disabled={!selectedInstance.overrideState.label}
-                >
+                  >
                     {t('screenSpec.inspector.resetLabel')}
                   </Button>
                 </div>
@@ -426,7 +426,7 @@ export default function ScreenDesignInspector({
                   disabled={
                     !selectedInstance.overrideState.width && !selectedInstance.overrideState.height
                   }
-                  >
+                >
                   {t('screenSpec.inspector.resetSize')}
                 </Button>
               </div>

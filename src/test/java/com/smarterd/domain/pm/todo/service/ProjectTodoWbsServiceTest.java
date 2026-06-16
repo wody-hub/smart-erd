@@ -61,26 +61,28 @@ class ProjectTodoWbsServiceTest {
 
         when(projectTodoAccessService.loadProject("tester", 10L, 20L)).thenReturn(project);
         when(projectTodoAccessService.findWbsItem(project, 100L)).thenReturn(wbsItem);
-        when(projectTodoRepository.findByProjectAndLinkedWbsItemOrderByCreatedAtDescIdDesc(project, wbsItem)).thenReturn(List.of(todo));
-        when(todoDocumentLinkRepository.findByTodoInAndVisibility(List.of(todo), TodoDocumentVisibility.PROJECT_SHARED))
-            .thenReturn(List.of(createTodoDocumentLink(todo, sharedDoc, TodoDocumentVisibility.PROJECT_SHARED)));
-        when(projectTodoMapper.toTodoDocumentResult(any(TodoDocumentLink.class)))
-            .thenReturn(
-                new ProjectTodoService.TodoDocumentResult(
-                    301L,
-                    42L,
-                    "공유 문서",
-                    "markdown",
-                    null,
-                    null,
-                    "summary",
-                    List.of("spec"),
-                    TodoDocumentVisibility.PROJECT_SHARED,
-                    Instant.parse("2026-04-28T03:15:00Z"),
-                    Instant.parse("2026-04-28T03:10:00Z"),
-                    Instant.parse("2026-04-28T03:10:00Z")
-                )
-            );
+        when(
+            projectTodoRepository.findByProjectAndLinkedWbsItemOrderByCreatedAtDescIdDesc(project, wbsItem)
+        ).thenReturn(List.of(todo));
+        when(
+            todoDocumentLinkRepository.findByTodoInAndVisibility(List.of(todo), TodoDocumentVisibility.PROJECT_SHARED)
+        ).thenReturn(List.of(createTodoDocumentLink(todo, sharedDoc, TodoDocumentVisibility.PROJECT_SHARED)));
+        when(projectTodoMapper.toTodoDocumentResult(any(TodoDocumentLink.class))).thenReturn(
+            new ProjectTodoService.TodoDocumentResult(
+                301L,
+                42L,
+                "공유 문서",
+                "markdown",
+                null,
+                null,
+                "summary",
+                List.of("spec"),
+                TodoDocumentVisibility.PROJECT_SHARED,
+                Instant.parse("2026-04-28T03:15:00Z"),
+                Instant.parse("2026-04-28T03:10:00Z"),
+                Instant.parse("2026-04-28T03:10:00Z")
+            )
+        );
 
         final var result = projectTodoWbsService.getSharedTodoSummariesByWbs("tester", 10L, 20L, 100L);
 
@@ -172,14 +174,24 @@ class ProjectTodoWbsServiceTest {
     }
 
     private Diagram createDiagram(Long id, Project project, String name) {
-        final var diagram = Diagram.builder().name(name).pluginId("markdown").project(project).content("# spec").dictionarySet(null).build();
+        final var diagram = Diagram.builder()
+            .name(name)
+            .pluginId("markdown")
+            .project(project)
+            .content("# spec")
+            .dictionarySet(null)
+            .build();
         ReflectionTestUtils.setField(diagram, "id", id);
         ReflectionTestUtils.setField(diagram, "createdAt", Instant.parse("2026-04-28T03:10:00Z"));
         ReflectionTestUtils.setField(diagram, "updatedAt", Instant.parse("2026-04-28T03:10:00Z"));
         return diagram;
     }
 
-    private TodoDocumentLink createTodoDocumentLink(ProjectTodo todo, Diagram diagram, TodoDocumentVisibility visibility) {
+    private TodoDocumentLink createTodoDocumentLink(
+        ProjectTodo todo,
+        Diagram diagram,
+        TodoDocumentVisibility visibility
+    ) {
         final var link = TodoDocumentLink.builder().todo(todo).diagram(diagram).visibility(visibility).build();
         ReflectionTestUtils.setField(link, "id", 1L);
         ReflectionTestUtils.setField(link, "createdAt", Instant.parse("2026-04-28T03:15:00Z"));

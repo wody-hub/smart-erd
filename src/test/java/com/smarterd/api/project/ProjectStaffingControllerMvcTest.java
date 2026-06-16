@@ -355,7 +355,9 @@ class ProjectStaffingControllerMvcTest {
                 any(ProjectStaffingService.UpdateProjectStaffingCommand.class)
             )
         ).thenThrow(new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_VIEWER_READONLY.code()));
-        org.mockito.Mockito.doThrow(new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_VIEWER_READONLY.code()))
+        org.mockito.Mockito.doThrow(
+            new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_VIEWER_READONLY.code())
+        )
             .when(projectStaffingService)
             .deleteProjectStaffing("viewer", 1L, 10L, 100L);
 

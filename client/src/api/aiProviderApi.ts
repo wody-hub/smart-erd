@@ -6,22 +6,18 @@ import type {
   AiProviderStatusResponse,
 } from '@/types/ai-provider';
 
-const AI_PROVIDER_BASE_PATH = '/ai/provider';
+const AI_EXECUTION_BASE_PATH = '/ai/executions';
+const AI_PROVIDER_STATUS_PATH = '/ai/providers/current/status';
 
 export async function fetchAiProviderStatus(): Promise<AiProviderStatusResponse> {
-  const res = await axiosInstance.get<AiProviderStatusResponse>(
-    `${AI_PROVIDER_BASE_PATH}/status`,
-  );
+  const res = await axiosInstance.get<AiProviderStatusResponse>(AI_PROVIDER_STATUS_PATH);
   return res.data;
 }
 
 export async function executeAiProvider(
   request: AiProviderExecuteRequest,
 ): Promise<AiProviderExecuteResponse> {
-  const res = await axiosInstance.post<AiProviderExecuteResponse>(
-    `${AI_PROVIDER_BASE_PATH}/execute`,
-    request,
-  );
+  const res = await axiosInstance.post<AiProviderExecuteResponse>(AI_EXECUTION_BASE_PATH, request);
   return res.data;
 }
 
@@ -29,14 +25,14 @@ export async function fetchAiExecutionStatus(
   executionId: string,
 ): Promise<AiExecutionStatusResponse> {
   const res = await axiosInstance.get<AiExecutionStatusResponse>(
-    `${AI_PROVIDER_BASE_PATH}/executions/${executionId}`,
+    `${AI_EXECUTION_BASE_PATH}/${executionId}`,
   );
   return res.data;
 }
 
 export async function cancelAiExecution(executionId: string): Promise<AiExecutionStatusResponse> {
   const res = await axiosInstance.post<AiExecutionStatusResponse>(
-    `${AI_PROVIDER_BASE_PATH}/executions/${executionId}/cancel`,
+    `${AI_EXECUTION_BASE_PATH}/${executionId}/cancellation`,
   );
   return res.data;
 }

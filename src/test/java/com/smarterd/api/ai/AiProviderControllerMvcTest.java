@@ -59,12 +59,13 @@ class AiProviderControllerMvcTest {
 
     @Test
     void getStatusReturnsSafeProviderStatus() throws Exception {
-        when(aiExecutionGateway.status())
-            .thenReturn(new AiExecutionGateway.AiProviderStatusView("noop", "NOT_CONFIGURED", null, Instant.EPOCH));
+        when(aiExecutionGateway.status()).thenReturn(
+            new AiExecutionGateway.AiProviderStatusView("noop", "NOT_CONFIGURED", null, Instant.EPOCH)
+        );
 
         mockMvc
             .perform(
-                get("/api/ai/provider/status").with((request) -> {
+                get("/api/ai/providers/current/status").with((request) -> {
                     request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                     return request;
                 })
@@ -75,33 +76,52 @@ class AiProviderControllerMvcTest {
     }
 
     @Test
+    void providerEndpointsRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/api/ai/providers/current/status")).andExpect(status().isForbidden());
+        mockMvc
+            .perform(
+                post("/api/ai/executions")
+                    .contentType(APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "status?"))
+                    )
+            )
+            .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/ai/executions/exec-1")).andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/ai/executions/exec-1/cancellation")).andExpect(status().isForbidden());
+    }
+
+    @Test
     void executeReturnsFinalResultWithExecutionId() throws Exception {
-        when(aiExecutionGateway.execute(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(
-                new AiExecutionGateway.AiExecutionView(
-                    "exec-1",
-                    "noop",
-                    "provider-response-v1",
-                    AiExecutionState.FAILED,
-                    Instant.EPOCH,
-                    Instant.EPOCH,
-                    Instant.EPOCH,
-                    0L,
-                    null,
-                    List.of(),
-                    new AiProviderError("NOT_CONFIGURED", "Not configured", "No provider", false)
-                )
-            );
+        when(
+            aiExecutionGateway.execute(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any())
+        ).thenReturn(
+            new AiExecutionGateway.AiExecutionView(
+                "exec-1",
+                "noop",
+                "provider-response-v1",
+                AiExecutionState.FAILED,
+                Instant.EPOCH,
+                Instant.EPOCH,
+                Instant.EPOCH,
+                0L,
+                null,
+                List.of(),
+                new AiProviderError("NOT_CONFIGURED", "Not configured", "No provider", false)
+            )
+        );
 
         mockMvc
             .perform(
-                post("/api/ai/provider/execute")
+                post("/api/ai/executions")
                     .with((request) -> {
                         request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                         return request;
                     })
                     .contentType(APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "status?")))
+                    .content(
+                        objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "status?"))
+                    )
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.executionId").value("exec-1"))
@@ -111,12 +131,13 @@ class AiProviderControllerMvcTest {
 
     @Test
     void getExecutionCrossUserDenialReturnsForbidden() throws Exception {
-        when(aiExecutionGateway.getExecution("tester", "exec-1"))
-            .thenThrow(new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_AI_EXECUTION.code()));
+        when(aiExecutionGateway.getExecution("tester", "exec-1")).thenThrow(
+            new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_AI_EXECUTION.code())
+        );
 
         mockMvc
             .perform(
-                get("/api/ai/provider/executions/exec-1").with((request) -> {
+                get("/api/ai/executions/exec-1").with((request) -> {
                     request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                     return request;
                 })
@@ -126,26 +147,25 @@ class AiProviderControllerMvcTest {
 
     @Test
     void cancelExecutionReturnsTerminalStatus() throws Exception {
-        when(aiExecutionGateway.cancelExecution("tester", "exec-1"))
-            .thenReturn(
-                new AiExecutionGateway.AiExecutionView(
-                    "exec-1",
-                    "noop",
-                    "provider-response-v1",
-                    AiExecutionState.CANCELLED,
-                    Instant.EPOCH,
-                    Instant.EPOCH,
-                    Instant.EPOCH,
-                    0L,
-                    null,
-                    List.of(),
-                    null
-                )
-            );
+        when(aiExecutionGateway.cancelExecution("tester", "exec-1")).thenReturn(
+            new AiExecutionGateway.AiExecutionView(
+                "exec-1",
+                "noop",
+                "provider-response-v1",
+                AiExecutionState.CANCELLED,
+                Instant.EPOCH,
+                Instant.EPOCH,
+                Instant.EPOCH,
+                0L,
+                null,
+                List.of(),
+                null
+            )
+        );
 
         mockMvc
             .perform(
-                post("/api/ai/provider/executions/exec-1/cancel").with((request) -> {
+                post("/api/ai/executions/exec-1/cancellation").with((request) -> {
                     request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                     return request;
                 })

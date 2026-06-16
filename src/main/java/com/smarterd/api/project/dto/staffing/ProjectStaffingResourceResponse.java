@@ -48,8 +48,7 @@ public record ProjectStaffingResourceResponse(
 
     @Nullable @Schema(description = "실적-계획 델타 M/M", example = "-0.22") BigDecimal deltaMm,
 
-    @Schema(description = "월별 계획/실적 비교 목록")
-    List<ProjectStaffingMonthlyAllocationResponse> monthlyAllocations,
+    @Schema(description = "월별 계획/실적 비교 목록") List<ProjectStaffingMonthlyAllocationResponse> monthlyAllocations,
 
     @Schema(description = "생성 시각 (UTC, ISO-8601)") Instant createdAt,
 

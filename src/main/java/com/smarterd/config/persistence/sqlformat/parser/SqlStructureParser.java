@@ -1,6 +1,7 @@
 package com.smarterd.config.persistence.sqlformat.parser;
 
 import com.smarterd.config.persistence.sqlformat.SqlCharUtils;
+import com.smarterd.utils.AppStringUtils;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -90,7 +91,7 @@ public final class SqlStructureParser {
 
             if (ch == ',' && depth == 0) {
                 // top-level comma만 항목 경계로 사용한다.
-                items.add(current.toString().trim());
+                items.add(AppStringUtils.trimToEmpty(current.toString()));
                 current.setLength(0);
                 continue;
             }
@@ -98,7 +99,7 @@ public final class SqlStructureParser {
             current.append(ch);
         }
 
-        final var last = current.toString().trim();
+        final var last = AppStringUtils.trimToEmpty(current.toString());
         if (!last.isEmpty()) {
             items.add(last);
         }

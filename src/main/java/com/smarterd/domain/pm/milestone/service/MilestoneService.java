@@ -62,7 +62,10 @@ public class MilestoneService {
             .stream()
             .map((milestone) -> {
                 final var aggregate = aggregates.getOrDefault(milestone.getId(), MilestoneProgressAggregate.EMPTY);
-                final var dependencyCount = dependencyCounts.getOrDefault(milestone.getId(), MilestoneDependencyCount.EMPTY);
+                final var dependencyCount = dependencyCounts.getOrDefault(
+                    milestone.getId(),
+                    MilestoneDependencyCount.EMPTY
+                );
                 final var isDelayed = milestone.getTargetDate().isBefore(today) && aggregate.averageRate() < 100;
                 return toResult(
                     milestone,
@@ -202,8 +205,13 @@ public class MilestoneService {
     ) {
         return milestones
             .stream()
-            .filter((milestone) -> aggregates.getOrDefault(milestone.getId(), MilestoneProgressAggregate.EMPTY).count() > 0)
-            .filter((milestone) -> aggregates.getOrDefault(milestone.getId(), MilestoneProgressAggregate.EMPTY).averageRate() < 100)
+            .filter(
+                (milestone) -> aggregates.getOrDefault(milestone.getId(), MilestoneProgressAggregate.EMPTY).count() > 0
+            )
+            .filter(
+                (milestone) ->
+                    aggregates.getOrDefault(milestone.getId(), MilestoneProgressAggregate.EMPTY).averageRate() < 100
+            )
             .sorted((left, right) -> {
                 final var compareDate = left.getTargetDate().compareTo(right.getTargetDate());
                 if (compareDate != 0) {
@@ -228,21 +236,21 @@ public class MilestoneService {
 
             if (
                 predecessorMilestone != null &&
-                (successorMilestone == null || !Objects.equals(predecessorMilestone.getId(), successorMilestone.getId()))
+                (successorMilestone == null ||
+                    !Objects.equals(predecessorMilestone.getId(), successorMilestone.getId()))
             ) {
-                counts.compute(
-                    predecessorMilestone.getId(),
-                    (ignored, current) -> (current == null ? MilestoneDependencyCount.EMPTY : current).incrementOutbound()
+                counts.compute(predecessorMilestone.getId(), (ignored, current) ->
+                    (current == null ? MilestoneDependencyCount.EMPTY : current).incrementOutbound()
                 );
             }
 
             if (
                 successorMilestone != null &&
-                (predecessorMilestone == null || !Objects.equals(successorMilestone.getId(), predecessorMilestone.getId()))
+                (predecessorMilestone == null ||
+                    !Objects.equals(successorMilestone.getId(), predecessorMilestone.getId()))
             ) {
-                counts.compute(
-                    successorMilestone.getId(),
-                    (ignored, current) -> (current == null ? MilestoneDependencyCount.EMPTY : current).incrementInbound()
+                counts.compute(successorMilestone.getId(), (ignored, current) ->
+                    (current == null ? MilestoneDependencyCount.EMPTY : current).incrementInbound()
                 );
             }
         }

@@ -95,7 +95,9 @@ export function isWbsInlineEditorDirty(
       return item.estimatedMm != null;
     }
     if (Number.isNaN(parsed)) {
-      return draft.estimatedMmValue.trim() !== (item.estimatedMm == null ? '' : String(item.estimatedMm));
+      return (
+        draft.estimatedMmValue.trim() !== (item.estimatedMm == null ? '' : String(item.estimatedMm))
+      );
     }
     return parsed !== item.estimatedMm;
   }

@@ -661,7 +661,11 @@ export function ensureScreenDesignDocumentStructure(
 
     const screenOrder = root.get(SCREEN_ORDER_KEY);
     const screensMap = root.get(SCREENS_KEY);
-    if (shouldNormalizeScreenOrder && screenOrder instanceof Y.Array && screensMap instanceof Y.Map) {
+    if (
+      shouldNormalizeScreenOrder &&
+      screenOrder instanceof Y.Array &&
+      screensMap instanceof Y.Map
+    ) {
       normalizeScreenOrderYArray(screensMap, screenOrder);
     }
   }, origin);

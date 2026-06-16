@@ -61,6 +61,8 @@ public class DictionarySetController {
         description = "생성 성공",
         content = @Content(schema = @Schema(implementation = DictionarySetResponse.class))
     )
+    @ApiResponse(responseCode = "400", description = "잘못된 요청", content = @Content)
+    @ApiResponse(responseCode = "409", description = "사전 세트명 중복", content = @Content)
     @PostMapping
     public ResponseEntity<DictionarySetResponse> createDictionarySet(
         @AuthenticationPrincipal Jwt jwt,
@@ -84,6 +86,8 @@ public class DictionarySetController {
      * @return 사전 세트 목록 응답
      */
     @Operation(summary = "사전 세트 목록 조회")
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @ApiResponse(responseCode = "400", description = "팀이 존재하지 않거나 접근 권한 없음", content = @Content)
     @GetMapping
     public ResponseEntity<List<DictionarySetResponse>> getDictionarySets(
         @AuthenticationPrincipal Jwt jwt,
@@ -107,6 +111,8 @@ public class DictionarySetController {
      * @return 사전 세트 단건 응답
      */
     @Operation(summary = "사전 세트 단건 조회")
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @ApiResponse(responseCode = "400", description = "사전 세트 미존재 또는 접근 권한 없음", content = @Content)
     @GetMapping("/{setId}")
     public ResponseEntity<DictionarySetResponse> getDictionarySet(
         @AuthenticationPrincipal Jwt jwt,
@@ -128,6 +134,9 @@ public class DictionarySetController {
      * @return 수정된 사전 세트 응답
      */
     @Operation(summary = "사전 세트 수정")
+    @ApiResponse(responseCode = "200", description = "수정 성공")
+    @ApiResponse(responseCode = "400", description = "잘못된 요청", content = @Content)
+    @ApiResponse(responseCode = "409", description = "사전 세트명 중복", content = @Content)
     @PutMapping("/{setId}")
     public ResponseEntity<DictionarySetResponse> updateDictionarySet(
         @AuthenticationPrincipal Jwt jwt,
@@ -157,6 +166,8 @@ public class DictionarySetController {
      * @return 본문 없는 204 응답
      */
     @Operation(summary = "사전 세트 삭제")
+    @ApiResponse(responseCode = "204", description = "삭제 성공")
+    @ApiResponse(responseCode = "400", description = "사전 세트 미존재 또는 접근 권한 없음", content = @Content)
     @DeleteMapping("/{setId}")
     public ResponseEntity<Void> deleteDictionarySet(
         @AuthenticationPrincipal Jwt jwt,
@@ -176,6 +187,8 @@ public class DictionarySetController {
      * @return 기본 사전 세트로 지정된 응답
      */
     @Operation(summary = "기본 사전 세트 지정")
+    @ApiResponse(responseCode = "200", description = "기본 사전 세트 지정 성공")
+    @ApiResponse(responseCode = "400", description = "사전 세트 미존재 또는 접근 권한 없음", content = @Content)
     @PatchMapping("/{setId}/default")
     public ResponseEntity<DictionarySetResponse> setDefaultDictionarySet(
         @AuthenticationPrincipal Jwt jwt,

@@ -25,7 +25,23 @@ public class AiExecutionRegistry {
         this.clock = clock;
     }
 
-    public ExecutionSnapshot create(String requestedBy, Long teamId, Long projectId, String provider, String promptVersion) {
+    /**
+     * Creates a new tracked execution snapshot for a provider request.
+     *
+     * @param requestedBy login ID that requested the execution
+     * @param teamId team scope for the execution
+     * @param projectId project scope for the execution
+     * @param provider provider identifier
+     * @param promptVersion prompt contract version
+     * @return created execution snapshot
+     */
+    public ExecutionSnapshot create(
+        String requestedBy,
+        Long teamId,
+        Long projectId,
+        String provider,
+        String promptVersion
+    ) {
         final var now = clock.instant();
         final var execution = new MutableExecution(
             UUID.randomUUID().toString(),

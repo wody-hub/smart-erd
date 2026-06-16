@@ -74,7 +74,11 @@ public class LocalCodexProcessProvider implements AiProvider {
             case CODEX_NOT_FOUND -> failed("CODEX_NOT_FOUND", "Codex executable was not found", false);
             case TIMED_OUT -> failed("TIMED_OUT", "Codex execution timed out", true);
             case CANCELLED -> failed("CANCELLED", "Codex execution was cancelled", false);
-            case UNSUPPORTED_ENVIRONMENT -> failed("UNSUPPORTED_ENVIRONMENT", "Codex environment is unsupported", false);
+            case UNSUPPORTED_ENVIRONMENT -> failed(
+                "UNSUPPORTED_ENVIRONMENT",
+                "Codex environment is unsupported",
+                false
+            );
             case FAILED -> failed("CODEX_EXEC_FAILED", "Codex execution failed", true);
         };
     }
@@ -106,17 +110,21 @@ public class LocalCodexProcessProvider implements AiProvider {
             User message:
             %s
             """.formatted(
-                promptTemplate == null ? "Return JSON only, matching the configured output schema." : promptTemplate,
-                request.executionId(),
-                objectMapper.writeValueAsString(request.context()),
-                request.userMessage()
-            );
+                    promptTemplate == null
+                        ? "Return JSON only, matching the configured output schema."
+                        : promptTemplate,
+                    request.executionId(),
+                    objectMapper.writeValueAsString(request.context()),
+                    request.userMessage()
+                );
         } catch (JsonProcessingException ex) {
             return request.userMessage();
         }
     }
 
     private AiProviderResult failed(String type, String title, boolean retryable) {
-        return AiProviderResult.failed(new AiProviderError(type, title, "The local Codex provider failed safely.", retryable));
+        return AiProviderResult.failed(
+            new AiProviderError(type, title, "The local Codex provider failed safely.", retryable)
+        );
     }
 }

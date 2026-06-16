@@ -3,25 +3,41 @@ package com.smarterd.api.ai.dto;
 import com.smarterd.application.ai.proposal.AiActionProposalView;
 import com.smarterd.application.ai.provider.AiActionRiskLevel;
 import com.smarterd.domain.ai.AiActionProposalStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
 
+@Schema(description = "AI action proposal response")
 public record AiActionProposalResponse(
-    String proposalId,
-    AiActionProposalStatus status,
-    boolean executable,
-    String actionType,
-    AiActionRiskLevel riskLevel,
-    TargetResponse target,
-    String title,
-    String summary,
-    List<FieldChangeResponse> fields,
-    String content,
-    List<String> warnings,
-    Instant expiresAt,
-    ResultResponse result,
-    String redactedErrorTitle,
-    String redactedErrorDetail
+    @Schema(description = "Public proposal id", example = "proposal-1") String proposalId,
+
+    @Schema(description = "Proposal status", example = "PENDING") AiActionProposalStatus status,
+
+    @Schema(description = "Whether the proposal can still be executed", example = "true") boolean executable,
+
+    @Schema(description = "Action type", example = "ISSUE_CREATE") String actionType,
+
+    @Schema(description = "Risk level") AiActionRiskLevel riskLevel,
+
+    @Schema(description = "Sanitized target metadata") AiActionProposalTargetResponse target,
+
+    @Schema(description = "Proposal title", example = "Create issue") String title,
+
+    @Schema(description = "Proposal summary", example = "Create a project issue") String summary,
+
+    @Schema(description = "Field-level preview rows") List<AiActionProposalFieldChangeResponse> fields,
+
+    @Schema(description = "Sanitized content preview") String content,
+
+    @Schema(description = "Warnings shown before applying the proposal") List<String> warnings,
+
+    @Schema(description = "Proposal expiration timestamp") Instant expiresAt,
+
+    @Schema(description = "Sanitized action result") AiActionProposalResultResponse result,
+
+    @Schema(description = "Redacted error title") String redactedErrorTitle,
+
+    @Schema(description = "Redacted error detail") String redactedErrorDetail
 ) {
     public AiActionProposalResponse {
         fields = fields == null ? List.of() : List.copyOf(fields);
@@ -44,66 +60,16 @@ public record AiActionProposalResponse(
             view.executable(),
             view.actionType(),
             view.riskLevel(),
-            TargetResponse.from(view.target()),
+            AiActionProposalTargetResponse.from(view.target()),
             view.title(),
             view.summary(),
-            view.fields().stream().map(FieldChangeResponse::from).toList(),
+            view.fields().stream().map(AiActionProposalFieldChangeResponse::from).toList(),
             view.content(),
             view.warnings(),
             view.expiresAt(),
-            ResultResponse.from(view.result()),
+            AiActionProposalResultResponse.from(view.result()),
             view.redactedErrorTitle(),
             view.redactedErrorDetail()
         );
-    }
-
-    public record TargetResponse(String type, String id, String label, Long teamId, Long projectId) {
-        /**
-         * Maps the sanitized target metadata for display.
-         *
-         * @param target sanitized target metadata
-         * @return REST target response or null
-         */
-        private static TargetResponse from(AiActionProposalView.Target target) {
-            if (target == null) {
-                return null;
-            }
-            return new TargetResponse(target.type(), target.id(), target.label(), target.teamId(), target.projectId());
-        }
-    }
-
-    public record FieldChangeResponse(String label, String beforeValue, String afterValue, String changeType) {
-        /**
-         * Maps one sanitized field change preview row.
-         *
-         * @param field sanitized field change
-         * @return REST field change response
-         */
-        private static FieldChangeResponse from(AiActionProposalView.FieldChange field) {
-            return new FieldChangeResponse(field.label(), field.beforeValue(), field.afterValue(), field.changeType());
-        }
-    }
-
-    public record ResultResponse(
-        String actionType,
-        String resourceType,
-        String resourceId,
-        String targetLabel,
-        String status,
-        String summary
-    ) {
-        private static ResultResponse from(AiActionProposalView.Result result) {
-            if (result == null) {
-                return null;
-            }
-            return new ResultResponse(
-                result.actionType(),
-                result.resourceType(),
-                result.resourceId(),
-                result.targetLabel(),
-                result.status(),
-                result.summary()
-            );
-        }
     }
 }

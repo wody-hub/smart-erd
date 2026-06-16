@@ -165,7 +165,9 @@ class WbsDependencyServiceTest {
                 WbsDependencyType.FS
             )
         ).thenReturn(false);
-        when(wbsDependencyRepository.findByProjectWithRelations(project)).thenReturn(List.of(dependencyAB, dependencyBC));
+        when(wbsDependencyRepository.findByProjectWithRelations(project)).thenReturn(
+            List.of(dependencyAB, dependencyBC)
+        );
 
         assertThatThrownBy(() ->
             wbsDependencyService.createDependency(

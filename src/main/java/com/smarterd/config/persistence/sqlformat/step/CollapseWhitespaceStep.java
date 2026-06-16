@@ -1,6 +1,7 @@
 package com.smarterd.config.persistence.sqlformat.step;
 
 import com.smarterd.config.persistence.sqlformat.SqlCharUtils;
+import com.smarterd.utils.AppStringUtils;
 
 /**
  * 문자열 리터럴 외부의 연속 공백을 1칸으로 축약한다.
@@ -57,6 +58,6 @@ public class CollapseWhitespaceStep implements SqlFormatStep {
             previousWhitespace = false;
         }
 
-        return result.toString().trim();
+        return AppStringUtils.trimToEmpty(result.toString());
     }
 }

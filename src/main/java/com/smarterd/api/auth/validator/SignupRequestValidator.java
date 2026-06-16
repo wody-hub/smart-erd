@@ -2,7 +2,7 @@ package com.smarterd.api.auth.validator;
 
 import com.smarterd.api.auth.dto.SignupRequest;
 import com.smarterd.domain.common.message.MessageCode;
-import com.smarterd.domain.user.repository.UserRepository;
+import com.smarterd.domain.user.service.AuthService;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.NonNull;
@@ -24,8 +24,8 @@ import org.springframework.validation.Validator;
 @RequiredArgsConstructor
 public class SignupRequestValidator implements Validator {
 
-    /** 사용자 레포지토리 */
-    private final UserRepository userRepository;
+    /** 인증 서비스 */
+    private final AuthService authService;
 
     @Override
     public boolean supports(@NonNull Class<?> clazz) {
@@ -36,7 +36,7 @@ public class SignupRequestValidator implements Validator {
     public void validate(@NonNull Object target, @NonNull Errors errors) {
         final var request = (SignupRequest) target;
 
-        if (request.loginId() != null && userRepository.existsByLoginId(request.loginId())) {
+        if (request.loginId() != null && authService.existsByLoginId(request.loginId())) {
             errors.rejectValue(
                 "loginId",
                 Objects.requireNonNull(MessageCode.ERROR_DUPLICATE_LOGIN_ID.code()),

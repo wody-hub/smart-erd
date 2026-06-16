@@ -10,5 +10,8 @@ import java.util.List;
  */
 @Schema(description = "dependency shift preview/apply 요청")
 public record WbsDependencyShiftRequest(
-    @Valid @NotEmpty @Schema(description = "사용자가 직접 이동한 anchor 목록") List<WbsDependencyShiftItemRequest> anchors
+    @Valid
+    @NotEmpty(message = "{validation.not-empty.wbs-dependency-shift-anchors}")
+    @Schema(description = "사용자가 직접 이동한 anchor 목록")
+    List<WbsDependencyShiftItemRequest> anchors
 ) {}

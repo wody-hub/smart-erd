@@ -1,5 +1,7 @@
 package com.smarterd.collaboration.document;
 
+import java.util.Arrays;
+import java.util.Objects;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
@@ -33,7 +35,7 @@ public record DocumentCheckpoint(
      * <p>배열 필드는 방어 복사하여 경계 객체의 불변성을 유지한다.</p>
      */
     public DocumentCheckpoint {
-        snapshot = snapshot.clone();
+        snapshot = Objects.requireNonNull(snapshot, "snapshot must not be null").clone();
         compatibilityArtifact = compatibilityArtifact != null ? compatibilityArtifact.clone() : null;
     }
 
@@ -45,5 +47,53 @@ public record DocumentCheckpoint(
     @Override
     public byte[] compatibilityArtifact() {
         return compatibilityArtifact != null ? compatibilityArtifact.clone() : null;
+    }
+
+    /**
+     * 배열 필드를 내용 기준으로 비교한다.
+     *
+     * @param value 비교 대상
+     * @return 값 동등 여부
+     */
+    @Override
+    public boolean equals(Object value) {
+        if (this == value) {
+            return true;
+        }
+        if (!(value instanceof DocumentCheckpoint other)) {
+            return false;
+        }
+        return (
+            pluginSchemaVersion == other.pluginSchemaVersion &&
+            snapshotFormatVersion == other.snapshotFormatVersion &&
+            revision == other.revision &&
+            Objects.equals(documentId, other.documentId) &&
+            Objects.equals(pluginId, other.pluginId) &&
+            Objects.equals(engineId, other.engineId) &&
+            Objects.equals(artifactVersion, other.artifactVersion) &&
+            Arrays.equals(snapshot, other.snapshot) &&
+            Arrays.equals(compatibilityArtifact, other.compatibilityArtifact)
+        );
+    }
+
+    /**
+     * 배열 필드를 내용 기준으로 해시한다.
+     *
+     * @return hash code
+     */
+    @Override
+    public int hashCode() {
+        var result = Objects.hash(
+            documentId,
+            pluginId,
+            engineId,
+            pluginSchemaVersion,
+            snapshotFormatVersion,
+            artifactVersion,
+            revision
+        );
+        result = 31 * result + Arrays.hashCode(snapshot);
+        result = 31 * result + Arrays.hashCode(compatibilityArtifact);
+        return result;
     }
 }

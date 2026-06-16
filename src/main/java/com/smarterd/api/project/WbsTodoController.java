@@ -4,6 +4,9 @@ import com.smarterd.api.project.dto.todo.SharedTodoSummaryResponse;
 import com.smarterd.domain.pm.todo.service.ProjectTodoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +30,11 @@ public class WbsTodoController {
     private final ProjectTodoService projectTodoService;
 
     @Operation(summary = "WBS 연결 TODO 공유 요약 조회")
+    @ApiResponse(
+        responseCode = "200",
+        description = "조회 성공",
+        content = @Content(schema = @Schema(implementation = SharedTodoSummaryResponse.class))
+    )
     @GetMapping
     public ResponseEntity<List<SharedTodoSummaryResponse>> getSharedTodoSummaries(
         @AuthenticationPrincipal Jwt jwt,

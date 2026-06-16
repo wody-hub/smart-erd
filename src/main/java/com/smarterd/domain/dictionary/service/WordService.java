@@ -12,7 +12,6 @@ import com.smarterd.domain.team.service.TeamService;
 import com.smarterd.domain.user.entity.User;
 import com.smarterd.domain.user.service.AuthService;
 import com.smarterd.utils.AppStringUtils;
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -285,35 +284,4 @@ public class WordService {
      * @param dictionarySet 대상 사전 세트
      */
     private record AccessContext(User user, Team team, DictionarySet dictionarySet) {}
-
-    /**
-     * 단어 응답용 서비스 결과.
-     *
-     * @param id 단어 ID
-     * @param logicalName 논리명
-     * @param physicalName 물리명
-     * @param description 설명
-     * @param teamId 소속 팀 ID
-     * @param dictionarySetId 소속 사전 세트 ID
-     * @param createdAt 생성 시각
-     * @param updatedAt 수정 시각
-     */
-    public record WordResult(
-        Long id,
-        String logicalName,
-        String physicalName,
-        String description,
-        Long teamId,
-        Long dictionarySetId,
-        Instant createdAt,
-        Instant updatedAt
-    ) {}
-
-    /**
-     * 단어 사전 엑셀 내보내기 결과.
-     *
-     * @param dictionarySetName 사전 세트명
-     * @param words 정렬된 단어 목록
-     */
-    public record WordExportResult(String dictionarySetName, List<WordResult> words) {}
 }

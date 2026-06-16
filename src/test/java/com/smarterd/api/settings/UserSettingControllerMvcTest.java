@@ -47,8 +47,9 @@ class UserSettingControllerMvcTest {
 
     @Test
     void getProjectWorkspaceTabOrder_returnsStoredOrder() throws Exception {
-        when(userSettingService.getProjectWorkspaceTabOrder("tester"))
-            .thenReturn(new ProjectWorkspaceTabOrderResult(List.of("documents", "overview", "tags")));
+        when(userSettingService.getProjectWorkspaceTabOrder("tester")).thenReturn(
+            new ProjectWorkspaceTabOrderResult(List.of("documents", "overview", "tags"))
+        );
 
         mockMvc
             .perform(
@@ -65,12 +66,11 @@ class UserSettingControllerMvcTest {
 
     @Test
     void updateProjectWorkspaceTabOrder_returnsNormalizedOrder() throws Exception {
-        when(userSettingService.updateProjectWorkspaceTabOrder("tester", List.of("documents", "issues")))
-            .thenReturn(
-                new ProjectWorkspaceTabOrderResult(
-                    List.of("documents", "issues", "overview", "tags", "wbs", "myTasks", "gantt", "staffing")
-                )
-            );
+        when(userSettingService.updateProjectWorkspaceTabOrder("tester", List.of("documents", "issues"))).thenReturn(
+            new ProjectWorkspaceTabOrderResult(
+                List.of("documents", "issues", "overview", "tags", "wbs", "myTasks", "gantt", "staffing")
+            )
+        );
 
         mockMvc
             .perform(
@@ -80,7 +80,9 @@ class UserSettingControllerMvcTest {
                         return request;
                     })
                     .contentType(APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(java.util.Map.of("tabOrder", List.of("documents", "issues"))))
+                    .content(
+                        objectMapper.writeValueAsString(java.util.Map.of("tabOrder", List.of("documents", "issues")))
+                    )
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.tabOrder[0]").value("documents"))

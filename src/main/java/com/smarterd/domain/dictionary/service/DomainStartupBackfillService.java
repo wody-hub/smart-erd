@@ -203,7 +203,7 @@ public class DomainStartupBackfillService implements ApplicationRunner {
         if (normalized == null) {
             return null;
         }
-        return normalized.replaceAll("\\s+", "").toUpperCase(java.util.Locale.ROOT);
+        return AppStringUtils.upperCaseToEmpty(normalized.replaceAll("\\s+", ""));
     }
 
     private static Map<String, GhContractDomainMetadata> createGhContractDomainMetadata() {
@@ -288,14 +288,4 @@ public class DomainStartupBackfillService implements ApplicationRunner {
             metadata.put(Objects.requireNonNull(normalizeDomainKey(alias)), domainMetadata);
         }
     }
-
-    /**
-     * 백필 요약.
-     *
-     * @param structuredTypeUpdates 구조화 타입 보정 건수
-     * @param ghContractUpdates GH 도급 메타데이터 보정 건수
-     */
-    public record BackfillSummary(int structuredTypeUpdates, int ghContractUpdates) {}
-
-    private record GhContractDomainMetadata(String group, String domainName) {}
 }

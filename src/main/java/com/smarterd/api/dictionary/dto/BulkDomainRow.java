@@ -18,8 +18,12 @@ import jakarta.validation.constraints.NotBlank;
 public record BulkDomainRow(
     @Schema(description = "도메인 그룹", example = "명칭") String domainGroup,
     @Schema(description = "도메인명", example = "명") String domainClassification,
-    @Schema(description = "공통 표준 도메인명", example = "금액_DECIMAL15_2") @NotBlank String logicalName,
-    @Schema(description = "데이터 타입", example = "DECIMAL") @NotBlank String dataType,
+    @Schema(description = "공통 표준 도메인명", example = "금액_DECIMAL15_2")
+    @NotBlank(message = "{validation.not-blank.logical-name}")
+    String logicalName,
+    @Schema(description = "데이터 타입", example = "DECIMAL")
+    @NotBlank(message = "{validation.not-blank.data-type}")
+    String dataType,
     @Schema(description = "데이터 길이", example = "15") Integer dataLength,
     @Schema(description = "데이터 소수점 길이", example = "2") Integer dataScale,
     @Schema(description = "설명", example = "화폐 금액") String description

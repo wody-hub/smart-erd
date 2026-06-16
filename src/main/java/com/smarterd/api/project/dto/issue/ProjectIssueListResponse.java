@@ -1,13 +1,15 @@
 package com.smarterd.api.project.dto.issue;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
 /**
  * 프로젝트 이슈 목록 응답 DTO.
  */
+@Schema(description = "프로젝트 이슈 목록 응답")
 public record ProjectIssueListResponse(
-    List<ProjectIssueResponse> items,
-    ProjectIssueSummaryResponse summary
+    @Schema(description = "프로젝트 이슈 목록") List<ProjectIssueResponse> items,
+    @Schema(description = "프로젝트 이슈 상태별 요약") ProjectIssueSummaryResponse summary
 ) {
     /**
      * 이슈 목록 응답 DTO를 생성한다.

@@ -50,7 +50,12 @@ public class TodoUpdateActionExecutor implements AiActionExecutor {
         payload.requireTargetType("todo");
         payload.requireOnlyFields(ALLOWED_FIELDS);
         final var todoId = payload.requireTargetId();
-        final var current = projectTodoService.getProjectTodo(loginId, proposal.getTeamId(), proposal.getProjectId(), todoId);
+        final var current = projectTodoService.getProjectTodo(
+            loginId,
+            proposal.getTeamId(),
+            proposal.getProjectId(),
+            todoId
+        );
         payload.assertBeforeMatches("title", current.title());
         payload.assertBeforeMatches("description", current.description());
         payload.assertBeforeMatches("status", current.status().name());

@@ -13,7 +13,7 @@ test.skip(
 );
 
 async function mockAiChatEndpoints(page: Page, target: DiagramTarget): Promise<void> {
-  await page.route('**/api/ai/provider/status', async (route) => {
+  await page.route('**/api/ai/providers/current/status', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -51,7 +51,9 @@ async function mockAiChatEndpoints(page: Page, target: DiagramTarget): Promise<v
   });
 }
 
-test('AI chat drawer opens globally and keeps context while routes change @smoke', async ({ page }) => {
+test('AI chat drawer opens globally and keeps context while routes change @smoke', async ({
+  page,
+}) => {
   const config = getE2EConfig();
 
   await page.goto(`${config.baseUrl}/login`, { waitUntil: 'domcontentloaded' });
@@ -77,7 +79,9 @@ test('AI chat drawer opens globally and keeps context while routes change @smoke
   await drawer.getByRole('textbox').fill(question);
   await drawer.getByRole('button', { name: '질문 보내기' }).click();
 
-  await expect(drawer.getByText(`${target.projectName} 지연 이슈를 먼저 확인해야 합니다.`)).toBeVisible();
+  await expect(
+    drawer.getByText(`${target.projectName} 지연 이슈를 먼저 확인해야 합니다.`),
+  ).toBeVisible();
   await expect(drawer.getByText(`${target.projectName} - issues 12`)).toBeVisible();
   await expect(drawer.getByText(/확인된 사실|AI 응답을 만들지 못했습니다/)).toBeVisible();
 

@@ -3,9 +3,9 @@ package com.smarterd.application.ai.proposal.executor;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.domain.ai.AiActionProposal;
+import com.smarterd.utils.AppStringUtils;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -38,7 +38,7 @@ public class AiActionPayloadReader {
     }
 
     private Map<String, Object> readMap(String json) {
-        if (json == null || json.isBlank()) {
+        if (AppStringUtils.isBlank(json)) {
             return Map.of();
         }
         try {
@@ -58,7 +58,7 @@ public class AiActionPayloadReader {
                 throw invalid();
             }
             final var name = firstString(map, "name", "key", "field", "label");
-            if (name == null || name.isBlank()) {
+            if (AppStringUtils.isBlank(name)) {
                 throw invalid();
             }
             final var normalized = normalize(name);
@@ -66,7 +66,10 @@ public class AiActionPayloadReader {
             final var hasValue = map.containsKey("value");
             final var hasBefore = map.containsKey("beforeValue");
             final var afterValue = hasAfter ? map.get("afterValue") : map.get("value");
-            fields.put(normalized, new FieldValue(name, hasBefore, map.get("beforeValue"), hasAfter || hasValue, afterValue));
+            fields.put(
+                normalized,
+                new FieldValue(name, hasBefore, map.get("beforeValue"), hasAfter || hasValue, afterValue)
+            );
         }
         return Map.copyOf(fields);
     }
@@ -87,17 +90,12 @@ public class AiActionPayloadReader {
         if (value == null) {
             return fallback;
         }
-        final var string = String.valueOf(value).trim();
+        final var string = AppStringUtils.trimToEmpty(String.valueOf(value));
         return string.isEmpty() ? fallback : string;
     }
 
     static String normalize(String value) {
-        return value
-            .trim()
-            .toLowerCase(Locale.ROOT)
-            .replace("_", "")
-            .replace("-", "")
-            .replace(" ", "");
+        return AppStringUtils.lowerTrimToEmpty(value).replace("_", "").replace("-", "").replace(" ", "");
     }
 
     static IllegalArgumentException invalid() {
@@ -126,11 +124,11 @@ public class AiActionPayloadReader {
         }
 
         public Long requireTargetId() {
-            if (targetId == null || targetId.isBlank()) {
+            if (AppStringUtils.isBlank(targetId)) {
                 throw invalid();
             }
             try {
-                return Long.valueOf(targetId.trim());
+                return Long.valueOf(AppStringUtils.trimToEmpty(targetId));
             } catch (NumberFormatException ex) {
                 throw invalid();
             }
@@ -145,7 +143,10 @@ public class AiActionPayloadReader {
         }
 
         public void requireOnlyFields(Set<String> allowedFields) {
-            final var allowed = allowedFields.stream().map(AiActionPayloadReader::normalize).collect(java.util.stream.Collectors.toSet());
+            final var allowed = allowedFields
+                .stream()
+                .map(AiActionPayloadReader::normalize)
+                .collect(java.util.stream.Collectors.toSet());
             for (final var name : fields.keySet()) {
                 if (!allowed.contains(name)) {
                     throw invalid();
@@ -201,7 +202,7 @@ public class AiActionPayloadReader {
                 return null;
             }
             try {
-                return Long.valueOf(String.valueOf(field.afterValue()).trim());
+                return Long.valueOf(AppStringUtils.trimToEmpty(String.valueOf(field.afterValue())));
             } catch (NumberFormatException ex) {
                 throw invalid();
             }
@@ -216,7 +217,7 @@ public class AiActionPayloadReader {
                 throw invalid();
             }
             try {
-                return Integer.parseInt(String.valueOf(field.afterValue()).trim());
+                return Integer.parseInt(AppStringUtils.trimToEmpty(String.valueOf(field.afterValue())));
             } catch (NumberFormatException ex) {
                 throw invalid();
             }
@@ -256,7 +257,7 @@ public class AiActionPayloadReader {
                 return null;
             }
             try {
-                return Enum.valueOf(enumType, value.toUpperCase(Locale.ROOT));
+                return Enum.valueOf(enumType, AppStringUtils.upperCaseToEmpty(value));
             } catch (RuntimeException ex) {
                 throw invalid();
             }
@@ -264,11 +265,7 @@ public class AiActionPayloadReader {
 
         @Nullable
         private static String trimToNull(@Nullable String value) {
-            if (value == null) {
-                return null;
-            }
-            final var trimmed = value.trim();
-            return trimmed.isEmpty() ? null : trimmed;
+            return AppStringUtils.trimToNull(value);
         }
 
         @Nullable
@@ -276,7 +273,7 @@ public class AiActionPayloadReader {
             if (value == null) {
                 return "";
             }
-            final var string = String.valueOf(value).trim();
+            final var string = AppStringUtils.trimToEmpty(String.valueOf(value));
             return string.isEmpty() ? null : string;
         }
     }

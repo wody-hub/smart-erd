@@ -117,6 +117,21 @@ class ProjectIssueControllerMvcTest {
     }
 
     @Test
+    void getProjectIssues_invalidFilterValueReturnsBadRequest() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/teams/1/projects/10/issues")
+                    .param("status", "BROKEN")
+                    .with((request) -> {
+                        request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                        return request;
+                    })
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").exists());
+    }
+
+    @Test
     void createProjectIssue_returnsCreated() throws Exception {
         when(
             projectIssueService.createProjectIssue(
@@ -171,10 +186,9 @@ class ProjectIssueControllerMvcTest {
 
     @Test
     void updateProjectIssueStatus_returnsUpdatedIssue() throws Exception {
-        when(projectIssueService.updateProjectIssueStatus("tester", 1L, 10L, 100L, ProjectIssueStatus.IN_PROGRESS))
-            .thenReturn(
-            sampleResult(100L, ProjectIssueStatus.IN_PROGRESS, ProjectIssuePriority.HIGH)
-        );
+        when(
+            projectIssueService.updateProjectIssueStatus("tester", 1L, 10L, 100L, ProjectIssueStatus.IN_PROGRESS)
+        ).thenReturn(sampleResult(100L, ProjectIssueStatus.IN_PROGRESS, ProjectIssuePriority.HIGH));
 
         mockMvc
             .perform(
@@ -188,6 +202,25 @@ class ProjectIssueControllerMvcTest {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+    }
+
+    @Test
+    void advanceProjectIssueStatus_usesStatusTransitionResource() throws Exception {
+        when(projectIssueService.advanceProjectIssueStatus("tester", 1L, 10L, 100L)).thenReturn(
+            sampleResult(100L, ProjectIssueStatus.IN_PROGRESS, ProjectIssuePriority.HIGH)
+        );
+
+        mockMvc
+            .perform(
+                post("/api/teams/1/projects/10/issues/100/status-transitions").with((request) -> {
+                    request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
+                    return request;
+                })
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+
+        verify(projectIssueService).advanceProjectIssueStatus("tester", 1L, 10L, 100L);
     }
 
     @Test
@@ -210,7 +243,7 @@ class ProjectIssueControllerMvcTest {
 
         mockMvc
             .perform(
-                get("/api/teams/1/projects/10/issues/download/excel")
+                get("/api/teams/1/projects/10/issues/exports/excel")
                     .param("status", "IN_PROGRESS")
                     .param("priority", "HIGH")
                     .param("assigneeUserId", "7")
@@ -221,7 +254,9 @@ class ProjectIssueControllerMvcTest {
                     })
             )
             .andExpect(status().isOk())
-            .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("phoenix-issues.xlsx")));
+            .andExpect(
+                header().string("Content-Disposition", org.hamcrest.Matchers.containsString("phoenix-issues.xlsx"))
+            );
 
         verify(projectIssueService).exportProjectIssues(
             "tester",
@@ -256,10 +291,9 @@ class ProjectIssueControllerMvcTest {
 
     @Test
     void viewerUpdateStatus_returnsForbidden() throws Exception {
-        when(projectIssueService.updateProjectIssueStatus("tester", 1L, 10L, 100L, ProjectIssueStatus.IN_PROGRESS))
-            .thenThrow(
-            new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_VIEWER_READONLY.code())
-        );
+        when(
+            projectIssueService.updateProjectIssueStatus("tester", 1L, 10L, 100L, ProjectIssueStatus.IN_PROGRESS)
+        ).thenThrow(new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_VIEWER_READONLY.code()));
 
         mockMvc
             .perform(

@@ -1,5 +1,6 @@
 package com.smarterd.config.security;
 
+import com.smarterd.utils.AppStringUtils;
 import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
@@ -40,6 +41,8 @@ public class CorsConfig {
      */
     @Bean
     CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
+        validateCorsProperties(corsProperties);
+
         final var configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(corsProperties.getAllowedOrigins());
         configuration.setAllowedMethods(corsProperties.getAllowedMethods());
@@ -50,6 +53,31 @@ public class CorsConfig {
         final var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    /**
+     * CORS 설정이 브라우저 보안 모델과 충돌하지 않는지 검증한다.
+     *
+     * @param corsProperties CORS 프로퍼티
+     */
+    private void validateCorsProperties(CorsProperties corsProperties) {
+        if (corsProperties.isAllowCredentials() && containsWildcardOrigin(corsProperties.getAllowedOrigins())) {
+            throw new IllegalStateException("CORS wildcard origin cannot be used with allowCredentials.");
+        }
+    }
+
+    /**
+     * 허용 Origin 목록에 wildcard가 포함되었는지 확인한다.
+     *
+     * @param allowedOrigins 허용 Origin 목록
+     * @return wildcard 포함 여부
+     */
+    private boolean containsWildcardOrigin(List<String> allowedOrigins) {
+        if (allowedOrigins == null) {
+            return false;
+        }
+
+        return allowedOrigins.stream().map(AppStringUtils::trimToEmpty).anyMatch("*"::equals);
     }
 
     /**

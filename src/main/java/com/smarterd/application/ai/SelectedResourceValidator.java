@@ -9,7 +9,7 @@ import com.smarterd.domain.pm.issue.repository.ProjectIssueRepository;
 import com.smarterd.domain.pm.todo.repository.ProjectTodoRepository;
 import com.smarterd.domain.pm.wbs.repository.WbsItemRepository;
 import com.smarterd.domain.project.entity.Project;
-import java.util.Locale;
+import com.smarterd.utils.AppStringUtils;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -31,7 +31,7 @@ public class SelectedResourceValidator {
             return;
         }
         final var id = Objects.requireNonNull(selectedResource.id());
-        final var type = selectedResource.type() == null ? "" : selectedResource.type().toUpperCase(Locale.ROOT);
+        final var type = AppStringUtils.upperCaseToEmpty(selectedResource.type());
         switch (type) {
             case "PROJECT_ISSUE", "ISSUE" -> projectIssueRepository
                 .findByProjectAndId(project, id)
@@ -39,9 +39,13 @@ public class SelectedResourceValidator {
             case "PROJECT_TODO", "TODO" -> {
                 final var todo = projectTodoRepository
                     .findByProjectAndId(project, id)
-                    .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_PROJECT_TODO.code(), id));
+                    .orElseThrow(() ->
+                        new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_PROJECT_TODO.code(), id)
+                    );
                 if (!Objects.equals(todo.getOwner().getLoginId(), loginId)) {
-                    throw new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_PROJECT_TODO_OWNER_ONLY.code());
+                    throw new DomainAccessDeniedException(
+                        MessageCode.ERROR_ACCESS_DENIED_PROJECT_TODO_OWNER_ONLY.code()
+                    );
                 }
             }
             case "WBS_ITEM", "WBS" -> wbsItemRepository

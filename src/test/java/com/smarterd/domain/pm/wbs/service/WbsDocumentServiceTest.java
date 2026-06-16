@@ -5,6 +5,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.smarterd.domain.diagram.entity.Diagram;
+import com.smarterd.domain.diagram.repository.DiagramRepository;
+import com.smarterd.domain.markdown.service.MarkdownDocumentDescriptorService;
 import com.smarterd.domain.pm.common.ProjectContextLoader;
 import com.smarterd.domain.pm.common.ProjectContextLoader.ProjectContext;
 import com.smarterd.domain.pm.history.service.WorkItemHistoryService;
@@ -15,8 +17,6 @@ import com.smarterd.domain.pm.wbs.repository.WbsItemRepository;
 import com.smarterd.domain.project.entity.Project;
 import com.smarterd.domain.team.entity.Team;
 import com.smarterd.domain.user.entity.User;
-import com.smarterd.domain.diagram.repository.DiagramRepository;
-import com.smarterd.domain.markdown.service.MarkdownDocumentDescriptorService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -131,8 +131,9 @@ class WbsDocumentServiceTest {
         when(projectContextLoader.load("tester", 10L, 20L, true)).thenReturn(new ProjectContext(team, project));
         when(wbsItemRepository.findByProjectAndId(project, 100L)).thenReturn(Optional.of(wbsItem));
         when(diagramRepository.findByProjectAndIdAndDeletedAtIsNull(project, 42L)).thenReturn(Optional.of(document));
-        when(wbsDocumentLinkRepository.findByWbsItemAndDiagram(wbsItem, document))
-            .thenReturn(Optional.of(WbsDocumentLink.builder().wbsItem(wbsItem).diagram(document).build()));
+        when(wbsDocumentLinkRepository.findByWbsItemAndDiagram(wbsItem, document)).thenReturn(
+            Optional.of(WbsDocumentLink.builder().wbsItem(wbsItem).diagram(document).build())
+        );
 
         wbsDocumentService.unlinkDocument("tester", 10L, 20L, 100L, 42L);
 

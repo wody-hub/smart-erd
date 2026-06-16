@@ -77,7 +77,24 @@ public class WbsTemplate extends BaseAuditEntity {
         this.payloadJson = payloadJson;
     }
 
-    public void update(String name, @Nullable String description, String rootName, int itemCount, int dependencyCount, String payloadJson) {
+    /**
+     * Updates the template metadata and serialized planning payload.
+     *
+     * @param name template name
+     * @param description optional template description
+     * @param rootName root item name
+     * @param itemCount number of template items
+     * @param dependencyCount number of template dependencies
+     * @param payloadJson serialized template payload
+     */
+    public void update(
+        String name,
+        @Nullable String description,
+        String rootName,
+        int itemCount,
+        int dependencyCount,
+        String payloadJson
+    ) {
         this.name = name;
         this.description = description;
         this.rootName = rootName;

@@ -18,11 +18,11 @@ import com.smarterd.domain.ai.AiActionProposalStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -56,93 +56,106 @@ class AiChatExecutionServiceTest {
     @Test
     @DisplayName("10-W0-08 weak or ambiguous scope returns confirmation without provider execution")
     void w0_10_W0_08_scopeGapReturnsConfirmationBeforeProviderExecution() {
-        when(contextResolver.resolve(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(
-                AiChatContextResolver.ResolvedContext.needsConfirmation(
-                    "scope-required",
-                    "Select a project before asking project-data questions."
-                )
-            );
+        when(
+            contextResolver.resolve(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any())
+        ).thenReturn(
+            AiChatResolvedContext.needsConfirmation(
+                "scope-required",
+                "Select a project before asking project-data questions."
+            )
+        );
 
         final var result = executionService.execute(
             "tester",
-            new AiChatExecutionService.ChatCommand(1L, null, "What is delayed?", "ko", "teams")
+            new AiChatCommand(1L, null, "What is delayed?", "ko", "teams")
         );
 
         assertThat(result.status()).isEqualTo("NEEDS_CONFIRMATION");
         assertThat(result.needsConfirmation()).isNotEmpty();
-        verify(providerExecutionRunner, never())
-            .execute(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+        verify(providerExecutionRunner, never()).execute(
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.any()
+        );
     }
 
     @Test
     @DisplayName("10-W0-08 empty read context returns confirmation without provider execution")
     void w0_10_W0_08_emptyReadContextReturnsConfirmationBeforeProviderExecution() {
-        when(contextResolver.resolve(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(AiChatContextResolver.ResolvedContext.resolved(1L, List.of(10L), "Alpha Project"));
-        when(readContextService.read(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(new AiReadContextService.ReadContext(List.of(), List.of(), List.of(), Map.of()));
+        when(
+            contextResolver.resolve(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any())
+        ).thenReturn(AiChatResolvedContext.resolved(1L, List.of(10L), "Alpha Project"));
+        when(
+            readContextService.read(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any())
+        ).thenReturn(new AiReadContextService.ReadContext(List.of(), List.of(), List.of(), Map.of()));
 
         final var result = executionService.execute(
             "tester",
-            new AiChatExecutionService.ChatCommand(1L, 10L, "What is delayed?", "ko", "project-route")
+            new AiChatCommand(1L, 10L, "What is delayed?", "ko", "project-route")
         );
 
         assertThat(result.status()).isEqualTo("NEEDS_CONFIRMATION");
         assertThat(result.needsConfirmation()).isNotEmpty();
-        verify(providerExecutionRunner, never())
-            .execute(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+        verify(providerExecutionRunner, never()).execute(
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.any()
+        );
     }
 
     @Test
     @DisplayName("10-W0-08 assembler maps server facts source chips context and provider answer sections")
     void w0_10_W0_08_assemblerBuildsSectionedReadOnlyAnswer() {
-        when(contextResolver.resolve(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(
-                new AiChatContextResolver.ResolvedContext(
-                    AiChatContextResolver.ScopeStatus.RESOLVED,
-                    1L,
-                    List.of(10L),
-                    "Alpha Project",
-                    List.of(),
-                    List.of()
-                )
-            );
-        when(readContextService.read(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(
-                new AiReadContextService.ReadContext(
-                    List.of("Delayed issues: 2", "WBS risk count: 1"),
-                    List.of(new AiReadContextService.SourceChip("Alpha Project", "issues", 12)),
-                    List.of(),
-                    Map.of("teamId", 1L, "projectIds", List.of(10L)),
-                    """
-                    facts:
-                    - Delayed issues: 2
-                    summaries:
-                    - overview:10: {memberCount=5}
-                    - wbs:10: {count=1}
-                    - milestones:10: {count=2}
-                    - issues:10: {count=12}
-                    - todo:10: {count=3}
-                    - history:10: {count=4}
-                    """,
-                    java.util.Set.of(
-                        AiReadContextService.ReadTool.OVERVIEW,
-                        AiReadContextService.ReadTool.WBS,
-                        AiReadContextService.ReadTool.MILESTONES,
-                        AiReadContextService.ReadTool.ISSUES,
-                        AiReadContextService.ReadTool.TODO,
-                        AiReadContextService.ReadTool.HISTORY
-                    ),
-                    Map.of("providerContextMaxChars", AiReadContextService.MAX_PROVIDER_CONTEXT_CHARS)
-                )
-            );
-        when(providerExecutionRunner.execute(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(executionView(AiProviderResult.answer("Risk is concentrated in API work.")));
+        when(
+            contextResolver.resolve(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any())
+        ).thenReturn(
+            new AiChatResolvedContext(
+                AiChatScopeStatus.RESOLVED,
+                1L,
+                List.of(10L),
+                "Alpha Project",
+                List.of(),
+                List.of()
+            )
+        );
+        when(
+            readContextService.read(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any())
+        ).thenReturn(
+            new AiReadContextService.ReadContext(
+                List.of("Delayed issues: 2", "WBS risk count: 1"),
+                List.of(new AiReadContextService.SourceChip("Alpha Project", "issues", 12)),
+                List.of(),
+                Map.of("teamId", 1L, "projectIds", List.of(10L)),
+                """
+                facts:
+                - Delayed issues: 2
+                summaries:
+                - overview:10: {memberCount=5}
+                - wbs:10: {count=1}
+                - milestones:10: {count=2}
+                - issues:10: {count=12}
+                - todo:10: {count=3}
+                - history:10: {count=4}
+                """,
+                java.util.Set.of(
+                    AiReadContextService.ReadTool.OVERVIEW,
+                    AiReadContextService.ReadTool.WBS,
+                    AiReadContextService.ReadTool.MILESTONES,
+                    AiReadContextService.ReadTool.ISSUES,
+                    AiReadContextService.ReadTool.TODO,
+                    AiReadContextService.ReadTool.HISTORY
+                ),
+                Map.of("providerContextMaxChars", AiReadContextService.MAX_PROVIDER_CONTEXT_CHARS)
+            )
+        );
+        when(
+            providerExecutionRunner.execute(
+                org.mockito.ArgumentMatchers.eq("tester"),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(executionView(AiProviderResult.answer("Risk is concentrated in API work.")));
 
         final var result = executionService.execute(
             "tester",
-            new AiChatExecutionService.ChatCommand(1L, 10L, "Summarize risks", "ko", "project-route")
+            new AiChatCommand(1L, 10L, "Summarize risks", "ko", "project-route")
         );
 
         final var commandCaptor = ArgumentCaptor.forClass(AiProviderExecutionRunner.RunCommand.class);
@@ -165,61 +178,68 @@ class AiChatExecutionServiceTest {
     @Test
     @DisplayName("11-W2-01 provider actions become sanitized pending proposals")
     void w2_11_W2_01_providerActionsBecomePendingProposals() {
-        when(contextResolver.resolve(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(
-                new AiChatContextResolver.ResolvedContext(
-                    AiChatContextResolver.ScopeStatus.RESOLVED,
-                    1L,
-                    List.of(10L),
-                    "Alpha Project",
-                    List.of(),
-                    List.of()
-                )
-            );
-        when(readContextService.read(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(
-                new AiReadContextService.ReadContext(
-                    List.of("Issue summary loaded"),
-                    List.of(new AiReadContextService.SourceChip("Alpha Project", "issues", 3)),
-                    List.of(),
-                    Map.of("teamId", 1L)
-                )
-            );
-        when(providerExecutionRunner.execute(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(
-                executionView(
-                    new AiProviderResult(
-                        "Create a follow-up issue.",
-                        List.of(
-                            new AiActionDraft(
-                                "act-1",
-                                "ISSUE_CREATE",
-                                "Create issue",
-                                "Create a project issue",
-                                AiActionRiskLevel.LOW,
-                                true,
-                                Map.of(
-                                    "targetType",
-                                    "issue",
-                                    "targetId",
-                                    "ISS-1",
-                                    "targetLabel",
-                                    "Follow-up",
-                                    "fields",
-                                    List.of(Map.of("label", "Title", "afterValue", "Follow-up"))
-                                )
+        when(
+            contextResolver.resolve(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any())
+        ).thenReturn(
+            new AiChatResolvedContext(
+                AiChatScopeStatus.RESOLVED,
+                1L,
+                List.of(10L),
+                "Alpha Project",
+                List.of(),
+                List.of()
+            )
+        );
+        when(
+            readContextService.read(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any())
+        ).thenReturn(
+            new AiReadContextService.ReadContext(
+                List.of("Issue summary loaded"),
+                List.of(new AiReadContextService.SourceChip("Alpha Project", "issues", 3)),
+                List.of(),
+                Map.of("teamId", 1L)
+            )
+        );
+        when(
+            providerExecutionRunner.execute(
+                org.mockito.ArgumentMatchers.eq("tester"),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(
+            executionView(
+                new AiProviderResult(
+                    "Create a follow-up issue.",
+                    List.of(
+                        new AiActionDraft(
+                            "act-1",
+                            "ISSUE_CREATE",
+                            "Create issue",
+                            "Create a project issue",
+                            AiActionRiskLevel.LOW,
+                            true,
+                            Map.of(
+                                "targetType",
+                                "issue",
+                                "targetId",
+                                "ISS-1",
+                                "targetLabel",
+                                "Follow-up",
+                                "fields",
+                                List.of(Map.of("label", "Title", "afterValue", "Follow-up"))
                             )
-                        ),
-                        null
-                    )
+                        )
+                    ),
+                    null
                 )
-            );
-        when(proposalService.createProposals(org.mockito.ArgumentMatchers.any()))
-            .thenReturn(List.of(proposalView("proposal-1")));
+            )
+        );
+        when(proposalService.createProposals(org.mockito.ArgumentMatchers.any())).thenReturn(
+            List.of(proposalView("proposal-1"))
+        );
 
         final var result = executionService.execute(
             "tester",
-            new AiChatExecutionService.ChatCommand(1L, 10L, "Create follow-up?", "ko", "project-route")
+            new AiChatCommand(1L, 10L, "Create follow-up?", "ko", "project-route")
         );
 
         assertThat(result.status()).isEqualTo("ANSWER");
@@ -233,29 +253,35 @@ class AiChatExecutionServiceTest {
     @Test
     @DisplayName("10-W0-08 provider failure returns structured failed chat response")
     void w0_10_W0_08_providerFailureReturnsSafeStructuredResponse() {
-        when(contextResolver.resolve(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(AiChatContextResolver.ResolvedContext.resolved(1L, List.of(10L), "Alpha Project"));
-        when(readContextService.read(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(
-                new AiReadContextService.ReadContext(
-                    List.of("Issue summary loaded"),
-                    List.of(new AiReadContextService.SourceChip("Alpha Project", "issues", 3)),
-                    List.of(),
-                    Map.of("teamId", 1L)
+        when(
+            contextResolver.resolve(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any())
+        ).thenReturn(AiChatResolvedContext.resolved(1L, List.of(10L), "Alpha Project"));
+        when(
+            readContextService.read(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any())
+        ).thenReturn(
+            new AiReadContextService.ReadContext(
+                List.of("Issue summary loaded"),
+                List.of(new AiReadContextService.SourceChip("Alpha Project", "issues", 3)),
+                List.of(),
+                Map.of("teamId", 1L)
+            )
+        );
+        when(
+            providerExecutionRunner.execute(
+                org.mockito.ArgumentMatchers.eq("tester"),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(
+            executionView(
+                AiProviderResult.failed(
+                    new AiProviderError("PROVIDER_FAILED", "Provider failed", "Provider failed safely.", true)
                 )
-            );
-        when(providerExecutionRunner.execute(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(
-                executionView(
-                    AiProviderResult.failed(
-                        new AiProviderError("PROVIDER_FAILED", "Provider failed", "Provider failed safely.", true)
-                    )
-                )
-            );
+            )
+        );
 
         final var result = executionService.execute(
             "tester",
-            new AiChatExecutionService.ChatCommand(1L, 10L, "Summarize risks", "ko", "project-route")
+            new AiChatCommand(1L, 10L, "Summarize risks", "ko", "project-route")
         );
 
         assertThat(result.status()).isEqualTo("ERROR");

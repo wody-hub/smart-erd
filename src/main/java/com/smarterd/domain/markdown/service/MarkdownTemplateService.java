@@ -2,6 +2,7 @@ package com.smarterd.domain.markdown.service;
 
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.utils.AppStringUtils;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -62,8 +63,10 @@ public class MarkdownTemplateService {
      * @return 정규화된 템플릿 키
      */
     public String resolveTemplateKey(@Nullable String templateKey) {
-        final var resolvedTemplateKey =
-            templateKey == null || templateKey.isBlank() ? DEFAULT_TEMPLATE_KEY : templateKey.trim();
+        final var resolvedTemplateKey = AppStringUtils.defaultIfBlank(
+            AppStringUtils.trimToNull(templateKey),
+            DEFAULT_TEMPLATE_KEY
+        );
         if (!TEMPLATE_LABELS.containsKey(resolvedTemplateKey)) {
             throw new BusinessException(MessageCode.ERROR_BUSINESS_MARKDOWN_TEMPLATE_INVALID.code());
         }
@@ -78,7 +81,7 @@ public class MarkdownTemplateService {
      */
     @Nullable
     public String resolveTemplateLabel(@Nullable String templateKey) {
-        if (templateKey == null || templateKey.isBlank()) {
+        if (AppStringUtils.isBlank(templateKey)) {
             return null;
         }
         return TEMPLATE_LABELS.get(templateKey);
@@ -182,6 +185,6 @@ public class MarkdownTemplateService {
      * @return {@code ---} 구분자로 감싼 YAML 프론트매터 문자열
      */
     private String serialize(Map<String, Object> frontmatter) {
-        return "---\n" + yaml.dump(frontmatter).trim() + "\n---\n\n";
+        return "---\n" + AppStringUtils.trimToEmpty(yaml.dump(frontmatter)) + "\n---\n\n";
     }
 }

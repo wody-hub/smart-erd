@@ -123,6 +123,26 @@ public final class AppStringUtils {
     }
 
     /**
+     * 문자열을 소문자로 변환하고, null이면 빈 문자열을 반환한다.
+     *
+     * @param value 원본 문자열
+     * @return lower 결과(널 안전)
+     */
+    public static String lowerCaseToEmpty(@Nullable String value) {
+        return StringUtils.lowerCase(StringUtils.defaultString(value), Locale.ROOT);
+    }
+
+    /**
+     * 문자열을 대문자로 변환하고, null이면 빈 문자열을 반환한다.
+     *
+     * @param value 원본 문자열
+     * @return upper 결과(널 안전)
+     */
+    public static String upperCaseToEmpty(@Nullable String value) {
+        return StringUtils.upperCase(StringUtils.defaultString(value), Locale.ROOT);
+    }
+
+    /**
      * 문자열이 지정 접미사로 끝나는지(대소문자 무시) 확인한다.
      *
      * @param value 원본 문자열

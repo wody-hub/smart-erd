@@ -49,7 +49,9 @@ export async function approveAiProposal(
   proposalId: string,
 ): Promise<AiActionProposalDecisionResponse> {
   const httpClient = await resolveAiChatHttpClient();
-  const res = await httpClient.post(`${AI_PROPOSAL_BASE_PATH}/${proposalId}/approve`);
+  const res = await httpClient.post(`${AI_PROPOSAL_BASE_PATH}/${proposalId}/decisions`, {
+    decision: 'APPROVE',
+  });
   return res.data as AiActionProposalDecisionResponse;
 }
 
@@ -57,6 +59,8 @@ export async function cancelAiProposal(
   proposalId: string,
 ): Promise<AiActionProposalDecisionResponse> {
   const httpClient = await resolveAiChatHttpClient();
-  const res = await httpClient.post(`${AI_PROPOSAL_BASE_PATH}/${proposalId}/cancel`);
+  const res = await httpClient.post(`${AI_PROPOSAL_BASE_PATH}/${proposalId}/decisions`, {
+    decision: 'CANCEL',
+  });
   return res.data as AiActionProposalDecisionResponse;
 }

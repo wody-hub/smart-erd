@@ -77,8 +77,13 @@ export default function StaffingTab({ teamId, projectId, canEdit }: StaffingTabP
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ staffingId, payload }: { staffingId: number; payload: UpdateProjectStaffingPayload }) =>
-      updateProjectStaffing(teamId, projectId, staffingId, payload),
+    mutationFn: ({
+      staffingId,
+      payload,
+    }: {
+      staffingId: number;
+      payload: UpdateProjectStaffingPayload;
+    }) => updateProjectStaffing(teamId, projectId, staffingId, payload),
     onSuccess: () => {
       invalidateRelatedQueries({
         includeWbs: false,
@@ -108,10 +113,13 @@ export default function StaffingTab({ teamId, projectId, canEdit }: StaffingTabP
   const summary = staffingQuery.data?.summary;
   const months = staffingQuery.data?.months ?? [];
 
-  const staffedUserIds = useMemo(() => new Set(resources.map((resource) => resource.userId)), [resources]);
+  const staffedUserIds = useMemo(
+    () => new Set(resources.map((resource) => resource.userId)),
+    [resources],
+  );
 
   const dialogSubmitting = createMutation.isPending || updateMutation.isPending;
-  const deletingId = deleteMutation.isPending ? deleteTarget?.id ?? null : null;
+  const deletingId = deleteMutation.isPending ? (deleteTarget?.id ?? null) : null;
 
   /**
    * 생성 다이얼로그를 연다.
@@ -198,15 +206,15 @@ export default function StaffingTab({ teamId, projectId, canEdit }: StaffingTabP
         <div className="space-y-2">
           <h2 className="text-lg font-semibold text-foreground">{t('staffing.section.title')}</h2>
           <p className="text-sm text-muted-foreground">{t('staffing.section.description')}</p>
-          {!canEdit ? <p className="text-xs text-muted-foreground">{t('staffing.status.readOnly')}</p> : null}
+          {!canEdit ? (
+            <p className="text-xs text-muted-foreground">{t('staffing.status.readOnly')}</p>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" onClick={() => void handleRefresh()}>
             <RefreshCcw
-              className={
-                staffingQuery.isFetching ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'
-              }
+              className={staffingQuery.isFetching ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'}
             />
             {t('staffing.action.refresh')}
           </Button>
@@ -223,7 +231,9 @@ export default function StaffingTab({ teamId, projectId, canEdit }: StaffingTabP
         <WorkspaceEmptyState
           icon={<UsersRound className="h-6 w-6" />}
           title={t('staffing.empty.title')}
-          description={canEdit ? t('staffing.empty.description') : t('staffing.empty.readOnlyDescription')}
+          description={
+            canEdit ? t('staffing.empty.description') : t('staffing.empty.readOnlyDescription')
+          }
           action={
             canEdit ? (
               <Button type="button" onClick={handleOpenCreate}>

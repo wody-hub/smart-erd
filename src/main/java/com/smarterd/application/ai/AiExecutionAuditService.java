@@ -1,20 +1,29 @@
 package com.smarterd.application.ai;
 
+import com.smarterd.domain.ai.AiActionProposal;
 import com.smarterd.domain.ai.AiExecutionAudit;
 import com.smarterd.domain.ai.AiExecutionAuditRepository;
-import com.smarterd.domain.ai.AiActionProposal;
+import com.smarterd.utils.AppStringUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Persists metadata-only AI execution audit rows.
  */
 @Service
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class AiExecutionAuditService {
 
     private final AiExecutionAuditRepository auditRepository;
 
+    /**
+     * Records one provider execution lifecycle snapshot as sanitized audit metadata.
+     *
+     * @param execution provider execution snapshot
+     */
+    @Transactional
     public void record(AiExecutionRegistry.ExecutionSnapshot execution) {
         final var error = execution.result() == null ? null : execution.result().error();
         final var audit = new AiExecutionAudit(
@@ -40,6 +49,7 @@ public class AiExecutionAuditService {
      *
      * @param proposal sanitized proposal entity
      */
+    @Transactional
     public void recordProposalCreated(AiActionProposal proposal) {
         recordProposal("PROPOSAL_CREATED", proposal);
     }
@@ -49,6 +59,7 @@ public class AiExecutionAuditService {
      *
      * @param proposal sanitized proposal entity
      */
+    @Transactional
     public void recordProposalDecision(AiActionProposal proposal) {
         recordProposal("PROPOSAL_" + proposal.getStatus().name(), proposal);
     }
@@ -94,7 +105,7 @@ public class AiExecutionAuditService {
      * @return trimmed metadata or null
      */
     private String safe(String value, int maxLength) {
-        if (value == null || value.isBlank()) {
+        if (AppStringUtils.isBlank(value)) {
             return null;
         }
         return value.length() <= maxLength ? value : value.substring(0, maxLength);

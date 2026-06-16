@@ -55,11 +55,7 @@ public class DictionarySetExportService {
      * @param styles      공유 스타일
      * @param exportResult 단어 내보내기 결과
      */
-    private void writeWordSheet(
-        XSSFWorkbook workbook,
-        DictionaryWorkbookStyles styles,
-        WordService.WordExportResult exportResult
-    ) {
+    private void writeWordSheet(XSSFWorkbook workbook, DictionaryWorkbookStyles styles, WordExportResult exportResult) {
         final var template = DictionaryWorkbookExportSupport.createTemplate(
             workbook,
             styles,

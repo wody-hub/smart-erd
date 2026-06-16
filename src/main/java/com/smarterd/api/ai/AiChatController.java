@@ -1,10 +1,15 @@
 package com.smarterd.api.ai;
 
+import static com.smarterd.api.ai.AiAuthenticationSupport.subject;
+
 import com.smarterd.api.ai.dto.AiChatRequest;
 import com.smarterd.api.ai.dto.AiChatResponse;
 import com.smarterd.application.ai.chat.AiChatExecutionService;
-import com.smarterd.domain.common.exception.DomainAccessDeniedException;
-import com.smarterd.domain.common.message.MessageCode;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Read-only AI chat REST controller.
  */
+@Tag(name = "AI Chat", description = "Read-only AI chat APIs")
 @RestController
 @RequestMapping("/api/ai/chat")
 @RequiredArgsConstructor
@@ -25,14 +31,21 @@ public class AiChatController {
 
     private final AiChatExecutionService aiChatExecutionService;
 
+    @Operation(summary = "Execute AI chat", description = "Runs a read-only AI chat request inside the AI harness.")
+    @ApiResponse(
+        responseCode = "200",
+        description = "Chat response returned",
+        content = @Content(schema = @Schema(implementation = AiChatResponse.class))
+    )
+    @ApiResponse(responseCode = "400", description = "Invalid chat request", content = @Content)
+    @ApiResponse(responseCode = "403", description = "AI execution access denied", content = @Content)
     @PostMapping
     public ResponseEntity<AiChatResponse> chat(
         @AuthenticationPrincipal Jwt jwt,
         @Valid @RequestBody AiChatRequest request
     ) {
-        if (jwt == null) {
-            throw new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_AI_EXECUTION.code());
-        }
-        return ResponseEntity.ok(AiChatResponse.from(aiChatExecutionService.execute(jwt.getSubject(), request.toCommand())));
+        return ResponseEntity.ok(
+            AiChatResponse.from(aiChatExecutionService.execute(subject(jwt), request.toCommand()))
+        );
     }
 }

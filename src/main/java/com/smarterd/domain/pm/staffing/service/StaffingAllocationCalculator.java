@@ -79,8 +79,11 @@ public class StaffingAllocationCalculator {
             }
 
             final var overlapDays = ChronoUnit.DAYS.between(overlapStart, overlapEnd) + 1;
-            final var monthRatio = BigDecimal.valueOf(overlapDays)
-                .divide(BigDecimal.valueOf(month.lengthOfMonth()), INTERNAL_SCALE, RoundingMode.HALF_UP);
+            final var monthRatio = BigDecimal.valueOf(overlapDays).divide(
+                BigDecimal.valueOf(month.lengthOfMonth()),
+                INTERNAL_SCALE,
+                RoundingMode.HALF_UP
+            );
             final var mm = monthRatio
                 .multiply(BigDecimal.valueOf(participationRate))
                 .divide(HUNDRED, INTERNAL_SCALE, RoundingMode.HALF_UP);

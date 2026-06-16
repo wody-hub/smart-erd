@@ -1,8 +1,4 @@
-import type {
-  ProjectTodo,
-  ProjectTodoPriority,
-  ProjectTodoStatus,
-} from '@/types/project-todo';
+import type { ProjectTodo, ProjectTodoPriority, ProjectTodoStatus } from '@/types/project-todo';
 
 export interface TodoEditorValues {
   title: string;

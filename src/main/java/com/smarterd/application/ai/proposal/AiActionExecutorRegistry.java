@@ -20,9 +20,12 @@ public class AiActionExecutorRegistry {
     private final Map<String, AiActionExecutor> executors;
 
     public AiActionExecutorRegistry(List<AiActionExecutor> executors) {
-        this.executors = executors == null
-            ? Map.of()
-            : executors.stream().collect(Collectors.toUnmodifiableMap(AiActionExecutor::actionType, Function.identity()));
+        this.executors =
+            executors == null
+                ? Map.of()
+                : executors
+                      .stream()
+                      .collect(Collectors.toUnmodifiableMap(AiActionExecutor::actionType, Function.identity()));
     }
 
     public Optional<AiActionExecutor> find(String actionType) {

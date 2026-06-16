@@ -17,6 +17,8 @@ import com.smarterd.domain.pm.todo.entity.ProjectTodoPriority;
 import com.smarterd.domain.pm.todo.entity.ProjectTodoStatus;
 import com.smarterd.domain.pm.todo.service.ProjectTodoService;
 import com.smarterd.domain.pm.wbs.service.WbsService;
+import com.smarterd.domain.project.service.BusinessOverviewResult;
+import com.smarterd.domain.project.service.ProjectResult;
 import com.smarterd.domain.project.service.ProjectService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -56,11 +58,21 @@ class AiReadContextServiceTest {
     @Test
     @DisplayName("10-W0-02 overview WBS milestone issue TODO and history summaries are source backed")
     void w0_10_W0_02_summaryFirstReadToolsReturnFactsAndSourceChips() {
-        when(projectService.getProject("tester", 1L, 10L))
-            .thenReturn(new ProjectService.ProjectResult(10L, "Alpha", "", 1L, null, null));
-        when(projectService.getBusinessOverview("tester", 1L, 10L))
-            .thenReturn(new ProjectService.BusinessOverviewResult(10L, "Alpha", null, null, null, null, null, null, 5L, 2L, 40));
-        final var service = new AiReadContextService(projectService, null, null, null, null, null, new AiSourceChipFactory());
+        when(projectService.getProject("tester", 1L, 10L)).thenReturn(
+            new ProjectResult(10L, "Alpha", "", 1L, null, null)
+        );
+        when(projectService.getBusinessOverview("tester", 1L, 10L)).thenReturn(
+            new BusinessOverviewResult(10L, "Alpha", null, null, null, null, null, null, 5L, 2L, 40)
+        );
+        final var service = new AiReadContextService(
+            projectService,
+            null,
+            null,
+            null,
+            null,
+            null,
+            new AiSourceChipFactory()
+        );
 
         final var result = service.read(
             "tester",
@@ -80,15 +92,14 @@ class AiReadContextServiceTest {
             )
         );
 
-        assertThat(result.confirmedFacts())
-            .contains(
-                "Project overview summary loaded",
-                "WBS risk summary loaded",
-                "Milestone delay summary loaded",
-                "Issue status summary loaded",
-                "Current user TODO summary loaded",
-                "Recent history/comment summary loaded"
-            );
+        assertThat(result.confirmedFacts()).contains(
+            "Project overview summary loaded",
+            "WBS risk summary loaded",
+            "Milestone delay summary loaded",
+            "Issue status summary loaded",
+            "Current user TODO summary loaded",
+            "Recent history/comment summary loaded"
+        );
         assertThat(result.sourceChips())
             .extracting(AiReadContextService.SourceChip::tool)
             .containsExactlyInAnyOrder("overview", "WBS", "milestones", "issues", "TODO", "history");
@@ -123,21 +134,21 @@ class AiReadContextServiceTest {
             "WBS 작업 지연, 마일스톤 일정, 이슈 리스크, TODO 할 일, 코멘트 히스토리와 미완료 항목을 요약해줘"
         );
 
-        assertThat(tools)
-            .containsExactlyInAnyOrder(
-                AiReadContextService.ReadTool.WBS,
-                AiReadContextService.ReadTool.MILESTONES,
-                AiReadContextService.ReadTool.ISSUES,
-                AiReadContextService.ReadTool.TODO,
-                AiReadContextService.ReadTool.HISTORY
-            );
+        assertThat(tools).containsExactlyInAnyOrder(
+            AiReadContextService.ReadTool.WBS,
+            AiReadContextService.ReadTool.MILESTONES,
+            AiReadContextService.ReadTool.ISSUES,
+            AiReadContextService.ReadTool.TODO,
+            AiReadContextService.ReadTool.HISTORY
+        );
     }
 
     @Test
     @DisplayName("13-01 detailed read context serializes authorized rows for provider grounding")
     void detailedReadContextSerializesAuthorizedRowsForProviderGrounding() {
-        when(projectService.getProject("tester", 1L, 10L))
-            .thenReturn(new ProjectService.ProjectResult(10L, "Alpha", "", 1L, null, null));
+        when(projectService.getProject("tester", 1L, 10L)).thenReturn(
+            new ProjectResult(10L, "Alpha", "", 1L, null, null)
+        );
         when(wbsService.getWbsItems("tester", 1L, 10L)).thenReturn(List.of(sampleWbs()));
         when(milestoneService.getMilestones("tester", 1L, 10L)).thenReturn(List.of(sampleMilestone()));
         when(projectIssueService.getProjectIssues("tester", 1L, 10L, null)).thenReturn(List.of(sampleIssue()));
@@ -194,8 +205,9 @@ class AiReadContextServiceTest {
     @Test
     @DisplayName("13-01 history detail reports truncation when returned rows are capped")
     void historyDetailReportsTruncationWhenRowsAreCapped() {
-        when(projectService.getProject("tester", 1L, 10L))
-            .thenReturn(new ProjectService.ProjectResult(10L, "Alpha", "", 1L, null, null));
+        when(projectService.getProject("tester", 1L, 10L)).thenReturn(
+            new ProjectResult(10L, "Alpha", "", 1L, null, null)
+        );
         when(wbsService.getWbsItems("tester", 1L, 10L)).thenReturn(List.of(sampleWbs()));
         when(workItemHistoryService.getWbsComments("tester", 1L, 10L, 100L)).thenReturn(manyComments());
         when(workItemHistoryService.getWbsActivities("tester", 1L, 10L, 100L)).thenReturn(List.of());
@@ -232,8 +244,9 @@ class AiReadContextServiceTest {
     @Test
     @DisplayName("13-01 history detail marks WBS scan truncation separately from row truncation")
     void historyDetailMarksWbsScanTruncation() {
-        when(projectService.getProject("tester", 1L, 10L))
-            .thenReturn(new ProjectService.ProjectResult(10L, "Alpha", "", 1L, null, null));
+        when(projectService.getProject("tester", 1L, 10L)).thenReturn(
+            new ProjectResult(10L, "Alpha", "", 1L, null, null)
+        );
         when(wbsService.getWbsItems("tester", 1L, 10L)).thenReturn(manyWbsItems(26));
         for (long id = 1L; id <= AiReadContextService.MAX_WBS_DETAIL_ROWS; id++) {
             when(workItemHistoryService.getWbsComments("tester", 1L, 10L, id)).thenReturn(List.of());
@@ -272,7 +285,15 @@ class AiReadContextServiceTest {
     @DisplayName("13-01 member TODO aggregate caps owner rows after grouping")
     void memberTodoAggregateCapsOwnerRowsAfterGrouping() {
         when(projectTodoService.getMemberTodoSummaries("tester", 1L, 10L)).thenReturn(manyMemberTodoSummaries(21));
-        final var service = new AiReadContextService(null, null, null, null, projectTodoService, null, new AiSourceChipFactory());
+        final var service = new AiReadContextService(
+            null,
+            null,
+            null,
+            null,
+            projectTodoService,
+            null,
+            new AiSourceChipFactory()
+        );
 
         final var result = service.read(
             "tester",
@@ -297,12 +318,18 @@ class AiReadContextServiceTest {
     @Test
     @DisplayName("13-01 provider context truncation keeps explicit marker and caps")
     void providerContextTruncationKeepsExplicitMarkerAndCaps() {
-        when(projectService.getProject("tester", 1L, 10L))
-            .thenReturn(new ProjectService.ProjectResult(10L, "Alpha", "", 1L, null, null));
-        when(projectService.getProject("tester", 1L, 11L))
-            .thenReturn(new ProjectService.ProjectResult(11L, "Beta", "", 1L, null, null));
-        when(projectIssueService.getProjectIssues("tester", 1L, 10L, null)).thenReturn(manyIssuesWithLongDescriptions());
-        when(projectIssueService.getProjectIssues("tester", 1L, 11L, null)).thenReturn(manyIssuesWithLongDescriptions());
+        when(projectService.getProject("tester", 1L, 10L)).thenReturn(
+            new ProjectResult(10L, "Alpha", "", 1L, null, null)
+        );
+        when(projectService.getProject("tester", 1L, 11L)).thenReturn(
+            new ProjectResult(11L, "Beta", "", 1L, null, null)
+        );
+        when(projectIssueService.getProjectIssues("tester", 1L, 10L, null)).thenReturn(
+            manyIssuesWithLongDescriptions()
+        );
+        when(projectIssueService.getProjectIssues("tester", 1L, 11L, null)).thenReturn(
+            manyIssuesWithLongDescriptions()
+        );
         final var service = new AiReadContextService(
             projectService,
             null,
@@ -337,26 +364,34 @@ class AiReadContextServiceTest {
     void providerContextKeepsCapsWhenFactsAndSourcesOverflow() {
         final var longProjectName = "긴 프로젝트명 ".repeat(500);
         for (long projectId = 10L; projectId <= 14L; projectId++) {
-            when(projectService.getProject("tester", 1L, projectId))
-                .thenReturn(new ProjectService.ProjectResult(projectId, longProjectName + projectId, "", 1L, null, null));
-            when(projectService.getBusinessOverview("tester", 1L, projectId))
-                .thenReturn(
-                    new ProjectService.BusinessOverviewResult(
-                        projectId,
-                        longProjectName + projectId,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        1L,
-                        1L,
-                        10
-                    )
-                );
+            when(projectService.getProject("tester", 1L, projectId)).thenReturn(
+                new ProjectResult(projectId, longProjectName + projectId, "", 1L, null, null)
+            );
+            when(projectService.getBusinessOverview("tester", 1L, projectId)).thenReturn(
+                new BusinessOverviewResult(
+                    projectId,
+                    longProjectName + projectId,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    1L,
+                    1L,
+                    10
+                )
+            );
         }
-        final var service = new AiReadContextService(projectService, null, null, null, null, null, new AiSourceChipFactory());
+        final var service = new AiReadContextService(
+            projectService,
+            null,
+            null,
+            null,
+            null,
+            null,
+            new AiSourceChipFactory()
+        );
 
         final var result = service.read(
             "tester",
@@ -435,14 +470,21 @@ class AiReadContextServiceTest {
     @Test
     @DisplayName("10-02 member TODO summary uses aggregate-only service path")
     void memberTodoSummaryUsesAggregateOnlyServicePath() {
-        when(projectTodoService.getMemberTodoSummaries("tester", 1L, 10L))
-            .thenReturn(
-                List.of(
-                    new ProjectTodoService.MemberTodoSummaryResult(100L, "member-1", ProjectTodoStatus.TODO, 4L),
-                    new ProjectTodoService.MemberTodoSummaryResult(100L, "member-1", ProjectTodoStatus.DONE, 3L)
-                )
-            );
-        final var service = new AiReadContextService(null, null, null, null, projectTodoService, null, new AiSourceChipFactory());
+        when(projectTodoService.getMemberTodoSummaries("tester", 1L, 10L)).thenReturn(
+            List.of(
+                new ProjectTodoService.MemberTodoSummaryResult(100L, "member-1", ProjectTodoStatus.TODO, 4L),
+                new ProjectTodoService.MemberTodoSummaryResult(100L, "member-1", ProjectTodoStatus.DONE, 3L)
+            )
+        );
+        final var service = new AiReadContextService(
+            null,
+            null,
+            null,
+            null,
+            projectTodoService,
+            null,
+            new AiSourceChipFactory()
+        );
 
         final var result = service.read(
             "tester",
@@ -466,7 +508,13 @@ class AiReadContextServiceTest {
     void w0_10_W0_02_readContextDoesNotExposeRawPromptOrProviderPayloads() {
         final var result = readContextService.read(
             "tester",
-            new AiReadContextService.ReadCommand(1L, List.of(10L), Set.of(AiReadContextService.ReadTool.ISSUES), false, null)
+            new AiReadContextService.ReadCommand(
+                1L,
+                List.of(10L),
+                Set.of(AiReadContextService.ReadTool.ISSUES),
+                false,
+                null
+            )
         );
 
         assertThat(result.toString())
@@ -483,8 +531,9 @@ class AiReadContextServiceTest {
     @Test
     @DisplayName("10-02 source chips use actual read result counts")
     void sourceChipsUseActualReadResultCounts() {
-        final var chips = new AiSourceChipFactory()
-            .fromToolResults(List.of(new AiReadContextService.ToolReadResult("A Project", "issues", 12)));
+        final var chips = new AiSourceChipFactory().fromToolResults(
+            List.of(new AiReadContextService.ToolReadResult("A Project", "issues", 12))
+        );
 
         assertThat(chips).containsExactly(new AiReadContextService.SourceChip("A Project", "issues", 12));
     }
@@ -522,7 +571,9 @@ class AiReadContextServiceTest {
     }
 
     private static List<WbsService.WbsItemResult> manyWbsItems(int count) {
-        return LongStream.rangeClosed(1, count).mapToObj(id -> sampleWbs(id, "WBS " + id)).toList();
+        return LongStream.rangeClosed(1, count)
+            .mapToObj((id) -> sampleWbs(id, "WBS " + id))
+            .toList();
     }
 
     private static MilestoneService.MilestoneResult sampleMilestone() {
@@ -566,9 +617,8 @@ class AiReadContextServiceTest {
 
     private static List<ProjectIssueService.ProjectIssueResult> manyIssuesWithLongDescriptions() {
         final var longDescription = "긴 설명 ".repeat(300);
-        return LongStream
-            .rangeClosed(1, 60)
-            .mapToObj(id ->
+        return LongStream.rangeClosed(1, 60)
+            .mapToObj((id) ->
                 new ProjectIssueService.ProjectIssueResult(
                     id,
                     "이슈 " + id,
@@ -615,9 +665,8 @@ class AiReadContextServiceTest {
     }
 
     private static List<WorkItemHistoryService.WorkCommentResult> manyComments() {
-        return LongStream
-            .rangeClosed(0, 25)
-            .mapToObj(index ->
+        return LongStream.rangeClosed(0, 25)
+            .mapToObj((index) ->
                 new WorkItemHistoryService.WorkCommentResult(
                     600L + index,
                     WorkTargetType.WBS,
@@ -633,9 +682,8 @@ class AiReadContextServiceTest {
     }
 
     private static List<ProjectTodoService.MemberTodoSummaryResult> manyMemberTodoSummaries(int ownerCount) {
-        return LongStream
-            .rangeClosed(1, ownerCount)
-            .mapToObj(index ->
+        return LongStream.rangeClosed(1, ownerCount)
+            .mapToObj((index) ->
                 new ProjectTodoService.MemberTodoSummaryResult(
                     900L + index,
                     "member-" + index,

@@ -1,6 +1,6 @@
 package com.smarterd.api.project.dto;
 
-import com.smarterd.domain.project.service.ProjectService.BusinessOverviewResult;
+import com.smarterd.domain.project.service.BusinessOverviewResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import org.springframework.lang.Nullable;

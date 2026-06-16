@@ -59,7 +59,7 @@ interface TableNodeEditableRowsProps {
   resolvedHandleLayout: TableHandleLayout;
   renderMetaById: Map<string, ColumnRenderMeta>;
   domainPopoverColId: string | null;
-  sensors: SensorDescriptor<any>[];
+  sensors: SensorDescriptor<object>[];
   isConnected: (colId: string) => boolean;
   t: TFunction;
   onDragEnd: (event: DragEndEvent) => void;

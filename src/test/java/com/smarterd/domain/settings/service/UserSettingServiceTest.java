@@ -44,8 +44,9 @@ class UserSettingServiceTest {
         final var setting = new UserSetting(user, "project-workspace-tab-order", "[\"documents\",\"issues\"]");
 
         when(authService.findUserByLoginId("tester")).thenReturn(user);
-        when(userSettingRepository.findByUserAndSettingKey(user, "project-workspace-tab-order"))
-            .thenReturn(Optional.of(setting));
+        when(userSettingRepository.findByUserAndSettingKey(user, "project-workspace-tab-order")).thenReturn(
+            Optional.of(setting)
+        );
 
         final var result = userSettingService.getProjectWorkspaceTabOrder("tester");
 
@@ -102,17 +103,16 @@ class UserSettingServiceTest {
     @Test
     @DisplayName("resolveProjectWorkspaceTabOrder falls back to defaults when input is empty")
     void resolveProjectWorkspaceTabOrder_emptyFallsBackToDefault() {
-        assertThat(UserSettingService.resolveProjectWorkspaceTabOrder(List.of()))
-            .containsExactly(
-                "overview",
-                "documents",
-                "tags",
-                "wbs",
-                "myTasks",
-                "gantt",
-                "staffing",
-                "issues"
-            );
+        assertThat(UserSettingService.resolveProjectWorkspaceTabOrder(List.of())).containsExactly(
+            "overview",
+            "documents",
+            "tags",
+            "wbs",
+            "myTasks",
+            "gantt",
+            "staffing",
+            "issues"
+        );
     }
 
     private User createUser(Long id, String loginId) {

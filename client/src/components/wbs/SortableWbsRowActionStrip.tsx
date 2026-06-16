@@ -220,10 +220,7 @@ export function SortableWbsRowActionStrip({
                       </Button>
                     </DropdownMenuTrigger>
                   </TooltipTrigger>
-                  <ActionTooltip
-                    label={t('wbs.action.more')}
-                    description={t('wbs.tooltip.more')}
-                  />
+                  <ActionTooltip label={t('wbs.action.more')} description={t('wbs.tooltip.more')} />
                 </Tooltip>
                 <DropdownMenuContent align="end" className="w-64">
                   <DropdownMenuLabel>{t('wbs.template.menuTitle')}</DropdownMenuLabel>

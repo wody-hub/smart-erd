@@ -52,11 +52,30 @@ public class WorkItemHistoryService {
             wbsItemId
         );
         final var actorNames = resolveActorNames(comments.stream().map(WorkComment::getCreatedBy).toList());
-        return comments.stream().map((comment) -> toCommentResult(comment, actorNames)).toList();
+        return comments
+            .stream()
+            .map((comment) -> toCommentResult(comment, actorNames))
+            .toList();
     }
 
+    /**
+     * Adds a user-authored comment to a WBS item.
+     *
+     * @param loginId actor login ID
+     * @param teamId team ID
+     * @param projectId project ID
+     * @param wbsItemId WBS item ID
+     * @param content comment body
+     * @return saved comment result
+     */
     @Transactional
-    public WorkCommentResult addWbsComment(String loginId, Long teamId, Long projectId, Long wbsItemId, String content) {
+    public WorkCommentResult addWbsComment(
+        String loginId,
+        Long teamId,
+        Long projectId,
+        Long wbsItemId,
+        String content
+    ) {
         final var context = projectContextLoader.load(loginId, teamId, projectId, true);
         ensureTargetExists(context.project(), WorkTargetType.WBS, wbsItemId);
 
@@ -81,11 +100,29 @@ public class WorkItemHistoryService {
             wbsItemId
         );
         final var actorNames = resolveActorNames(activities.stream().map(WorkActivity::getCreatedBy).toList());
-        return activities.stream().map((activity) -> toActivityResult(activity, actorNames)).toList();
+        return activities
+            .stream()
+            .map((activity) -> toActivityResult(activity, actorNames))
+            .toList();
     }
 
+    /**
+     * Records that a document was linked to a WBS item.
+     *
+     * @param project target project
+     * @param wbsItemId WBS item ID
+     * @param documentId linked document ID
+     * @param documentName linked document name
+     * @param actorLoginId actor login ID
+     */
     @Transactional
-    public void recordWbsDocumentLinked(Project project, Long wbsItemId, Long documentId, String documentName, String actorLoginId) {
+    public void recordWbsDocumentLinked(
+        Project project,
+        Long wbsItemId,
+        Long documentId,
+        String documentName,
+        String actorLoginId
+    ) {
         ensureTargetExists(project, WorkTargetType.WBS, wbsItemId);
         saveActivity(
             project,
@@ -102,6 +139,15 @@ public class WorkItemHistoryService {
         );
     }
 
+    /**
+     * Records that a document was unlinked from a WBS item.
+     *
+     * @param project target project
+     * @param wbsItemId WBS item ID
+     * @param documentId unlinked document ID
+     * @param documentName unlinked document name
+     * @param actorLoginId actor login ID
+     */
     @Transactional
     public void recordWbsDocumentUnlinked(
         Project project,
@@ -150,8 +196,23 @@ public class WorkItemHistoryService {
         );
     }
 
+    /**
+     * Records that a document was linked to a TODO item.
+     *
+     * @param project target project
+     * @param todoId TODO item ID
+     * @param documentId linked document ID
+     * @param documentName linked document name
+     * @param actorLoginId actor login ID
+     */
     @Transactional
-    public void recordTodoDocumentLinked(Project project, Long todoId, Long documentId, String documentName, String actorLoginId) {
+    public void recordTodoDocumentLinked(
+        Project project,
+        Long todoId,
+        Long documentId,
+        String documentName,
+        String actorLoginId
+    ) {
         ensureTargetExists(project, WorkTargetType.TODO, todoId);
         saveActivity(
             project,
@@ -168,8 +229,23 @@ public class WorkItemHistoryService {
         );
     }
 
+    /**
+     * Records that a document was unlinked from a TODO item.
+     *
+     * @param project target project
+     * @param todoId TODO item ID
+     * @param documentId unlinked document ID
+     * @param documentName unlinked document name
+     * @param actorLoginId actor login ID
+     */
     @Transactional
-    public void recordTodoDocumentUnlinked(Project project, Long todoId, Long documentId, String documentName, String actorLoginId) {
+    public void recordTodoDocumentUnlinked(
+        Project project,
+        Long todoId,
+        Long documentId,
+        String documentName,
+        String actorLoginId
+    ) {
         ensureTargetExists(project, WorkTargetType.TODO, todoId);
         saveActivity(
             project,
@@ -186,8 +262,23 @@ public class WorkItemHistoryService {
         );
     }
 
+    /**
+     * Records that a TODO item was linked to a WBS item.
+     *
+     * @param project target project
+     * @param todoId TODO item ID
+     * @param wbsItemId linked WBS item ID
+     * @param wbsItemName linked WBS item name
+     * @param actorLoginId actor login ID
+     */
     @Transactional
-    public void recordTodoWbsLinked(Project project, Long todoId, Long wbsItemId, String wbsItemName, String actorLoginId) {
+    public void recordTodoWbsLinked(
+        Project project,
+        Long todoId,
+        Long wbsItemId,
+        String wbsItemName,
+        String actorLoginId
+    ) {
         ensureTargetExists(project, WorkTargetType.TODO, todoId);
         saveActivity(
             project,
@@ -204,8 +295,23 @@ public class WorkItemHistoryService {
         );
     }
 
+    /**
+     * Records that a TODO item was unlinked from a WBS item.
+     *
+     * @param project target project
+     * @param todoId TODO item ID
+     * @param wbsItemId unlinked WBS item ID
+     * @param wbsItemName unlinked WBS item name
+     * @param actorLoginId actor login ID
+     */
     @Transactional
-    public void recordTodoWbsUnlinked(Project project, Long todoId, Long wbsItemId, String wbsItemName, String actorLoginId) {
+    public void recordTodoWbsUnlinked(
+        Project project,
+        Long todoId,
+        Long wbsItemId,
+        String wbsItemName,
+        String actorLoginId
+    ) {
         ensureTargetExists(project, WorkTargetType.TODO, todoId);
         saveActivity(
             project,
@@ -259,10 +365,14 @@ public class WorkItemHistoryService {
                 .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_WBS_ITEM.code(), targetId));
             case ISSUE -> projectIssueRepository
                 .findByProjectAndId(project, targetId)
-                .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_PROJECT_ISSUE.code(), targetId));
+                .orElseThrow(() ->
+                    new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_PROJECT_ISSUE.code(), targetId)
+                );
             case TODO -> projectTodoRepository
                 .findByProjectAndId(project, targetId)
-                .orElseThrow(() -> new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_PROJECT_TODO.code(), targetId));
+                .orElseThrow(() ->
+                    new EntityNotFoundException(MessageCode.ERROR_NOT_FOUND_PROJECT_TODO.code(), targetId)
+                );
         }
     }
 

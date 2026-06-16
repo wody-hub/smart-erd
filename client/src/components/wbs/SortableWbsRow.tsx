@@ -263,11 +263,8 @@ export default function SortableWbsRow({
       return;
     }
     if (activeEditor != null && activeEditor !== editor) {
-      const nextDecision = resolveInlineBlurDecision(
-        activeEditor,
-        item,
-        draftState,
-        () => window.confirm(t('wbs.dialog.inlineBlurConfirm')),
+      const nextDecision = resolveInlineBlurDecision(activeEditor, item, draftState, () =>
+        window.confirm(t('wbs.dialog.inlineBlurConfirm')),
       );
       if (nextDecision === 'save') {
         if (!confirmInlineEdit(activeEditor)) {
@@ -293,11 +290,8 @@ export default function SortableWbsRow({
         return;
       }
       if (activeEditor === editor) {
-        const nextDecision = resolveInlineBlurDecision(
-          editor,
-          item,
-          draftState,
-          () => window.confirm(t('wbs.dialog.inlineBlurConfirm')),
+        const nextDecision = resolveInlineBlurDecision(editor, item, draftState, () =>
+          window.confirm(t('wbs.dialog.inlineBlurConfirm')),
         );
         if (nextDecision === 'save') {
           confirmInlineEdit(editor);
@@ -311,10 +305,14 @@ export default function SortableWbsRow({
     event.stopPropagation();
   };
 
-  const handleEditorKeyDown = (
-    event: KeyboardEvent<HTMLElement>,
-    onConfirm: () => void,
-  ) => {
+  /**
+   * Handles keyboard confirmation and cancellation for inline WBS editors.
+   *
+   * @param event Keyboard event from the active inline editor.
+   * @param onConfirm Callback that commits the editor value.
+   * @returns Nothing.
+   */
+  const handleEditorKeyDown = (event: KeyboardEvent<HTMLElement>, onConfirm: () => void) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       onConfirm();

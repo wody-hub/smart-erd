@@ -13,8 +13,12 @@ import jakarta.validation.constraints.NotBlank;
  */
 @Schema(description = "용어 일괄 저장 행 데이터")
 public record BulkTermRow(
-    @Schema(description = "논리명", example = "사용자명") @NotBlank String logicalName,
-    @Schema(description = "물리명", example = "user_name") @NotBlank String physicalName,
+    @Schema(description = "논리명", example = "사용자명")
+    @NotBlank(message = "{validation.not-blank.logical-name}")
+    String logicalName,
+    @Schema(description = "물리명", example = "user_name")
+    @NotBlank(message = "{validation.not-blank.physical-name}")
+    String physicalName,
     @Schema(description = "도메인 논리명", example = "이름") String domainLogicalName,
     @Schema(description = "설명") String description
 ) {}

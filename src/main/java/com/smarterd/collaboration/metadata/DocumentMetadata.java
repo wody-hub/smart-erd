@@ -1,5 +1,6 @@
 package com.smarterd.collaboration.metadata;
 
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.lang.NonNull;
 
@@ -18,4 +19,13 @@ public record DocumentMetadata(
     @NonNull String engineId,
     @NonNull String ownerId,
     @NonNull Set<String> memberIds
-) {}
+) {
+    /**
+     * 기본 생성자.
+     *
+     * <p>member ID 목록은 방어 복사해 문서 메타데이터의 불변성을 유지한다.</p>
+     */
+    public DocumentMetadata {
+        memberIds = Set.copyOf(Objects.requireNonNull(memberIds, "memberIds must not be null"));
+    }
+}

@@ -7,12 +7,12 @@ import com.smarterd.domain.ai.AiActionProposalRepository;
 import com.smarterd.domain.ai.AiExecutionAudit;
 import com.smarterd.domain.ai.AiExecutionAuditRepository;
 import com.smarterd.domain.pm.common.ProjectContextLoader;
+import com.smarterd.utils.AppStringUtils;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Reads project-scoped AI execution and proposal history as sanitized metadata.
  */
 @Service
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class AiProjectHistoryService {
 
@@ -46,7 +47,6 @@ public class AiProjectHistoryService {
      * @param limit requested item limit
      * @return sanitized project AI history
      */
-    @Transactional(readOnly = true)
     public AiProjectHistoryView getProjectHistory(String loginId, Long teamId, Long projectId, Integer limit) {
         projectContextLoader.load(loginId, teamId, projectId, false);
         final var effectiveLimit = normalizeLimit(limit);
@@ -58,10 +58,11 @@ public class AiProjectHistoryService {
         final var proposals = proposalRepository.findByTeamIdAndProjectId(teamId, projectId, page);
         final var audits = auditRepository.findByTeamIdAndProjectId(teamId, projectId, page);
         final var rows = new ArrayList<AiProjectHistoryItemView>();
-        proposals.forEach(proposal -> rows.add(fromProposal(loginId, proposal)));
-        audits.forEach(audit -> rows.add(fromAudit(loginId, audit)));
+        proposals.forEach((proposal) -> rows.add(fromProposal(loginId, proposal)));
+        audits.forEach((audit) -> rows.add(fromAudit(loginId, audit)));
         rows.sort(newestFirst());
-        final var hasMore = rows.size() > effectiveLimit || proposals.size() > effectiveLimit || audits.size() > effectiveLimit;
+        final var hasMore =
+            rows.size() > effectiveLimit || proposals.size() > effectiveLimit || audits.size() > effectiveLimit;
         final var items = rows.stream().limit(effectiveLimit).toList();
         return new AiProjectHistoryView(effectiveLimit, hasMore, items);
     }
@@ -164,10 +165,10 @@ public class AiProjectHistoryService {
      * @return summary text
      */
     private String auditSummary(AiExecutionAudit audit) {
-        if (audit.getRedactedErrorTitle() != null && !audit.getRedactedErrorTitle().isBlank()) {
+        if (AppStringUtils.isNotBlank(audit.getRedactedErrorTitle())) {
             return audit.getRedactedErrorTitle();
         }
-        if (audit.getTargetLabel() != null && !audit.getTargetLabel().isBlank()) {
+        if (AppStringUtils.isNotBlank(audit.getTargetLabel())) {
             return audit.getTargetLabel();
         }
         return audit.getStatus();
@@ -179,16 +180,17 @@ public class AiProjectHistoryService {
     }
 
     private String resultSummary(String resultJson) {
-        if (resultJson == null || resultJson.isBlank()) {
+        if (AppStringUtils.isBlank(resultJson)) {
             return null;
         }
         try {
             final var result = objectMapper.readValue(resultJson, MAP_TYPE);
             final var summary = result.get("summary");
-            if (summary == null || String.valueOf(summary).isBlank()) {
+            final var summaryText = summary == null ? null : String.valueOf(summary);
+            if (AppStringUtils.isBlank(summaryText)) {
                 return null;
             }
-            return String.valueOf(summary);
+            return summaryText;
         } catch (Exception ex) {
             return null;
         }
@@ -213,7 +215,11 @@ public class AiProjectHistoryService {
         String targetId,
         String targetLabel
     ) {
-        return isTodo(actionType, targetType) && !Objects.equals(loginId, requestedBy) && !hasProjectVisibleWbsMarker(targetType, targetId, targetLabel);
+        return (
+            isTodo(actionType, targetType) &&
+            !Objects.equals(loginId, requestedBy) &&
+            !hasProjectVisibleWbsMarker(targetType, targetId, targetLabel)
+        );
     }
 
     /**
@@ -247,7 +253,7 @@ public class AiProjectHistoryService {
      * @return true when value contains needle
      */
     private boolean contains(String value, String needle) {
-        return value != null && value.toLowerCase(Locale.ROOT).contains(needle);
+        return AppStringUtils.containsIgnoreCase(value, needle);
     }
 
     /**
@@ -280,40 +286,4 @@ public class AiProjectHistoryService {
             return right.activityAt().compareTo(left.activityAt());
         };
     }
-
-    public record AiProjectHistoryView(int limit, boolean hasMore, List<AiProjectHistoryItemView> items) {
-        /**
-         * Normalizes nullable item collections.
-         *
-         * @param limit effective limit
-         * @param hasMore pagination hint
-         * @param items history items
-         * @return initialized history view
-         */
-        public AiProjectHistoryView {
-            items = items == null ? List.of() : List.copyOf(items);
-        }
-    }
-
-    public record AiProjectHistoryItemView(
-        String kind,
-        String executionId,
-        String proposalId,
-        String provider,
-        String promptVersion,
-        String actionType,
-        String riskLevel,
-        String status,
-        String targetType,
-        String targetId,
-        String targetLabel,
-        String summary,
-        String requestedBy,
-        String decisionBy,
-        Instant createdAt,
-        Instant decidedAt,
-        String redactedErrorTitle,
-        String redactedErrorDetail,
-        Instant activityAt
-    ) {}
 }

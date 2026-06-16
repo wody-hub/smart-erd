@@ -38,6 +38,11 @@ public class MilestoneController {
     private final MilestoneService milestoneService;
 
     @Operation(summary = "마일스톤 목록 조회")
+    @ApiResponse(
+        responseCode = "200",
+        description = "조회 성공",
+        content = @Content(schema = @Schema(implementation = MilestoneResponse.class))
+    )
     @GetMapping
     public ResponseEntity<List<MilestoneResponse>> getMilestones(
         @AuthenticationPrincipal Jwt jwt,
@@ -81,6 +86,11 @@ public class MilestoneController {
     }
 
     @Operation(summary = "마일스톤 수정")
+    @ApiResponse(
+        responseCode = "200",
+        description = "수정 성공",
+        content = @Content(schema = @Schema(implementation = MilestoneResponse.class))
+    )
     @PutMapping("/{milestoneId}")
     public ResponseEntity<MilestoneResponse> updateMilestone(
         @AuthenticationPrincipal Jwt jwt,
@@ -105,6 +115,7 @@ public class MilestoneController {
     }
 
     @Operation(summary = "마일스톤 삭제")
+    @ApiResponse(responseCode = "204", description = "삭제 성공", content = @Content)
     @DeleteMapping("/{milestoneId}")
     public ResponseEntity<Void> deleteMilestone(
         @AuthenticationPrincipal Jwt jwt,

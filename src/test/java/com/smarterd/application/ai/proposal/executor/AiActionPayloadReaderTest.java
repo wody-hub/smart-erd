@@ -88,8 +88,12 @@ class AiActionPayloadReaderTest {
             .hasMessageContaining("Current data changed");
     }
 
-    private AiActionProposal proposal(String actionType, String targetType, String targetId, Map<String, Object> payload)
-        throws Exception {
+    private AiActionProposal proposal(
+        String actionType,
+        String targetType,
+        String targetId,
+        Map<String, Object> payload
+    ) throws Exception {
         return new AiActionProposal(
             "proposal-1",
             "exec-1",

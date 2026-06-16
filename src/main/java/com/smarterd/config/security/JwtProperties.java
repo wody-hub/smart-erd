@@ -35,17 +35,15 @@ public class JwtProperties {
     private long refreshExpiration;
 
     /**
-     * 프로덕션 프로파일에서 기본 시크릿 사용 시 경고 로그를 출력한다.
+     * 프로덕션 프로파일에서 기본 시크릿 사용 시 시작을 중단한다.
      */
     @PostConstruct
     void validateSecret() {
         if (isUsingDefaultSecret()) {
             if (EnvironmentProfile.hasProductionProfile(environment)) {
-                log.warn(
-                    "프로덕션 환경에서 기본 JWT 시크릿을 사용하고 있습니다. " +
-                        "SMART_ERD_JWT_SECRET 환경 변수를 반드시 설정하세요."
+                throw new IllegalStateException(
+                    "Production profile cannot use the default JWT secret. Set SMART_ERD_JWT_SECRET."
                 );
-                return;
             }
             log.info("개발 환경 기본 JWT 시크릿을 사용 중입니다.");
         }

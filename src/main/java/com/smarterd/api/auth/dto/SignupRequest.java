@@ -1,5 +1,6 @@
 package com.smarterd.api.auth.dto;
 
+import com.smarterd.domain.user.service.AuthSignupCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -27,4 +28,13 @@ public record SignupRequest(
     @NotBlank(message = "{validation.not-blank.name}")
     @Size(min = 1, max = 50, message = "{validation.size.name}")
     String name
-) {}
+) {
+    /**
+     * Converts this REST request into the domain signup command.
+     *
+     * @return domain signup command
+     */
+    public AuthSignupCommand toCommand() {
+        return new AuthSignupCommand(loginId, password, name);
+    }
+}

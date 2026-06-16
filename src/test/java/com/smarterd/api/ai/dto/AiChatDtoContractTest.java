@@ -7,6 +7,7 @@ import com.smarterd.application.ai.chat.AiChatExecutionService;
 import jakarta.validation.Validation;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 class AiChatDtoContractTest {
@@ -22,7 +23,7 @@ class AiChatDtoContractTest {
             "Alpha",
             "PROJECT",
             "ko",
-            new AiChatRequest.AiChatContextRequest(
+            new AiChatContextRequest(
                 "project",
                 1L,
                 "Platform Team",
@@ -56,7 +57,7 @@ class AiChatDtoContractTest {
             null,
             "MULTI_PROJECT",
             "ko",
-            new AiChatRequest.AiChatContextRequest(
+            new AiChatContextRequest(
                 "team",
                 1L,
                 "Platform Team",
@@ -86,11 +87,58 @@ class AiChatDtoContractTest {
         final var oversizedRequest = new AiChatRequest("x".repeat(4001), 1L, 10L, null, null, "ko", null, null);
 
         assertThat(validator.validate(blankRequest))
-            .extracting(violation -> violation.getConstraintDescriptor().getAttributes().get("message"))
+            .extracting((violation) -> violation.getConstraintDescriptor().getAttributes().get("message"))
             .contains("{validation.not-blank.ai-chat-message}");
         assertThat(validator.validate(oversizedRequest))
-            .extracting(violation -> violation.getConstraintDescriptor().getAttributes().get("message"))
+            .extracting((violation) -> violation.getConstraintDescriptor().getAttributes().get("message"))
             .contains("{validation.size.ai-chat-message}");
+    }
+
+    @Test
+    void aiRequestValidationUsesLocalizedMessageKeys() {
+        final var validator = Validation.buildDefaultValidatorFactory().getValidator();
+        final var providerRequest = new AiProviderExecuteRequest(
+            null,
+            null,
+            "",
+            "x".repeat(21),
+            new AiSelectedResourceRequest("", null)
+        );
+        final var chatRequest = new AiChatRequest(
+            "status?",
+            null,
+            null,
+            "x".repeat(121),
+            "x".repeat(41),
+            "x".repeat(21),
+            null,
+            null
+        );
+        final var contextRequest = new AiChatContextRequest(
+            "x".repeat(41),
+            null,
+            "x".repeat(121),
+            null,
+            "x".repeat(121),
+            "x".repeat(41),
+            "x".repeat(41),
+            "x".repeat(41),
+            false
+        );
+        final var decisionRequest = new AiActionProposalDecisionRequest(null);
+
+        final var messages = Stream.of(
+            validator.validate(providerRequest),
+            validator.validate(chatRequest),
+            validator.validate(contextRequest),
+            validator.validate(decisionRequest)
+        )
+            .flatMap((violations) -> violations.stream())
+            .map((violation) -> String.valueOf(violation.getConstraintDescriptor().getAttributes().get("message")))
+            .toList();
+
+        assertThat(messages).isNotEmpty();
+        assertThat(messages).allSatisfy((message) -> assertThat(message).startsWith("{validation."));
     }
 
     @Test
@@ -101,7 +149,7 @@ class AiChatDtoContractTest {
             false,
             null,
             List.of(
-                new AiChatResponse.AiConfirmationCandidateResponse(
+                new AiConfirmationCandidateResponse(
                     "project:10",
                     "Alpha Project",
                     "project",
@@ -112,7 +160,7 @@ class AiChatDtoContractTest {
                     "exact"
                 )
             ),
-            new AiChatResponse.AiChatContextResponse(
+            new AiChatContextResponse(
                 "project",
                 1L,
                 List.of(10L),
@@ -142,5 +190,37 @@ class AiChatDtoContractTest {
         assertThat(json.has("proposal")).isFalse();
         assertThat(json.has("approval")).isFalse();
         assertThat(json.has("diff")).isFalse();
+    }
+
+    @Test
+    void aiApiDtoContractsAreTopLevelRecords() {
+        final var dtoTypes = List.of(
+            AiActionDraftResponse.class,
+            AiActionProposalDecisionRequest.class,
+            AiActionProposalDecisionResponse.class,
+            AiActionProposalFieldChangeResponse.class,
+            AiActionProposalResponse.class,
+            AiActionProposalResultResponse.class,
+            AiActionProposalTargetResponse.class,
+            AiChatContextRequest.class,
+            AiChatContextResponse.class,
+            AiChatErrorResponse.class,
+            AiChatRequest.class,
+            AiChatResponse.class,
+            AiChatSourceChipResponse.class,
+            AiConfirmationCandidateResponse.class,
+            AiExecutionStatusResponse.class,
+            AiProjectHistoryItemResponse.class,
+            AiProjectHistoryResponse.class,
+            AiProviderErrorResponse.class,
+            AiProviderExecuteRequest.class,
+            AiProviderExecuteResponse.class,
+            AiProviderStatusResponse.class,
+            AiSelectedResourceRequest.class
+        );
+
+        assertThat(dtoTypes).allSatisfy((dtoType) ->
+            assertThat(dtoType.getDeclaredClasses()).as(dtoType.getName()).isEmpty()
+        );
     }
 }

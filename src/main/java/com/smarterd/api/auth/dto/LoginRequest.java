@@ -1,5 +1,6 @@
 package com.smarterd.api.auth.dto;
 
+import com.smarterd.domain.user.service.AuthLoginCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -21,4 +22,14 @@ public record LoginRequest(
     @NotBlank(message = "{validation.not-blank.password}")
     @Size(max = 100, message = "{validation.size.password}")
     String password
-) {}
+) {
+    /**
+     * Converts this REST request into the domain login command.
+     *
+     * @param clientIp resolved client IP address
+     * @return domain login command
+     */
+    public AuthLoginCommand toCommand(String clientIp) {
+        return new AuthLoginCommand(loginId, password, clientIp);
+    }
+}

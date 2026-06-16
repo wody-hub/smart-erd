@@ -2,7 +2,14 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import type { ProjectStaffingMonthlyAllocation, ProjectStaffingResource } from '@/types/staffing';
 import {
   clampStaffingMonthWindowStart,
@@ -69,7 +76,10 @@ export default function StaffingMatrixTable({ resources, months }: StaffingMatri
   }
 
   return (
-    <section className="space-y-3 rounded-lg border border-border/80 bg-card p-4" aria-label={t('staffing.matrix.title')}>
+    <section
+      className="space-y-3 rounded-lg border border-border/80 bg-card p-4"
+      aria-label={t('staffing.matrix.title')}
+    >
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="space-y-1">
           <h3 className="text-base font-semibold text-foreground">{t('staffing.matrix.title')}</h3>
@@ -155,11 +165,15 @@ export default function StaffingMatrixTable({ resources, months }: StaffingMatri
                       <TableCell key={month} className="min-w-[132px] py-3 text-center text-xs">
                         <div className="space-y-1 tabular-nums">
                           <p>
-                            <span className="mr-1 text-muted-foreground">{t('staffing.matrix.planned')}</span>
+                            <span className="mr-1 text-muted-foreground">
+                              {t('staffing.matrix.planned')}
+                            </span>
                             <span>{formatMm(allocation?.plannedMm ?? null)}</span>
                           </p>
                           <p>
-                            <span className="mr-1 text-muted-foreground">{t('staffing.matrix.actual')}</span>
+                            <span className="mr-1 text-muted-foreground">
+                              {t('staffing.matrix.actual')}
+                            </span>
                             <span>
                               {allocation?.actualMm != null
                                 ? formatMm(allocation.actualMm)

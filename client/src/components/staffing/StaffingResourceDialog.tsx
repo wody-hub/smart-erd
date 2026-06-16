@@ -12,9 +12,19 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { isDateOrderValid } from '@/lib/format';
-import { hasAnyActualInput, isValidParticipation, validateActualInput } from './staffing-dialog-validation';
+import {
+  hasAnyActualInput,
+  isValidParticipation,
+  validateActualInput,
+} from './staffing-dialog-validation';
 import type {
   CreateProjectStaffingPayload,
   ProjectStaffingResource,
@@ -96,7 +106,9 @@ export default function StaffingResourceDialog({
       setActualStartDate(initialData.actualStartDate ?? '');
       setActualEndDate(initialData.actualEndDate ?? '');
       setActualParticipationRate(
-        initialData.actualParticipationRate != null ? String(initialData.actualParticipationRate) : '',
+        initialData.actualParticipationRate != null
+          ? String(initialData.actualParticipationRate)
+          : '',
       );
       return;
     }
@@ -239,7 +251,9 @@ export default function StaffingResourceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[680px]">
         <DialogHeader>
-          <DialogTitle>{isEdit ? t('staffing.form.editTitle') : t('staffing.form.createTitle')}</DialogTitle>
+          <DialogTitle>
+            {isEdit ? t('staffing.form.editTitle') : t('staffing.form.createTitle')}
+          </DialogTitle>
           <DialogDescription>
             {isEdit ? t('staffing.form.editDescription') : t('staffing.form.createDescription')}
           </DialogDescription>
@@ -285,7 +299,10 @@ export default function StaffingResourceDialog({
 
             <div className="space-y-2">
               <Label htmlFor="staffing-grade">{t('staffing.field.grade')}</Label>
-              <Select value={grade} onValueChange={(nextValue) => setGrade(nextValue as StaffingGrade)}>
+              <Select
+                value={grade}
+                onValueChange={(nextValue) => setGrade(nextValue as StaffingGrade)}
+              >
                 <SelectTrigger id="staffing-grade">
                   <SelectValue placeholder={t('staffing.form.gradePlaceholder')} />
                 </SelectTrigger>
@@ -386,7 +403,12 @@ export default function StaffingResourceDialog({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+            >
               {t('staffing.form.close')}
             </Button>
             <Button type="submit" disabled={loading}>

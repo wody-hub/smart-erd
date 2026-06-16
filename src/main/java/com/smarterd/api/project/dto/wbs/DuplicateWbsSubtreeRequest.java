@@ -13,5 +13,6 @@ public record DuplicateWbsSubtreeRequest(
     @Schema(description = "일정 초기화 여부", example = "false") boolean resetSchedule,
     @Schema(description = "진척률 초기화 여부", example = "true") boolean resetProgress,
     @Schema(description = "마일스톤 초기화 여부", example = "true") boolean resetMilestone,
-    @Schema(description = "subtree 내부 dependency까지 함께 복제할지 여부", example = "true") boolean includeDependencies
+    @Schema(description = "subtree 내부 dependency까지 함께 복제할지 여부", example = "true")
+    boolean includeDependencies
 ) {}

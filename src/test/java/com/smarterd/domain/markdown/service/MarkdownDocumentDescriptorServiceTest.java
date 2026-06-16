@@ -12,8 +12,7 @@ class MarkdownDocumentDescriptorServiceTest {
 
     @Test
     void describe_extractsTemplateSummaryAndNormalizedTags() {
-        final var content =
-            """
+        final var content = """
             ---
             title: 기능 명세
             template: technical-spec

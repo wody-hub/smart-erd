@@ -1,5 +1,6 @@
 package com.smarterd.api.auth;
 
+import com.smarterd.api.auth.dto.AuthHealthResponse;
 import com.smarterd.api.auth.dto.AuthResponse;
 import com.smarterd.api.auth.dto.LoginRequest;
 import com.smarterd.api.auth.dto.RefreshRequest;
@@ -15,7 +16,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -52,11 +52,15 @@ public class AuthController {
      * @return 서버 상태 응답
      */
     @Operation(summary = "인증 API 헬스 체크", description = "인증 API 서버에 도달 가능한지 확인한다.")
-    @ApiResponse(responseCode = "200", description = "서버 도달 가능")
+    @ApiResponse(
+        responseCode = "200",
+        description = "서버 도달 가능",
+        content = @Content(schema = @Schema(implementation = AuthHealthResponse.class))
+    )
     @SecurityRequirements
     @GetMapping("/health")
-    public ResponseEntity<Map<String, String>> health() {
-        return ResponseEntity.ok(Map.of("status", "ok"));
+    public ResponseEntity<AuthHealthResponse> health() {
+        return ResponseEntity.ok(AuthHealthResponse.ok());
     }
 
     /**
@@ -96,7 +100,8 @@ public class AuthController {
         @Valid @RequestBody LoginRequest request,
         HttpServletRequest httpServletRequest
     ) {
-        return ResponseEntity.ok(authService.login(request, clientIpUtils.resolveClientIp(httpServletRequest)));
+        final var command = request.toCommand(clientIpUtils.resolveClientIp(httpServletRequest));
+        return ResponseEntity.ok(AuthResponse.from(authService.login(command)));
     }
 
     /**
@@ -115,7 +120,9 @@ public class AuthController {
     @SecurityRequirements
     @PostMapping("/signup")
     public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(authService.signup(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            AuthResponse.from(authService.signup(request.toCommand()))
+        );
     }
 
     /**
@@ -137,7 +144,7 @@ public class AuthController {
     @SecurityRequirements
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
-        return ResponseEntity.ok(authService.refresh(request));
+        return ResponseEntity.ok(AuthResponse.from(authService.refresh(request.toCommand())));
     }
 
     /**
@@ -152,7 +159,7 @@ public class AuthController {
     @SecurityRequirements
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest request) {
-        authService.logout(request);
+        authService.logout(request.toCommand());
         return ResponseEntity.noContent().build();
     }
 }

@@ -5,6 +5,8 @@ import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.diagram.entity.Diagram;
 import com.smarterd.domain.diagram.entity.DiagramPluginId;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 
 /**
@@ -49,5 +51,62 @@ public class MarkdownExportService {
      * @param fileName 파일 이름
      * @param body 본문 바이트
      */
-    public record MarkdownExportResult(String contentType, String fileName, byte[] body) {}
+    public record MarkdownExportResult(String contentType, String fileName, byte[] body) {
+        public MarkdownExportResult {
+            body = copy(body);
+        }
+
+        /**
+         * markdown 본문 바이트를 방어 복사하여 반환한다.
+         *
+         * @return 본문 바이트 복사본
+         */
+        @Override
+        public byte[] body() {
+            return copy(body);
+        }
+
+        /**
+         * 배열 내용을 포함해 동등성을 비교한다.
+         *
+         * @param other 비교 대상
+         * @return 동등하면 {@code true}
+         */
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof MarkdownExportResult that)) {
+                return false;
+            }
+            return (
+                Objects.equals(contentType, that.contentType) &&
+                Objects.equals(fileName, that.fileName) &&
+                Arrays.equals(body, that.body)
+            );
+        }
+
+        /**
+         * 배열 내용을 포함한 hash code를 반환한다.
+         *
+         * @return hash code
+         */
+        @Override
+        public int hashCode() {
+            var result = Objects.hash(contentType, fileName);
+            result = 31 * result + Arrays.hashCode(body);
+            return result;
+        }
+
+        /**
+         * byte 배열을 방어 복사한다.
+         *
+         * @param value 원본 배열
+         * @return 복사본
+         */
+        private static byte[] copy(byte[] value) {
+            return Arrays.copyOf(value, value.length);
+        }
+    }
 }

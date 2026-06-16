@@ -86,7 +86,8 @@ export function expandDateRange(
 
   const baseStart =
     normalizedMin.getTime() <= normalizedMax.getTime() ? normalizedMin : normalizedMax;
-  const baseEnd = normalizedMin.getTime() <= normalizedMax.getTime() ? normalizedMax : normalizedMin;
+  const baseEnd =
+    normalizedMin.getTime() <= normalizedMax.getTime() ? normalizedMax : normalizedMin;
 
   const start = new Date(baseStart);
   const end = new Date(baseEnd);

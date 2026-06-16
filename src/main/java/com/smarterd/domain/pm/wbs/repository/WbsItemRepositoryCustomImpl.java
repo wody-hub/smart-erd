@@ -2,8 +2,8 @@ package com.smarterd.domain.pm.wbs.repository;
 
 import static com.smarterd.domain.pm.wbs.entity.QWbsItem.wbsItem;
 
-import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.smarterd.domain.pm.milestone.entity.Milestone;
 import com.smarterd.domain.pm.wbs.entity.WbsItem;
@@ -59,7 +59,11 @@ public class WbsItemRepositoryCustomImpl implements WbsItemRepositoryCustom {
 
     @Override
     public Map<Long, MilestoneProgressAggregate> aggregateProgressByMilestone(Project project) {
-        final var completedCountExpression = new CaseBuilder().when(wbsItem.progressRate.goe(100)).then(1).otherwise(0).sum();
+        final var completedCountExpression = new CaseBuilder()
+            .when(wbsItem.progressRate.goe(100))
+            .then(1)
+            .otherwise(0)
+            .sum();
         final var results = queryFactory
             .select(wbsItem.milestone.id, wbsItem.count(), completedCountExpression, wbsItem.progressRate.avg())
             .from(wbsItem)
@@ -89,7 +93,11 @@ public class WbsItemRepositoryCustomImpl implements WbsItemRepositoryCustom {
 
     @Override
     public MilestoneProgressAggregate aggregateProgressByMilestone(Milestone milestone) {
-        final var completedCountExpression = new CaseBuilder().when(wbsItem.progressRate.goe(100)).then(1).otherwise(0).sum();
+        final var completedCountExpression = new CaseBuilder()
+            .when(wbsItem.progressRate.goe(100))
+            .then(1)
+            .otherwise(0)
+            .sum();
         final var result = queryFactory
             .select(wbsItem.count(), completedCountExpression, wbsItem.progressRate.avg())
             .from(wbsItem)

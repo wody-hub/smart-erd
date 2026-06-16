@@ -3,6 +3,7 @@ package com.smarterd.domain.diagram.collaboration;
 import com.smarterd.collaboration.plugin.ScopeLockMode;
 import com.smarterd.collaboration.plugin.ScopeRef;
 import com.smarterd.collaboration.plugin.ScopeResolver;
+import com.smarterd.utils.AppStringUtils;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +44,7 @@ public class MarkdownScopeResolver implements ScopeResolver {
                     yield List.of(rootScope());
                 }
                 final var sectionId = payload.get("sectionId");
-                if (!(sectionId instanceof String sid) || sid.isBlank()) {
+                if (!(sectionId instanceof String sid) || AppStringUtils.isBlank(sid)) {
                     yield List.of(rootScope());
                 }
                 // offset 검증: 음수 또는 역전된 offset은 document root scope로 fallback

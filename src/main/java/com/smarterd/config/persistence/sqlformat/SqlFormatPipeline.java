@@ -1,6 +1,7 @@
 package com.smarterd.config.persistence.sqlformat;
 
 import com.smarterd.config.persistence.sqlformat.step.SqlFormatStep;
+import com.smarterd.utils.AppStringUtils;
 import java.util.List;
 import java.util.Objects;
 
@@ -42,6 +43,6 @@ public final class SqlFormatPipeline {
         for (SqlFormatStep step : steps) {
             result = step.apply(result);
         }
-        return result.trim();
+        return AppStringUtils.trimToEmpty(result);
     }
 }

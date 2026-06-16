@@ -109,7 +109,7 @@ export async function downloadProjectIssuesExcel(
   projectId: string,
   filters: ProjectIssueFilters = {},
 ): Promise<AxiosResponse<Blob>> {
-  return axiosInstance.get<Blob>(`/teams/${teamId}/projects/${projectId}/issues/download/excel`, {
+  return axiosInstance.get<Blob>(`/teams/${teamId}/projects/${projectId}/issues/exports/excel`, {
     params: buildProjectIssueQueryParams(filters),
     responseType: 'blob',
   });

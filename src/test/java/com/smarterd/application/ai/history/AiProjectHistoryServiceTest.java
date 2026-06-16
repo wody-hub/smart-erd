@@ -50,26 +50,40 @@ class AiProjectHistoryServiceTest {
 
     @Test
     void getProjectHistory_checksAuthorizationBeforeRepositoryQueries() {
-        when(projectContextLoader.load("viewer", 1L, 10L, false))
-            .thenThrow(new DomainAccessDeniedException("denied"));
+        when(projectContextLoader.load("viewer", 1L, 10L, false)).thenThrow(new DomainAccessDeniedException("denied"));
 
-        assertThatThrownBy(() -> service.getProjectHistory("viewer", 1L, 10L, 50))
-            .isInstanceOf(DomainAccessDeniedException.class);
+        assertThatThrownBy(() -> service.getProjectHistory("viewer", 1L, 10L, 50)).isInstanceOf(
+            DomainAccessDeniedException.class
+        );
         verifyNoInteractions(proposalRepository, auditRepository);
     }
 
     @Test
     void getProjectHistory_capsLimitAtOneHundred() {
         authorize();
-        when(proposalRepository.findByTeamIdAndProjectId(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(List.of());
-        when(auditRepository.findByTeamIdAndProjectId(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(List.of());
+        when(
+            proposalRepository.findByTeamIdAndProjectId(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(List.of());
+        when(
+            auditRepository.findByTeamIdAndProjectId(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(List.of());
 
         final var result = service.getProjectHistory("viewer", 1L, 10L, 500);
 
         final var pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(proposalRepository).findByTeamIdAndProjectId(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), pageableCaptor.capture());
+        verify(proposalRepository).findByTeamIdAndProjectId(
+            org.mockito.ArgumentMatchers.eq(1L),
+            org.mockito.ArgumentMatchers.eq(10L),
+            pageableCaptor.capture()
+        );
         assertThat(result.limit()).isEqualTo(100);
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(101);
     }
@@ -77,10 +91,20 @@ class AiProjectHistoryServiceTest {
     @Test
     void getProjectHistory_hidesPersonalTodoDetailFromOtherMember() {
         authorize();
-        when(proposalRepository.findByTeamIdAndProjectId(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(List.of(proposal("owner", "todo.update", "todo", "TODO-1", "Private TODO", "Private content")));
-        when(auditRepository.findByTeamIdAndProjectId(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(List.of());
+        when(
+            proposalRepository.findByTeamIdAndProjectId(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(List.of(proposal("owner", "todo.update", "todo", "TODO-1", "Private TODO", "Private content")));
+        when(
+            auditRepository.findByTeamIdAndProjectId(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(List.of());
 
         final var result = service.getProjectHistory("viewer", 1L, 10L, 50);
 
@@ -93,10 +117,22 @@ class AiProjectHistoryServiceTest {
     @Test
     void getProjectHistory_keepsWbsLinkedTodoSummaryVisible() {
         authorize();
-        when(proposalRepository.findByTeamIdAndProjectId(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(List.of(proposal("owner", "todo.update", "todo", "wbs:22", "[wbs] Shared TODO", "Shared content")));
-        when(auditRepository.findByTeamIdAndProjectId(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(List.of());
+        when(
+            proposalRepository.findByTeamIdAndProjectId(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(
+            List.of(proposal("owner", "todo.update", "todo", "wbs:22", "[wbs] Shared TODO", "Shared content"))
+        );
+        when(
+            auditRepository.findByTeamIdAndProjectId(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(List.of());
 
         final var result = service.getProjectHistory("viewer", 1L, 10L, 50);
 
@@ -107,16 +143,25 @@ class AiProjectHistoryServiceTest {
     @Test
     void getProjectHistory_returnsProposalAndAuditMetadataWithoutRawFields() {
         authorize();
-        when(proposalRepository.findByTeamIdAndProjectId(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(List.of(proposal("viewer", "issue.create", "issue", "ISS-1", "Risk issue", "Create issue")));
-        when(auditRepository.findByTeamIdAndProjectId(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(List.of(audit()));
+        when(
+            proposalRepository.findByTeamIdAndProjectId(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(List.of(proposal("viewer", "issue.create", "issue", "ISS-1", "Risk issue", "Create issue")));
+        when(
+            auditRepository.findByTeamIdAndProjectId(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(List.of(audit()));
 
         final var result = service.getProjectHistory("viewer", 1L, 10L, 50);
 
         assertThat(result.items()).hasSize(2);
-        assertThat(result.items()).extracting(AiProjectHistoryService.AiProjectHistoryItemView::proposalId)
-            .contains("proposal-1");
+        assertThat(result.items()).extracting(AiProjectHistoryItemView::proposalId).contains("proposal-1");
         assertThat(result.toString())
             .doesNotContain("sanitizedPayloadJson")
             .doesNotContain("rawPrompt")
@@ -129,8 +174,9 @@ class AiProjectHistoryServiceTest {
     }
 
     private void authorize() {
-        when(projectContextLoader.load("viewer", 1L, 10L, false))
-            .thenReturn(new ProjectContextLoader.ProjectContext(null, null));
+        when(projectContextLoader.load("viewer", 1L, 10L, false)).thenReturn(
+            new ProjectContextLoader.ProjectContext(null, null)
+        );
     }
 
     private AiActionProposal proposal(

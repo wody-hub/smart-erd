@@ -29,11 +29,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -67,11 +66,21 @@ class WbsPlanningServiceTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
-    @InjectMocks
     private WbsPlanningService wbsPlanningService;
 
     @BeforeEach
     void setUp() {
+        wbsPlanningService = new WbsPlanningService(
+            wbsItemRepository,
+            wbsDependencyRepository,
+            wbsTemplateRepository,
+            milestoneRepository,
+            projectContextLoader,
+            teamMemberRepository,
+            userRepository,
+            objectMapper,
+            wbsScheduleMetricsService
+        );
         lenient()
             .when(wbsScheduleMetricsService.calculate(any(), any(), any(), any(), anyInt()))
             .thenReturn(new WbsScheduleMetricsService.WbsScheduleMetricsResult(null, null, null, null));
@@ -80,8 +89,6 @@ class WbsPlanningServiceTest {
     @Test
     @DisplayName("duplicateSubtree - 일정/진척률/담당자를 초기화하며 subtree를 복제한다")
     void duplicateSubtree_resetsOptionalFields() {
-        ReflectionTestUtils.setField(wbsPlanningService, "objectMapper", objectMapper);
-
         final var owner = createUser(1L, "tester");
         final var team = createTeam(10L, owner);
         final var project = createProject(20L, team);
@@ -130,8 +137,6 @@ class WbsPlanningServiceTest {
     @Test
     @DisplayName("bulkCreate - 부모 clientKey 순환이 있으면 예외를 던진다")
     void bulkCreate_whenParentCycle_throwsBusinessException() {
-        ReflectionTestUtils.setField(wbsPlanningService, "objectMapper", objectMapper);
-
         final var owner = createUser(1L, "tester");
         final var team = createTeam(10L, owner);
         final var project = createProject(20L, team);
@@ -145,8 +150,30 @@ class WbsPlanningServiceTest {
                 20L,
                 new WbsPlanningService.BulkCreateCommand(
                     List.of(
-                        new WbsPlanningService.BulkCreateItemCommand("a", null, "b", "A", null, null, null, 0, null, null),
-                        new WbsPlanningService.BulkCreateItemCommand("b", null, "a", "B", null, null, null, 0, null, null)
+                        new WbsPlanningService.BulkCreateItemCommand(
+                            "a",
+                            null,
+                            "b",
+                            "A",
+                            null,
+                            null,
+                            null,
+                            0,
+                            null,
+                            null
+                        ),
+                        new WbsPlanningService.BulkCreateItemCommand(
+                            "b",
+                            null,
+                            "a",
+                            "B",
+                            null,
+                            null,
+                            null,
+                            0,
+                            null,
+                            null
+                        )
                     )
                 )
             )
@@ -158,8 +185,6 @@ class WbsPlanningServiceTest {
     @Test
     @DisplayName("saveTemplate + instantiateTemplate - stable payload를 저장하고 다시 적용한다")
     void saveTemplateAndInstantiate_roundTrip() {
-        ReflectionTestUtils.setField(wbsPlanningService, "objectMapper", objectMapper);
-
         final var owner = createUser(1L, "tester");
         final var team = createTeam(10L, owner);
         final var project = createProject(20L, team);
@@ -181,7 +206,28 @@ class WbsPlanningServiceTest {
                 .rootName("운영 wave")
                 .itemCount(1)
                 .dependencyCount(0)
-                .payloadJson(objectMapper.writeValueAsString(new WbsPlanningService.TemplatePayload("운영 wave", List.of(new WbsPlanningService.TemplateNodePayload("node-1", null, "운영 wave", null, null, null, 0, new BigDecimal("1.00"), null, 0)), List.of())))
+                .payloadJson(
+                    objectMapper.writeValueAsString(
+                        new WbsPlanningService.TemplatePayload(
+                            "운영 wave",
+                            List.of(
+                                new WbsPlanningService.TemplateNodePayload(
+                                    "node-1",
+                                    null,
+                                    "운영 wave",
+                                    null,
+                                    null,
+                                    null,
+                                    0,
+                                    new BigDecimal("1.00"),
+                                    null,
+                                    0
+                                )
+                            ),
+                            List.of()
+                        )
+                    )
+                )
                 .build();
             ReflectionTestUtils.setField(saved, "id", 51L);
             return Optional.of(saved);
@@ -208,7 +254,9 @@ class WbsPlanningServiceTest {
         );
 
         assertThat(savedTemplate.id()).isEqualTo(51L);
-        assertThat(instantiated.items()).singleElement().satisfies((item) -> assertThat(item.id()).isEqualTo(500L));
+        assertThat(instantiated.items())
+            .singleElement()
+            .satisfies((item) -> assertThat(item.id()).isEqualTo(500L));
         verify(wbsTemplateRepository).save(any(WbsTemplate.class));
     }
 

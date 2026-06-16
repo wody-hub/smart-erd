@@ -31,12 +31,14 @@ import org.springframework.web.socket.WebSocketHttpHeaders;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.handler.BinaryWebSocketHandler;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * 실제 WebSocket 엔드포인트 + ticket 핸드셰이크를 포함한 E2E 테스트.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestcontainersConfiguration.class)
+@Testcontainers(disabledWithoutDocker = true)
 class DiagramWebSocketE2ETest {
 
     @LocalServerPort

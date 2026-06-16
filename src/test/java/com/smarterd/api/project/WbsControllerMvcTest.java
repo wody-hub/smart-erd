@@ -76,14 +76,13 @@ class WbsControllerMvcTest {
 
     @BeforeEach
     void setUp() {
-        final var controller = new WbsController(
-            wbsService,
-            wbsDependencyService,
-            wbsDocumentService,
-            wbsPlanningService,
-            workItemHistoryService
-        );
-        this.mockMvc = MockMvcBuilders.standaloneSetup(controller)
+        this.mockMvc = MockMvcBuilders.standaloneSetup(
+            new WbsController(wbsService),
+            new WbsDependencyController(wbsDependencyService),
+            new WbsDocumentController(wbsDocumentService),
+            new WbsHistoryController(workItemHistoryService),
+            new WbsPlanningController(wbsPlanningService)
+        )
             .setCustomArgumentResolvers(new TestJwtArgumentResolver())
             .build();
         this.objectMapper = new ObjectMapper();
@@ -235,8 +234,20 @@ class WbsControllerMvcTest {
 
     @Test
     void getTemplates_returnsList() throws Exception {
-        when(wbsPlanningService.getTemplates("tester", 1L, 10L))
-            .thenReturn(List.of(new WbsPlanningService.WbsTemplateSummaryResult(1L, "기본 템플릿", "설명", "루트", 3, 1, Instant.now(), Instant.now())));
+        when(wbsPlanningService.getTemplates("tester", 1L, 10L)).thenReturn(
+            List.of(
+                new WbsPlanningService.WbsTemplateSummaryResult(
+                    1L,
+                    "기본 템플릿",
+                    "설명",
+                    "루트",
+                    3,
+                    1,
+                    Instant.now(),
+                    Instant.now()
+                )
+            )
+        );
 
         mockMvc
             .perform(
@@ -263,17 +274,14 @@ class WbsControllerMvcTest {
         ).thenReturn(
             new WbsPlanningService.WbsMutationResult(
                 301L,
-                List.of(
-                    sampleResult(301L, null, "복제 루트", 0, 0),
-                    sampleResult(302L, 301L, "복제 자식", 1, 0)
-                ),
+                List.of(sampleResult(301L, null, "복제 루트", 0, 0), sampleResult(302L, 301L, "복제 자식", 1, 0)),
                 List.of(sampleDependency(701L))
             )
         );
 
         mockMvc
             .perform(
-                post("/api/teams/1/projects/10/wbs/100/duplicate-subtree")
+                post("/api/teams/1/projects/10/wbs/100/subtree-copies")
                     .with((request) -> {
                         request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                         return request;
@@ -306,19 +314,25 @@ class WbsControllerMvcTest {
 
     @Test
     void saveTemplate_returnsCreatedTemplateSummary() throws Exception {
-        when(wbsPlanningService.saveTemplate(eq("tester"), eq(1L), eq(10L), any(WbsPlanningService.SaveTemplateCommand.class)))
-            .thenReturn(
-                new WbsPlanningService.WbsTemplateSummaryResult(
-                    11L,
-                    "운영형 wave",
-                    "반복 업무 골격",
-                    "운영 루트",
-                    4,
-                    2,
-                    Instant.parse("2026-05-06T00:00:00Z"),
-                    Instant.parse("2026-05-06T00:00:00Z")
-                )
-            );
+        when(
+            wbsPlanningService.saveTemplate(
+                eq("tester"),
+                eq(1L),
+                eq(10L),
+                any(WbsPlanningService.SaveTemplateCommand.class)
+            )
+        ).thenReturn(
+            new WbsPlanningService.WbsTemplateSummaryResult(
+                11L,
+                "운영형 wave",
+                "반복 업무 골격",
+                "운영 루트",
+                4,
+                2,
+                Instant.parse("2026-05-06T00:00:00Z"),
+                Instant.parse("2026-05-06T00:00:00Z")
+            )
+        );
 
         mockMvc
             .perform(
@@ -367,7 +381,7 @@ class WbsControllerMvcTest {
 
         mockMvc
             .perform(
-                post("/api/teams/1/projects/10/wbs/templates/11/instantiate")
+                post("/api/teams/1/projects/10/wbs/templates/11/instantiations")
                     .with((request) -> {
                         request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                         return request;
@@ -400,16 +414,27 @@ class WbsControllerMvcTest {
 
     @Test
     void bulkCreate_returnsCreated() throws Exception {
-        when(wbsPlanningService.bulkCreate(eq("tester"), eq(1L), eq(10L), any(WbsPlanningService.BulkCreateCommand.class)))
-            .thenReturn(
-                new WbsPlanningService.BulkCreateResult(
-                    List.of(new WbsPlanningService.BulkCreateItemResult("task-api-design", sampleResult(301L, null, "API 설계", 0, 0)))
+        when(
+            wbsPlanningService.bulkCreate(
+                eq("tester"),
+                eq(1L),
+                eq(10L),
+                any(WbsPlanningService.BulkCreateCommand.class)
+            )
+        ).thenReturn(
+            new WbsPlanningService.BulkCreateResult(
+                List.of(
+                    new WbsPlanningService.BulkCreateItemResult(
+                        "task-api-design",
+                        sampleResult(301L, null, "API 설계", 0, 0)
+                    )
                 )
-            );
+            )
+        );
 
         mockMvc
             .perform(
-                post("/api/teams/1/projects/10/wbs/bulk-create")
+                post("/api/teams/1/projects/10/wbs/batches")
                     .with((request) -> {
                         request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                         return request;
@@ -431,28 +456,27 @@ class WbsControllerMvcTest {
 
     @Test
     void previewDependencyShift_returnsValidationSummary() throws Exception {
-        when(wbsDependencyService.previewShift(eq("tester"), eq(1L), eq(10L), any()))
-            .thenReturn(
-                new WbsDependencyShiftResult(
-                    false,
-                    false,
-                    List.of(
-                        new WbsDependencyShiftItemResult(
-                            101L,
-                            LocalDate.parse("2026-05-10"),
-                            LocalDate.parse("2026-05-14"),
-                            LocalDate.parse("2026-05-12"),
-                            LocalDate.parse("2026-05-16"),
-                            true
-                        )
-                    ),
-                    List.of(new WbsDependencyShiftIssueResult(102L, "missing-date", "후행 WBS 일정이 비어 있습니다."))
-                )
-            );
+        when(wbsDependencyService.previewShift(eq("tester"), eq(1L), eq(10L), any())).thenReturn(
+            new WbsDependencyShiftResult(
+                false,
+                false,
+                List.of(
+                    new WbsDependencyShiftItemResult(
+                        101L,
+                        LocalDate.parse("2026-05-10"),
+                        LocalDate.parse("2026-05-14"),
+                        LocalDate.parse("2026-05-12"),
+                        LocalDate.parse("2026-05-16"),
+                        true
+                    )
+                ),
+                List.of(new WbsDependencyShiftIssueResult(102L, "missing-date", "후행 WBS 일정이 비어 있습니다."))
+            )
+        );
 
         mockMvc
             .perform(
-                post("/api/teams/1/projects/10/wbs/dependency-shift-preview")
+                post("/api/teams/1/projects/10/wbs/dependency-shift-simulations")
                     .with((request) -> {
                         request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                         return request;
@@ -484,28 +508,27 @@ class WbsControllerMvcTest {
 
     @Test
     void applyDependencyShift_returnsAppliedResult() throws Exception {
-        when(wbsDependencyService.applyShift(eq("tester"), eq(1L), eq(10L), any()))
-            .thenReturn(
-                new WbsDependencyShiftResult(
-                    true,
-                    true,
-                    List.of(
-                        new WbsDependencyShiftItemResult(
-                            101L,
-                            LocalDate.parse("2026-05-10"),
-                            LocalDate.parse("2026-05-14"),
-                            LocalDate.parse("2026-05-12"),
-                            LocalDate.parse("2026-05-16"),
-                            false
-                        )
-                    ),
-                    List.of()
-                )
-            );
+        when(wbsDependencyService.applyShift(eq("tester"), eq(1L), eq(10L), any())).thenReturn(
+            new WbsDependencyShiftResult(
+                true,
+                true,
+                List.of(
+                    new WbsDependencyShiftItemResult(
+                        101L,
+                        LocalDate.parse("2026-05-10"),
+                        LocalDate.parse("2026-05-14"),
+                        LocalDate.parse("2026-05-12"),
+                        LocalDate.parse("2026-05-16"),
+                        false
+                    )
+                ),
+                List.of()
+            )
+        );
 
         mockMvc
             .perform(
-                post("/api/teams/1/projects/10/wbs/dependency-shift-apply")
+                post("/api/teams/1/projects/10/wbs/dependency-shifts")
                     .with((request) -> {
                         request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                         return request;
@@ -563,7 +586,7 @@ class WbsControllerMvcTest {
 
         mockMvc
             .perform(
-                patch("/api/teams/1/projects/10/wbs/reorder")
+                patch("/api/teams/1/projects/10/wbs/order")
                     .with((request) -> {
                         request.setAttribute(TEST_JWT_REQUEST_ATTRIBUTE, jwt("tester"));
                         return request;
@@ -619,7 +642,9 @@ class WbsControllerMvcTest {
 
     @Test
     void getDocumentTags_returnsTagCounts() throws Exception {
-        when(wbsDocumentService.getDocumentTags("tester", 1L, 10L)).thenReturn(List.of(new DocumentTagResult("spec", 2)));
+        when(wbsDocumentService.getDocumentTags("tester", 1L, 10L)).thenReturn(
+            List.of(new DocumentTagResult("spec", 2))
+        );
 
         mockMvc
             .perform(
@@ -688,7 +713,9 @@ class WbsControllerMvcTest {
 
     @Test
     void getWbsActivities_returnsList() throws Exception {
-        when(workItemHistoryService.getWbsActivities("tester", 1L, 10L, 100L)).thenReturn(List.of(sampleActivity(401L)));
+        when(workItemHistoryService.getWbsActivities("tester", 1L, 10L, 100L)).thenReturn(
+            List.of(sampleActivity(401L))
+        );
 
         mockMvc
             .perform(

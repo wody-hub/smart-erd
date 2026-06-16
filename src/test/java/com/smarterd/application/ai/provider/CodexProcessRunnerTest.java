@@ -109,13 +109,11 @@ class CodexProcessRunnerTest {
     @Test
     void runMapsTimeoutAndCancel() {
         final var timeoutLauncher = new CapturingLauncher(new ProcessLauncher.Result(124, "", "timeout", true, false));
-        final var timeout = new CodexProcessRunner(timeoutLauncher)
-            .run(request("exec-timeout"));
+        final var timeout = new CodexProcessRunner(timeoutLauncher).run(request("exec-timeout"));
         assertThat(timeout.status()).isEqualTo(CodexProcessResult.Status.TIMED_OUT);
 
         final var cancelLauncher = new CapturingLauncher(new ProcessLauncher.Result(143, "", "cancelled", false, true));
-        final var cancelled = new CodexProcessRunner(cancelLauncher)
-            .run(request("exec-cancel"));
+        final var cancelled = new CodexProcessRunner(cancelLauncher).run(request("exec-cancel"));
         assertThat(cancelled.status()).isEqualTo(CodexProcessResult.Status.CANCELLED);
     }
 

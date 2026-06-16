@@ -38,6 +38,11 @@ public class ProjectStaffingController {
     private final ProjectStaffingService projectStaffingService;
 
     @Operation(summary = "프로젝트 인력 투입 목록 조회")
+    @ApiResponse(
+        responseCode = "200",
+        description = "조회 성공",
+        content = @Content(schema = @Schema(implementation = ProjectStaffingListResponse.class))
+    )
     @GetMapping
     public ResponseEntity<ProjectStaffingListResponse> getProjectStaffing(
         @AuthenticationPrincipal Jwt jwt,
@@ -45,7 +50,9 @@ public class ProjectStaffingController {
         @Parameter(description = "프로젝트 ID") @PathVariable Long projectId
     ) {
         return ResponseEntity.ok(
-            ProjectStaffingListResponse.from(projectStaffingService.getProjectStaffing(jwt.getSubject(), teamId, projectId))
+            ProjectStaffingListResponse.from(
+                projectStaffingService.getProjectStaffing(jwt.getSubject(), teamId, projectId)
+            )
         );
     }
 
@@ -78,6 +85,11 @@ public class ProjectStaffingController {
     }
 
     @Operation(summary = "프로젝트 인력 투입 수정")
+    @ApiResponse(
+        responseCode = "200",
+        description = "수정 성공",
+        content = @Content(schema = @Schema(implementation = ProjectStaffingResourceResponse.class))
+    )
     @PutMapping("/{staffingId}")
     public ResponseEntity<ProjectStaffingResourceResponse> updateProjectStaffing(
         @AuthenticationPrincipal Jwt jwt,
@@ -107,6 +119,7 @@ public class ProjectStaffingController {
     }
 
     @Operation(summary = "프로젝트 인력 투입 삭제")
+    @ApiResponse(responseCode = "204", description = "삭제 성공", content = @Content)
     @DeleteMapping("/{staffingId}")
     public ResponseEntity<Void> deleteProjectStaffing(
         @AuthenticationPrincipal Jwt jwt,

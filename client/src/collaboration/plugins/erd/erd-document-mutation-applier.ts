@@ -20,6 +20,7 @@ import { findColumnYMap, resolveUniqueTableLabel } from '@/lib/erd-yjs-utils';
 import { normalizeEdgeHandlesInYDoc, syncEdgeHandlePreference } from '@/lib/erd-edge-yjs-utils';
 import {
   buildStableEdgeId,
+  type EdgeHandleSelectionValue,
   parseEdgeHandleSelectionValue,
   resolveAutoEdgeHandles,
   resolveEdgeHandlesFromPreference,
@@ -987,7 +988,7 @@ export class ErdDocumentMutationApplier {
 
     const sourceColId = extractColId(sourceHandle, sourceTableId);
     const targetColId = extractColId(targetHandle, targetTableId);
-    const preference = parseEdgeHandleSelectionValue(selection as any);
+    const preference = parseEdgeHandleSelectionValue(selection as EdgeHandleSelectionValue);
     const resolution = resolveEdgeHandlesFromPreference({
       sourceNode,
       targetNode,

@@ -4,8 +4,8 @@ import com.smarterd.application.ai.provider.AiActionDraft;
 import com.smarterd.domain.ai.AiActionProposal;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.utils.AppStringUtils;
 import java.time.Instant;
-import java.util.Locale;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
@@ -46,17 +46,19 @@ public class AiActionProposalValidator {
     }
 
     public boolean isDestructiveType(String type) {
-        final var normalized = type == null ? "" : type.toLowerCase(Locale.ROOT);
-        return normalized.contains("delete") ||
-        normalized.contains("remove") ||
-        normalized.contains("destroy") ||
-        normalized.contains("bulk") ||
-        normalized.contains("drop") ||
-        normalized.contains("truncate") ||
-        normalized.contains("shell") ||
-        normalized.contains("command") ||
-        normalized.contains("execute") ||
-        normalized.contains("sql");
+        final var normalized = AppStringUtils.lowerCaseToEmpty(type);
+        return (
+            normalized.contains("delete") ||
+            normalized.contains("remove") ||
+            normalized.contains("destroy") ||
+            normalized.contains("bulk") ||
+            normalized.contains("drop") ||
+            normalized.contains("truncate") ||
+            normalized.contains("shell") ||
+            normalized.contains("command") ||
+            normalized.contains("execute") ||
+            normalized.contains("sql")
+        );
     }
 
     static String stringValue(Object value) {
@@ -64,7 +66,7 @@ public class AiActionProposalValidator {
     }
 
     private boolean isBlank(String value) {
-        return value == null || value.isBlank();
+        return AppStringUtils.isBlank(value);
     }
 
     private BusinessException validationFailed() {

@@ -105,7 +105,7 @@ export async function reorderWbsItems(
   payload: ReorderWbsPayload,
 ): Promise<WbsItem[]> {
   const res = await axiosInstance.patch<WbsItem[]>(
-    `/teams/${teamId}/projects/${projectId}/wbs/reorder`,
+    `/teams/${teamId}/projects/${projectId}/wbs/order`,
     payload,
   );
   return res.data;
@@ -140,7 +140,7 @@ export async function instantiateWbsTemplate(
   payload: WbsSubtreeInstantiationPayload,
 ): Promise<WbsSubtreeMutationResponse> {
   const res = await axiosInstance.post<WbsSubtreeMutationResponse>(
-    `/teams/${teamId}/projects/${projectId}/wbs/templates/${templateId}/instantiate`,
+    `/teams/${teamId}/projects/${projectId}/wbs/templates/${templateId}/instantiations`,
     payload,
   );
   return res.data;
@@ -153,7 +153,7 @@ export async function duplicateWbsSubtree(
   payload: WbsSubtreeInstantiationPayload,
 ): Promise<WbsSubtreeMutationResponse> {
   const res = await axiosInstance.post<WbsSubtreeMutationResponse>(
-    `/teams/${teamId}/projects/${projectId}/wbs/${wbsId}/duplicate-subtree`,
+    `/teams/${teamId}/projects/${projectId}/wbs/${wbsId}/subtree-copies`,
     payload,
   );
   return res.data;
@@ -165,7 +165,7 @@ export async function bulkCreateWbsItems(
   payload: BulkCreateWbsItemsPayload,
 ): Promise<BulkCreateWbsItemsResponse> {
   const res = await axiosInstance.post<BulkCreateWbsItemsResponse>(
-    `/teams/${teamId}/projects/${projectId}/wbs/bulk-create`,
+    `/teams/${teamId}/projects/${projectId}/wbs/batches`,
     payload,
   );
   return res.data;
@@ -177,7 +177,7 @@ export async function previewWbsDependencyShift(
   payload: WbsDependencyShiftPayload,
 ): Promise<WbsDependencyShiftResponse> {
   const res = await axiosInstance.post<WbsDependencyShiftResponse>(
-    `/teams/${teamId}/projects/${projectId}/wbs/dependency-shift-preview`,
+    `/teams/${teamId}/projects/${projectId}/wbs/dependency-shift-simulations`,
     payload,
   );
   return res.data;
@@ -189,7 +189,7 @@ export async function applyWbsDependencyShift(
   payload: WbsDependencyShiftPayload,
 ): Promise<WbsDependencyShiftResponse> {
   const res = await axiosInstance.post<WbsDependencyShiftResponse>(
-    `/teams/${teamId}/projects/${projectId}/wbs/dependency-shift-apply`,
+    `/teams/${teamId}/projects/${projectId}/wbs/dependency-shifts`,
     payload,
   );
   return res.data;

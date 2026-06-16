@@ -3,6 +3,7 @@ package com.smarterd.domain.diagram.collaboration;
 import com.smarterd.collaboration.plugin.ScopeLockMode;
 import com.smarterd.collaboration.plugin.ScopeRef;
 import com.smarterd.collaboration.plugin.ScopeResolver;
+import com.smarterd.utils.AppStringUtils;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +50,9 @@ public class ScreenSpecScopeResolver implements ScopeResolver {
         }
 
         if ("screen:add".equals(commandKey) || "screen:rename".equals(commandKey) || "screen:move".equals(commandKey)) {
-            return screenId == null ? List.of(DOCUMENT_ROOT_SCOPE) : List.of(new ScopeRef("screen", screenId, ScopeLockMode.EXCLUSIVE));
+            return screenId == null
+                ? List.of(DOCUMENT_ROOT_SCOPE)
+                : List.of(new ScopeRef("screen", screenId, ScopeLockMode.EXCLUSIVE));
         }
 
         if ("screen:update-frame".equals(commandKey) || "screen:delete".equals(commandKey)) {
@@ -104,7 +107,6 @@ public class ScreenSpecScopeResolver implements ScopeResolver {
         if (!(value instanceof String stringValue)) {
             return null;
         }
-        final var trimmed = stringValue.trim();
-        return trimmed.isEmpty() ? null : trimmed;
+        return AppStringUtils.trimToNull(stringValue);
     }
 }

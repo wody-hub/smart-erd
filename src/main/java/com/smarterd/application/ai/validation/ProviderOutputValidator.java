@@ -5,11 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.application.ai.provider.AiProviderResult;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.utils.AppStringUtils;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import java.util.Set;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 /**
  * Parses and validates structured provider output.
@@ -21,7 +21,11 @@ public class ProviderOutputValidator {
     private final Validator validator;
     private final ActionDraftValidator actionDraftValidator;
 
-    public ProviderOutputValidator(ObjectMapper objectMapper, Validator validator, ActionDraftValidator actionDraftValidator) {
+    public ProviderOutputValidator(
+        ObjectMapper objectMapper,
+        Validator validator,
+        ActionDraftValidator actionDraftValidator
+    ) {
         this.objectMapper = objectMapper;
         this.validator = validator;
         this.actionDraftValidator = actionDraftValidator;
@@ -55,10 +59,10 @@ public class ProviderOutputValidator {
         if (!violations.isEmpty()) {
             throw outputValidationFailed();
         }
-        if (result.error() == null && !StringUtils.hasText(result.answer())) {
+        if (result.error() == null && AppStringUtils.isBlank(result.answer())) {
             throw outputValidationFailed();
         }
-        if (result.error() != null && StringUtils.hasText(result.answer())) {
+        if (result.error() != null && AppStringUtils.isNotBlank(result.answer())) {
             throw outputValidationFailed();
         }
         final var actions = actionDraftValidator.validate(result.actions());

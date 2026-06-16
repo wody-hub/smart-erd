@@ -154,7 +154,12 @@ class ProjectIssueServiceTest {
                 "tester",
                 10L,
                 20L,
-                new ProjectIssueService.CreateProjectIssueCommand("외부 담당자 금지", null, ProjectIssuePriority.HIGH, 99L)
+                new ProjectIssueService.CreateProjectIssueCommand(
+                    "외부 담당자 금지",
+                    null,
+                    ProjectIssuePriority.HIGH,
+                    99L
+                )
             )
         )
             .isInstanceOf(DomainAccessDeniedException.class)

@@ -26,8 +26,14 @@ class CodexAvailabilityProbeTest {
 
     @Test
     void probeMapsMissingExecutableWithoutLeakingPath() {
-        final var launcher = new CapturingLauncher(new ProcessLauncher.Result(127, "", "missing /secret/path", false, false));
-        final var probe = new CodexAvailabilityProbe("/secret/path/codex", launcher, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+        final var launcher = new CapturingLauncher(
+            new ProcessLauncher.Result(127, "", "missing /secret/path", false, false)
+        );
+        final var probe = new CodexAvailabilityProbe(
+            "/secret/path/codex",
+            launcher,
+            Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)
+        );
 
         final var status = probe.status();
 

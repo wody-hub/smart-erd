@@ -83,7 +83,7 @@ test('executeAiChat posts typed request to chat endpoint and forwards abort sign
   }
 });
 
-test('11-W3-04 proposal API helpers use proposal id paths without request bodies', async () => {
+test('11-W3-04 proposal API helpers post proposal decisions with request bodies', async () => {
   const proposal: AiActionProposalCard = {
     proposalId: 'proposal-1',
     status: 'PENDING',
@@ -126,10 +126,10 @@ test('11-W3-04 proposal API helpers use proposal id paths without request bodies
 
     assert.equal(AI_PROPOSAL_BASE_PATH, '/ai/proposals');
     assert.equal(calls[0]?.[0], '/ai/proposals/proposal-1');
-    assert.equal(calls[1]?.[0], '/ai/proposals/proposal-1/approve');
-    assert.equal(calls[1]?.[1], undefined);
-    assert.equal(calls[2]?.[0], '/ai/proposals/proposal-1/cancel');
-    assert.equal(calls[2]?.[1], undefined);
+    assert.equal(calls[1]?.[0], '/ai/proposals/proposal-1/decisions');
+    assert.deepEqual(calls[1]?.[1], { decision: 'APPROVE' });
+    assert.equal(calls[2]?.[0], '/ai/proposals/proposal-1/decisions');
+    assert.deepEqual(calls[2]?.[1], { decision: 'CANCEL' });
   } finally {
     restore();
   }

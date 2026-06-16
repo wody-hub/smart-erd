@@ -30,9 +30,12 @@ function invalidateExecutedProposal(proposal: AiActionProposalCard) {
   });
   void queryClient.invalidateQueries({ queryKey: queryKeys.aiChat.proposal(proposal.proposalId) });
 
-  const resourceType = proposal.result?.resourceType ?? proposal.target?.type ?? proposal.actionType;
+  const resourceType =
+    proposal.result?.resourceType ?? proposal.target?.type ?? proposal.actionType;
   if (resourceType?.includes('issue')) {
-    void queryClient.invalidateQueries({ queryKey: ['teams', teamId, 'projects', projectId, 'issues'] });
+    void queryClient.invalidateQueries({
+      queryKey: ['teams', teamId, 'projects', projectId, 'issues'],
+    });
   }
   if (resourceType?.includes('todo')) {
     void queryClient.invalidateQueries({ queryKey: queryKeys.projectTodos.all(teamId, projectId) });
@@ -41,8 +44,12 @@ function invalidateExecutedProposal(proposal: AiActionProposalCard) {
     void queryClient.invalidateQueries({ queryKey: queryKeys.wbs.all(teamId, projectId) });
     const wbsId = proposal.target?.id == null ? null : Number(proposal.target.id);
     if (Number.isFinite(wbsId)) {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.wbs.comments(teamId, projectId, wbsId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.wbs.activities(teamId, projectId, wbsId) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.wbs.comments(teamId, projectId, wbsId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.wbs.activities(teamId, projectId, wbsId),
+      });
     }
   }
 }

@@ -317,7 +317,7 @@ public class DiagramColumnDefinitionExportService {
     }
 
     private String extractBaseType(String rawType) {
-        final var trimmed = AppStringUtils.defaultIfBlank(rawType, "").trim();
+        final var trimmed = AppStringUtils.trimToEmpty(rawType);
         if (trimmed.isEmpty()) {
             return "";
         }
@@ -326,17 +326,17 @@ public class DiagramColumnDefinitionExportService {
         if (openParenIndex < 0) {
             return trimmed;
         }
-        return trimmed.substring(0, openParenIndex).trim();
+        return AppStringUtils.trimToEmpty(trimmed.substring(0, openParenIndex));
     }
 
     private String extractTypeLength(String rawType) {
-        final var trimmed = AppStringUtils.defaultIfBlank(rawType, "").trim();
+        final var trimmed = AppStringUtils.trimToEmpty(rawType);
         final var openParenIndex = trimmed.indexOf('(');
         final var closeParenIndex = trimmed.lastIndexOf(')');
         if (openParenIndex < 0 || closeParenIndex <= openParenIndex) {
             return "";
         }
-        return trimmed.substring(openParenIndex + 1, closeParenIndex).trim();
+        return AppStringUtils.trimToEmpty(trimmed.substring(openParenIndex + 1, closeParenIndex));
     }
 
     private String formatNotNullFlag(@Nullable Boolean nullable) {
@@ -357,7 +357,7 @@ public class DiagramColumnDefinitionExportService {
         if (node == null || node.isNull()) {
             return "";
         }
-        return AppStringUtils.defaultIfBlank(node.asText(null), "").trim();
+        return AppStringUtils.trimToEmpty(node.asText(null));
     }
 
     private record TableSnapshot(

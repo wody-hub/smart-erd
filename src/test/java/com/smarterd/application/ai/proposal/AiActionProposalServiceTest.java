@@ -44,26 +44,25 @@ class AiActionProposalServiceTest {
     @Test
     void createProposals_persistsSanitizedIndependentPendingProposals() {
         final var service = service(new AiActionExecutorRegistry(List.of()));
-        when(proposalRepository.save(any(AiActionProposal.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(proposalRepository.save(any(AiActionProposal.class))).thenAnswer((invocation) ->
+            invocation.getArgument(0)
+        );
 
         final var views = service.createProposals(
-            new AiActionProposalService.CreateCommand(
+            new AiActionProposalCreateCommand(
                 "exec-1",
                 "noop",
                 "provider-response-v1",
                 1L,
                 10L,
                 "tester",
-                List.of(
-                    draft("a1", "issue.create", "Issue one"),
-                    draft("a2", "todo.update", "Todo one")
-                )
+                List.of(draft("a1", "issue.create", "Issue one"), draft("a2", "todo.update", "Todo one"))
             )
         );
 
         assertThat(views).hasSize(2);
         assertThat(views).extracting(AiActionProposalView::proposalId).doesNotHaveDuplicates();
-        assertThat(views).allSatisfy(view -> {
+        assertThat(views).allSatisfy((view) -> {
             assertThat(view.status()).isEqualTo(AiActionProposalStatus.PENDING);
             assertThat(view.target().type()).isEqualTo("issue");
             assertThat(view.expiresAt()).isAfter(Instant.now().plusSeconds(14 * 60));
@@ -103,9 +102,13 @@ class AiActionProposalServiceTest {
         final var service = service(new AiActionExecutorRegistry(List.of()));
         final var proposal = proposal("proposal-1", "issue.create");
         when(proposalRepository.findByProposalId("proposal-1")).thenReturn(Optional.of(proposal));
-        when(projectContextLoader.load("intruder", 1L, 10L, false)).thenThrow(new DomainAccessDeniedException("denied"));
+        when(projectContextLoader.load("intruder", 1L, 10L, false)).thenThrow(
+            new DomainAccessDeniedException("denied")
+        );
 
-        assertThatThrownBy(() -> service.approve("intruder", "proposal-1")).isInstanceOf(DomainAccessDeniedException.class);
+        assertThatThrownBy(() -> service.approve("intruder", "proposal-1")).isInstanceOf(
+            DomainAccessDeniedException.class
+        );
 
         assertThat(proposal.getStatus()).isEqualTo(AiActionProposalStatus.PENDING);
         verify(executor, never()).execute(any(), any());
@@ -196,8 +199,9 @@ class AiActionProposalServiceTest {
     void expirePending_marksOnlyPendingExpiredProposals() {
         final var service = service(new AiActionExecutorRegistry(List.of()));
         final var pending = proposal("proposal-1", "issue.create");
-        when(proposalRepository.findByStatusAndExpiresAtBefore(AiActionProposalStatus.PENDING, Instant.EPOCH))
-            .thenReturn(List.of(pending));
+        when(
+            proposalRepository.findByStatusAndExpiresAtBefore(AiActionProposalStatus.PENDING, Instant.EPOCH)
+        ).thenReturn(List.of(pending));
 
         final var count = service.expirePending(Instant.EPOCH);
 

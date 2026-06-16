@@ -2,9 +2,11 @@ package com.smarterd.application.ai.chat;
 
 import com.smarterd.application.ai.AiExecutionGateway;
 import com.smarterd.application.ai.AiProviderExecutionRunner;
+import com.smarterd.application.ai.proposal.AiActionProposalCreateCommand;
 import com.smarterd.application.ai.proposal.AiActionProposalService;
 import com.smarterd.application.ai.proposal.AiActionProposalView;
 import com.smarterd.application.ai.provider.AiProviderError;
+import com.smarterd.utils.AppStringUtils;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,9 +32,9 @@ public class AiChatExecutionService {
      * @param command chat command
      * @return chat view for the API layer
      */
-    public AiChatView execute(String loginId, ChatCommand command) {
+    public AiChatView execute(String loginId, AiChatCommand command) {
         final var context = contextResolver.resolve(loginId, command.toResolveCommand());
-        if (context.status() == AiChatContextResolver.ScopeStatus.DENIED) {
+        if (context.status() == AiChatScopeStatus.DENIED) {
             return AiChatView.error(
                 "AI_CHAT_SCOPE_DENIED",
                 "요청한 AI 채팅 범위에 접근할 수 없습니다.",
@@ -89,257 +91,13 @@ public class AiChatExecutionService {
         );
     }
 
-    public record ChatCommand(
-        Long teamId,
-        Long projectId,
-        String userMessage,
-        String locale,
-        String routeSource,
-        String mentionedProjectName,
-        String scopeMode,
-        boolean currentTeamMode,
-        boolean multiProjectQuestion
-    ) {
-        /**
-         * Creates a command from the legacy route-level chat fields.
-         *
-         * @param teamId team id
-         * @param projectId project id
-         * @param userMessage user prompt
-         * @param locale requested locale
-         * @param routeSource route source label
-         * @return initialized chat command
-         */
-        public ChatCommand(Long teamId, Long projectId, String userMessage, String locale, String routeSource) {
-            this(teamId, projectId, userMessage, locale, routeSource, null, null, false, false);
-        }
-
-        AiChatContextResolver.ResolveCommand toResolveCommand() {
-            return new AiChatContextResolver.ResolveCommand(
-                teamId,
-                projectId,
-                routeSource,
-                List.of(),
-                mentionedProjectName,
-                currentTeamMode,
-                multiProjectQuestion
-            );
-        }
-
-        AiReadContextService.ReadCommand toReadCommand(AiChatContextResolver.ResolvedContext context) {
-            return new AiReadContextService.ReadCommand(
-                context.teamId(),
-                context.projectIds(),
-                java.util.Set.of(),
-                memberTodoSummaryRequested(),
-                null,
-                userMessage
-            );
-        }
-
-        /**
-         * Detects when the question asks for member or team TODO aggregation.
-         *
-         * @return true when member TODO aggregation is requested
-         */
-        private boolean memberTodoSummaryRequested() {
-            final var text = userMessage == null ? "" : userMessage.toLowerCase(java.util.Locale.ROOT);
-            return text.contains("member todo") || text.contains("team todo") || text.contains("멤버") || text.contains("팀원");
-        }
-    }
-
-    public record AiChatView(
-        String status,
-        String executionId,
-        boolean requiresConfirmation,
-        String confirmationReason,
-        AiChatContextView context,
-        String conclusion,
-        String interpretation,
-        List<String> confirmedFacts,
-        List<String> needsConfirmation,
-        List<AiReadContextService.SourceChip> sourceChips,
-        List<AiChatConfirmationCandidateView> confirmationCandidates,
-        List<AiActionProposalView> proposals,
-        String error,
-        AiChatErrorView errorState
-    ) {
-        /**
-         * Creates a backward-compatible view for older tests and callers.
-         *
-         * @param status chat status
-         * @param conclusion leading conclusion text
-         * @param interpretation provider answer text
-         * @param confirmedFacts confirmed facts
-         * @param needsConfirmation missing confirmation items
-         * @param sourceChips source chips
-         * @param confirmationCandidates project confirmation candidates
-         * @param error safe error text
-         * @return initialized chat view
-         */
-        public AiChatView(
-            String status,
-            String conclusion,
-            String interpretation,
-            List<String> confirmedFacts,
-            List<String> needsConfirmation,
-            List<AiReadContextService.SourceChip> sourceChips,
-            List<AiChatContextResolver.ProjectCandidate> confirmationCandidates,
-            String error
-        ) {
-            this(
-                status,
-                null,
-                "NEEDS_CONFIRMATION".equals(status),
-                null,
-                null,
-                conclusion,
-                interpretation,
-                confirmedFacts,
-                needsConfirmation,
-                sourceChips,
-                confirmationCandidates.stream().map(AiChatConfirmationCandidateView::from).toList(),
-                List.of(),
-                error,
-                error == null ? null : new AiChatErrorView("AI_CHAT_ERROR", error, false)
-            );
-        }
-
-        public AiChatView {
-            confirmedFacts = confirmedFacts == null ? List.of() : List.copyOf(confirmedFacts);
-            needsConfirmation = needsConfirmation == null ? List.of() : List.copyOf(needsConfirmation);
-            sourceChips = sourceChips == null ? List.of() : List.copyOf(sourceChips);
-            confirmationCandidates =
-                confirmationCandidates == null ? List.of() : List.copyOf(confirmationCandidates);
-            proposals = proposals == null ? List.of() : List.copyOf(proposals);
-        }
-
-        /**
-         * Creates a scope-confirmation response without project candidates.
-         *
-         * @param needsConfirmation missing confirmation items
-         * @param candidates project confirmation candidates
-         * @return confirmation chat view
-         */
-        public static AiChatView needsConfirmation(
-            List<String> needsConfirmation,
-            List<AiChatContextResolver.ProjectCandidate> candidates
-        ) {
-            return needsConfirmation(needsConfirmation, candidates, null);
-        }
-
-        /**
-         * Creates a scope-confirmation response with a stable reason code.
-         *
-         * @param needsConfirmation missing confirmation items
-         * @param candidates project confirmation candidates
-         * @param confirmationReason stable confirmation reason
-         * @return confirmation chat view
-         */
-        public static AiChatView needsConfirmation(
-            List<String> needsConfirmation,
-            List<AiChatContextResolver.ProjectCandidate> candidates,
-            String confirmationReason
-        ) {
-            final var safeNeedsConfirmation = needsConfirmation == null ? List.<String>of() : List.copyOf(needsConfirmation);
-            final var safeCandidates = candidates == null ? List.<AiChatContextResolver.ProjectCandidate>of() : candidates;
-            return new AiChatView(
-                "NEEDS_CONFIRMATION",
-                null,
-                true,
-                confirmationReason == null && !safeNeedsConfirmation.isEmpty()
-                    ? safeNeedsConfirmation.getFirst()
-                    : confirmationReason,
-                null,
-                "질문 범위를 먼저 확인해야 합니다.",
-                "",
-                List.of(),
-                safeNeedsConfirmation,
-                List.of(),
-                safeCandidates.stream().map(AiChatConfirmationCandidateView::from).toList(),
-                List.of(),
-                null,
-                null
-            );
-        }
-
-        /**
-         * Creates a structured chat error response.
-         *
-         * @param code error code
-         * @param message safe error message
-         * @param retryable retry hint
-         * @param needsConfirmation missing confirmation items
-         * @return error chat view
-         */
-        public static AiChatView error(String code, String message, boolean retryable, List<String> needsConfirmation) {
-            return new AiChatView(
-                "ERROR",
-                null,
-                false,
-                null,
-                null,
-                "",
-                "",
-                List.of(),
-                needsConfirmation,
-                List.of(),
-                List.of(),
-                List.of(),
-                message,
-                new AiChatErrorView(code, message, retryable)
-            );
-        }
-    }
-
-    public record AiChatContextView(
-        String kind,
-        Long teamId,
-        List<Long> projectIds,
-        String label,
-        List<String> toolsUsed,
-        Map<String, Object> caps
-    ) {
-        public AiChatContextView {
-            projectIds = projectIds == null ? List.of() : List.copyOf(projectIds);
-            toolsUsed = toolsUsed == null ? List.of() : List.copyOf(toolsUsed);
-            caps = caps == null ? Map.of() : Map.copyOf(caps);
-        }
-    }
-
-    public record AiChatConfirmationCandidateView(
-        String id,
-        String label,
-        String kind,
-        Long teamId,
-        String teamName,
-        Long projectId,
-        String projectName,
-        String reason
-    ) {
-        static AiChatConfirmationCandidateView from(AiChatContextResolver.ProjectCandidate candidate) {
-            return new AiChatConfirmationCandidateView(
-                "project:" + candidate.projectId(),
-                candidate.projectName(),
-                "project",
-                candidate.teamId(),
-                null,
-                candidate.projectId(),
-                candidate.projectName(),
-                null
-            );
-        }
-    }
-
-    public record AiChatErrorView(String code, String message, boolean retryable) {}
-
     /**
      * Converts a resolver confirmation reason to its wire value.
      *
      * @param context resolved chat context
      * @return confirmation reason name or null
      */
-    private static String confirmationReason(AiChatContextResolver.ResolvedContext context) {
+    private static String confirmationReason(AiChatResolvedContext context) {
         return context.confirmationReason() == null ? null : context.confirmationReason().name();
     }
 
@@ -349,7 +107,7 @@ public class AiChatExecutionService {
      * @param context resolved chat context
      * @return representative project id or null
      */
-    private static Long representativeProjectId(AiChatContextResolver.ResolvedContext context) {
+    private static Long representativeProjectId(AiChatResolvedContext context) {
         return context.projectIds().isEmpty() ? null : context.projectIds().getFirst();
     }
 
@@ -362,8 +120,8 @@ public class AiChatExecutionService {
      * @return provider context map
      */
     private static Map<String, Object> providerContext(
-        ChatCommand command,
-        AiChatContextResolver.ResolvedContext context,
+        AiChatCommand command,
+        AiChatResolvedContext context,
         AiReadContextService.ReadContext readContext
     ) {
         final var map = new LinkedHashMap<String, Object>();
@@ -372,9 +130,12 @@ public class AiChatExecutionService {
         map.put("scopeLabel", context.label());
         map.put("locale", command.locale() == null ? "" : command.locale());
         map.put("toolsUsed", readContext.toolsUsed().stream().map(Enum::name).toList());
-        map.put("readContext", readContext.sanitizedProviderContext().isBlank()
-            ? readContext.sanitizedContext()
-            : readContext.sanitizedProviderContext());
+        map.put(
+            "readContext",
+            AppStringUtils.isBlank(readContext.sanitizedProviderContext())
+                ? readContext.sanitizedContext()
+                : readContext.sanitizedProviderContext()
+        );
         map.put("sourceChips", readContext.sourceChips());
         map.put("caps", readContext.capMetadata());
         return Map.copyOf(map);
@@ -388,7 +149,7 @@ public class AiChatExecutionService {
      * @return chat context view
      */
     private static AiChatContextView contextView(
-        AiChatContextResolver.ResolvedContext context,
+        AiChatResolvedContext context,
         AiReadContextService.ReadContext readContext
     ) {
         return new AiChatContextView(
@@ -425,7 +186,7 @@ public class AiChatExecutionService {
     private static AiChatView providerFailure(
         AiExecutionGateway.AiExecutionView execution,
         AiReadContextService.ReadContext readContext,
-        AiChatContextResolver.ResolvedContext context
+        AiChatResolvedContext context
     ) {
         final var error = execution.error();
         return new AiChatView(
@@ -457,13 +218,13 @@ public class AiChatExecutionService {
     private List<AiActionProposalView> createProposals(
         String loginId,
         AiExecutionGateway.AiExecutionView execution,
-        AiChatContextResolver.ResolvedContext context
+        AiChatResolvedContext context
     ) {
         if (execution.actions().isEmpty()) {
             return List.of();
         }
         return proposalService.createProposals(
-            new AiActionProposalService.CreateCommand(
+            new AiActionProposalCreateCommand(
                 execution.executionId(),
                 execution.provider(),
                 execution.promptVersion(),

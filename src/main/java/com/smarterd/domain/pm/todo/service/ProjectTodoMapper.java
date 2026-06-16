@@ -36,7 +36,12 @@ class ProjectTodoMapper {
     }
 
     ProjectTodoService.TodoDocumentResult toTodoDocumentResult(TodoDocumentLink link) {
-        return toTodoDocumentResult(link.getTodo().getId(), link.getDiagram(), link.getVisibility(), link.getCreatedAt());
+        return toTodoDocumentResult(
+            link.getTodo().getId(),
+            link.getDiagram(),
+            link.getVisibility(),
+            link.getCreatedAt()
+        );
     }
 
     ProjectTodoService.TodoDocumentResult toTodoDocumentResult(
@@ -45,10 +50,9 @@ class ProjectTodoMapper {
         TodoDocumentVisibility visibility,
         @Nullable Instant linkedAt
     ) {
-        final MarkdownTemplateDescriptor descriptor =
-            document.isMarkdownDocument()
-                ? markdownDocumentDescriptorService.describe(document.getContent())
-                : new MarkdownTemplateDescriptor(document.getTemplateKey(), null, document.getSummaryText(), List.of());
+        final MarkdownTemplateDescriptor descriptor = document.isMarkdownDocument()
+            ? markdownDocumentDescriptorService.describe(document.getContent())
+            : new MarkdownTemplateDescriptor(document.getTemplateKey(), null, document.getSummaryText(), List.of());
 
         return new ProjectTodoService.TodoDocumentResult(
             todoId,

@@ -18,7 +18,10 @@ public record UpdateProjectIssueRequest(
     @Size(max = ProjectIssue.MAX_TITLE_LENGTH, message = "{validation.size.issue-title}")
     String title,
 
-    @Schema(description = "이슈 내용", example = "status/priority 필터와 export 결과가 일치하도록 서버 정렬 규칙을 보완한다.")
+    @Schema(
+        description = "이슈 내용",
+        example = "status/priority 필터와 export 결과가 일치하도록 서버 정렬 규칙을 보완한다."
+    )
     @Nullable
     @Size(max = ProjectIssue.MAX_DESCRIPTION_LENGTH, message = "{validation.size.issue-description}")
     String description,

@@ -63,11 +63,7 @@ npm run format:check                 # Check formatting (CI)
 
 ## Code Quality — SonarQube 준수
 
-- **SonarQube / SonarLint 규칙을 최대한 준수한다.** 코드 작성 시 SonarQube가 경고하는 코드 스멜, 버그, 취약점을 사전에 방지한다.
-- null 반환 대신 빈 컬렉션/빈 배열 반환 (`Return an empty array instead of null`)
-- 사용하지 않는 변수/import 제거
-- 인라인 조건문 대신 명시적 블록 사용
-- 예외를 무시하지 않고 적절히 처리 또는 로깅
+- **SonarQube / SonarLint 규칙을 최대한 준수한다.**
 - Prettier와 충돌하는 S1611(람다 괄호)은 Prettier 우선으로 억제 (`sonar-project.properties`, VS Code `sonarlint.rules`)
 
 ## Architecture
@@ -301,11 +297,8 @@ Client                                    Server
 
 ### Timezone Policy (UTC 표준화)
 
-- **백엔드 엔티티 시간 타입:** `Instant` (Java Time)
-- **DB 컬럼 타입:** `TIMESTAMP WITH TIME ZONE` (`timestamptz`)
-- **JPA/Jackson 설정:** `hibernate.jdbc.time_zone: UTC`, `spring.jackson.time-zone: UTC`
-- **API 응답 시간 포맷:** ISO-8601 UTC (예: `2026-02-09T07:23:34.065Z`)
-- **프론트 표시:** 브라우저 로컬 시간대로 변환하되, 포맷은 현재 선택 언어(`i18n`) 기준으로 렌더링
+- 백엔드 시간 타입 `Instant`, DB 컬럼 `timestamptz`, API 응답 ISO-8601 UTC (설정: `hibernate.jdbc.time_zone: UTC`, `spring.jackson.time-zone: UTC`)
+- 프론트 표시: 브라우저 로컬 시간대로 변환, 포맷은 현재 선택 언어(`i18n`) 기준
 
 ### Error Response Format
 
@@ -342,15 +335,9 @@ Accept-Language: ko → { "error": "사용자를 찾을 수 없습니다: testus
 
 ## SOLID 원칙 (MUST)
 
-아키텍처와 코드는 반드시 SOLID 원칙을 준수해야 하며, 위반해서는 안 된다.
-
-| 원칙 | 설명 | 점검 기준 |
-|------|------|----------|
-| **S — 단일 책임 원칙 (SRP)** | 하나의 클래스/모듈/훅은 하나의 변경 사유만 가진다 | 여러 관심사(렌더링+동기화+직렬화 등)가 하나의 파일에 혼재하면 위반 |
-| **O — 개방-폐쇄 원칙 (OCP)** | 확장에는 열려 있고 수정에는 닫혀 있다 | 새 기능(플러그인, 핸들러, Projector 등) 추가 시 기존 코드 수정이 필요하면 위반 |
-| **L — 리스코프 치환 원칙 (LSP)** | 구현체는 상위 타입의 계약을 준수한다 | 구현체가 예외를 던지거나 부분적으로만 동작하면 위반 |
-| **I — 인터페이스 분리 원칙 (ISP)** | 클라이언트는 사용하지 않는 메서드에 의존하지 않는다 | 거대 인터페이스 대신 역할별 포트(Command/Query/Subscription)로 분리 |
-| **D — 의존성 역전 원칙 (DIP)** | 상위 모듈은 하위 모듈의 구체 타입에 직접 의존하지 않는다 | View가 Y.Doc 등 CRDT 구현체에 직접 의존하면 위반. 추상(인터페이스/포트)에 의존 |
+- 아키텍처와 코드는 SOLID 원칙을 준수한다.
+- 프로젝트 특이 규칙 (DIP): View가 Y.Doc 등 CRDT 구현체에 직접 의존하면 위반 — 항상 추상(인터페이스/포트)에 의존한다.
+- 프로젝트 특이 규칙 (OCP): 새 기능(플러그인, 핸들러, Projector 등)은 기존 협업 코어 수정 없이 확장 가능해야 한다.
 
 ## Code Standards
 
@@ -596,19 +583,8 @@ const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
 ### Formatting — Prettier
 
-- Root `.prettierrc.json` with `prettier-plugin-java`
-- Java: tabWidth 4, printWidth 120
-- TypeScript: tabWidth 2, printWidth 100
-- Prettier와 SonarQube S1611 충돌: **Prettier 우선** — `sonar-project.properties`에서 S1611 전역 무시, VS Code에서 `sonarlint.rules: java:S1611: off`
-
-### VS Code Development Environment
-
-`.vscode/settings.json` 주요 설정:
-
-- `editor.formatOnSave: true` (Prettier), `source.organizeImports: explicit` (미사용 import 제거)
-- `files.autoSave: afterDelay` (1초), `trimTrailingWhitespace`, `insertFinalNewline`
-- `java.compile.nullAnalysis.mode: automatic` (`@NonNullApi` null 분석)
-- 기본 포맷터: `esbenp.prettier-vscode` (Java + TypeScript)
+- 포맷 규칙의 정본은 루트 `.prettierrc.json` (+ `prettier-plugin-java`) — Java tabWidth 4/printWidth 120, TS tabWidth 2/printWidth 100
+- Prettier와 SonarQube S1611 충돌: **Prettier 우선** (IDE/CI 설정은 README.md "개발 환경" 참조)
 
 ### Database
 
@@ -1012,10 +988,3 @@ Use these entry points:
 
 Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
 <!-- GSD:workflow-end -->
-
-<!-- GSD:profile-start -->
-## Developer Profile
-
-> Profile not yet configured. Run `/gsd:profile-user` to generate your developer profile.
-> This section is managed by `generate-claude-profile` -- do not edit manually.
-<!-- GSD:profile-end -->

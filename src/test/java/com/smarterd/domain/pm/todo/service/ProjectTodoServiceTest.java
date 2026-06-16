@@ -75,7 +75,9 @@ class ProjectTodoServiceTest {
 
         when(projectTodoAccessService.loadProject("tester", 10L, 20L)).thenReturn(project);
         when(projectTodoAccessService.findUserByLoginId("tester")).thenReturn(owner);
-        when(projectTodoRepository.findByProjectAndOwnerOrderByCreatedAtDescIdDesc(project, owner)).thenReturn(List.of(todo));
+        when(projectTodoRepository.findByProjectAndOwnerOrderByCreatedAtDescIdDesc(project, owner)).thenReturn(
+            List.of(todo)
+        );
         when(projectTodoMapper.toProjectTodoResult(todo)).thenReturn(mapped);
 
         final var result = projectTodoService.getProjectTodos("tester", 10L, 20L);
@@ -92,30 +94,39 @@ class ProjectTodoServiceTest {
         when(projectTodoAccessService.loadProject("tester", 10L, 20L)).thenReturn(project);
         when(projectTodoAccessService.findUserByLoginId("tester")).thenReturn(owner);
         when(projectTodoAccessService.resolveWbsItem(project, null)).thenReturn(null);
-        when(projectTodoRepository.save(any(ProjectTodo.class))).thenAnswer((invocation) -> invocation.getArgument(0, ProjectTodo.class));
-        when(projectTodoMapper.toProjectTodoResult(any(ProjectTodo.class)))
-            .thenAnswer((invocation) -> {
-                final var saved = invocation.getArgument(0, ProjectTodo.class);
-                return new ProjectTodoService.ProjectTodoResult(
-                    saved.getId(),
-                    saved.getTitle(),
-                    saved.getDescription(),
-                    saved.getStatus(),
-                    saved.getPriority(),
-                    saved.getTargetDate(),
-                    saved.getProgressRate(),
-                    null,
-                    null,
-                    Instant.EPOCH,
-                    Instant.EPOCH
-                );
-            });
+        when(projectTodoRepository.save(any(ProjectTodo.class))).thenAnswer((invocation) ->
+            invocation.getArgument(0, ProjectTodo.class)
+        );
+        when(projectTodoMapper.toProjectTodoResult(any(ProjectTodo.class))).thenAnswer((invocation) -> {
+            final var saved = invocation.getArgument(0, ProjectTodo.class);
+            return new ProjectTodoService.ProjectTodoResult(
+                saved.getId(),
+                saved.getTitle(),
+                saved.getDescription(),
+                saved.getStatus(),
+                saved.getPriority(),
+                saved.getTargetDate(),
+                saved.getProgressRate(),
+                null,
+                null,
+                Instant.EPOCH,
+                Instant.EPOCH
+            );
+        });
 
         final var result = projectTodoService.createProjectTodo(
             "tester",
             10L,
             20L,
-            new ProjectTodoService.CreateProjectTodoCommand("응답 계약 정리", "private note", null, null, null, null, null)
+            new ProjectTodoService.CreateProjectTodoCommand(
+                "응답 계약 정리",
+                "private note",
+                null,
+                null,
+                null,
+                null,
+                null
+            )
         );
 
         assertThat(result.status()).isEqualTo(ProjectTodoStatus.TODO);
@@ -140,8 +151,16 @@ class ProjectTodoServiceTest {
             Instant.parse("2026-04-28T03:10:00Z"),
             Instant.parse("2026-04-28T03:10:00Z")
         );
-        when(projectTodoDocumentService.linkDocument("tester", 10L, 20L, 301L, 41L, com.smarterd.domain.pm.todo.entity.TodoDocumentVisibility.PRIVATE))
-            .thenReturn(expected);
+        when(
+            projectTodoDocumentService.linkDocument(
+                "tester",
+                10L,
+                20L,
+                301L,
+                41L,
+                com.smarterd.domain.pm.todo.entity.TodoDocumentVisibility.PRIVATE
+            )
+        ).thenReturn(expected);
 
         final var result = projectTodoService.linkDocument(
             "tester",
@@ -153,7 +172,14 @@ class ProjectTodoServiceTest {
         );
 
         assertThat(result).isEqualTo(expected);
-        verify(projectTodoDocumentService).linkDocument("tester", 10L, 20L, 301L, 41L, com.smarterd.domain.pm.todo.entity.TodoDocumentVisibility.PRIVATE);
+        verify(projectTodoDocumentService).linkDocument(
+            "tester",
+            10L,
+            20L,
+            301L,
+            41L,
+            com.smarterd.domain.pm.todo.entity.TodoDocumentVisibility.PRIVATE
+        );
     }
 
     @Test
@@ -183,17 +209,17 @@ class ProjectTodoServiceTest {
         final var unlinkedPrivate = createTodo(303L, project, other);
 
         when(projectTodoAccessService.loadProject("tester", 10L, 20L)).thenReturn(project);
-        when(projectTodoRepository.findByProjectAndLinkedWbsItemIsNotNullOrderByCreatedAtDescIdDesc(project))
-            .thenReturn(List.of(linkedTodo, linkedDone));
+        when(
+            projectTodoRepository.findByProjectAndLinkedWbsItemIsNotNullOrderByCreatedAtDescIdDesc(project)
+        ).thenReturn(List.of(linkedTodo, linkedDone));
 
         final var result = projectTodoService.getMemberTodoSummaries("tester", 10L, 20L);
 
-        assertThat(result)
-            .containsExactly(
-                new ProjectTodoService.MemberTodoSummaryResult(1L, "김개발", ProjectTodoStatus.TODO, 1L),
-                new ProjectTodoService.MemberTodoSummaryResult(1L, "김개발", ProjectTodoStatus.DONE, 1L)
-            );
-        assertThat(result).noneMatch(summary -> summary.ownerUserId().equals(unlinkedPrivate.getOwner().getId()));
+        assertThat(result).containsExactly(
+            new ProjectTodoService.MemberTodoSummaryResult(1L, "김개발", ProjectTodoStatus.TODO, 1L),
+            new ProjectTodoService.MemberTodoSummaryResult(1L, "김개발", ProjectTodoStatus.DONE, 1L)
+        );
+        assertThat(result).noneMatch((summary) -> summary.ownerUserId().equals(unlinkedPrivate.getOwner().getId()));
         verify(projectTodoRepository).findByProjectAndLinkedWbsItemIsNotNullOrderByCreatedAtDescIdDesc(project);
         verify(projectTodoRepository, never()).findByProjectOrderByCreatedAtDescIdDesc(project);
     }
@@ -227,7 +253,13 @@ class ProjectTodoServiceTest {
     }
 
     private ProjectTodo createLinkedTodo(Long id, Project project, User owner, ProjectTodoStatus status) {
-        final var wbsItem = WbsItem.builder().project(project).name("WBS").depth(0).sortOrder(1).progressRate(0).build();
+        final var wbsItem = WbsItem.builder()
+            .project(project)
+            .name("WBS")
+            .depth(0)
+            .sortOrder(1)
+            .progressRate(0)
+            .build();
         ReflectionTestUtils.setField(wbsItem, "id", 700L + id);
         final var todo = ProjectTodo.builder()
             .project(project)

@@ -31,7 +31,10 @@ class AiExecutionGatewayCancellationTest {
         final var resourceValidator = Mockito.mock(SelectedResourceValidator.class);
         final var auditService = Mockito.mock(AiExecutionAuditService.class);
         final var provider = Mockito.mock(AiProvider.class);
-        final var registry = new AiExecutionRegistry(Duration.ofMinutes(15), Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+        final var registry = new AiExecutionRegistry(
+            Duration.ofMinutes(15),
+            Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)
+        );
         final var providerExecutionRunner = new AiProviderExecutionRunner(
             auditService,
             provider,
@@ -42,17 +45,16 @@ class AiExecutionGatewayCancellationTest {
                 new ActionDraftValidator()
             )
         );
-        final var gateway = new AiExecutionGateway(
-            contextLoader,
-            resourceValidator,
-            providerExecutionRunner
-        );
+        final var gateway = new AiExecutionGateway(contextLoader, resourceValidator, providerExecutionRunner);
         final var owner = User.builder().loginId("owner").password("encoded").name("Owner").build();
         final var team = Team.builder().name("team").owner(owner).build();
         final var project = Project.builder().team(team).name("project").build();
-        when(contextLoader.load("tester", 1L, 10L, false))
-            .thenReturn(new ProjectContextLoader.ProjectContext(team, project));
-        when(provider.status()).thenReturn(new AiProviderStatus("local-codex", AiProviderAvailability.AVAILABLE, null, Instant.EPOCH));
+        when(contextLoader.load("tester", 1L, 10L, false)).thenReturn(
+            new ProjectContextLoader.ProjectContext(team, project)
+        );
+        when(provider.status()).thenReturn(
+            new AiProviderStatus("local-codex", AiProviderAvailability.AVAILABLE, null, Instant.EPOCH)
+        );
         when(provider.execute(Mockito.any())).thenReturn(AiProviderResult.answer("ok"));
 
         final var execution = gateway.execute(

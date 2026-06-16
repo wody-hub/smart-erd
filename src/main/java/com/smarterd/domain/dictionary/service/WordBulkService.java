@@ -128,7 +128,7 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         final var rawRows = parseFile(file, file.getOriginalFilename());
         validateRowCount(rawRows);
 
-        final var existingNames = findExistingLogicalNames(
+        final var existingNames = BulkLogicalNameLookupSupport.findExistingByLogicalNames(
             rawRows
                 .stream()
                 .map((row) -> AppStringUtils.trimToEmpty(row.getOrDefault("logicalName", "")))
@@ -136,7 +136,7 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
             LOGICAL_NAME_QUERY_BATCH_SIZE,
             (names) -> wordRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, names),
             Word::getLogicalName
-        );
+        ).keySet();
         final var validationResult = validateRows(rawRows, existingNames, locale);
         return createValidationResponse(loginId, teamId, dictionarySet.getId(), rawRows.size(), validationResult);
     }
@@ -169,12 +169,12 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
             .map(ValidatedWordRow::row)
             .toList();
 
-        final var existingNames = findExistingLogicalNames(
+        final var existingNames = BulkLogicalNameLookupSupport.findExistingByLogicalNames(
             candidateRows.stream().map(WordBulkRow::logicalName).toList(),
             LOGICAL_NAME_QUERY_BATCH_SIZE,
             (names) -> wordRepository.findByDictionarySetAndLogicalNameIn(dictionarySet, names),
             Word::getLogicalName
-        );
+        ).keySet();
 
         final var wordsToSave = new ArrayList<Word>();
         var failedCount = 0;
@@ -255,7 +255,7 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
 
         return buildTemplateExcel(
             locale,
-            TemplateType.WORD,
+            BulkTemplateType.WORD,
             "template.word.sheet-name",
             List.of(
                 "template.word.col.logical-name",
@@ -511,7 +511,7 @@ public class WordBulkService extends AbstractBulkService<WordBulkService.WordUpl
         List<ValidatedWordRow> validRows,
         List<WordErrorReportRow> errorRows,
         boolean saveConsumed
-    ) implements SessionExpirable, SessionOwnership {}
+    ) implements BulkValidationSessionExpirable, BulkValidationSessionOwnership {}
 
     /**
      * 템플릿 엑셀 예시 행 모델.

@@ -40,6 +40,11 @@ public class ProjectTodoController {
     private final ProjectTodoService projectTodoService;
 
     @Operation(summary = "내 TODO 목록 조회")
+    @ApiResponse(
+        responseCode = "200",
+        description = "조회 성공",
+        content = @Content(schema = @Schema(implementation = ProjectTodoResponse.class))
+    )
     @GetMapping
     public ResponseEntity<List<ProjectTodoResponse>> getProjectTodos(
         @AuthenticationPrincipal Jwt jwt,
@@ -56,6 +61,11 @@ public class ProjectTodoController {
     }
 
     @Operation(summary = "내 TODO 상세 조회")
+    @ApiResponse(
+        responseCode = "200",
+        description = "조회 성공",
+        content = @Content(schema = @Schema(implementation = ProjectTodoResponse.class))
+    )
     @GetMapping("/{todoId}")
     public ResponseEntity<ProjectTodoResponse> getProjectTodo(
         @AuthenticationPrincipal Jwt jwt,
@@ -99,6 +109,11 @@ public class ProjectTodoController {
     }
 
     @Operation(summary = "내 TODO 수정")
+    @ApiResponse(
+        responseCode = "200",
+        description = "수정 성공",
+        content = @Content(schema = @Schema(implementation = ProjectTodoResponse.class))
+    )
     @PutMapping("/{todoId}")
     public ResponseEntity<ProjectTodoResponse> updateProjectTodo(
         @AuthenticationPrincipal Jwt jwt,
@@ -125,6 +140,7 @@ public class ProjectTodoController {
     }
 
     @Operation(summary = "내 TODO 삭제")
+    @ApiResponse(responseCode = "204", description = "삭제 성공", content = @Content)
     @DeleteMapping("/{todoId}")
     public ResponseEntity<Void> deleteProjectTodo(
         @AuthenticationPrincipal Jwt jwt,
@@ -137,6 +153,11 @@ public class ProjectTodoController {
     }
 
     @Operation(summary = "내 TODO 연결 문서 목록 조회")
+    @ApiResponse(
+        responseCode = "200",
+        description = "조회 성공",
+        content = @Content(schema = @Schema(implementation = TodoDocumentResponse.class))
+    )
     @GetMapping("/{todoId}/documents")
     public ResponseEntity<List<TodoDocumentResponse>> getTodoDocuments(
         @AuthenticationPrincipal Jwt jwt,
@@ -154,6 +175,11 @@ public class ProjectTodoController {
     }
 
     @Operation(summary = "내 TODO에 문서 연결")
+    @ApiResponse(
+        responseCode = "200",
+        description = "문서 연결 성공",
+        content = @Content(schema = @Schema(implementation = TodoDocumentResponse.class))
+    )
     @PutMapping("/{todoId}/documents/{documentId}")
     public ResponseEntity<TodoDocumentResponse> linkDocument(
         @AuthenticationPrincipal Jwt jwt,
@@ -178,6 +204,7 @@ public class ProjectTodoController {
     }
 
     @Operation(summary = "내 TODO 문서 연결 해제")
+    @ApiResponse(responseCode = "204", description = "문서 연결 해제 성공", content = @Content)
     @DeleteMapping("/{todoId}/documents/{documentId}")
     public ResponseEntity<Void> unlinkDocument(
         @AuthenticationPrincipal Jwt jwt,
@@ -191,6 +218,11 @@ public class ProjectTodoController {
     }
 
     @Operation(summary = "내 TODO를 WBS에 연결")
+    @ApiResponse(
+        responseCode = "200",
+        description = "WBS 연결 성공",
+        content = @Content(schema = @Schema(implementation = ProjectTodoResponse.class))
+    )
     @PutMapping("/{todoId}/wbs/{wbsItemId}")
     public ResponseEntity<ProjectTodoResponse> linkTodoToWbs(
         @AuthenticationPrincipal Jwt jwt,
@@ -200,11 +232,18 @@ public class ProjectTodoController {
         @Parameter(description = "WBS 항목 ID") @PathVariable Long wbsItemId
     ) {
         return ResponseEntity.ok(
-            ProjectTodoResponse.from(projectTodoService.linkTodoToWbs(jwt.getSubject(), teamId, projectId, todoId, wbsItemId))
+            ProjectTodoResponse.from(
+                projectTodoService.linkTodoToWbs(jwt.getSubject(), teamId, projectId, todoId, wbsItemId)
+            )
         );
     }
 
     @Operation(summary = "내 TODO의 WBS 연결 해제")
+    @ApiResponse(
+        responseCode = "200",
+        description = "WBS 연결 해제 성공",
+        content = @Content(schema = @Schema(implementation = ProjectTodoResponse.class))
+    )
     @DeleteMapping("/{todoId}/wbs")
     public ResponseEntity<ProjectTodoResponse> unlinkTodoFromWbs(
         @AuthenticationPrincipal Jwt jwt,

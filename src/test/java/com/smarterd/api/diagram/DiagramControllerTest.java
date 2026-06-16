@@ -51,15 +51,7 @@ class DiagramControllerTest {
 
     @Test
     void saveDiagram_returnsOkResponseWithLatestSaveState() {
-        final var controller = new DiagramController(
-            diagramService,
-            saveDiagramUseCase,
-            persistDiagramSnapshotUseCase,
-            diagramTableDefinitionExportService,
-            diagramColumnDefinitionExportService,
-            diagramIndexDefinitionExportService,
-            markdownExportService
-        );
+        final var controller = diagramContentController();
         final var jwt = jwt("tester");
         final var request = new SaveDiagramRequest("{\"nodes\":[]}", new byte[] { 0x01, 0x02 });
         final var result = new SaveDiagramResult(
@@ -85,15 +77,7 @@ class DiagramControllerTest {
 
     @Test
     void persistYdocSnapshot_returnsPersistenceResultBody() {
-        final var controller = new DiagramController(
-            diagramService,
-            saveDiagramUseCase,
-            persistDiagramSnapshotUseCase,
-            diagramTableDefinitionExportService,
-            diagramColumnDefinitionExportService,
-            diagramIndexDefinitionExportService,
-            markdownExportService
-        );
+        final var controller = diagramContentController();
         final var jwt = jwt("tester");
         final var request = new PersistYdocSnapshotRequest("17", new byte[] { 0x11 }, false);
 
@@ -127,15 +111,7 @@ class DiagramControllerTest {
 
     @Test
     void downloadTableDefinition_streamsExcelResponse() throws Exception {
-        final var controller = new DiagramController(
-            diagramService,
-            saveDiagramUseCase,
-            persistDiagramSnapshotUseCase,
-            diagramTableDefinitionExportService,
-            diagramColumnDefinitionExportService,
-            diagramIndexDefinitionExportService,
-            markdownExportService
-        );
+        final var controller = diagramExportController();
         final var jwt = jwt("tester");
         final var workbook = new XSSFWorkbook();
         workbook.createSheet("테이블 정의서").createRow(0).createCell(0).setCellValue("데이터베이스 정의");
@@ -158,15 +134,7 @@ class DiagramControllerTest {
 
     @Test
     void downloadColumnDefinition_streamsExcelResponse() throws Exception {
-        final var controller = new DiagramController(
-            diagramService,
-            saveDiagramUseCase,
-            persistDiagramSnapshotUseCase,
-            diagramTableDefinitionExportService,
-            diagramColumnDefinitionExportService,
-            diagramIndexDefinitionExportService,
-            markdownExportService
-        );
+        final var controller = diagramExportController();
         final var jwt = jwt("tester");
         final var workbook = new XSSFWorkbook();
         workbook.createSheet("컬럼 정의서").createRow(0).createCell(0).setCellValue("컬럼 정의서");
@@ -195,15 +163,7 @@ class DiagramControllerTest {
 
     @Test
     void downloadIndexDefinition_streamsExcelResponse() throws Exception {
-        final var controller = new DiagramController(
-            diagramService,
-            saveDiagramUseCase,
-            persistDiagramSnapshotUseCase,
-            diagramTableDefinitionExportService,
-            diagramColumnDefinitionExportService,
-            diagramIndexDefinitionExportService,
-            markdownExportService
-        );
+        final var controller = diagramExportController();
         final var jwt = jwt("tester");
         final var workbook = new XSSFWorkbook();
         workbook.createSheet("인덱스 정의서").createRow(0).createCell(0).setCellValue("인덱스 정의서");
@@ -226,15 +186,7 @@ class DiagramControllerTest {
 
     @Test
     void exportDocument_streamsMarkdownResponse() throws Exception {
-        final var controller = new DiagramController(
-            diagramService,
-            saveDiagramUseCase,
-            persistDiagramSnapshotUseCase,
-            diagramTableDefinitionExportService,
-            diagramColumnDefinitionExportService,
-            diagramIndexDefinitionExportService,
-            markdownExportService
-        );
+        final var controller = diagramExportController();
         final var jwt = jwt("tester");
         final var diagram = org.mockito.Mockito.mock(com.smarterd.domain.diagram.entity.Diagram.class);
         final var response = new MockHttpServletResponse();
@@ -261,5 +213,19 @@ class DiagramControllerTest {
 
     private Jwt jwt(String subject) {
         return Jwt.withTokenValue("token").header("alg", "none").subject(subject).build();
+    }
+
+    private DiagramContentController diagramContentController() {
+        return new DiagramContentController(saveDiagramUseCase, persistDiagramSnapshotUseCase);
+    }
+
+    private DiagramExportController diagramExportController() {
+        return new DiagramExportController(
+            diagramTableDefinitionExportService,
+            diagramColumnDefinitionExportService,
+            diagramIndexDefinitionExportService,
+            diagramService,
+            markdownExportService
+        );
     }
 }

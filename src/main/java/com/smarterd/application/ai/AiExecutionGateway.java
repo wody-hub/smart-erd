@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Provider-independent AI execution gateway.
@@ -33,7 +32,6 @@ public class AiExecutionGateway {
         );
     }
 
-    @Transactional
     public AiExecutionView execute(String loginId, ExecuteCommand command) {
         final var context = projectContextLoader.load(loginId, command.teamId(), command.projectId(), false);
         selectedResourceValidator.validate(loginId, context.project(), command.selectedResource());

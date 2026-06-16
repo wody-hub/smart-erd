@@ -1,5 +1,6 @@
 package com.smarterd.api.common;
 
+import com.smarterd.api.common.dto.ErrorResponse;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.DomainAccessDeniedException;
@@ -9,7 +10,6 @@ import com.smarterd.domain.common.exception.LocalizedException;
 import com.smarterd.domain.common.exception.TooManyRequestsException;
 import com.smarterd.domain.common.message.MessageCode;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,13 +43,13 @@ public class GlobalExceptionHandler {
      * @return 적절한 HTTP 상태 + 다국어 에러 메시지
      */
     @ExceptionHandler(LocalizedException.class)
-    public ResponseEntity<Map<String, String>> handleLocalizedException(LocalizedException ex, Locale locale) {
+    public ResponseEntity<ErrorResponse> handleLocalizedException(LocalizedException ex, Locale locale) {
         final var message = messageSource.getMessage(
             Objects.requireNonNull(ex.getMessageCode()),
             ex.getMessageArgs(),
             locale
         );
-        return ResponseEntity.status(Objects.requireNonNull(resolveStatus(ex))).body(Map.of("error", message));
+        return ResponseEntity.status(Objects.requireNonNull(resolveStatus(ex))).body(ErrorResponse.of(message));
     }
 
     /**
@@ -57,12 +57,13 @@ public class GlobalExceptionHandler {
      *
      * <p>Bean Validation이 {@link MessageSource}를 통해 이미 로케일에 맞게 번역한 메시지를 사용한다.</p>
      *
-     * @param ex 유효성 검증 예외
+     * @param ex     유효성 검증 예외
+     * @param locale 요청 로케일
      * @return 400 응답 (첫 번째 필드 에러 메시지)
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException ex, Locale locale) {
-        String message = ex
+    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex, Locale locale) {
+        final var message = ex
             .getBindingResult()
             .getFieldErrors()
             .stream()
@@ -83,7 +84,7 @@ public class GlobalExceptionHandler {
                         )
                     )
             );
-        return ResponseEntity.badRequest().body(Map.of("error", message));
+        return ResponseEntity.badRequest().body(ErrorResponse.of(message));
     }
 
     /**
@@ -96,13 +97,13 @@ public class GlobalExceptionHandler {
      * @return 401 응답 (다국어 인증 실패 메시지)
      */
     @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<Map<String, String>> handleAuthenticationException(Locale locale) {
+    public ResponseEntity<ErrorResponse> handleAuthenticationException(Locale locale) {
         final var message = messageSource.getMessage(
             Objects.requireNonNull(MessageCode.ERROR_AUTH_BAD_CREDENTIALS.code()),
             null,
             locale
         );
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", message));
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ErrorResponse.of(message));
     }
 
     /**
@@ -116,14 +117,14 @@ public class GlobalExceptionHandler {
      * @return 500 응답 (다국어 일반 메시지)
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, String>> handleUnexpected(Exception ex, Locale locale) {
+    public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex, Locale locale) {
         log.error("Unexpected error", ex);
         final var message = messageSource.getMessage(
             Objects.requireNonNull(MessageCode.ERROR_UNEXPECTED.code()),
             null,
             locale
         );
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", message));
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorResponse.of(message));
     }
 
     /**

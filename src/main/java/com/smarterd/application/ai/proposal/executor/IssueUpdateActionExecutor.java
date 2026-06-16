@@ -42,7 +42,12 @@ public class IssueUpdateActionExecutor implements AiActionExecutor {
         payload.requireTargetType("issue");
         payload.requireOnlyFields(ALLOWED_FIELDS);
         final var issueId = payload.requireTargetId();
-        final var current = projectIssueService.getProjectIssue(loginId, proposal.getTeamId(), proposal.getProjectId(), issueId);
+        final var current = projectIssueService.getProjectIssue(
+            loginId,
+            proposal.getTeamId(),
+            proposal.getProjectId(),
+            issueId
+        );
         payload.assertBeforeMatches("title", current.title());
         payload.assertBeforeMatches("description", current.description());
         payload.assertBeforeMatches("priority", current.priority().name());

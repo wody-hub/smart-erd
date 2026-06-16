@@ -1,7 +1,6 @@
 package com.smarterd.domain.dictionary.service;
 
 import com.smarterd.utils.AppStringUtils;
-import java.util.Locale;
 import java.util.regex.Pattern;
 import org.springframework.lang.Nullable;
 
@@ -104,7 +103,7 @@ public final class DomainPhysicalTypeSupport {
         final var matcher = TYPE_PATTERN.matcher(normalizedPhysicalType);
         if (!matcher.matches()) {
             return new DomainTypeComponents(
-                normalizedPhysicalType.toUpperCase(Locale.ROOT),
+                AppStringUtils.upperCaseToEmpty(normalizedPhysicalType),
                 null,
                 null,
                 normalizedPhysicalType
@@ -159,7 +158,7 @@ public final class DomainPhysicalTypeSupport {
     }
 
     private static String normalizeTypeName(String value) {
-        return AppStringUtils.trimToEmpty(value).replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
+        return AppStringUtils.upperCaseToEmpty(AppStringUtils.trimToEmpty(value).replaceAll("\\s+", " "));
     }
 
     @Nullable

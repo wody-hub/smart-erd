@@ -1,8 +1,8 @@
 package com.smarterd.domain.pm.issue.service;
 
+import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.exception.DomainAccessDeniedException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
-import com.smarterd.domain.common.exception.ConflictException;
 import com.smarterd.domain.common.message.MessageCode;
 import com.smarterd.domain.pm.common.ProjectContextLoader;
 import com.smarterd.domain.pm.history.service.WorkItemHistoryService;
@@ -206,9 +206,17 @@ public class ProjectIssueService {
      * @param query 서버 소유 필터
      * @return 엑셀 데이터
      */
-    public ExcelData exportProjectIssues(String loginId, Long teamId, Long projectId, @Nullable ProjectIssueQuery query) {
+    public ExcelData exportProjectIssues(
+        String loginId,
+        Long teamId,
+        Long projectId,
+        @Nullable ProjectIssueQuery query
+    ) {
         final var context = projectContextLoader.load(loginId, teamId, projectId, false);
-        final var issues = projectIssueRepository.findByProjectAndQuery(context.project(), ProjectIssueQuery.normalize(query));
+        final var issues = projectIssueRepository.findByProjectAndQuery(
+            context.project(),
+            ProjectIssueQuery.normalize(query)
+        );
         final var template = ProjectIssueWorkbookExportSupport.createTemplate(
             AppStringUtils.defaultIfBlank(context.project().getName(), "project") + " 이슈 목록"
         );

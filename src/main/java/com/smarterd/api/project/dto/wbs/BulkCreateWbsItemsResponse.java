@@ -12,6 +12,8 @@ public record BulkCreateWbsItemsResponse(
     @Schema(description = "생성 결과 목록") List<WbsCreatedItemMappingResponse> items
 ) {
     public static BulkCreateWbsItemsResponse from(BulkCreateResult result) {
-        return new BulkCreateWbsItemsResponse(result.items().stream().map(WbsCreatedItemMappingResponse::from).toList());
+        return new BulkCreateWbsItemsResponse(
+            result.items().stream().map(WbsCreatedItemMappingResponse::from).toList()
+        );
     }
 }

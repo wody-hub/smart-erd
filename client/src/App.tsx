@@ -73,10 +73,7 @@ export default function App() {
               <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
 
               {/* ── 인증 필요 라우트 ── */}
-              <Route
-                path={ROUTES.TEAMS}
-                element={protectedAppElement(<TeamsPage />)}
-              />
+              <Route path={ROUTES.TEAMS} element={protectedAppElement(<TeamsPage />)} />
               <Route
                 path={ROUTES.PROJECTS_PATTERN}
                 element={protectedAppElement(<ProjectsPage />)}

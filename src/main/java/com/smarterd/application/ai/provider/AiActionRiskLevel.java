@@ -5,5 +5,5 @@ package com.smarterd.application.ai.provider;
  */
 public enum AiActionRiskLevel {
     LOW,
-    MEDIUM
+    MEDIUM,
 }

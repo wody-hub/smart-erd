@@ -133,7 +133,10 @@ public class ProjectTodo extends BaseAuditEntity {
             throw new BusinessException(MessageCode.ERROR_BUSINESS_PROJECT_TODO_TITLE_REQUIRED.code());
         }
         if (normalized.length() > MAX_TITLE_LENGTH) {
-            throw new BusinessException(MessageCode.ERROR_BUSINESS_PROJECT_TODO_TITLE_TOO_LONG.code(), MAX_TITLE_LENGTH);
+            throw new BusinessException(
+                MessageCode.ERROR_BUSINESS_PROJECT_TODO_TITLE_TOO_LONG.code(),
+                MAX_TITLE_LENGTH
+            );
         }
         return normalized;
     }

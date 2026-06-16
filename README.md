@@ -270,7 +270,8 @@ src/main/java/com/smarterd/
 │   │   ├── dto/                     #   LoginRequest, SignupRequest, AuthResponse (record)
 │   │   └── validator/               #   인증 관련 커스텀 검증기
 │   ├── team/
-│   │   ├── TeamController.java      #   팀 CRUD + 멤버 관리 (7 엔드포인트)
+│   │   ├── TeamController.java      #   팀 CRUD
+│   │   ├── TeamMemberController.java #  멤버 조회/초대/제거/역할 변경
 │   │   ├── dto/                     #   CreateTeamRequest, TeamResponse, AddMemberRequest 등
 │   │   └── validator/               #   팀 관련 커스텀 검증기
 │   ├── project/
@@ -284,7 +285,10 @@ src/main/java/com/smarterd/
 │   │   ├── DictionarySuggestController.java # 용어/도메인 조합 기반 물리명 추천
 │   │   └── dto/                     #   Create/Update/Response + Bulk + Suggest record
 │   ├── diagram/
-│   │   ├── DiagramController.java   #   다이어그램 CRUD + 저장 + Y.Doc snapshot + 사전 세트 변경
+│   │   ├── DiagramController.java   #   다이어그램 생성/목록/상세/bootstrap 조회
+│   │   ├── DiagramContentController.java # content 저장 + Y.Doc snapshot
+│   │   ├── DiagramMutationController.java # 이름/사전 세트 변경 + 삭제
+│   │   ├── DiagramExportController.java # 정의서/문서 export
 │   │   ├── WsTicketController.java  #   WebSocket 접속용 일회용 ticket 발급
 │   │   └── dto/                     #   Create/Save/Rename/Detail/Response, Snapshot, WsTicket record
 │   └── common/
@@ -586,6 +590,24 @@ client/
 - **와일드카드 import (`.*`) 사용 금지** — 모든 import는 명시적으로 선언한다
 - Prettier가 저장 시 자동 포맷, VS Code `organizeImports`가 import 정리를 수행한다
 
+#### Java 주석/어노테이션 순서
+
+메서드 문서화 주석은 어노테이션보다 위에 둔다. 순서는 항상 `Javadoc 주석 → 어노테이션 → 함수 선언`이다.
+
+```java
+/**
+ * 프로젝트를 생성한다.
+ *
+ * @param request 프로젝트 생성 요청
+ * @return 생성된 프로젝트 응답
+ */
+@Operation(summary = "프로젝트 생성")
+@PostMapping
+public ResponseEntity<ProjectResponse> createProject(@Valid @RequestBody CreateProjectRequest request) {
+    ...
+}
+```
+
 #### Null 처리 규칙 (필수)
 
 - `@SuppressWarnings("null")` 사용 금지 (`src/main/**` 기준). 단, 테스트 코드(`src/test/**`)에서는 필요 시 사용 허용
@@ -617,7 +639,7 @@ import jakarta.persistence.Id;
 
 최근 반영 (2026-02-25):
 
-- 공통 문자열 유틸 `AppStringUtils` 추가 및 확장: `trimToNull`, `trimToEmpty`, `isBlank`, `isNotBlank`, `defaultIfBlank`, `startsWith`, `equalsIgnoreCase`, `containsIgnoreCase`, `lowerTrimToNull`, `lowerTrimToEmpty`, `endsWithIgnoreCase`, `endsWithAnyIgnoreCase`, `firstCsvTokenToNull`
+- 공통 문자열 유틸 `AppStringUtils` 추가 및 확장: `trimToNull`, `trimToEmpty`, `isBlank`, `isNotBlank`, `defaultIfBlank`, `startsWith`, `equalsIgnoreCase`, `containsIgnoreCase`, `lowerCaseToEmpty`, `upperCaseToEmpty`, `lowerTrimToNull`, `lowerTrimToEmpty`, `endsWithIgnoreCase`, `endsWithAnyIgnoreCase`, `firstCsvTokenToNull`
 - 공통 배열 유틸 `AppArrayUtils` 추가: `isEmpty(Object[] values)`
 - 주요 입력 검증/정규화 로직(`SecurityConfig`, `ClientIpUtils`, `EnvironmentProfile`, `LoginRateLimitService`, `DiagramService`, `WsTicketHandshakeInterceptor`, `Dictionary*BulkService`, `ExcelUtils`, `CsvParser`)을 `App*Utils` 기준으로 통일
 - Apache Commons 직접 호출은 `AppStringUtils`/`AppArrayUtils` 내부로 제한
@@ -1344,3 +1366,13 @@ PostgreSQL 17을 Docker 컨테이너로 사용한다. `spring-boot-docker-compos
 - **시간 컬럼:** 감사/만료 시각 컬럼은 `timestamptz` 사용 (UTC 기준 저장)
 - **기존 데이터 변환:** 운영 DB의 `timestamp without time zone` 컬럼은 별도 SQL 마이그레이션으로 `timestamptz`로 변환 필요
 - **전제 조건:** Docker Desktop 실행 중, 포트 5432 사용 가능, 최초 실행 시 `postgres:17` 이미지 다운로드 (~400MB)
+
+## 개발 환경 (VS Code)
+
+`.vscode/settings.json` 주요 설정:
+
+- `editor.formatOnSave: true` (Prettier), `source.organizeImports: explicit` (미사용 import 제거)
+- `files.autoSave: afterDelay` (1초), `trimTrailingWhitespace`, `insertFinalNewline`
+- `java.compile.nullAnalysis.mode: automatic` (`@NonNullApi` null 분석)
+- 기본 포맷터: `esbenp.prettier-vscode` (Java + TypeScript)
+- SonarLint: `sonarlint.rules: java:S1611: off` (Prettier 우선 — `sonar-project.properties`에서 S1611 전역 무시)

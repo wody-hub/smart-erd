@@ -6,7 +6,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.smarterd.api.common.GlobalExceptionHandler;
+import com.smarterd.application.ai.history.AiProjectHistoryItemView;
 import com.smarterd.application.ai.history.AiProjectHistoryService;
+import com.smarterd.application.ai.history.AiProjectHistoryView;
 import com.smarterd.domain.common.exception.DomainAccessDeniedException;
 import com.smarterd.domain.common.message.MessageCode;
 import java.time.Instant;
@@ -68,7 +70,9 @@ class AiProjectHistoryControllerMvcTest {
         );
         final var getMapping = method.getAnnotation(GetMapping.class);
 
-        Assertions.assertThat(classMapping.value()).containsExactly("/api/teams/{teamId}/projects/{projectId}/ai-history");
+        Assertions.assertThat(classMapping.value()).containsExactly(
+            "/api/teams/{teamId}/projects/{projectId}/ai-history"
+        );
         Assertions.assertThat(getMapping.value()).isEmpty();
     }
 
@@ -116,8 +120,14 @@ class AiProjectHistoryControllerMvcTest {
     @Test
     @DisplayName("11-W2-03 limit parameter is delegated to service")
     void w2_11_W2_03_limitParameterIsDelegatedToService() throws Exception {
-        when(historyService.getProjectHistory(org.mockito.ArgumentMatchers.eq("viewer"), org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(history());
+        when(
+            historyService.getProjectHistory(
+                org.mockito.ArgumentMatchers.eq("viewer"),
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(history());
 
         mockMvc
             .perform(
@@ -143,8 +153,9 @@ class AiProjectHistoryControllerMvcTest {
     @Test
     @DisplayName("11-W2-03 project authorization failure maps to forbidden")
     void w2_11_W2_03_projectAuthorizationFailureMapsToForbidden() throws Exception {
-        when(historyService.getProjectHistory("viewer", 1L, 10L, 50))
-            .thenThrow(new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
+        when(historyService.getProjectHistory("viewer", 1L, 10L, 50)).thenThrow(
+            new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code())
+        );
 
         mockMvc
             .perform(
@@ -160,12 +171,12 @@ class AiProjectHistoryControllerMvcTest {
         return Jwt.withTokenValue("token").header("alg", "none").subject(subject).build();
     }
 
-    private AiProjectHistoryService.AiProjectHistoryView history() {
-        return new AiProjectHistoryService.AiProjectHistoryView(
+    private AiProjectHistoryView history() {
+        return new AiProjectHistoryView(
             25,
             false,
             List.of(
-                new AiProjectHistoryService.AiProjectHistoryItemView(
+                new AiProjectHistoryItemView(
                     "AUDIT",
                     "exec-1",
                     "proposal-1",

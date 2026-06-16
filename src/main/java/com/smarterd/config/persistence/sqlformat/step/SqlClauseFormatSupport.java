@@ -1,6 +1,7 @@
 package com.smarterd.config.persistence.sqlformat.step;
 
 import com.smarterd.config.persistence.sqlformat.parser.SqlStructureParser;
+import com.smarterd.utils.AppStringUtils;
 import java.util.List;
 
 /**
@@ -86,9 +87,9 @@ final class SqlClauseFormatSupport {
         boolean appendTrailingNewline
     ) {
         // 첫 항목은 prefix와 함께 두고, 이후 항목은 commaPrefix를 사용해 줄맞춤한다.
-        final var builder = new StringBuilder(firstPrefix).append(items.get(0).trim());
+        final var builder = new StringBuilder(firstPrefix).append(AppStringUtils.trimToEmpty(items.get(0)));
         for (var i = 1; i < items.size(); i++) {
-            builder.append(commaPrefix).append(items.get(i).trim());
+            builder.append(commaPrefix).append(AppStringUtils.trimToEmpty(items.get(i)));
         }
         if (appendTrailingNewline) {
             builder.append("\n");

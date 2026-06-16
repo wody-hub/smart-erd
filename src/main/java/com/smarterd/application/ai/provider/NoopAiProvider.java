@@ -26,7 +26,12 @@ public class NoopAiProvider implements AiProvider {
     @Override
     public AiProviderResult execute(AiProviderRequest request) {
         return AiProviderResult.failed(
-            new AiProviderError("NOT_CONFIGURED", "AI provider is not configured", "No AI provider is configured.", false)
+            new AiProviderError(
+                "NOT_CONFIGURED",
+                "AI provider is not configured",
+                "No AI provider is configured.",
+                false
+            )
         );
     }
 }

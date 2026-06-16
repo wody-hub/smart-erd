@@ -31,16 +31,13 @@ class AuthControllerMvcTest {
 
     @BeforeEach
     void setUp() {
-        this.mockMvc = MockMvcBuilders
-            .standaloneSetup(new AuthController(authService, clientIpUtils, signupRequestValidator))
-            .build();
+        this.mockMvc = MockMvcBuilders.standaloneSetup(
+            new AuthController(authService, clientIpUtils, signupRequestValidator)
+        ).build();
     }
 
     @Test
     void healthReturnsOk() throws Exception {
-        mockMvc
-            .perform(get("/api/auth/health"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.status").value("ok"));
+        mockMvc.perform(get("/api/auth/health")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ok"));
     }
 }

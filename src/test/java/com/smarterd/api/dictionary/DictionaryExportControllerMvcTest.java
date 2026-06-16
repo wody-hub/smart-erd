@@ -69,15 +69,21 @@ class DictionaryExportControllerMvcTest {
 
     @BeforeEach
     void setUp() {
-        final var wordController = new WordController(wordService, wordBulkService, wordDictionaryExportService);
-        final var termController = new TermController(termService, termBulkService, termDictionaryExportService);
-        final var domainController = new DomainController(
-            domainService,
-            domainBulkService,
-            domainDictionaryExportService
-        );
+        final var wordController = new WordController(wordService);
+        final var wordBulkController = new WordBulkController(wordBulkService, wordDictionaryExportService);
+        final var termController = new TermController(termService);
+        final var termBulkController = new TermBulkController(termBulkService, termDictionaryExportService);
+        final var domainController = new DomainController(domainService);
+        final var domainBulkController = new DomainBulkController(domainBulkService, domainDictionaryExportService);
 
-        this.mockMvc = MockMvcBuilders.standaloneSetup(wordController, termController, domainController)
+        this.mockMvc = MockMvcBuilders.standaloneSetup(
+            wordController,
+            wordBulkController,
+            termController,
+            termBulkController,
+            domainController,
+            domainBulkController
+        )
             .setCustomArgumentResolvers(new TestJwtArgumentResolver())
             .build();
     }

@@ -7,6 +7,7 @@ import com.smarterd.application.ai.provider.AiProviderResult;
 import com.smarterd.application.ai.provider.AiProviderStatus;
 import com.smarterd.application.ai.validation.ProviderOutputValidator;
 import com.smarterd.domain.common.exception.BusinessException;
+import com.smarterd.utils.AppStringUtils;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,7 +37,9 @@ public class AiProviderExecutionRunner {
             providerStatus.provider(),
             command.promptVersion()
         );
-        executionRegistry.registerCancelHandler(execution.executionId(), () -> aiProvider.cancel(execution.executionId()));
+        executionRegistry.registerCancelHandler(execution.executionId(), () ->
+            aiProvider.cancel(execution.executionId())
+        );
         executionRegistry.markRunning(execution.executionId());
 
         final AiProviderResult result = runProvider(execution.executionId(), command);
@@ -84,7 +87,12 @@ public class AiProviderExecutionRunner {
             );
         } catch (RuntimeException ex) {
             return AiProviderResult.failed(
-                new AiProviderError("PROVIDER_FAILED", "Provider execution failed", "The AI provider failed safely.", true)
+                new AiProviderError(
+                    "PROVIDER_FAILED",
+                    "Provider execution failed",
+                    "The AI provider failed safely.",
+                    true
+                )
             );
         }
     }
@@ -98,9 +106,7 @@ public class AiProviderExecutionRunner {
         Map<String, Object> providerContext
     ) {
         public RunCommand {
-            promptVersion = promptVersion == null || promptVersion.isBlank()
-                ? AiExecutionGateway.PROMPT_VERSION
-                : promptVersion;
+            promptVersion = AppStringUtils.isBlank(promptVersion) ? AiExecutionGateway.PROMPT_VERSION : promptVersion;
             providerContext = providerContext == null ? Map.of() : Map.copyOf(providerContext);
         }
     }

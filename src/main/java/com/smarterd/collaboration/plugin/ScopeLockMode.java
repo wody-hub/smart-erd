@@ -2,6 +2,7 @@ package com.smarterd.collaboration.plugin;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.smarterd.utils.AppStringUtils;
 
 /**
  * generic lock scope 모드.
@@ -34,7 +35,7 @@ public enum ScopeLockMode {
      */
     @JsonCreator
     public static ScopeLockMode fromWireValue(String value) {
-        return switch (value) {
+        return switch (AppStringUtils.lowerTrimToEmpty(value)) {
             case "shared" -> SHARED;
             case "exclusive" -> EXCLUSIVE;
             default -> throw new IllegalArgumentException("Unsupported scope lock mode: " + value);

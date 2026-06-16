@@ -40,8 +40,9 @@ class WbsActionExecutorTest {
 
     @Test
     void wbsCommentAdd_callsHistoryService() throws Exception {
-        when(workItemHistoryService.addWbsComment("tester", 1L, 10L, 77L, "Review this WBS"))
-            .thenReturn(comment(90L, 77L, "Review this WBS"));
+        when(workItemHistoryService.addWbsComment("tester", 1L, 10L, 77L, "Review this WBS")).thenReturn(
+            comment(90L, 77L, "Review this WBS")
+        );
 
         final var result = commentExecutor.execute(
             "tester",
@@ -59,8 +60,9 @@ class WbsActionExecutorTest {
 
     @Test
     void wbsMemoAdd_usesSameHistoryBoundaryWithMemoResult() throws Exception {
-        when(workItemHistoryService.addWbsComment("tester", 1L, 10L, 77L, "Memo text"))
-            .thenReturn(comment(91L, 77L, "Memo text"));
+        when(workItemHistoryService.addWbsComment("tester", 1L, 10L, 77L, "Memo text")).thenReturn(
+            comment(91L, 77L, "Memo text")
+        );
 
         final var result = memoExecutor.execute(
             "tester",
@@ -84,9 +86,16 @@ class WbsActionExecutorTest {
             Map.of("targetType", "wbs", "targetId", "77", "content", " ")
         );
 
-        assertThatThrownBy(() -> commentExecutor.execute("tester", proposal)).isInstanceOf(IllegalArgumentException.class);
-        verify(workItemHistoryService, never())
-            .addWbsComment(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        assertThatThrownBy(() -> commentExecutor.execute("tester", proposal)).isInstanceOf(
+            IllegalArgumentException.class
+        );
+        verify(workItemHistoryService, never()).addWbsComment(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any()
+        );
     }
 
     private WorkItemHistoryService.WorkCommentResult comment(Long id, Long targetId, String content) {
@@ -102,8 +111,12 @@ class WbsActionExecutorTest {
         );
     }
 
-    private AiActionProposal proposal(String actionType, String targetType, String targetId, Map<String, Object> payload)
-        throws Exception {
+    private AiActionProposal proposal(
+        String actionType,
+        String targetType,
+        String targetId,
+        Map<String, Object> payload
+    ) throws Exception {
         return new AiActionProposal(
             "proposal-1",
             "exec-1",

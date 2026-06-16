@@ -20,10 +20,10 @@ class WordDictionaryExportServiceTest {
     void generateWordDictionary_buildsWorkbookFromExportRows() {
         final var service = new WordDictionaryExportService(wordService);
         when(wordService.getWordsForExport("tester", 1L, 2L)).thenReturn(
-            new WordService.WordExportResult(
+            new WordExportResult(
                 "기본사전",
                 List.of(
-                    new WordService.WordResult(
+                    new WordResult(
                         1L,
                         "사용자",
                         "user",

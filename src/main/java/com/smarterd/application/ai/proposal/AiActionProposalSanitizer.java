@@ -1,9 +1,9 @@
 package com.smarterd.application.ai.proposal;
 
+import com.smarterd.utils.AppStringUtils;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Component;
@@ -76,21 +76,23 @@ public class AiActionProposalSanitizer {
     }
 
     private boolean isSensitiveKey(String key) {
-        final var normalized = key == null ? "" : key.toLowerCase(Locale.ROOT);
-        return normalized.contains("token") ||
-        normalized.contains("cookie") ||
-        normalized.contains("password") ||
-        normalized.contains("secret") ||
-        normalized.contains("credential") ||
-        normalized.contains("env") ||
-        normalized.contains("stdout") ||
-        normalized.contains("stderr") ||
-        normalized.contains("prompt") ||
-        normalized.contains("context") ||
-        normalized.contains("provideroutput") ||
-        normalized.contains("shell") ||
-        normalized.contains("command") ||
-        normalized.contains("sql") ||
-        normalized.contains("path");
+        final var normalized = AppStringUtils.lowerCaseToEmpty(key);
+        return (
+            normalized.contains("token") ||
+            normalized.contains("cookie") ||
+            normalized.contains("password") ||
+            normalized.contains("secret") ||
+            normalized.contains("credential") ||
+            normalized.contains("env") ||
+            normalized.contains("stdout") ||
+            normalized.contains("stderr") ||
+            normalized.contains("prompt") ||
+            normalized.contains("context") ||
+            normalized.contains("provideroutput") ||
+            normalized.contains("shell") ||
+            normalized.contains("command") ||
+            normalized.contains("sql") ||
+            normalized.contains("path")
+        );
     }
 }

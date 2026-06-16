@@ -12,6 +12,7 @@ import com.smarterd.domain.pm.wbs.entity.WbsItem;
 import com.smarterd.domain.pm.wbs.repository.WbsDocumentLinkRepository;
 import com.smarterd.domain.pm.wbs.repository.WbsItemRepository;
 import com.smarterd.domain.project.entity.Project;
+import com.smarterd.utils.AppStringUtils;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -47,8 +48,24 @@ public class WbsDocumentService {
             .toList();
     }
 
+    /**
+     * WBS 항목에 문서를 연결한다.
+     *
+     * @param loginId 요청 사용자 로그인 ID
+     * @param teamId 팀 ID
+     * @param projectId 프로젝트 ID
+     * @param wbsItemId WBS 항목 ID
+     * @param documentId 문서 ID
+     * @return 연결된 문서 결과
+     */
     @Transactional
-    public LinkedDocumentResult linkDocument(String loginId, Long teamId, Long projectId, Long wbsItemId, Long documentId) {
+    public LinkedDocumentResult linkDocument(
+        String loginId,
+        Long teamId,
+        Long projectId,
+        Long wbsItemId,
+        Long documentId
+    ) {
         final var context = projectContextLoader.load(loginId, teamId, projectId, true);
         final var wbsItem = findWbsItem(context.project(), wbsItemId);
         final var document = diagramRepository
@@ -60,7 +77,9 @@ public class WbsDocumentService {
             return toLinkedDocumentResult(existing.get(), existing.get().getCreatedAt());
         }
 
-        final var link = wbsDocumentLinkRepository.save(WbsDocumentLink.builder().wbsItem(wbsItem).diagram(document).build());
+        final var link = wbsDocumentLinkRepository.save(
+            WbsDocumentLink.builder().wbsItem(wbsItem).diagram(document).build()
+        );
         workItemHistoryService.recordWbsDocumentLinked(
             context.project(),
             wbsItemId,
@@ -97,13 +116,10 @@ public class WbsDocumentService {
         final var context = projectContextLoader.load(loginId, teamId, projectId, false);
         final var tagCounts = new LinkedHashMap<String, Long>();
 
-        loadMarkdownDocuments(context.project())
-            .forEach((diagram) -> {
-                final var descriptor = markdownDocumentDescriptorService.describe(diagram.getContent());
-                descriptor
-                    .tags()
-                    .forEach((tag) -> tagCounts.merge(tag, 1L, Long::sum));
-            });
+        loadMarkdownDocuments(context.project()).forEach((diagram) -> {
+            final var descriptor = markdownDocumentDescriptorService.describe(diagram.getContent());
+            descriptor.tags().forEach((tag) -> tagCounts.merge(tag, 1L, Long::sum));
+        });
 
         return tagCounts
             .entrySet()
@@ -124,7 +140,9 @@ public class WbsDocumentService {
             .stream()
             .map((diagram) -> toLinkedDocumentResult(diagram, null))
             .filter((result) -> result.tags().contains(normalizedTag))
-            .sorted(Comparator.comparing(LinkedDocumentResult::updatedAt).reversed().thenComparing(LinkedDocumentResult::id))
+            .sorted(
+                Comparator.comparing(LinkedDocumentResult::updatedAt).reversed().thenComparing(LinkedDocumentResult::id)
+            )
             .toList();
     }
 
@@ -150,10 +168,9 @@ public class WbsDocumentService {
         com.smarterd.domain.diagram.entity.Diagram document,
         @Nullable Instant linkedAt
     ) {
-        final MarkdownTemplateDescriptor descriptor =
-            document.isMarkdownDocument()
-                ? markdownDocumentDescriptorService.describe(document.getContent())
-                : new MarkdownTemplateDescriptor(document.getTemplateKey(), null, document.getSummaryText(), List.of());
+        final MarkdownTemplateDescriptor descriptor = document.isMarkdownDocument()
+            ? markdownDocumentDescriptorService.describe(document.getContent())
+            : new MarkdownTemplateDescriptor(document.getTemplateKey(), null, document.getSummaryText(), List.of());
 
         return new LinkedDocumentResult(
             document.getId(),
@@ -171,11 +188,7 @@ public class WbsDocumentService {
 
     @Nullable
     private String normalizeTag(String tag) {
-        if (tag == null) {
-            return null;
-        }
-        final var normalized = tag.trim().toLowerCase();
-        return normalized.isBlank() ? null : normalized;
+        return AppStringUtils.lowerTrimToNull(tag);
     }
 
     public record LinkedDocumentResult(

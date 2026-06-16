@@ -1,6 +1,7 @@
 package com.smarterd.application.ai.proposal.executor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smarterd.utils.AppStringUtils;
 import java.util.LinkedHashMap;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
@@ -44,7 +45,7 @@ public class AiActionExecutionResultWriter {
         if (value == null) {
             return null;
         }
-        final var normalized = value.replaceAll("[\\p{Cntrl}&&[^\n\t]]", "").trim();
+        final var normalized = AppStringUtils.trimToEmpty(value.replaceAll("[\\p{Cntrl}&&[^\n\t]]", ""));
         if (normalized.isEmpty()) {
             return null;
         }

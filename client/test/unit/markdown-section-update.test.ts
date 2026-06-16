@@ -1,10 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyIncrementalTextUpdate } from '../../src/lib/incremental-text-update.js';
-import {
-  buildSectionCommands,
-  type SectionCommand,
-} from '../../src/collaboration/plugins/markdown/markdown-section-projector.js';
+import { buildSectionCommands } from '../../src/collaboration/plugins/markdown/markdown-section-projector.js';
 import * as Y from 'yjs';
 
 // --- DOC-01: diff-match-patch -> Y.Text 증분 적용 정확성 ---
@@ -63,11 +60,7 @@ test.describe('applyIncrementalTextUpdate', () => {
 
     const nextText = 'The slow brown cat sits on the lazy mat';
     doc.transact(() => {
-      applyIncrementalTextUpdate(
-        yText,
-        'The quick brown fox jumps over the lazy dog',
-        nextText,
-      );
+      applyIncrementalTextUpdate(yText, 'The quick brown fox jumps over the lazy dog', nextText);
     });
     assert.equal(yText.toString(), nextText);
   });

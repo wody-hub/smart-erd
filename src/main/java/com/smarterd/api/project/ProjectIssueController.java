@@ -3,10 +3,9 @@ package com.smarterd.api.project;
 import com.smarterd.api.project.dto.issue.CreateProjectIssueRequest;
 import com.smarterd.api.project.dto.issue.ProjectIssueListResponse;
 import com.smarterd.api.project.dto.issue.ProjectIssueResponse;
-import com.smarterd.api.project.dto.issue.UpdateProjectIssueStatusRequest;
+import com.smarterd.api.project.dto.issue.ProjectIssueSearchRequest;
 import com.smarterd.api.project.dto.issue.UpdateProjectIssueRequest;
-import com.smarterd.domain.pm.issue.entity.ProjectIssuePriority;
-import com.smarterd.domain.pm.issue.entity.ProjectIssueStatus;
+import com.smarterd.api.project.dto.issue.UpdateProjectIssueStatusRequest;
 import com.smarterd.domain.pm.issue.service.ProjectIssueService;
 import com.smarterd.utils.ExcelUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -53,36 +53,28 @@ public class ProjectIssueController {
      * @param jwt 인증된 JWT
      * @param teamId 팀 ID
      * @param projectId 프로젝트 ID
-     * @param status 상태 필터
-     * @param statuses 상태 필터(하위 호환)
-     * @param priority 우선순위 필터
-     * @param priorities 우선순위 필터(하위 호환)
-     * @param assigneeUserId 담당자 사용자 ID 필터
-     * @param assigneeIds 담당자 사용자 ID 필터(하위 호환)
-     * @param unassignedOnly 미배정 이슈만 조회 여부
-     * @param includeUnassigned 미배정 이슈 포함 여부(하위 호환)
+     * @param parameters 검색 조건 query parameters
      * @return 필터링된 프로젝트 이슈 목록
      */
     @Operation(summary = "프로젝트 이슈 목록 조회")
+    @ApiResponse(
+        responseCode = "200",
+        description = "조회 성공",
+        content = @Content(schema = @Schema(implementation = ProjectIssueListResponse.class))
+    )
     @GetMapping
     public ResponseEntity<ProjectIssueListResponse> getProjectIssues(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
         @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
-        @Parameter(description = "상태 필터") @RequestParam(required = false) ProjectIssueStatus status,
-        @Parameter(description = "상태 필터(하위 호환)") @RequestParam(required = false) List<ProjectIssueStatus> statuses,
-        @Parameter(description = "우선순위 필터") @RequestParam(required = false) ProjectIssuePriority priority,
-        @Parameter(description = "우선순위 필터(하위 호환)") @RequestParam(required = false) List<ProjectIssuePriority> priorities,
-        @Parameter(description = "담당자 사용자 ID 필터") @RequestParam(required = false) Long assigneeUserId,
-        @Parameter(description = "담당자 사용자 ID 필터(하위 호환)") @RequestParam(required = false) List<Long> assigneeIds,
-        @Parameter(description = "미배정 이슈만 조회 여부") @RequestParam(defaultValue = "false") boolean unassignedOnly,
-        @Parameter(description = "미배정 이슈 포함 여부") @RequestParam(defaultValue = "false") boolean includeUnassigned
+        @RequestParam MultiValueMap<String, String> parameters
     ) {
+        final var request = ProjectIssueSearchRequest.fromParameters(parameters);
         final var result = projectIssueService.getProjectIssues(
             jwt.getSubject(),
             teamId,
             projectId,
-            buildQuery(status, statuses, priority, priorities, assigneeUserId, assigneeIds, unassignedOnly, includeUnassigned)
+            buildQuery(request)
         );
         final var items = result.stream().map(ProjectIssueResponse::from).toList();
         return ResponseEntity.ok(ProjectIssueListResponse.from(items));
@@ -135,6 +127,11 @@ public class ProjectIssueController {
      * @return 수정된 프로젝트 이슈
      */
     @Operation(summary = "프로젝트 이슈 수정")
+    @ApiResponse(
+        responseCode = "200",
+        description = "수정 성공",
+        content = @Content(schema = @Schema(implementation = ProjectIssueResponse.class))
+    )
     @PutMapping("/{issueId}")
     public ResponseEntity<ProjectIssueResponse> updateProjectIssue(
         @AuthenticationPrincipal Jwt jwt,
@@ -169,6 +166,11 @@ public class ProjectIssueController {
      * @return 상태가 전진된 프로젝트 이슈
      */
     @Operation(summary = "프로젝트 이슈 상태 변경")
+    @ApiResponse(
+        responseCode = "200",
+        description = "상태 변경 성공",
+        content = @Content(schema = @Schema(implementation = ProjectIssueResponse.class))
+    )
     @PatchMapping("/{issueId}/status")
     public ResponseEntity<ProjectIssueResponse> updateProjectIssueStatus(
         @AuthenticationPrincipal Jwt jwt,
@@ -197,7 +199,12 @@ public class ProjectIssueController {
      * @return 상태가 전진된 프로젝트 이슈
      */
     @Operation(summary = "프로젝트 이슈 상태 전진")
-    @PatchMapping("/{issueId}/advance")
+    @ApiResponse(
+        responseCode = "200",
+        description = "상태 전진 성공",
+        content = @Content(schema = @Schema(implementation = ProjectIssueResponse.class))
+    )
+    @PostMapping("/{issueId}/status-transitions")
     public ResponseEntity<ProjectIssueResponse> advanceProjectIssueStatus(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
@@ -214,61 +221,52 @@ public class ProjectIssueController {
      * @param jwt 인증된 JWT
      * @param teamId 팀 ID
      * @param projectId 프로젝트 ID
-     * @param status 상태 필터
-     * @param statuses 상태 필터(하위 호환)
-     * @param priority 우선순위 필터
-     * @param priorities 우선순위 필터(하위 호환)
-     * @param assigneeUserId 담당자 사용자 ID 필터
-     * @param assigneeIds 담당자 사용자 ID 필터(하위 호환)
-     * @param unassignedOnly 미배정 이슈만 조회 여부
-     * @param includeUnassigned 미배정 포함 여부(하위 호환)
+     * @param parameters 검색 조건 query parameters
      * @param response HTTP 응답
      * @throws IOException 다운로드 중 I/O 오류가 발생한 경우
      */
     @Operation(summary = "프로젝트 이슈 엑셀 다운로드")
     @ApiResponse(responseCode = "200", description = "다운로드 성공")
-    @GetMapping("/download/excel")
+    @GetMapping("/exports/excel")
     public void downloadProjectIssuesExcel(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "팀 ID") @PathVariable Long teamId,
         @Parameter(description = "프로젝트 ID") @PathVariable Long projectId,
-        @Parameter(description = "상태 필터") @RequestParam(required = false) ProjectIssueStatus status,
-        @Parameter(description = "상태 필터(하위 호환)") @RequestParam(required = false) List<ProjectIssueStatus> statuses,
-        @Parameter(description = "우선순위 필터") @RequestParam(required = false) ProjectIssuePriority priority,
-        @Parameter(description = "우선순위 필터(하위 호환)") @RequestParam(required = false) List<ProjectIssuePriority> priorities,
-        @Parameter(description = "담당자 사용자 ID 필터") @RequestParam(required = false) Long assigneeUserId,
-        @Parameter(description = "담당자 사용자 ID 필터(하위 호환)") @RequestParam(required = false) List<Long> assigneeIds,
-        @Parameter(description = "미배정 이슈만 조회 여부") @RequestParam(defaultValue = "false") boolean unassignedOnly,
-        @Parameter(description = "미배정 이슈 포함 여부") @RequestParam(defaultValue = "false") boolean includeUnassigned,
+        @RequestParam MultiValueMap<String, String> parameters,
         HttpServletResponse response
     ) throws IOException {
+        final var request = ProjectIssueSearchRequest.fromParameters(parameters);
         final var excelData = projectIssueService.exportProjectIssues(
             jwt.getSubject(),
             teamId,
             projectId,
-            buildQuery(status, statuses, priority, priorities, assigneeUserId, assigneeIds, unassignedOnly, includeUnassigned)
+            buildQuery(request)
         );
         ExcelUtils.download(excelData, response);
     }
 
-    private ProjectIssueService.ProjectIssueQuery buildQuery(
-        ProjectIssueStatus status,
-        List<ProjectIssueStatus> statuses,
-        ProjectIssuePriority priority,
-        List<ProjectIssuePriority> priorities,
-        Long assigneeUserId,
-        List<Long> assigneeIds,
-        boolean unassignedOnly,
-        boolean includeUnassigned
-    ) {
+    /**
+     * 검색 요청 DTO를 서비스 query 객체로 변환한다.
+     *
+     * @param request 프로젝트 이슈 검색 요청
+     * @return 프로젝트 이슈 서비스 query
+     */
+    private ProjectIssueService.ProjectIssueQuery buildQuery(ProjectIssueSearchRequest request) {
         return new ProjectIssueService.ProjectIssueQuery(
-            mergeFilterValues(status, statuses),
-            mergeFilterValues(priority, priorities),
-            mergeFilterValues(assigneeUserId, assigneeIds),
-            unassignedOnly || includeUnassigned
+            mergeFilterValues(request.status(), request.statuses()),
+            mergeFilterValues(request.priority(), request.priorities()),
+            mergeFilterValues(request.assigneeUserId(), request.assigneeIds()),
+            request.unassignedOnly() || request.includeUnassigned()
         );
     }
 
+    /**
+     * 단일 필터 값과 다중 필터 값을 중복 제거된 목록으로 병합한다.
+     *
+     * @param singleValue 단일 필터 값
+     * @param multiValues 다중 필터 값
+     * @return 병합된 필터 값 목록
+     */
     private <T> List<T> mergeFilterValues(T singleValue, List<T> multiValues) {
         final var merged = new ArrayList<T>();
         if (singleValue != null) {

@@ -48,7 +48,7 @@ test('RIS-318: dedicated WBS page structure authoring regression check', async (
   const token = await loginViaUi(page, { ...config, ...fixture });
   const { teamId, projectId } = fixture.target;
 
-  const rootA = await apiPost<WbsItemSummary>(
+  await apiPost<WbsItemSummary>(
     `${config.apiBaseUrl}/teams/${teamId}/projects/${projectId}/wbs`,
     token,
     { name: '기획' },
@@ -68,7 +68,8 @@ test('RIS-318: dedicated WBS page structure authoring regression check', async (
     waitUntil: 'networkidle',
   });
 
-  const rowByName = (name: string) => page.locator('tr', { has: page.getByText(name, { exact: true }) });
+  const rowByName = (name: string) =>
+    page.locator('tr', { has: page.getByText(name, { exact: true }) });
 
   await expect(rowByName('기획')).toBeVisible();
   await expect(rowByName('개발')).toBeVisible();
@@ -84,7 +85,9 @@ test('RIS-318: dedicated WBS page structure authoring regression check', async (
   ).toBeVisible();
 
   // sibling-below add
-  await rowByName('기획').getByRole('button', { name: /아래 추가|Add below/i }).click();
+  await rowByName('기획')
+    .getByRole('button', { name: /아래 추가|Add below/i })
+    .click();
   await page.getByRole('button', { name: /같은 레벨 아래 추가|Add item below/i }).click();
   const siblingInput = page.getByRole('textbox', { name: /같은 레벨 아래 추가|Add item below/i });
   await siblingInput.fill('기획-아래');
@@ -95,11 +98,16 @@ test('RIS-318: dedicated WBS page structure authoring regression check', async (
   await expect(rowByName('기획-아래')).toBeVisible();
 
   // child add
-  await rowByName('개발').getByRole('button', { name: /하위 추가|Add child/i }).click();
+  await rowByName('개발')
+    .getByRole('button', { name: /하위 추가|Add child/i })
+    .click();
   await page.getByRole('button', { name: /하위 항목 추가|Add sub-item/i }).click();
   const childInput = page.getByRole('textbox', { name: /하위 항목 추가|Add sub-item/i });
   await childInput.fill('개발-하위-2');
-  await childInput.locator('xpath=ancestor::tr').getByRole('button', { name: /^추가$|^Add$/i }).click();
+  await childInput
+    .locator('xpath=ancestor::tr')
+    .getByRole('button', { name: /^추가$|^Add$/i })
+    .click();
   await expect(rowByName('개발-하위-2')).toBeVisible();
 
   // structure preset policy: progress column is hidden by default.
@@ -111,13 +119,15 @@ test('RIS-318: dedicated WBS page structure authoring regression check', async (
 
   // inline edit regression (progress inline editor after column visibility opt-in)
   await rowByName('기획').getByRole('button', { name: /0%/ }).click();
-  const inlineProgressInput = rowByName('기획').locator('input[type=\"number\"]').first();
+  const inlineProgressInput = rowByName('기획').locator('input[type="number"]').first();
   await inlineProgressInput.fill('15');
   await inlineProgressInput.press('Enter');
   await expect(rowByName('기획')).toContainText('15%');
 
   // structural move: outdent then indent
-  await rowByName('개발-하위').getByRole('button', { name: /내어쓰기|Outdent/i }).click();
+  await rowByName('개발-하위')
+    .getByRole('button', { name: /내어쓰기|Outdent/i })
+    .click();
   await expect
     .poll(async () => {
       const items = await apiGet<WbsItemSummary[]>(
@@ -129,7 +139,9 @@ test('RIS-318: dedicated WBS page structure authoring regression check', async (
     })
     .toBeNull();
 
-  await rowByName('개발-하위').getByRole('button', { name: /들여쓰기|Indent/i }).click();
+  await rowByName('개발-하위')
+    .getByRole('button', { name: /들여쓰기|Indent/i })
+    .click();
   await expect
     .poll(async () => {
       const items = await apiGet<WbsItemSummary[]>(

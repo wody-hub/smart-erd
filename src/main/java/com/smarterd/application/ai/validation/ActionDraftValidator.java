@@ -3,8 +3,8 @@ package com.smarterd.application.ai.validation;
 import com.smarterd.application.ai.provider.AiActionDraft;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.message.MessageCode;
+import com.smarterd.utils.AppStringUtils;
 import java.util.List;
-import java.util.Locale;
 import org.springframework.stereotype.Component;
 
 /**
@@ -31,7 +31,7 @@ public class ActionDraftValidator {
         if (!Boolean.TRUE.equals(action.requiresApproval())) {
             throw outputValidationFailed();
         }
-        final var type = action.type() == null ? "" : action.type().toLowerCase(Locale.ROOT);
+        final var type = AppStringUtils.lowerCaseToEmpty(action.type());
         if (
             type.contains("delete") ||
             type.contains("remove") ||

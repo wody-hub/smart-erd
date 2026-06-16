@@ -6,10 +6,10 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.application.ai.provider.AiProvider;
+import com.smarterd.application.ai.provider.AiProviderAvailability;
 import com.smarterd.application.ai.provider.AiProviderRequest;
 import com.smarterd.application.ai.provider.AiProviderResult;
 import com.smarterd.application.ai.provider.AiProviderStatus;
-import com.smarterd.application.ai.provider.AiProviderAvailability;
 import com.smarterd.application.ai.validation.ActionDraftValidator;
 import com.smarterd.application.ai.validation.ProviderOutputValidator;
 import jakarta.validation.Validation;
@@ -43,14 +43,21 @@ class AiProviderExecutionRunnerTest {
             Validation.buildDefaultValidatorFactory().getValidator(),
             new ActionDraftValidator()
         );
-        final var registry = new AiExecutionRegistry(Duration.ofMinutes(15), Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+        final var registry = new AiExecutionRegistry(
+            Duration.ofMinutes(15),
+            Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)
+        );
         runner = new AiProviderExecutionRunner(auditService, aiProvider, registry, validator);
     }
 
     @Test
     void executeCreatesLifecycleRecordValidatesProviderOutputAndAudits() {
-        when(aiProvider.status()).thenReturn(new AiProviderStatus("noop", AiProviderAvailability.AVAILABLE, null, Instant.EPOCH));
-        when(aiProvider.execute(org.mockito.ArgumentMatchers.any())).thenReturn(AiProviderResult.answer("validated answer"));
+        when(aiProvider.status()).thenReturn(
+            new AiProviderStatus("noop", AiProviderAvailability.AVAILABLE, null, Instant.EPOCH)
+        );
+        when(aiProvider.execute(org.mockito.ArgumentMatchers.any())).thenReturn(
+            AiProviderResult.answer("validated answer")
+        );
 
         final var result = runner.execute(
             "tester",

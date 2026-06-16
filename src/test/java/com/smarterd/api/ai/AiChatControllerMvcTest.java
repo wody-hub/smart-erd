@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarterd.api.common.GlobalExceptionHandler;
 import com.smarterd.application.ai.chat.AiChatExecutionService;
+import com.smarterd.application.ai.chat.AiChatView;
 import com.smarterd.application.ai.proposal.AiActionProposalView;
 import com.smarterd.application.ai.provider.AiActionRiskLevel;
 import com.smarterd.domain.ai.AiActionProposalStatus;
@@ -30,12 +31,12 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 
 @ExtendWith(MockitoExtension.class)
 class AiChatControllerMvcTest {
@@ -64,7 +65,11 @@ class AiChatControllerMvcTest {
     @DisplayName("10-W0-03 controller owns chat-specific request mapping")
     void w0_10_W0_03_controllerOwnsChatSpecificRequestMapping() throws Exception {
         final var classMapping = AiChatController.class.getAnnotation(RequestMapping.class);
-        final var method = AiChatController.class.getDeclaredMethod("chat", Jwt.class, com.smarterd.api.ai.dto.AiChatRequest.class);
+        final var method = AiChatController.class.getDeclaredMethod(
+            "chat",
+            Jwt.class,
+            com.smarterd.api.ai.dto.AiChatRequest.class
+        );
         final var postMapping = method.getAnnotation(PostMapping.class);
 
         org.assertj.core.api.Assertions.assertThat(classMapping.value()).containsExactly("/api/ai/chat");
@@ -74,19 +79,25 @@ class AiChatControllerMvcTest {
     @Test
     @DisplayName("10-W0-03 authenticated POST /api/ai/chat returns read-only structured answer")
     void w0_10_W0_03_authenticatedChatReturnsStructuredReadOnlyResponse() throws Exception {
-        when(aiChatExecutionService.execute(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(
-                new AiChatExecutionService.AiChatView(
-                    "ANSWER",
-                    "Delayed issues need attention.",
-                    "API work is the main risk.",
-                    List.of("Delayed issues: 2"),
-                    List.of(),
-                    List.of(new com.smarterd.application.ai.chat.AiReadContextService.SourceChip("Alpha Project", "issues", 12)),
-                    List.of(),
-                    null
-                )
-            );
+        when(
+            aiChatExecutionService.execute(
+                org.mockito.ArgumentMatchers.eq("tester"),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(
+            new AiChatView(
+                "ANSWER",
+                "Delayed issues need attention.",
+                "API work is the main risk.",
+                List.of("Delayed issues: 2"),
+                List.of(),
+                List.of(
+                    new com.smarterd.application.ai.chat.AiReadContextService.SourceChip("Alpha Project", "issues", 12)
+                ),
+                List.of(),
+                null
+            )
+        );
 
         mockMvc
             .perform(
@@ -96,7 +107,9 @@ class AiChatControllerMvcTest {
                         return request;
                     })
                     .contentType(APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "status?")))
+                    .content(
+                        objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "status?"))
+                    )
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("ANSWER"))
@@ -108,25 +121,29 @@ class AiChatControllerMvcTest {
     @Test
     @DisplayName("11-W2-01 chat response exposes sanitized proposal previews")
     void w2_11_W2_01_chatResponseExposesSanitizedProposalPreviews() throws Exception {
-        when(aiChatExecutionService.execute(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(
-                new AiChatExecutionService.AiChatView(
-                    "ANSWER",
-                    "exec-1",
-                    false,
-                    null,
-                    null,
-                    "Issue summary loaded",
-                    "Create a follow-up issue.",
-                    List.of("Issue summary loaded"),
-                    List.of(),
-                    List.of(),
-                    List.of(),
-                    List.of(proposalView()),
-                    null,
-                    null
-                )
-            );
+        when(
+            aiChatExecutionService.execute(
+                org.mockito.ArgumentMatchers.eq("tester"),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(
+            new AiChatView(
+                "ANSWER",
+                "exec-1",
+                false,
+                null,
+                null,
+                "Issue summary loaded",
+                "Create a follow-up issue.",
+                List.of("Issue summary loaded"),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(proposalView()),
+                null,
+                null
+            )
+        );
 
         final var response = mockMvc
             .perform(
@@ -136,7 +153,9 @@ class AiChatControllerMvcTest {
                         return request;
                     })
                     .contentType(APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "create?")))
+                    .content(
+                        objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "create?"))
+                    )
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.proposals[0].proposalId").value("proposal-1"))
@@ -161,7 +180,9 @@ class AiChatControllerMvcTest {
             .perform(
                 post("/api/ai/chat")
                     .contentType(APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "status?")))
+                    .content(
+                        objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "status?"))
+                    )
             )
             .andExpect(status().isForbidden());
     }
@@ -169,8 +190,12 @@ class AiChatControllerMvcTest {
     @Test
     @DisplayName("10-W0-03 scope denial maps before provider invocation")
     void w0_10_W0_03_scopeDenialReturnsForbidden() throws Exception {
-        when(aiChatExecutionService.execute(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenThrow(new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
+        when(
+            aiChatExecutionService.execute(
+                org.mockito.ArgumentMatchers.eq("tester"),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenThrow(new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code()));
 
         mockMvc
             .perform(
@@ -180,7 +205,9 @@ class AiChatControllerMvcTest {
                         return request;
                     })
                     .contentType(APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "status?")))
+                    .content(
+                        objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "status?"))
+                    )
             )
             .andExpect(status().isForbidden());
     }
@@ -188,8 +215,12 @@ class AiChatControllerMvcTest {
     @Test
     @DisplayName("10-W0-03 confirmation response is returned without write controls")
     void w0_10_W0_03_confirmationResponseHasNoWriteControls() throws Exception {
-        when(aiChatExecutionService.execute(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(AiChatExecutionService.AiChatView.needsConfirmation(List.of("Select a project."), List.of()));
+        when(
+            aiChatExecutionService.execute(
+                org.mockito.ArgumentMatchers.eq("tester"),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(AiChatView.needsConfirmation(List.of("Select a project."), List.of()));
 
         mockMvc
             .perform(
@@ -211,19 +242,14 @@ class AiChatControllerMvcTest {
     @Test
     @DisplayName("10-W0-03 provider failure maps to localized safe error response")
     void w0_10_W0_03_providerFailureMapsToSafeErrorCardContract() throws Exception {
-        when(aiChatExecutionService.execute(org.mockito.ArgumentMatchers.eq("tester"), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(
-                new AiChatExecutionService.AiChatView(
-                    "ERROR",
-                    "",
-                    "",
-                    List.of(),
-                    List.of(),
-                    List.of(),
-                    List.of(),
-                    "AI 응답을 만들지 못했습니다."
-                )
-            );
+        when(
+            aiChatExecutionService.execute(
+                org.mockito.ArgumentMatchers.eq("tester"),
+                org.mockito.ArgumentMatchers.any()
+            )
+        ).thenReturn(
+            new AiChatView("ERROR", "", "", List.of(), List.of(), List.of(), List.of(), "AI 응답을 만들지 못했습니다.")
+        );
 
         mockMvc
             .perform(
@@ -233,7 +259,9 @@ class AiChatControllerMvcTest {
                         return request;
                     })
                     .contentType(APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "status?")))
+                    .content(
+                        objectMapper.writeValueAsString(Map.of("teamId", 1, "projectId", 10, "userMessage", "status?"))
+                    )
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("ERROR"))

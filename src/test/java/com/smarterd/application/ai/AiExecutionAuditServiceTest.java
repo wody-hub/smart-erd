@@ -3,9 +3,9 @@ package com.smarterd.application.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 
+import com.smarterd.application.ai.provider.AiActionRiskLevel;
 import com.smarterd.application.ai.provider.AiProviderError;
 import com.smarterd.application.ai.provider.AiProviderResult;
-import com.smarterd.application.ai.provider.AiActionRiskLevel;
 import com.smarterd.domain.ai.AiActionProposal;
 import com.smarterd.domain.ai.AiExecutionAudit;
 import com.smarterd.domain.ai.AiExecutionAuditRepository;
