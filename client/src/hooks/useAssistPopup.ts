@@ -397,6 +397,11 @@ export function useAssistPopup({
 
     assistPopupVisibleKeyRef.current = editor.createContextKey('dslAssistPopupVisible', false);
     assistPopupVisibleKeyRef.current.set(Boolean(assistPopupRef.current));
+    const keyModWithWinCtrl = monaco.KeyMod as typeof monaco.KeyMod & { WinCtrl?: number };
+    const manualOpenKeybindings = [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Space];
+    if (typeof keyModWithWinCtrl.WinCtrl === 'number') {
+      manualOpenKeybindings.push(keyModWithWinCtrl.WinCtrl | monaco.KeyCode.Space);
+    }
 
     /**
      * 보조 팝업 선택 인덱스를 delta만큼 순환 이동한다.
@@ -431,6 +436,12 @@ export function useAssistPopup({
     };
 
     const disposables: Monaco.IDisposable[] = [
+      editor.addAction({
+        id: 'dsl-assist-popup-open',
+        label: 'DSL Assist Popup Open',
+        keybindings: manualOpenKeybindings,
+        run: () => openAssistPopup({ trigger: 'manual' }),
+      }),
       editor.addAction({
         id: 'dsl-assist-popup-up',
         label: 'DSL Assist Popup Up',
@@ -478,6 +489,7 @@ export function useAssistPopup({
     editorRef,
     executeAssistPopupItem,
     monacoRef,
+    openAssistPopup,
     setAssistPopupSelectedIndex,
   ]);
 
