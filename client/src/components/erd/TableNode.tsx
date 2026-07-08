@@ -119,7 +119,6 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
     isEditing,
     fkMode,
   });
-  const effectiveCompactRows = staticRowCompactMode !== 'off';
   const {
     renderMetaById: columnRenderMetaById,
     duplicateLogicalNameColumnCount,
@@ -128,8 +127,6 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
     hiddenUnconnectedColumnCount,
   } = useTableColumnRenderModel({
     columns,
-    connectedColumnIds,
-    compactRows: effectiveCompactRows,
     t,
     resolveLogicalName,
     findTermById,

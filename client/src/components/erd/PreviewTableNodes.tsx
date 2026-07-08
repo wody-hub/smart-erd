@@ -9,7 +9,7 @@ import StaticColumnRow from './StaticColumnRow';
 import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
 import type { TableNode as PersistedTableNode } from '@/types/erd';
 import { getColumnHandlePlacements } from './columnHandleLayout';
-import { useConnectedColumnDirections, useConnectedColumnIds } from './ConnectedColumnIdsContext';
+import { useConnectedColumnDirections } from './ConnectedColumnIdsContext';
 import {
   type CompactTableRenderingMode,
   resolvePreviewCompactTableMode,
@@ -92,12 +92,10 @@ function PreviewTableNodeFrame({
  */
 function PreviewTableRows({
   node,
-  connectedColumnIds,
   compactModeOverride,
   ghost = false,
 }: {
   node: DslPreviewNode;
-  connectedColumnIds: Set<string>;
   compactModeOverride?: CompactTableRenderingMode;
   ghost?: boolean;
 }) {
@@ -109,7 +107,6 @@ function PreviewTableRows({
     override: compactModeOverride,
     ghost,
   });
-  const compactRows = compactMode !== 'off';
   const resolvedHandleLayout = node.data.handleLayout ?? 'split';
   const targetHandlePlacements = useMemo(
     () => getColumnHandlePlacements(resolvedHandleLayout, 'target'),
@@ -126,8 +123,6 @@ function PreviewTableRows({
     hiddenUnconnectedColumnCount,
   } = useTableColumnRenderModel({
     columns: node.data.columns,
-    connectedColumnIds,
-    compactRows,
     t,
     resolveLogicalName,
     findTermById,
@@ -203,7 +198,6 @@ function PreviewTableRows({
  * @returns read-only preview 노드
  */
 function PreviewTableNode(props: NodeProps<DslPreviewNode>) {
-  const connectedColumnIds = useConnectedColumnIds(props.id);
   const node = {
     id: props.id,
     type: 'previewTable' as const,
@@ -212,7 +206,7 @@ function PreviewTableNode(props: NodeProps<DslPreviewNode>) {
   };
   return (
     <PreviewTableNodeFrame node={node}>
-      <PreviewTableRows node={node} connectedColumnIds={connectedColumnIds} />
+      <PreviewTableRows node={node} />
     </PreviewTableNodeFrame>
   );
 }
@@ -226,7 +220,6 @@ function PreviewTableNode(props: NodeProps<DslPreviewNode>) {
  * @returns invisible preview ghost 노드
  */
 function PreviewGhostTableNode(props: NodeProps<DslPreviewNode>) {
-  const connectedColumnIds = useConnectedColumnIds(props.id);
   const node = {
     id: props.id,
     type: 'previewTable' as const,
@@ -235,12 +228,7 @@ function PreviewGhostTableNode(props: NodeProps<DslPreviewNode>) {
   };
   return (
     <PreviewTableNodeFrame node={node} ghost>
-      <PreviewTableRows
-        node={node}
-        connectedColumnIds={connectedColumnIds}
-        compactModeOverride="off"
-        ghost
-      />
+      <PreviewTableRows node={node} compactModeOverride="off" ghost />
     </PreviewTableNodeFrame>
   );
 }
@@ -255,7 +243,6 @@ function PreviewGhostTableNode(props: NodeProps<DslPreviewNode>) {
  * @returns preview-safe fallback 노드
  */
 function PreviewPersistedTableFallbackNode(props: NodeProps<PersistedTableNode>) {
-  const connectedColumnIds = useConnectedColumnIds(props.id);
   const node: DslPreviewNode = {
     id: props.id,
     type: 'previewTable',
@@ -272,7 +259,7 @@ function PreviewPersistedTableFallbackNode(props: NodeProps<PersistedTableNode>)
 
   return (
     <PreviewTableNodeFrame node={node}>
-      <PreviewTableRows node={node} connectedColumnIds={connectedColumnIds} />
+      <PreviewTableRows node={node} />
     </PreviewTableNodeFrame>
   );
 }
