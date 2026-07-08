@@ -276,7 +276,7 @@ async function executeLayoutPhase(params: ExecuteLayoutPhaseParams): Promise<Lay
 /**
  * DDL/DSL 파싱 결과를 ERD 캔버스에 반영하는 공통 훅.
  *
- * replaceFromDdl → dagre 레이아웃 → toast 알림 흐름을 캡슐화하여
+ * replaceFromDdl → 정책 기반 ERD/ELK 레이아웃 → toast 알림 흐름을 캡슐화하여
  * SqlDdlEditor와 DslCodeEditorPanel에서 중복 없이 재사용한다.
  *
  * @param options.canEdit     편집 가능 여부
@@ -466,7 +466,7 @@ export function useApplyToErd({
   /**
    * 파싱 결과를 수동으로 ERD에 즉시 반영한다.
    *
-   * replaceFromDdl + 정책 기반 레이아웃 분기를 수행하고 성공 토스트를 표시한다.
+   * replaceFromDdl + 정책 기반 ERD/ELK 레이아웃 분기를 수행하고 성공 토스트를 표시한다.
    */
   const executeApply = useCallback(() => {
     if (!parseResult) {
