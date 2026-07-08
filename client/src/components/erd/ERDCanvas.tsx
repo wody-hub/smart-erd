@@ -45,6 +45,7 @@ import { useAwareness } from '@/hooks/useAwareness';
 import { useRemoteEditLocks } from '@/hooks/useRemoteEditLocks';
 import { useDiagramErdEdgeActions } from '@/collaboration/channel/diagram/use-diagram-erd-edge-actions';
 import { useDiagramErdDragActions } from '@/collaboration/channel/diagram/use-diagram-erd-drag-actions';
+import { useDiagramErdApplyActions } from '@/collaboration/channel/diagram/use-diagram-erd-apply-actions';
 import TableNode from './TableNode';
 import RemoteEditLocksProvider from './RemoteEditLocksProvider';
 import CanvasToolbar from './CanvasToolbar';
@@ -225,6 +226,7 @@ function ERDCanvas({
   const reactFlowInstance = useReactFlow();
   const edgeActions = useDiagramErdEdgeActions();
   const dragActions = useDiagramErdDragActions();
+  const applyActions = useDiagramErdApplyActions();
   /** 캔버스 컨테이너 ref (Awareness 커서 추적용) */
   const canvasRef = useRef<HTMLDivElement>(null);
   /** 동일 락 토스트 중복 방지용 ref */
@@ -244,7 +246,6 @@ function ERDCanvas({
   const setHighlightedEdge = useCanvasStore((s) => s.setHighlightedEdge);
   const setHighlightedNodes = useCanvasStore((s) => s.setHighlightedNodes);
   const clearHighlights = useCanvasStore((s) => s.clearHighlights);
-  const applyLayout = useCanvasStore((s) => s.applyLayout);
   const undo = useCanvasStore((s) => s.undo);
   const redo = useCanvasStore((s) => s.redo);
   const canUndo = useCanvasStore((s) => s.canUndo);
@@ -813,7 +814,7 @@ function ERDCanvas({
       return;
     }
 
-    applyLayout(result.nodes);
+    applyActions.applyLayout(result.nodes);
     requestAnimationFrame(() => {
       edgeActions.normalizeEdgeHandles(undefined, 'layout', {
         nodeOverrides: reactFlowInstance.getNodes() as Node<TableNodeData>[],
