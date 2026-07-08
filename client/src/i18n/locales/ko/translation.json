@@ -1797,6 +1797,7 @@
       "fkConnect": "FK 연결",
       "fkConnectActive": "FK 연결 (활성)",
       "autoLayout": "자동 정렬",
+      "autoLayoutFailed": "자동 정렬에 실패했습니다.",
       "export": "내보내기",
       "exporting": "내보내는 중...",
       "tableDefinitionExport": "테이블 정의서",

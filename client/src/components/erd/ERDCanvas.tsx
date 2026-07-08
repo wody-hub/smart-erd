@@ -33,7 +33,7 @@ import type {
 import type { YjsProvider } from '@/collaboration/YjsProvider';
 import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
 import { KEYBINDINGS } from '@/constants/keybindings';
-import { applyDagreLayout } from '@/lib/auto-layout';
+import { applyErdLayout } from '@/lib/auto-layout';
 import type { CodeEditorTableFocusRequest } from '@/lib/code-editor-table-navigation';
 import { serializeDiagramDefinitionExportContent } from '@/lib/diagram-definition-export';
 import { findPersistedTableNodeForFocus } from '@/lib/diagram-table-focus';
@@ -806,9 +806,14 @@ function ERDCanvas({
    *
    * @returns 없음
    */
-  const handleAutoLayout = () => {
-    const layoutedNodes = applyDagreLayout(nodes, edges);
-    applyLayout(layoutedNodes);
+  const handleAutoLayout = async () => {
+    const result = await applyErdLayout(nodes, edges);
+    if (result.status === 'failed') {
+      toast.error(t('erd.toolbar.autoLayoutFailed'));
+      return;
+    }
+
+    applyLayout(result.nodes);
     requestAnimationFrame(() => {
       edgeActions.normalizeEdgeHandles(undefined, 'layout', {
         nodeOverrides: reactFlowInstance.getNodes() as Node<TableNodeData>[],

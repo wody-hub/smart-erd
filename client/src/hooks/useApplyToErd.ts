@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import type { Edge, Node } from '@xyflow/react';
 import useAuthStore from '@/stores/useAuthStore';
-import { applyDagreLayout, applyIncrementalLayoutByLabel } from '@/lib/auto-layout';
+import { applyErdLayout, applyIncrementalLayoutByLabel } from '@/lib/auto-layout';
 import type { DdlParseResult } from '@/lib/ddl-parser';
 import type { ApplyDiffResult } from '@/lib/erd-diff-apply';
 import { buildErdTableDiffPlan } from '@/lib/erd-diff-builder';
@@ -57,7 +57,7 @@ interface UseApplyToErdReturn {
   /** 파싱 결과를 ERD에 즉시 반영한다 (확인 다이얼로그에서 호출) */
   executeApply: () => void;
   /** 코드 자동 동기화 경로에서 파싱 결과를 ERD에 반영한다 (차단 시 false) */
-  applyParsedToErd: () => boolean;
+  applyParsedToErd: () => Promise<boolean>;
   /** 교체 확인 다이얼로그 열림 상태 */
   confirmOpen: boolean;
   /** 교체 확인 다이얼로그 열림 상태 변경 함수 */
@@ -235,7 +235,7 @@ interface ExecuteLayoutPhaseParams {
  * @param params 실행 파라미터
  * @returns 레이아웃 결과와 최신 노드/엣지
  */
-function executeLayoutPhase(params: ExecuteLayoutPhaseParams): LayoutPhaseResult {
+async function executeLayoutPhase(params: ExecuteLayoutPhaseParams): Promise<LayoutPhaseResult> {
   const { nodes: freshNodes, edges: freshEdges } = params.getCurrentState();
   const shouldRunLayout = params.applyPath !== 'diff' || params.diffAppliedOperations > 0;
   const preserveExistingDiagram = params.beforeNodes.length > 0;
@@ -253,8 +253,11 @@ function executeLayoutPhase(params: ExecuteLayoutPhaseParams): LayoutPhaseResult
   if (freshNodes.length > 0 && shouldRunLayout) {
     const layoutStart = performance.now();
     if (effectiveLayoutMode === 'full') {
-      const layoutedNodes = applyDagreLayout(freshNodes, freshEdges);
-      params.applyLayout(layoutedNodes);
+      const layoutResult = await applyErdLayout(freshNodes, freshEdges);
+      if (layoutResult.status === 'failed') {
+        console.warn('[erd-sync] full layout failed; preserving existing positions');
+      }
+      params.applyLayout(layoutResult.nodes);
     } else if (effectiveLayoutMode === 'incremental') {
       const layoutedNodes = applyIncrementalLayoutByLabel(params.beforeNodes, freshNodes);
       params.applyLayout(layoutedNodes);
@@ -348,7 +351,7 @@ export function useApplyToErd({
    * @returns 반영 성공 여부
    */
   const runApply = useCallback(
-    (source: ApplySource): boolean => {
+    async (source: ApplySource): Promise<boolean> => {
       if (!parseResult || (parseResult.tables.length === 0 && parseResult.errors.length > 0)) {
         return false;
       }
@@ -412,7 +415,7 @@ export function useApplyToErd({
         });
         const replaceDurationMs = performance.now() - replaceStart;
 
-        const layoutPhase = executeLayoutPhase({
+        const layoutPhase = await executeLayoutPhase({
           source,
           beforeNodes: beforeLayoutNodes,
           estimatedNodeCount,
@@ -470,7 +473,7 @@ export function useApplyToErd({
       return;
     }
     beforeExecuteManualApply?.();
-    runApply('manual');
+    void runApply('manual');
     setConfirmOpen(false);
   }, [beforeExecuteManualApply, parseResult, runApply]);
 
@@ -479,7 +482,31 @@ export function useApplyToErd({
    *
    * @returns 반영 성공 여부 (차단 시 false)
    */
-  const applyParsedToErd = useCallback(() => runApply('auto'), [runApply]);
+  const applyParsedToErd = useCallback(async () => {
+    if (!parseResult || (parseResult.tables.length === 0 && parseResult.errors.length > 0)) {
+      return false;
+    }
+    if (hasBlockingStructureLocks) {
+      return false;
+    }
+
+    const estimatedNodeCount = Math.max(
+      diagramErdApplyRuntime.currentNodes.length,
+      parseResult.tables.length,
+    );
+    const blockReason = getAutoApplyBlockReason(syncPolicy, estimatedNodeCount);
+    if (blockReason) {
+      return false;
+    }
+
+    return runApply('auto');
+  }, [
+    diagramErdApplyRuntime.currentNodes.length,
+    hasBlockingStructureLocks,
+    parseResult,
+    runApply,
+    syncPolicy,
+  ]);
 
   /**
    * Apply 버튼 클릭 핸들러.

@@ -1799,6 +1799,7 @@
       "fkConnect": "FK Connect",
       "fkConnectActive": "FK Connect (Active)",
       "autoLayout": "Auto Layout",
+      "autoLayoutFailed": "Auto layout failed.",
       "export": "Export",
       "exporting": "Exporting...",
       "tableDefinitionExport": "Table Definition",

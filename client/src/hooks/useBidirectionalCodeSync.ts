@@ -46,7 +46,7 @@ interface UseBidirectionalCodeSyncOptions {
   /** 현재 authoritative ERD revision hash */
   currentErdRevisionHash: string;
   /** 코드 -> ERD 반영 함수 */
-  applyParsedToErd: () => boolean;
+  applyParsedToErd: () => Promise<boolean>;
   /** 현재 파싱 결과의 구조 해시 */
   parsedSchemaHash: string | null;
   /** 코드 idle 대기 시간 (ms) */
@@ -323,7 +323,7 @@ export function useBidirectionalCodeSync({
     const isClearRequest = codeText.trim().length === 0;
 
     codeToErdTimerRef.current = setTimeout(
-      () => {
+      async () => {
         if (originRef.current === 'erd-auto-sync') {
           originRef.current = null;
           return;
@@ -375,7 +375,7 @@ export function useBidirectionalCodeSync({
         try {
           // code->ERD 직후 발생하는 1회의 ERD 리비전 변경은 역방향 코드 생성에서 제외한다.
           suppressNextErdSyncRef.current = true;
-          const applied = applyParsedToErd();
+          const applied = await applyParsedToErd();
           if (!applied) {
             suppressNextErdSyncRef.current = false;
             setStatus(resolveCodeAutoApplyStatus(false));
