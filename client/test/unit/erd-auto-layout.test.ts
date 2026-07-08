@@ -42,6 +42,33 @@ function box(node: Node<TableNodeData>) {
   };
 }
 
+function center(node: Node<TableNodeData>) {
+  const nodeBox = box(node);
+  return {
+    x: (nodeBox.left + nodeBox.right) / 2,
+    y: (nodeBox.top + nodeBox.bottom) / 2,
+  };
+}
+
+function byId(nodes: Node<TableNodeData>[], id: string): Node<TableNodeData> {
+  const node = nodes.find((candidate) => candidate.id === id);
+  assert.ok(node, `expected node ${id}`);
+  return node;
+}
+
+function distance(left: Node<TableNodeData>, right: Node<TableNodeData>): number {
+  const leftCenter = center(left);
+  const rightCenter = center(right);
+  return Math.hypot(leftCenter.x - rightCenter.x, leftCenter.y - rightCenter.y);
+}
+
+function assertBefore(left: Node<TableNodeData>, right: Node<TableNodeData>) {
+  assert.ok(
+    left.position.x < right.position.x,
+    `expected ${left.id} to be left of ${right.id}: ${left.position.x} >= ${right.position.x}`,
+  );
+}
+
 function overlaps(left: Node<TableNodeData>, right: Node<TableNodeData>): boolean {
   const a = box(left);
   const b = box(right);
@@ -120,6 +147,112 @@ test('applyErdLayout keeps a small reference chain progressing left to right', a
   assert.ok(result.nodes[0].position.x < result.nodes[1].position.x);
   assert.ok(result.nodes[1].position.x < result.nodes[2].position.x);
   assertNoOverlaps(result.nodes);
+});
+
+test('applyErdLayout keeps branching parent before child tables', async () => {
+  const nodes = [
+    table('contract', 8),
+    table('contract_item', 4),
+    table('contract_history', 4),
+    table('contract_attendee', 4),
+    table('payment', 4),
+  ];
+  const edges = [
+    relation('contract-item', 'contract', 'contract_item'),
+    relation('contract-history', 'contract', 'contract_history'),
+    relation('contract-attendee', 'contract', 'contract_attendee'),
+    relation('contract-payment', 'contract', 'payment'),
+  ];
+
+  const result = await applyErdLayout(nodes, edges);
+
+  assert.equal(result.status, 'applied');
+  const contract = byId(result.nodes, 'contract');
+  assertBefore(contract, byId(result.nodes, 'contract_item'));
+  assertBefore(contract, byId(result.nodes, 'contract_history'));
+  assertBefore(contract, byId(result.nodes, 'contract_attendee'));
+  assertBefore(contract, byId(result.nodes, 'payment'));
+  assertNoOverlaps(result.nodes);
+  assert.ok(aspectScore(result.nodes) <= 2.4);
+});
+
+test('applyErdLayout places mapping tables near their referenced parents', async () => {
+  const nodes = [
+    table('user', 6),
+    table('role', 4),
+    table('user_role_mapping', 3),
+    table('login_log', 3),
+  ];
+  const edges = [
+    relation('user-mapping', 'user', 'user_role_mapping'),
+    relation('role-mapping', 'role', 'user_role_mapping'),
+    relation('user-log', 'user', 'login_log'),
+  ];
+
+  const result = await applyErdLayout(nodes, edges);
+
+  assert.equal(result.status, 'applied');
+  const user = byId(result.nodes, 'user');
+  const role = byId(result.nodes, 'role');
+  const mapping = byId(result.nodes, 'user_role_mapping');
+  const log = byId(result.nodes, 'login_log');
+
+  assertBefore(user, mapping);
+  assertBefore(role, mapping);
+  assert.ok(distance(mapping, user) < distance(log, role));
+  assert.ok(distance(mapping, role) < distance(log, role));
+  assertNoOverlaps(result.nodes);
+});
+
+test('applyErdLayout keeps high degree hub near the vertical center of its component', async () => {
+  const nodes = [
+    table('site', 8),
+    table('contract', 4),
+    table('user', 4),
+    table('org', 4),
+    table('file', 4),
+    table('api_connection_log', 4),
+    table('site_history', 4),
+  ];
+  const edges = [
+    relation('site-contract', 'site', 'contract'),
+    relation('site-user', 'site', 'user'),
+    relation('site-org', 'site', 'org'),
+    relation('site-file', 'site', 'file'),
+    relation('site-api-log', 'site', 'api_connection_log'),
+    relation('site-history', 'site', 'site_history'),
+  ];
+
+  const result = await applyErdLayout(nodes, edges);
+
+  assert.equal(result.status, 'applied');
+  const resultBounds = bounds(result.nodes);
+  const siteCenterY = center(byId(result.nodes, 'site')).y;
+  const componentMiddleY = resultBounds.height / 2 + Math.min(...result.nodes.map((node) => box(node).top));
+
+  assert.ok(Math.abs(siteCenterY - componentMiddleY) <= resultBounds.height * 0.3);
+  assertNoOverlaps(result.nodes);
+});
+
+test('applyErdLayout handles cyclic relationships deterministically without overlap', async () => {
+  const nodes = [table('alpha', 4), table('beta', 4), table('gamma', 4), table('delta', 4)];
+  const edges = [
+    relation('alpha-beta', 'alpha', 'beta'),
+    relation('beta-gamma', 'beta', 'gamma'),
+    relation('gamma-alpha', 'gamma', 'alpha'),
+    relation('gamma-delta', 'gamma', 'delta'),
+  ];
+
+  const first = await applyErdLayout(nodes, edges);
+  const second = await applyErdLayout(nodes, edges);
+
+  assert.equal(first.status, 'applied');
+  assert.equal(second.status, 'applied');
+  assert.deepEqual(
+    first.nodes.map((node) => ({ id: node.id, position: node.position })),
+    second.nodes.map((node) => ({ id: node.id, position: node.position })),
+  );
+  assertNoOverlaps(first.nodes);
 });
 
 test('applyErdLayout wraps a long reference chain into a balanced snake grid', async () => {
