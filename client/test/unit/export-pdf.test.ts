@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PDF_MAX_PAGE_DIMENSION,
+  buildPdfTilePlan,
   getSinglePagePdfLayout,
   getSinglePagePdfPixelRatio,
 } from '../../src/lib/export/export-pdf.js';
@@ -28,4 +29,21 @@ test('getSinglePagePdfPixelRatio lowers ratio when full render area is too large
   const pixelRatio = getSinglePagePdfPixelRatio(10_000, 10_000, 1.6);
 
   assert.equal(Number(pixelRatio.toFixed(3)), 0.819);
+});
+
+test('buildPdfTilePlan returns one full-size tile for small diagrams', () => {
+  assert.deepEqual(buildPdfTilePlan(1200, 800, 4096), [
+    { x: 0, y: 0, width: 1200, height: 800 },
+  ]);
+});
+
+test('buildPdfTilePlan splits wide and tall diagrams into bounded tiles', () => {
+  assert.deepEqual(buildPdfTilePlan(9000, 5000, 4096), [
+    { x: 0, y: 0, width: 4096, height: 4096 },
+    { x: 4096, y: 0, width: 4096, height: 4096 },
+    { x: 8192, y: 0, width: 808, height: 4096 },
+    { x: 0, y: 4096, width: 4096, height: 904 },
+    { x: 4096, y: 4096, width: 4096, height: 904 },
+    { x: 8192, y: 4096, width: 808, height: 904 },
+  ]);
 });

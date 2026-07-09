@@ -11,6 +11,14 @@ export interface SinglePagePdfLayout {
   pageHeight: number;
 }
 
+/** PDF 고해상도 렌더링용 CSS 좌표 타일 */
+export interface PdfTile {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /** 단일 페이지 PDF에 맞는 페이지 크기를 계산한다. */
 export const getSinglePagePdfLayout = (width: number, height: number): SinglePagePdfLayout => {
   const boundedWidth = Math.max(1, width);
@@ -46,4 +54,25 @@ export const getSinglePagePdfPixelRatio = (
   }
 
   return Math.min(boundedSafePixelRatio, areaLimitedPixelRatio);
+};
+
+/** 전체 다이어그램 영역을 제한된 크기의 PDF 렌더 타일로 나눈다. */
+export const buildPdfTilePlan = (width: number, height: number, tileCssSize: number): PdfTile[] => {
+  const boundedWidth = Math.max(1, Math.ceil(width));
+  const boundedHeight = Math.max(1, Math.ceil(height));
+  const boundedTileSize = Math.max(1, Math.floor(tileCssSize));
+  const tiles: PdfTile[] = [];
+
+  for (let y = 0; y < boundedHeight; y += boundedTileSize) {
+    for (let x = 0; x < boundedWidth; x += boundedTileSize) {
+      tiles.push({
+        x,
+        y,
+        width: Math.min(boundedTileSize, boundedWidth - x),
+        height: Math.min(boundedTileSize, boundedHeight - y),
+      });
+    }
+  }
+
+  return tiles;
 };
