@@ -23,6 +23,10 @@ test('getSafePixelRatio lowers requested ratio to stay within canvas dimension l
   assert.equal(Number(ratio.toFixed(3)), 1.82);
 });
 
+test('getSafePixelRatio supports explicit lower requested image ratios', () => {
+  assert.equal(getSafePixelRatio(2000, 1200, 2), 2);
+});
+
 test('isCanvasLimited detects exports that cannot safely render at 1x', () => {
   assert.equal(isCanvasLimited(17000, 1000), true);
   assert.equal(isCanvasLimited(16000, 1000), false);

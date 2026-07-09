@@ -199,12 +199,11 @@ export function useExportDiagram(diagramName: string) {
       (opts) =>
         exportImageDiagram({
           filename: `${diagramName}.jpg`,
-          opts,
-          format: 'jpg',
-          mimeType: 'image/jpeg',
-          quality: 0.95,
-          progress,
-          getHtmlToImageModule,
+        opts,
+        format: 'jpg',
+        mimeType: 'image/jpeg',
+        progress,
+        getHtmlToImageModule,
           getFontEmbedCss,
         }),
       handleImageExportSuccess,

@@ -1,4 +1,5 @@
 import {
+  DEFAULT_EXPORT_QUALITY_PROFILE,
   buildRenderConfig,
   convertSvgDataUrlToBlob,
   downloadBlobFile,
@@ -65,7 +66,13 @@ export const exportImageDiagram = async ({
   getFontEmbedCss,
 }: ImageExportExecutionOptions): Promise<ImageExportResult> => {
   const backgroundColor = getExportBackgroundColor();
-  const pixelRatio = getSafePixelRatio(opts.imageWidth, opts.imageHeight);
+  const pixelRatio = getSafePixelRatio(
+    opts.imageWidth,
+    opts.imageHeight,
+    DEFAULT_EXPORT_QUALITY_PROFILE.imagePixelRatio,
+  );
+  const renderQuality =
+    format === 'jpg' ? quality ?? DEFAULT_EXPORT_QUALITY_PROFILE.jpegQuality : undefined;
   await progress.updateExportProgress({
     format,
     stage: 'preparing',
@@ -91,6 +98,8 @@ export const exportImageDiagram = async ({
       width: opts.imageWidth,
       height: opts.imageHeight,
       pixelRatio,
+      quality: renderQuality,
+      type: mimeType,
     }),
   );
 
@@ -101,7 +110,7 @@ export const exportImageDiagram = async ({
     detailKey: 'erd.export.progress.encodingImage',
     yieldAfter: true,
   });
-  const blob = await renderCanvasBlob(canvas, mimeType, quality);
+  const blob = await renderCanvasBlob(canvas, mimeType, renderQuality);
 
   await progress.updateExportProgress({
     format,
