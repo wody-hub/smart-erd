@@ -1950,6 +1950,7 @@
         "preparingDiagram": "다이어그램 범위와 화면 상태를 확인하고 있습니다.",
         "loadingResources": "폰트와 렌더링 리소스를 준비하고 있습니다.",
         "renderingDiagram": "현재 보이는 캔버스를 export용 이미지로 렌더링하고 있습니다.",
+        "renderingTile": "고해상도 PDF 조각을 렌더링하는 중입니다. ({{current}}/{{total}})",
         "encodingImage": "이미지 파일 형식으로 변환하고 있습니다.",
         "encodingSvg": "SVG 파일 데이터를 정리하고 있습니다.",
         "assemblingPdf": "렌더링된 이미지를 PDF 페이지에 배치하고 있습니다.",

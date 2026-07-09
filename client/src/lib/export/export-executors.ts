@@ -239,7 +239,8 @@ export const exportPdfDiagram = async ({
       format,
       stage: 'rendering',
       stageKey: 'erd.export.progress.rendering',
-      detailKey: 'erd.export.progress.renderingDiagram',
+      detailKey: 'erd.export.progress.renderingTile',
+      detailValues: { current: index + 1, total: tiles.length },
       progressPercent: Math.round(((index + 1) / tiles.length) * 80),
       yieldAfter: true,
     });

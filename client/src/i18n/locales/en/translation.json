@@ -1952,6 +1952,7 @@
         "preparingDiagram": "Checking diagram bounds and the current viewport state.",
         "loadingResources": "Loading fonts and rendering resources.",
         "renderingDiagram": "Rendering the current diagram into an exportable image.",
+        "renderingTile": "Rendering high-resolution PDF tile {{current}}/{{total}}.",
         "encodingImage": "Encoding the rendered canvas into an image file.",
         "encodingSvg": "Finalizing SVG file data.",
         "assemblingPdf": "Placing rendered images into PDF pages.",
