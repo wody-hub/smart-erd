@@ -1,9 +1,14 @@
-import type { CaptureOptions, RenderConfigOptions } from './export-types';
+import type { CaptureOptions, ExportQualityProfile, RenderConfigOptions } from './export-types';
 
 /** 브라우저 캔버스 단일 축 최대 크기 (html-to-image 내부 제한과 동일) */
 const MAX_CANVAS_DIMENSION = 16384;
-/** 기본 목표 해상도 배율 */
-const TARGET_PIXEL_RATIO = 2;
+/** High quality default: slower exports are acceptable for readable ERD documents. */
+export const DEFAULT_EXPORT_QUALITY_PROFILE: ExportQualityProfile = {
+  imagePixelRatio: 4,
+  pdfPixelRatio: 3,
+  jpegQuality: 1,
+  tileCssSize: 4096,
+};
 /** Blob URL 정리 지연 시간(ms) */
 const OBJECT_URL_REVOKE_DELAY_MS = 1000;
 /** 디자인 토큰 기반 export 배경색 fallback */
@@ -40,12 +45,18 @@ export const getCaptureStyle = (opts: CaptureOptions, offsetX = 0, offsetY = 0) 
 });
 
 /** 대상 크기에서 사용할 안전한 픽셀 비율을 계산한다. */
-export const getSafePixelRatio = (width: number, height: number): number => {
+export const getSafePixelRatio = (
+  width: number,
+  height: number,
+  requestedPixelRatio = DEFAULT_EXPORT_QUALITY_PROFILE.imagePixelRatio,
+): number => {
   const maxRatio = Math.min(
     MAX_CANVAS_DIMENSION / Math.max(1, width),
     MAX_CANVAS_DIMENSION / Math.max(1, height),
   );
-  const ratio = Math.min(TARGET_PIXEL_RATIO, maxRatio);
+  const normalizedRatio =
+    Number.isFinite(requestedPixelRatio) && requestedPixelRatio > 0 ? requestedPixelRatio : 1;
+  const ratio = Math.min(normalizedRatio, maxRatio);
   return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
 };
 

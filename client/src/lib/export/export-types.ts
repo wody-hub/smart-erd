@@ -13,6 +13,18 @@ export type ExportProgressStage =
   | 'downloading'
   | 'failed';
 
+/** Export quality knobs shared by image and PDF renderers. */
+export interface ExportQualityProfile {
+  /** PNG/JPG capture pixel ratio. Higher is sharper but slower. */
+  imagePixelRatio: number;
+  /** PDF capture pixel ratio before tile/page constraints. */
+  pdfPixelRatio: number;
+  /** JPEG quality passed to canvas.toBlob. */
+  jpegQuality: number;
+  /** Maximum tile side length in CSS px before pixel ratio is applied. */
+  tileCssSize: number;
+}
+
 /** 현재 export 진행 상태 */
 export interface ExportProgressState {
   /** export 진행 여부 */
