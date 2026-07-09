@@ -544,6 +544,7 @@ export default function DiagramPage() {
                             activeGroupTableIds={activeGroupTableIds}
                             codeEditorActive={leftPanel === 'code'}
                             onToggleCodeEditor={handleToggleCodeEditor}
+                            onPersistLayout={persistPublishedDiagramNow}
                             isSidebarResizing={isSidebarResizing}
                             onExportTableDefinition={handleExportTableDefinition}
                             onExportColumnDefinition={handleExportColumnDefinition}

@@ -150,6 +150,8 @@ interface ERDCanvasProps {
   codeEditorActive?: boolean;
   /** 코드 에디터 토글 핸들러 */
   onToggleCodeEditor?: () => void;
+  /** 자동정렬 적용 후 서버 저장을 실행하는 핸들러 */
+  onPersistLayout?: () => Promise<boolean>;
   /** 사이드바 리사이즈 진행 여부 (성능 최적화용) */
   isSidebarResizing?: boolean;
   /** 활성 그룹 ID (null이면 전체 보기) */
@@ -209,6 +211,7 @@ function ERDCanvas({
   canEdit = true,
   codeEditorActive,
   onToggleCodeEditor,
+  onPersistLayout,
   isSidebarResizing = false,
   activeGroupId,
   activeGroupName,
@@ -814,12 +817,15 @@ function ERDCanvas({
       return;
     }
 
-    applyActions.applyLayout(result.nodes);
+    const appliedStatus = applyActions.applyLayout(result.nodes);
     requestAnimationFrame(() => {
       edgeActions.normalizeEdgeHandles(undefined, 'layout', {
         nodeOverrides: reactFlowInstance.getNodes() as Node<TableNodeData>[],
         origin: CANVAS_HISTORY_ORIGIN.USER_LAYOUT,
       });
+      if (appliedStatus === 'applied') {
+        void onPersistLayout?.();
+      }
     });
   };
 

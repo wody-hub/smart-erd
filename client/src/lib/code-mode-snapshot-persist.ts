@@ -19,6 +19,7 @@ const PREVIEW_POSITION_PERSIST_ORIGIN_TYPE = 'canvas-user-drag';
 export function shouldScheduleCodeModeSnapshotPersist(origin: unknown): boolean {
   return (
     origin === SHARED_SCHEMA_DRAFT_ORIGIN ||
+    origin === 'canvas-user-layout' ||
     (typeof origin === 'object' &&
       origin !== null &&
       'type' in origin &&

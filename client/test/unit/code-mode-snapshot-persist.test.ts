@@ -11,11 +11,14 @@ test('shouldScheduleCodeModeSnapshotPersist 는 preview drag persisted 위치 �
   assert.equal(shouldScheduleCodeModeSnapshotPersist({ type: 'canvas-user-drag' }), true);
 });
 
+test('shouldScheduleCodeModeSnapshotPersist 는 자동정렬 persisted 위치 반영을 저장 대상으로 본다', () => {
+  assert.equal(shouldScheduleCodeModeSnapshotPersist('canvas-user-layout'), true);
+});
+
 test('shouldScheduleCodeModeSnapshotPersist 는 일반 persisted 편집 origin 은 제외한다', () => {
   assert.equal(shouldScheduleCodeModeSnapshotPersist('canvas-user-table'), false);
   assert.equal(shouldScheduleCodeModeSnapshotPersist('canvas-user-column'), false);
   assert.equal(shouldScheduleCodeModeSnapshotPersist('canvas-user-edge'), false);
-  assert.equal(shouldScheduleCodeModeSnapshotPersist('canvas-user-layout'), false);
 });
 
 test('shouldScheduleCodeModeSnapshotPersist 는 remote/system/origin 없음 을 제외한다', () => {
