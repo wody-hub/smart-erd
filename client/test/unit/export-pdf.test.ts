@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   PDF_MAX_PAGE_DIMENSION,
   buildPdfTilePlan,
+  getPdfTilePlacement,
   getSinglePagePdfLayout,
   getSinglePagePdfPixelRatio,
 } from '../../src/lib/export/export-pdf.js';
@@ -46,4 +47,16 @@ test('buildPdfTilePlan splits wide and tall diagrams into bounded tiles', () => 
     { x: 4096, y: 4096, width: 4096, height: 904 },
     { x: 8192, y: 4096, width: 808, height: 904 },
   ]);
+});
+
+test('getPdfTilePlacement maps tile css coordinates into scaled PDF coordinates', () => {
+  assert.deepEqual(
+    getPdfTilePlacement(
+      { x: 4096, y: 2048, width: 1024, height: 512 },
+      { pageWidth: 5000, pageHeight: 2500 },
+      10000,
+      5000,
+    ),
+    { x: 2048, y: 1024, width: 512, height: 256 },
+  );
 });

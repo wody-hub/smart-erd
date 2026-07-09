@@ -7,7 +7,7 @@ import {
   getSafePixelRatio,
   renderCanvasBlob,
 } from './export-core';
-import { getSinglePagePdfLayout, getSinglePagePdfPixelRatio } from './export-pdf';
+import { buildPdfTilePlan, getPdfTilePlacement, getSinglePagePdfLayout } from './export-pdf';
 import type { CaptureOptions, ExportFormat, ExportProgressController } from './export-types';
 
 /** export 실행에 필요한 공통 의존성 */
@@ -50,7 +50,7 @@ interface PdfExportExecutionOptions extends SharedExportExecutionOptions {
 
 /** PDF export 결과 */
 export interface PdfExportResult {
-  /** 호환용 타일 PDF 페이지 수. 단일 페이지 고정 정책에서는 항상 0 */
+  /** 타일 렌더링으로 처리한 경우 렌더링 타일 수 */
   tiledPageCount: number;
 }
 
@@ -183,7 +183,7 @@ export const exportSvgDiagram = async ({
   downloadBlobFile(blob, filename);
 };
 
-/** PDF 포맷으로 다이어그램을 내보낸다. PNG로 캡처 후 jsPDF로 변환한다. */
+/** PDF 포맷으로 다이어그램을 고해상도 타일로 내보낸다. */
 export const exportPdfDiagram = async ({
   filename,
   opts,
@@ -206,27 +206,17 @@ export const exportPdfDiagram = async ({
     getJsPdfModule(),
     getFontEmbedCss(opts.viewportEl),
   ]);
-  const renderPixelRatio = getSinglePagePdfPixelRatio(
+  const layout = getSinglePagePdfLayout(opts.imageWidth, opts.imageHeight);
+  const { pageWidth, pageHeight } = layout;
+  const tiles = buildPdfTilePlan(
     opts.imageWidth,
     opts.imageHeight,
-    getSafePixelRatio(opts.imageWidth, opts.imageHeight),
+    DEFAULT_EXPORT_QUALITY_PROFILE.tileCssSize,
   );
-  const { pageWidth, pageHeight } = getSinglePagePdfLayout(opts.imageWidth, opts.imageHeight);
-
-  await progress.updateExportProgress({
-    format,
-    stage: 'rendering',
-    stageKey: 'erd.export.progress.rendering',
-    detailKey: 'erd.export.progress.renderingDiagram',
-    yieldAfter: true,
-  });
-  const canvas = await toCanvas(
-    opts.viewportEl,
-    buildRenderConfig(opts, backgroundColor, fontEmbedCSS, {
-      width: opts.imageWidth,
-      height: opts.imageHeight,
-      pixelRatio: renderPixelRatio,
-    }),
+  const tilePixelRatio = getSafePixelRatio(
+    Math.min(opts.imageWidth, DEFAULT_EXPORT_QUALITY_PROFILE.tileCssSize),
+    Math.min(opts.imageHeight, DEFAULT_EXPORT_QUALITY_PROFILE.tileCssSize),
+    DEFAULT_EXPORT_QUALITY_PROFILE.pdfPixelRatio,
   );
 
   await progress.updateExportProgress({
@@ -243,7 +233,38 @@ export const exportPdfDiagram = async ({
     format: [pageWidth, pageHeight],
     compress: true,
   });
-  doc.addImage(canvas, 'PNG', 0, 0, pageWidth, pageHeight);
+
+  for (const [index, tile] of tiles.entries()) {
+    await progress.updateExportProgress({
+      format,
+      stage: 'rendering',
+      stageKey: 'erd.export.progress.rendering',
+      detailKey: 'erd.export.progress.renderingDiagram',
+      progressPercent: Math.round(((index + 1) / tiles.length) * 80),
+      yieldAfter: true,
+    });
+
+    const canvas = await toCanvas(
+      opts.viewportEl,
+      buildRenderConfig(opts, backgroundColor, fontEmbedCSS, {
+        width: tile.width,
+        height: tile.height,
+        offsetX: tile.x,
+        offsetY: tile.y,
+        pixelRatio: tilePixelRatio,
+        type: 'image/png',
+      }),
+    );
+    const placement = getPdfTilePlacement(tile, layout, opts.imageWidth, opts.imageHeight);
+    doc.addImage(
+      canvas.toDataURL('image/png'),
+      'PNG',
+      placement.x,
+      placement.y,
+      placement.width,
+      placement.height,
+    );
+  }
 
   await progress.updateExportProgress({
     format,
@@ -253,5 +274,5 @@ export const exportPdfDiagram = async ({
     yieldAfter: true,
   });
   doc.save(filename);
-  return { tiledPageCount: 0 };
+  return { tiledPageCount: tiles.length > 1 ? tiles.length : 0 };
 };

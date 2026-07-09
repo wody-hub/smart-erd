@@ -19,6 +19,14 @@ export interface PdfTile {
   height: number;
 }
 
+/** PDF 페이지에 삽입할 타일 배치 좌표 */
+export interface PdfTilePlacement {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /** 단일 페이지 PDF에 맞는 페이지 크기를 계산한다. */
 export const getSinglePagePdfLayout = (width: number, height: number): SinglePagePdfLayout => {
   const boundedWidth = Math.max(1, width);
@@ -75,4 +83,22 @@ export const buildPdfTilePlan = (width: number, height: number, tileCssSize: num
   }
 
   return tiles;
+};
+
+/** CSS 좌표계 타일을 축소/확대된 PDF 페이지 좌표계로 변환한다. */
+export const getPdfTilePlacement = (
+  tile: PdfTile,
+  layout: SinglePagePdfLayout,
+  imageWidth: number,
+  imageHeight: number,
+): PdfTilePlacement => {
+  const scaleX = layout.pageWidth / Math.max(1, imageWidth);
+  const scaleY = layout.pageHeight / Math.max(1, imageHeight);
+
+  return {
+    x: tile.x * scaleX,
+    y: tile.y * scaleY,
+    width: tile.width * scaleX,
+    height: tile.height * scaleY,
+  };
 };
