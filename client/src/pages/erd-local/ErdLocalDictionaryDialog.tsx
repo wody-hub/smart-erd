@@ -23,7 +23,7 @@ import ConfirmDialog from '@/components/ui/confirm-dialog';
 import DomainFormDialog from '@/components/dictionary/DomainFormDialog';
 import WordFormDialog from '@/components/dictionary/WordFormDialog';
 import { parseErdLocalDictionaryFile } from '@/lib/erd-local-dictionary-storage';
-import { useErdLocalDictionary } from './useErdLocalDictionary';
+import { useErdLocalDictionaryStore } from './ErdLocalDictionaryProvider';
 import { ErdLocalTermDialog } from './ErdLocalTermDialog';
 import type {
   Domain,
@@ -64,8 +64,8 @@ interface ErdLocalDictionaryDialogProps {
 /**
  * ERD 로컬 모드용 사전 관리 다이얼로그.
  *
- * `ErdLocalDictionaryProvider` 안에서 렌더링되며 `useErdLocalDictionary()`를
- * 직접 사용한다. 도메인/용어/단어 탭별 목록·추가/수정/삭제와
+ * `ErdLocalDictionaryProvider` 안에서 렌더링되며 Provider의 단일 스토어를
+ * `useErdLocalDictionaryStore()`로 공유한다. 도메인/용어/단어 탭별 목록·추가/수정/삭제와
  * 사전 파일 저장/열기를 제공한다.
  *
  * @param props.open 열림 상태
@@ -74,7 +74,7 @@ interface ErdLocalDictionaryDialogProps {
  */
 export function ErdLocalDictionaryDialog({ open, onOpenChange }: ErdLocalDictionaryDialogProps) {
   const { t } = useTranslation();
-  const store = useErdLocalDictionary();
+  const store = useErdLocalDictionaryStore();
 
   /** 도메인 폼 열림 여부 */
   const [domainFormOpen, setDomainFormOpen] = useState(false);

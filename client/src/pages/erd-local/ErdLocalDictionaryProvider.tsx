@@ -1,10 +1,34 @@
-import { useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { ErdDictionaryContext } from '@/components/erd/ErdDictionaryContext';
 import { buildErdDictionaryView } from '@/components/erd/erdDictionaryData';
-import { useErdLocalDictionary } from './useErdLocalDictionary';
+import { useErdLocalDictionary, type ErdLocalDictionaryStore } from './useErdLocalDictionary';
 
 /** 로컬 사전 스코프 식별자 (context teamId/setId 자리표시자). */
 export const ERD_LOCAL_DICTIONARY_SCOPE_ID = 'local';
+
+/**
+ * Provider가 생성한 단일 사전 스토어를 공유하는 내부 컨텍스트.
+ *
+ * 다이얼로그와 캔버스가 별개 `useState` 인스턴스를 만들지 않도록
+ * 스토어 객체 전체를 값으로 제공한다.
+ */
+const ErdLocalStoreContext = createContext<ErdLocalDictionaryStore | null>(null);
+
+/**
+ * Provider 내부의 단일 사전 스토어를 반환한다.
+ *
+ * `ErdLocalDictionaryProvider` 서브트리 안에서만 호출해야 하며,
+ * 외부에서 호출하면 에러를 던진다.
+ *
+ * @returns 단일 사전 스토어 객체
+ */
+export function useErdLocalDictionaryStore(): ErdLocalDictionaryStore {
+  const store = useContext(ErdLocalStoreContext);
+  if (store === null) {
+    throw new Error('useErdLocalDictionaryStore must be used within ErdLocalDictionaryProvider');
+  }
+  return store;
+}
 
 /** ErdLocalDictionaryProvider props. */
 interface ErdLocalDictionaryProviderProps {
@@ -45,5 +69,9 @@ export function ErdLocalDictionaryProvider({ children }: ErdLocalDictionaryProvi
     [store, view],
   );
 
-  return <ErdDictionaryContext.Provider value={value}>{children}</ErdDictionaryContext.Provider>;
+  return (
+    <ErdLocalStoreContext.Provider value={store}>
+      <ErdDictionaryContext.Provider value={value}>{children}</ErdDictionaryContext.Provider>
+    </ErdLocalStoreContext.Provider>
+  );
 }

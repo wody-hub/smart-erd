@@ -61,53 +61,53 @@ export default function ErdLocalPage() {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground">
-      <header className="flex items-center gap-2 border-b border-border bg-card px-4 py-2">
-        <Button variant="ghost" size="sm" onClick={() => navigate(ROUTES.GUIDE)}>
-          {t('erdLocal.backToGuide')}
-        </Button>
-        <h1 className="text-sm font-semibold">{t('erdLocal.title')}</h1>
-        <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={exportFile}>
-            {t('erdLocal.saveFile')}
+    <ErdLocalDictionaryProvider>
+      <div className="flex h-screen flex-col bg-background text-foreground">
+        <header className="flex items-center gap-2 border-b border-border bg-card px-4 py-2">
+          <Button variant="ghost" size="sm" onClick={() => navigate(ROUTES.GUIDE)}>
+            {t('erdLocal.backToGuide')}
           </Button>
-          <Button variant="outline" size="sm" onClick={handleOpenFileClick}>
-            {t('erdLocal.openFile')}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setDictionaryOpen(true)}>
-            {t('erdLocalDictionary.manage')}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
-            {t('erdLocal.reset')}
-          </Button>
-        </div>
-      </header>
-      <div className="relative flex-1">
-        <ReactFlowProvider>
-          <ErdLocalDictionaryProvider>
+          <h1 className="text-sm font-semibold">{t('erdLocal.title')}</h1>
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={exportFile}>
+              {t('erdLocal.saveFile')}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleOpenFileClick}>
+              {t('erdLocal.openFile')}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setDictionaryOpen(true)}>
+              {t('erdLocalDictionary.manage')}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
+              {t('erdLocal.reset')}
+            </Button>
+          </div>
+        </header>
+        <div className="relative flex-1">
+          <ReactFlowProvider>
             <ErdPermissionProvider canEdit>
               <ERDCanvas diagramName="erd-local" />
             </ErdPermissionProvider>
-          </ErdLocalDictionaryProvider>
-        </ReactFlowProvider>
+          </ReactFlowProvider>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ERD_LOCAL_FILE_ACCEPT}
+          className="hidden"
+          aria-label={t('erdLocal.openFile')}
+          onChange={handleFileChange}
+        />
+        <ErdLocalDictionaryDialog open={dictionaryOpen} onOpenChange={setDictionaryOpen} />
+        <ConfirmDialog
+          open={resetOpen}
+          onOpenChange={setResetOpen}
+          title={t('erdLocal.resetTitle')}
+          description={t('erdLocal.resetDescription')}
+          confirmLabel={t('erdLocal.reset')}
+          onConfirm={handleConfirmReset}
+        />
       </div>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={ERD_LOCAL_FILE_ACCEPT}
-        className="hidden"
-        aria-label={t('erdLocal.openFile')}
-        onChange={handleFileChange}
-      />
-      <ErdLocalDictionaryDialog open={dictionaryOpen} onOpenChange={setDictionaryOpen} />
-      <ConfirmDialog
-        open={resetOpen}
-        onOpenChange={setResetOpen}
-        title={t('erdLocal.resetTitle')}
-        description={t('erdLocal.resetDescription')}
-        confirmLabel={t('erdLocal.reset')}
-        onConfirm={handleConfirmReset}
-      />
-    </div>
+    </ErdLocalDictionaryProvider>
   );
 }
