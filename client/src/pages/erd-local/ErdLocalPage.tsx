@@ -1,12 +1,14 @@
-import { useRef, useState } from 'react';
+import { Suspense, lazy, useRef, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import ERDCanvas from '@/components/erd/ERDCanvas';
+import DiagramSidebar from '@/components/erd/DiagramSidebar';
 import { ErdPermissionProvider } from '@/components/erd/ErdPermissionContext';
 import { Button } from '@/components/ui/button';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
+import Spinner from '@/components/ui/spinner';
 import { ROUTES } from '@/constants/routes';
 import { useErdLocalPersistence } from './useErdLocalPersistence';
 import { ErdLocalDictionaryProvider } from './ErdLocalDictionaryProvider';
@@ -14,6 +16,11 @@ import { ErdLocalDictionaryDialog } from './ErdLocalDictionaryDialog';
 
 /** 파일 입력 accept 속성값. */
 const ERD_LOCAL_FILE_ACCEPT = '.json,application/json';
+/** 좌측 패널 모드. */
+type ErdLocalLeftPanel = 'sidebar' | 'code';
+
+/** DDL 코드 에디터 (monaco 무게로 lazy 로드). */
+const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPanel'));
 
 /**
  * 로그인 불필요 ERD 단독 편집 페이지.
@@ -30,6 +37,8 @@ export default function ErdLocalPage() {
   const [resetOpen, setResetOpen] = useState(false);
   /** 로컬 사전 관리 다이얼로그 열림 여부 */
   const [dictionaryOpen, setDictionaryOpen] = useState(false);
+  /** 좌측 패널 모드 (테이블 목록 | 코드 에디터) */
+  const [leftPanel, setLeftPanel] = useState<ErdLocalLeftPanel>('sidebar');
   /** 숨겨진 파일 입력 참조 */
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { exportFile, importFileText, resetAll } = useErdLocalPersistence();
@@ -64,6 +73,11 @@ export default function ErdLocalPage() {
     setResetOpen(false);
   };
 
+  /** 코드 에디터와 사이드바 표시를 전환한다. */
+  const handleToggleCodeEditor = () => {
+    setLeftPanel((prev) => (prev === 'code' ? 'sidebar' : 'code'));
+  };
+
   return (
     <ErdLocalDictionaryProvider>
       <div className="flex h-screen flex-col bg-background text-foreground">
@@ -87,12 +101,27 @@ export default function ErdLocalPage() {
             </Button>
           </div>
         </header>
-        <div className="relative flex-1">
-          <ReactFlowProvider>
-            <ErdPermissionProvider canEdit>
-              <ERDCanvas diagramName="erd-local" />
-            </ErdPermissionProvider>
-          </ReactFlowProvider>
+        <div className="flex min-h-0 flex-1">
+          <div className="h-full w-56 shrink-0 border-r border-border bg-card">
+            {leftPanel === 'sidebar' ? (
+              <DiagramSidebar canEdit />
+            ) : (
+              <Suspense fallback={<Spinner />}>
+                <DdlCodeEditorPanel canEdit />
+              </Suspense>
+            )}
+          </div>
+          <div className="relative min-w-0 flex-1">
+            <ReactFlowProvider>
+              <ErdPermissionProvider canEdit>
+                <ERDCanvas
+                  diagramName="erd-local"
+                  codeEditorActive={leftPanel === 'code'}
+                  onToggleCodeEditor={handleToggleCodeEditor}
+                />
+              </ErdPermissionProvider>
+            </ReactFlowProvider>
+          </div>
         </div>
         <input
           ref={fileInputRef}
