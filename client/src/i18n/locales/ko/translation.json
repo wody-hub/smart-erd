@@ -2885,6 +2885,8 @@
   },
   "erdLocal": {
     "title": "ERD 로컬 편집",
+    "panelTables": "테이블",
+    "panelCode": "코드",
     "backToGuide": "가이드로 돌아가기",
     "saveFile": "파일로 저장",
     "openFile": "파일 열기",

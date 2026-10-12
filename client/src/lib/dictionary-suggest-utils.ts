@@ -12,7 +12,7 @@ import type { SuggestResponse } from '@/types/dictionary';
  * @returns 힌트 텍스트 문자열 또는 null
  */
 export function buildSuggestHintText(
-  suggestion: SuggestResponse | undefined,
+  suggestion: SuggestResponse | null | undefined,
   t: TFunction,
 ): string | null {
   if (!suggestion?.matches || suggestion.matches.length === 0) {

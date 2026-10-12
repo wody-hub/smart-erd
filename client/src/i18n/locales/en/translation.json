@@ -2887,6 +2887,8 @@
   },
   "erdLocal": {
     "title": "Local ERD Editor",
+    "panelTables": "Tables",
+    "panelCode": "Code",
     "backToGuide": "Back to guide",
     "saveFile": "Save to file",
     "openFile": "Open file",

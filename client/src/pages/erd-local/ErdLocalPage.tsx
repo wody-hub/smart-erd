@@ -9,6 +9,7 @@ import { ErdPermissionProvider } from '@/components/erd/ErdPermissionContext';
 import { Button } from '@/components/ui/button';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import Spinner from '@/components/ui/spinner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ROUTES } from '@/constants/routes';
 import { useErdLocalPersistence } from './useErdLocalPersistence';
 import { ErdLocalDictionaryProvider } from './ErdLocalDictionaryProvider';
@@ -73,11 +74,6 @@ export default function ErdLocalPage() {
     setResetOpen(false);
   };
 
-  /** 코드 에디터와 사이드바 표시를 전환한다. */
-  const handleToggleCodeEditor = () => {
-    setLeftPanel((prev) => (prev === 'code' ? 'sidebar' : 'code'));
-  };
-
   return (
     <ErdLocalDictionaryProvider>
       <div className="flex h-screen flex-col bg-background text-foreground">
@@ -102,26 +98,41 @@ export default function ErdLocalPage() {
           </div>
         </header>
         <div className="flex min-h-0 flex-1">
-          <div className="h-full w-56 shrink-0 border-r border-border bg-card">
-            {leftPanel === 'sidebar' ? (
-              <DiagramSidebar canEdit />
-            ) : (
-              <Suspense fallback={<Spinner />}>
-                <DdlCodeEditorPanel canEdit />
-              </Suspense>
-            )}
-          </div>
-          <div className="relative min-w-0 flex-1">
-            <ReactFlowProvider>
+          <ReactFlowProvider>
+            <div className="h-full w-56 shrink-0 border-r border-border bg-card">
+              <Tabs
+                value={leftPanel}
+                onValueChange={(value) => {
+                  if (value === 'sidebar' || value === 'code') {
+                    setLeftPanel(value);
+                  }
+                }}
+                className="flex h-full min-h-0 flex-col"
+              >
+                <TabsList className="mx-3 mt-3 h-9 w-fit sm:w-fit sm:justify-start">
+                  <TabsTrigger value="sidebar" className="px-3 py-1.5 text-xs">
+                    {t('erdLocal.panelTables')}
+                  </TabsTrigger>
+                  <TabsTrigger value="code" className="px-3 py-1.5 text-xs">
+                    {t('erdLocal.panelCode')}
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="sidebar" className="mt-0 min-h-0 flex-1 overflow-hidden">
+                  <DiagramSidebar canEdit />
+                </TabsContent>
+                <TabsContent value="code" className="mt-0 min-h-0 flex-1 overflow-hidden">
+                  <Suspense fallback={<Spinner />}>
+                    <DdlCodeEditorPanel canEdit />
+                  </Suspense>
+                </TabsContent>
+              </Tabs>
+            </div>
+            <div className="relative min-w-0 flex-1">
               <ErdPermissionProvider canEdit>
-                <ERDCanvas
-                  diagramName="erd-local"
-                  codeEditorActive={leftPanel === 'code'}
-                  onToggleCodeEditor={handleToggleCodeEditor}
-                />
+                <ERDCanvas diagramName="erd-local" />
               </ErdPermissionProvider>
-            </ReactFlowProvider>
-          </div>
+            </div>
+          </ReactFlowProvider>
         </div>
         <input
           ref={fileInputRef}
