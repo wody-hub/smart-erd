@@ -23,7 +23,9 @@ export interface ErdLocalDictionaryFile {
  * @param storage 읽기 대상 스토리지
  * @returns 저장된 사전, 없거나 손상됐으면 null
  */
-export function readErdLocalDictionary(storage: ErdLocalStorageLike): ErdLocalDictionaryFile | null {
+export function readErdLocalDictionary(
+  storage: ErdLocalStorageLike,
+): ErdLocalDictionaryFile | null {
   const raw = storage.getItem(STORAGE_KEYS.ERD_LOCAL_DICTIONARY);
   if (raw === null) {
     return null;
