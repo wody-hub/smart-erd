@@ -262,3 +262,24 @@ export interface SuggestMatch {
   /** 매칭 출처 설명 */
   source: string | null;
 }
+
+/**
+ * 로컬 사전 쓰기 어댑터 (서버 없는 ERD 로컬 모드용).
+ *
+ * Quick 다이얼로그가 context에서 이 값을 받으면 서버 API 대신 로컬 저장소에 쓴다.
+ */
+export interface ErdDictionaryLocalWriter {
+  /** 로컬 용어를 생성한다 (음수 id 발급). */
+  createTerm: (data: TermFormData) => Term;
+  /** 로컬 도메인을 생성한다 (음수 id 발급). */
+  createDomain: (data: DomainFormData) => Domain;
+  /** 로컬 단어를 생성한다 (음수 id 발급). */
+  createWord: (data: WordFormData) => Word;
+  /**
+   * 키워드와 정확히 일치하는 용어를 찾아 추천 형태로 반환한다.
+   *
+   * @param keyword 검색 키워드
+   * @returns 정확히 일치하는 용어가 있으면 추천, 없으면 null
+   */
+  suggest: (keyword: string) => SuggestResponse | null;
+}

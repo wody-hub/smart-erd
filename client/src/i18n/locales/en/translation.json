@@ -2895,5 +2895,23 @@
     "resetDescription": "The current canvas and the locally saved draft will be removed.",
     "importError": "Could not load the file. Please check it is an ERD JSON file.",
     "storageFull": "Browser storage is full. Please save to a file."
+  },
+  "erdLocalDictionary": {
+    "manage": "Local dictionary",
+    "title": "Manage local dictionary",
+    "domains": "Domains",
+    "terms": "Terms",
+    "words": "Words",
+    "create": "Add",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteTitle": "Delete this entry?",
+    "deleteDescription": "Removes the selected entry from the local dictionary.",
+    "duplicateLogicalName": "This logical name is already registered.",
+    "saveFile": "Save dictionary to file",
+    "openFile": "Open dictionary file",
+    "importError": "Could not load the dictionary file. Please check it is a local dictionary JSON file.",
+    "empty": "No entries yet.",
+    "domainUnlinked": "The linked domain was cleared."
   }
 }

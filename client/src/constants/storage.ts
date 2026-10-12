@@ -32,4 +32,6 @@ export const STORAGE_KEYS = {
   AI_CHAT_CONVERSATION_PREFIX: 'smart-erd-ai-chat-conversation',
   /** 로그인 불필요 ERD 로컬 드래프트 */
   ERD_LOCAL_DRAFT: 'smart-erd-erd-local-draft',
+  /** 로그인 불필요 ERD 로컬 사전 */
+  ERD_LOCAL_DICTIONARY: 'smart-erd-erd-local-dictionary',
 } as const;
