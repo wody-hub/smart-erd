@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   PDF_MAX_PAGE_DIMENSION,
   buildPdfTilePlan,
+  getPdfTilePixelRatio,
   getPdfTilePlacement,
   getSinglePagePdfLayout,
   getSinglePagePdfPixelRatio,
@@ -33,9 +34,7 @@ test('getSinglePagePdfPixelRatio lowers ratio when full render area is too large
 });
 
 test('buildPdfTilePlan returns one full-size tile for small diagrams', () => {
-  assert.deepEqual(buildPdfTilePlan(1200, 800, 4096), [
-    { x: 0, y: 0, width: 1200, height: 800 },
-  ]);
+  assert.deepEqual(buildPdfTilePlan(1200, 800, 4096), [{ x: 0, y: 0, width: 1200, height: 800 }]);
 });
 
 test('buildPdfTilePlan splits wide and tall diagrams into bounded tiles', () => {
@@ -59,4 +58,15 @@ test('getPdfTilePlacement maps tile css coordinates into scaled PDF coordinates'
     ),
     { x: 2048, y: 1024, width: 512, height: 256 },
   );
+});
+
+test('getPdfTilePixelRatio caps square tile area below browser-heavy canvas size', () => {
+  const pixelRatio = getPdfTilePixelRatio(4096, 4096, 3);
+
+  assert.ok(pixelRatio > 1.99);
+  assert.ok(pixelRatio < 2);
+});
+
+test('getPdfTilePixelRatio preserves requested ratio for narrow tiles', () => {
+  assert.equal(getPdfTilePixelRatio(4096, 1000, 3), 3);
 });

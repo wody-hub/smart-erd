@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { EXPORT_QUALITY_PRESETS } from '../../src/lib/export/export-core.js';
 import { exportImageDiagram, exportPdfDiagram } from '../../src/lib/export/export-executors.js';
 import type {
   CaptureOptions,
@@ -16,7 +17,7 @@ const createProgressStub = (): ExportProgressController => ({
   resetExportProgress: () => undefined,
 });
 
-test('exportImageDiagram renders JPG with high quality image options', async () => {
+test('exportImageDiagram renders JPG with selected balanced quality options', async () => {
   const originalDocument = globalThis.document;
   const originalGetComputedStyle = globalThis.getComputedStyle;
   const originalWindow = globalThis.window;
@@ -61,6 +62,7 @@ test('exportImageDiagram renders JPG with high quality image options', async () 
       } satisfies CaptureOptions,
       format: 'jpg',
       mimeType: 'image/jpeg',
+      qualityProfile: EXPORT_QUALITY_PRESETS.balanced,
       progress: createProgressStub(),
       getHtmlToImageModule: async () =>
         ({
@@ -70,11 +72,7 @@ test('exportImageDiagram renders JPG with high quality image options', async () 
           ) => {
             captured.renderOptions = options;
             return {
-              toBlob: (
-                callback: BlobCallback,
-                type?: string,
-                quality?: number,
-              ): void => {
+              toBlob: (callback: BlobCallback, type?: string, quality?: number): void => {
                 capturedBlobType = type;
                 capturedBlobQuality = quality;
                 callback(new Blob(['image'], { type }));
@@ -96,11 +94,11 @@ test('exportImageDiagram renders JPG with high quality image options', async () 
     assert.fail('Expected html-to-image render options to be captured.');
   }
   const renderOptions = captured.renderOptions;
-  assert.equal(renderOptions.pixelRatio, 4);
-  assert.equal(renderOptions.quality, 1);
+  assert.equal(renderOptions.pixelRatio, 3);
+  assert.equal(renderOptions.quality, 0.96);
   assert.equal(renderOptions.type, 'image/jpeg');
   assert.equal(capturedBlobType, 'image/jpeg');
-  assert.equal(capturedBlobQuality, 1);
+  assert.equal(capturedBlobQuality, 0.96);
 });
 
 test('exportPdfDiagram reports high-resolution tile progress', async () => {
@@ -176,10 +174,18 @@ test('exportPdfDiagram reports high-resolution tile progress', async () => {
     globalThis.getComputedStyle = originalGetComputedStyle;
   }
 
-  assert.deepEqual(renderOptions.map(({ width, height, pixelRatio, type }) => ({ width, height, pixelRatio, type })), [
-    { width: 4096, height: 1000, pixelRatio: 3, type: 'image/png' },
-    { width: 904, height: 1000, pixelRatio: 3, type: 'image/png' },
-  ]);
+  assert.deepEqual(
+    renderOptions.map(({ width, height, pixelRatio, type }) => ({
+      width,
+      height,
+      pixelRatio,
+      type,
+    })),
+    [
+      { width: 4096, height: 1000, pixelRatio: 3, type: 'image/png' },
+      { width: 904, height: 1000, pixelRatio: 3, type: 'image/png' },
+    ],
+  );
   assert.match(renderOptions[0]?.style?.transform ?? '', /translate\(0px, 0px\)/);
   assert.match(renderOptions[1]?.style?.transform ?? '', /translate\(-4096px, 0px\)/);
   assert.equal(saved.imageCount, 2);
@@ -191,6 +197,149 @@ test('exportPdfDiagram reports high-resolution tile progress', async () => {
     [
       { current: 1, total: 2 },
       { current: 2, total: 2 },
+    ],
+  );
+});
+
+test('exportPdfDiagram caps square PDF tile pixel ratio to avoid blank canvases', async () => {
+  const originalDocument = globalThis.document;
+  const originalGetComputedStyle = globalThis.getComputedStyle;
+  const renderOptions: Array<{
+    width?: number;
+    height?: number;
+    pixelRatio?: number;
+    type?: string;
+  }> = [];
+
+  globalThis.getComputedStyle = (() => ({
+    getPropertyValue: () => '0 0% 100%',
+  })) as unknown as typeof globalThis.getComputedStyle;
+  globalThis.document = { documentElement: {} } as unknown as Document;
+
+  try {
+    await exportPdfDiagram({
+      filename: 'large-diagram.pdf',
+      opts: {
+        viewportEl: {} as HTMLElement,
+        imageWidth: 5000,
+        imageHeight: 5000,
+        viewport: { x: 0, y: 0, zoom: 1 },
+      } satisfies CaptureOptions,
+      progress: createProgressStub(),
+      getHtmlToImageModule: async () =>
+        ({
+          toCanvas: async (
+            _node: HTMLElement,
+            options: {
+              width?: number;
+              height?: number;
+              pixelRatio?: number;
+              type?: string;
+            },
+          ) => {
+            renderOptions.push(options);
+            return {
+              toDataURL: () => 'data:image/png;base64,AAAA',
+            } as HTMLCanvasElement;
+          },
+        }) as unknown as typeof import('html-to-image'),
+      getJsPdfModule: async () =>
+        ({
+          jsPDF: class {
+            addImage(): void {}
+            save(): void {}
+          },
+        }) as unknown as typeof import('jspdf'),
+      getFontEmbedCss: async () => '',
+    });
+  } finally {
+    globalThis.document = originalDocument;
+    globalThis.getComputedStyle = originalGetComputedStyle;
+  }
+
+  assert.deepEqual(
+    renderOptions.map(({ width, height, type }) => ({ width, height, type })),
+    [
+      { width: 4096, height: 4096, type: 'image/png' },
+      { width: 904, height: 4096, type: 'image/png' },
+      { width: 4096, height: 904, type: 'image/png' },
+      { width: 904, height: 904, type: 'image/png' },
+    ],
+  );
+  assert.ok((renderOptions[0]?.pixelRatio ?? 0) > 1.99);
+  assert.ok((renderOptions[0]?.pixelRatio ?? 0) < 2);
+  assert.equal(renderOptions[1]?.pixelRatio, 3);
+  assert.equal(renderOptions[2]?.pixelRatio, 3);
+  assert.equal(renderOptions[3]?.pixelRatio, 3);
+});
+
+test('exportPdfDiagram uses selected quality profile for PDF tiling', async () => {
+  const originalDocument = globalThis.document;
+  const originalGetComputedStyle = globalThis.getComputedStyle;
+  const renderOptions: Array<{
+    width?: number;
+    height?: number;
+    pixelRatio?: number;
+    type?: string;
+  }> = [];
+
+  globalThis.getComputedStyle = (() => ({
+    getPropertyValue: () => '0 0% 100%',
+  })) as unknown as typeof globalThis.getComputedStyle;
+  globalThis.document = { documentElement: {} } as unknown as Document;
+
+  try {
+    await exportPdfDiagram({
+      filename: 'fast-diagram.pdf',
+      opts: {
+        viewportEl: {} as HTMLElement,
+        imageWidth: 5000,
+        imageHeight: 1000,
+        viewport: { x: 0, y: 0, zoom: 1 },
+      } satisfies CaptureOptions,
+      qualityProfile: EXPORT_QUALITY_PRESETS.fast,
+      progress: createProgressStub(),
+      getHtmlToImageModule: async () =>
+        ({
+          toCanvas: async (
+            _node: HTMLElement,
+            options: {
+              width?: number;
+              height?: number;
+              pixelRatio?: number;
+              type?: string;
+            },
+          ) => {
+            renderOptions.push(options);
+            return {
+              toDataURL: () => 'data:image/png;base64,AAAA',
+            } as HTMLCanvasElement;
+          },
+        }) as unknown as typeof import('html-to-image'),
+      getJsPdfModule: async () =>
+        ({
+          jsPDF: class {
+            addImage(): void {}
+            save(): void {}
+          },
+        }) as unknown as typeof import('jspdf'),
+      getFontEmbedCss: async () => '',
+    });
+  } finally {
+    globalThis.document = originalDocument;
+    globalThis.getComputedStyle = originalGetComputedStyle;
+  }
+
+  assert.deepEqual(
+    renderOptions.map(({ width, height, pixelRatio, type }) => ({
+      width,
+      height,
+      pixelRatio,
+      type,
+    })),
+    [
+      { width: 3072, height: 1000, pixelRatio: 1.5, type: 'image/png' },
+      { width: 1928, height: 1000, pixelRatio: 1.5, type: 'image/png' },
     ],
   );
 });

@@ -1937,6 +1937,11 @@
       "failed": "Failed to export diagram",
       "inProgress": "Another export is already in progress",
       "largeDiagramHint": "This diagram is very large, so PNG/JPG quality may be limited. Use SVG or PDF for higher clarity.",
+      "quality": {
+        "fast": "Fast",
+        "balanced": "Balanced",
+        "high": "Best quality"
+      },
       "pdfTiled": "Large diagram exported as a tiled PDF ({{count}} pages)",
       "progress": {
         "preparing": "Preparing export",

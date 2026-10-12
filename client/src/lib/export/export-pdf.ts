@@ -64,6 +64,13 @@ export const getSinglePagePdfPixelRatio = (
   return Math.min(boundedSafePixelRatio, areaLimitedPixelRatio);
 };
 
+/** PDF 타일 렌더에 사용할 픽셀 비율을 계산한다. 단일 타일 canvas 면적도 제한한다. */
+export const getPdfTilePixelRatio = (
+  width: number,
+  height: number,
+  safePixelRatio: number,
+): number => getSinglePagePdfPixelRatio(width, height, safePixelRatio);
+
 /** 전체 다이어그램 영역을 제한된 크기의 PDF 렌더 타일로 나눈다. */
 export const buildPdfTilePlan = (width: number, height: number, tileCssSize: number): PdfTile[] => {
   const boundedWidth = Math.max(1, Math.ceil(width));

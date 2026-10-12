@@ -7,8 +7,18 @@ import {
   getSafePixelRatio,
   renderCanvasBlob,
 } from './export-core';
-import { buildPdfTilePlan, getPdfTilePlacement, getSinglePagePdfLayout } from './export-pdf';
-import type { CaptureOptions, ExportFormat, ExportProgressController } from './export-types';
+import {
+  buildPdfTilePlan,
+  getPdfTilePixelRatio,
+  getPdfTilePlacement,
+  getSinglePagePdfLayout,
+} from './export-pdf';
+import type {
+  CaptureOptions,
+  ExportFormat,
+  ExportProgressController,
+  ExportQualityProfile,
+} from './export-types';
 
 /** export 실행에 필요한 공통 의존성 */
 interface SharedExportExecutionOptions {
@@ -18,6 +28,8 @@ interface SharedExportExecutionOptions {
   opts: CaptureOptions;
   /** 진행 상태 제어기 */
   progress: ExportProgressController;
+  /** export 품질 설정 */
+  qualityProfile?: ExportQualityProfile;
   /** html-to-image 모듈 lazy loader */
   getHtmlToImageModule: () => Promise<typeof import('html-to-image')>;
   /** 재사용할 font embed CSS loader */
@@ -62,17 +74,14 @@ export const exportImageDiagram = async ({
   mimeType,
   quality,
   progress,
+  qualityProfile,
   getHtmlToImageModule,
   getFontEmbedCss,
 }: ImageExportExecutionOptions): Promise<ImageExportResult> => {
+  const profile = qualityProfile ?? DEFAULT_EXPORT_QUALITY_PROFILE;
   const backgroundColor = getExportBackgroundColor();
-  const pixelRatio = getSafePixelRatio(
-    opts.imageWidth,
-    opts.imageHeight,
-    DEFAULT_EXPORT_QUALITY_PROFILE.imagePixelRatio,
-  );
-  const renderQuality =
-    format === 'jpg' ? quality ?? DEFAULT_EXPORT_QUALITY_PROFILE.jpegQuality : undefined;
+  const pixelRatio = getSafePixelRatio(opts.imageWidth, opts.imageHeight, profile.imagePixelRatio);
+  const renderQuality = format === 'jpg' ? (quality ?? profile.jpegQuality) : undefined;
   await progress.updateExportProgress({
     format,
     stage: 'preparing',
@@ -188,10 +197,12 @@ export const exportPdfDiagram = async ({
   filename,
   opts,
   progress,
+  qualityProfile,
   getHtmlToImageModule,
   getJsPdfModule,
   getFontEmbedCss,
 }: PdfExportExecutionOptions): Promise<PdfExportResult> => {
+  const profile = qualityProfile ?? DEFAULT_EXPORT_QUALITY_PROFILE;
   const format: ExportFormat = 'pdf';
   const backgroundColor = getExportBackgroundColor();
   await progress.updateExportProgress({
@@ -208,16 +219,7 @@ export const exportPdfDiagram = async ({
   ]);
   const layout = getSinglePagePdfLayout(opts.imageWidth, opts.imageHeight);
   const { pageWidth, pageHeight } = layout;
-  const tiles = buildPdfTilePlan(
-    opts.imageWidth,
-    opts.imageHeight,
-    DEFAULT_EXPORT_QUALITY_PROFILE.tileCssSize,
-  );
-  const tilePixelRatio = getSafePixelRatio(
-    Math.min(opts.imageWidth, DEFAULT_EXPORT_QUALITY_PROFILE.tileCssSize),
-    Math.min(opts.imageHeight, DEFAULT_EXPORT_QUALITY_PROFILE.tileCssSize),
-    DEFAULT_EXPORT_QUALITY_PROFILE.pdfPixelRatio,
-  );
+  const tiles = buildPdfTilePlan(opts.imageWidth, opts.imageHeight, profile.tileCssSize);
 
   await progress.updateExportProgress({
     format,
@@ -245,6 +247,11 @@ export const exportPdfDiagram = async ({
       yieldAfter: true,
     });
 
+    const tilePixelRatio = getPdfTilePixelRatio(
+      tile.width,
+      tile.height,
+      getSafePixelRatio(tile.width, tile.height, profile.pdfPixelRatio),
+    );
     const canvas = await toCanvas(
       opts.viewportEl,
       buildRenderConfig(opts, backgroundColor, fontEmbedCSS, {

@@ -1,13 +1,48 @@
-import type { CaptureOptions, ExportQualityProfile, RenderConfigOptions } from './export-types';
+import type {
+  CaptureOptions,
+  ExportQualityPreset,
+  ExportQualityProfile,
+  RenderConfigOptions,
+} from './export-types';
 
 /** 브라우저 캔버스 단일 축 최대 크기 (html-to-image 내부 제한과 동일) */
 const MAX_CANVAS_DIMENSION = 16384;
-/** High quality default: slower exports are acceptable for readable ERD documents. */
-export const DEFAULT_EXPORT_QUALITY_PROFILE: ExportQualityProfile = {
-  imagePixelRatio: 4,
-  pdfPixelRatio: 3,
-  jpegQuality: 1,
-  tileCssSize: 4096,
+/** export 품질 프리셋별 기본 설정 */
+export const EXPORT_QUALITY_PRESETS: Record<ExportQualityPreset, ExportQualityProfile> = {
+  fast: {
+    imagePixelRatio: 2,
+    pdfPixelRatio: 1.5,
+    jpegQuality: 0.92,
+    tileCssSize: 3072,
+  },
+  balanced: {
+    imagePixelRatio: 3,
+    pdfPixelRatio: 2,
+    jpegQuality: 0.96,
+    tileCssSize: 3072,
+  },
+  high: {
+    imagePixelRatio: 4,
+    pdfPixelRatio: 3,
+    jpegQuality: 1,
+    tileCssSize: 4096,
+  },
+};
+/** 일반 export 메뉴의 기본 프리셋 */
+export const DEFAULT_EXPORT_QUALITY_PRESET: ExportQualityPreset = 'balanced';
+/** High quality fallback: slower exports are acceptable for readable ERD documents. */
+export const DEFAULT_EXPORT_QUALITY_PROFILE: ExportQualityProfile = EXPORT_QUALITY_PRESETS.high;
+/** 프리셋별 이미지 export 목표 최대 픽셀 면적 */
+const IMAGE_OUTPUT_PIXEL_AREA_LIMIT: Record<ExportQualityPreset, number> = {
+  fast: 60_000_000,
+  balanced: 100_000_000,
+  high: 140_000_000,
+};
+/** 프리셋별 PDF export 목표 최대 픽셀 면적 */
+const PDF_OUTPUT_PIXEL_AREA_LIMIT: Record<ExportQualityPreset, number> = {
+  fast: 45_000_000,
+  balanced: 75_000_000,
+  high: 110_000_000,
 };
 /** Blob URL 정리 지연 시간(ms) */
 const OBJECT_URL_REVOKE_DELAY_MS = 1000;
@@ -58,6 +93,60 @@ export const getSafePixelRatio = (
     Number.isFinite(requestedPixelRatio) && requestedPixelRatio > 0 ? requestedPixelRatio : 1;
   const ratio = Math.min(normalizedRatio, maxRatio);
   return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+};
+
+/** 캡처 면적 기준으로 요청 ratio를 자동 제한한다. */
+const getAreaLimitedPixelRatio = (
+  width: number,
+  height: number,
+  requestedPixelRatio: number,
+  maxOutputPixelArea: number,
+): number => {
+  const boundedArea = Math.max(1, width) * Math.max(1, height);
+  const areaLimitedPixelRatio = Math.sqrt(maxOutputPixelArea / boundedArea);
+  return Math.min(requestedPixelRatio, areaLimitedPixelRatio);
+};
+
+/**
+ * 선택한 품질 프리셋과 다이어그램 크기를 바탕으로 실제 export 설정을 계산한다.
+ *
+ * @param preset 사용자가 선택한 품질 프리셋
+ * @param width 캡처 대상 CSS 너비
+ * @param height 캡처 대상 CSS 높이
+ * @returns 다이어그램 크기에 맞춰 보정된 export 품질 설정
+ */
+export const resolveExportQualityProfile = (
+  preset: ExportQualityPreset,
+  width: number,
+  height: number,
+): ExportQualityProfile => {
+  const profile = EXPORT_QUALITY_PRESETS[preset];
+  const imagePixelRatio = getSafePixelRatio(
+    width,
+    height,
+    getAreaLimitedPixelRatio(
+      width,
+      height,
+      profile.imagePixelRatio,
+      IMAGE_OUTPUT_PIXEL_AREA_LIMIT[preset],
+    ),
+  );
+  const pdfPixelRatio = getSafePixelRatio(
+    width,
+    height,
+    getAreaLimitedPixelRatio(
+      width,
+      height,
+      profile.pdfPixelRatio,
+      PDF_OUTPUT_PIXEL_AREA_LIMIT[preset],
+    ),
+  );
+
+  return {
+    ...profile,
+    imagePixelRatio,
+    pdfPixelRatio,
+  };
 };
 
 /** 캔버스 제한으로 인해 품질 하향이 필요한지 확인한다. */

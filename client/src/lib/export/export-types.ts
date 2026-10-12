@@ -1,6 +1,9 @@
 /** 지원하는 export 포맷 */
 export type ExportFormat = 'png' | 'jpg' | 'svg' | 'pdf';
 
+/** export 품질 프리셋 */
+export type ExportQualityPreset = 'fast' | 'balanced' | 'high';
+
 /** export 진행 표시 방식 */
 export type ExportProgressMode = 'indeterminate' | 'determinate';
 

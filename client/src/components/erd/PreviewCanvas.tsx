@@ -21,12 +21,18 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import ExportProgressDialog from './ExportProgressDialog';
+import type { ExportQualityPreset } from '@/lib/export/export-types';
 import type { DslPreviewCanvasState, DslPreviewNode } from '@/lib/dsl-preview-graph';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
+
+const EXPORT_QUALITY_PRESETS: ExportQualityPreset[] = ['fast', 'balanced', 'high'];
 import type { CodeEditorTableFocusRequest } from '@/lib/code-editor-table-navigation';
 import { serializeDiagramDefinitionExportContent } from '@/lib/diagram-definition-export';
 import { findPreviewTableNodeForFocus } from '@/lib/diagram-table-focus';
@@ -236,18 +242,51 @@ function PreviewCanvasToolbar({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={exportPng} disabled={isExportBusy}>
-                PNG
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportJpg} disabled={isExportBusy}>
-                JPG
-              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger disabled={isExportBusy}>PNG</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {EXPORT_QUALITY_PRESETS.map((preset) => (
+                    <DropdownMenuItem
+                      key={`png-${preset}`}
+                      onClick={() => exportPng(preset)}
+                      disabled={isExportBusy}
+                    >
+                      {t(`erd.export.quality.${preset}`)}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger disabled={isExportBusy}>JPG</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {EXPORT_QUALITY_PRESETS.map((preset) => (
+                    <DropdownMenuItem
+                      key={`jpg-${preset}`}
+                      onClick={() => exportJpg(preset)}
+                      disabled={isExportBusy}
+                    >
+                      {t(`erd.export.quality.${preset}`)}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               <DropdownMenuItem onClick={exportSvg} disabled={isExportBusy}>
                 SVG
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportPdf} disabled={isExportBusy}>
-                PDF
-              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger disabled={isExportBusy}>PDF</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {EXPORT_QUALITY_PRESETS.map((preset) => (
+                    <DropdownMenuItem
+                      key={`pdf-${preset}`}
+                      onClick={() => exportPdf(preset)}
+                      disabled={isExportBusy}
+                    >
+                      {t(`erd.export.quality.${preset}`)}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               {(onExportTableDefinition || onExportColumnDefinition || onExportIndexDefinition) && (
                 <>
                   <DropdownMenuSeparator />

@@ -18,9 +18,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import type { ExportQualityPreset } from '@/lib/export/export-types';
+
+const EXPORT_QUALITY_PRESETS: ExportQualityPreset[] = ['fast', 'balanced', 'high'];
 
 /** CanvasToolbar 컴포넌트의 props. */
 interface CanvasToolbarProps {
@@ -31,13 +37,13 @@ interface CanvasToolbarProps {
   /** 자동 배치 실행 핸들러 */
   onAutoLayout: () => void;
   /** PNG 내보내기 핸들러 */
-  onExportPng: () => void;
+  onExportPng: (qualityPreset?: ExportQualityPreset) => void;
   /** JPG 내보내기 핸들러 */
-  onExportJpg: () => void;
+  onExportJpg: (qualityPreset?: ExportQualityPreset) => void;
   /** SVG 내보내기 핸들러 */
   onExportSvg: () => void;
   /** PDF 내보내기 핸들러 */
-  onExportPdf: () => void;
+  onExportPdf: (qualityPreset?: ExportQualityPreset) => void;
   /** SQL DDL 내보내기 핸들러 */
   onExportDdl?: () => void;
   /** 테이블 정의서 내보내기 핸들러 */
@@ -205,18 +211,51 @@ export default function CanvasToolbar({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onExportPng} disabled={isExporting}>
-              PNG
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onExportJpg} disabled={isExporting}>
-              JPG
-            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={isExporting}>PNG</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {EXPORT_QUALITY_PRESETS.map((preset) => (
+                  <DropdownMenuItem
+                    key={`png-${preset}`}
+                    onClick={() => onExportPng(preset)}
+                    disabled={isExporting}
+                  >
+                    {t(`erd.export.quality.${preset}`)}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={isExporting}>JPG</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {EXPORT_QUALITY_PRESETS.map((preset) => (
+                  <DropdownMenuItem
+                    key={`jpg-${preset}`}
+                    onClick={() => onExportJpg(preset)}
+                    disabled={isExporting}
+                  >
+                    {t(`erd.export.quality.${preset}`)}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuItem onClick={onExportSvg} disabled={isExporting}>
               SVG
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onExportPdf} disabled={isExporting}>
-              PDF
-            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={isExporting}>PDF</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {EXPORT_QUALITY_PRESETS.map((preset) => (
+                  <DropdownMenuItem
+                    key={`pdf-${preset}`}
+                    onClick={() => onExportPdf(preset)}
+                    disabled={isExporting}
+                  >
+                    {t(`erd.export.quality.${preset}`)}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             {(onExportTableDefinition || onExportColumnDefinition || onExportIndexDefinition) && (
               <>
                 <DropdownMenuSeparator />

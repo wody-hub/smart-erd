@@ -9,18 +9,28 @@ import {
   type ImageExportResult,
   type PdfExportResult,
 } from '@/lib/export/export-executors';
-import { isCanvasLimited } from '@/lib/export/export-core';
+import {
+  DEFAULT_EXPORT_QUALITY_PRESET,
+  isCanvasLimited,
+  resolveExportQualityProfile,
+} from '@/lib/export/export-core';
 import {
   createExportProgressController,
   createIdleExportProgress,
 } from '@/lib/export/export-progress';
-import type { CaptureOptions, ExportFormat, ExportProgressState } from '@/lib/export/export-types';
+import type {
+  CaptureOptions,
+  ExportFormat,
+  ExportProgressState,
+  ExportQualityPreset,
+} from '@/lib/export/export-types';
 
 export type {
   ExportFormat,
   ExportProgressMode,
   ExportProgressStage,
   ExportProgressState,
+  ExportQualityPreset,
 } from '@/lib/export/export-types';
 
 /** fitView 패딩 비율 */
@@ -175,8 +185,12 @@ export function useExportDiagram(diagramName: string) {
     }
   };
 
+  /** 선택한 프리셋과 캡처 크기로 실제 export 품질 설정을 계산한다. */
+  const getQualityProfile = (preset: ExportQualityPreset, opts: CaptureOptions) =>
+    resolveExportQualityProfile(preset, opts.imageWidth, opts.imageHeight);
+
   /** PNG 포맷으로 다이어그램을 내보낸다. */
-  const exportPng = async () =>
+  const exportPng = async (qualityPreset = DEFAULT_EXPORT_QUALITY_PRESET) =>
     runExport(
       'png',
       (opts) =>
@@ -185,6 +199,7 @@ export function useExportDiagram(diagramName: string) {
           opts,
           format: 'png',
           mimeType: 'image/png',
+          qualityProfile: getQualityProfile(qualityPreset, opts),
           progress,
           getHtmlToImageModule,
           getFontEmbedCss,
@@ -193,17 +208,18 @@ export function useExportDiagram(diagramName: string) {
     );
 
   /** JPG 포맷으로 다이어그램을 내보낸다. */
-  const exportJpg = async () =>
+  const exportJpg = async (qualityPreset = DEFAULT_EXPORT_QUALITY_PRESET) =>
     runExport(
       'jpg',
       (opts) =>
         exportImageDiagram({
           filename: `${diagramName}.jpg`,
-        opts,
-        format: 'jpg',
-        mimeType: 'image/jpeg',
-        progress,
-        getHtmlToImageModule,
+          opts,
+          format: 'jpg',
+          mimeType: 'image/jpeg',
+          qualityProfile: getQualityProfile(qualityPreset, opts),
+          progress,
+          getHtmlToImageModule,
           getFontEmbedCss,
         }),
       handleImageExportSuccess,
@@ -227,13 +243,14 @@ export function useExportDiagram(diagramName: string) {
     );
 
   /** PDF 포맷으로 다이어그램을 내보낸다. */
-  const exportPdf = async () =>
+  const exportPdf = async (qualityPreset = DEFAULT_EXPORT_QUALITY_PRESET) =>
     runExport(
       'pdf',
       (opts) =>
         exportPdfDiagram({
           filename: `${diagramName}.pdf`,
           opts,
+          qualityProfile: getQualityProfile(qualityPreset, opts),
           progress,
           getHtmlToImageModule,
           getJsPdfModule,
