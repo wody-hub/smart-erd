@@ -11,13 +11,14 @@ import {
 } from '@/lib/erd-local-storage';
 import { getErrorMessage } from '@/lib/api-error';
 import { STORAGE_KEYS } from '@/constants/storage';
+import { isProjectorManagedDocumentOrigin } from '@/collaboration/core/store/document-change-origin';
 
 /** 로컬 Y.Doc bootstrap 트랜잭션 origin. */
 const ERD_LOCAL_BOOTSTRAP_ORIGIN = 'erd-local-bootstrap';
 /** autosave 간격 (ms). */
 const ERD_LOCAL_AUTOSAVE_INTERVAL_MS = 5000;
-/** 지연 projection flush debounce (ms). */
-const ERD_LOCAL_FLUSH_DEBOUNCE_MS = 50;
+/** 지연 projection 동기화 debounce (ms). */
+const ERD_LOCAL_SYNC_DEBOUNCE_MS = 50;
 /** 파일 다운로드용 기본 파일명. */
 const ERD_LOCAL_FILE_NAME = 'erd-local.json';
 
@@ -28,31 +29,38 @@ interface ErdLocalFileTrigger {
 }
 
 /**
- * Y.Doc 변경 시 지연된 projection을 반영하도록 구독한다.
+ * projector 없이 dropped되는 system-origin 변경을 로컬에서 재동기화하도록 구독한다.
  *
- * `canvas-system-*` 트랜잭션(DDL import, 코드 동기화 등)은 projection을
- * projector에게 위임하는데, 로컬 모드에는 projector가 없으므로 여기서 flush한다.
- * 일반 로컬 편집은 defer 큐에 쌓이지 않아 no-op으로 스킵된다.
+ * 옵저버는 `canvas-system-*` 트랜잭션(DDL import, 코드 동기화, 사전 재조정)을
+ * projector가 처리한다고 보고 drop하는데, 로컬 모드에는 projector가 없으므로
+ * 여기서 `syncFromYDoc()`으로 직접 반영한다. 일반 로컬 편집은 옵저버가 처리하므로
+ * 스킵된다. 드래그 중이면 스토어가 내부 큐에 적재해 드래그 종료 시 반영한다.
  *
  * @param doc 구독 대상 문서
  * @returns 구독 해제 함수
  */
-function subscribeDeferredFlush(doc: Y.Doc): () => void {
-  /** 지연 projection flush 타이머 */
-  let flushTimer: number | undefined;
-  /** ydoc 변경 핸들러. @returns 없음 */
-  const handleDocUpdate = () => {
-    if (!useCanvasStore.getState().internal.hasDeferredProjectionSync) {
+function subscribeProjectorlessSync(doc: Y.Doc): () => void {
+  /** 재동기화 debounce 타이머 */
+  let syncTimer: number | undefined;
+  /**
+   * ydoc 변경 핸들러.
+   *
+   * @param _update Yjs 상태 업데이트 (미사용)
+   * @param origin  트랜잭션 origin
+   * @returns 없음
+   */
+  const handleDocUpdate = (_update: Uint8Array, origin: unknown) => {
+    if (!isProjectorManagedDocumentOrigin(origin)) {
       return;
     }
-    window.clearTimeout(flushTimer);
-    flushTimer = window.setTimeout(() => {
-      useCanvasStore.getState().flushDeferredProjection();
-    }, ERD_LOCAL_FLUSH_DEBOUNCE_MS);
+    window.clearTimeout(syncTimer);
+    syncTimer = window.setTimeout(() => {
+      useCanvasStore.getState().syncFromYDoc();
+    }, ERD_LOCAL_SYNC_DEBOUNCE_MS);
   };
   doc.on('update', handleDocUpdate);
   return () => {
-    window.clearTimeout(flushTimer);
+    window.clearTimeout(syncTimer);
     doc.off('update', handleDocUpdate);
   };
 }
@@ -93,12 +101,12 @@ export function useErdLocalPersistence() {
   /** 현재 바인딩된 Y.Doc (교체·unmount 시 정리용) */
   const docRef = useRef<Y.Doc | null>(null);
   /** 현재 Y.Doc의 flush 구독 해제 함수 */
-  const unsubscribeFlushRef = useRef<(() => void) | null>(null);
+  const unsubscribeSyncRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const doc = new Y.Doc();
     docRef.current = doc;
-    unsubscribeFlushRef.current = subscribeDeferredFlush(doc);
+    unsubscribeSyncRef.current = subscribeProjectorlessSync(doc);
     useCanvasStore.getState().initYDoc(doc);
     const draft = readErdLocalDraft(localStorage);
     if (draft !== null) {
@@ -126,8 +134,8 @@ export function useErdLocalPersistence() {
       window.clearInterval(intervalId);
       window.removeEventListener('beforeunload', saveIfDirty);
       saveIfDirty();
-      unsubscribeFlushRef.current?.();
-      unsubscribeFlushRef.current = null;
+      unsubscribeSyncRef.current?.();
+      unsubscribeSyncRef.current = null;
       useCanvasStore.getState().destroyYDoc();
       docRef.current?.destroy();
       docRef.current = null;
@@ -160,11 +168,11 @@ export function useErdLocalPersistence() {
       try {
         const previous = docRef.current;
         const doc = new Y.Doc();
-        unsubscribeFlushRef.current?.();
+        unsubscribeSyncRef.current?.();
         useCanvasStore.getState().destroyYDoc();
         previous?.destroy();
         docRef.current = doc;
-        unsubscribeFlushRef.current = subscribeDeferredFlush(doc);
+        unsubscribeSyncRef.current = subscribeProjectorlessSync(doc);
         useCanvasStore.getState().initYDoc(doc);
         migrateJsonToYDoc(doc, json, ERD_LOCAL_BOOTSTRAP_ORIGIN);
         const ok = writeErdLocalDraft(localStorage, json);
@@ -184,11 +192,11 @@ export function useErdLocalPersistence() {
   const resetAll = useCallback(() => {
     const previous = docRef.current;
     const doc = new Y.Doc();
-    unsubscribeFlushRef.current?.();
+    unsubscribeSyncRef.current?.();
     useCanvasStore.getState().destroyYDoc();
     previous?.destroy();
     docRef.current = doc;
-    unsubscribeFlushRef.current = subscribeDeferredFlush(doc);
+    unsubscribeSyncRef.current = subscribeProjectorlessSync(doc);
     useCanvasStore.getState().initYDoc(doc);
     localStorage.removeItem(STORAGE_KEYS.ERD_LOCAL_DRAFT);
     lastSavedRef.current = useCanvasStore.getState().serialize();

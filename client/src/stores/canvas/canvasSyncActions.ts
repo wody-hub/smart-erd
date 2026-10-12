@@ -78,8 +78,7 @@ type CanvasSyncActionKeys =
   | 'applyLayout'
   | 'finalizeNodeDrag'
   | 'applyPreviewPositionChangesToPersisted'
-  | 'serialize'
-  | 'flushDeferredProjection';
+  | 'serialize';
 
 /**
  * 캔버스 동기화/뷰 상태 액션 팩토리.
@@ -931,16 +930,6 @@ export function createCanvasSyncActions(
     serialize: () => {
       const { ydoc } = get();
       return ydoc ? yDocToJson(ydoc) : JSON.stringify({ nodes: [], edges: [], groups: [] });
-    },
-
-    /**
-     * 지연된 projection을 즉시 반영한다.
-     *
-     * projector 없이 동작하는 로컬 모드에서 `canvas-system-*` 트랜잭션 후 호출한다.
-     * 대기 큐가 비었으면 아무 일도 하지 않는다.
-     */
-    flushDeferredProjection: () => {
-      flushDeferredProjectionSync();
     },
   };
 }
