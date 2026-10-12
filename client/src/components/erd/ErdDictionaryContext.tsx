@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import { useErdDictionaryData } from './erdDictionaryData';
+import type { ErdDictionaryLocalWriter } from '@/types/dictionary';
 
 /** ERD 에디터 공유 데이터 컨텍스트 값 */
 type ErdDictionaryContextValue = ReturnType<typeof useErdDictionaryData> & {
@@ -7,9 +8,12 @@ type ErdDictionaryContextValue = ReturnType<typeof useErdDictionaryData> & {
   teamId: string;
   /** 사전 세트 ID (non-null 보장) */
   setId: string;
+  /** 로컬 사전 writer (로컬 모드에서만 존재) */
+  localWriter?: ErdDictionaryLocalWriter;
 };
 
-const ErdDictionaryContext = createContext<ErdDictionaryContextValue | null>(null);
+// eslint-disable-next-line react-refresh/only-export-components
+export const ErdDictionaryContext = createContext<ErdDictionaryContextValue | null>(null);
 
 /** ErdDictionaryProvider 컴포넌트 props */
 interface ErdDictionaryProviderProps {
