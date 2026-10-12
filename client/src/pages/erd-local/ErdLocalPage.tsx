@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import { ROUTES } from '@/constants/routes';
 import { useErdLocalPersistence } from './useErdLocalPersistence';
+import { ErdLocalDictionaryProvider } from './ErdLocalDictionaryProvider';
+import { ErdLocalDictionaryDialog } from './ErdLocalDictionaryDialog';
 
 /** 파일 입력 accept 속성값. */
 const ERD_LOCAL_FILE_ACCEPT = '.json,application/json';
@@ -15,8 +17,8 @@ const ERD_LOCAL_FILE_ACCEPT = '.json,application/json';
 /**
  * 로그인 불필요 ERD 단독 편집 페이지.
  *
- * 로컬 Y.Doc + localStorage 자동저장 + JSON 파일 저장/열기로 동작하며
- * 서버·사전·협업 기능은 포함하지 않는다.
+ * 로컬 Y.Doc + localStorage 자동저장 + JSON 파일 저장/열기 + 로컬 사전으로 동작하며
+ * 서버·협업 기능은 포함하지 않는다.
  *
  * @returns ERD 로컬 페이지 JSX
  */
@@ -25,6 +27,8 @@ export default function ErdLocalPage() {
   const { t } = useTranslation();
   /** 새로 시작 확인 다이얼로그 열림 여부 */
   const [resetOpen, setResetOpen] = useState(false);
+  /** 로컬 사전 관리 다이얼로그 열림 여부 */
+  const [dictionaryOpen, setDictionaryOpen] = useState(false);
   /** 숨겨진 파일 입력 참조 */
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { exportFile, importFileText, resetAll } = useErdLocalPersistence();
@@ -70,6 +74,9 @@ export default function ErdLocalPage() {
           <Button variant="outline" size="sm" onClick={handleOpenFileClick}>
             {t('erdLocal.openFile')}
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setDictionaryOpen(true)}>
+            {t('erdLocalDictionary.manage')}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
             {t('erdLocal.reset')}
           </Button>
@@ -77,9 +84,11 @@ export default function ErdLocalPage() {
       </header>
       <div className="relative flex-1">
         <ReactFlowProvider>
-          <ErdPermissionProvider canEdit>
-            <ERDCanvas diagramName="erd-local" />
-          </ErdPermissionProvider>
+          <ErdLocalDictionaryProvider>
+            <ErdPermissionProvider canEdit>
+              <ERDCanvas diagramName="erd-local" />
+            </ErdPermissionProvider>
+          </ErdLocalDictionaryProvider>
         </ReactFlowProvider>
       </div>
       <input
@@ -90,6 +99,7 @@ export default function ErdLocalPage() {
         aria-label={t('erdLocal.openFile')}
         onChange={handleFileChange}
       />
+      <ErdLocalDictionaryDialog open={dictionaryOpen} onOpenChange={setDictionaryOpen} />
       <ConfirmDialog
         open={resetOpen}
         onOpenChange={setResetOpen}
