@@ -30,4 +30,6 @@ export const STORAGE_KEYS = {
   SERVER_URL: 'smart-erd-server-url',
   /** AI 채팅 대화 저장 prefix */
   AI_CHAT_CONVERSATION_PREFIX: 'smart-erd-ai-chat-conversation',
+  /** 로그인 불필요 ERD 로컬 드래프트 */
+  ERD_LOCAL_DRAFT: 'smart-erd-erd-local-draft',
 } as const;

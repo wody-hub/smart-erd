@@ -2882,5 +2882,16 @@
       "view": "{{title}} 이슈 보기",
       "advance": "{{title}} 이슈를 {{status}} 상태로 변경"
     }
+  },
+  "erdLocal": {
+    "title": "ERD 로컬 편집",
+    "backToGuide": "가이드로 돌아가기",
+    "saveFile": "파일로 저장",
+    "openFile": "파일 열기",
+    "reset": "새로 시작",
+    "resetTitle": "새로 시작할까요?",
+    "resetDescription": "현재 캔버스 내용과 로컬 저장본이 모두 지워집니다.",
+    "importError": "파일을 불러오지 못했습니다. ERD JSON 파일인지 확인해주세요.",
+    "storageFull": "브라우저 저장 공간이 부족합니다. 파일로 저장해주세요."
   }
 }

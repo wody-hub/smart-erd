@@ -2884,5 +2884,16 @@
       "view": "View issue {{title}}",
       "advance": "Move issue {{title}} to {{status}}"
     }
+  },
+  "erdLocal": {
+    "title": "Local ERD Editor",
+    "backToGuide": "Back to guide",
+    "saveFile": "Save to file",
+    "openFile": "Open file",
+    "reset": "Start over",
+    "resetTitle": "Start over?",
+    "resetDescription": "The current canvas and the locally saved draft will be removed.",
+    "importError": "Could not load the file. Please check it is an ERD JSON file.",
+    "storageFull": "Browser storage is full. Please save to a file."
   }
 }

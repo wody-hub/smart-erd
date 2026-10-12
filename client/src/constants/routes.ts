@@ -42,6 +42,8 @@ export const ROUTES = {
   GUIDE: '/guide',
   /** 제품 가이드 페이지 (진입 맥락/앵커 포함) */
   GUIDE_ENTRY: buildGuideRoute,
+  /** 로그인 불필요 ERD 단독 편집 페이지 */
+  ERD_LOCAL: '/erd-local',
   /** 로그인 페이지 */
   LOGIN: '/login',
   /** 회원가입 페이지 */
