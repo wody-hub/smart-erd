@@ -150,6 +150,8 @@ export interface CanvasState {
     positionOverrides: DiagramPreviewPositionRecord,
   ) => string[];
   serialize: () => string;
+  /** 지연된 projection을 즉시 반영한다 (대기 없으면 no-op). */
+  flushDeferredProjection: () => void;
   addFkRelation: (params: AddFkRelationParams) => number;
   connectWithRelationType: (
     source: string,
