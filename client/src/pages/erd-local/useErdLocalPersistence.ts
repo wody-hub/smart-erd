@@ -58,9 +58,12 @@ export function useErdLocalPersistence() {
   const { t } = useTranslation();
   /** 마지막으로 저장한 직렬화 문자열 (불필요한 쓰기 방지용) */
   const lastSavedRef = useRef<string | null>(null);
+  /** 현재 바인딩된 Y.Doc (교체·unmount 시 정리용) */
+  const docRef = useRef<Y.Doc | null>(null);
 
   useEffect(() => {
     const doc = new Y.Doc();
+    docRef.current = doc;
     useCanvasStore.getState().initYDoc(doc);
     const draft = readErdLocalDraft(localStorage);
     if (draft !== null) {
@@ -89,7 +92,8 @@ export function useErdLocalPersistence() {
       window.removeEventListener('beforeunload', saveIfDirty);
       saveIfDirty();
       useCanvasStore.getState().destroyYDoc();
-      doc.destroy();
+      docRef.current?.destroy();
+      docRef.current = null;
     };
   }, [t]);
 
@@ -117,8 +121,11 @@ export function useErdLocalPersistence() {
         return false;
       }
       try {
+        const previous = docRef.current;
         const doc = new Y.Doc();
         useCanvasStore.getState().destroyYDoc();
+        previous?.destroy();
+        docRef.current = doc;
         useCanvasStore.getState().initYDoc(doc);
         migrateJsonToYDoc(doc, json, ERD_LOCAL_BOOTSTRAP_ORIGIN);
         const ok = writeErdLocalDraft(localStorage, json);
@@ -136,8 +143,11 @@ export function useErdLocalPersistence() {
 
   /** 캔버스와 로컬 저장본을 모두 비운다. */
   const resetAll = useCallback(() => {
+    const previous = docRef.current;
     const doc = new Y.Doc();
     useCanvasStore.getState().destroyYDoc();
+    previous?.destroy();
+    docRef.current = doc;
     useCanvasStore.getState().initYDoc(doc);
     localStorage.removeItem(STORAGE_KEYS.ERD_LOCAL_DRAFT);
     lastSavedRef.current = useCanvasStore.getState().serialize();
