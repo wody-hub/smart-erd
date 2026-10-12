@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import ERDCanvas from '@/components/erd/ERDCanvas';
 import { ErdPermissionProvider } from '@/components/erd/ErdPermissionContext';
 import { Button } from '@/components/ui/button';
@@ -49,9 +50,12 @@ export default function ErdLocalPage() {
     if (!file) {
       return;
     }
-    void file.text().then((text) => {
-      importFileText(text);
-    });
+    void file
+      .text()
+      .then((text) => {
+        importFileText(text);
+      })
+      .catch(() => toast.error(t('erdLocal.importError')));
   };
 
   /** 새로 시작을 확정한다. */

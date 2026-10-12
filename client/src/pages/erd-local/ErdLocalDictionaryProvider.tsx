@@ -22,6 +22,7 @@ const ErdLocalStoreContext = createContext<ErdLocalDictionaryStore | null>(null)
  *
  * @returns 단일 사전 스토어 객체
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useErdLocalDictionaryStore(): ErdLocalDictionaryStore {
   const store = useContext(ErdLocalStoreContext);
   if (store === null) {

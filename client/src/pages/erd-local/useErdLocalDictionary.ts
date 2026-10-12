@@ -5,6 +5,7 @@ import {
   readErdLocalDictionary,
   writeErdLocalDictionary,
   nextErdLocalId,
+  ERD_LOCAL_DICTIONARY_FILE_VERSION,
 } from '@/lib/erd-local-dictionary-storage';
 import type { ErdLocalDictionaryFile } from '@/lib/erd-local-dictionary-storage';
 import { STORAGE_KEYS } from '@/constants/storage';
@@ -59,7 +60,7 @@ export interface ErdLocalDictionaryStore extends ErdLocalDictionaryMutations {
 
 /** 빈 사전 페이로드. */
 const EMPTY_DICTIONARY: ErdLocalDictionaryFile = {
-  version: 1,
+  version: ERD_LOCAL_DICTIONARY_FILE_VERSION,
   domains: [],
   terms: [],
   words: [],
@@ -365,6 +366,7 @@ export function useErdLocalDictionary(): ErdLocalDictionaryStore {
         (createWord(form) as Word),
       suggest,
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- revision은 ref-mirror 읽기라 dep으로 불필요하지만 writer identity 안정(구독자 리렌더 트리거) 목적으로 의도적으로 포함
     [createTerm, createDomain, createWord, suggest, revision],
   );
 

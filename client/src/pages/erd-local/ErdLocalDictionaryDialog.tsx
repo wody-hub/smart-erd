@@ -22,7 +22,10 @@ import {
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import DomainFormDialog from '@/components/dictionary/DomainFormDialog';
 import WordFormDialog from '@/components/dictionary/WordFormDialog';
-import { parseErdLocalDictionaryFile } from '@/lib/erd-local-dictionary-storage';
+import {
+  parseErdLocalDictionaryFile,
+  ERD_LOCAL_DICTIONARY_FILE_VERSION,
+} from '@/lib/erd-local-dictionary-storage';
 import { useErdLocalDictionaryStore } from './ErdLocalDictionaryProvider';
 import { ErdLocalTermDialog } from './ErdLocalTermDialog';
 import type {
@@ -194,7 +197,7 @@ export function ErdLocalDictionaryDialog({ open, onOpenChange }: ErdLocalDiction
   const handleSaveFile = () => {
     const payload = JSON.stringify(
       {
-        version: 1,
+        version: ERD_LOCAL_DICTIONARY_FILE_VERSION,
         domains: store.domains,
         terms: store.terms,
         words: store.words,
@@ -231,14 +234,17 @@ export function ErdLocalDictionaryDialog({ open, onOpenChange }: ErdLocalDiction
     if (!file) {
       return;
     }
-    void file.text().then((text) => {
-      const parsed = parseErdLocalDictionaryFile(text);
-      if (!parsed.ok) {
-        toast.error(t('erdLocalDictionary.importError'));
-        return;
-      }
-      store.replaceAll(parsed.data);
-    });
+    void file
+      .text()
+      .then((text) => {
+        const parsed = parseErdLocalDictionaryFile(text);
+        if (!parsed.ok) {
+          toast.error(t('erdLocalDictionary.importError'));
+          return;
+        }
+        store.replaceAll(parsed.data);
+      })
+      .catch(() => toast.error(t('erdLocalDictionary.importError')));
   };
 
   return (
