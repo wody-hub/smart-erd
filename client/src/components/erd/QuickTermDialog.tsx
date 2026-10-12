@@ -47,7 +47,7 @@ export default function QuickTermDialog({
 }: QuickTermDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { teamId, setId, domains, words, findDomainById } = useErdDictionary();
+  const { teamId, setId, domains, words, findDomainById, localWriter } = useErdDictionary();
 
   const [logicalName, setLogicalName] = useState('');
   const [domainId, setDomainId] = useState<string>(NONE_VALUE);
@@ -64,12 +64,14 @@ export default function QuickTermDialog({
   );
   const physicalName = composition.isCompleteMatch ? composition.derivedPhysicalName : '';
 
-  const { suggestion, isLoading: suggestLoading } = useDictionarySuggest(
+  const { suggestion: remoteSuggestion, isLoading: suggestLoading } = useDictionarySuggest(
     teamId,
     setId,
     logicalName,
-    open && composition.isCompleteMatch,
+    open && composition.isCompleteMatch && !localWriter,
   );
+
+  const suggestion = localWriter ? localWriter.suggest(logicalName.trim()) : remoteSuggestion;
 
   useEffect(() => {
     if (open) {
@@ -93,16 +95,23 @@ export default function QuickTermDialog({
   }, [open, suggestion, domainDirty]);
 
   const createTermMutation = useMutation({
-    mutationFn: () =>
-      createTerm(teamId, setId, {
+    mutationFn: () => {
+      const payload = {
         logicalName: logicalName.trim(),
         physicalName,
         domainId: domainId !== NONE_VALUE ? Number(domainId) : null,
         description: description || undefined,
         wordIds: composition.matchedWordIds,
-      }),
+      };
+      if (localWriter) {
+        return Promise.resolve(localWriter.createTerm(payload));
+      }
+      return createTerm(teamId, setId, payload);
+    },
     onSuccess: (term) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId, setId) });
+      if (!localWriter) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.dictionary.terms(teamId, setId) });
+      }
       onApply(buildColumnUpdatesFromTerm(term, findDomainById));
       toast.success(t('erd.quickTerm.success'));
       onOpenChange(false);
@@ -120,6 +129,22 @@ export default function QuickTermDialog({
     successMessageKey: 'erd.quickTerm.wordCreated',
     errorMessageKey: 'erd.quickTerm.wordCreateFailed',
   });
+
+  /**
+   * 단어 폼 제출 — 로컬 모드면 로컬 writer로 생성한다.
+   *
+   * @param data 단어 폼 데이터
+   */
+  const handleWordSubmit = async (data: WordFormData): Promise<void> => {
+    if (localWriter) {
+      localWriter.createWord(data);
+      toast.success(t('erd.quickTerm.wordCreated'));
+      setQuickWordOpen(false);
+      setDraftWord(null);
+      return;
+    }
+    await createWordMutation.mutateAsync(data);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -292,7 +317,7 @@ export default function QuickTermDialog({
             setDraftWord(null);
           }
         }}
-        onSubmit={(data) => createWordMutation.mutateAsync(data).then(() => undefined)}
+        onSubmit={(data) => handleWordSubmit(data)}
         draftData={draftWord}
       />
     </>
