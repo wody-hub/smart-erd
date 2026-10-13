@@ -1,4 +1,14 @@
-import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -23,6 +33,7 @@ import {
   getCurrentEdgeHandleSelectionValue,
 } from '@/lib/edge-handles';
 import { extractColId } from '@/lib/handle-id';
+import { probeCounter } from '@/lib/erd-performance-probe';
 import type {
   ERDEdge,
   EdgeRoutingType,
@@ -226,6 +237,9 @@ function ERDCanvas({
   indexDefinitionExporting = false,
 }: ERDCanvasProps) {
   const { t } = useTranslation();
+  useLayoutEffect(() => {
+    probeCounter('erd-canvas-react-commit');
+  });
   const reactFlowInstance = useReactFlow();
   const edgeActions = useDiagramErdEdgeActions();
   const dragActions = useDiagramErdDragActions();

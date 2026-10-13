@@ -20,6 +20,14 @@ import { useTableColumnRenderModel } from './useTableColumnRenderModel';
 import { useTableNodeInteractions } from './useTableNodeInteractions';
 import { TableNodeEditableRows, TableNodeStaticRows } from './TableNodeRows';
 import { useCompactTableRowExpansion } from './useCompactTableRowExpansion';
+import {
+  probeAggregateEnd,
+  probeAggregateStart,
+  probeCounter,
+  probeMark,
+  probeMarkInternalsQueueStart,
+  probeSetInternalsPending,
+} from '@/lib/erd-performance-probe';
 
 const TABLE_NODE_INTERNALS_BATCH_SIZE = 6;
 
@@ -27,6 +35,7 @@ const pendingNodeInternalsUpdates = new Map<string, (id: string) => void>();
 let nodeInternalsFlushHandle: number | null = null;
 
 function flushPendingNodeInternalsUpdates() {
+  const flushStartedAt = probeAggregateStart();
   nodeInternalsFlushHandle = null;
 
   const queued = Array.from(pendingNodeInternalsUpdates.entries()).slice(
@@ -39,13 +48,24 @@ function flushPendingNodeInternalsUpdates() {
     updateInternals(nodeId);
   }
 
+  probeMark('node-internals-flush', {
+    batchSize: queued.length,
+    pendingAfter: pendingNodeInternalsUpdates.size,
+  });
+  probeSetInternalsPending(pendingNodeInternalsUpdates.size);
+  probeAggregateEnd('node-internals-flush', flushStartedAt);
+
   if (pendingNodeInternalsUpdates.size > 0) {
     nodeInternalsFlushHandle = window.requestAnimationFrame(flushPendingNodeInternalsUpdates);
   }
 }
 
 function scheduleNodeInternalsUpdate(nodeId: string, updateInternals: (id: string) => void) {
+  const wasEmpty = pendingNodeInternalsUpdates.size === 0;
   pendingNodeInternalsUpdates.set(nodeId, updateInternals);
+  probeCounter('node-internals-queued');
+  probeSetInternalsPending(pendingNodeInternalsUpdates.size);
+  if (wasEmpty) probeMarkInternalsQueueStart(pendingNodeInternalsUpdates.size);
 
   if (nodeInternalsFlushHandle == null) {
     nodeInternalsFlushHandle = window.requestAnimationFrame(flushPendingNodeInternalsUpdates);
@@ -54,6 +74,7 @@ function scheduleNodeInternalsUpdate(nodeId: string, updateInternals: (id: strin
 
 function cancelScheduledNodeInternalsUpdate(nodeId: string) {
   pendingNodeInternalsUpdates.delete(nodeId);
+  probeSetInternalsPending(pendingNodeInternalsUpdates.size);
 
   if (pendingNodeInternalsUpdates.size === 0 && nodeInternalsFlushHandle != null) {
     window.cancelAnimationFrame(nodeInternalsFlushHandle);
@@ -79,6 +100,11 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
   const { label, columns, logicalTableName, tableTermId, headerColor, handleLayout } = data;
   const updateNodeInternals = useUpdateNodeInternals();
   const isHighlighted = useCanvasStore((s) => s.highlightedNodeIds.includes(id));
+
+  useEffect(() => {
+    probeCounter('table-node-mount');
+    return () => probeCounter('table-node-unmount');
+  }, []);
 
   const { findTermById, findDomainById, resolveLogicalName } = useErdDictionary();
   const { canNavigateToCode, navigateToCode } = useDiagramCodeNavigation();

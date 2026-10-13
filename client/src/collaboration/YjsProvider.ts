@@ -1,6 +1,14 @@
 import * as Y from 'yjs';
 import { CANVAS_HISTORY_ORIGIN, DRAG_TRANSACTION_ORIGIN } from '@/constants/canvas-history';
 import { getWsBaseUrl } from '@/lib/platform';
+import {
+  probeBegin,
+  probeEnd,
+  probeMark,
+  probeRemoteSnapshotApplied,
+  probeSetConnectionStatus,
+  probeSetSynced,
+} from '@/lib/erd-performance-probe';
 import { WS_MSG_TYPE, WS_PRESENCE, WS_RECONNECT } from '@/constants/ws';
 import type {
   AwarenessState,
@@ -346,6 +354,7 @@ export class YjsProvider {
         this.lastPresenceVersion = 0;
         this.snapshotRequestTimestamps = [];
         this.onConnectionIssueDetected?.(null);
+        probeMark('ws-open');
         this.emitConnectionStatus('connected');
 
         if (this.presenceProtocolVersion >= 1) {
@@ -401,6 +410,7 @@ export class YjsProvider {
 
     const messageType = data[0];
     const payload = data.subarray(1);
+    probeMark('ws-frame', { messageType, bytes: data.byteLength });
 
     switch (messageType) {
       case WS_MSG_TYPE.SYNC_STEP1: {
@@ -413,9 +423,22 @@ export class YjsProvider {
       case WS_MSG_TYPE.SYNC_STEP2:
       case WS_MSG_TYPE.YJS_UPDATE: {
         // diff 또는 update 수신 -> Y.Doc에 적용
+        probeMark('snapshot-message', {
+          messageType,
+          bytes: payload.byteLength,
+          kind: messageType === WS_MSG_TYPE.SYNC_STEP2 ? 'sync-step-2' : 'update',
+        });
+        const applyStartedAt = probeBegin('ydoc-apply', {
+          messageType,
+          bytes: payload.byteLength,
+          kind: messageType === WS_MSG_TYPE.SYNC_STEP2 ? 'sync-step-2' : 'update',
+        });
         try {
           Y.applyUpdate(this.doc, payload, 'remote');
+          probeEnd('ydoc-apply', applyStartedAt, { messageType });
         } catch (e) {
+          probeEnd('ydoc-apply', applyStartedAt, { failed: true, messageType });
+          probeMark('ydoc-apply-error', { messageType });
           console.error('[YjsProvider] Y.applyUpdate 실패 (sync/update):', e);
           this.reconnectAfterError();
           return;
@@ -432,9 +455,23 @@ export class YjsProvider {
       }
       case WS_MSG_TYPE.SNAPSHOT_RESPONSE: {
         // 서버 스냅샷 수신 -> Y.Doc에 적용
+        probeMark('snapshot-message', {
+          messageType,
+          bytes: payload.byteLength,
+          kind: 'snapshot',
+        });
+        const applyStartedAt = probeBegin('ydoc-apply', {
+          messageType,
+          bytes: payload.byteLength,
+          kind: 'snapshot',
+        });
         try {
           Y.applyUpdate(this.doc, payload, 'remote');
+          probeEnd('ydoc-apply', applyStartedAt, { messageType });
+          probeRemoteSnapshotApplied();
         } catch (e) {
+          probeEnd('ydoc-apply', applyStartedAt, { failed: true, messageType });
+          probeMark('ydoc-apply-error', { messageType });
           console.error('[YjsProvider] Y.applyUpdate 실패 (snapshot):', e);
           this.reconnectAfterError();
           return;
@@ -444,9 +481,35 @@ export class YjsProvider {
         break;
       }
       case WS_MSG_TYPE.SNAPSHOT_RESPONSE_V2: {
+        probeMark('snapshot-message', {
+          messageType,
+          bytes: payload.byteLength,
+          kind: 'snapshot-v2',
+        });
+        const mergeStartedAt = probeBegin('snapshot-merge', { bytes: payload.byteLength });
+        let mergedPayload: Uint8Array;
         try {
-          Y.applyUpdate(this.doc, this.mergeSnapshotPayload(payload), 'remote');
+          mergedPayload = this.mergeSnapshotPayload(payload);
+          probeEnd('snapshot-merge', mergeStartedAt, { mergedBytes: mergedPayload.byteLength });
         } catch (e) {
+          probeEnd('snapshot-merge', mergeStartedAt, { failed: true });
+          probeMark('ydoc-apply-error', { messageType });
+          console.error('[YjsProvider] Y.applyUpdate 실패 (snapshot v2):', e);
+          this.reconnectAfterError();
+          return;
+        }
+        const applyStartedAt = probeBegin('ydoc-apply', {
+          messageType,
+          bytes: mergedPayload.byteLength,
+          kind: 'snapshot-v2',
+        });
+        try {
+          Y.applyUpdate(this.doc, mergedPayload, 'remote');
+          probeEnd('ydoc-apply', applyStartedAt, { messageType });
+          probeRemoteSnapshotApplied();
+        } catch (e) {
+          probeEnd('ydoc-apply', applyStartedAt, { failed: true, messageType });
+          probeMark('ydoc-apply-error', { messageType });
           console.error('[YjsProvider] Y.applyUpdate 실패 (snapshot v2):', e);
           this.reconnectAfterError();
           return;
@@ -847,6 +910,7 @@ export class YjsProvider {
    * @param status 연결 상태
    */
   private emitConnectionStatus(status: ConnectionStatus): void {
+    probeSetConnectionStatus(status);
     this.onConnectionStatusChange?.(status);
   }
 
@@ -860,6 +924,7 @@ export class YjsProvider {
       return;
     }
     this.synced = synced;
+    probeSetSynced(synced);
     this.onSyncStateChange?.(synced);
   }
 

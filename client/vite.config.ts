@@ -10,6 +10,16 @@ import { fileURLToPath, URL } from 'node:url';
  */
 export default defineConfig((configEnv) => {
   const env = loadEnv(configEnv.mode, process.cwd(), '');
+  const backendProxy = {
+    '/api': {
+      target: env.VITE_API_PROXY_TARGET ?? 'http://localhost:9503',
+      changeOrigin: true,
+    },
+    '/ws': {
+      target: env.VITE_WS_PROXY_TARGET ?? 'ws://localhost:9503',
+      ws: true,
+    },
+  };
 
   return {
     plugins: [react()],
@@ -105,16 +115,10 @@ export default defineConfig((configEnv) => {
     server: {
       port: Number(env.VITE_DEV_SERVER_PORT ?? '4503'),
       strictPort: env.VITE_DEV_SERVER_STRICT_PORT === 'true',
-      proxy: {
-        '/api': {
-          target: env.VITE_API_PROXY_TARGET ?? 'http://localhost:9503',
-          changeOrigin: true,
-        },
-        '/ws': {
-          target: env.VITE_WS_PROXY_TARGET ?? 'ws://localhost:9503',
-          ws: true,
-        },
-      },
+      proxy: backendProxy,
+    },
+    preview: {
+      proxy: backendProxy,
     },
   };
 });

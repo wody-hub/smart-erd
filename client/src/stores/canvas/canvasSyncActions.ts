@@ -42,6 +42,12 @@ import {
   resolveEdgeHandlesFromPreference,
 } from '@/lib/edge-handles';
 import { isProjectorManagedDocumentOrigin } from '@/collaboration/core/store/document-change-origin';
+import {
+  probeBegin,
+  probeEnd,
+  probeRelevantActivity,
+  probeSetGraphCounts,
+} from '@/lib/erd-performance-probe';
 import type {
   CanvasGetState,
   ProjectionSyncRequest,
@@ -230,15 +236,39 @@ export function createCanvasSyncActions(
 
     const forceFull = request?.forceFull ?? false;
     const targets = forceFull ? new Set<ProjectionSyncTarget>() : collectProjectionTargets(request);
+    const projectionStartedAt = probeBegin('projection', {
+      scope: forceFull || targets.size === 0 ? 'full' : 'scoped',
+      targetCount: targets.size,
+      nodeIdCount: request?.nodeIds?.length ?? 0,
+      edgeIdCount: request?.edgeIds?.length ?? 0,
+      groupIdCount: request?.groupIds?.length ?? 0,
+    });
+    probeRelevantActivity('projection');
 
     if (forceFull || targets.size === 0) {
+      const convertStartedAt = probeBegin('projection-convert', { scope: 'full' });
       const nextNodes = yTablesMapToNodes(getTablesMap(ydoc));
       const nextEdges = yEdgesMapToEdges(getEdgesMap(ydoc));
       const nextGroups = yGroupsMapToTableGroups(getGroupsMap(ydoc));
+      probeEnd('projection-convert', convertStartedAt, {
+        nodes: nextNodes.length,
+        edges: nextEdges.length,
+        groups: nextGroups.length,
+      });
+      const setStartedAt = probeBegin('projection-set', { scope: 'full' });
       set({
         nodes: nextNodes,
         edges: nextEdges,
         groups: nextGroups,
+      });
+      probeEnd('projection-set', setStartedAt, {
+        nodes: nextNodes.length,
+        edges: nextEdges.length,
+      });
+      probeSetGraphCounts(nextNodes.length, nextEdges.length, true);
+      probeEnd('projection', projectionStartedAt, {
+        nodes: nextNodes.length,
+        edges: nextEdges.length,
       });
       return;
     }
@@ -260,6 +290,10 @@ export function createCanvasSyncActions(
       return [...retained, ...nextEntries];
     }
 
+    const convertStartedAt = probeBegin('projection-convert', {
+      scope: 'scoped',
+      targetCount: targets.size,
+    });
     if (targets.has('nodes')) {
       if (requestedNodeIds.size === 0) {
         nextState.nodes = yTablesMapToNodes(getTablesMap(ydoc));
@@ -310,7 +344,21 @@ export function createCanvasSyncActions(
         nextState.groups = mergeEntitiesById(get().groups, requestedGroupIds, nextGroups);
       }
     }
+    probeEnd('projection-convert', convertStartedAt, {
+      nodes: nextState.nodes?.length ?? get().nodes.length,
+      edges: nextState.edges?.length ?? get().edges.length,
+      groups: nextState.groups?.length ?? get().groups.length,
+    });
+    const setStartedAt = probeBegin('projection-set', { scope: 'scoped' });
     set(nextState);
+    probeEnd('projection-set', setStartedAt, {
+      nodes: nextState.nodes?.length ?? get().nodes.length,
+      edges: nextState.edges?.length ?? get().edges.length,
+    });
+    const nextNodeCount = nextState.nodes?.length ?? get().nodes.length;
+    const nextEdgeCount = nextState.edges?.length ?? get().edges.length;
+    probeSetGraphCounts(nextNodeCount, nextEdgeCount, true);
+    probeEnd('projection', projectionStartedAt, { nodes: nextNodeCount, edges: nextEdgeCount });
   }
 
   function collectObservedEntityIds(events: Y.YEvent<Y.AbstractType<unknown>>[]): string[] | null {

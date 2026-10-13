@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo } from 'react';
+import { lazy, Suspense, useCallback, useLayoutEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ReactFlowProvider } from '@xyflow/react';
@@ -44,6 +44,14 @@ import type { DictionaryWorkspaceRouteState } from '@/types/workspace';
 import { useDiagramPageControls } from './use-diagram-page-controls';
 import { useDiagramPageRuntimeState } from './use-diagram-page-runtime-state';
 import { useDiagramWorkModeState } from './use-diagram-work-mode-state';
+import {
+  createProbeLifecycleId,
+  probeMark,
+  probePresentationProxy,
+  probeSetGraphCounts,
+  probeSetNavigationOrigin,
+  recordProbeUnmount,
+} from '@/lib/erd-performance-probe';
 
 const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPanel'));
 
@@ -82,6 +90,12 @@ export default function DiagramPage() {
   const navigate = useNavigate();
 
   const { t } = useTranslation();
+
+  useLayoutEffect(() => {
+    probeSetNavigationOrigin();
+    const lifecycleId = createProbeLifecycleId(`diagram-${diagramId ?? 'unknown'}`);
+    return () => recordProbeUnmount(lifecycleId);
+  }, [diagramId]);
   const { recordRecentProjectContext } = useRecentProjectContext(teamId);
   const { canEdit } = useTeamRole(teamId);
   const isMobileEditorLayout = useMediaQuery('(max-width: 767px)');
@@ -171,6 +185,35 @@ export default function DiagramPage() {
     diagramId,
     enableCodeModeDraftPersist: workModeCapabilities.persistCodeDraft,
   });
+
+  useLayoutEffect(() => {
+    const hasGraph = persistedNodes.length > 0 || persistedEdges.length > 0;
+    probeSetGraphCounts(
+      persistedNodes.length,
+      persistedEdges.length,
+      !isPreviewMode && previewSyncStatus !== 'syncing',
+    );
+    probeMark('diagram-page-commit', {
+      preview: isPreviewMode,
+      nodes: persistedNodes.length,
+      edges: persistedEdges.length,
+      connectionStatus: connectionStatus ?? 'unknown',
+    });
+    if (isPreviewMode && hasGraph) {
+      probeMark('preview-commit', { nodes: persistedNodes.length, edges: persistedEdges.length });
+      probePresentationProxy('preview');
+    } else if (!isPreviewMode && hasGraph) {
+      probeMark('live-commit', { nodes: persistedNodes.length, edges: persistedEdges.length });
+      probePresentationProxy('live');
+    }
+  }, [
+    connectionStatus,
+    isPreviewMode,
+    persistedEdges.length,
+    persistedNodes.length,
+    previewSyncStatus,
+  ]);
+
   const { sharedSchemaDraft, writePreviewPositionOverrides } = useDiagramSharedSchemaDraft();
   const {
     activeGroupId,

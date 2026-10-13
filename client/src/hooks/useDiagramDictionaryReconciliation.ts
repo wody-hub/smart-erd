@@ -4,6 +4,7 @@ import { useDiagramDictionaryReconciliationActions } from '@/collaboration/chann
 import { useDiagramErdNodesSnapshot } from '@/collaboration/channel/diagram/use-diagram-erd-read-snapshot';
 import { useErdDictionary } from '@/components/erd/ErdDictionaryContext';
 import { buildDiagramDictionaryReconciliationPlan } from '@/lib/diagram-dictionary-reconciliation';
+import { probeBegin, probeEnd, probeMark } from '@/lib/erd-performance-probe';
 
 interface UseDiagramDictionaryReconciliationParams {
   diagramId: string;
@@ -49,13 +50,21 @@ export function useDiagramDictionaryReconciliation({
     }
 
     const revisionKey = `${diagramId}:${dictionaryRevision}`;
+    const planStartedAt = probeBegin('dictionary-plan', {
+      nodeCount: diagramErdNodesSnapshot.currentNodes.length,
+    });
     const plan = buildDiagramDictionaryReconciliationPlan(diagramErdNodesSnapshot.currentNodes, {
       findTermById,
       findDomainById,
       resolveLogicalName,
     });
+    probeEnd('dictionary-plan', planStartedAt, {
+      tableUpdates: plan.tableMetaUpdates.length,
+      columnUpdates: plan.columnUpdates.length,
+    });
 
     if (plan.tableMetaUpdates.length === 0 && plan.columnUpdates.length === 0) {
+      probeMark('dictionary-noop');
       appliedRevisionRef.current = revisionKey;
       return;
     }
@@ -64,11 +73,16 @@ export function useDiagramDictionaryReconciliation({
       return;
     }
 
+    const applyStartedAt = probeBegin('dictionary-apply', {
+      tableUpdates: plan.tableMetaUpdates.length,
+      columnUpdates: plan.columnUpdates.length,
+    });
     const result = dictionaryReconciliationActions.reconcile(plan, {
       origin: {
         source: 'system',
       },
     });
+    probeEnd('dictionary-apply', applyStartedAt, { applied: result === 'applied' });
     if (result === 'applied') {
       appliedRevisionRef.current = revisionKey;
     }

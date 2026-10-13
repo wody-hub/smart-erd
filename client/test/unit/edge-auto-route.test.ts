@@ -1,6 +1,46 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { buildObstacleAvoidingAutoRoute } from '../../src/components/erd/edgeAutoRoute.js';
+import {
+  areEdgeObstacleRectsEqual,
+  buildObstacleAvoidingAutoRoute,
+} from '../../src/components/erd/edgeAutoRoute.js';
+
+test('areEdgeObstacleRectsEqual 는 새 배열이어도 동일한 장애물 geometry 를 같다고 본다', () => {
+  const left = [{ left: 10, right: 30, top: 40, bottom: 70 }];
+  const right = [{ left: 10, right: 30, top: 40, bottom: 70 }];
+
+  assert.notEqual(left, right);
+  assert.equal(areEdgeObstacleRectsEqual(left, right), true);
+  assert.equal(areEdgeObstacleRectsEqual([], []), true);
+});
+
+test('areEdgeObstacleRectsEqual 는 각 좌표가 바뀌면 geometry 를 다르다고 본다', () => {
+  const obstacle = { left: 10, right: 30, top: 40, bottom: 70 };
+  const changedCoordinates = [
+    { ...obstacle, left: 11 },
+    { ...obstacle, right: 31 },
+    { ...obstacle, top: 41 },
+    { ...obstacle, bottom: 71 },
+  ];
+
+  for (const changed of changedCoordinates) {
+    assert.equal(areEdgeObstacleRectsEqual([obstacle], [changed]), false);
+  }
+});
+
+test('areEdgeObstacleRectsEqual 는 장애물이 추가되거나 제거되면 다르다고 본다', () => {
+  const obstacle = { left: 10, right: 30, top: 40, bottom: 70 };
+
+  assert.equal(areEdgeObstacleRectsEqual([], [obstacle]), false);
+  assert.equal(areEdgeObstacleRectsEqual([obstacle], []), false);
+});
+
+test('areEdgeObstacleRectsEqual 는 서로 다른 장애물의 순서가 바뀌면 다르다고 본다', () => {
+  const first = { left: 10, right: 30, top: 40, bottom: 70 };
+  const second = { left: 50, right: 90, top: 20, bottom: 60 };
+
+  assert.equal(areEdgeObstacleRectsEqual([first, second], [second, first]), false);
+});
 
 function assertOrthogonal(points: Array<{ x: number; y: number }>) {
   for (let index = 0; index < points.length - 1; index += 1) {

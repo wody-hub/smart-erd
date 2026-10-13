@@ -4,6 +4,7 @@ import type { ConnectionStatus } from '@/types/collaboration';
 import type { CollaborationRuntimeEvent } from '@/collaboration/core/collaboration-runtime-types';
 import type { DiagramYjsDocumentAdapter } from '@/collaboration/yjs/diagram-yjs-document-adapter';
 import type { DiagramCollaborationBootstrap } from '@/collaboration/channel/diagram/diagram-collaboration-bootstrap';
+import { probeBegin, probeEnd, probeMark, probePreviewReleased } from '@/lib/erd-performance-probe';
 
 const REMOTE_SNAPSHOT_CONNECTED_GRACE_MS = 1_000;
 
@@ -67,6 +68,8 @@ export class DiagramPreviewHydrationController {
 
     this.options.updatePreviewMode(false);
     this.previewUnlockedAt = performance.now();
+    probeMark('preview-unlock', { reason: this.previewHydrationSource, updatesApplied });
+    probePreviewReleased(this.previewHydrationSource);
     console.info(
       '%s preview-unlocked source=%s totalMs=%d afterPreviewMs=%d updatesApplied=%d',
       this.options.handoffLogPrefix,
@@ -120,13 +123,18 @@ export class DiagramPreviewHydrationController {
     const { bootstrap, previewEnabled, dispatchRuntimeEvent, loadPreview, updatePreviewMode } =
       this.options;
     if (!previewEnabled || !bootstrap.content) {
+      probePreviewReleased('not-needed');
       return;
     }
 
     dispatchRuntimeEvent('bootstrap-loaded');
+    const previewLoadStartedAt = probeBegin('preview-load');
     loadPreview(bootstrap.content);
+    probeEnd('preview-load', previewLoadStartedAt);
+    probeMark('preview-store-ready');
     this.previewShownAt = performance.now();
     updatePreviewMode(true);
+    probeMark('preview-visible');
     console.info(
       '%s preview-visible totalMs=%d',
       this.options.handoffLogPrefix,

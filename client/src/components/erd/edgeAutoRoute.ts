@@ -10,6 +10,26 @@ export interface EdgeObstacleRect {
 const OBSTACLE_PADDING = 20;
 const OUTER_CORRIDOR_MARGIN = 48;
 
+/** 장애물 사각형 배열이 순서와 네 좌표까지 같은지 비교한다. */
+export function areEdgeObstacleRectsEqual(
+  left: readonly EdgeObstacleRect[],
+  right: readonly EdgeObstacleRect[],
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((obstacle, index) => {
+    const other = right[index];
+    return (
+      obstacle.left === other.left &&
+      obstacle.right === other.right &&
+      obstacle.top === other.top &&
+      obstacle.bottom === other.bottom
+    );
+  });
+}
+
 export function buildObstacleAvoidingAutoRoute(
   input: BuildStraightEdgePointsInput,
   obstacles: EdgeObstacleRect[],

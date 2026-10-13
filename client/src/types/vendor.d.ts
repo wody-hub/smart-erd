@@ -5,6 +5,7 @@ declare module 'js-yaml' {
 
 interface ImportMetaEnv {
   readonly VITE_WS_DIRECT_BASE_URL?: string;
+  readonly VITE_ERD_PERF_PROBE?: string;
 }
 
 interface ImportMeta {

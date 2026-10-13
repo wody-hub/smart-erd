@@ -19,7 +19,12 @@ import {
   buildOrthogonalRouteSegments,
   buildStraightEdgePoints,
 } from './edgeWaypointGeometry';
-import { buildObstacleAvoidingAutoRoute } from './edgeAutoRoute';
+import { areEdgeObstacleRectsEqual, buildObstacleAvoidingAutoRoute } from './edgeAutoRoute';
+import {
+  isPerfRouteDetourOff,
+  probeAggregateEnd,
+  probeAggregateStart,
+} from '@/lib/erd-performance-probe';
 
 /** 카디널리티 기호 유형 */
 type CardinalitySymbol = 'one' | 'many';
@@ -256,11 +261,13 @@ export default function ErdRelationEdge({
   const obstacleRects = useStore(
     useCallback(
       (s) => {
+        const selectorStartedAt = probeAggregateStart();
         if (routingType !== 'smoothstep') {
+          probeAggregateEnd('obstacle-selector', selectorStartedAt);
           return [];
         }
 
-        return s.nodes
+        const rects = s.nodes
           .filter(
             (node) =>
               node.id !== source &&
@@ -278,9 +285,12 @@ export default function ErdRelationEdge({
               bottom: node.position.y + height,
             };
           });
+        probeAggregateEnd('obstacle-selector', selectorStartedAt);
+        return rects;
       },
       [routingType, source, target],
     ),
+    areEdgeObstacleRectsEqual,
   );
   const { edgeLocksById, edgePreviewsById, localEdgeDrag, beginSegmentDrag, splitSegment } =
     useEdgeEditingContext();
@@ -306,35 +316,36 @@ export default function ErdRelationEdge({
 
   const sourceDirection = resolvedSourcePosition === ('left' as Position) ? -1 : 1;
   const targetDirection = resolvedTargetPosition === ('left' as Position) ? -1 : 1;
-  const autoRoutePoints = useMemo(
-    () =>
-      routingType === 'smoothstep'
-        ? buildObstacleAvoidingAutoRoute(
-            {
-              sourceX,
-              sourceY,
-              targetX,
-              targetY,
-              sourceDirection,
-              targetDirection,
-              sourceMarkerOffset: SOURCE_MARKER_OFFSET,
-              targetMarkerOffset: TARGET_MARKER_OFFSET,
-              waypoints: [],
-            },
-            obstacleRects,
-          )
-        : null,
-    [
+  const autoRoutePoints = useMemo(() => {
+    if (routingType !== 'smoothstep') return null;
+    if (isPerfRouteDetourOff()) return null;
+    const routeStartedAt = probeAggregateStart();
+    const points = buildObstacleAvoidingAutoRoute(
+      {
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+        sourceDirection,
+        targetDirection,
+        sourceMarkerOffset: SOURCE_MARKER_OFFSET,
+        targetMarkerOffset: TARGET_MARKER_OFFSET,
+        waypoints: [],
+      },
       obstacleRects,
-      routingType,
-      sourceDirection,
-      sourceX,
-      sourceY,
-      targetDirection,
-      targetX,
-      targetY,
-    ],
-  );
+    );
+    probeAggregateEnd('detour-routing', routeStartedAt);
+    return points;
+  }, [
+    obstacleRects,
+    routingType,
+    sourceDirection,
+    sourceX,
+    sourceY,
+    targetDirection,
+    targetX,
+    targetY,
+  ]);
 
   const edgePath = getEdgePathByRoutingType({
     routingType,
