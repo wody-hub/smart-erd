@@ -10,22 +10,21 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import useThemeStore from '@/stores/useThemeStore';
-import type { ThemeName } from '@/lib/theme';
+import { THEME_OPTIONS, type ThemeName } from '@/lib/theme';
 
 /** theme 항목별 swatch CSS Variable (hsl 참조) */
 const THEME_SWATCHES: Record<ThemeName, string> = {
   paper: 'hsl(var(--theme-swatch-paper))',
   graphite: 'hsl(var(--theme-swatch-graphite))',
   midnight: 'hsl(var(--theme-swatch-midnight))',
+  lumen: 'hsl(var(--theme-swatch-lumen))',
+  eclipse: 'hsl(var(--theme-swatch-eclipse))',
 };
-
-/** theme 선택 항목 목록 (표시 순서대로) */
-const THEME_OPTIONS: ThemeName[] = ['paper', 'graphite', 'midnight'];
 
 /**
  * 헤더에서 테마를 전환하는 드롭다운 컴포넌트.
  *
- * Palette 아이콘 버튼을 클릭하면 3개의 curated theme을 선택할 수 있다.
+ * Palette 아이콘 버튼을 클릭하면 5개의 curated theme을 선택할 수 있다.
  * 선택 시 useThemeStore.setTheme()을 호출하여 localStorage persistence와 DOM class 적용을 동시에 트리거한다.
  *
  * @returns 테마 전환 드롭다운 JSX

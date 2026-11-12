@@ -21,7 +21,7 @@ import { isElectron, initServerUrl } from '@/lib/platform';
 import { ROUTES } from '@/constants/routes';
 import { STORAGE_KEYS } from '@/constants/storage';
 import useThemeStore from '@/stores/useThemeStore';
-import type { ThemeName } from '@/lib/theme';
+import { THEME_OPTIONS, type ThemeName } from '@/lib/theme';
 import { toast } from 'sonner';
 
 /** Electron 환경에서 선택 가능한 서버 URL 목록. */
@@ -33,8 +33,6 @@ const SERVER_URL_OPTIONS = [
   { label: 'Test (127.0.0.1:9502)', value: 'http://127.0.0.1:9502' },
   { label: 'Local (127.0.0.1:9501)', value: 'http://127.0.0.1:9501' },
 ];
-
-const THEME_OPTIONS: ThemeName[] = ['paper', 'graphite', 'midnight'];
 
 /**
  * 로그인 페이지 컴포넌트.

@@ -370,6 +370,257 @@
     --composition-warning-foreground: 42 78% 84%;
     --composition-warning-muted: 39 58% 67%;
   }
+
+  /* 새 테마 swatch — 모든 테마에서 스위처가 참조하므로 :root에 둔다 */
+  :root {
+    --theme-swatch-lumen: 0 0% 100%;
+    --theme-swatch-eclipse: 240 12% 4.9%;
+  }
+
+  /*
+   * Lumen (light) — Linear식 미니멀.
+   * 순백 배경 + 옅은 zinc 보조면 + 1px 헤어라인 보더 + 인디고 단일 포인트. 그림자 최소, radius 8px.
+   * ERD 테이블 헤더는 색 채움 대신 톤온톤(옅은 면 + 진한 글자)으로 절제한다.
+   */
+  .theme-lumen {
+    --background: 0 0% 100%;
+    --foreground: 240 5.9% 10%;
+    --foreground-secondary: 240 5.2% 26%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 5.9% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 5.9% 10%;
+    --primary: 240 60% 59.8%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 42%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 5.9% 90%;
+    --input: 240 4.9% 83.9%;
+    --ring: 240 60% 59.8%;
+    --radius: 0.5rem;
+
+    --surface-muted: 240 4.8% 95.9%;
+    --surface-strong: 240 5.9% 90%;
+    --brand-secondary: 162 80% 31%;
+    --brand-secondary-foreground: 0 0% 100%;
+    --accent-warm: 36 90% 38%;
+    --accent-warm-foreground: 0 0% 100%;
+    --shadow-soft: 0 1px 2px rgba(24, 24, 27, 0.04), 0 4px 12px rgba(24, 24, 27, 0.04);
+    --shadow-strong: 0 12px 32px rgba(24, 24, 27, 0.14);
+    --shadow-operational: 0 1px 2px rgba(24, 24, 27, 0.06);
+    --shadow-primary: 0 1px 2px hsl(var(--primary) / 0.3);
+    --shadow-primary-hover: 0 2px 6px hsl(var(--primary) / 0.3);
+    --shadow-destructive: 0 1px 2px hsl(var(--destructive) / 0.3);
+    --shadow-field-inset: inset 0 1px 0 hsl(var(--field-highlight));
+    --field-highlight: 0 0% 100% / 0;
+    --overlay-scrim: 240 10% 4% / 0.5;
+
+    --header-bg: 0 0% 100%;
+    --header-foreground: 240 5.9% 10%;
+    --header-muted: 240 3.8% 42%;
+
+    --erd-table-header: 240 4.8% 95.9%;
+    --erd-table-header-foreground: 240 5.9% 10%;
+    --erd-table-supporting: 240 60% 94%;
+    --erd-table-supporting-foreground: 240 50% 32%;
+    --erd-table-attention: 40 90% 92%;
+    --erd-table-attention-foreground: 30 80% 26%;
+    --erd-pk: 36 90% 38%;
+    --erd-fk: 240 60% 59.8%;
+    --erd-nn: 162 80% 31%;
+    --erd-handle: 240 3.8% 42%;
+    --erd-handle-border: 240 5.2% 26%;
+    --erd-warning: 36 90% 34%;
+    --erd-ai: 18 70% 45%;
+    --erd-domain: 162 80% 31%;
+    --erd-domain-foreground: 0 0% 100%;
+
+    --erd-status-connected: 162 80% 31%;
+    --erd-status-connecting: 240 60% 59.8%;
+    --erd-status-disconnected: 0 72% 51%;
+
+    --erd-cursor-foreground: 0 0% 100%;
+
+    --cursor-color-1: 0 80% 60%;
+    --cursor-color-2: 210 80% 60%;
+    --cursor-color-3: 120 60% 50%;
+    --cursor-color-4: 45 90% 55%;
+    --cursor-color-5: 280 70% 60%;
+    --cursor-color-6: 180 60% 50%;
+
+    --success: 162 80% 31%;
+    --success-foreground: 0 0% 100%;
+
+    --erd-validation-matched: 162 80% 31%;
+    --erd-validation-mismatch: 36 90% 34%;
+    --erd-validation-unregistered: 0 72% 51%;
+    --erd-validation-unchecked: 240 3.8% 42%;
+
+    --composition-valid-bg: 160 45% 95%;
+    --composition-valid-border: 160 40% 75%;
+    --composition-valid-foreground: 162 70% 18%;
+    --composition-valid-muted: 162 60% 25%;
+    --composition-warning-bg: 40 100% 94%;
+    --composition-warning-border: 40 70% 70%;
+    --composition-warning-foreground: 35 100% 22%;
+    --composition-warning-muted: 36 75% 31%;
+
+    --screen-spec-frame-fill: 0 0% 100%;
+    --screen-spec-frame-stroke: 240 6% 88%;
+    --screen-spec-frame-shadow: 240 6% 90%;
+    --screen-spec-safe-area: 240 6% 84%;
+    --screen-spec-canvas-background: 240 5% 96%;
+    --screen-spec-grid: 240 6% 90%;
+    --screen-spec-surface-fill: 0 0% 100%;
+    --screen-spec-surface-stroke: 240 6% 88%;
+    --screen-spec-accent-primary: 240 5% 93%;
+    --screen-spec-accent-secondary: 240 30% 94%;
+    --screen-spec-accent-tertiary: 240 5% 92%;
+    --screen-spec-accent-quaternary: 40 25% 91%;
+    --screen-spec-accent-ink: 240 4% 40%;
+    --screen-spec-accent-muted: 240 4% 55%;
+    --screen-spec-selection: 240 60% 59.8%;
+    --screen-spec-orphan: 36 90% 34%;
+    --screen-spec-anchor-fill: 0 0% 100%;
+    --screen-spec-shadow-color: 240 6% 10% / 0.08;
+
+    --screen-spec-category-layout: 213 27% 84%;
+    --screen-spec-category-table: 213 97% 87%;
+    --screen-spec-category-form: 232 97% 89%;
+    --screen-spec-category-input: 141 79% 85%;
+    --screen-spec-category-feedback: 48 97% 77%;
+    --screen-spec-category-button: 326 88% 90%;
+    --screen-spec-category-default: 212 24% 89%;
+  }
+
+  /*
+   * Eclipse (dark) — Lumen의 반전이 아니라 별도로 잡은 다크 팔레트.
+   * 순수 검정 대신 깊은 zinc-violet 면, 보더로 계층을 만들고 그림자는 헤어라인 수준.
+   * 밝은 인디고 위에는 흰 글자 대신 어두운 글자(대비 6:1)를 쓴다.
+   */
+  .theme-eclipse {
+    --background: 240 12% 4.9%;
+    --foreground: 240 15% 93.5%;
+    --foreground-secondary: 240 8% 73%;
+    --card: 240 12% 8.4%;
+    --card-foreground: 240 15% 93.5%;
+    --popover: 240 12% 10.2%;
+    --popover-foreground: 240 15% 93.5%;
+    --primary: 240 77% 74.3%;
+    --primary-foreground: 240 12% 5%;
+    --secondary: 240 12% 12%;
+    --secondary-foreground: 240 15% 93.5%;
+    --muted: 240 12% 12%;
+    --muted-foreground: 240 6% 59%;
+    --accent: 240 12% 12%;
+    --accent-foreground: 240 15% 93.5%;
+    --destructive: 358 75% 59%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 10% 16.5%;
+    --input: 240 10% 20%;
+    --ring: 240 77% 74.3%;
+    --radius: 0.5rem;
+
+    --surface-muted: 240 12% 12%;
+    --surface-strong: 240 10% 16.5%;
+    --brand-secondary: 160 60% 45%;
+    --brand-secondary-foreground: 240 12% 5%;
+    --accent-warm: 38 90% 58%;
+    --accent-warm-foreground: 240 12% 5%;
+    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-strong: 0 16px 40px rgba(0, 0, 0, 0.6);
+    --shadow-operational: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-primary: 0 0 0 1px hsl(var(--primary) / 0.4), 0 4px 14px hsl(var(--primary) / 0.18);
+    --shadow-primary-hover:
+      0 0 0 1px hsl(var(--primary) / 0.55), 0 6px 18px hsl(var(--primary) / 0.26);
+    --shadow-destructive: 0 0 0 1px hsl(var(--destructive) / 0.4);
+    --shadow-field-inset: inset 0 1px 0 hsl(var(--field-highlight));
+    --field-highlight: 240 15% 93.5% / 0.04;
+    --overlay-scrim: 240 12% 3% / 0.7;
+
+    --header-bg: 240 12% 6.5%;
+    --header-foreground: 240 15% 93.5%;
+    --header-muted: 240 6% 59%;
+
+    --erd-table-header: 240 10% 16.5%;
+    --erd-table-header-foreground: 240 15% 93.5%;
+    --erd-table-supporting: 240 30% 20%;
+    --erd-table-supporting-foreground: 240 80% 85%;
+    --erd-table-attention: 38 40% 17%;
+    --erd-table-attention-foreground: 38 80% 78%;
+    --erd-pk: 38 90% 58%;
+    --erd-fk: 240 77% 74.3%;
+    --erd-nn: 160 60% 45%;
+    --erd-handle: 240 6% 59%;
+    --erd-handle-border: 240 10% 24%;
+    --erd-warning: 38 90% 58%;
+    --erd-ai: 18 80% 60%;
+    --erd-domain: 160 60% 45%;
+    --erd-domain-foreground: 240 12% 5%;
+
+    --erd-status-connected: 160 60% 45%;
+    --erd-status-connecting: 240 77% 74.3%;
+    --erd-status-disconnected: 358 75% 62%;
+
+    --erd-cursor-foreground: 0 0% 100%;
+
+    --cursor-color-1: 0 80% 60%;
+    --cursor-color-2: 210 80% 60%;
+    --cursor-color-3: 120 60% 50%;
+    --cursor-color-4: 45 90% 55%;
+    --cursor-color-5: 280 70% 60%;
+    --cursor-color-6: 180 60% 50%;
+
+    --success: 160 60% 45%;
+    --success-foreground: 240 12% 5%;
+
+    --erd-validation-matched: 160 60% 45%;
+    --erd-validation-mismatch: 38 90% 58%;
+    --erd-validation-unregistered: 358 75% 62%;
+    --erd-validation-unchecked: 240 6% 59%;
+
+    --composition-valid-bg: 160 35% 15%;
+    --composition-valid-border: 167.9 28% 28%;
+    --composition-valid-foreground: 162 48% 84%;
+    --composition-valid-muted: 168 32% 68%;
+    --composition-warning-bg: 40 42% 16%;
+    --composition-warning-border: 38 44% 30%;
+    --composition-warning-foreground: 42 78% 84%;
+    --composition-warning-muted: 39 58% 67%;
+
+    --screen-spec-frame-fill: 240 12% 8.4%;
+    --screen-spec-frame-stroke: 240 10% 24%;
+    --screen-spec-frame-shadow: 240 12% 3%;
+    --screen-spec-safe-area: 240 8% 34%;
+    --screen-spec-canvas-background: 240 12% 6%;
+    --screen-spec-grid: 240 10% 13%;
+    --screen-spec-surface-fill: 240 12% 8.4%;
+    --screen-spec-surface-stroke: 240 10% 20%;
+    --screen-spec-accent-primary: 240 12% 14%;
+    --screen-spec-accent-secondary: 240 20% 20%;
+    --screen-spec-accent-tertiary: 38 20% 20%;
+    --screen-spec-accent-quaternary: 240 10% 22%;
+    --screen-spec-accent-ink: 240 15% 93.5%;
+    --screen-spec-accent-muted: 240 8% 73%;
+    --screen-spec-selection: 240 77% 74.3%;
+    --screen-spec-orphan: 38 90% 58%;
+    --screen-spec-anchor-fill: 240 15% 93.5%;
+    --screen-spec-shadow-color: 0 0% 0% / 0.4;
+
+    --screen-spec-category-layout: 213 22% 34%;
+    --screen-spec-category-table: 213 46% 38%;
+    --screen-spec-category-form: 232 38% 42%;
+    --screen-spec-category-input: 141 36% 34%;
+    --screen-spec-category-feedback: 48 46% 38%;
+    --screen-spec-category-button: 326 40% 42%;
+    --screen-spec-category-default: 212 18% 36%;
+  }
 }
 
 @layer base {
@@ -426,6 +677,12 @@
         hsl(var(--background)) 64%,
         hsl(var(--secondary) / 0.72) 100%
       );
+  }
+
+  /* Lumen / Eclipse: 장식 없는 플랫 배경 (radial 글로우 제거) */
+  .theme-lumen body,
+  .theme-eclipse body {
+    background-image: none;
   }
 
   h1,

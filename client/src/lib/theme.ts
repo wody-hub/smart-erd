@@ -8,20 +8,36 @@
  */
 
 /** 지원하는 테마 이름 */
-export type ThemeName = 'paper' | 'graphite' | 'midnight';
+export type ThemeName = 'paper' | 'graphite' | 'midnight' | 'lumen' | 'eclipse';
+
+/** 테마 선택 UI에 표시되는 순서 (스위처, 로그인 화면 공용) */
+export const THEME_OPTIONS: readonly ThemeName[] = [
+  'paper',
+  'graphite',
+  'midnight',
+  'lumen',
+  'eclipse',
+] as const;
+
+/** dark 계열 테마 집합 (.dark class 및 Monaco vs-dark 적용 대상) */
+const DARK_THEMES: ReadonlySet<ThemeName> = new Set<ThemeName>(['graphite', 'midnight', 'eclipse']);
 
 /** 기본 테마 (localStorage 값이 없거나 유효하지 않을 때 사용) */
 export const DEFAULT_THEME: ThemeName = 'paper';
 
 /** 유효한 테마 이름 집합 */
-const VALID_THEMES: ReadonlySet<string> = new Set<ThemeName>(['paper', 'graphite', 'midnight']);
+const VALID_THEMES: ReadonlySet<string> = new Set<ThemeName>(THEME_OPTIONS);
 
 /** 테마별 CSS class 이름 */
 const THEME_CLASSES: readonly string[] = [
   'theme-paper',
   'theme-graphite',
   'theme-midnight',
+  'theme-lumen',
+  'theme-eclipse',
 ] as const;
+// 주의: 클래스명을 템플릿(`theme-${name}`)으로 조합하지 말 것.
+// Tailwind가 콘텐츠 스캔에서 리터럴을 찾지 못하면 index.css @layer base의 .theme-* 규칙을 제거한다.
 
 /**
  * localStorage에 저장된 테마 문자열을 유효한 ThemeName으로 정규화한다.
@@ -42,10 +58,10 @@ export function resolveStoredTheme(value: string | null | undefined): ThemeName 
  * 테마가 dark 계열인지 판별한다.
  *
  * @param theme 판별 대상 테마
- * @returns paper이면 false, graphite/midnight이면 true
+ * @returns graphite/midnight/eclipse이면 true, paper/lumen이면 false
  */
 export function isDarkTheme(theme: ThemeName): boolean {
-  return theme !== 'paper';
+  return DARK_THEMES.has(theme);
 }
 
 /**
@@ -62,8 +78,8 @@ export function resolveMonacoTheme(theme: ThemeName): 'vs' | 'vs-dark' {
  * DOM 요소에 테마 class를 적용한다.
  *
  * 기존 theme-* class를 모두 제거하고 현재 테마에 해당하는 class만 추가한다.
- * dark 테마(graphite, midnight)에서는 Tailwind dark: variant 호환성을 위해
- * .dark class를 함께 추가하고, light 테마(paper)에서는 제거한다.
+ * dark 테마(graphite, midnight, eclipse)에서는 Tailwind dark: variant 호환성을 위해
+ * .dark class를 함께 추가하고, light 테마(paper, lumen)에서는 제거한다.
  *
  * @param target class를 적용할 HTML 요소 (보통 document.documentElement)
  * @param theme  적용할 테마

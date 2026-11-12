@@ -270,3 +270,11 @@ Graphite and Midnight share the same dark-surface shadow values (deeper opacity 
 |------|----------|-----------|
 | 2026-03-31 | Initial design system created | The workspace IA was cleaned up, but the visual system was still generic. This document locks the product into a warmer, more editorial, more memorable direction without sacrificing ERD tool clarity. |
 | 2026-04-03 | 3-theme system (Paper/Graphite/Midnight) adopted | Curated themes replace binary light/dark toggle. `.dark` demoted to compatibility bit. |
+
+## Additional Themes — Lumen / Eclipse (2026-11-12)
+기존 Paper / Graphite / Midnight는 그대로 유지하며, 선택형 테마로 두 개를 추가했다. 기본 테마는 여전히 Paper다.
+- **Direction:** Linear식 미니멀. 순백 배경 + 옅은 zinc 보조면 + 1px 헤어라인 보더 + 인디고 단일 포인트. 그림자 최소, radius `0.5rem`, 배경 글로우(radial gradient) 없음.
+- **Lumen (light):** `.theme-lumen`. background `#FFFFFF`, card `#FFFFFF`, muted/secondary `#F4F4F5`, border `#E4E4E7`, ink `#18181B`, muted text `#71717A`, primary `#5B5BD6`(흰 글자).
+- **Eclipse (dark):** `.theme-eclipse`. Lumen의 반전이 아닌 별도 팔레트. background `#0B0B0E`, card `#131318`, muted `#1B1B22`, border `#26262E`, ink `#ECECF1`, primary `#8B8BF0`(어두운 글자, 대비 약 6:1).
+- **ERD:** 테이블 헤더는 색 채움 대신 톤온톤(옅은 면 + 진한 글자). PK/FK/NN 마커와 상태 색은 기존 의미를 유지한다.
+- **구현:** `client/src/index.css`의 `.theme-lumen` / `.theme-eclipse` 블록, `lib/theme.ts`의 `ThemeName`·`THEME_OPTIONS`·`THEME_CLASSES`. 클래스명은 반드시 리터럴로 둔다(Tailwind가 `@layer base`의 미사용 `.theme-*` 규칙을 제거함).

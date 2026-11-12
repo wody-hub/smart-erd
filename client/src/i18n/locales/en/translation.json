@@ -2656,6 +2656,8 @@
     "paper": "Paper",
     "graphite": "Graphite",
     "midnight": "Midnight",
+    "lumen": "Lumen",
+    "eclipse": "Eclipse",
     "current": "Current theme",
     "aria": {
       "switchTheme": "Switch theme"
