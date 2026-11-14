@@ -7,6 +7,81 @@ export interface EdgeObstacleRect {
   bottom: number;
 }
 
+interface ObstacleNode {
+  /** 노드 식별자 */
+  id: string;
+  /** 테이블 계열 노드 유형 */
+  type?: string;
+  /** 캔버스 위치 */
+  position: { x: number; y: number };
+  /** 지정 너비 */
+  width?: number;
+  /** 지정 높이 */
+  height?: number;
+  /** 측정된 크기 */
+  measured?: { width?: number; height?: number };
+  /** 컬럼 데이터 */
+  data?: { columns?: unknown[] };
+}
+
+interface ObstacleSnapshot {
+  /** 노드 ID별 라우팅 장애물 좌표 */
+  rectByNodeId: Map<string, EdgeObstacleRect>;
+  /** 엣지별 안정된 장애물 배열 */
+  rectsByEdge: Map<string, EdgeObstacleRect[]>;
+}
+
+const obstacleSnapshots = new WeakMap<readonly ObstacleNode[], ObstacleSnapshot>();
+const DEFAULT_NODE_WIDTH = 420;
+const DEFAULT_NODE_BASE_HEIGHT = 52;
+const DEFAULT_NODE_ROW_HEIGHT = 30;
+
+/**
+ * React Flow 노드 스냅샷에서 특정 엣지의 장애물 좌표를 캐시한다.
+ * 같은 노드 배열과 endpoint 조합을 사용하면 동일한 배열 참조를 반환한다.
+ * @param nodes React Flow 노드 스냅샷
+ * @param sourceNodeId 엣지 시작 노드 ID
+ * @param targetNodeId 엣지 끝 노드 ID
+ * @returns endpoint를 제외한 테이블 장애물 좌표
+ */
+export function getCachedEdgeObstacleRects(
+  nodes: readonly ObstacleNode[],
+  sourceNodeId: string,
+  targetNodeId: string,
+): EdgeObstacleRect[] {
+  let snapshot = obstacleSnapshots.get(nodes);
+  if (!snapshot) {
+    const rectByNodeId = new Map<string, EdgeObstacleRect>();
+    for (const node of nodes) {
+      if (node.type !== 'table' && node.type !== 'previewTable') continue;
+      const width = node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH;
+      const height =
+        node.measured?.height ??
+        node.height ??
+        DEFAULT_NODE_BASE_HEIGHT + (node.data?.columns?.length ?? 0) * DEFAULT_NODE_ROW_HEIGHT;
+      rectByNodeId.set(node.id, {
+        left: node.position.x,
+        right: node.position.x + width,
+        top: node.position.y,
+        bottom: node.position.y + height,
+      });
+    }
+    snapshot = { rectByNodeId, rectsByEdge: new Map() };
+    obstacleSnapshots.set(nodes, snapshot);
+  }
+
+  const edgeKey = `${sourceNodeId}\u0000${targetNodeId}`;
+  const cached = snapshot.rectsByEdge.get(edgeKey);
+  if (cached) return cached;
+
+  const rects: EdgeObstacleRect[] = [];
+  for (const [nodeId, rect] of snapshot.rectByNodeId) {
+    if (nodeId !== sourceNodeId && nodeId !== targetNodeId) rects.push(rect);
+  }
+  snapshot.rectsByEdge.set(edgeKey, rects);
+  return rects;
+}
+
 const OBSTACLE_PADDING = 20;
 const OUTER_CORRIDOR_MARGIN = 48;
 

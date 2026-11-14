@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { useUpdateNodeInternals, type NodeProps } from '@xyflow/react';
 import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -122,6 +122,10 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
   const isEditing = canEdit && isEditingState;
   const fkMode = useErdFkMode();
   const resolvedHandleLayout = handleLayout ?? 'split';
+  const columnHandleSignature = useMemo(
+    () => columns.map((column) => column.id).join('\u0000'),
+    [columns],
+  );
   const targetHandlePlacements = useMemo(
     () => getColumnHandlePlacements(resolvedHandleLayout, 'target'),
     [resolvedHandleLayout],
@@ -134,6 +138,11 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
   /** 관계선이 연결된 컬럼 ID 셋 */
   const connectedColumnIds = useConnectedColumnIds(id);
   const connectedColumnDirections = useConnectedColumnDirections(id);
+  const previousHandleLayoutRef = useRef({
+    columnHandleSignature,
+    handleLayout: resolvedHandleLayout,
+    connectedColumnIds,
+  });
   const compactTableRenderingMode = useCompactTableRenderingMode();
 
   /** 해당 컬럼이 엣지에 연결되어 있는지 확인한다. */
@@ -199,16 +208,23 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
   });
 
   useEffect(() => {
-    if (!fkMode && connectedColumnIds.size === 0) {
-      cancelScheduledNodeInternalsUpdate(id);
-      return;
-    }
+    const previous = previousHandleLayoutRef.current;
+    const handlesChanged =
+      previous.columnHandleSignature !== columnHandleSignature ||
+      previous.handleLayout !== resolvedHandleLayout ||
+      previous.connectedColumnIds !== connectedColumnIds;
+    previousHandleLayoutRef.current = {
+      columnHandleSignature,
+      handleLayout: resolvedHandleLayout,
+      connectedColumnIds,
+    };
+    if (!handlesChanged) return;
 
     scheduleNodeInternalsUpdate(id, updateNodeInternals);
     return () => {
       cancelScheduledNodeInternalsUpdate(id);
     };
-  }, [columns.length, connectedColumnIds, fkMode, handleLayout, id, updateNodeInternals]);
+  }, [columnHandleSignature, connectedColumnIds, id, resolvedHandleLayout, updateNodeInternals]);
 
   return (
     <div

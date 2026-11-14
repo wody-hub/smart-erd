@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import {
   type EdgeProps,
-  EdgeLabelRenderer,
   getBezierPath,
   getSmoothStepPath,
   useStore,
@@ -14,6 +13,7 @@ import type { EdgeRoutingType, RelationType, TableNodeData, Waypoint } from '@/t
 import { extractColId, extractHandleSide } from '@/lib/handle-id';
 import { cn } from '@/lib/utils';
 import { useEdgeEditingContext } from './EdgeEditingContext';
+import { EdgeLabelPortal } from './EdgeLabelPortal';
 import { useErdCardVariant } from '@/hooks/useErdCardVariant';
 import { IeChildEndMarker, IeParentEndMarker } from './IeEdgeMarkers';
 import { computeIeMarkers } from './erdIeMarkers';
@@ -22,7 +22,12 @@ import {
   buildOrthogonalRouteSegments,
   buildStraightEdgePoints,
 } from './edgeWaypointGeometry';
-import { areEdgeObstacleRectsEqual, buildObstacleAvoidingAutoRoute } from './edgeAutoRoute';
+import {
+  type EdgeObstacleRect,
+  areEdgeObstacleRectsEqual,
+  buildObstacleAvoidingAutoRoute,
+  getCachedEdgeObstacleRects,
+} from './edgeAutoRoute';
 import {
   isPerfRouteDetourOff,
   probeAggregateEnd,
@@ -73,9 +78,7 @@ const CROW_FOOT_SPREAD = 8;
 const SEGMENT_HANDLE_THICKNESS = 18;
 const SEGMENT_GRIP_LENGTH = 24;
 const SEGMENT_GRIP_THICKNESS = 4;
-const DEFAULT_NODE_WIDTH = 420;
-const DEFAULT_NODE_BASE_HEIGHT = 52;
-const DEFAULT_NODE_ROW_HEIGHT = 30;
+const EMPTY_OBSTACLE_RECTS: EdgeObstacleRect[] = [];
 
 function buildSegmentHandleStyle(
   start: { x: number; y: number },
@@ -148,10 +151,6 @@ function getEdgePathByRoutingType(input: {
     borderRadius: 8,
   });
   return path;
-}
-
-function estimateNodeHeight(data: TableNodeData | undefined): number {
-  return DEFAULT_NODE_BASE_HEIGHT + (data?.columns.length ?? 0) * DEFAULT_NODE_ROW_HEIGHT;
 }
 
 function renderOneMarker(x: number, y: number, direction: number, stroke: string) {
@@ -257,7 +256,7 @@ export default function ErdRelationEdge({
   const childData = useStore(
     useCallback(
       (s) => {
-        const childNode = s.nodes.find((n) => n.id === target);
+        const childNode = s.nodeLookup.get(target);
         return childNode?.data as TableNodeData | undefined;
       },
       [target],
@@ -269,27 +268,9 @@ export default function ErdRelationEdge({
         const selectorStartedAt = probeAggregateStart();
         if (routingType !== 'smoothstep') {
           probeAggregateEnd('obstacle-selector', selectorStartedAt);
-          return [];
+          return EMPTY_OBSTACLE_RECTS;
         }
-
-        const rects = s.nodes
-          .filter(
-            (node) =>
-              node.id !== source &&
-              node.id !== target &&
-              (node.type === 'table' || node.type === 'previewTable'),
-          )
-          .map((node) => {
-            const tableData = node.data as TableNodeData | undefined;
-            const width = node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH;
-            const height = node.measured?.height ?? node.height ?? estimateNodeHeight(tableData);
-            return {
-              left: node.position.x,
-              right: node.position.x + width,
-              top: node.position.y,
-              bottom: node.position.y + height,
-            };
-          });
+        const rects = getCachedEdgeObstacleRects(s.nodes, source, target);
         probeAggregateEnd('obstacle-selector', selectorStartedAt);
         return rects;
       },
@@ -484,7 +465,7 @@ export default function ErdRelationEdge({
         </g>
       )}
 
-      <EdgeLabelRenderer>
+      <EdgeLabelPortal>
         <>
           {showSegmentControls &&
             routeSegments.map((segment) => (
@@ -553,7 +534,7 @@ export default function ErdRelationEdge({
               </button>
             ))}
         </>
-      </EdgeLabelRenderer>
+      </EdgeLabelPortal>
     </g>
   );
 }
