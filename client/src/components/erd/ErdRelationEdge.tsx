@@ -14,6 +14,9 @@ import type { EdgeRoutingType, RelationType, TableNodeData, Waypoint } from '@/t
 import { extractColId, extractHandleSide } from '@/lib/handle-id';
 import { cn } from '@/lib/utils';
 import { useEdgeEditingContext } from './EdgeEditingContext';
+import { useErdCardVariant } from '@/hooks/useErdCardVariant';
+import { IeChildEndMarker, IeParentEndMarker } from './IeEdgeMarkers';
+import { computeIeMarkers } from './erdIeMarkers';
 import {
   buildRoundedOrthogonalSvgPath,
   buildOrthogonalRouteSegments,
@@ -242,6 +245,8 @@ export default function ErdRelationEdge({
   selected,
 }: EdgeProps) {
   const { t } = useTranslation();
+  /** `ie` 변형이면 Erwin IE 표기(부모 필수/선택, 자식 0..N/0..1)로 그린다 */
+  const isIe = useErdCardVariant() === 'ie';
   const reactFlowInstance = useReactFlow();
   const relationType: RelationType =
     (data as { relationType?: RelationType } | undefined)?.relationType ?? 'non-identifying';
@@ -361,11 +366,16 @@ export default function ErdRelationEdge({
     autoRoutePoints,
   });
 
+  const ieMarkers = computeIeMarkers({ targetSymbol, optional });
   const edgeStyle = style as React.CSSProperties | undefined;
   const strokeColor =
     (edgeStyle?.stroke as string) ??
-    (selected ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))');
-  const strokeWidth = selected ? 2.5 : 1.5;
+    (selected
+      ? 'hsl(var(--primary))'
+      : isIe
+        ? 'hsl(var(--foreground))'
+        : 'hsl(var(--muted-foreground))');
+  const strokeWidth = selected ? 2.5 : isIe && relationType === 'identifying' ? 2 : 1.5;
 
   const routePoints =
     routingType === 'straight'
@@ -415,8 +425,37 @@ export default function ErdRelationEdge({
         }}
       />
 
-      {sourceSymbol === 'one' && renderOneMarker(sourceX, sourceY, sourceDirection, strokeColor)}
-      {renderTargetMarker(targetX, targetY, targetDirection, targetSymbol, optional, strokeColor)}
+      {isIe ? (
+        <>
+          <IeParentEndMarker
+            x={sourceX}
+            y={sourceY}
+            direction={sourceDirection}
+            stroke={strokeColor}
+            marker={ieMarkers.parent}
+          />
+          <IeChildEndMarker
+            x={targetX}
+            y={targetY}
+            direction={targetDirection}
+            stroke={strokeColor}
+            marker={ieMarkers.child}
+          />
+        </>
+      ) : (
+        <>
+          {sourceSymbol === 'one' &&
+            renderOneMarker(sourceX, sourceY, sourceDirection, strokeColor)}
+          {renderTargetMarker(
+            targetX,
+            targetY,
+            targetDirection,
+            targetSymbol,
+            optional,
+            strokeColor,
+          )}
+        </>
+      )}
 
       <path d={edgePath} fill="none" stroke="transparent" strokeWidth={20} />
 

@@ -12,6 +12,7 @@ import type { CompactTableRenderingMode } from './CompactTableRenderingContext';
 import type { ColumnConnectionDirections } from './ConnectedColumnIdsContext';
 import StaticColumnRow from './StaticColumnRow';
 import EditableColumnRow from './EditableColumnRow';
+import type { ErdCardVariant } from '@/lib/theme';
 
 interface SortableColumnRowProps {
   col: Column;
@@ -151,6 +152,8 @@ interface TableNodeStaticRowsProps {
   validationWarningTextByStatus: Record<WarningValidationStatus, string>;
   getConnectedDirections: (colId: string) => ColumnConnectionDirections;
   onExpandHiddenColumns?: () => void;
+  /** ERD 카드 변형 (`ie`이면 PK 블록을 구분해 표시) */
+  variant?: ErdCardVariant;
   t: TFunction;
 }
 
@@ -166,11 +169,13 @@ export function TableNodeStaticRows({
   validationWarningTextByStatus,
   getConnectedDirections,
   onExpandHiddenColumns,
+  variant = 'classic',
   t,
 }: TableNodeStaticRowsProps) {
+  const emphasizePk = variant === 'ie';
   return (
     <div className="divide-y divide-border">
-      {visibleColumns.map((column) => {
+      {visibleColumns.map((column, index) => {
         const renderMeta = renderMetaById.get(column.id);
         if (!renderMeta) {
           return null;
@@ -216,6 +221,8 @@ export function TableNodeStaticRows({
             domainLogicalName={renderMeta.domain?.logicalName}
             domainPhysicalType={renderMeta.domain?.physicalType}
             compactMode={compactMode}
+            emphasizePk={emphasizePk}
+            afterPkBlock={index > 0 && !column.pk && visibleColumns[index - 1].pk === true}
           />
         );
       })}

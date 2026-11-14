@@ -22,8 +22,8 @@ export const THEME_OPTIONS: readonly ThemeName[] = [
 /** dark 계열 테마 집합 (.dark class 및 Monaco vs-dark 적용 대상) */
 const DARK_THEMES: ReadonlySet<ThemeName> = new Set<ThemeName>(['graphite', 'midnight', 'eclipse']);
 
-/** 기본 테마 (localStorage 값이 없거나 유효하지 않을 때 사용) */
-export const DEFAULT_THEME: ThemeName = 'paper';
+/** 기본 테마 (localStorage 값이 없거나 유효하지 않을 때 사용). 저장된 테마가 있는 사용자는 영향받지 않는다. */
+export const DEFAULT_THEME: ThemeName = 'lumen';
 
 /** 유효한 테마 이름 집합 */
 const VALID_THEMES: ReadonlySet<string> = new Set<ThemeName>(THEME_OPTIONS);
@@ -40,9 +40,36 @@ const THEME_CLASSES: readonly string[] = [
 // Tailwind가 콘텐츠 스캔에서 리터럴을 찾지 못하면 index.css @layer base의 .theme-* 규칙을 제거한다.
 
 /**
+ * ERD 테이블 카드/관계선 스타일 변형.
+ *
+ * - `classic`: 기존 모양 (paper, graphite, midnight, eclipse)
+ * - `ie`: Erwin IE 표기 기반 모양 (단색 헤더, PK 블록 구분, 부모 필수/선택 마커)
+ */
+export type ErdCardVariant = 'classic' | 'ie';
+
+/** 테마별 ERD 카드 변형. 다른 테마에 확장할 때는 이 매핑만 바꾼다. */
+const ERD_CARD_VARIANTS: Readonly<Record<ThemeName, ErdCardVariant>> = {
+  paper: 'classic',
+  graphite: 'classic',
+  midnight: 'classic',
+  lumen: 'ie',
+  eclipse: 'classic',
+};
+
+/**
+ * 테마에 대응하는 ERD 카드 변형을 반환한다.
+ *
+ * @param theme 현재 테마
+ * @returns ERD 카드 변형 ('classic' | 'ie')
+ */
+export function resolveErdCardVariant(theme: ThemeName): ErdCardVariant {
+  return ERD_CARD_VARIANTS[theme];
+}
+
+/**
  * localStorage에 저장된 테마 문자열을 유효한 ThemeName으로 정규화한다.
  *
- * null, undefined, 빈 문자열, 알 수 없는 값이면 기본 테마(paper)를 반환한다.
+ * null, undefined, 빈 문자열, 알 수 없는 값이면 기본 테마(lumen)를 반환한다.
  *
  * @param value localStorage에서 읽은 raw 문자열
  * @returns 정규화된 ThemeName

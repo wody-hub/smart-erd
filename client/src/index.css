@@ -380,7 +380,7 @@
   /*
    * Lumen (light) — Linear식 미니멀.
    * 순백 배경 + 옅은 zinc 보조면 + 1px 헤어라인 보더 + 인디고 단일 포인트. 그림자 최소, radius 8px.
-   * ERD 테이블 헤더는 색 채움 대신 톤온톤(옅은 면 + 진한 글자)으로 절제한다.
+   * ERD 테이블 헤더는 Erwin IE 표기 PDF를 따라 짙은 단색(네이비/틸/머스터드) 채움이다.
    */
   .theme-lumen {
     --background: 0 0% 100%;
@@ -425,12 +425,12 @@
     --header-foreground: 240 5.9% 10%;
     --header-muted: 240 3.8% 42%;
 
-    --erd-table-header: 240 4.8% 95.9%;
-    --erd-table-header-foreground: 240 5.9% 10%;
-    --erd-table-supporting: 240 60% 94%;
-    --erd-table-supporting-foreground: 240 50% 32%;
-    --erd-table-attention: 40 90% 92%;
-    --erd-table-attention-foreground: 30 80% 26%;
+    --erd-table-header: 213 52% 24%;
+    --erd-table-header-foreground: 0 0% 100%;
+    --erd-table-supporting: 180 60% 28%;
+    --erd-table-supporting-foreground: 0 0% 100%;
+    --erd-table-attention: 42 70% 48%;
+    --erd-table-attention-foreground: 30 80% 12%;
     --erd-pk: 36 90% 38%;
     --erd-fk: 240 60% 59.8%;
     --erd-nn: 162 80% 31%;

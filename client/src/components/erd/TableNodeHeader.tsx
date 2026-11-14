@@ -8,6 +8,7 @@ import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
 import type { TableHandleLayout, TableHeaderColor } from '@/types/erd';
 import type { TermSelectResult } from './ColumnAutocomplete';
 import { cn } from '@/lib/utils';
+import { useErdCardVariant } from '@/hooks/useErdCardVariant';
 import ColumnAutocomplete from './ColumnAutocomplete';
 import TableColorPicker from './TableColorPicker';
 
@@ -74,6 +75,8 @@ export default function TableNodeHeader({
   onHandleLayoutChange,
 }: TableNodeHeaderProps) {
   const { t } = useTranslation();
+  /** `ie` 변형이면 물리명(위) + 논리명(아래)을 중앙 정렬로 쌓는다 */
+  const isIe = useErdCardVariant() === 'ie';
 
   /** 헤더 색상 설정 */
   const normalizedHeaderColor = normalizeTableHeaderColor(headerColor);
@@ -85,7 +88,7 @@ export default function TableNodeHeader({
 
   return (
     <div
-      className="px-3 py-2 rounded-t group"
+      className={cn('px-3 py-2 group', isIe ? 'rounded-t-sm' : 'rounded-t')}
       style={{
         backgroundColor: `hsl(${colorConfig.bg})`,
         color: `hsl(${colorConfig.fg})`,
@@ -170,9 +173,14 @@ export default function TableNodeHeader({
               {t('erd.lock.lockedBy', { name: lockInfo.name })}
             </div>
           )}
-          <div className="flex items-center gap-4">
+          <div
+            className={cn(
+              'flex',
+              isIe ? 'flex-col-reverse items-stretch gap-0.5 text-center' : 'items-center gap-4',
+            )}
+          >
             <div
-              className="flex-1 whitespace-nowrap"
+              className={cn('whitespace-nowrap', !isIe && 'flex-1')}
               style={{
                 minWidth: `${Math.max((logicalTableName?.length ?? 0) + 2, 12)}ch`,
               }}
@@ -189,7 +197,7 @@ export default function TableNodeHeader({
                 />
               ) : logicalTableName ? (
                 <div
-                  className="opacity-85 whitespace-nowrap"
+                  className={cn('whitespace-nowrap', isIe ? 'opacity-90' : 'opacity-85')}
                   style={{
                     fontSize: 'var(--erd-table-header-logical-font-size, 12px)',
                     lineHeight: 'var(--erd-table-header-logical-line-height, 14px)',
@@ -212,12 +220,15 @@ export default function TableNodeHeader({
             </div>
 
             <div
-              className="flex-1 text-right whitespace-nowrap"
+              className={cn('whitespace-nowrap', isIe ? 'text-center' : 'flex-1 text-right')}
               style={{ minWidth: `${Math.max(label.length + 2, 12)}ch` }}
             >
               {editing && isEditing ? (
                 <input
-                  className="nodrag bg-transparent font-semibold w-full text-right whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-ring rounded placeholder-current/50"
+                  className={cn(
+                    'nodrag bg-transparent font-semibold w-full whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-ring rounded placeholder-current/50',
+                    isIe ? 'text-center' : 'text-right',
+                  )}
                   style={{
                     fontSize: 'var(--erd-table-header-physical-font-size, 16px)',
                     lineHeight: 'var(--erd-table-header-physical-line-height, 20px)',

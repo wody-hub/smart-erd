@@ -10,20 +10,20 @@ import {
 
 // --- resolveStoredTheme ---
 
-test('resolveStoredTheme(null) 은 기본 테마 paper 를 반환한다', () => {
-  assert.equal(resolveStoredTheme(null), 'paper');
+test('resolveStoredTheme(null) 은 기본 테마 lumen 을 반환한다', () => {
+  assert.equal(resolveStoredTheme(null), 'lumen');
 });
 
-test('resolveStoredTheme(undefined) 은 기본 테마 paper 를 반환한다', () => {
-  assert.equal(resolveStoredTheme(undefined), 'paper');
+test('resolveStoredTheme(undefined) 은 기본 테마 lumen 을 반환한다', () => {
+  assert.equal(resolveStoredTheme(undefined), 'lumen');
 });
 
-test('resolveStoredTheme("") 은 기본 테마 paper 를 반환한다', () => {
-  assert.equal(resolveStoredTheme(''), 'paper');
+test('resolveStoredTheme("") 은 기본 테마 lumen 을 반환한다', () => {
+  assert.equal(resolveStoredTheme(''), 'lumen');
 });
 
-test('resolveStoredTheme("unknown") 은 기본 테마 paper 를 반환한다', () => {
-  assert.equal(resolveStoredTheme('unknown'), 'paper');
+test('resolveStoredTheme("unknown") 은 기본 테마 lumen 을 반환한다', () => {
+  assert.equal(resolveStoredTheme('unknown'), 'lumen');
 });
 
 test('resolveStoredTheme("paper") 은 paper 를 반환한다', () => {
@@ -68,8 +68,8 @@ test('resolveMonacoTheme("midnight") 은 vs-dark 를 반환한다', () => {
 
 // --- DEFAULT_THEME ---
 
-test('DEFAULT_THEME 은 paper 이다', () => {
-  assert.equal(DEFAULT_THEME, 'paper');
+test('DEFAULT_THEME 은 lumen 이다', () => {
+  assert.equal(DEFAULT_THEME, 'lumen');
 });
 
 // --- applyThemeClass ---

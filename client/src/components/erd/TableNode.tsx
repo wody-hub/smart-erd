@@ -10,6 +10,8 @@ import { useErdFkMode } from './ErdFkModeContext';
 import { useRemoteEditLocksContext } from './RemoteEditLocksContext';
 import type { WarningValidationStatus } from '@/hooks/useColumnValidation';
 import { cn } from '@/lib/utils';
+import { TABLE_COLORS, normalizeTableHeaderColor } from '@/lib/table-colors';
+import { useErdCardVariant } from '@/hooks/useErdCardVariant';
 import QuickTermDialog from './QuickTermDialog';
 import TableNodeHeader from './TableNodeHeader';
 import { useDiagramCodeNavigation } from './DiagramCodeNavigationContext';
@@ -100,6 +102,8 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
   const { label, columns, logicalTableName, tableTermId, headerColor, handleLayout } = data;
   const updateNodeInternals = useUpdateNodeInternals();
   const isHighlighted = useCanvasStore((s) => s.highlightedNodeIds.includes(id));
+  /** `ie` 변형이면 헤더 색을 따르는 1px 직각 외곽선 카드로 그린다 */
+  const isIe = useErdCardVariant() === 'ie';
 
   useEffect(() => {
     probeCounter('table-node-mount');
@@ -212,9 +216,15 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
       data-table-name={label}
       data-table-logical-name={logicalTableName ?? ''}
       className={cn(
-        'surface-data w-max min-w-[420px] rounded shadow-operational',
+        'w-max min-w-[420px] shadow-operational',
+        isIe ? 'rounded-sm border bg-card' : 'surface-data rounded',
         isHighlighted && 'ring-2 ring-primary shadow-editorial',
       )}
+      style={
+        isIe
+          ? { borderColor: `hsl(${TABLE_COLORS[normalizeTableHeaderColor(headerColor)].bg})` }
+          : undefined
+      }
     >
       {/* Table header */}
       <TableNodeHeader
@@ -284,6 +294,7 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
               ? expandHiddenColumns
               : undefined
           }
+          variant={isIe ? 'ie' : 'classic'}
           t={t}
         />
       )}

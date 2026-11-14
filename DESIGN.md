@@ -272,9 +272,13 @@ Graphite and Midnight share the same dark-surface shadow values (deeper opacity 
 | 2026-04-03 | 3-theme system (Paper/Graphite/Midnight) adopted | Curated themes replace binary light/dark toggle. `.dark` demoted to compatibility bit. |
 
 ## Additional Themes — Lumen / Eclipse (2026-11-12)
-기존 Paper / Graphite / Midnight는 그대로 유지하며, 선택형 테마로 두 개를 추가했다. 기본 테마는 여전히 Paper다.
+기존 Paper / Graphite / Midnight는 그대로 유지하며, 선택형 테마로 두 개를 추가했다. **기본 테마는 2026-11-14부터 Lumen**이다(저장된 테마가 있는 사용자는 기존 선택 유지).
 - **Direction:** Linear식 미니멀. 순백 배경 + 옅은 zinc 보조면 + 1px 헤어라인 보더 + 인디고 단일 포인트. 그림자 최소, radius `0.5rem`, 배경 글로우(radial gradient) 없음.
 - **Lumen (light):** `.theme-lumen`. background `#FFFFFF`, card `#FFFFFF`, muted/secondary `#F4F4F5`, border `#E4E4E7`, ink `#18181B`, muted text `#71717A`, primary `#5B5BD6`(흰 글자).
 - **Eclipse (dark):** `.theme-eclipse`. Lumen의 반전이 아닌 별도 팔레트. background `#0B0B0E`, card `#131318`, muted `#1B1B22`, border `#26262E`, ink `#ECECF1`, primary `#8B8BF0`(어두운 글자, 대비 약 6:1).
-- **ERD:** 테이블 헤더는 색 채움 대신 톤온톤(옅은 면 + 진한 글자). PK/FK/NN 마커와 상태 색은 기존 의미를 유지한다.
+- **ERD 카드/관계선 (`ie` 변형, 현재 Lumen만):** Erwin IE 표기 PDF를 기준으로 한 디자인이다. `lib/theme.ts`의 `ERD_CARD_VARIANTS`로 테마별 on/off 하며 다른 테마는 `classic`이다.
+  - 헤더: 물리명(위, 굵게) + 논리명(아래) 중앙 정렬, 짙은 단색(네이비 `#1D3A5F` / 틸 / 머스터드) + 외곽선이 헤더 색을 따른다. 색 프리셋 토큰(`--erd-table-header/supporting/attention`)만 Lumen에서 덮어쓴다.
+  - PK 행: 연한 회색 면 + 굵게, PK 블록 아래 구분선 강조. 컬럼 행의 PK/FK/AI/NN 배지 열은 기존 구조를 유지한다.
+  - 관계선: 식별 = 굵은 실선, 비식별 = 파선. 마커는 Erwin IE 의미 — 부모 필수 `||`, 부모 선택 `o|`(FK NULL 허용), 자식 0..N 까마귀발+`o`, 자식 0..1 `o|`(FK가 PK 전체).
+  - 제외(후속): 그룹 컨테이너, 논리 관계(FK 없음, 파랑 점선), 도면 양식. 미리보기 캔버스(`PreviewTableNodes`)는 아직 `classic` 모양이다.
 - **구현:** `client/src/index.css`의 `.theme-lumen` / `.theme-eclipse` 블록, `lib/theme.ts`의 `ThemeName`·`THEME_OPTIONS`·`THEME_CLASSES`. 클래스명은 반드시 리터럴로 둔다(Tailwind가 `@layer base`의 미사용 `.theme-*` 규칙을 제거함).

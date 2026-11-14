@@ -51,6 +51,10 @@ interface StaticColumnRowProps {
   domainPhysicalType?: string;
   /** 대형 다이어그램 overview용 compact 렌더 모드 */
   compactMode?: CompactTableRenderingMode;
+  /** `ie` 변형에서 PK 행을 굵게·회색 채움으로 강조할지 여부 */
+  emphasizePk?: boolean;
+  /** `ie` 변형에서 PK 블록 바로 아래 첫 행인지 여부 (구분선 강조) */
+  afterPkBlock?: boolean;
 }
 
 /**
@@ -84,7 +88,16 @@ function StaticColumnRow({
   domainLogicalName,
   domainPhysicalType,
   compactMode = 'off',
+  emphasizePk = false,
+  afterPkBlock = false,
 }: StaticColumnRowProps) {
+  /** 행 루트 공통 class (중복 논리명 경고 + `ie` PK 블록 구분) */
+  const rowClassName = cn(
+    'relative px-3 py-1 text-xs group/col',
+    hasDuplicateLogicalName && 'bg-destructive/5',
+    emphasizePk && col.pk && 'bg-surface-muted font-semibold',
+    emphasizePk && afterPkBlock && '!border-foreground/40',
+  );
   const legacyTargetPlacement = showTargetHandles
     ? getLegacyHandlePlacement(targetHandlePlacements, 'target')
     : null;
@@ -156,12 +169,7 @@ function StaticColumnRow({
 
   if (compactMode === 'compact') {
     return (
-      <div
-        className={cn(
-          'relative px-3 py-1 text-xs group/col',
-          hasDuplicateLogicalName && 'bg-destructive/5',
-        )}
-      >
+      <div className={rowClassName}>
         <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
           {targetHandles}
 
@@ -193,12 +201,7 @@ function StaticColumnRow({
   }
 
   return (
-    <div
-      className={cn(
-        'relative px-3 py-1 text-xs group/col',
-        hasDuplicateLogicalName && 'bg-destructive/5',
-      )}
-    >
+    <div className={rowClassName}>
       <div className="flex items-center gap-1.5" style={{ paddingLeft: '12px' }}>
         {targetHandles}
 
