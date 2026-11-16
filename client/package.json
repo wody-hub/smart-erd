@@ -26,7 +26,8 @@
     "preview": "vite preview",
     "perf:erd:apply": "node ./scripts/perf/erd-apply.mjs --scenarios S50,S200,S500 --iterations 15 --warmup 2 --out /tmp/smart-erd/perf/erd-apply-report.json",
     "perf:erd:apply:sample": "node ./scripts/perf/erd-apply.mjs --scenarios S50,S200,S500 --iterations 15 --warmup 2 --out ./perf-reports/erd-apply-report.json",
-    "perf:erd:app": "node ./scripts/perf/erd-app-bench.mjs --scenarios S200,S500,S1000 --iterations 10 --warmup 2 --out ./perf-reports/erd-app-baseline.json"
+    "perf:erd:app": "node ./scripts/perf/erd-app-bench.mjs --scenarios S200,S500,S1000 --iterations 10 --warmup 2 --out ./perf-reports/erd-app-baseline.json",
+    "perf:erd:collab": "node ./scripts/perf/erd-collab-bench.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
