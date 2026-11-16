@@ -32,6 +32,8 @@ interface ObstacleSnapshot {
 }
 
 const obstacleSnapshots = new WeakMap<readonly ObstacleNode[], ObstacleSnapshot>();
+const obstacleSnapshotsByGeometry = new Map<string, ObstacleSnapshot>();
+const MAX_GEOMETRY_SNAPSHOTS = 8;
 const DEFAULT_NODE_WIDTH = 420;
 const DEFAULT_NODE_BASE_HEIGHT = 52;
 const DEFAULT_NODE_ROW_HEIGHT = 30;
@@ -51,22 +53,31 @@ export function getCachedEdgeObstacleRects(
 ): EdgeObstacleRect[] {
   let snapshot = obstacleSnapshots.get(nodes);
   if (!snapshot) {
-    const rectByNodeId = new Map<string, EdgeObstacleRect>();
-    for (const node of nodes) {
-      if (node.type !== 'table' && node.type !== 'previewTable') continue;
-      const width = node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH;
-      const height =
-        node.measured?.height ??
-        node.height ??
-        DEFAULT_NODE_BASE_HEIGHT + (node.data?.columns?.length ?? 0) * DEFAULT_NODE_ROW_HEIGHT;
-      rectByNodeId.set(node.id, {
-        left: node.position.x,
-        right: node.position.x + width,
-        top: node.position.y,
-        bottom: node.position.y + height,
-      });
+    const geometrySignature = buildObstacleGeometrySignature(nodes);
+    snapshot = obstacleSnapshotsByGeometry.get(geometrySignature);
+    if (!snapshot) {
+      const rectByNodeId = new Map<string, EdgeObstacleRect>();
+      for (const node of nodes) {
+        if (node.type !== 'table' && node.type !== 'previewTable') continue;
+        const width = node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH;
+        const height =
+          node.measured?.height ??
+          node.height ??
+          DEFAULT_NODE_BASE_HEIGHT + (node.data?.columns?.length ?? 0) * DEFAULT_NODE_ROW_HEIGHT;
+        rectByNodeId.set(node.id, {
+          left: node.position.x,
+          right: node.position.x + width,
+          top: node.position.y,
+          bottom: node.position.y + height,
+        });
+      }
+      snapshot = { rectByNodeId, rectsByEdge: new Map() };
+      obstacleSnapshotsByGeometry.set(geometrySignature, snapshot);
+      if (obstacleSnapshotsByGeometry.size > MAX_GEOMETRY_SNAPSHOTS) {
+        const oldestSignature = obstacleSnapshotsByGeometry.keys().next().value;
+        if (oldestSignature) obstacleSnapshotsByGeometry.delete(oldestSignature);
+      }
     }
-    snapshot = { rectByNodeId, rectsByEdge: new Map() };
     obstacleSnapshots.set(nodes, snapshot);
   }
 
@@ -80,6 +91,28 @@ export function getCachedEdgeObstacleRects(
   }
   snapshot.rectsByEdge.set(edgeKey, rects);
   return rects;
+}
+
+/**
+ * 테이블 장애물 좌표와 크기만으로 안정된 스냅샷 키를 만든다.
+ * 컬럼 이름 등 렌더링 데이터 변경은 장애물 경로 캐시를 무효화하지 않는다.
+ * @param nodes React Flow 노드 스냅샷
+ * @returns 장애물 기하 정보의 직렬화 키
+ */
+function buildObstacleGeometrySignature(nodes: readonly ObstacleNode[]): string {
+  return JSON.stringify(
+    nodes
+      .filter((node) => node.type === 'table' || node.type === 'previewTable')
+      .map((node) => [
+        node.id,
+        node.position.x,
+        node.position.y,
+        node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH,
+        node.measured?.height ??
+          node.height ??
+          DEFAULT_NODE_BASE_HEIGHT + (node.data?.columns?.length ?? 0) * DEFAULT_NODE_ROW_HEIGHT,
+      ]),
+  );
 }
 
 const OBSTACLE_PADDING = 20;
