@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import {
   type EdgeProps,
   getBezierPath,
@@ -21,19 +21,20 @@ import {
   buildRoundedOrthogonalSvgPath,
   buildOrthogonalRouteSegments,
   buildStraightEdgePoints,
+  type BuildStraightEdgePointsInput,
 } from './edgeWaypointGeometry';
-import {
-  type EdgeObstacleRect,
-  areEdgeObstacleRectsEqual,
-  buildObstacleAvoidingAutoRoute,
-  getCachedEdgeObstacleRects,
-} from './edgeAutoRoute';
+import { type EdgeObstacleRect, buildObstacleAvoidingAutoRoute } from './edgeAutoRoute';
 import {
   isPerfRouteDetourOff,
   probeAggregateEnd,
   probeAggregateStart,
 } from '@/lib/erd-performance-probe';
-import { areErdRelationEdgePropsEqual, createEdgeCardinalitySelector } from './edgeRenderSelectors';
+import {
+  areEdgeRoutePointsEqual,
+  areErdRelationEdgePropsEqual,
+  createEdgeAutoRouteSelector,
+  createEdgeCardinalitySelector,
+} from './edgeRenderSelectors';
 
 /** 카디널리티 기호 유형 */
 type CardinalitySymbol = 'one' | 'many';
@@ -44,7 +45,22 @@ const CROW_FOOT_SPREAD = 8;
 const SEGMENT_HANDLE_THICKNESS = 18;
 const SEGMENT_GRIP_LENGTH = 24;
 const SEGMENT_GRIP_THICKNESS = 4;
-const EMPTY_OBSTACLE_RECTS: EdgeObstacleRect[] = [];
+
+/**
+ * selector의 캐시가 빗나가 실제 경로를 계산할 때만 기존 성능 지표를 기록한다.
+ * @param input 앵커, 방향과 마커 오프셋
+ * @param obstacles endpoint를 제외한 장애물
+ * @returns 기존 알고리즘이 반환하는 우회 점 배열 또는 null
+ */
+function buildProfiledAutoRoute(
+  input: BuildStraightEdgePointsInput,
+  obstacles: EdgeObstacleRect[],
+) {
+  const routeStartedAt = probeAggregateStart();
+  const points = buildObstacleAvoidingAutoRoute(input, obstacles);
+  probeAggregateEnd('detour-routing', routeStartedAt);
+  return points;
+}
 
 function buildSegmentHandleStyle(
   start: { x: number; y: number },
@@ -229,22 +245,6 @@ function ErdRelationEdge({
     [relationType, target, targetHandleId],
   );
   const { sourceSymbol, targetSymbol, optional } = useStore(cardinalitySelector);
-  const obstacleRects = useStore(
-    useCallback(
-      (s) => {
-        const selectorStartedAt = probeAggregateStart();
-        if (routingType !== 'smoothstep') {
-          probeAggregateEnd('obstacle-selector', selectorStartedAt);
-          return EMPTY_OBSTACLE_RECTS;
-        }
-        const rects = getCachedEdgeObstacleRects(s.nodes, source, target);
-        probeAggregateEnd('obstacle-selector', selectorStartedAt);
-        return rects;
-      },
-      [routingType, source, target],
-    ),
-    areEdgeObstacleRectsEqual,
-  );
   const {
     edgeLock: lockInfo,
     edgePreview,
@@ -266,36 +266,40 @@ function ErdRelationEdge({
 
   const sourceDirection = resolvedSourcePosition === ('left' as Position) ? -1 : 1;
   const targetDirection = resolvedTargetPosition === ('left' as Position) ? -1 : 1;
-  const autoRoutePoints = useMemo(() => {
-    if (routingType !== 'smoothstep') return null;
-    if (isPerfRouteDetourOff()) return null;
-    const routeStartedAt = probeAggregateStart();
-    const points = buildObstacleAvoidingAutoRoute(
-      {
-        sourceX,
-        sourceY,
-        targetX,
-        targetY,
-        sourceDirection,
-        targetDirection,
-        sourceMarkerOffset: SOURCE_MARKER_OFFSET,
-        targetMarkerOffset: TARGET_MARKER_OFFSET,
-        waypoints: [],
-      },
-      obstacleRects,
-    );
-    probeAggregateEnd('detour-routing', routeStartedAt);
-    return points;
-  }, [
-    obstacleRects,
-    routingType,
-    sourceDirection,
-    sourceX,
-    sourceY,
-    targetDirection,
-    targetX,
-    targetY,
-  ]);
+  const detourOff = isPerfRouteDetourOff();
+  const autoRouteSelector = useMemo(
+    () =>
+      createEdgeAutoRouteSelector(
+        {
+          sourceNodeId: source,
+          targetNodeId: target,
+          routingType,
+          detourOff,
+          sourceX,
+          sourceY,
+          targetX,
+          targetY,
+          sourceDirection,
+          targetDirection,
+          sourceMarkerOffset: SOURCE_MARKER_OFFSET,
+          targetMarkerOffset: TARGET_MARKER_OFFSET,
+        },
+        buildProfiledAutoRoute,
+      ),
+    [
+      source,
+      target,
+      routingType,
+      detourOff,
+      sourceDirection,
+      sourceX,
+      sourceY,
+      targetDirection,
+      targetX,
+      targetY,
+    ],
+  );
+  const autoRoutePoints = useStore(autoRouteSelector, areEdgeRoutePointsEqual);
 
   const edgePath = getEdgePathByRoutingType({
     routingType,
