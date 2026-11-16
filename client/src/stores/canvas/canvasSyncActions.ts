@@ -37,6 +37,7 @@ import { collectErdAffectedScopesFromEvents } from '@/collaboration/plugins/erd/
 import { buildErdProjectionRefreshRequest } from '@/collaboration/plugins/erd/erd-projection-refresh-request';
 import type { EdgeRoutingType, Waypoint } from '@/types/erd';
 import { buildPersistedPreviewPositionChanges } from '@/lib/preview-position-sync';
+import { mergeProjectedEntitiesById } from '@/lib/erd-projection';
 import {
   parseEdgeHandleSelectionValue,
   resolveEdgeHandlesFromPreference,
@@ -278,18 +279,6 @@ export function createCanvasSyncActions(
     const requestedEdgeIds = new Set(request?.edgeIds ?? []);
     const requestedGroupIds = new Set(request?.groupIds ?? []);
 
-    function mergeEntitiesById<T extends { id: string }>(
-      current: T[],
-      requestedIds: Set<string>,
-      nextEntries: T[],
-    ): T[] {
-      if (requestedIds.size === 0) {
-        return current;
-      }
-      const retained = current.filter((entry) => !requestedIds.has(entry.id));
-      return [...retained, ...nextEntries];
-    }
-
     const convertStartedAt = probeBegin('projection-convert', {
       scope: 'scoped',
       targetCount: targets.size,
@@ -305,7 +294,7 @@ export function createCanvasSyncActions(
             return tableYMap ? yTableYMapToNode(nodeId, tableYMap) : null;
           })
           .filter((node): node is Node<TableNodeData> => node != null);
-        nextState.nodes = mergeEntitiesById(
+        nextState.nodes = mergeProjectedEntitiesById(
           get().nodes as Node<TableNodeData>[],
           requestedNodeIds,
           nextNodes,
@@ -323,7 +312,7 @@ export function createCanvasSyncActions(
             return edgeYMap ? yEdgeYMapToEdge(edgeId, edgeYMap) : null;
           })
           .filter((edge): edge is Edge<ERDEdgeData> => edge != null);
-        nextState.edges = mergeEntitiesById(
+        nextState.edges = mergeProjectedEntitiesById(
           get().edges as Edge<ERDEdgeData>[],
           requestedEdgeIds,
           nextEdges,
@@ -341,7 +330,7 @@ export function createCanvasSyncActions(
             return groupYMap ? yGroupYMapToTableGroup(groupId, groupYMap) : null;
           })
           .filter((group): group is TableGroup => group != null);
-        nextState.groups = mergeEntitiesById(get().groups, requestedGroupIds, nextGroups);
+        nextState.groups = mergeProjectedEntitiesById(get().groups, requestedGroupIds, nextGroups);
       }
     }
     probeEnd('projection-convert', convertStartedAt, {
