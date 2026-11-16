@@ -274,6 +274,7 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
             })
           }
           onDomainChange={handleDomainChange}
+          variant={isIe ? 'ie' : 'classic'}
         />
       ) : (
         <TableNodeStaticRows

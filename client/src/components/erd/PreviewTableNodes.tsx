@@ -16,6 +16,9 @@ import {
   useCompactTableRenderingMode,
 } from './CompactTableRenderingContext';
 import { useTableColumnRenderModel } from './useTableColumnRenderModel';
+import { useErdCardVariant } from '@/hooks/useErdCardVariant';
+import { TABLE_COLORS, normalizeTableHeaderColor } from '@/lib/table-colors';
+import { cn } from '@/lib/utils';
 
 /**
  * preview 테이블 외곽을 렌더한다.
@@ -35,6 +38,8 @@ function PreviewTableNodeFrame({
   ghost?: boolean;
 }) {
   const { canNavigateToCode, navigateToCode } = useDiagramCodeNavigation();
+  /** `ie` 변형이면 persisted 노드와 같은 외곽(단색 테두리)을 쓴다 */
+  const isIe = useErdCardVariant() === 'ie';
 
   /**
    * preview 테이블에 대응되는 코드 줄로 이동한다.
@@ -57,8 +62,18 @@ function PreviewTableNodeFrame({
       data-table-node-kind={ghost ? 'ghost' : 'preview'}
       data-table-name={node.data.label}
       data-table-logical-name={node.data.logicalTableName ?? ''}
-      className="surface-data w-max min-w-[420px] rounded shadow-operational"
-      style={ghost ? { opacity: 0, pointerEvents: 'none' } : undefined}
+      className={cn(
+        'w-max min-w-[420px] shadow-operational',
+        isIe ? 'rounded-sm border bg-card' : 'surface-data rounded',
+      )}
+      style={{
+        ...(isIe
+          ? {
+              borderColor: `hsl(${TABLE_COLORS[normalizeTableHeaderColor(node.data.headerColor)].bg})`,
+            }
+          : {}),
+        ...(ghost ? { opacity: 0, pointerEvents: 'none' as const } : {}),
+      }}
     >
       <TableNodeHeader
         label={node.data.label}
@@ -100,6 +115,8 @@ function PreviewTableRows({
   ghost?: boolean;
 }) {
   const { t } = useTranslation();
+  /** `ie` 변형이면 PK 블록을 구분해 표시한다 */
+  const emphasizePk = useErdCardVariant() === 'ie';
   const { findDomainById, findTermById, resolveLogicalName } = useErdDictionary();
   const connectedColumnDirections = useConnectedColumnDirections(node.id);
   const compactTableRenderingMode = useCompactTableRenderingMode();
@@ -131,7 +148,7 @@ function PreviewTableRows({
 
   return (
     <>
-      {visibleColumns.map((column) => {
+      {visibleColumns.map((column, index) => {
         const renderMeta = columnRenderMetaById.get(column.id);
         if (!renderMeta) {
           return null;
@@ -179,6 +196,8 @@ function PreviewTableRows({
             domainLogicalName={renderMeta.domain?.logicalName}
             domainPhysicalType={renderMeta.domain?.physicalType}
             compactMode={compactMode}
+            emphasizePk={emphasizePk}
+            afterPkBlock={index > 0 && !column.pk && visibleColumns[index - 1].pk === true}
           />
         );
       })}
