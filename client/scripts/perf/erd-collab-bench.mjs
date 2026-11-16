@@ -7,7 +7,7 @@ import { chromium } from 'playwright';
 import { buildErdLocalSeed } from './lib/erd-app-seed.mjs';
 import { summarizeCpuProfile } from './lib/erd-cpu-profile.mjs';
 import { installReactRenderStats } from './lib/erd-react-render-stats.mjs';
-import { classifyTicket, installCollabProbe } from './lib/erd-collab-probe.mjs';
+import { classifyTicket, COLLAB_PROBE_SCRIPT } from './lib/erd-collab-probe.mjs';
 import {
   commitHash,
   loadDiagramHelpers,
@@ -228,7 +228,7 @@ async function loginClient(session) {
   const page = await context.newPage();
   page.setDefaultTimeout(session.options.timeoutMs);
   page.setDefaultNavigationTimeout(15000);
-  await page.addInitScript(installCollabProbe);
+  await page.addInitScript({ content: COLLAB_PROBE_SCRIPT });
   if (session.options.profile)
     await page.addInitScript(() => {
       window.__ERD_PERF_PROBE_ENABLE__ = true;

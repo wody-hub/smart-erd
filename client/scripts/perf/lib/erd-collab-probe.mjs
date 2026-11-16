@@ -34,7 +34,7 @@ export function classifyTicket(sample) {
     sample.peers.every((peer) => peer.seenAt !== null)
   )
     return 'exact-seen';
-  if (sample.peers.some((peer) => peer.supersededAt !== null)) return 'superseded';
+  if (sample.peers.some((peer) => peer.supersededAt != null)) return 'superseded';
   return 'pending';
 }
 
@@ -282,3 +282,9 @@ export function installCollabProbe() {
     },
   };
 }
+
+/**
+ * 브라우저에 주입할 프로브 스크립트.
+ * `page.addInitScript(fn)`은 함수 본문만 직렬화하므로, 모듈 수준 보조 함수(`selectInputTicket`)를 함께 넣어야 한다.
+ */
+export const COLLAB_PROBE_SCRIPT = `${selectInputTicket.toString()}\n(${installCollabProbe.toString()})();`;

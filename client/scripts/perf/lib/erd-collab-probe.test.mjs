@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import vm from 'node:vm';
-import { classifyTicket, installCollabProbe, selectInputTicket } from './erd-collab-probe.mjs';
+import { classifyTicket, COLLAB_PROBE_SCRIPT, selectInputTicket } from './erd-collab-probe.mjs';
 import { loadDiagramHelpers, summarize } from './erd-collab-system.mjs';
 
 /**
@@ -55,7 +55,7 @@ function createProbeHarness() {
       frame = callback;
     },
   });
-  vm.runInContext(`(${installCollabProbe.toString()})()`, context);
+  vm.runInContext(COLLAB_PROBE_SCRIPT, context);
   return {
     probe: context.window.__collabBench,
     column,
