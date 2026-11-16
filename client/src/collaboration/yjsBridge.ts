@@ -444,7 +444,7 @@ export function createColumnYMap(column: Column): Y.Map<unknown> {
 }
 
 /**
- * 컬럼의 기존 직렬화 규칙으로 초기 필드를 생성한다.
+ * 컬럼의 초기 필드를 생성한다. 명시적인 false/빈 값과 생략된 필드를 구분한다.
  * @param column 컬럼 데이터
  * @returns 초기 필드 값
  */
@@ -453,13 +453,13 @@ function columnFields(column: Column): Record<string, unknown> {
     id: column.id,
     name: column.name,
     type: column.type,
-    ...(column.pk ? { pk: true } : {}),
-    ...(column.fk ? { fk: true } : {}),
+    ...(column.pk !== undefined ? { pk: column.pk } : {}),
+    ...(column.fk !== undefined ? { fk: column.fk } : {}),
     ...(column.nullable !== undefined ? { nullable: column.nullable } : {}),
-    ...(column.autoIncrement ? { autoIncrement: true } : {}),
-    ...(column.logicalName ? { logicalName: column.logicalName } : {}),
-    ...(column.termId ? { termId: column.termId } : {}),
-    ...(column.domainId ? { domainId: column.domainId } : {}),
+    ...(column.autoIncrement !== undefined ? { autoIncrement: column.autoIncrement } : {}),
+    ...(column.logicalName !== undefined ? { logicalName: column.logicalName } : {}),
+    ...(column.termId !== undefined ? { termId: column.termId } : {}),
+    ...(column.domainId !== undefined ? { domainId: column.domainId } : {}),
   };
 }
 
@@ -622,7 +622,7 @@ interface CreateTableOptions {
 }
 
 /**
- * 테이블 데이터를 Y.Map으로 변환한다.
+ * 테이블 데이터를 신형 컬럼 저장소만 가진 Y.Map으로 변환한다.
  *
  * @param label    테이블 이름 (물리명)
  * @param position 위치 좌표
@@ -640,11 +640,6 @@ export function createTableYMap(
   tableYMap.set('label', label);
   setTableYMapPosition(tableYMap, position);
 
-  const colsYArray = new Y.Array<Y.Map<unknown>>();
-  for (const col of columns) {
-    colsYArray.push([createColumnYMap(col)]);
-  }
-  tableYMap.set('columns', colsYArray);
   initializeColumnStorage(tableYMap, columns.map(columnFields));
 
   if (options?.logicalTableName) tableYMap.set('logicalTableName', options.logicalTableName);
