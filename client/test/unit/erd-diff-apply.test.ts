@@ -1,3 +1,4 @@
+import { readColumnYMaps } from '@/collaboration/yjs-columns';
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import * as Y from 'yjs';
@@ -100,13 +101,19 @@ function getTableByLabel(doc: Y.Doc, label: string): { id: string; yMap: Y.Map<u
   return null;
 }
 
+/**
+ * 현재 읽기 스키마에서 이름으로 컬럼을 찾는다.
+ * @param tableYMap 테이블
+ * @param name 컬럼 이름
+ * @returns 컬럼 본체 또는 빈 값
+ */
 function getColumnByName(tableYMap: Y.Map<unknown>, name: string): Y.Map<unknown> | null {
-  const columnsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+  const columnsYArray = readColumnYMaps(tableYMap);
   if (!columnsYArray) {
     return null;
   }
   for (let i = 0; i < columnsYArray.length; i += 1) {
-    const col = columnsYArray.get(i);
+    const col = columnsYArray[i]!;
     if (col.get('name') === name) {
       return col;
     }

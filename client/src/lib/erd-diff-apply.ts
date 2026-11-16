@@ -1,11 +1,24 @@
+import {
+  ensureColumnStorage,
+  getColumnYMap,
+  insertColumnYMap,
+  deleteTableColumn,
+  patchColumnYMap,
+  readColumnYMaps,
+} from '@/collaboration/yjs-columns';
 import * as Y from 'yjs';
 import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
 import type { EdgeHandleMode, EdgeHandleSide, EdgeRoutingType, Waypoint } from '../types/erd.js';
-import type { DiffPlan, DiffParsedColumn, DiffRelationType } from './erd-diff-plan.js';
+import type {
+  DiffPlan,
+  DiffParsedColumn,
+  DiffRelationType,
+  CurrentColumnSnapshot,
+} from './erd-diff-plan.js';
 import {
+  createTableYMap,
   createWaypointsYArray,
   readWaypointsFromEdgeYMap,
-  setTableYMapPosition,
   syncLegacyWaypointsInEdgeYMap,
 } from '../collaboration/yjsBridge.js';
 import { buildStableEdgeId, resolveEdgeHandlesFromPreference } from './edge-handles.js';
@@ -96,6 +109,7 @@ export function applyDiffToYDoc(doc: Y.Doc, plan: DiffPlan, origin?: unknown): A
     },
   };
 
+  prepareColumnWrites(context);
   doc.transact(() => {
     applyTableDeletes(context);
     applyTableUpdates(context);
@@ -140,6 +154,76 @@ export function applyDiffToYDoc(doc: Y.Doc, plan: DiffPlan, origin?: unknown): A
       droppedByMissing,
     },
   };
+}
+
+/**
+ * FK 재계산/참조 정리까지 포함해 컬럼 쓰기 대상만 시스템 트랜잭션으로 먼저 이관한다.
+ * @param context diff 적용 컨텍스트
+ * @returns 없음
+ */
+function prepareColumnWrites(context: DiffApplyContext): void {
+  const { plan, tablesMap, edgesMap } = context;
+  const writeTables = new Set(plan.columns.map((diff) => diff.tableId));
+  const nextNames = new Map<string, string>();
+  const deletedTables = new Set<string>();
+  const deletedColumns = new Set<string>();
+  for (const diff of plan.tables) {
+    if (diff.op === 'update') nextNames.set(diff.tableId, diff.next.name);
+    if (diff.op === 'delete') deletedTables.add(diff.tableId);
+  }
+  for (const diff of plan.columns) {
+    if (diff.op === 'delete') deletedColumns.add(JSON.stringify([diff.tableId, diff.columnId]));
+  }
+  for (const diff of plan.edges) {
+    if (diff.op === 'add') {
+      tablesMap.forEach((table, id) => {
+        if ((nextNames.get(id) ?? table.get('label')) === diff.next.childTable) writeTables.add(id);
+      });
+    } else {
+      const target = edgesMap.get(diff.edgeId)?.get('target');
+      if (typeof target === 'string') writeTables.add(target);
+    }
+  }
+  // cleanupInvalidEdges may delete existing edges without an explicit edge diff.
+  edgesMap.forEach((edge) => {
+    const target = edge.get('target');
+    if (typeof target !== 'string') return;
+    for (const side of ['source', 'target'] as const) {
+      const tableId = edge.get(side);
+      const handle = edge.get(`${side}Handle`);
+      const table = typeof tableId === 'string' ? tablesMap.get(tableId) : undefined;
+      const columnId =
+        typeof tableId === 'string' && typeof handle === 'string'
+          ? extractColumnIdFromHandle(handle, tableId, side)
+          : null;
+      if (
+        !table ||
+        !columnId ||
+        deletedTables.has(tableId as string) ||
+        deletedColumns.has(JSON.stringify([tableId, columnId])) ||
+        !getColumnYMap(table, columnId)
+      ) {
+        writeTables.add(target);
+      }
+    }
+  });
+  const existingTargets = collectForeignKeyTargets(edgesMap);
+  tablesMap.forEach((table, tableId) => {
+    if (
+      readColumnYMaps(table).some(
+        (body) =>
+          !Object.is(
+            body.get('fk'),
+            existingTargets.has(`${tableId}:${body.get('id')}`) ? true : undefined,
+          ),
+      )
+    )
+      writeTables.add(tableId);
+  });
+  for (const id of writeTables) {
+    const table = tablesMap.get(id);
+    if (table && !deletedTables.has(id)) ensureColumnStorage(table);
+  }
 }
 
 /**
@@ -222,24 +306,13 @@ function applyTableAdds(context: DiffApplyContext): void {
     }
 
     const tableId = `table-${crypto.randomUUID()}`;
-    const tableYMap = new Y.Map<unknown>();
-    tableYMap.set('label', tableDiff.next.name);
-    if (tableDiff.next.logicalTableName) {
-      tableYMap.set('logicalTableName', tableDiff.next.logicalTableName);
-    }
-    if (tableDiff.next.tableTermId != null) {
-      tableYMap.set('tableTermId', tableDiff.next.tableTermId);
-    }
-
-    setTableYMapPosition(tableYMap, nextPosition);
+    const tableYMap = createTableYMap(
+      tableDiff.next.name,
+      { ...nextPosition },
+      tableDiff.next.columns.map((column) => ({ id: `col-${crypto.randomUUID()}`, ...column })),
+      tableDiff.next,
+    );
     nextPosition.x += 300;
-
-    const columnsYArray = new Y.Array<Y.Map<unknown>>();
-    for (const column of tableDiff.next.columns) {
-      const colId = `col-${crypto.randomUUID()}`;
-      columnsYArray.push([createColumnYMap({ id: colId, ...column })]);
-    }
-    tableYMap.set('columns', columnsYArray);
 
     context.tablesMap.set(tableId, tableYMap);
     context.counters.appliedOperations += 1;
@@ -262,12 +335,7 @@ function applyColumnDeletes(context: DiffApplyContext): void {
       context.counters.skippedOperations += 1;
       continue;
     }
-    const columnsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-    if (!columnsYArray) {
-      context.counters.skippedOperations += 1;
-      continue;
-    }
-    if (!deleteColumnById(columnsYArray, columnDiff.columnId)) {
+    if (!deleteTableColumn(tableYMap, columnDiff.columnId)) {
       context.counters.skippedOperations += 1;
       continue;
     }
@@ -291,17 +359,16 @@ function applyColumnUpdates(context: DiffApplyContext): void {
       context.counters.skippedOperations += 1;
       continue;
     }
-    const columnsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-    if (!columnsYArray) {
-      context.counters.skippedOperations += 1;
-      continue;
-    }
-    const colYMap = findColumnYMap(columnsYArray, columnDiff.columnId);
+    const colYMap = getColumnYMap(tableYMap, columnDiff.columnId);
     if (!colYMap) {
       context.counters.skippedOperations += 1;
       continue;
     }
-    applyColumnYMapUpdate(colYMap, columnDiff.next);
+    patchColumnYMap(
+      tableYMap,
+      columnDiff.columnId,
+      buildColumnFieldPatch(columnDiff.current, columnDiff.next, colYMap),
+    );
     context.counters.appliedOperations += 1;
   }
 }
@@ -322,23 +389,14 @@ function applyColumnAdds(context: DiffApplyContext): void {
       context.counters.skippedOperations += 1;
       continue;
     }
-    const columnsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-    if (!columnsYArray) {
-      context.counters.skippedOperations += 1;
-      continue;
-    }
+    const columnsYArray = readColumnYMaps(tableYMap);
     if (findColumnByName(columnsYArray, columnDiff.next.name)) {
       context.counters.skippedOperations += 1;
       continue;
     }
     const colId = `col-${crypto.randomUUID()}`;
     const colYMap = createColumnYMap({ id: colId, ...columnDiff.next });
-    const index = Math.min(Math.max(columnDiff.nextIndex, 0), columnsYArray.length);
-    if (index === columnsYArray.length) {
-      columnsYArray.push([colYMap]);
-    } else {
-      columnsYArray.insert(index, [colYMap]);
-    }
+    insertColumnYMap(tableYMap, colId, colYMap, columnDiff.nextIndex);
     context.counters.appliedOperations += 1;
   }
 }
@@ -589,10 +647,7 @@ function refreshColumnNameLookup(
 ): void {
   out.clear();
   tablesMap.forEach((tableYMap, tableId) => {
-    const columnsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-    if (!columnsYArray) {
-      return;
-    }
+    const columnsYArray = readColumnYMaps(tableYMap);
     const byName = new Map<string, string>();
     columnsYArray.forEach((colYMap) => {
       const name = colYMap.get('name');
@@ -606,36 +661,18 @@ function refreshColumnNameLookup(
 }
 
 /**
- * 컬럼 Y.Array에서 ID 기준으로 컬럼을 삭제한다.
+ * 현재 컬럼 목록에서 이름 기준으로 컬럼을 찾는다.
  *
- * @param columnsYArray 컬럼 Y.Array
- * @param columnId 컬럼 ID
- * @returns 삭제 성공 여부
- */
-function deleteColumnById(columnsYArray: Y.Array<Y.Map<unknown>>, columnId: string): boolean {
-  for (let i = columnsYArray.length - 1; i >= 0; i -= 1) {
-    const colYMap = columnsYArray.get(i);
-    if (colYMap.get('id') === columnId) {
-      columnsYArray.delete(i, 1);
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * 컬럼 Y.Array에서 이름 기준으로 컬럼을 찾는다.
- *
- * @param columnsYArray 컬럼 Y.Array
+ * @param columnsYArray 현재 컬럼 목록
  * @param name 컬럼명
  * @returns 컬럼 Y.Map 또는 undefined
  */
 function findColumnByName(
-  columnsYArray: Y.Array<Y.Map<unknown>>,
+  columnsYArray: Y.Map<unknown>[],
   name: string,
 ): Y.Map<unknown> | undefined {
   for (let i = 0; i < columnsYArray.length; i += 1) {
-    const colYMap = columnsYArray.get(i);
+    const colYMap = columnsYArray[i]!;
     if (colYMap.get('name') === name) {
       return colYMap;
     }
@@ -644,53 +681,47 @@ function findColumnByName(
 }
 
 /**
- * 컬럼 ID로 컬럼 Y.Map을 찾는다.
- *
- * @param columnsYArray 컬럼 Y.Array
- * @param columnId 컬럼 ID
- * @returns 컬럼 Y.Map 또는 undefined
+ * base -> local에서 변경한 필드만 patch로 만든다. 현재 Y.Doc과의 비교는 적용 시 수행한다.
+ * @param current 편집 기준 컬럼
+ * @param next 로컬 변경 컬럼
+ * @param live 현재 Y.Doc 컬럼 본체
+ * @returns 변경 필드 patch (undefined는 삭제)
  */
-function findColumnYMap(
-  columnsYArray: Y.Array<Y.Map<unknown>>,
-  columnId: string,
-): Y.Map<unknown> | undefined {
-  for (let i = 0; i < columnsYArray.length; i += 1) {
-    const colYMap = columnsYArray.get(i);
-    if (colYMap.get('id') === columnId) {
-      return colYMap;
-    }
+export function buildColumnFieldPatch(
+  current: CurrentColumnSnapshot,
+  next: DiffParsedColumn,
+  live: Y.Map<unknown>,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  for (const key of [
+    'name',
+    'type',
+    'pk',
+    'nullable',
+    'autoIncrement',
+    'logicalName',
+    'termId',
+    'domainId',
+  ] as const) {
+    const before = normalizeColumnField(key, current[key]);
+    const after = normalizeColumnField(key, next[key]);
+    if (!Object.is(before, after) && !Object.is(normalizeColumnField(key, live.get(key)), after))
+      patch[key] = after;
   }
-  return undefined;
+  return patch;
 }
 
 /**
- * 파싱 컬럼 스냅샷을 컬럼 Y.Map에 반영한다.
- *
- * @param colYMap 대상 컬럼 Y.Map
- * @param next 다음 컬럼 스냅샷
- * @returns 없음
+ * 선택 필드의 기존 저장 규칙을 유지한다.
+ * @param key 필드명
+ * @param value 비교할 값
+ * @returns 정규화된 저장 값
  */
-function applyColumnYMapUpdate(colYMap: Y.Map<unknown>, next: DiffParsedColumn): void {
-  colYMap.set('name', next.name);
-  colYMap.set('type', next.type);
-  setBooleanFlag(colYMap, 'pk', next.pk);
-  setBooleanFlag(colYMap, 'autoIncrement', next.autoIncrement);
-  colYMap.set('nullable', next.nullable);
-  if (next.logicalName) {
-    colYMap.set('logicalName', next.logicalName);
-  } else {
-    colYMap.delete('logicalName');
-  }
-  if (next.termId != null) {
-    colYMap.set('termId', next.termId);
-  } else {
-    colYMap.delete('termId');
-  }
-  if (next.domainId != null) {
-    colYMap.set('domainId', next.domainId);
-  } else {
-    colYMap.delete('domainId');
-  }
+function normalizeColumnField(key: string, value: unknown): unknown {
+  if (key === 'pk' || key === 'autoIncrement') return value === true ? true : undefined;
+  if (key === 'logicalName') return value || undefined;
+  if (key === 'nullable') return value !== false;
+  return value ?? undefined;
 }
 
 /**
@@ -813,15 +844,9 @@ function cleanupInvalidEdges(
       deleteIds.push(edgeId);
       return;
     }
-    const sourceColumns = sourceTable.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-    const targetColumns = targetTable.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-    if (!sourceColumns || !targetColumns) {
-      deleteIds.push(edgeId);
-      return;
-    }
     if (
-      !findColumnYMap(sourceColumns, sourceColumnId) ||
-      !findColumnYMap(targetColumns, targetColumnId)
+      !getColumnYMap(sourceTable, sourceColumnId) ||
+      !getColumnYMap(targetTable, targetColumnId)
     ) {
       deleteIds.push(edgeId);
     }
@@ -843,41 +868,31 @@ function normalizeForeignKeyFlags(
   tablesMap: Y.Map<Y.Map<unknown>>,
   edgesMap: Y.Map<Y.Map<unknown>>,
 ): void {
-  // 1) 모두 초기화
-  tablesMap.forEach((tableYMap) => {
-    const columnsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-    if (!columnsYArray) {
-      return;
+  const targets = collectForeignKeyTargets(edgesMap);
+  tablesMap.forEach((table, tableId) => {
+    for (const body of readColumnYMaps(table)) {
+      const id = body.get('id') as string;
+      const fk = targets.has(`${tableId}:${id}`) ? true : undefined;
+      if (!Object.is(body.get('fk'), fk)) patchColumnYMap(table, id, { fk });
     }
-    columnsYArray.forEach((colYMap) => {
-      colYMap.delete('fk');
-    });
   });
+}
 
-  // 2) edge target 기준 fk=true 재설정
-  edgesMap.forEach((edgeYMap) => {
-    const target = edgeYMap.get('target');
-    const targetHandle = edgeYMap.get('targetHandle');
-    if (typeof target !== 'string' || typeof targetHandle !== 'string') {
-      return;
-    }
-    const tableYMap = tablesMap.get(target);
-    if (!tableYMap) {
-      return;
-    }
-    const columnId = extractColumnIdFromHandle(targetHandle, target, 'target');
-    if (!columnId) {
-      return;
-    }
-    const columnsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-    if (!columnsYArray) {
-      return;
-    }
-    const colYMap = findColumnYMap(columnsYArray, columnId);
-    if (colYMap) {
-      colYMap.set('fk', true);
-    }
+/**
+ * 엣지가 참조하는 FK 컬럼 ID 집합을 읽는다.
+ * @param edgesMap 엣지 Map
+ * @returns 테이블/컬럼 참조 집합
+ */
+function collectForeignKeyTargets(edgesMap: Y.Map<Y.Map<unknown>>): Set<string> {
+  const targets = new Set<string>();
+  edgesMap.forEach((edge) => {
+    const target = edge.get('target');
+    const handle = edge.get('targetHandle');
+    if (typeof target !== 'string' || typeof handle !== 'string') return;
+    const id = extractColumnIdFromHandle(handle, target, 'target');
+    if (id) targets.add(`${target}:${id}`);
   });
+  return targets;
 }
 
 /**

@@ -1,3 +1,11 @@
+import {
+  ensureColumnStorage,
+  getColumnYMap,
+  insertColumnYMap,
+  deleteTableColumn,
+  moveTableColumn,
+  patchColumnYMap,
+} from '@/collaboration/yjs-columns';
 import * as Y from 'yjs';
 import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
 import { applyDiffToYDoc } from '@/lib/erd-diff-apply';
@@ -7,7 +15,6 @@ import {
   buildTableMetaRestoreMaps,
   buildUniqueFkColumnName,
   buildUniqueName,
-  findColumnYMap,
   populateFromDdl,
 } from '@/stores/canvas/canvasStoreHelpers';
 import { extractColId } from '@/lib/handle-id';
@@ -16,11 +23,9 @@ import {
   createColumnYMap,
   createEdgeYMap,
   createTableYMap,
-  deleteColumnFromYArray,
   getEdgesMap,
   getGroupsMap,
   getTablesMap,
-  moveColumnInYArray,
   removeTableIdFromYArray,
   syncLegacyWaypointsInEdgeYMap,
 } from '@/collaboration/yjsBridge';
@@ -184,19 +189,20 @@ export function createCanvasTableActions(
       if (!tableYMap) {
         return;
       }
-      const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-      if (colsYArray) {
-        ydoc.transact(() => {
-          colsYArray.push([
-            createColumnYMap({
-              id: `col-${crypto.randomUUID()}`,
-              name: 'column',
-              type: 'VARCHAR(255)',
-              nullable: true,
-            }),
-          ]);
-        }, CANVAS_HISTORY_ORIGIN.USER_COLUMN);
-      }
+      ensureColumnStorage(tableYMap);
+      ydoc.transact(() => {
+        const id = `col-${crypto.randomUUID()}`;
+        insertColumnYMap(
+          tableYMap,
+          id,
+          createColumnYMap({
+            id,
+            name: 'column',
+            type: 'VARCHAR(255)',
+            nullable: true,
+          }),
+        );
+      }, CANVAS_HISTORY_ORIGIN.USER_COLUMN);
     },
 
     deleteColumn: (nodeId, colId) => {
@@ -204,14 +210,13 @@ export function createCanvasTableActions(
       if (!ydoc) {
         return;
       }
+      const table = getTablesMap(ydoc).get(nodeId);
+      if (table) ensureColumnStorage(table);
       const handlePrefix = `${nodeId}-${colId}`;
       ydoc.transact(() => {
         const tableYMap = getTablesMap(ydoc).get(nodeId);
         if (tableYMap) {
-          const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-          if (colsYArray) {
-            deleteColumnFromYArray(colsYArray, colId);
-          }
+          deleteTableColumn(tableYMap, colId);
         }
         const edgesMap = getEdgesMap(ydoc);
         const toDelete: string[] = [];
@@ -235,23 +240,10 @@ export function createCanvasTableActions(
       if (!tableYMap) {
         return;
       }
-      const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-      if (!colsYArray) {
-        return;
-      }
-      const colYMap = findColumnYMap(colsYArray, colId);
-      if (!colYMap) {
-        return;
-      }
-
+      ensureColumnStorage(tableYMap);
       ydoc.transact(() => {
-        for (const [key, value] of Object.entries(updates)) {
-          if (value === undefined) {
-            colYMap.delete(key);
-          } else {
-            colYMap.set(key, value);
-          }
-        }
+        if (!patchColumnYMap(tableYMap, colId, updates)) return;
+        const colYMap = getColumnYMap(tableYMap, colId)!;
         if ('pk' in updates || 'fk' in updates) {
           const isPk = !!colYMap.get('pk');
           const isFk = !!colYMap.get('fk');
@@ -275,6 +267,11 @@ export function createCanvasTableActions(
         return;
       }
 
+      const tables = getTablesMap(ydoc);
+      for (const tableId of new Set(columnUpdates.map((update) => update.nodeId))) {
+        const table = tables.get(tableId);
+        if (table) ensureColumnStorage(table);
+      }
       ydoc.transact(() => {
         const tablesMap = getTablesMap(ydoc);
 
@@ -297,21 +294,7 @@ export function createCanvasTableActions(
           if (!tableYMap) {
             continue;
           }
-          const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-          if (!colsYArray) {
-            continue;
-          }
-          const colYMap = findColumnYMap(colsYArray, columnUpdate.colId);
-          if (!colYMap) {
-            continue;
-          }
-          for (const [key, value] of Object.entries(columnUpdate.updates)) {
-            if (value === undefined) {
-              colYMap.delete(key);
-            } else {
-              colYMap.set(key, value);
-            }
-          }
+          patchColumnYMap(tableYMap, columnUpdate.colId, columnUpdate.updates);
         }
       }, CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE);
     },
@@ -323,13 +306,11 @@ export function createCanvasTableActions(
       }
       const tableYMap = getTablesMap(ydoc).get(nodeId);
       if (tableYMap) {
-        const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-        if (colsYArray) {
-          ydoc.transact(
-            () => moveColumnInYArray(colsYArray, fromIndex, toIndex),
-            CANVAS_HISTORY_ORIGIN.USER_COLUMN,
-          );
-        }
+        ensureColumnStorage(tableYMap);
+        ydoc.transact(
+          () => moveTableColumn(tableYMap, fromIndex, toIndex),
+          CANVAS_HISTORY_ORIGIN.USER_COLUMN,
+        );
       }
     },
 
@@ -357,14 +338,13 @@ export function createCanvasTableActions(
       const isId = relationType === 'identifying';
       let count = 0;
 
+      const childTable = getTablesMap(ydoc).get(childNodeId);
+      if (!childTable) return 0;
+      ensureColumnStorage(childTable);
       ydoc.transact(() => {
         const tablesMap = getTablesMap(ydoc);
         const childTableYMap = tablesMap.get(childNodeId);
         if (!childTableYMap) {
-          return;
-        }
-        const colsYArray = childTableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-        if (!colsYArray) {
           return;
         }
         for (const pkCol of pkColumns) {
@@ -372,7 +352,9 @@ export function createCanvasTableActions(
           const fkName = buildUniqueFkColumnName(base, names);
           names.push(fkName);
           const fkColId = `col-${crypto.randomUUID()}`;
-          colsYArray.push([
+          insertColumnYMap(
+            childTableYMap,
+            fkColId,
             createColumnYMap({
               id: fkColId,
               name: fkName,
@@ -383,7 +365,7 @@ export function createCanvasTableActions(
               logicalName: pkCol.logicalName,
               domainId: pkCol.domainId,
             }),
-          ]);
+          );
 
           const { sourceHandle, targetHandle } = resolveAutoEdgeHandles({
             sourceNode: parentNode,
@@ -459,6 +441,8 @@ export function createCanvasTableActions(
               sourceHandle,
               targetHandle,
             };
+      const targetTable = getTablesMap(ydoc).get(target);
+      if (targetTable) ensureColumnStorage(targetTable);
       ydoc.transact(() => {
         const edgeYMap = createEdgeYMap(
           source,
@@ -472,17 +456,10 @@ export function createCanvasTableActions(
         const colId = extractColId(targetHandle, target);
         const tableYMap = getTablesMap(ydoc).get(target);
         if (tableYMap) {
-          const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-          if (colsYArray) {
-            const colYMap = findColumnYMap(colsYArray, colId);
-            if (colYMap) {
-              colYMap.set('fk', true);
-              if (isId) {
-                colYMap.set('pk', true);
-                colYMap.set('nullable', false);
-              }
-            }
-          }
+          patchColumnYMap(tableYMap, colId, {
+            fk: true,
+            ...(isId ? { pk: true, nullable: false } : {}),
+          });
         }
       }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
     },

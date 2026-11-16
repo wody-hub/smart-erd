@@ -1,3 +1,4 @@
+import { readColumnYMaps } from '@/collaboration/yjs-columns';
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import * as Y from 'yjs';
@@ -183,13 +184,19 @@ function getTableById(doc: Y.Doc, tableId: string): Y.Map<unknown> | undefined {
   return tablesMap.get(tableId);
 }
 
+/**
+ * 현재 읽기 스키마에서 이름으로 컬럼을 찾는다.
+ * @param tableYMap 테이블
+ * @param name 컬럼 이름
+ * @returns 컬럼 본체 또는 빈 값
+ */
 function getColumnByName(tableYMap: Y.Map<unknown>, name: string): Y.Map<unknown> | undefined {
-  const columnsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+  const columnsYArray = readColumnYMaps(tableYMap);
   if (!columnsYArray) {
     return undefined;
   }
   for (let i = 0; i < columnsYArray.length; i += 1) {
-    const colYMap = columnsYArray.get(i);
+    const colYMap = columnsYArray[i]!;
     if (colYMap.get('name') === name) {
       return colYMap;
     }
@@ -215,12 +222,12 @@ function resolveTargetColumnName(
   if (!tableYMap) {
     return null;
   }
-  const columnsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+  const columnsYArray = readColumnYMaps(tableYMap);
   if (!columnsYArray) {
     return null;
   }
   for (let i = 0; i < columnsYArray.length; i += 1) {
-    const col = columnsYArray.get(i);
+    const col = columnsYArray[i]!;
     if (col.get('id') === colId) {
       const name = col.get('name');
       if (typeof name === 'string') {

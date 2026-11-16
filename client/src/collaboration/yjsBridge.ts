@@ -1,3 +1,9 @@
+import {
+  deleteTableColumn,
+  initializeColumnStorage,
+  moveTableColumn,
+  readColumnYMaps,
+} from '@/collaboration/yjs-columns';
 import * as Y from 'yjs';
 import { type Edge, type Node } from '@xyflow/react';
 import { normalizeTableHeaderColor } from '../lib/table-colors.js';
@@ -119,9 +125,15 @@ export function yTablesMapToNodes(tablesMap: Y.Map<Y.Map<unknown>>): Node<TableN
   return nodes;
 }
 
+/**
+ * 신형/레거시 컬럼을 읽어 단일 테이블 노드를 투영한다.
+ * @param tableId 테이블 ID
+ * @param tableYMap 테이블 본체
+ * @returns React Flow 테이블 노드
+ */
 export function yTableYMapToNode(tableId: string, tableYMap: Y.Map<unknown>): Node<TableNodeData> {
   const position = readTablePosition(tableYMap);
-  const columnsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
+  const columnsYArray = readColumnYMaps(tableYMap);
 
   const columns: Column[] = [];
   if (columnsYArray) {
@@ -428,18 +440,27 @@ function parseNumberOrNull(value: unknown): number | null {
  * @returns Y.Map 인스턴스
  */
 export function createColumnYMap(column: Column): Y.Map<unknown> {
-  const colYMap = new Y.Map<unknown>();
-  colYMap.set('id', column.id);
-  colYMap.set('name', column.name);
-  colYMap.set('type', column.type);
-  if (column.pk) colYMap.set('pk', true);
-  if (column.fk) colYMap.set('fk', true);
-  if (column.nullable !== undefined) colYMap.set('nullable', column.nullable);
-  if (column.autoIncrement) colYMap.set('autoIncrement', true);
-  if (column.logicalName) colYMap.set('logicalName', column.logicalName);
-  if (column.termId) colYMap.set('termId', column.termId);
-  if (column.domainId) colYMap.set('domainId', column.domainId);
-  return colYMap;
+  return new Y.Map(Object.entries(columnFields(column)));
+}
+
+/**
+ * 컬럼의 기존 직렬화 규칙으로 초기 필드를 생성한다.
+ * @param column 컬럼 데이터
+ * @returns 초기 필드 값
+ */
+function columnFields(column: Column): Record<string, unknown> {
+  return {
+    id: column.id,
+    name: column.name,
+    type: column.type,
+    ...(column.pk ? { pk: true } : {}),
+    ...(column.fk ? { fk: true } : {}),
+    ...(column.nullable !== undefined ? { nullable: column.nullable } : {}),
+    ...(column.autoIncrement ? { autoIncrement: true } : {}),
+    ...(column.logicalName ? { logicalName: column.logicalName } : {}),
+    ...(column.termId ? { termId: column.termId } : {}),
+    ...(column.domainId ? { domainId: column.domainId } : {}),
+  };
 }
 
 /**
@@ -624,6 +645,7 @@ export function createTableYMap(
     colsYArray.push([createColumnYMap(col)]);
   }
   tableYMap.set('columns', colsYArray);
+  initializeColumnStorage(tableYMap, columns.map(columnFields));
 
   if (options?.logicalTableName) tableYMap.set('logicalTableName', options.logicalTableName);
   if (options?.tableTermId != null) tableYMap.set('tableTermId', options.tableTermId);
@@ -715,7 +737,10 @@ export function removeTableIdFromYArray(tableIdsYArray: Y.Array<string>, tableId
 }
 
 /**
- * Y.Array<Y.Map>에서 지정된 컬럼 ID를 가진 항목을 삭제한다.
+ * 기존 배열 인자를 유지하면서 테이블의 신형 컬럼 본체와 순서를 삭제한다.
+ * @deprecated 앱 내부에서 호출하지 않는다. ensureColumnStorage를 transaction 전에 호출하고
+ * deleteTableColumn을 사용한다. 열린 transaction의 최초 이관은
+ * ERR_COLUMN_MIGRATION_IN_TRANSACTION으로 거부한다.
  *
  * @param colsYArray 컬럼 Y.Array
  * @param colId      삭제할 컬럼 ID
@@ -725,6 +750,9 @@ export function deleteColumnFromYArray(
   colsYArray: Y.Array<Y.Map<unknown>>,
   colId: string,
 ): boolean {
+  if (colsYArray.parent instanceof Y.Map) {
+    return deleteTableColumn(colsYArray.parent, colId);
+  }
   for (let i = colsYArray.length - 1; i >= 0; i--) {
     const colYMap = colsYArray.get(i);
     if (colYMap.get('id') === colId) {
@@ -749,18 +777,26 @@ export function cloneYMap(source: Y.Map<unknown>): Y.Map<unknown> {
 }
 
 /**
- * Y.Array 내 컬럼 위치를 이동한다.
- * Y.Map은 한 번 detach된 후 다시 attach할 수 없으므로 새 Y.Map을 복제하여 삽입한다.
+ * 기존 배열 인자를 유지하면서 테이블의 신형 ID 순서만 이동한다.
+ * 테이블에 속하지 않은 독립 배열은 기존 복제 동작을 유지한다.
+ * @deprecated 앱 내부에서 호출하지 않는다. ensureColumnStorage를 transaction 전에 호출하고
+ * moveTableColumn을 사용한다. 열린 transaction의 최초 이관은
+ * ERR_COLUMN_MIGRATION_IN_TRANSACTION으로 거부한다.
  *
  * @param colsYArray 컬럼 Y.Array
  * @param fromIndex  이동 전 인덱스
  * @param toIndex    이동 후 인덱스
+ * @returns 없음
  */
 export function moveColumnInYArray(
   colsYArray: Y.Array<Y.Map<unknown>>,
   fromIndex: number,
   toIndex: number,
 ): void {
+  if (colsYArray.parent instanceof Y.Map) {
+    moveTableColumn(colsYArray.parent, fromIndex, toIndex);
+    return;
+  }
   if (fromIndex === toIndex) return;
   const sourceMap = colsYArray.get(fromIndex);
   const cloned = cloneYMap(sourceMap);
