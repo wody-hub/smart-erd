@@ -1,5 +1,13 @@
+import {
+  buildEdgeObstacleIndex,
+  indexedSegmentIntersectsObstacles,
+  segmentIntersectsObstacle,
+  type EdgeObstacleIndex,
+  type IndexedEdgeObstacle,
+} from './edgeObstacleIndex.js';
 import type { BuildStraightEdgePointsInput, EdgePoint } from './edgeWaypointGeometry.js';
 
+/** 라우팅 장애물의 캔버스 좌표. */
 export interface EdgeObstacleRect {
   left: number;
   right: number;
@@ -7,6 +15,7 @@ export interface EdgeObstacleRect {
   bottom: number;
 }
 
+/** 장애물 스냅샷에 필요한 React Flow 노드 기하 정보. */
 interface ObstacleNode {
   /** 노드 식별자 */
   id: string;
@@ -24,12 +33,33 @@ interface ObstacleNode {
   data?: { columns?: unknown[] };
 }
 
+/** 노드 기하만으로 공유하는 장애물 스냅샷. */
 interface ObstacleSnapshot {
+  /** 모든 endpoint 조합에서 공유하는 공간 인덱스 */
+  index: EdgeObstacleIndex;
+  /** 다른 스냅샷과의 변경 노드 계산을 한 번만 수행한다. */
+  changes: WeakMap<ObstacleSnapshot, IndexedEdgeObstacle[]>;
   /** 노드 ID별 라우팅 장애물 좌표 */
   rectByNodeId: Map<string, EdgeObstacleRect>;
   /** 엣지별 안정된 장애물 배열 */
   rectsByEdge: Map<string, EdgeObstacleRect[]>;
 }
+
+/** 기존 배열 API에 연결하는 내부 스냅샷/endpoint 메타데이터. */
+interface EdgeObstacleMetadata {
+  snapshot: ObstacleSnapshot;
+  sourceNodeId: string;
+  targetNodeId: string;
+}
+
+/** 기본 경로가 비어 있음이 증명된 입력만 저장한다. 우회 실패 null은 저장하지 않는다. */
+interface ClearRouteCacheEntry {
+  snapshot: ObstacleSnapshot;
+}
+
+const edgeObstacleMetadata = new WeakMap<readonly EdgeObstacleRect[], EdgeObstacleMetadata>();
+const clearRoutes = new Map<string, ClearRouteCacheEntry>();
+const MAX_CLEAR_ROUTES = 1024;
 
 const obstacleSnapshots = new WeakMap<readonly ObstacleNode[], ObstacleSnapshot>();
 const obstacleSnapshotsByGeometry = new Map<string, ObstacleSnapshot>();
@@ -71,11 +101,28 @@ export function getCachedEdgeObstacleRects(
           bottom: node.position.y + height,
         });
       }
-      snapshot = { rectByNodeId, rectsByEdge: new Map() };
+      snapshot = {
+        rectByNodeId,
+        rectsByEdge: new Map(),
+        index: buildEdgeObstacleIndex(
+          [...rectByNodeId].map(([nodeId, raw]) => ({
+            nodeId,
+            raw,
+            expanded: expandObstacle(raw, OBSTACLE_PADDING),
+          })),
+        ),
+        changes: new WeakMap(),
+      };
       obstacleSnapshotsByGeometry.set(geometrySignature, snapshot);
       if (obstacleSnapshotsByGeometry.size > MAX_GEOMETRY_SNAPSHOTS) {
         const oldestSignature = obstacleSnapshotsByGeometry.keys().next().value;
-        if (oldestSignature) obstacleSnapshotsByGeometry.delete(oldestSignature);
+        if (oldestSignature) {
+          const evicted = obstacleSnapshotsByGeometry.get(oldestSignature);
+          obstacleSnapshotsByGeometry.delete(oldestSignature);
+          for (const [key, entry] of clearRoutes) {
+            if (entry.snapshot === evicted) clearRoutes.delete(key);
+          }
+        }
       }
     }
     obstacleSnapshots.set(nodes, snapshot);
@@ -90,6 +137,7 @@ export function getCachedEdgeObstacleRects(
     if (nodeId !== sourceNodeId && nodeId !== targetNodeId) rects.push(rect);
   }
   snapshot.rectsByEdge.set(edgeKey, rects);
+  edgeObstacleMetadata.set(rects, { snapshot, sourceNodeId, targetNodeId });
   return rects;
 }
 
@@ -118,7 +166,12 @@ function buildObstacleGeometrySignature(nodes: readonly ObstacleNode[]): string 
 const OBSTACLE_PADDING = 20;
 const OUTER_CORRIDOR_MARGIN = 48;
 
-/** 장애물 사각형 배열이 순서와 네 좌표까지 같은지 비교한다. */
+/**
+ * 장애물 사각형 배열이 순서와 네 좌표까지 같은지 비교한다.
+ * @param left 이전 장애물
+ * @param right 현재 장애물
+ * @returns 순서와 좌표가 모두 같은지 여부
+ */
 export function areEdgeObstacleRectsEqual(
   left: readonly EdgeObstacleRect[],
   right: readonly EdgeObstacleRect[],
@@ -138,15 +191,16 @@ export function areEdgeObstacleRectsEqual(
   });
 }
 
+/**
+ * 기존 후보 순서와 점 배열을 유지하며 장애물 우회 경로를 계산한다.
+ * @param input 앵커 좌표, 방향과 마커 오프셋 (기존과 동일하게 waypoints는 사용하지 않는다)
+ * @param obstacles endpoint를 제외한 장애물 배열
+ * @returns 우회 점 배열, 또는 기본 경로가 비었거나 우회 후보가 없으면 null
+ */
 export function buildObstacleAvoidingAutoRoute(
   input: BuildStraightEdgePointsInput,
   obstacles: EdgeObstacleRect[],
 ): EdgePoint[] | null {
-  if (obstacles.length === 0) {
-    return null;
-  }
-
-  const expandedObstacles = obstacles.map((obstacle) => expandObstacle(obstacle, OBSTACLE_PADDING));
   const sourcePoint = {
     x: input.sourceX + input.sourceDirection * input.sourceMarkerOffset,
     y: input.sourceY,
@@ -162,9 +216,32 @@ export function buildObstacleAvoidingAutoRoute(
     targetPoint,
   ]);
 
-  if (!routeIntersectsObstacles(defaultPoints, obstacles, expandedObstacles)) {
+  const metadata = edgeObstacleMetadata.get(obstacles);
+  const cacheKey = metadata ? buildClearRouteKey(input, metadata) : null;
+  const previous = cacheKey === null ? undefined : clearRoutes.get(cacheKey);
+  if (
+    metadata &&
+    cacheKey !== null &&
+    previous &&
+    canReuseClearRoute(previous.snapshot, metadata, defaultPoints)
+  ) {
+    rememberClearRoute(cacheKey, metadata.snapshot);
     return null;
   }
+
+  // 일반 가변 배열은 참조만으로 캐시하지 않는다. 스냅샷 배열만 인덱스를 공유한다.
+  const index =
+    metadata?.snapshot.index ??
+    buildEdgeObstacleIndex(
+      obstacles.map((raw) => ({ raw, expanded: expandObstacle(raw, OBSTACLE_PADDING) })),
+    );
+  if (!routeIntersectsObstacles(defaultPoints, index, metadata)) {
+    if (metadata && cacheKey !== null) rememberClearRoute(cacheKey, metadata.snapshot);
+    return null;
+  }
+  // 기본 경로가 다시 막혔다면 이전의 clear 증명을 폐기한다.
+  if (cacheKey !== null) clearRoutes.delete(cacheKey);
+  const expandedObstacles = obstacles.map((obstacle) => expandObstacle(obstacle, OBSTACLE_PADDING));
 
   const xCandidates = new Set<number>([
     Math.min(sourcePoint.x, targetPoint.x) - OUTER_CORRIDOR_MARGIN,
@@ -192,7 +269,7 @@ export function buildObstacleAvoidingAutoRoute(
       { x: corridorX, y: targetPoint.y },
       targetPoint,
     ]);
-    if (routeIntersectsObstacles(candidate, obstacles, expandedObstacles)) {
+    if (routeIntersectsObstacles(candidate, index, metadata)) {
       continue;
     }
     const score = calculateRouteScore(candidate);
@@ -209,7 +286,7 @@ export function buildObstacleAvoidingAutoRoute(
       { x: targetPoint.x, y: corridorY },
       targetPoint,
     ]);
-    if (routeIntersectsObstacles(candidate, obstacles, expandedObstacles)) {
+    if (routeIntersectsObstacles(candidate, index, metadata)) {
       continue;
     }
     const score = calculateRouteScore(candidate);
@@ -222,6 +299,12 @@ export function buildObstacleAvoidingAutoRoute(
   return bestRoute;
 }
 
+/**
+ * 장애물의 모든 변을 padding만큼 확장한다.
+ * @param obstacle 원본 장애물
+ * @param padding 여유 거리
+ * @returns 확장된 사각형
+ */
 function expandObstacle(obstacle: EdgeObstacleRect, padding: number): EdgeObstacleRect {
   return {
     left: obstacle.left - padding,
@@ -231,6 +314,11 @@ function expandObstacle(obstacle: EdgeObstacleRect, padding: number): EdgeObstac
   };
 }
 
+/**
+ * 동일 직선 위의 중간 점을 기존 순서대로 제거한다.
+ * @param points 직교 경로
+ * @returns 기존과 동일한 축약 점 배열
+ */
 function compactOrthogonalPoints(points: EdgePoint[]): EdgePoint[] {
   if (points.length <= 2) {
     return points;
@@ -256,48 +344,132 @@ function compactOrthogonalPoints(points: EdgePoint[]): EdgePoint[] {
   return compacted;
 }
 
+/**
+ * 선분별 endpoint 제외와 원본/확장 전환을 유지하며 공간 인덱스를 조회한다.
+ * @param points 직교 경로
+ * @param index 공유 장애물 인덱스
+ * @param metadata 제외할 endpoint ID
+ * @returns 장애물 교차 여부
+ */
 function routeIntersectsObstacles(
   points: EdgePoint[],
-  rawObstacles: EdgeObstacleRect[],
-  expandedObstacles: EdgeObstacleRect[],
+  index: EdgeObstacleIndex,
+  metadata?: EdgeObstacleMetadata,
 ): boolean {
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const start = points[index];
-    const end = points[index + 1];
-    const obstacles = index === 0 || index === points.length - 2 ? rawObstacles : expandedObstacles;
-    for (const obstacle of obstacles) {
-      if (segmentIntersectsObstacle(start, end, obstacle)) {
-        return true;
-      }
-    }
+  for (let segment = 0; segment < points.length - 1; segment += 1) {
+    if (
+      indexedSegmentIntersectsObstacles(
+        index,
+        points[segment],
+        points[segment + 1],
+        segment !== 0 && segment !== points.length - 2,
+        metadata?.sourceNodeId,
+        metadata?.targetNodeId,
+      )
+    )
+      return true;
   }
   return false;
 }
 
-function segmentIntersectsObstacle(
-  start: EdgePoint,
-  end: EdgePoint,
-  obstacle: EdgeObstacleRect,
-): boolean {
-  if (start.x === end.x) {
-    const x = start.x;
-    if (x <= obstacle.left || x >= obstacle.right) {
-      return false;
-    }
-    const minY = Math.min(start.y, end.y);
-    const maxY = Math.max(start.y, end.y);
-    return maxY > obstacle.top && minY < obstacle.bottom;
-  }
-
-  const y = start.y;
-  if (y <= obstacle.top || y >= obstacle.bottom) {
-    return false;
-  }
-  const minX = Math.min(start.x, end.x);
-  const maxX = Math.max(start.x, end.x);
-  return maxX > obstacle.left && minX < obstacle.right;
+/**
+ * 입력과 endpoint 조합으로 clear 증명을 조회한다. -0과 비유한 값도 구분한다.
+ * @param input 경로 입력
+ * @param metadata endpoint ID
+ * @returns 충돌 없는 입력 키
+ */
+function buildClearRouteKey(
+  input: BuildStraightEdgePointsInput,
+  metadata: EdgeObstacleMetadata,
+): string {
+  return JSON.stringify([
+    metadata.sourceNodeId,
+    metadata.targetNodeId,
+    ...[
+      input.sourceX,
+      input.sourceY,
+      input.targetX,
+      input.targetY,
+      input.sourceDirection,
+      input.targetDirection,
+      input.sourceMarkerOffset,
+      input.targetMarkerOffset,
+    ].map((value) => (Object.is(value, -0) ? '-0' : String(value))),
+  ]);
 }
 
+/**
+ * clear 증명을 LRU로 제한하여 과거 스냅샷의 무제한 보유를 방지한다.
+ * @param key 경로 입력 키
+ * @param snapshot 증명이 성립하는 스냅샷
+ * @returns 없음
+ */
+function rememberClearRoute(key: string, snapshot: ObstacleSnapshot): void {
+  clearRoutes.delete(key);
+  clearRoutes.set(key, { snapshot });
+  if (clearRoutes.size > MAX_CLEAR_ROUTES) clearRoutes.delete(clearRoutes.keys().next().value!);
+}
+
+/**
+ * 스냅샷 사이의 변경 노드를 한 번만 비교해 이전/현재 좌표를 모두 저장한다.
+ * 순서 변경은 clear 증명에 영향을 주지 않는다. 우회 후보는 재사용하지 않는다.
+ * @param previous 이전 증명 스냅샷
+ * @param next 현재 스냅샷
+ * @returns 변경/추가/삭제된 장애물의 이전/현재 좌표
+ */
+function getChangedObstacles(
+  previous: ObstacleSnapshot,
+  next: ObstacleSnapshot,
+): IndexedEdgeObstacle[] {
+  const cached = next.changes.get(previous);
+  if (cached) return cached;
+  const changed: IndexedEdgeObstacle[] = [];
+  for (const [nodeId, raw] of previous.rectByNodeId) {
+    const current = next.rectByNodeId.get(nodeId);
+    if (!current || !areEdgeObstacleRectsEqual([raw], [current])) {
+      changed.push({ nodeId, raw, expanded: expandObstacle(raw, OBSTACLE_PADDING) });
+      if (current)
+        changed.push({ nodeId, raw: current, expanded: expandObstacle(current, OBSTACLE_PADDING) });
+    }
+  }
+  for (const [nodeId, raw] of next.rectByNodeId) {
+    if (!previous.rectByNodeId.has(nodeId))
+      changed.push({ nodeId, raw, expanded: expandObstacle(raw, OBSTACLE_PADDING) });
+  }
+  next.changes.set(previous, changed);
+  return changed;
+}
+
+/**
+ * 동일 입력에서 변경 노드의 이전/현재 사각형이 기본 경로와 교차하지 않으면 clear 증명이 유지된다.
+ * endpoint 변경은 장애물에서 제외하고 앵커 변경은 입력 키가 달라지므로 다시 판정한다.
+ * @param previous 증명된 스냅샷
+ * @param metadata 현재 스냅샷과 endpoint
+ * @param points 동일 입력의 기본 경로
+ * @returns 기본 경로가 계속 비어 있음을 증명할 수 있는지 여부
+ */
+function canReuseClearRoute(
+  previous: ObstacleSnapshot,
+  metadata: EdgeObstacleMetadata,
+  points: EdgePoint[],
+): boolean {
+  if (previous === metadata.snapshot) return true;
+  const changed = getChangedObstacles(previous, metadata.snapshot);
+  for (const entry of changed) {
+    if (entry.nodeId === metadata.sourceNodeId || entry.nodeId === metadata.targetNodeId) continue;
+    for (let segment = 0; segment < points.length - 1; segment += 1) {
+      const rect = segment === 0 || segment === points.length - 2 ? entry.raw : entry.expanded;
+      if (segmentIntersectsObstacle(points[segment], points[segment + 1], rect)) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * 맨해튼 길이와 꺾임 수로 후보의 우선순위를 계산한다.
+ * @param points 직교 경로
+ * @returns 기존 후보 평가 점수
+ */
 function calculateRouteScore(points: EdgePoint[]): number {
   let totalLength = 0;
   for (let index = 0; index < points.length - 1; index += 1) {
