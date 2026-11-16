@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import vm from 'node:vm';
-import { installCollabProbe } from './erd-collab-probe.mjs';
+import { classifyTicket, installCollabProbe, selectInputTicket } from './erd-collab-probe.mjs';
 import { loadDiagramHelpers, summarize } from './erd-collab-system.mjs';
 
 /**
@@ -16,13 +16,18 @@ function createProbeHarness() {
   const events = new Map();
   const column = { name: 'id', input: false };
   const row = {
+    closest: (selector) => (selector.includes('group/col') ? row : null),
     querySelector(selector) {
       if (selector === '[data-handleid]') return { getAttribute: () => 't0-t0c0-source-right' };
       if (selector.startsWith('input')) return column.input ? { value: column.name } : null;
       return { textContent: column.name };
     },
   };
-  const node = { style: { transform: 'translate(10px, 20px)' }, querySelectorAll: () => [row] };
+  const node = {
+    style: { transform: 'translate(10px, 20px)' },
+    getAttribute: () => 't0',
+    querySelectorAll: () => [row],
+  };
   const document = {
     querySelector: () => node,
     querySelectorAll: () => [],
@@ -71,7 +76,14 @@ function createProbeHarness() {
     input(table = 't0') {
       events.get('input')({
         type: 'input',
-        target: { closest: (selector) => (selector.includes(`"${table}"`) ? node : null) },
+        target: {
+          value: column.name,
+          closest: (selector) => {
+            if (selector.includes('group/col')) return row;
+            if (selector.includes('data-id') && table === 't0') return node;
+            return null;
+          },
+        },
       });
     },
   };
@@ -114,12 +126,49 @@ test('작성자 input.value는 실제 입력 시각과 rAF 보조 관찰로 구�
   h.input('t1');
   assert.equal(h.probe.read('edit').startedAt, null);
   h.advance(10);
-  h.input();
   h.column.name = 'new';
+  h.input();
   h.frame(16);
   assert.equal(h.probe.read('edit').startedAt, 1010);
   assert.equal(h.probe.read('edit').seenAt, 1016);
   assert.equal(h.probe.read('edit').source, 'raf');
+});
+
+test('입력은 실제 컬럼과 목표 값이 일치하는 티켓 하나에만 귀속한다', () => {
+  const pending = [
+    { id: 'old', event: 'input', table: 't0', column: 't0c0', value: 'c2_0_4' },
+    { id: 'new', event: 'input', table: 't0', column: 't0c0', value: 'c2_0_5' },
+    { id: 'other-column', event: 'input', table: 't0', column: 't0c1', value: 'c2_0_5' },
+  ];
+  const target = { table: 't0', column: 't0c0', value: 'c2_0_5' };
+  assert.equal(selectInputTicket('input', target, pending).id, 'new');
+  assert.equal(selectInputTicket('input', { ...target, value: 'unknown' }, pending), null);
+});
+
+test('같은 이벤트에 맞는 티켓이 여러 개면 모두 시작 처리하지 않는다', () => {
+  const pending = [
+    { id: 'first', event: 'click', table: 't0' },
+    { id: 'second', event: 'click', table: 't0' },
+  ];
+  assert.equal(selectInputTicket('click', { table: 't0' }, pending), null);
+  assert.equal(selectInputTicket('click', { table: 't1' }, pending), null);
+});
+
+test('더 큰 동일 작성자 sequence는 superseded로, exact는 exact-seen으로 분류한다', () => {
+  assert.equal(
+    classifyTicket({
+      startedAt: 10,
+      localSeenAt: null,
+      peers: [{ seenAt: null, supersededAt: 20 }],
+    }),
+    'superseded',
+  );
+  assert.equal(
+    classifyTicket({ startedAt: 10, localSeenAt: 20, peers: [{ seenAt: 20, supersededAt: null }] }),
+    'exact-seen',
+  );
+  assert.equal(classifyTicket({ startedAt: null, peers: [] }), 'not-dispatched');
+  assert.equal(classifyTicket({ startedAt: 10, peers: [{ seenAt: null }] }), 'pending');
 });
 
 test('잘못된 컬럼 ID와 목표에 못 미친 이동은 성공으로 기록하지 않는다', () => {

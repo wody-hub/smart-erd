@@ -1,4 +1,44 @@
 /**
+ * 실제 UI 이벤트에 귀속할 유일한 대기 티켓을 찾는다.
+ * @param {string} eventType 이벤트 종류
+ * @param {object} target 입력 대상에서 읽은 테이블/컬럼/값
+ * @param {object[]} candidates 대기 티켓
+ * @returns {object|null} 모호하지 않게 일치한 티켓
+ */
+export function selectInputTicket(eventType, target, candidates) {
+  const matching = candidates.filter((candidate) => {
+    if (candidate.event !== eventType) return false;
+    if (candidate.table && eventType !== 'pointerup' && candidate.table !== target.table)
+      return false;
+    if (eventType === 'input')
+      return (
+        candidate.column === target.column &&
+        candidate.value === target.value &&
+        target.table === candidate.table
+      );
+    return true;
+  });
+  return matching.length === 1 ? matching[0] : null;
+}
+
+/**
+ * 편집 티켓의 전파 결과를 네 가지 상태로 분류한다.
+ * @param {object} sample 수거된 편집 표본
+ * @returns {'exact-seen'|'superseded'|'not-dispatched'|'pending'} 상태
+ */
+export function classifyTicket(sample) {
+  if (sample.startedAt === null) return 'not-dispatched';
+  if (
+    sample.localSeenAt !== null &&
+    sample.peers.length &&
+    sample.peers.every((peer) => peer.seenAt !== null)
+  )
+    return 'exact-seen';
+  if (sample.peers.some((peer) => peer.supersededAt !== null)) return 'superseded';
+  return 'pending';
+}
+
+/**
  * 앱 상태를 읽거나 변경하지 않고 DOM, 입력 이벤트와 브라우저 성능을 관찰한다.
  * @returns {void} 새 문서에 설치할 관찰기
  */
@@ -97,6 +137,17 @@ export function installCollabProbe() {
         watch.seenAt = now;
         watch.source = source;
         activeWatches.delete(watch);
+      } else if (watch.spec.supersededBy) {
+        const state = tableState(watch.spec.table);
+        const column = state?.columns.find((item) => item.id === watch.spec.column);
+        const newer = new RegExp(`^c2_${watch.spec.supersededBy.writer}_(\\d+)$`).exec(
+          column?.name ?? '',
+        );
+        if (newer && Number(newer[1]) > watch.spec.supersededBy.sequence) {
+          watch.supersededAt = now;
+          watch.supersededBySequence = Number(newer[1]);
+          activeWatches.delete(watch);
+        }
       }
     }
   }
@@ -117,16 +168,19 @@ export function installCollabProbe() {
    * @returns {void}
    */
   function recordInput(event) {
-    for (const pending of inputs.values()) {
-      if (pending.startedAt !== null || pending.event !== event.type) continue;
-      // 드래그는 포인터가 테이블 밖에서 끝날 수 있으므로 pointerup에는 대상 테이블 필터를 적용하지 않는다.
-      const outsideTable =
-        pending.table &&
-        event.type !== 'pointerup' &&
-        !event.target.closest?.(`[data-id="${pending.table}"]`);
-      if (outsideTable) continue;
-      pending.startedAt = clock();
-    }
+    const input = event.type === 'input' ? event.target : null;
+    const row = input?.closest?.('[class~="group/col"]');
+    const tableNode = event.target.closest?.('.react-flow__node[data-id]');
+    const table = tableNode?.getAttribute('data-id') ?? null;
+    const handle = row?.querySelector('[data-handleid]')?.getAttribute('data-handleid');
+    const column = handle
+      ?.slice((table ?? '').length + 1)
+      .replace(/-(?:source|target)(?:-(?:left|right|top|bottom))?$/, '');
+    const candidates = [...inputs.entries()]
+      .filter(([, pending]) => pending.startedAt === null)
+      .map(([id, pending]) => ({ id, ...pending }));
+    const match = selectInputTicket(event.type, { table, column, value: input?.value }, candidates);
+    if (match) inputs.get(match.id).startedAt = clock();
   }
   for (const event of ['input', 'click', 'pointerup']) {
     document.addEventListener(event, recordInput, true);
@@ -176,10 +230,17 @@ export function installCollabProbe() {
      * @returns {void}
      */
     arm(id, spec, event = null) {
-      const watch = { spec, seenAt: null, source: null };
+      const watch = { spec, seenAt: null, source: null, supersededAt: null };
       watches.set(id, watch);
       activeWatches.add(watch);
-      if (event) inputs.set(id, { event, table: spec.table, startedAt: null });
+      if (event)
+        inputs.set(id, {
+          event,
+          table: spec.table,
+          column: spec.column,
+          value: spec.value,
+          startedAt: null,
+        });
     },
     /** @param {string} id 편집 ID @returns {object} 관찰 기록 */
     read(id) {
@@ -187,6 +248,8 @@ export function installCollabProbe() {
       return {
         seenAt: watch?.seenAt ?? null,
         source: watch?.source ?? null,
+        supersededAt: watch?.supersededAt ?? null,
+        supersededBySequence: watch?.supersededBySequence ?? null,
         startedAt: inputs.get(id)?.startedAt ?? null,
       };
     },

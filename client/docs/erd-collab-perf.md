@@ -148,31 +148,46 @@ K명의 C2 편집 중 첫 입력이 완료되면 새 컨텍스트를 합류시�
 모든 UI 입력/관찰 시각은 각 페이지의 `performance.timeOrigin + performance.now()`이며 단위는 ms다.
 같은 머신·Chromium의 시계를 공유한다는 전제다. 음수 피어 지연은 0으로 보정하지 않고 오류로 남긴다.
 
-| JSON 필드                             | 의미                                                                                   |
-| ------------------------------------- | -------------------------------------------------------------------------------------- |
-| `samples[].startedAt`                 | 작성자의 실제 input/click/pointerup 캡처 단계 시각                                     |
-| `samples[].peers[].seenAt`            | 해당 DOM 조건이 처음 일치한 시각                                                       |
-| `samples[].peers[].latencyMs`         | 피어 seenAt − 작성자 startedAt                                                         |
-| `samples[].localMs`                   | 입력 → 작성자 자신의 DOM 조건 일치. 드래그는 종료 전에 로컬 이동하므로 null            |
-| `localSource`, `peers[].source`       | `mutation` 또는 `raf`. 관찰 방법을 표본마다 기록                                       |
-| `summary.peerMs`, `summary.localMs`   | 전체 표본의 n/p50/p95/max/mean. 피어 수만큼 표본 발생                                  |
-| `summary.byOperation`                 | C1 작업 종류별 동일 통계                                                               |
-| `missingPeerObservations`             | 누락된 피어 반영 수. 타임아웃은 0ms 표본으로 넣지 않음                                 |
-| `load.attemptedEdits`, `load.edits`   | 준비한 편집 수 / 실제 입력 이벤트가 확인된 수                                          |
-| `load.writers[].achievedRate`         | 실제 입력 수 / 실제 부하 창 길이(초)                                                   |
-| `pages[].longtaskCount/TotalMs/MaxMs` | PerformanceObserver longtask 수/총 시간/최대 시간                                      |
-| `pages[].frameGapOver50Count`         | 측정 창 중 rAF 간격이 50ms를 초과한 횟수                                               |
-| `pages[].frameGapMaxMs`               | 가장 큰 rAF 간격                                                                       |
-| `pages[].cdpDeltaMs`                  | CDP Performance의 TaskDuration/ScriptDuration/LayoutDuration 종료−시작. 초를 ms로 변환 |
-| `pages[].websocket`                   | CDP WebSocket 송수신 프레임 수와 payload byte 합. 바이너리는 base64를 디코딩해 계산    |
-| `pages[].jsHeapMiB`, `heapSamples`    | 편집 창 시작/종료 및 매 1초 CDP Runtime.getHeapUsage의 usedSize                        |
-| `server.cpuPercent`                   | java PID의 ps %cpu 표본 평균/최대 및 백분위수                                          |
-| `server.rssMiB`                       | ps rss(KiB)를 MiB로 변환한 평균/최대 및 백분위수                                       |
-| `convergence[].convergenceMs`         | 첫 실제 입력 → 최종 안정 상태를 처음 확인한 시각. 추가 300ms 확인 대기는 제외          |
-| `joins[].editableMs`                  | 다이어그램 접속 직전 → 편집 가능한 DOM의 최초 관찰 시각                                |
+| JSON 필드                                | 의미                                                                                     |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `samples[].startedAt`                    | 작성자의 실제 input/click/pointerup 캡처 단계 시각                                       |
+| `samples[].peers[].seenAt`               | 해당 DOM 조건이 처음 일치한 시각                                                         |
+| `samples[].peers[].latencyMs`            | 피어 seenAt − 작성자 startedAt                                                           |
+| `samples[].localMs`                      | 입력 → 작성자 자신의 DOM 조건 일치. 드래그는 종료 전에 로컬 이동하므로 null              |
+| `localSource`, `peers[].source`          | `mutation` 또는 `raf`. 관찰 방법을 표본마다 기록                                         |
+| `summary.peerMs`, `summary.localMs`      | exact-seen 표본만의 n/p50/p95/max/mean. 피어 수만큼 표본 발생                            |
+| `summary.byOperation`                    | C1 작업 종류별 동일 통계                                                                 |
+| `missingPeerObservations`                | 누락된 피어 반영 수. 타임아웃은 0ms 표본으로 넣지 않음                                   |
+| `load.attemptedEdits`, `load.dispatched` | 작성 UI 동작을 예약해 감시 티켓을 만든 수. 두 값은 호환상 같은 수                        |
+| `load.committed`, `load.edits`           | 실제 target 컬럼과 목표 value가 일치하는 `input` 이벤트에 귀속된 수. `edits`는 호환 별칭 |
+| `load.exactSeen`, `superseded`           | 모든 클라이언트에서 해당 값을 관찰한 수 / 같은 작성자·컬럼의 더 큰 sequence를 관찰한 수  |
+| `load.notDispatched`, `pending`          | 입력 이벤트 귀속 실패 수 / 귀속은 됐지만 exact 또는 superseded로 끝나지 않은 수          |
+| `load.writers[].achievedRate`            | committed 수 / 실제 부하 창 길이(초)                                                     |
+| `load.requestedDurationS`                | `--duration-s`로 지정한 요청 부하 창                                                     |
+| `load.actualWindowMs`                    | 부하 시작부터 작성 루프 종료까지의 실제 시간. 요청 값과 다를 수 있음                     |
+| `pages[].longtaskCount/TotalMs/MaxMs`    | PerformanceObserver longtask 수/총 시간/최대 시간                                        |
+| `pages[].frameGapOver50Count`            | 측정 창 중 rAF 간격이 50ms를 초과한 횟수                                                 |
+| `pages[].frameGapMaxMs`                  | 가장 큰 rAF 간격                                                                         |
+| `pages[].cdpDeltaMs`                     | CDP Performance의 TaskDuration/ScriptDuration/LayoutDuration 종료−시작. 초를 ms로 변환   |
+| `pages[].websocket`                      | CDP WebSocket 송수신 프레임 수와 payload byte 합. 바이너리는 base64를 디코딩해 계산      |
+| `pages[].jsHeapMiB`, `heapSamples`       | 편집 창 시작/종료 및 매 1초 CDP Runtime.getHeapUsage의 usedSize                          |
+| `server.cpuPercent`                      | java PID의 ps %cpu 표본 평균/최대 및 백분위수                                            |
+| `server.rssMiB`                          | ps rss(KiB)를 MiB로 변환한 평균/최대 및 백분위수                                         |
+| `convergence[].convergenceMs`            | 첫 실제 입력 → 최종 안정 상태를 처음 확인한 시각. 추가 300ms 확인 대기는 제외            |
+| `joins[].editableMs`                     | 다이어그램 접속 직전 → 편집 가능한 DOM의 최초 관찰 시각                                  |
 
 백분위수는 정렬한 유효 표본의 **최근접 순위법**이다. 빈 집합은 n=0과 null로 보고한다.
 C2/C4의 페이지 지표는 로그인·초기 렌더·전파 결과 수거 시간을 제외한 편집 창을 대상으로 한다.
+요청 window(`requestedDurationS`)는 목표 부하 시간이고 actual window(`actualWindowMs`)는 작성 루프가
+실제로 실행된 시간이다. 스케줄링과 UI 입력 처리에 따라 둘은 달라질 수 있다. `load.edits`는 기존
+JSON 소비자를 위해 유지하며 `load.committed`와 같은 값이다. `summary.edits`도 기존 전체 티켓 수를
+유지하고, 새 상태별 카운터를 함께 제공한다. p50/p95/local/peer 지연 필드는 기존 이름과 모양을
+유지하지만 exact-seen 티켓만 표본에 넣는다. superseded는 지연 분포에 넣지 않고 건수만 집계한다.
+입력이 귀속되지 않으면 not-dispatched, 귀속 후 timeout까지 exact/superseded가 확인되지 않으면
+pending이다. JSON `samples[].status`에는 네 상태 중 하나가 기록된다.
+C2와 C4 부하 뒤에는 각 작성자의 마지막 귀속 값이 모든 현재 클라이언트에서 300ms 안정적으로
+관찰되는지 검사한다. 실패는 `final-diverged` 오류이며 대기 상한은 `--timeout-ms`다. C4의
+부하 중 합류 클라이언트도 이 검사 대상에 포함한다.
 각 페이지의 CDP 호출 경계는 원자적으로 일치하지 않으며, DevTools/관찰기 자체 비용도 포함된다.
 JS 힙은 JS 엔진 used heap이며 페이지 전체 RSS나 GC 전후의 정규화된 메모리가 아니다.
 WebSocket payload byte는 프레임 헤더·TCP/TLS 오버헤드를 제외하며 awareness/heartbeat도 포함한다.

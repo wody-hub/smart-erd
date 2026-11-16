@@ -7,7 +7,7 @@ import { chromium } from 'playwright';
 import { buildErdLocalSeed } from './lib/erd-app-seed.mjs';
 import { summarizeCpuProfile } from './lib/erd-cpu-profile.mjs';
 import { installReactRenderStats } from './lib/erd-react-render-stats.mjs';
-import { installCollabProbe } from './lib/erd-collab-probe.mjs';
+import { classifyTicket, installCollabProbe } from './lib/erd-collab-probe.mjs';
 import {
   commitHash,
   loadDiagramHelpers,
@@ -388,8 +388,9 @@ async function prepare(session, size) {
  */
 async function armEdit(session, writer, spec, event = 'input') {
   const id = `${session.key}-${session.sequence++}`;
+  const clients = session.finalClients ?? session.clients;
   await Promise.all(
-    session.clients.map(({ page }, index) =>
+    clients.map(({ page }, index) =>
       page.evaluate(({ id, spec, event }) => window.__collabBench.arm(id, spec, event), {
         id,
         spec,
@@ -409,11 +410,16 @@ async function armEdit(session, writer, spec, event = 'input') {
 async function collectEdits(session, tickets) {
   if (!tickets.length) return [];
   const ids = tickets.map((ticket) => ticket.id);
+  const clients = session.finalClients ?? session.clients;
   const observations = await Promise.all(
-    session.clients.map(async ({ page }, client) => {
+    clients.map(async ({ page }, client) => {
       try {
         await page.waitForFunction(
-          (ids) => ids.every((id) => window.__collabBench.read(id).seenAt !== null),
+          (ids) =>
+            ids.every((id) => {
+              const record = window.__collabBench.read(id);
+              return record.seenAt !== null || record.supersededAt !== null;
+            }),
           ids,
           { timeout: session.options.timeoutMs },
         );
@@ -425,7 +431,7 @@ async function collectEdits(session, tickets) {
         ids,
       );
       const missing = records.flatMap((record, index) =>
-        record.seenAt === null ? [ids[index]] : [],
+        record.seenAt === null && record.supersededAt === null ? [ids[index]] : [],
       );
       if (missing.length)
         session.result.errors.push({
@@ -442,6 +448,8 @@ async function collectEdits(session, tickets) {
     return {
       ...ticket,
       startedAt,
+      localSeenAt: observations[ticket.writer][index].seenAt,
+      status: null,
       localSource: observations[ticket.writer][index].source,
       localMs:
         ticket.spec.kind === 'move' ||
@@ -457,6 +465,8 @@ async function collectEdits(session, tickets) {
                 client,
                 seenAt: records[index].seenAt,
                 source: records[index].source,
+                supersededAt: records[index].supersededAt,
+                supersededBySequence: records[index].supersededBySequence,
                 latencyMs:
                   startedAt === null || records[index].seenAt === null
                     ? null
@@ -466,7 +476,8 @@ async function collectEdits(session, tickets) {
       ),
     };
   });
-  const missingInputs = samples.filter((sample) => sample.startedAt === null);
+  for (const sample of samples) sample.status = classifyTicket(sample);
+  const missingInputs = samples.filter((sample) => sample.status === 'not-dispatched');
   if (missingInputs.length)
     session.result.errors.push({
       message: 'Actual UI input event not captured',
@@ -483,9 +494,7 @@ async function collectEdits(session, tickets) {
       operations: early.slice(0, 20).map((sample) => sample.id),
     });
   await Promise.all(
-    session.clients.map(({ page }) =>
-      page.evaluate((ids) => window.__collabBench.forget(ids), ids),
-    ),
+    clients.map(({ page }) => page.evaluate((ids) => window.__collabBench.forget(ids), ids)),
   );
   session.result.samples.push(...samples);
   return samples;
@@ -660,6 +669,7 @@ async function runLoad(session, afterFirstEdit) {
       if (window.__RS) window.__RS.on = true;
     });
   const tickets = [];
+  session.loadTickets = tickets;
   const startedAt = Date.now();
   const deadline = startedAt + session.options.durationS * 1000;
   const period = 1000 / session.options.rate;
@@ -680,7 +690,9 @@ async function runLoad(session, afterFirstEdit) {
         table: `t${writer}`,
         column: `t${writer}c0`,
         value,
+        supersededBy: { writer, sequence: slot },
       });
+      ticket.sequence = slot;
       tickets.push(ticket);
       await columnInput(page, `t${writer}`).fill(value);
       if (!firstResolved) {
@@ -755,7 +767,8 @@ async function runLoad(session, afterFirstEdit) {
     endedAt,
     requestedDurationS: session.options.durationS,
     actualWindowMs: endedAt - startedAt,
-    edits: tickets.length,
+    edits: 0,
+    dispatched: tickets.length,
     writers: session.clients.map((_, writer) => ({
       writer,
       edits: tickets.filter((ticket) => ticket.writer === writer).length,
@@ -766,7 +779,16 @@ async function runLoad(session, afterFirstEdit) {
   };
   const samples = await collectEdits(session, tickets);
   session.result.load.attemptedEdits = tickets.length;
-  session.result.load.edits = samples.filter((sample) => sample.startedAt !== null).length;
+  session.result.load.committed = samples.filter((sample) => sample.startedAt !== null).length;
+  session.result.load.edits = session.result.load.committed;
+  session.result.load.exactSeen = samples.filter((sample) => sample.status === 'exact-seen').length;
+  session.result.load.superseded = samples.filter(
+    (sample) => sample.status === 'superseded',
+  ).length;
+  session.result.load.notDispatched = samples.filter(
+    (sample) => sample.status === 'not-dispatched',
+  ).length;
+  session.result.load.pending = samples.filter((sample) => sample.status === 'pending').length;
   for (const writer of session.result.load.writers) {
     writer.edits = samples.filter(
       (sample) => sample.writer === writer.writer && sample.startedAt !== null,
@@ -775,6 +797,71 @@ async function runLoad(session, afterFirstEdit) {
   }
   if (!tickets.length)
     session.result.errors.push({ workload: 'C2', message: 'No edits dispatched' });
+  const finalState = await waitForFinalConvergence(session, tickets);
+  session.result.load.finalConvergence = finalState;
+  if (!finalState.pass)
+    session.result.errors.push({ workload: 'C2', type: 'final-diverged', ...finalState });
+}
+
+/**
+ * 마지막으로 귀속된 작성자별 값을 모든 현재 클라이언트에서 안정 확인한다.
+ * @param {object} session 실행 세션
+ * @returns {Promise<object>} 최종 수렴 결과
+ */
+async function waitForFinalConvergence(session) {
+  const lastByWriter = new Map();
+  for (const sample of session.result.samples.filter((item) => item.startedAt !== null)) {
+    const previous = lastByWriter.get(sample.writer);
+    if (!previous || sample.sequence > previous.sequence) lastByWriter.set(sample.writer, sample);
+  }
+  const expected = [...lastByWriter.values()].map(({ writer, spec, sequence }) => ({
+    writer,
+    table: spec.table,
+    column: spec.column,
+    value: spec.value,
+    sequence,
+  }));
+  if (!expected.length) return { pass: true, skipped: true, expected, states: [] };
+  const deadline = Date.now() + session.options.timeoutMs;
+  let stableSince = null;
+  let signature = null;
+  let states = [];
+  do {
+    states = await Promise.all(
+      (session.finalClients ?? session.clients).map(({ page }) =>
+        page.evaluate(
+          (expected) => ({
+            at: window.__collabBench.clock(),
+            values: expected.map((item) => ({
+              writer: item.writer,
+              value:
+                window.__collabBench
+                  .tableState(item.table)
+                  ?.columns.find((column) => column.id === item.column)?.name ?? null,
+            })),
+          }),
+          expected,
+        ),
+      ),
+    );
+    const next = JSON.stringify(states.map((state) => state.values));
+    const converged = expected.every((item) =>
+      states.every(
+        (state) => state.values.find((value) => value.writer === item.writer)?.value === item.value,
+      ),
+    );
+    if (converged) {
+      if (signature !== next) stableSince = Date.now();
+      if (Date.now() - stableSince >= 300)
+        return { pass: true, stableForMs: 300, expected, states };
+      signature = next;
+    } else {
+      stableSince = null;
+      signature = null;
+    }
+    await delay(25);
+  } while (Date.now() < deadline);
+  return { pass: false, stableForMs: 0, expected, states, timedOut: true };
 }
 
 /**
@@ -952,6 +1039,10 @@ async function runC4(session) {
     if (Date.now() >= session.loadWindow.deadline)
       throw new Error('C2 load finished before late join started');
     const join = await joinDiagram(session, loaded);
+    session.finalClients = [...session.clients, loaded];
+    await loaded.page.evaluate((tickets) => {
+      for (const ticket of tickets) window.__collabBench.arm(ticket.id, ticket.spec);
+    }, session.loadTickets);
     session.result.joins.push({ mode: 'under-C2-load', ...join });
   });
 }
@@ -965,8 +1056,18 @@ function summarizeEdits(samples) {
   /** 주어진 표본 집합을 집계한다. */
   const stats = (items) => ({
     edits: items.length,
-    localMs: summarize(items.map((sample) => sample.localMs)),
-    peerMs: summarize(items.flatMap((sample) => sample.peers.map((peer) => peer.latencyMs))),
+    exactSeen: items.filter((sample) => sample.status === 'exact-seen').length,
+    superseded: items.filter((sample) => sample.status === 'superseded').length,
+    notDispatched: items.filter((sample) => sample.status === 'not-dispatched').length,
+    pending: items.filter((sample) => sample.status === 'pending').length,
+    localMs: summarize(
+      items.filter((sample) => sample.status === 'exact-seen').map((sample) => sample.localMs),
+    ),
+    peerMs: summarize(
+      items
+        .filter((sample) => sample.status === 'exact-seen')
+        .flatMap((sample) => sample.peers.map((peer) => peer.latencyMs)),
+    ),
     missingPeerObservations: items
       .flatMap((sample) => sample.peers)
       .filter((peer) => peer.latencyMs === null).length,
@@ -1082,6 +1183,18 @@ function markdown(report) {
         `| ↳ ${kind} | ${result.size} | | ${stats.edits} | ${triplet(stats.peerMs)} | ${triplet(stats.localMs)} | | |`,
       );
     }
+    if (result.load) {
+      details.push(
+        `- S${result.size}/${result.scenario} 편집 분류: dispatched ${result.load.dispatched}, committed ${result.load.committed}, exact-seen ${result.load.exactSeen}, superseded ${result.load.superseded}, not-dispatched ${result.load.notDispatched}, pending ${result.load.pending}`,
+      );
+      details.push(
+        `- S${result.size}/${result.scenario} 요청 window ${result.load.requestedDurationS}s / 실제 window ${result.load.actualWindowMs}ms`,
+      );
+    }
+    if (result.load?.finalConvergence)
+      details.push(
+        `- S${result.size}/${result.scenario} 최종 수렴: **${result.load.finalConvergence.pass ? 'PASS' : 'FAIL'}**, 안정 ${result.load.finalConvergence.stableForMs}ms`,
+      );
     for (const check of result.convergence)
       details.push(
         `- S${result.size}/${result.scenario} ${check.check}: **${check.status}**, 수렴 ${check.convergenceMs ?? '-'}ms, 입력 차이 ${check.dispatchSkewMs ?? '-'}ms`,
