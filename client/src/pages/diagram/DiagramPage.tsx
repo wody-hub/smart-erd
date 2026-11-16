@@ -269,6 +269,17 @@ export default function DiagramPage() {
     workMode,
     writePreviewPositionOverrides,
   });
+
+  /** 코드 이동 컨텍스트 값 (참조 안정화: 값이 같으면 모든 TableNode의 리렌더링을 막는다) */
+  const codeNavigationValue = useMemo(
+    () => ({
+      canNavigateToCode: workModeCapabilities.showCodePanel,
+      navigateToCode: workModeCapabilities.showCodePanel
+        ? handleNavigateToCodeFromDiagram
+        : undefined,
+    }),
+    [workModeCapabilities.showCodePanel, handleNavigateToCodeFromDiagram],
+  );
   const handleOpenDictionaryContext = useCallback(() => {
     if (!teamId || !projectId || !canOpenDictionaryContext) {
       return;
@@ -403,14 +414,7 @@ export default function DiagramPage() {
             capabilities={workModeCapabilities}
             setMode={handleWorkModeChange}
           >
-            <DiagramCodeNavigationProvider
-              value={{
-                canNavigateToCode: workModeCapabilities.showCodePanel,
-                navigateToCode: workModeCapabilities.showCodePanel
-                  ? handleNavigateToCodeFromDiagram
-                  : undefined,
-              }}
-            >
+            <DiagramCodeNavigationProvider value={codeNavigationValue}>
               <ErdPermissionProvider canEdit={workModeRuntimeState.effectiveCanvasCanEdit}>
                 <div className="flex h-screen flex-col bg-background">
                   <Header

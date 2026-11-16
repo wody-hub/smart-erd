@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import { useErdDictionaryData } from './erdDictionaryData';
 import type { ErdDictionaryLocalWriter } from '@/types/dictionary';
 
@@ -37,12 +37,10 @@ interface ErdDictionaryProviderProps {
  */
 export function ErdDictionaryProvider({ teamId, setId, children }: ErdDictionaryProviderProps) {
   const cache = useErdDictionaryData(teamId, setId);
+  /** 사전 데이터가 실제로 바뀔 때만 새 값을 만들어 모든 TableNode의 리렌더링을 막는다 */
+  const value = useMemo(() => ({ teamId, setId, ...cache }), [teamId, setId, cache]);
 
-  return (
-    <ErdDictionaryContext.Provider value={{ teamId, setId, ...cache }}>
-      {children}
-    </ErdDictionaryContext.Provider>
-  );
+  return <ErdDictionaryContext.Provider value={value}>{children}</ErdDictionaryContext.Provider>;
 }
 
 /**

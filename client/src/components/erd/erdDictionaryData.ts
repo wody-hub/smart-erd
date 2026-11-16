@@ -191,6 +191,13 @@ export function buildErdDictionaryView(
   };
 }
 
+/** 데이터가 없을 때 쓰는 안정된 빈 용어 배열 (렌더마다 새 배열을 만들면 하위 useMemo 의존성이 매번 바뀐다) */
+const EMPTY_TERMS: Term[] = [];
+/** 데이터가 없을 때 쓰는 안정된 빈 도메인 배열 */
+const EMPTY_DOMAINS: Domain[] = [];
+/** 데이터가 없을 때 쓰는 안정된 빈 단어 배열 */
+const EMPTY_WORDS: Word[] = [];
+
 /**
  * ERD 전용 사전 조회 훅.
  *
@@ -220,9 +227,9 @@ export function useErdDictionaryData(teamId: string | undefined, setId: string |
     staleTime: 0,
     refetchOnMount: 'always',
   });
-  const terms = termsQuery.data ?? [];
-  const domains = domainsQuery.data ?? [];
-  const words = wordsQuery.data ?? [];
+  const terms = termsQuery.data ?? EMPTY_TERMS;
+  const domains = domainsQuery.data ?? EMPTY_DOMAINS;
+  const words = wordsQuery.data ?? EMPTY_WORDS;
   const isDictionaryFetching =
     termsQuery.isFetching || domainsQuery.isFetching || wordsQuery.isFetching;
   const isDictionaryReady =
@@ -243,13 +250,16 @@ export function useErdDictionaryData(teamId: string | undefined, setId: string |
     [terms, domains, words],
   );
 
-  return {
-    terms,
-    domains,
-    words,
-    isDictionaryReady,
-    isDictionaryFetching,
-    dictionaryRevision,
-    ...view,
-  };
+  return useMemo(
+    () => ({
+      terms,
+      domains,
+      words,
+      isDictionaryReady,
+      isDictionaryFetching,
+      dictionaryRevision,
+      ...view,
+    }),
+    [terms, domains, words, isDictionaryReady, isDictionaryFetching, dictionaryRevision, view],
+  );
 }

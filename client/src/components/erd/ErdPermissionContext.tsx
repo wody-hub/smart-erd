@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 
 /** ERD 편집 권한 컨텍스트 값 */
 interface ErdPermissionContextValue {
@@ -26,9 +26,9 @@ interface ErdPermissionProviderProps {
  * @param props.children 자식 요소
  */
 export function ErdPermissionProvider({ canEdit, children }: ErdPermissionProviderProps) {
-  return (
-    <ErdPermissionContext.Provider value={{ canEdit }}>{children}</ErdPermissionContext.Provider>
-  );
+  /** canEdit이 같으면 같은 참조를 유지해 모든 구독자(TableNode 등)의 불필요한 리렌더링을 막는다 */
+  const value = useMemo(() => ({ canEdit }), [canEdit]);
+  return <ErdPermissionContext.Provider value={value}>{children}</ErdPermissionContext.Provider>;
 }
 
 /**
