@@ -5,6 +5,7 @@ import os from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { buildErdLocalSeed } from './lib/erd-app-seed.mjs';
+import { summarizeCpuProfile } from './lib/erd-cpu-profile.mjs';
 import { installCollabProbe } from './lib/erd-collab-probe.mjs';
 import {
   commitHash,
@@ -47,6 +48,7 @@ function parseOptions(args) {
     'base-url',
     'api-url',
     'timeout-ms',
+    'profile',
     'help',
   ]);
   const values = {};
@@ -54,7 +56,7 @@ function parseOptions(args) {
     const key = args[i].replace(/^--/, '');
     if (!args[i].startsWith('--') || !accepted.has(key))
       throw new Error(`Unknown option: ${args[i]}`);
-    if (key === 'help') values.help = true;
+    if (key === 'help' || key === 'profile') values[key] = true;
     else {
       const value = args[++i];
       if (!value || value.startsWith('--')) throw new Error(`Missing value for --${key}`);
@@ -226,6 +228,10 @@ async function loginClient(session) {
   page.setDefaultTimeout(session.options.timeoutMs);
   page.setDefaultNavigationTimeout(15000);
   await page.addInitScript(installCollabProbe);
+  if (session.options.profile)
+    await page.addInitScript(() => {
+      window.__ERD_PERF_PROBE_ENABLE__ = true;
+    });
   const client = {
     context,
     page,
@@ -635,6 +641,17 @@ async function startPageMetrics(session) {
 async function runLoad(session, afterFirstEdit) {
   await Promise.all(session.clients.map(({ page }, index) => selectTable(page, `t${index}`)));
   const meter = await startPageMetrics(session);
+  // --profile: 작성자 1번 페이지의 메인 스레드 CPU 프로파일을 편집 부하 창 동안 수집한다.
+  const profiled = session.options.profile ? session.clients[1] : null;
+  if (profiled) {
+    await profiled.cdp.send('Profiler.enable');
+    await profiled.cdp.send('Profiler.setSamplingInterval', { interval: 1000 });
+    await profiled.cdp.send('Profiler.start');
+  }
+  // 앱 프로브(VITE_ERD_PERF_PROBE=true 빌드에서만 존재)의 카운터 변화량을 함께 기록한다.
+  const readCounters = () =>
+    profiled.page.evaluate(() => window.__ERD_PERF_SNAPSHOT__?.().counters ?? {});
+  const countersBefore = profiled ? await readCounters() : null;
   const tickets = [];
   const startedAt = Date.now();
   const deadline = startedAt + session.options.durationS * 1000;
@@ -686,6 +703,23 @@ async function runLoad(session, afterFirstEdit) {
     endedAt = Date.now();
   } finally {
     session.result.pages = await meter.stop();
+    if (profiled) {
+      const { profile } = await profiled.cdp.send('Profiler.stop');
+      await profiled.cdp.send('Profiler.disable');
+      session.result.cpuProfile = summarizeCpuProfile(profile);
+      const countersAfter = await readCounters();
+      session.result.probeCounters = Object.fromEntries(
+        Object.entries(countersAfter)
+          .map(([name, value]) => {
+            const prev = countersBefore[name] ?? { calls: 0, totalMs: 0 };
+            return [
+              name,
+              { calls: value.calls - prev.calls, totalMs: value.totalMs - prev.totalMs },
+            ];
+          })
+          .filter(([, value]) => value.calls !== 0),
+      );
+    }
   }
   const extraResult = await extraOutcome;
   for (const result of writerResults) {
