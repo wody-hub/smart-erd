@@ -22,6 +22,7 @@ import { useTableColumnRenderModel } from './useTableColumnRenderModel';
 import { useTableNodeInteractions } from './useTableNodeInteractions';
 import { TableNodeEditableRows, TableNodeStaticRows } from './TableNodeRows';
 import { useCompactTableRowExpansion } from './useCompactTableRowExpansion';
+import { getTableNodeHandleRenderSignature } from './tableNodeHandleSignature';
 import {
   probeAggregateEnd,
   probeAggregateStart,
@@ -122,10 +123,6 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
   const isEditing = canEdit && isEditingState;
   const fkMode = useErdFkMode();
   const resolvedHandleLayout = handleLayout ?? 'split';
-  const columnHandleSignature = useMemo(
-    () => columns.map((column) => column.id).join('\u0000'),
-    [columns],
-  );
   const targetHandlePlacements = useMemo(
     () => getColumnHandlePlacements(resolvedHandleLayout, 'target'),
     [resolvedHandleLayout],
@@ -138,11 +135,6 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
   /** 관계선이 연결된 컬럼 ID 셋 */
   const connectedColumnIds = useConnectedColumnIds(id);
   const connectedColumnDirections = useConnectedColumnDirections(id);
-  const previousHandleLayoutRef = useRef({
-    columnHandleSignature,
-    handleLayout: resolvedHandleLayout,
-    connectedColumnIds,
-  });
   const compactTableRenderingMode = useCompactTableRenderingMode();
 
   /** 해당 컬럼이 엣지에 연결되어 있는지 확인한다. */
@@ -171,6 +163,22 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
     findTermById,
     findDomainById,
   });
+  const handleRenderSignature = getTableNodeHandleRenderSignature({
+    nodeId: id,
+    mode: isEditing ? 'editable' : 'static',
+    fkMode,
+    handleLayout: resolvedHandleLayout,
+    rows: (isEditing ? columns : visibleStaticColumns).map((column) => {
+      const directions = getConnectedDirections(column.id);
+      return {
+        columnId: column.id,
+        connected: connectedColumnIds.has(column.id),
+        sourceConnected: directions.source,
+        targetConnected: directions.target,
+      };
+    }),
+  });
+  const previousHandleRenderSignatureRef = useRef(handleRenderSignature);
   const {
     sensors,
     quickTermTarget,
@@ -208,23 +216,15 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
   });
 
   useEffect(() => {
-    const previous = previousHandleLayoutRef.current;
-    const handlesChanged =
-      previous.columnHandleSignature !== columnHandleSignature ||
-      previous.handleLayout !== resolvedHandleLayout ||
-      previous.connectedColumnIds !== connectedColumnIds;
-    previousHandleLayoutRef.current = {
-      columnHandleSignature,
-      handleLayout: resolvedHandleLayout,
-      connectedColumnIds,
-    };
+    const handlesChanged = previousHandleRenderSignatureRef.current !== handleRenderSignature;
+    previousHandleRenderSignatureRef.current = handleRenderSignature;
     if (!handlesChanged) return;
 
     scheduleNodeInternalsUpdate(id, updateNodeInternals);
     return () => {
       cancelScheduledNodeInternalsUpdate(id);
     };
-  }, [columnHandleSignature, connectedColumnIds, id, resolvedHandleLayout, updateNodeInternals]);
+  }, [handleRenderSignature, id, updateNodeInternals]);
 
   return (
     <div

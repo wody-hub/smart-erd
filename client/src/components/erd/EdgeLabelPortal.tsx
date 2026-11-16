@@ -1,6 +1,15 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '@xyflow/react';
+import { resolveEdgeLabelContainer } from './edgeLabelContainer';
 
 const EdgeLabelContainerContext = createContext<HTMLElement | null>(null);
 
@@ -12,9 +21,22 @@ const EdgeLabelContainerContext = createContext<HTMLElement | null>(null);
 export function EdgeLabelPortalProvider({ children }: { children: ReactNode }) {
   const domNode = useStore((state) => state.domNode);
   const [container, setContainer] = useState<HTMLElement | null>(null);
+  const containerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    setContainer(domNode?.querySelector<HTMLElement>('.react-flow__edgelabel-renderer') ?? null);
+    const refreshContainer = () => {
+      const nextContainer = resolveEdgeLabelContainer(domNode, containerRef.current);
+      if (nextContainer === containerRef.current) return;
+      containerRef.current = nextContainer;
+      setContainer(nextContainer);
+    };
+
+    refreshContainer();
+    if (!domNode || typeof MutationObserver === 'undefined') return;
+
+    const observer = new MutationObserver(refreshContainer);
+    observer.observe(domNode, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [domNode]);
 
   return (

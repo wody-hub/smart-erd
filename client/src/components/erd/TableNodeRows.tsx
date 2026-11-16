@@ -13,6 +13,7 @@ import type { ColumnConnectionDirections } from './ConnectedColumnIdsContext';
 import StaticColumnRow from './StaticColumnRow';
 import EditableColumnRow from './EditableColumnRow';
 import type { ErdCardVariant } from '@/lib/theme';
+import { getColumnHandleRenderState } from './tableNodeHandleSignature';
 
 interface SortableColumnRowProps {
   col: Column;
@@ -181,13 +182,21 @@ export function TableNodeStaticRows({
           return null;
         }
 
+        const directions = getConnectedDirections(column.id);
+        const handleState = getColumnHandleRenderState({
+          mode: 'static',
+          fkMode,
+          sourceConnected: directions.source,
+          targetConnected: directions.target,
+        });
+
         return (
           <StaticColumnRow
             key={column.id}
             col={column}
             nodeId={nodeId}
-            showTargetHandles={fkMode || getConnectedDirections(column.id).target}
-            showSourceHandles={fkMode || getConnectedDirections(column.id).source}
+            showTargetHandles={handleState.target}
+            showSourceHandles={handleState.source}
             targetHandlePlacements={targetHandlePlacements}
             sourceHandlePlacements={sourceHandlePlacements}
             warning={renderMeta.warning}
