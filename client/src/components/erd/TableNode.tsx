@@ -7,7 +7,7 @@ import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { useErdDictionary } from './ErdDictionaryContext';
 import { useErdPermission } from './ErdPermissionContext';
 import { useErdFkMode } from './ErdFkModeContext';
-import { useRemoteEditLocksContext } from './RemoteEditLocksContext';
+import { useRemoteEditLock } from './RemoteEditLocksContext';
 import type { WarningValidationStatus } from '@/hooks/useColumnValidation';
 import { cn } from '@/lib/utils';
 import { TABLE_COLORS, normalizeTableHeaderColor } from '@/lib/table-colors';
@@ -114,8 +114,7 @@ function TableNode({ id, data, selected = false }: NodeProps<TableNodeType>) {
   const { findTermById, findDomainById, resolveLogicalName } = useErdDictionary();
   const { canNavigateToCode, navigateToCode } = useDiagramCodeNavigation();
   const { canEdit: permissionCanEdit } = useErdPermission();
-  const { locksByNodeId } = useRemoteEditLocksContext();
-  const lockInfo = locksByNodeId.get(id);
+  const lockInfo = useRemoteEditLock(id);
   const canEdit = permissionCanEdit && !lockInfo;
   /** 이 노드가 현재 편집 모드인지 여부 (파생 boolean으로 전환 시 최대 2개 노드만 리렌더링) */
   const isEditingState = useCanvasStore((s) => s.activeEditNodeId === id);

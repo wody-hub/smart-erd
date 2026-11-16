@@ -1,3 +1,4 @@
+import { memo, useCallback } from 'react';
 import { Trash2, Pencil, Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -12,16 +13,12 @@ interface DiagramSidebarTableItemProps {
   label: string;
   /** 목록에 표시할 이름(미지정 시 label 사용) */
   displayLabel?: string;
-  /** 이름 변경 접근성 라벨 */
-  renameAriaLabel: string;
-  /** 삭제 접근성 라벨 */
-  deleteAriaLabel: string;
   /** 테이블 클릭 시 캔버스 포커스 핸들러 */
-  onClick: () => void;
+  onClick: (nodeId: string) => void;
   /** 이름 변경 핸들러 */
-  onRename: (newName: string) => void;
+  onRename: (nodeId: string, newName: string) => void;
   /** 삭제 핸들러 */
-  onDelete: () => void;
+  onDelete: (nodeId: string) => void;
   /** 편집 가능 여부 (VIEWER일 때 false — 이름변경/삭제 버튼 숨김) */
   canEdit?: boolean;
 }
@@ -31,24 +28,32 @@ interface DiagramSidebarTableItemProps {
  *
  * 테이블 이름 표시, 클릭 시 캔버스 포커스, 인라인 이름 변경, 삭제 기능을 제공한다.
  *
+ * @param props.nodeId   대상 노드 ID
  * @param props.label    테이블 표시 이름
  * @param props.onClick  테이블 클릭 시 캔버스 포커스 핸들러
  * @param props.onRename 이름 변경 확정 핸들러
  * @param props.onDelete 삭제 핸들러
  * @param props.canEdit  편집 가능 여부
+ * @returns 테이블 목록 행
  */
-export default function DiagramSidebarTableItem({
+function DiagramSidebarTableItem({
+  nodeId,
   label,
   displayLabel,
-  renameAriaLabel,
-  deleteAriaLabel,
   onClick,
   onRename,
   onDelete,
   canEdit = true,
 }: DiagramSidebarTableItemProps) {
   const { t } = useTranslation();
-  const { editing, value, setValue, startEdit, confirmEdit, cancelEdit } = useInlineEdit(onRename);
+  const renameAriaLabel = t('erd.sidebar.aria.renameTable', { name: label });
+  const deleteAriaLabel = t('erd.sidebar.aria.deleteTable', { name: label });
+  const handleRename = useCallback(
+    (newName: string) => onRename(nodeId, newName),
+    [nodeId, onRename],
+  );
+  const { editing, value, setValue, startEdit, confirmEdit, cancelEdit } =
+    useInlineEdit(handleRename);
   const rowLabel = displayLabel ?? label;
 
   if (editing) {
@@ -90,7 +95,7 @@ export default function DiagramSidebarTableItem({
   return (
     <div
       className="group flex cursor-pointer items-center justify-between rounded-lg border border-transparent px-2.5 py-2 text-foreground transition-colors hover:border-border/70 hover:bg-secondary/35 focus-within:border-border/70 focus-within:bg-secondary/35"
-      onClick={onClick}
+      onClick={() => onClick(nodeId)}
     >
       <span className="flex-1 truncate text-sm" title={rowLabel}>
         {rowLabel}
@@ -115,7 +120,7 @@ export default function DiagramSidebarTableItem({
             className="h-6 w-6 text-muted-foreground hover:text-destructive"
             onClick={(e) => {
               e.stopPropagation();
-              onDelete();
+              onDelete(nodeId);
             }}
             aria-label={deleteAriaLabel}
           >
@@ -126,3 +131,5 @@ export default function DiagramSidebarTableItem({
     </div>
   );
 }
+
+export default memo(DiagramSidebarTableItem);

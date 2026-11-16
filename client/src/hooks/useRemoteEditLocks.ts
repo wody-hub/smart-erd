@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useAuthStore from '@/stores/useAuthStore';
 import { LOCK_HEARTBEAT_MS } from '@/constants/collab-lock';
 import { buildTableLockKeyFromNodeData } from '@/lib/table-lock-key';
 import {
+  areRemoteEditLocksEqual,
+  areEdgeWaypointPreviewsEqual,
   resolveRemoteEditLocks,
   resolveRemoteEdgeEditLocks,
   type RemoteEditLockInfo,
 } from '@/lib/remote-edit-locks';
+import { shareMapEntries } from '@/lib/keyed-external-store';
 import type { EdgeWaypointPreview } from '@/types/collaboration';
 
 /** 원격 편집 락 계산 결과 */
@@ -52,7 +55,7 @@ export function useRemoteEditLocks(): UseRemoteEditLocksReturn {
     return () => clearInterval(timerId);
   }, [remoteCursors.size, remoteEdgeAwareness.size]);
 
-  const locksByTableKey = useMemo(() => {
+  const calculatedTableLocks = useMemo(() => {
     void ttlTick;
     return resolveRemoteEditLocks(
       remoteCursors,
@@ -62,7 +65,9 @@ export function useRemoteEditLocks(): UseRemoteEditLocksReturn {
     );
   }, [participantsByUserId, remoteCursors, selfLoginId, selfUserId, ttlTick]);
 
-  const locksByNodeId = useMemo(() => {
+  const locksByTableKey = useSharedMap(calculatedTableLocks, areRemoteEditLocksEqual);
+
+  const calculatedNodeLocks = useMemo(() => {
     const byNodeId = new Map<string, RemoteEditLockInfo>();
     for (const node of nodes) {
       const tableKey = buildTableLockKeyFromNodeData(node.data);
@@ -74,6 +79,8 @@ export function useRemoteEditLocks(): UseRemoteEditLocksReturn {
     return byNodeId;
   }, [locksByTableKey, nodes]);
 
+  const locksByNodeId = useSharedMap(calculatedNodeLocks, areRemoteEditLocksEqual);
+
   const resolvedEdgeLocks = useMemo(() => {
     void ttlTick;
     return resolveRemoteEdgeEditLocks(
@@ -84,7 +91,7 @@ export function useRemoteEditLocks(): UseRemoteEditLocksReturn {
     );
   }, [participantsByUserId, remoteEdgeAwareness, selfLoginId, selfUserId, ttlTick]);
 
-  const edgeLocksById = useMemo(() => {
+  const calculatedEdgeLocks = useMemo(() => {
     const locks = new Map<string, RemoteEditLockInfo>();
     for (const [edgeId, resolved] of resolvedEdgeLocks) {
       locks.set(edgeId, resolved.info);
@@ -92,7 +99,7 @@ export function useRemoteEditLocks(): UseRemoteEditLocksReturn {
     return locks;
   }, [resolvedEdgeLocks]);
 
-  const edgePreviewsById = useMemo(() => {
+  const calculatedEdgePreviews = useMemo(() => {
     const previews = new Map<string, EdgeWaypointPreview>();
     for (const [edgeId, resolved] of resolvedEdgeLocks) {
       if (resolved.preview) {
@@ -101,6 +108,9 @@ export function useRemoteEditLocks(): UseRemoteEditLocksReturn {
     }
     return previews;
   }, [resolvedEdgeLocks]);
+
+  const edgeLocksById = useSharedMap(calculatedEdgeLocks, areRemoteEditLocksEqual);
+  const edgePreviewsById = useSharedMap(calculatedEdgePreviews, areEdgeWaypointPreviewsEqual);
 
   const hasTableLocks = locksByTableKey.size > 0;
   const hasAnyActiveEdgeDrag = !!localEdgeDrag || edgeLocksById.size > 0;
@@ -114,4 +124,22 @@ export function useRemoteEditLocks(): UseRemoteEditLocksReturn {
     hasAnyActiveEdgeDrag,
     hasBlockingStructureLocks: hasTableLocks || hasAnyActiveEdgeDrag,
   };
+}
+
+/**
+ * 마지막 커밋의 Map과 비교해 변경 없는 엔트리를 공유한다.
+ * @param next 계산한 새 Map
+ * @param equal 엔트리 내용 비교 함수
+ * @returns 구조를 공유한 Map
+ */
+function useSharedMap<T>(
+  next: Map<string, T>,
+  equal: (left: T, right: T) => boolean,
+): Map<string, T> {
+  const committed = useRef(next);
+  const shared = useMemo(() => shareMapEntries(committed.current, next, equal), [next, equal]);
+  useLayoutEffect(() => {
+    committed.current = shared;
+  }, [shared]);
+  return shared;
 }

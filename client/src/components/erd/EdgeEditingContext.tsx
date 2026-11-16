@@ -1,4 +1,8 @@
-import { createContext, useContext } from 'react';
+import { useLayoutEffect, useMemo, useState } from 'react';
+import { createKeyedStore } from '@/lib/keyed-external-store';
+import { useCommittedCallback } from '@/hooks/useCommittedCallback';
+import { buildEdgeEditingStates, areEdgeEditingStatesEqual } from './edgeEditingState';
+import { EdgeEditingStoreContext } from './EdgeEditingStoreContext';
 import type { RemoteEditLockInfo } from '@/lib/remote-edit-locks';
 import type { EdgeWaypointPreview } from '@/types/collaboration';
 import type {
@@ -33,17 +37,11 @@ interface EdgeEditingContextValue {
   splitSegment: (params: SplitSegmentParams) => void;
 }
 
-const EMPTY_LOCKS = new Map<string, RemoteEditLockInfo>();
-const EMPTY_PREVIEWS = new Map<string, EdgeWaypointPreview>();
-
-const EdgeEditingContext = createContext<EdgeEditingContextValue>({
-  edgeLocksById: EMPTY_LOCKS,
-  edgePreviewsById: EMPTY_PREVIEWS,
-  localEdgeDrag: null,
-  beginSegmentDrag: () => {},
-  splitSegment: () => {},
-});
-
+/**
+ * 엣지별 구독 스토어와 참조가 안정적인 편집 동작을 제공한다.
+ * @param props 현재 편집 상태와 하위 요소
+ * @returns 엣지 편집 Provider
+ */
 export function EdgeEditingProvider({
   value,
   children,
@@ -51,9 +49,24 @@ export function EdgeEditingProvider({
   value: EdgeEditingContextValue;
   children: React.ReactNode;
 }) {
-  return <EdgeEditingContext.Provider value={value}>{children}</EdgeEditingContext.Provider>;
-}
-
-export function useEdgeEditingContext(): EdgeEditingContextValue {
-  return useContext(EdgeEditingContext);
+  const [store] = useState(() =>
+    createKeyedStore(
+      buildEdgeEditingStates(value.edgeLocksById, value.edgePreviewsById, value.localEdgeDrag),
+      areEdgeEditingStatesEqual,
+    ),
+  );
+  const beginSegmentDrag = useCommittedCallback(value.beginSegmentDrag);
+  const splitSegment = useCommittedCallback(value.splitSegment);
+  useLayoutEffect(() => {
+    store.update(
+      buildEdgeEditingStates(value.edgeLocksById, value.edgePreviewsById, value.localEdgeDrag),
+    );
+  }, [store, value.edgeLocksById, value.edgePreviewsById, value.localEdgeDrag]);
+  const context = useMemo(
+    () => ({ store, beginSegmentDrag, splitSegment }),
+    [store, beginSegmentDrag, splitSegment],
+  );
+  return (
+    <EdgeEditingStoreContext.Provider value={context}>{children}</EdgeEditingStoreContext.Provider>
+  );
 }

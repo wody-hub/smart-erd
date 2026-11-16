@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 import type { EdgeRoutingType, RelationType, Waypoint } from '@/types/erd';
 import { extractHandleSide } from '@/lib/handle-id';
 import { cn } from '@/lib/utils';
-import { useEdgeEditingContext } from './EdgeEditingContext';
+import { useEdgeEditing } from './EdgeEditingStoreContext';
 import { EdgeLabelPortal } from './EdgeLabelPortal';
 import { useErdCardVariant } from '@/hooks/useErdCardVariant';
 import { IeChildEndMarker, IeParentEndMarker } from './IeEdgeMarkers';
@@ -245,13 +245,17 @@ function ErdRelationEdge({
     ),
     areEdgeObstacleRectsEqual,
   );
-  const { edgeLocksById, edgePreviewsById, localEdgeDrag, beginSegmentDrag, splitSegment } =
-    useEdgeEditingContext();
+  const {
+    edgeLock: lockInfo,
+    edgePreview,
+    localEdgeDrag,
+    beginSegmentDrag,
+    splitSegment,
+  } = useEdgeEditing(id);
   const localPreviewWaypoints =
     localEdgeDrag?.edgeId === id ? localEdgeDrag.previewWaypoints : null;
-  const remotePreviewWaypoints = edgePreviewsById.get(id)?.waypoints ?? null;
+  const remotePreviewWaypoints = edgePreview?.waypoints ?? null;
   const displayWaypoints = localPreviewWaypoints ?? remotePreviewWaypoints ?? committedWaypoints;
-  const lockInfo = edgeLocksById.get(id) ?? null;
 
   const resolvedSourcePosition = (
     extractHandleSide(sourceHandleId ?? '') === 'left' ? 'left' : 'right'

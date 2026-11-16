@@ -159,3 +159,42 @@ export function resolveRemoteEdgeEditLocks(
 
   return locks;
 }
+
+/**
+ * 잠금 표시와 편집 차단에 쓰이는 소유자 정보를 비교한다.
+ * @param left 이전 소유자
+ * @param right 새 소유자
+ * @returns 모든 소유자 필드가 같으면 true
+ */
+export function areRemoteEditLocksEqual(
+  left: RemoteEditLockInfo,
+  right: RemoteEditLockInfo,
+): boolean {
+  return (
+    left.clientId === right.clientId &&
+    left.userId === right.userId &&
+    left.name === right.name &&
+    left.loginId === right.loginId &&
+    left.color === right.color
+  );
+}
+
+/**
+ * 원격 프리뷰를 좌표 내용으로 비교한다.
+ * @param left 이전 프리뷰
+ * @param right 새 프리뷰
+ * @returns 대상과 모든 좌표가 같으면 true
+ */
+export function areEdgeWaypointPreviewsEqual(
+  left: EdgeWaypointPreview,
+  right: EdgeWaypointPreview,
+): boolean {
+  return (
+    left.edgeId === right.edgeId &&
+    left.waypoints.length === right.waypoints.length &&
+    left.waypoints.every(
+      (point, index) =>
+        point.x === right.waypoints[index].x && point.y === right.waypoints[index].y,
+    )
+  );
+}

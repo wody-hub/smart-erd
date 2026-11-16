@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useCommittedCallback } from '@/hooks/useCommittedCallback';
 import { Layers, Plus, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -85,6 +86,9 @@ function DiagramSidebarView({
   onOpenGroupTableSelect,
 }: DiagramSidebarViewProps) {
   const { t } = useTranslation();
+  const handleFocusTable = useCommittedCallback(onFocusTable);
+  const handleRenameTable = useCommittedCallback(onRenameTable);
+  const handleDeleteTable = useCommittedCallback(onDeleteTable);
 
   const activeGroup = activeGroupId
     ? (groups.find((group) => group.id === activeGroupId) ?? null)
@@ -126,11 +130,9 @@ function DiagramSidebarView({
                 nodeId={entry.id}
                 label={entry.label}
                 displayLabel={entry.displayLabel}
-                renameAriaLabel={t('erd.sidebar.aria.renameTable', { name: entry.label })}
-                deleteAriaLabel={t('erd.sidebar.aria.deleteTable', { name: entry.label })}
-                onClick={() => onFocusTable(entry.id)}
-                onRename={(newName) => onRenameTable(entry.id, newName)}
-                onDelete={() => onDeleteTable(entry.id)}
+                onClick={handleFocusTable}
+                onRename={handleRenameTable}
+                onDelete={handleDeleteTable}
                 canEdit={canEdit}
               />
             ))
