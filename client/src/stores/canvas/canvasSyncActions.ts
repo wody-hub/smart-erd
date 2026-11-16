@@ -31,13 +31,12 @@ import {
   yDocToJson,
   yEdgesMapToEdges,
   yGroupsMapToTableGroups,
-  yTablesMapToNodes,
 } from '@/collaboration/yjsBridge';
 import { collectErdAffectedScopesFromEvents } from '@/collaboration/plugins/erd/erd-yjs-update-scope-collector';
 import { buildErdProjectionRefreshRequest } from '@/collaboration/plugins/erd/erd-projection-refresh-request';
 import type { EdgeRoutingType, Waypoint } from '@/types/erd';
 import { buildPersistedPreviewPositionChanges } from '@/lib/preview-position-sync';
-import { mergeProjectedEntitiesById } from '@/lib/erd-projection';
+import { mergeProjectedEntitiesById, mergeProjectedNodesById } from '@/lib/erd-projection';
 import {
   parseEdgeHandleSelectionValue,
   resolveEdgeHandlesFromPreference,
@@ -100,6 +99,47 @@ export function createCanvasSyncActions(
   set: CanvasSetState,
   get: CanvasGetState,
 ): Pick<CanvasState, CanvasSyncActionKeys> {
+  let projectedDocument: Y.Doc | null = null;
+  const projectedTableSources = new Map<string, Y.Map<unknown>>();
+
+  /**
+   * 부분/전체 노드 대상에 동일한 로컬 상태 보존 정책을 적용하고 Y.Map 생명주기를 추적한다.
+   * @param ydoc projection 문서
+   * @param nodeIds 부분 projection ID. 생략하면 모든 노드를 갱신한다.
+   * @param reset 전체 재투영/초기화로 모든 로컬 필드를 폐기할지 여부
+   * @returns 병합된 canvas 노드
+   */
+  function projectTableNodes(
+    ydoc: Y.Doc,
+    nodeIds?: Set<string>,
+    reset = false,
+  ): Node<TableNodeData>[] {
+    const resetAll = reset || projectedDocument !== ydoc;
+    if (resetAll) {
+      projectedTableSources.clear();
+      projectedDocument = ydoc;
+    }
+    const tables = getTablesMap(ydoc);
+    const requestedIds = resetAll
+      ? new Set(tables.keys())
+      : (nodeIds ?? new Set([...get().nodes.map((node) => node.id), ...tables.keys()]));
+    const resetNodeIds = new Set<string>();
+    const projected: Node<TableNodeData>[] = [];
+    for (const nodeId of requestedIds) {
+      const source = tables.get(nodeId);
+      if (source) {
+        if (resetAll || projectedTableSources.get(nodeId) !== source) resetNodeIds.add(nodeId);
+        projected.push(yTableYMapToNode(nodeId, source));
+        projectedTableSources.set(nodeId, source);
+      } else {
+        projectedTableSources.delete(nodeId);
+      }
+    }
+    // 전체 재투영은 기존처럼 문서 순서를 사용하고 로컬 상태를 넘기지 않는다.
+    if (resetAll) return projected;
+    return mergeProjectedNodesById(get().nodes, requestedIds, projected, resetNodeIds);
+  }
+
   function collectProjectionTargets(request?: ProjectionSyncRequest): Set<ProjectionSyncTarget> {
     const targets = new Set<ProjectionSyncTarget>(request?.targets ?? []);
     if ((request?.nodeIds?.length ?? 0) > 0) {
@@ -248,7 +288,7 @@ export function createCanvasSyncActions(
 
     if (forceFull || targets.size === 0) {
       const convertStartedAt = probeBegin('projection-convert', { scope: 'full' });
-      const nextNodes = yTablesMapToNodes(getTablesMap(ydoc));
+      const nextNodes = projectTableNodes(ydoc, undefined, true);
       const nextEdges = yEdgesMapToEdges(getEdgesMap(ydoc));
       const nextGroups = yGroupsMapToTableGroups(getGroupsMap(ydoc));
       probeEnd('projection-convert', convertStartedAt, {
@@ -284,22 +324,10 @@ export function createCanvasSyncActions(
       targetCount: targets.size,
     });
     if (targets.has('nodes')) {
-      if (requestedNodeIds.size === 0) {
-        nextState.nodes = yTablesMapToNodes(getTablesMap(ydoc));
-      } else {
-        const tablesMap = getTablesMap(ydoc);
-        const nextNodes = [...requestedNodeIds]
-          .map((nodeId) => {
-            const tableYMap = tablesMap.get(nodeId);
-            return tableYMap ? yTableYMapToNode(nodeId, tableYMap) : null;
-          })
-          .filter((node): node is Node<TableNodeData> => node != null);
-        nextState.nodes = mergeProjectedEntitiesById(
-          get().nodes as Node<TableNodeData>[],
-          requestedNodeIds,
-          nextNodes,
-        );
-      }
+      nextState.nodes = projectTableNodes(
+        ydoc,
+        requestedNodeIds.size > 0 ? requestedNodeIds : undefined,
+      );
     }
     if (targets.has('edges')) {
       if (requestedEdgeIds.size === 0) {
@@ -455,7 +483,7 @@ export function createCanvasSyncActions(
       }, CANVAS_HISTORY_ORIGIN.SYSTEM_FALLBACK);
 
       set({
-        nodes: yTablesMapToNodes(tablesMap),
+        nodes: projectTableNodes(ydoc, undefined, true),
         edges: yEdgesMapToEdges(edgesMap),
         groups: yGroupsMapToTableGroups(groupsMap),
         ydoc,
@@ -514,7 +542,7 @@ export function createCanvasSyncActions(
           syncProjectionFromYDocWithRequest(scopedRequest);
           return;
         }
-        set({ nodes: yTablesMapToNodes(tablesMap) });
+        set({ nodes: projectTableNodes(ydoc) });
       };
       internal.edgesObserver = (events) => {
         if (shouldDeferProjectionToProjector(events)) {
@@ -590,6 +618,8 @@ export function createCanvasSyncActions(
     },
 
     destroyYDoc: () => {
+      projectedDocument = null;
+      projectedTableSources.clear();
       const { ydoc, internal } = get();
       if (ydoc) {
         internal.undoManager?.destroy();
@@ -959,7 +989,7 @@ export function createCanvasSyncActions(
           setTableYMapPosition(tableYMap, change.position);
         }
       }, DRAG_TRANSACTION_ORIGIN);
-      set({ nodes: yTablesMapToNodes(getTablesMap(ydoc)) });
+      set({ nodes: projectTableNodes(ydoc) });
       return persistedPositionChanges.map((change) => change.previewNodeId);
     },
 
