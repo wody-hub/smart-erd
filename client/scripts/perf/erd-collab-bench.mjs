@@ -1153,13 +1153,16 @@ async function runC4(session) {
     }, session.loadTickets);
     const joinEntry = { mode: 'under-C2-load', ...join };
     session.result.joins.push(joinEntry);
-    // preview 표시 이후 remote snapshot 적용/fallback 여부가 정해질 때까지 기다려 기록한다.
+    // preview 표시 이후 원격 snapshot 적용/대기 timeout 여부를 기록한다.
     await delay(4000);
     joinEntry.handoff = loaded.consoleLog.filter((entry) =>
-      /snapshot-fallback|preview-unlocked|live-ready/.test(entry.text),
+      /snapshot-fallback|snapshot-wait-timeout|preview-unlocked|live-ready/.test(entry.text),
     );
     joinEntry.usedFallback = joinEntry.handoff.some((entry) =>
       /snapshot-fallback/.test(entry.text),
+    );
+    joinEntry.snapshotWaitTimedOut = joinEntry.handoff.some((entry) =>
+      /snapshot-wait-timeout/.test(entry.text),
     );
   });
 }

@@ -61,7 +61,6 @@ export function useDiagramCollaborationRuntime(
     resolvedSessionBootstrap,
     sharedDocumentEngine,
     snapshotCodec,
-    documentAdapter,
     transport,
     contentOnlySnapshotSeeder,
   } = useDiagramRuntimeBootstrap(diagram, documentBootstrap, setupAttempt);
@@ -108,7 +107,6 @@ export function useDiagramCollaborationRuntime(
           fallbackTimeoutMs: WS_SNAPSHOT_FALLBACK_MS,
           handoffStartedAt,
           handoffLogPrefix,
-          documentAdapter,
           dispatchRuntimeEvent,
           updatePreviewMode,
           diagramId,
@@ -128,7 +126,6 @@ export function useDiagramCollaborationRuntime(
       collaborationBootstrap,
       contentOnlySnapshotSeeder,
       dispatchRuntimeEvent,
-      documentAdapter,
       previewEnabled,
       sharedDocumentEngine,
       snapshotCodec,

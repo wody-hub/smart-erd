@@ -64,6 +64,12 @@ REST/백업/정의서 입력은 계속 `nodes[].data.columns: Column[]` plain �
 컴팩션과 달리, 이전 문서의 오프라인 update/undo 이력을 이어 붙이는 용도가 아니다.
 컴팩션은 기존 Y.Doc의 `Y.encodeStateAsUpdate`로 수행해야 한다.
 
+서버에 Y.Doc snapshot이 있는 preview 경로는 bootstrap `content`를 live Y.Doc에
+재시딩하지 않는다. 연결 후 grace/전체 대기 시간이 지나면 `fallback-timeout`으로
+degraded 상태만 알리고 읽기 전용 preview와 observer를 유지한다. 늦게 도착한 원격
+테이블은 `remote-snapshot-applied`로 preview를 해제하고 live 상태로 복구한다.
+snapshot이 없는 content-only 최초 시딩 경로는 별도 계약을 유지한다.
+
 ## 지연 이관과 undo
 
 읽기만 할 때는 이관하지 않는다. 최초 컬럼 쓰기 직전, 기존 시스템 정규화 origin인
@@ -175,7 +181,7 @@ schema가 undo 이후 양 피어에 보존됨을 검증한다. 기존 diff 테�
 | `stores/canvas/canvasTableActions.ts`                                                                                                                      | 필드/FK/사전 읽기는 ID reader 사용                                                                                                                             |
 | `stores/canvas/canvasSyncActions.ts`                                                                                                                       | 최초 로드/복구/serialize는 공통 투영. `tablesMap.observeDeep`의 중첩 path에서 table ID를 구하고 단일 노드 투영. 신형 본체/순서도 관찰 범위에 포함              |
 | `collaboration/plugins/erd/erd-yjs-update-scope-collector.ts`                                                                                              | 레거시 배열, `columnsById` 본체 필드, 본체 Map/`columnOrder` 변경을 테이블 scope로 수집. 신형 필드 변경은 컬럼 scope도 수집                                    |
-| `collaboration/channel/diagram/diagram-preview-hydration-controller.ts`                                                                                    | `observeDeep`/테이블 수로 unlock 판단. 컬럼 배열을 직접 읽지 않으며 fallback은 bootstrap adapter 사용                                                          |
+| `collaboration/channel/diagram/diagram-preview-hydration-controller.ts`                                                                                    | `observeDeep`/원격 테이블 수로 unlock 판단. timeout은 degraded만 알리고 preview/observer를 유지하며 live Y.Doc에 bootstrap을 쓰지 않음                         |
 | `collaboration/core/engines/yjs-shared-document-engine.ts`, `core/store/document-revision-tracker.ts`                                                      | 문서 update/revision 전달. 컬럼 스키마를 필터링하지 않음                                                                                                       |
 | `collaboration/YjsProvider.ts`, `types/collaboration.ts`                                                                                                   | awareness/presence는 사용자·커서·선택/편집 ID·락·edge preview. 컬럼 본체 snapshot을 읽거나 운반하지 않음                                                       |
 | `collaboration/plugins/markdown/**`, `collaboration/plugins/screen-spec/**`                                                                                | 각 문서의 전용 reader/projector. ERD tables/columns 읽기 없음                                                                                                  |
