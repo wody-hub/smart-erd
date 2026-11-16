@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import {
   type EdgeProps,
   getBezierPath,
@@ -9,8 +9,8 @@ import {
   type Position,
 } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
-import type { EdgeRoutingType, RelationType, TableNodeData, Waypoint } from '@/types/erd';
-import { extractColId, extractHandleSide } from '@/lib/handle-id';
+import type { EdgeRoutingType, RelationType, Waypoint } from '@/types/erd';
+import { extractHandleSide } from '@/lib/handle-id';
 import { cn } from '@/lib/utils';
 import { useEdgeEditingContext } from './EdgeEditingContext';
 import { EdgeLabelPortal } from './EdgeLabelPortal';
@@ -33,44 +33,10 @@ import {
   probeAggregateEnd,
   probeAggregateStart,
 } from '@/lib/erd-performance-probe';
+import { areErdRelationEdgePropsEqual, createEdgeCardinalitySelector } from './edgeRenderSelectors';
 
 /** 카디널리티 기호 유형 */
 type CardinalitySymbol = 'one' | 'many';
-
-/** 카디널리티 계산 결과 */
-interface Cardinality {
-  sourceSymbol: CardinalitySymbol;
-  targetSymbol: CardinalitySymbol;
-  optional: boolean;
-}
-
-function computeCardinality(
-  relationType: RelationType,
-  targetNodeId: string,
-  targetHandle: string | null | undefined,
-  childData: TableNodeData | undefined,
-): Cardinality {
-  const sourceSymbol: CardinalitySymbol = 'one';
-
-  let targetSymbol: CardinalitySymbol = 'many';
-  let optional = true;
-
-  if (childData) {
-    if (targetHandle) {
-      const colId = extractColId(targetHandle, targetNodeId);
-      const fkCol = childData.columns.find((c) => c.id === colId);
-      optional = fkCol?.nullable !== false;
-    }
-
-    if (relationType === 'identifying') {
-      const pkCols = childData.columns.filter((c) => c.pk);
-      const fkPkCols = pkCols.filter((c) => c.fk);
-      targetSymbol = fkPkCols.length > 0 && fkPkCols.length === pkCols.length ? 'one' : 'many';
-    }
-  }
-
-  return { sourceSymbol, targetSymbol, optional };
-}
 
 const SOURCE_MARKER_OFFSET = 12;
 const TARGET_MARKER_OFFSET = 14;
@@ -229,7 +195,12 @@ function renderTargetMarker(
   return <g>{elements}</g>;
 }
 
-export default function ErdRelationEdge({
+/**
+ * 관계의 경로, 카디널리티, 잠금 및 waypoint 편집 UI를 렌더링한다.
+ * @param props React Flow 관계 엣지 속성
+ * @returns 관계 엣지 SVG 및 편집 컨트롤
+ */
+function ErdRelationEdge({
   id,
   source,
   sourceX,
@@ -253,15 +224,11 @@ export default function ErdRelationEdge({
     (data as { routingType?: EdgeRoutingType } | undefined)?.routingType ?? 'smoothstep';
   const committedWaypoints = ((data as { waypoints?: Waypoint[] } | undefined)?.waypoints ??
     []) as Waypoint[];
-  const childData = useStore(
-    useCallback(
-      (s) => {
-        const childNode = s.nodeLookup.get(target);
-        return childNode?.data as TableNodeData | undefined;
-      },
-      [target],
-    ),
+  const cardinalitySelector = useMemo(
+    () => createEdgeCardinalitySelector(target, targetHandleId, relationType),
+    [relationType, target, targetHandleId],
   );
+  const { sourceSymbol, targetSymbol, optional } = useStore(cardinalitySelector);
   const obstacleRects = useStore(
     useCallback(
       (s) => {
@@ -285,13 +252,6 @@ export default function ErdRelationEdge({
   const remotePreviewWaypoints = edgePreviewsById.get(id)?.waypoints ?? null;
   const displayWaypoints = localPreviewWaypoints ?? remotePreviewWaypoints ?? committedWaypoints;
   const lockInfo = edgeLocksById.get(id) ?? null;
-
-  const { sourceSymbol, targetSymbol, optional } = computeCardinality(
-    relationType,
-    target,
-    targetHandleId,
-    childData,
-  );
 
   const resolvedSourcePosition = (
     extractHandleSide(sourceHandleId ?? '') === 'left' ? 'left' : 'right'
@@ -538,3 +498,5 @@ export default function ErdRelationEdge({
     </g>
   );
 }
+
+export default memo(ErdRelationEdge, areErdRelationEdgePropsEqual);
