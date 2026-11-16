@@ -1,3 +1,12 @@
+import {
+  ensureColumnStorage,
+  getColumnYMap,
+  insertColumnYMap,
+  deleteTableColumn,
+  moveTableColumn,
+  patchColumnYMap,
+  readColumnYMaps,
+} from '@/collaboration/yjs-columns';
 import type {
   DocumentMutation,
   DocumentMutationApplyResult,
@@ -16,7 +25,7 @@ import {
   buildUniqueName,
   populateFromDdl,
 } from '@/lib/erd-ddl-yjs-utils';
-import { findColumnYMap, resolveUniqueTableLabel } from '@/lib/erd-yjs-utils';
+import { resolveUniqueTableLabel } from '@/lib/erd-yjs-utils';
 import { normalizeEdgeHandlesInYDoc, syncEdgeHandlePreference } from '@/lib/erd-edge-yjs-utils';
 import {
   buildStableEdgeId,
@@ -48,8 +57,6 @@ import {
   createColumnYMap,
   createEdgeYMap,
   createWaypointsYArray,
-  deleteColumnFromYArray,
-  moveColumnInYArray,
   syncLegacyWaypointsInEdgeYMap,
 } from '@/collaboration/yjsBridge';
 
@@ -337,6 +344,11 @@ export class ErdDocumentMutationApplier {
     return resolved;
   }
 
+  /**
+   * 존재하는 컬럼의 변경 필드를 반영하고 관계 유형을 갱신한다.
+   * @param mutation 문서 mutation
+   * @returns 적용 여부
+   */
   private applyColumnUpdate(mutation: DocumentMutation): boolean {
     const tableId = typeof mutation.payload?.tableId === 'string' ? mutation.payload.tableId : null;
     const colId = typeof mutation.payload?.colId === 'string' ? mutation.payload.colId : null;
@@ -350,20 +362,17 @@ export class ErdDocumentMutationApplier {
       return false;
     }
     const entries = Object.entries(mutation.payload ?? {}).filter(
-      ([key]) => key !== 'tableId' && key !== 'colId',
+      ([key]) => key !== 'tableId' && key !== 'colId' && key !== 'id',
     );
     if (entries.length === 0) {
       return false;
     }
 
+    ensureColumnStorage(tableYMap);
     let relationTypeNeedsRecompute = false;
     let resolved = false;
     doc.transact(() => {
-      const columnsYArray = tableYMap.get('columns');
-      if (!(columnsYArray instanceof Y.Array)) {
-        return;
-      }
-      const colYMap = findColumnYMap(columnsYArray, colId);
+      const colYMap = getColumnYMap(tableYMap, colId);
       if (!colYMap) {
         return;
       }
@@ -408,6 +417,11 @@ export class ErdDocumentMutationApplier {
     return resolved;
   }
 
+  /**
+   * 새 ID의 컬럼 본체와 순서를 추가한다.
+   * @param mutation 문서 mutation
+   * @returns 적용 여부
+   */
   private applyColumnAdd(mutation: DocumentMutation): boolean {
     const tableId = typeof mutation.payload?.tableId === 'string' ? mutation.payload.tableId : null;
     if (!tableId) {
@@ -420,24 +434,28 @@ export class ErdDocumentMutationApplier {
       return false;
     }
 
-    const columnsYArray = tableYMap.get('columns');
-    if (!(columnsYArray instanceof Y.Array)) {
-      return false;
-    }
-
+    ensureColumnStorage(tableYMap);
     doc.transact(() => {
-      columnsYArray.push([
+      const id = `col-${crypto.randomUUID()}`;
+      insertColumnYMap(
+        tableYMap,
+        id,
         createColumnYMap({
-          id: `col-${crypto.randomUUID()}`,
+          id,
           name: 'column',
           type: 'VARCHAR(255)',
           nullable: true,
         }),
-      ]);
+      );
     }, CANVAS_HISTORY_ORIGIN.USER_COLUMN);
     return true;
   }
 
+  /**
+   * 컬럼 본체와 순서 및 참조 엣지를 삭제한다.
+   * @param mutation 문서 mutation
+   * @returns 적용 여부
+   */
   private applyColumnDelete(mutation: DocumentMutation): boolean {
     const tableId = typeof mutation.payload?.tableId === 'string' ? mutation.payload.tableId : null;
     const colId = typeof mutation.payload?.colId === 'string' ? mutation.payload.colId : null;
@@ -450,17 +468,12 @@ export class ErdDocumentMutationApplier {
     if (!tableYMap) {
       return false;
     }
-    const columnsYArray = tableYMap.get('columns');
-    if (!(columnsYArray instanceof Y.Array)) {
-      return false;
-    }
-    if (!findColumnYMap(columnsYArray, colId)) {
-      return false;
-    }
+    ensureColumnStorage(tableYMap);
+    if (!getColumnYMap(tableYMap, colId)) return false;
 
     const handlePrefix = `${tableId}-${colId}`;
     doc.transact(() => {
-      deleteColumnFromYArray(columnsYArray, colId);
+      deleteTableColumn(tableYMap, colId);
       const edgesMap = getEdgesMap(doc);
       const toDelete: string[] = [];
       edgesMap.forEach((edgeYMap, edgeId) => {
@@ -480,6 +493,11 @@ export class ErdDocumentMutationApplier {
     return true;
   }
 
+  /**
+   * 컬럼 본체를 유지하며 ID 순서만 이동한다.
+   * @param mutation 문서 mutation
+   * @returns 적용 여부
+   */
   private applyColumnMove(mutation: DocumentMutation): boolean {
     const tableId = typeof mutation.payload?.tableId === 'string' ? mutation.payload.tableId : null;
     const fromIndex =
@@ -497,23 +515,12 @@ export class ErdDocumentMutationApplier {
     if (!tableYMap) {
       return false;
     }
-    const columnsYArray = tableYMap.get('columns');
-    if (!(columnsYArray instanceof Y.Array)) {
-      return false;
-    }
-    if (
-      fromIndex < 0 ||
-      toIndex < 0 ||
-      fromIndex >= columnsYArray.length ||
-      toIndex >= columnsYArray.length
-    ) {
-      return false;
-    }
-
+    ensureColumnStorage(tableYMap);
+    let moved = false;
     doc.transact(() => {
-      moveColumnInYArray(columnsYArray, fromIndex, toIndex);
+      moved = moveTableColumn(tableYMap, fromIndex, toIndex);
     }, CANVAS_HISTORY_ORIGIN.USER_COLUMN);
-    return true;
+    return moved;
   }
 
   private applyGroupAdd(mutation: DocumentMutation): boolean {
@@ -722,6 +729,11 @@ export class ErdDocumentMutationApplier {
     return this.toApplyResult(true, result);
   }
 
+  /**
+   * 사전 변경 필드만 현재 컬럼 본체에 반영한다.
+   * @param mutation 문서 mutation
+   * @returns 적용 여부
+   */
   private applyDictionaryReconciliation(mutation: DocumentMutation): boolean {
     const plan = this.readDictionaryReconciliationPlan(mutation.payload?.plan);
     if (!plan || (plan.tableMetaUpdates.length === 0 && plan.columnUpdates.length === 0)) {
@@ -729,6 +741,11 @@ export class ErdDocumentMutationApplier {
     }
 
     const doc = this.engine.getDocument();
+    const tables = getTablesMap(doc);
+    for (const tableId of new Set(plan.columnUpdates.map((update) => update.nodeId))) {
+      const table = tables.get(tableId);
+      if (table) ensureColumnStorage(table);
+    }
     doc.transact(() => {
       const tablesMap = getTablesMap(doc);
 
@@ -751,26 +768,21 @@ export class ErdDocumentMutationApplier {
         if (!tableYMap) {
           continue;
         }
-        const columnsYArray = tableYMap.get('columns');
-        if (!(columnsYArray instanceof Y.Array)) {
-          continue;
-        }
-        const columnYMap = findColumnYMap(columnsYArray, columnUpdate.colId);
+        const columnYMap = getColumnYMap(tableYMap, columnUpdate.colId);
         if (!columnYMap) {
           continue;
         }
-        for (const [key, value] of Object.entries(columnUpdate.updates)) {
-          if (value === undefined) {
-            columnYMap.delete(key);
-          } else {
-            columnYMap.set(key, value);
-          }
-        }
+        patchColumnYMap(tableYMap, columnUpdate.colId, columnUpdate.updates);
       }
     }, CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE);
     return true;
   }
 
+  /**
+   * 기존 컬럼을 연결하고 변경된 FK 필드만 반영한다.
+   * @param mutation 문서 mutation
+   * @returns 적용 여부
+   */
   private applyEdgeConnect(mutation: DocumentMutation): boolean {
     const requestedEdgeId = readString(mutation.payload?.edgeId);
     const sourceTableId = readString(mutation.payload?.sourceTableId);
@@ -805,6 +817,7 @@ export class ErdDocumentMutationApplier {
         childColumn: targetColumn.name,
       });
 
+    ensureColumnStorage(targetTableYMap);
     doc.transact(() => {
       const edgeYMap = createEdgeYMap(
         sourceTableId,
@@ -820,6 +833,11 @@ export class ErdDocumentMutationApplier {
     return true;
   }
 
+  /**
+   * 새 FK 컬럼과 관계를 추가한다.
+   * @param mutation 문서 mutation
+   * @returns 적용 여부
+   */
   private applyEdgeAddFkRelation(mutation: DocumentMutation): boolean {
     const parentTableId = readString(mutation.payload?.parentTableId);
     const childTableId = readString(mutation.payload?.childTableId);
@@ -841,10 +859,7 @@ export class ErdDocumentMutationApplier {
       return false;
     }
 
-    const childColumnsYArray = childTableYMap.get('columns');
-    if (!(childColumnsYArray instanceof Y.Array)) {
-      return false;
-    }
+    ensureColumnStorage(childTableYMap);
     const childColumns = this.readColumns(childTableYMap);
     const existingNames = childColumns.map((column) => column.name);
     const parentLabel = readString(parentTableYMap.get('label')) ?? parentTableId;
@@ -862,7 +877,9 @@ export class ErdDocumentMutationApplier {
         const fkName = buildUniqueFkColumnName(baseName, assignedNames);
         assignedNames.push(fkName);
         const fkColumnId = `col-${crypto.randomUUID()}`;
-        childColumnsYArray.push([
+        insertColumnYMap(
+          childTableYMap,
+          fkColumnId,
           createColumnYMap({
             id: fkColumnId,
             name: fkName,
@@ -873,7 +890,7 @@ export class ErdDocumentMutationApplier {
             logicalName: parentColumn.logicalName,
             domainId: parentColumn.domainId,
           }),
-        ]);
+        );
 
         const handles = resolveAutoEdgeHandles({
           sourceNode: parentNode,
@@ -901,6 +918,11 @@ export class ErdDocumentMutationApplier {
     return true;
   }
 
+  /**
+   * 엣지와 요청된 FK 컬럼을 삭제한다.
+   * @param mutation 문서 mutation
+   * @returns 적용 여부
+   */
   private applyEdgeDelete(mutation: DocumentMutation): boolean {
     const edgeId = readString(mutation.payload?.edgeId);
     if (!edgeId) {
@@ -915,6 +937,11 @@ export class ErdDocumentMutationApplier {
       return false;
     }
 
+    if (removeFkColumn) {
+      const target = readString(edgeYMap.get('target'));
+      const table = target ? getTablesMap(doc).get(target) : undefined;
+      if (table) ensureColumnStorage(table);
+    }
     doc.transact(() => {
       if (removeFkColumn) {
         const targetTableId = readString(edgeYMap.get('target'));
@@ -922,10 +949,7 @@ export class ErdDocumentMutationApplier {
         if (targetTableId && targetHandle) {
           const targetColumnId = extractColId(targetHandle, targetTableId);
           const targetTableYMap = getTablesMap(doc).get(targetTableId);
-          const childColumnsYArray = targetTableYMap?.get('columns');
-          if (childColumnsYArray instanceof Y.Array) {
-            deleteColumnFromYArray(childColumnsYArray, targetColumnId);
-          }
+          if (targetTableYMap) deleteTableColumn(targetTableYMap, targetColumnId);
         }
       }
       edgesMap.delete(edgeId);
@@ -1152,6 +1176,10 @@ export class ErdDocumentMutationApplier {
       : null;
   }
 
+  /**
+   * 현재 스키마에서 테이블과 컬럼 스냅샷을 읽는다.
+   * @returns 테이블 노드 목록
+   */
   private readCurrentNodes(): Array<{
     id: string;
     position: { x: number; y: number };
@@ -1188,23 +1216,16 @@ export class ErdDocumentMutationApplier {
         name: column.name,
         type: column.type ?? 'VARCHAR(255)',
         pk: column.pk,
-        fk:
-          (findColumnYMap(tableYMap.get('columns') as Y.Array<Y.Map<unknown>>, column.id)?.get(
-            'fk',
-          ) as boolean | undefined) ?? undefined,
+        fk: (getColumnYMap(tableYMap, column.id)?.get('fk') as boolean | undefined) ?? undefined,
         nullable:
-          (findColumnYMap(tableYMap.get('columns') as Y.Array<Y.Map<unknown>>, column.id)?.get(
-            'nullable',
-          ) as boolean | undefined) ?? undefined,
+          (getColumnYMap(tableYMap, column.id)?.get('nullable') as boolean | undefined) ??
+          undefined,
         autoIncrement:
-          (findColumnYMap(tableYMap.get('columns') as Y.Array<Y.Map<unknown>>, column.id)?.get(
-            'autoIncrement',
-          ) as boolean | undefined) ?? undefined,
+          (getColumnYMap(tableYMap, column.id)?.get('autoIncrement') as boolean | undefined) ??
+          undefined,
         logicalName: column.logicalName,
         termId:
-          (findColumnYMap(tableYMap.get('columns') as Y.Array<Y.Map<unknown>>, column.id)?.get(
-            'termId',
-          ) as number | undefined) ?? undefined,
+          (getColumnYMap(tableYMap, column.id)?.get('termId') as number | undefined) ?? undefined,
         domainId: column.domainId,
       }));
       nodes.push({
@@ -1277,6 +1298,12 @@ export class ErdDocumentMutationApplier {
     return edges;
   }
 
+  /**
+   * 현재 스키마의 컬럼 엔티티를 조회한다.
+   * @param tableYMap 테이블
+   * @param columnId 컬럼 ID
+   * @returns 컬럼 엔티티 또는 null
+   */
   private findColumnEntity(
     tableYMap: Y.Map<unknown>,
     columnId: string,
@@ -1288,11 +1315,7 @@ export class ErdDocumentMutationApplier {
     logicalName?: string;
     domainId?: number;
   } | null {
-    const columns = tableYMap.get('columns');
-    if (!(columns instanceof Y.Array)) {
-      return null;
-    }
-    const columnYMap = findColumnYMap(columns, columnId);
+    const columnYMap = getColumnYMap(tableYMap, columnId);
     if (!columnYMap) {
       return null;
     }
@@ -1313,6 +1336,11 @@ export class ErdDocumentMutationApplier {
     };
   }
 
+  /**
+   * 현재 스키마의 유효한 컬럼을 표시 순서대로 읽는다.
+   * @param tableYMap 테이블
+   * @returns 컬럼 엔티티 목록
+   */
   private readColumns(tableYMap: Y.Map<unknown>): Array<{
     id: string;
     name: string;
@@ -1321,10 +1349,7 @@ export class ErdDocumentMutationApplier {
     logicalName?: string;
     domainId?: number;
   }> {
-    const columns = tableYMap.get('columns');
-    if (!(columns instanceof Y.Array)) {
-      return [];
-    }
+    const columns = readColumnYMaps(tableYMap);
     const result: Array<{
       id: string;
       name: string;
@@ -1333,7 +1358,7 @@ export class ErdDocumentMutationApplier {
       logicalName?: string;
       domainId?: number;
     }> = [];
-    for (const column of columns.toArray()) {
+    for (const column of columns) {
       if (!(column instanceof Y.Map)) {
         continue;
       }
@@ -1381,24 +1406,22 @@ export class ErdDocumentMutationApplier {
     };
   }
 
+  /**
+   * 존재하는 대상 컬럼의 변경된 FK 필드만 반영한다.
+   * @param targetTableYMap 대상 테이블
+   * @param targetColumnId 대상 컬럼 ID
+   * @param relationType 관계 유형
+   * @returns 없음
+   */
   private applyTargetFkFlags(
     targetTableYMap: Y.Map<unknown>,
     targetColumnId: string,
     relationType: RelationType,
   ): void {
-    const columns = targetTableYMap.get('columns');
-    if (!(columns instanceof Y.Array)) {
-      return;
-    }
-    const targetColumn = findColumnYMap(columns, targetColumnId);
-    if (!targetColumn) {
-      return;
-    }
-    targetColumn.set('fk', true);
-    if (relationType === 'identifying') {
-      targetColumn.set('pk', true);
-      targetColumn.set('nullable', false);
-    }
+    patchColumnYMap(targetTableYMap, targetColumnId, {
+      fk: true,
+      ...(relationType === 'identifying' ? { pk: true, nullable: false } : {}),
+    });
   }
 
   private resolveNormalizeOrigin(reason: 'edge' | 'table-move' | 'table-meta' | 'layout'): unknown {

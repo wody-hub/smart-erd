@@ -1,3 +1,4 @@
+import { getColumnYMap, readColumnYMaps } from '@/collaboration/yjs-columns';
 import * as Y from 'yjs';
 import type {
   DocumentEntity,
@@ -50,18 +51,20 @@ class ErdDocumentReadContext implements DocumentReadContext {
     }
   }
 
+  /**
+   * 현재 컬럼 순서 또는 관계를 기준으로 연관 엔티티를 읽는다.
+   * @param ref 기준 엔티티
+   * @param relation 관계명
+   * @returns 연관 엔티티 참조 목록
+   */
   listRelated(ref: DocumentEntityRef, relation: string): DocumentEntityRef[] {
     if (ref.kind === 'table' && relation === 'columns') {
       const tableYMap = getTablesMap(this.doc).get(ref.id);
       if (!tableYMap) {
         return [];
       }
-      const columnsYArray = tableYMap.get('columns');
-      if (!(columnsYArray instanceof Y.Array)) {
-        return [];
-      }
+      const columnsYArray = readColumnYMaps(tableYMap);
       return columnsYArray
-        .toArray()
         .filter((columnYMap): columnYMap is Y.Map<unknown> => columnYMap instanceof Y.Map)
         .map((columnYMap) => columnYMap.get('id'))
         .filter(
@@ -102,6 +105,11 @@ class ErdDocumentReadContext implements DocumentReadContext {
     return this.getEntity(ref)?.props[key];
   }
 
+  /**
+   * 현재 컬럼 스키마를 포함해 종류별 엔티티를 나열한다.
+   * @param kind 엔티티 종류
+   * @returns 엔티티 참조 목록
+   */
   findByKind(kind: string): DocumentEntityRef[] {
     if (kind === 'table') {
       return Array.from(getTablesMap(this.doc).keys()).map((id) => ({ kind: 'table', id }));
@@ -115,10 +123,7 @@ class ErdDocumentReadContext implements DocumentReadContext {
     if (kind === 'column') {
       const result: DocumentEntityRef[] = [];
       getTablesMap(this.doc).forEach((tableYMap, tableId) => {
-        const columnsYArray = tableYMap.get('columns');
-        if (!(columnsYArray instanceof Y.Array)) {
-          return;
-        }
+        const columnsYArray = readColumnYMaps(tableYMap);
         columnsYArray.forEach((columnYMap) => {
           if (!(columnYMap instanceof Y.Map)) {
             return;
@@ -204,6 +209,11 @@ class ErdDocumentReadContext implements DocumentReadContext {
     };
   }
 
+  /**
+   * 현재 컬럼 본체의 속성을 읽는다.
+   * @param columnEntityId 컬럼 엔티티 ID
+   * @returns 컬럼 엔티티 또는 null
+   */
   private readColumnEntity(columnEntityId: string): DocumentEntity | null {
     const parsedColumnRef = parseErdColumnEntityId(columnEntityId);
     if (!parsedColumnRef) {
@@ -213,16 +223,7 @@ class ErdDocumentReadContext implements DocumentReadContext {
     if (!tableYMap) {
       return null;
     }
-    const columnsYArray = tableYMap.get('columns');
-    if (!(columnsYArray instanceof Y.Array)) {
-      return null;
-    }
-    const columnYMap = columnsYArray
-      .toArray()
-      .find(
-        (candidate): candidate is Y.Map<unknown> =>
-          candidate instanceof Y.Map && candidate.get('id') === parsedColumnRef.columnId,
-      );
+    const columnYMap = getColumnYMap(tableYMap, parsedColumnRef.columnId);
     if (!columnYMap) {
       return null;
     }

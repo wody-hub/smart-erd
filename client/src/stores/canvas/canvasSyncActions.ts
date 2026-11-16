@@ -1,3 +1,4 @@
+import { deleteTableColumn, ensureColumnStorage } from '@/collaboration/yjs-columns';
 import * as Y from 'yjs';
 import {
   type Edge,
@@ -19,7 +20,6 @@ import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import type { ERDEdgeData, TableGroup, TableNode, TableNodeData } from '@/types/erd';
 import type { DslPreviewNode } from '@/lib/dsl-preview-graph';
 import {
-  deleteColumnFromYArray,
   createWaypointsYArray,
   getEdgesMap,
   getGroupsMap,
@@ -769,6 +769,8 @@ export function createCanvasSyncActions(
 
       const targetNodeId = edge.target;
       const targetHandle = edge.targetHandle;
+      const targetTable = getTablesMap(ydoc).get(targetNodeId);
+      if (targetTable && targetHandle) ensureColumnStorage(targetTable);
       ydoc.transact(() => {
         getEdgesMap(ydoc).delete(edgeId);
         if (targetHandle) {
@@ -776,10 +778,7 @@ export function createCanvasSyncActions(
           const tablesMap = getTablesMap(ydoc);
           const tableYMap = tablesMap.get(targetNodeId);
           if (tableYMap) {
-            const colsYArray = tableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-            if (colsYArray) {
-              deleteColumnFromYArray(colsYArray, colId);
-            }
+            deleteTableColumn(tableYMap, colId);
           }
         }
       }, CANVAS_HISTORY_ORIGIN.USER_EDGE);

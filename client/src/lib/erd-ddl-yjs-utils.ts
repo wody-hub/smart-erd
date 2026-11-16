@@ -1,3 +1,4 @@
+import { patchColumnYMap } from '@/collaboration/yjs-columns';
 import * as Y from 'yjs';
 import type { Edge, Node } from '@xyflow/react';
 import {
@@ -249,13 +250,7 @@ export function populateFromDdl(
 
     const childTableYMap = tablesMap.get(child.nodeId);
     if (childTableYMap) {
-      const colsYArray = childTableYMap.get('columns') as Y.Array<Y.Map<unknown>> | undefined;
-      if (colsYArray) {
-        const childColYMap = findColumnYMap(colsYArray, childColId);
-        if (childColYMap) {
-          childColYMap.set('fk', true);
-        }
-      }
+      patchColumnYMap(childTableYMap, childColId, { fk: true });
     }
 
     const relationKey = buildRelationKey({

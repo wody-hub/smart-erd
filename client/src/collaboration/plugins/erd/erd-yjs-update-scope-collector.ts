@@ -37,6 +37,12 @@ export function collectErdAffectedScopesFromEvents(
   return collectErdAffectedScopesFromTransaction(doc, transaction);
 }
 
+/**
+ * 레거시 배열과 신형 컬럼 Map/순서 변경의 영향 범위를 계산한다.
+ * @param doc 문서
+ * @param transaction Yjs 트랜잭션
+ * @returns 영향받은 테이블/컬럼/관계/그룹 범위
+ */
 export function collectErdAffectedScopesFromTransaction(
   doc: Y.Doc,
   transaction: Y.Transaction,
@@ -92,6 +98,20 @@ export function collectErdAffectedScopesFromTransaction(
     if (parent instanceof Y.Map && isSameType(parent.parent, groupsMap)) {
       addAffectedScope(affectedScopes, 'group', readParentSub(parent));
       continue;
+    }
+
+    if (parent instanceof Y.Map && readParentSub(parent) === 'columnsById') {
+      const table = parent.parent;
+      if (table instanceof Y.Map && isSameType(table.parent, tablesMap)) {
+        const tableId = readParentSub(table);
+        const columnId = readParentSub(changedType);
+        addAffectedScope(affectedScopes, 'table', tableId);
+        addAffectedScope(
+          affectedScopes,
+          'column',
+          tableId && columnId ? buildErdColumnEntityId(tableId, columnId) : null,
+        );
+      }
     }
 
     if (parent instanceof Y.Array) {

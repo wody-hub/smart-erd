@@ -1,3 +1,4 @@
+import { getColumnYMap } from '@/collaboration/yjs-columns';
 import * as Y from 'yjs';
 
 function sanitizeTableName(name: string): string {
@@ -7,10 +8,19 @@ function sanitizeTableName(name: string): string {
     .replace(/[^a-z0-9_]/g, '');
 }
 
+/**
+ * 기존 배열 인자를 유지하면서 이관된 컬럼 본체를 우선 조회한다.
+ * @param colsYArray 레거시 컬럼 배열
+ * @param colId 컬럼 ID
+ * @returns 현재 컬럼 본체 또는 undefined
+ */
 export function findColumnYMap(
   colsYArray: Y.Array<Y.Map<unknown>>,
   colId: string,
 ): Y.Map<unknown> | undefined {
+  if (colsYArray.parent instanceof Y.Map) {
+    return getColumnYMap(colsYArray.parent, colId);
+  }
   for (let index = 0; index < colsYArray.length; index += 1) {
     const candidate = colsYArray.get(index);
     if (candidate.get('id') === colId) {
