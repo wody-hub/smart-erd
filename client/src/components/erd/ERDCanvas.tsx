@@ -19,6 +19,7 @@ import {
   type EdgeTypes,
   type Node,
   type NodeTypes,
+  type ReactFlowInstance,
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -90,6 +91,7 @@ import {
   shiftOrthogonalSegment,
   toggleOrthogonalSegmentDetail,
 } from './edgeWaypointGeometry';
+import { applyEdgeDisplayState } from './edgeDisplay';
 
 const DdlExportDialog = lazy(() => import('./DdlExportDialog'));
 const DdlImportDialog = lazy(() => import('./DdlImportDialog'));
@@ -111,6 +113,8 @@ const MINIMAP_NODE_LIMIT = 80;
 const ENABLE_VISIBLE_ELEMENT_CULLING = false;
 const EMPTY_EDGE_LOCKS = new Map();
 const EMPTY_EDGE_PREVIEWS = new Map();
+const SNAP_GRID: [number, number] = [16, 16];
+const DEFAULT_EDGE_OPTIONS = { type: 'erdRelation' as const };
 
 /**
  * 캔버스 좌표가 유효한 finite number인지 검사한다.
@@ -359,7 +363,27 @@ function ERDCanvas({
   const isGroupView = !!activeGroupId && !!activeGroupTableIds;
   /** 그룹 뷰에서는 모든 편집 기능을 차단한다. */
   const effectiveCanEdit = canEdit && !isGroupView;
-
+  const latestCanvasCallbackStateRef = useRef({
+    fkMode,
+    effectiveCanEdit,
+    handleNodeClickInFkMode,
+    handleDragConnect,
+    locksByNodeId,
+    edges,
+    edgeLocksById: remoteEditLocks.edgeLocksById,
+    edgeActions,
+    setActiveEditNodeId,
+    setHighlightedEdge,
+    setHighlightedNodes,
+    setLocalEdgeDrag,
+    clearLocalEdgeDrag,
+    t,
+    displayNodeCount: 0,
+    reactFlowInstance,
+    dragActions,
+    applyZoomTextCompensation,
+    scheduleZoomTextCompensation,
+  });
   /** 그룹 뷰일 때 필터링된 노드, 아닐 때 전체 노드 */
   const displayNodes = useMemo(() => {
     const overlayNodes = draftOverlayGraph?.nodes ?? [];
@@ -368,6 +392,27 @@ function ERDCanvas({
     }
     return [...nodes.filter((node) => activeGroupTableIds.has(node.id)), ...overlayNodes];
   }, [nodes, activeGroupTableIds, draftOverlayGraph?.nodes]);
+  latestCanvasCallbackStateRef.current = {
+    fkMode,
+    effectiveCanEdit,
+    handleNodeClickInFkMode,
+    handleDragConnect,
+    locksByNodeId,
+    edges,
+    edgeLocksById: remoteEditLocks.edgeLocksById,
+    edgeActions,
+    setActiveEditNodeId,
+    setHighlightedEdge,
+    setHighlightedNodes,
+    setLocalEdgeDrag,
+    clearLocalEdgeDrag,
+    t,
+    displayNodeCount: displayNodes.length,
+    reactFlowInstance,
+    dragActions,
+    applyZoomTextCompensation,
+    scheduleZoomTextCompensation,
+  };
 
   /** 그룹 뷰일 때 양쪽 노드가 모두 속한 엣지만 노출한다. */
   const displayEdges = useMemo(() => {
@@ -516,10 +561,13 @@ function ERDCanvas({
    * @param edge 클릭된 엣지
    * @returns 없음
    */
-  const handleEdgeClick = (_: React.MouseEvent, edge: Edge) => {
-    setHighlightedEdge(edge.id);
-    setHighlightedNodes([edge.source, edge.target]);
-  };
+  const handleEdgeClick = useCallback(
+    (_: React.MouseEvent, edge: Edge) => {
+      setHighlightedEdge(edge.id);
+      setHighlightedNodes([edge.source, edge.target]);
+    },
+    [setHighlightedEdge, setHighlightedNodes],
+  );
 
   const finishLocalEdgeDrag = useCallback(
     (commit: boolean) => {
@@ -550,19 +598,20 @@ function ERDCanvas({
       routePoints,
       waypoints,
     }: BeginSegmentDragParams) => {
-      const edgeLockInfo = remoteEditLocks.edgeLocksById.get(edgeId);
+      const latest = latestCanvasCallbackStateRef.current;
+      const edgeLockInfo = latest.edgeLocksById.get(edgeId);
       if (edgeLockInfo) {
-        toast.info(t('erd.edge.blockedEditToast', { name: edgeLockInfo.name }));
+        toast.info(latest.t('erd.edge.blockedEditToast', { name: edgeLockInfo.name }));
         return;
       }
-      const edge = edges.find((candidate) => candidate.id === edgeId);
-      setActiveEditNodeId(null);
+      const edge = latest.edges.find((candidate) => candidate.id === edgeId);
+      latest.setActiveEditNodeId(null);
       lastBlockedNodeRef.current = null;
       if (edge) {
-        setHighlightedEdge(edge.id);
-        setHighlightedNodes([edge.source, edge.target]);
+        latest.setHighlightedEdge(edge.id);
+        latest.setHighlightedNodes([edge.source, edge.target]);
       }
-      setLocalEdgeDrag({
+      latest.setLocalEdgeDrag({
         edgeId,
         pointerId,
         segmentIndex,
@@ -573,49 +622,33 @@ function ERDCanvas({
         previewWaypoints: waypoints,
       });
     },
-    [
-      edges,
-      remoteEditLocks.edgeLocksById,
-      setActiveEditNodeId,
-      setHighlightedEdge,
-      setHighlightedNodes,
-      setLocalEdgeDrag,
-      t,
-    ],
+    [],
   );
 
   const splitSegment = useCallback(
     ({ edgeId, segmentIndex, routePoints, clickPoint }: SplitSegmentParams) => {
-      const edgeLockInfo = remoteEditLocks.edgeLocksById.get(edgeId);
+      const latest = latestCanvasCallbackStateRef.current;
+      const edgeLockInfo = latest.edgeLocksById.get(edgeId);
       if (edgeLockInfo) {
-        toast.info(t('erd.edge.blockedEditToast', { name: edgeLockInfo.name }));
+        toast.info(latest.t('erd.edge.blockedEditToast', { name: edgeLockInfo.name }));
         return;
       }
-      const edge = edges.find((candidate) => candidate.id === edgeId);
+      const edge = latest.edges.find((candidate) => candidate.id === edgeId);
       if (!edge) {
         return;
       }
-      setActiveEditNodeId(null);
+      latest.setActiveEditNodeId(null);
       lastBlockedNodeRef.current = null;
-      setHighlightedEdge(edge.id);
-      setHighlightedNodes([edge.source, edge.target]);
+      latest.setHighlightedEdge(edge.id);
+      latest.setHighlightedNodes([edge.source, edge.target]);
       const nextRoutePoints = toggleOrthogonalSegmentDetail(routePoints, segmentIndex, clickPoint);
       if (areRoutePointsEqual(nextRoutePoints, routePoints)) {
         return;
       }
-      clearLocalEdgeDrag();
-      edgeActions.updateEdgeWaypoints(edgeId, routePointsToWaypoints(nextRoutePoints));
+      latest.clearLocalEdgeDrag();
+      latest.edgeActions.updateEdgeWaypoints(edgeId, routePointsToWaypoints(nextRoutePoints));
     },
-    [
-      clearLocalEdgeDrag,
-      edges,
-      edgeActions,
-      remoteEditLocks.edgeLocksById,
-      setActiveEditNodeId,
-      setHighlightedEdge,
-      setHighlightedNodes,
-      t,
-    ],
+    [],
   );
 
   /**
@@ -625,37 +658,41 @@ function ERDCanvas({
    * @param node 클릭된 노드
    * @returns 없음
    */
-  const handleNodeClick = (event: React.MouseEvent, node: Node) => {
-    if (fkMode && effectiveCanEdit && node.type === 'table') {
-      handleNodeClickInFkMode(event, node as Node<TableNodeData>);
-      return;
-    }
-    if (effectiveCanEdit && node.type === 'table') {
-      const lockInfo = locksByNodeId.get(node.id);
-      if (lockInfo) {
-        if (lastBlockedNodeRef.current !== node.id) {
-          toast.info(t('erd.lock.blockedEditToast', { name: lockInfo.name }));
-          lastBlockedNodeRef.current = node.id;
-        }
+  const handleNodeClick = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      const latest = latestCanvasCallbackStateRef.current;
+      if (latest.fkMode && latest.effectiveCanEdit && node.type === 'table') {
+        latest.handleNodeClickInFkMode(event, node as Node<TableNodeData>);
         return;
       }
+      if (latest.effectiveCanEdit && node.type === 'table') {
+        const lockInfo = latest.locksByNodeId.get(node.id);
+        if (lockInfo) {
+          if (lastBlockedNodeRef.current !== node.id) {
+            toast.info(latest.t('erd.lock.blockedEditToast', { name: lockInfo.name }));
+            lastBlockedNodeRef.current = node.id;
+          }
+          return;
+        }
 
-      lastBlockedNodeRef.current = null;
-      setActiveEditNodeId(node.id);
-    }
-  };
+        lastBlockedNodeRef.current = null;
+        setActiveEditNodeId(node.id);
+      }
+    },
+    [setActiveEditNodeId],
+  );
 
   /**
    * 캔버스 빈 영역 클릭을 처리한다.
    *
    * @returns 없음
    */
-  const handlePaneClick = () => {
+  const handlePaneClick = useCallback(() => {
     clearHighlights();
     setContextMenu(null);
     setActiveEditNodeId(null);
     lastBlockedNodeRef.current = null;
-  };
+  }, [clearHighlights, setActiveEditNodeId]);
 
   // 편집 중인 노드가 원격 락 상태가 되면 즉시 편집 모드를 해제한다.
   useEffect(() => {
@@ -677,12 +714,82 @@ function ERDCanvas({
    * @param edge 대상 엣지
    * @returns 없음
    */
-  const handleEdgeContextMenu = (event: React.MouseEvent, edge: Edge) => {
-    event.preventDefault();
-    setHighlightedEdge(edge.id);
-    setHighlightedNodes([edge.source, edge.target]);
-    setContextMenu({ edgeId: edge.id, position: { x: event.clientX, y: event.clientY } });
-  };
+  const handleEdgeContextMenu = useCallback(
+    (event: React.MouseEvent, edge: Edge) => {
+      event.preventDefault();
+      setHighlightedEdge(edge.id);
+      setHighlightedNodes([edge.source, edge.target]);
+      setContextMenu({ edgeId: edge.id, position: { x: event.clientX, y: event.clientY } });
+    },
+    [setHighlightedEdge, setHighlightedNodes],
+  );
+
+  const handleDragConnectStable = useCallback(
+    (...args: Parameters<typeof handleDragConnect>) =>
+      latestCanvasCallbackStateRef.current.handleDragConnect(...args),
+    [],
+  );
+  const handleNodeDragStart = useCallback(() => setIsDraggingNode(true), []);
+  const handleNodeDragStop = useCallback((_event: React.MouseEvent, node: Node<TableNodeData>) => {
+    setIsDraggingNode(false);
+    requestAnimationFrame(() => {
+      const latest = latestCanvasCallbackStateRef.current;
+      const latestNode =
+        (latest.reactFlowInstance.getNode(node.id) as Node<TableNodeData> | undefined) ?? node;
+      const storeNode = useCanvasStore
+        .getState()
+        .nodes.find((candidate) => candidate.id === node.id) as Node<TableNodeData> | undefined;
+      const resolvedPosition = isFiniteCanvasPosition(latestNode.position)
+        ? latestNode.position
+        : isFiniteCanvasPosition(node.position)
+          ? node.position
+          : isFiniteCanvasPosition(storeNode?.position)
+            ? storeNode.position
+            : null;
+      if (!resolvedPosition) {
+        return;
+      }
+      const normalizedNode =
+        latestNode.position.x === resolvedPosition.x && latestNode.position.y === resolvedPosition.y
+          ? latestNode
+          : { ...latestNode, position: resolvedPosition };
+      latest.dragActions.commitTableDrag(latestNode.id, resolvedPosition, normalizedNode);
+    });
+  }, []);
+  const handleReactFlowInit = useCallback(
+    (instance: ReactFlowInstance<Node<TableNodeData>, Edge>) => {
+      const latest = latestCanvasCallbackStateRef.current;
+      lastViewportZoomRef.current = instance.getZoom();
+      setCompactTableRenderingMode(
+        resolveCompactTableRenderingMode(latest.displayNodeCount, lastViewportZoomRef.current),
+      );
+      latest.applyZoomTextCompensation(instance.getZoom());
+    },
+    [],
+  );
+  const handleReactFlowMoveEnd = useCallback(
+    (_event: MouseEvent | TouchEvent | null, viewport: { zoom: number }) => {
+      const latest = latestCanvasCallbackStateRef.current;
+      lastViewportZoomRef.current = viewport.zoom;
+      setCompactTableRenderingMode(
+        resolveCompactTableRenderingMode(latest.displayNodeCount, viewport.zoom),
+      );
+      const autoFitMovePending = autoFitViewportMovePendingRef.current;
+      autoFitViewportMovePendingRef.current = false;
+      if (!autoFitMovePending) {
+        manualViewportInteractionRef.current = true;
+      }
+      const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
+      if (
+        lastAppliedZoom != null &&
+        Math.abs(viewport.zoom - lastAppliedZoom) <= TABLE_HEADER_ZOOM_CHANGE_EPSILON
+      ) {
+        return;
+      }
+      latest.scheduleZoomTextCompensation(viewport.zoom);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!localEdgeDrag) {
@@ -862,12 +969,7 @@ function ERDCanvas({
 
   /** 엣지에 하이라이트 스타일 적용 */
   const styledEdges = useMemo(
-    () =>
-      displayEdges.map((edge) => ({
-        ...edge,
-        selected: edge.id === highlightedEdgeId,
-        animated: !isDraggingNode && edge.id === highlightedEdgeId,
-      })),
+    () => applyEdgeDisplayState(displayEdges, highlightedEdgeId, isDraggingNode),
     [displayEdges, highlightedEdgeId, isDraggingNode],
   );
 
@@ -938,80 +1040,15 @@ function ERDCanvas({
                       edges={styledEdges}
                       onNodesChange={effectiveCanEdit ? onNodesChange : undefined}
                       onEdgesChange={effectiveCanEdit ? onEdgesChange : undefined}
-                      onConnect={effectiveCanEdit ? handleDragConnect : undefined}
+                      onConnect={effectiveCanEdit ? handleDragConnectStable : undefined}
                       onNodeClick={handleNodeClick}
-                      onNodeDragStart={effectiveCanEdit ? () => setIsDraggingNode(true) : undefined}
-                      onNodeDragStop={
-                        effectiveCanEdit
-                          ? (_event, node) => {
-                              setIsDraggingNode(false);
-                              requestAnimationFrame(() => {
-                                const latestNode =
-                                  (reactFlowInstance.getNode(node.id) as
-                                    | Node<TableNodeData>
-                                    | undefined) ?? node;
-                                const storeNode = useCanvasStore
-                                  .getState()
-                                  .nodes.find((candidate) => candidate.id === node.id) as
-                                  | Node<TableNodeData>
-                                  | undefined;
-                                const resolvedPosition = isFiniteCanvasPosition(latestNode.position)
-                                  ? latestNode.position
-                                  : isFiniteCanvasPosition(node.position)
-                                    ? node.position
-                                    : isFiniteCanvasPosition(storeNode?.position)
-                                      ? storeNode.position
-                                      : null;
-                                if (!resolvedPosition) {
-                                  return;
-                                }
-                                const normalizedNode =
-                                  latestNode.position.x === resolvedPosition.x &&
-                                  latestNode.position.y === resolvedPosition.y
-                                    ? latestNode
-                                    : { ...latestNode, position: resolvedPosition };
-                                dragActions.commitTableDrag(
-                                  latestNode.id,
-                                  resolvedPosition,
-                                  normalizedNode,
-                                );
-                              });
-                            }
-                          : undefined
-                      }
+                      onNodeDragStart={effectiveCanEdit ? handleNodeDragStart : undefined}
+                      onNodeDragStop={effectiveCanEdit ? handleNodeDragStop : undefined}
                       onEdgeClick={handleEdgeClick}
                       onEdgeContextMenu={effectiveCanEdit ? handleEdgeContextMenu : undefined}
                       onPaneClick={handlePaneClick}
-                      onInit={(instance) => {
-                        lastViewportZoomRef.current = instance.getZoom();
-                        setCompactTableRenderingMode(
-                          resolveCompactTableRenderingMode(
-                            displayNodes.length,
-                            lastViewportZoomRef.current,
-                          ),
-                        );
-                        applyZoomTextCompensation(instance.getZoom());
-                      }}
-                      onMoveEnd={(_event, viewport) => {
-                        lastViewportZoomRef.current = viewport.zoom;
-                        setCompactTableRenderingMode(
-                          resolveCompactTableRenderingMode(displayNodes.length, viewport.zoom),
-                        );
-                        const autoFitMovePending = autoFitViewportMovePendingRef.current;
-                        autoFitViewportMovePendingRef.current = false;
-                        if (!autoFitMovePending) {
-                          manualViewportInteractionRef.current = true;
-                        }
-                        const lastAppliedZoom = lastAppliedHeaderZoomRef.current;
-                        if (
-                          lastAppliedZoom != null &&
-                          Math.abs(viewport.zoom - lastAppliedZoom) <=
-                            TABLE_HEADER_ZOOM_CHANGE_EPSILON
-                        ) {
-                          return;
-                        }
-                        scheduleZoomTextCompensation(viewport.zoom);
-                      }}
+                      onInit={handleReactFlowInit}
+                      onMoveEnd={handleReactFlowMoveEnd}
                       nodeTypes={nodeTypes}
                       edgeTypes={edgeTypes}
                       deleteKeyCode={null}
@@ -1020,10 +1057,8 @@ function ERDCanvas({
                       nodesConnectable={effectiveCanEdit}
                       elementsSelectable={effectiveCanEdit}
                       snapToGrid
-                      snapGrid={[16, 16]}
-                      defaultEdgeOptions={{
-                        type: 'erdRelation',
-                      }}
+                      snapGrid={SNAP_GRID}
+                      defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
                       fitView
                       onlyRenderVisibleElements={ENABLE_VISIBLE_ELEMENT_CULLING}
                       className={cn(fkMode && 'cursor-crosshair')}
