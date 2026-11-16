@@ -6,6 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { buildErdLocalSeed } from './lib/erd-app-seed.mjs';
 import { summarizeCpuProfile } from './lib/erd-cpu-profile.mjs';
+import { installReactRenderStats } from './lib/erd-react-render-stats.mjs';
 import { installCollabProbe } from './lib/erd-collab-probe.mjs';
 import {
   commitHash,
@@ -232,6 +233,7 @@ async function loginClient(session) {
     await page.addInitScript(() => {
       window.__ERD_PERF_PROBE_ENABLE__ = true;
     });
+  if (session.options.profile) await page.addInitScript(installReactRenderStats);
   const client = {
     context,
     page,
@@ -652,6 +654,11 @@ async function runLoad(session, afterFirstEdit) {
   const readCounters = () =>
     profiled.page.evaluate(() => window.__ERD_PERF_SNAPSHOT__?.().counters ?? {});
   const countersBefore = profiled ? await readCounters() : null;
+  if (profiled)
+    await profiled.page.evaluate(() => {
+      window.__RS?.reset();
+      if (window.__RS) window.__RS.on = true;
+    });
   const tickets = [];
   const startedAt = Date.now();
   const deadline = startedAt + session.options.durationS * 1000;
@@ -707,6 +714,21 @@ async function runLoad(session, afterFirstEdit) {
       const { profile } = await profiled.cdp.send('Profiler.stop');
       await profiled.cdp.send('Profiler.disable');
       session.result.cpuProfile = summarizeCpuProfile(profile);
+      session.result.reactRenders = await profiled.page.evaluate(() => {
+        if (!window.__RS) return null;
+        window.__RS.on = false;
+        const { commits, total, renders, mounts } = window.__RS;
+        const top = (map) =>
+          Object.entries(map)
+            .sort((left, right) => right[1] - left[1])
+            .slice(0, 15);
+        return {
+          commits,
+          componentRenders: total,
+          topRenders: top(renders),
+          topMounts: top(mounts),
+        };
+      });
       const countersAfter = await readCounters();
       session.result.probeCounters = Object.fromEntries(
         Object.entries(countersAfter)
