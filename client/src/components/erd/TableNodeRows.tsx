@@ -14,15 +14,34 @@ import StaticColumnRow from './StaticColumnRow';
 import EditableColumnRow from './EditableColumnRow';
 import type { ErdCardVariant } from '@/lib/theme';
 import { getColumnHandleRenderState } from './tableNodeHandleSignature';
+import { cn } from '@/lib/utils';
 
 interface SortableColumnRowProps {
   col: Column;
   canEdit: boolean;
   children: React.ReactNode;
   t: TFunction;
+  /** `ie` 변형: PK 행을 강조한다 */
+  emphasizePk?: boolean;
+  /** `ie` 변형: PK 블록 바로 다음 행이면 구분선을 강조한다 */
+  afterPkBlock?: boolean;
 }
 
-function SortableColumnRow({ col, canEdit, children, t }: SortableColumnRowProps) {
+/**
+ * 편집 모드 컬럼 행의 정렬(DnD) 래퍼. `divide-y` 구분선이 이 래퍼에 그려지므로
+ * `ie` 변형의 PK 강조/블록 구분선도 여기서 적용한다.
+ *
+ * @param props SortableColumnRowProps
+ * @returns 정렬 가능한 컬럼 행 래퍼
+ */
+function SortableColumnRow({
+  col,
+  canEdit,
+  children,
+  t,
+  emphasizePk = false,
+  afterPkBlock = false,
+}: SortableColumnRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: col.id,
   });
@@ -35,7 +54,15 @@ function SortableColumnRow({ col, canEdit, children, t }: SortableColumnRowProps
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="relative">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'relative',
+        emphasizePk && col.pk && 'bg-surface-muted font-semibold',
+        emphasizePk && afterPkBlock && '!border-foreground/40',
+      )}
+    >
       {canEdit && (
         <div
           className="nodrag absolute left-0 top-1/2 -translate-y-1/2 cursor-grab opacity-0 group-hover/col:opacity-100 hover:!opacity-100 transition-opacity z-10 pl-0.5"
@@ -73,6 +100,8 @@ interface TableNodeEditableRowsProps {
   onSelectDerived: (colId: string, resolution: LogicalNameResolution) => void;
   onRegisterNew: (colId: string, logicalName: string) => void;
   onDomainChange: (colId: string, domainId: number | null, physicalType?: string) => void;
+  /** ERD 카드 변형 (`ie`이면 PK 블록을 구분해 표시) */
+  variant?: ErdCardVariant;
 }
 
 export function TableNodeEditableRows({
@@ -95,7 +124,9 @@ export function TableNodeEditableRows({
   onSelectDerived,
   onRegisterNew,
   onDomainChange,
+  variant = 'classic',
 }: TableNodeEditableRowsProps) {
+  const emphasizePk = variant === 'ie';
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
       <SortableContext
@@ -103,14 +134,21 @@ export function TableNodeEditableRows({
         strategy={verticalListSortingStrategy}
       >
         <div className="divide-y divide-border">
-          {columns.map((column) => {
+          {columns.map((column, index) => {
             const renderMeta = renderMetaById.get(column.id);
             if (!renderMeta) {
               return null;
             }
 
             return (
-              <SortableColumnRow key={column.id} col={column} canEdit={canEdit} t={t}>
+              <SortableColumnRow
+                key={column.id}
+                col={column}
+                canEdit={canEdit}
+                t={t}
+                emphasizePk={emphasizePk}
+                afterPkBlock={index > 0 && !column.pk && columns[index - 1].pk === true}
+              >
                 <EditableColumnRow
                   col={column}
                   nodeId={nodeId}

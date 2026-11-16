@@ -127,7 +127,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted">
+    <div className="auth-backdrop min-h-screen flex items-center justify-center">
       <Card className="w-96">
         <CardHeader>
           <CardTitle className="text-center">{t('auth.login.title')}</CardTitle>

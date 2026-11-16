@@ -708,6 +708,15 @@
 }
 
 @layer components {
+  /* 로그인/회원가입 배경. Lumen은 순백 테마이므로 회색 muted 대신 background를 쓴다. */
+  .auth-backdrop {
+    background-color: hsl(var(--muted));
+  }
+
+  .theme-lumen .auth-backdrop {
+    background-color: hsl(var(--background));
+  }
+
   .workspace-shell {
     background: linear-gradient(
       180deg,
