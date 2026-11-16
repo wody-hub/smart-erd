@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { performance } from 'node:perf_hooks';
+import { Session } from 'node:inspector/promises';
 import {
   buildObstacleAvoidingAutoRoute,
   getCachedEdgeObstacleRects,
@@ -305,6 +306,114 @@ test('boundary touching, degenerate segments, tie order and mutable arrays match
   }
 });
 
+test('symmetric grids preserve x-before-y and obstacle insertion order for tied detours', () => {
+  let detours = 0;
+  for (const offset of [-1000, 0, 1000]) {
+    for (const centers of [
+      [300, 100, 500],
+      [500, 300, 100],
+      [100, 500, 300],
+    ]) {
+      const nodes = centers.flatMap((x) =>
+        centers.map((y) => tableNode(`grid-${x}-${y}`, offset + x - 30, y - 30, 60, 60)),
+      );
+      const input = edgeInput({ sourceX: offset - 12, targetX: offset + 614, targetY: 600 });
+      for (const ordered of [nodes, [...nodes].reverse()]) {
+        const rects = getCachedEdgeObstacleRects(ordered, 'grid-source', 'grid-target');
+        // All interior corridors have the same length/bend score. The first x wins.
+        const corridorX = ordered[0].position.x - 20 - 48;
+        const expected = [
+          { x: offset, y: 0 },
+          { x: corridorX, y: 0 },
+          { x: corridorX, y: 600 },
+          { x: offset + 600, y: 600 },
+        ];
+        assert.deepEqual(assertReference(input, rects), expected);
+        assert.deepEqual(
+          assertReference(
+            input,
+            rects.map((rect) => ({ ...rect })),
+          ),
+          expected,
+        );
+        detours += 2;
+      }
+    }
+  }
+  assert.equal(detours, 36);
+});
+
+test('non-finite scores, overflow and compacted duplicate candidates preserve reference results', () => {
+  const rects = [{ left: 280, right: 320, top: -30, bottom: 30 }];
+  for (const value of [-0, 0, NaN, -Infinity, Infinity, -1e308, 1e308]) {
+    assertReference(edgeInput({ targetX: value }), rects);
+    assertReference(edgeInput({ targetY: value }), rects);
+    assertReference(edgeInput(), [...rects, { left: value, right: value, top: 500, bottom: 600 }]);
+  }
+  // Every x corridor compacts to the same blocked horizontal segment.
+  assert.deepEqual(assertReference(edgeInput(), rects), [
+    { x: 0, y: 0 },
+    { x: 0, y: -98 },
+    { x: 600, y: -98 },
+    { x: 600, y: 0 },
+  ]);
+});
+
+/**
+ * Counts real production segment calls in a separate, untimed V8 coverage pass.
+ * @param run Synchronous routing workload, without reference implementation calls.
+ * @returns Recursive index visits and exact segment/rectangle predicate calls.
+ */
+async function countSegmentChecks(run: () => void) {
+  const session = new Session();
+  session.connect();
+  try {
+    await session.post('Profiler.enable');
+    await session.post('Profiler.startPreciseCoverage', { callCount: true, detailed: false });
+    run();
+    const { result } = await session.post('Profiler.takePreciseCoverage');
+    const script = result.find((entry) => entry.url.endsWith('/erd/edgeObstacleIndex.js'));
+    assert.ok(script, 'coverage must include the real production obstacle index');
+    const counts = new Map(script.functions.map((fn) => [fn.functionName, fn.ranges[0].count]));
+    const indexed = counts.get('indexedSegmentIntersectsObstacles');
+    const exact = counts.get('segmentIntersectsObstacle');
+    assert.ok(indexed !== undefined && exact !== undefined, 'both predicates must be measured');
+    return { indexed, exact };
+  } finally {
+    await session.post('Profiler.stopPreciseCoverage');
+    await session.post('Profiler.disable');
+    session.disconnect();
+  }
+}
+
+test('P5 unit benchmark bounds segment checks for many mandatory detours at N=200/500', async (t) => {
+  const budgets: { exact: number; limit: number }[] = [];
+  for (const size of [200, 500]) {
+    const rects = getCachedEdgeObstacleRects(benchmarkNodes(size), 'p5-source', 'p5-target');
+    const inputs = Array.from({ length: Math.round(size * 1.2) }, (_, i) =>
+      edgeInput({ sourceY: -24 + (i % 49), targetY: 160 + Math.floor(i / 49) * 3 }),
+    );
+    for (const input of inputs) assert.ok(assertReference(input, rects));
+    /**
+     * Routes distinct edges sharing an indexed snapshot; detours are never cached.
+     * @returns Nothing.
+     */
+    const run = () => {
+      for (const input of inputs) buildObstacleAvoidingAutoRoute(input, rects);
+    };
+    // Timings exclude profiler instrumentation and index/snapshot construction.
+    const elapsed = medianTiming(run);
+    const checks = await countSegmentChecks(run);
+    t.diagnostic(
+      `P5 N=${size}; detour edges=${inputs.length}/${inputs.length}; median(7), warmup=3: ${elapsed.toFixed(3)}ms; indexed calls (including recursive visits)=${checks.indexed}; exact segment/rectangle calls=${checks.exact}`,
+    );
+    // Exhaustive candidate checking exceeds this deterministic budget by over an order of magnitude.
+    budgets.push({ exact: checks.exact, limit: inputs.length * 50 });
+  }
+  for (const { exact, limit } of budgets)
+    assert.ok(exact < limit, `too many exact segment checks: ${exact} >= ${limit}`);
+});
+
 /**
  * Builds a sparse but nontrivial benchmark with O(N) distinct corridor coordinates.
  * @param size Number of table obstacles.
@@ -342,7 +451,7 @@ test('unit benchmark reports N=200/500 cold snapshot routing and incremental cle
     const rects = getCachedEdgeObstacleRects(nodes, 'bench-source', 'bench-target');
     const detourInput = edgeInput();
     assert.ok(assertReference(detourInput, rects));
-    // Every call must evaluate all candidate corridors; detour routes are deliberately never cached.
+    // Every call searches detour candidates; detour routes are deliberately never cached.
     const calls = 30;
     const before = medianTiming(() => {
       for (let i = 0; i < calls; i += 1) referenceAutoRoute(detourInput, rects);

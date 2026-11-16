@@ -166,6 +166,48 @@ function buildObstacleGeometrySignature(nodes: readonly ObstacleNode[]): string 
 const OBSTACLE_PADDING = 20;
 const OUTER_CORRIDOR_MARGIN = 48;
 
+/** 교차 검사 전 우선순위를 계산한 우회 후보. */
+interface AutoRouteCandidate {
+  /** 기존과 동일하게 축약된 경로 */
+  points: EdgePoint[];
+  /** 길이와 꺾임 비용 */
+  score: number;
+  /** x 후보 다음 y 후보를 열거한 순서 */
+  order: number;
+}
+
+/**
+ * 동점일 때 기존 생성 순서가 앞선 후보를 우선한다.
+ * @param left 비교할 후보
+ * @param right 비교 대상 후보
+ * @returns 점수, 생성 순서의 오름차순 비교값
+ */
+function compareRouteCandidates(left: AutoRouteCandidate, right: AutoRouteCandidate): number {
+  return left.score - right.score || left.order - right.order;
+}
+
+/**
+ * 두 자식의 힙 조건을 전제로 한 후보를 내려 최소 힙 조건을 복구한다.
+ * @param candidates 점수와 생성 순서로 비교하는 후보 힙
+ * @param root 복구할 부분 힙의 루트 위치
+ * @returns 없음
+ */
+function siftRouteCandidateDown(candidates: AutoRouteCandidate[], root: number): void {
+  const candidate = candidates[root];
+  while (root * 2 + 1 < candidates.length) {
+    let child = root * 2 + 1;
+    if (
+      child + 1 < candidates.length &&
+      compareRouteCandidates(candidates[child + 1], candidates[child]) < 0
+    )
+      child += 1;
+    if (compareRouteCandidates(candidate, candidates[child]) <= 0) break;
+    candidates[root] = candidates[child];
+    root = child;
+  }
+  candidates[root] = candidate;
+}
+
 /**
  * 장애물 사각형 배열이 순서와 네 좌표까지 같은지 비교한다.
  * @param left 이전 장애물
@@ -192,7 +234,8 @@ export function areEdgeObstacleRectsEqual(
 }
 
 /**
- * 기존 후보 순서와 점 배열을 유지하며 장애물 우회 경로를 계산한다.
+ * 후보 점수의 오름차순으로 교차 검사하고 첫 통과 경로를 반환한다.
+ * 동점은 기존 x → y 생성 순서를 유지하므로 전수 검사에서 엄격한 <로 고른 결과와 같다.
  * @param input 앵커 좌표, 방향과 마커 오프셋 (기존과 동일하게 waypoints는 사용하지 않는다)
  * @param obstacles endpoint를 제외한 장애물 배열
  * @returns 우회 점 배열, 또는 기본 경로가 비었거나 우회 후보가 없으면 null
@@ -259,8 +302,7 @@ export function buildObstacleAvoidingAutoRoute(
     yCandidates.add(obstacle.bottom + OUTER_CORRIDOR_MARGIN);
   }
 
-  let bestRoute: EdgePoint[] | null = null;
-  let bestScore = Number.POSITIVE_INFINITY;
+  const candidates: AutoRouteCandidate[] = [];
 
   for (const corridorX of xCandidates) {
     const candidate = compactOrthogonalPoints([
@@ -269,14 +311,11 @@ export function buildObstacleAvoidingAutoRoute(
       { x: corridorX, y: targetPoint.y },
       targetPoint,
     ]);
-    if (routeIntersectsObstacles(candidate, index, metadata)) {
-      continue;
-    }
-    const score = calculateRouteScore(candidate);
-    if (score < bestScore) {
-      bestScore = score;
-      bestRoute = candidate;
-    }
+    candidates.push({
+      points: candidate,
+      score: calculateRouteScore(candidate),
+      order: candidates.length,
+    });
   }
 
   for (const corridorY of yCandidates) {
@@ -286,17 +325,30 @@ export function buildObstacleAvoidingAutoRoute(
       { x: targetPoint.x, y: corridorY },
       targetPoint,
     ]);
-    if (routeIntersectsObstacles(candidate, index, metadata)) {
-      continue;
-    }
-    const score = calculateRouteScore(candidate);
-    if (score < bestScore) {
-      bestScore = score;
-      bestRoute = candidate;
-    }
+    candidates.push({
+      points: candidate,
+      score: calculateRouteScore(candidate),
+      order: candidates.length,
+    });
   }
 
-  return bestRoute;
+  // 기존 score < Infinity에서 선택되지 않던 NaN/Infinity는 정렬에서도 제외한다.
+  // 축약 후 동일한 점 배열이 되는 후보도 기존 생성 순서대로 보존한다.
+  const rankedCandidates = candidates.filter(({ score }) => score < Number.POSITIVE_INFINITY);
+  // O(C)에 힙을 만들고 실제 검사할 후보만 O(log C)에 꺼낸다.
+  for (let root = Math.floor(rankedCandidates.length / 2) - 1; root >= 0; root -= 1) {
+    siftRouteCandidateDown(rankedCandidates, root);
+  }
+  while (rankedCandidates.length > 0) {
+    const { points } = rankedCandidates[0];
+    if (!routeIntersectsObstacles(points, index, metadata)) return points;
+    const last = rankedCandidates.pop()!;
+    if (rankedCandidates.length > 0) {
+      rankedCandidates[0] = last;
+      siftRouteCandidateDown(rankedCandidates, 0);
+    }
+  }
+  return null;
 }
 
 /**
