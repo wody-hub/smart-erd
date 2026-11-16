@@ -241,13 +241,34 @@ async function loginClient(session) {
     ws: null,
     heap: [],
     pageErrors: [],
+    wsLog: { opened: [], closed: [], errors: [], receivedFrames: 0, sentFrames: 0 },
+    consoleLog: [],
   };
   session.allClients.push(client);
+  // 협업 핸드오프(preview/fallback/live-ready) 로그만 보관해 수렴 실패 진단에 쓴다.
+  page.on('console', (message) => {
+    const text = message.text();
+    if (
+      client.consoleLog.length < MAX_PAGE_ERRORS * 10 &&
+      /preview|fallback|live-ready|handoff|snapshot|sync/i.test(text)
+    )
+      client.consoleLog.push({ at: Date.now(), type: message.type(), text: text.slice(0, 300) });
+  });
   page.on('pageerror', (error) => {
     if (client.pageErrors.length < MAX_PAGE_ERRORS) client.pageErrors.push(errorMessage(error));
   });
   await client.cdp.send('Network.enable');
   await client.cdp.send('Performance.enable');
+  // 부하 창과 무관하게 연결 수명을 기록해 수렴 실패 진단에 쓴다.
+  client.cdp.on('Network.webSocketCreated', ({ url }) =>
+    client.wsLog.opened.push({ at: Date.now(), url: url.replace(/ticket=[^&]+/, 'ticket=*') }),
+  );
+  client.cdp.on('Network.webSocketClosed', () => client.wsLog.closed.push({ at: Date.now() }));
+  client.cdp.on('Network.webSocketFrameError', ({ errorMessage: message }) =>
+    client.wsLog.errors.push({ at: Date.now(), message }),
+  );
+  client.cdp.on('Network.webSocketFrameReceived', () => (client.wsLog.receivedFrames += 1));
+  client.cdp.on('Network.webSocketFrameSent', () => (client.wsLog.sentFrames += 1));
   for (const [event, direction] of [
     ['Network.webSocketFrameSent', 'sent'],
     ['Network.webSocketFrameReceived', 'received'],
@@ -861,7 +882,94 @@ async function waitForFinalConvergence(session) {
     }
     await delay(25);
   } while (Date.now() < deadline);
-  return { pass: false, stableForMs: 0, expected, states, timedOut: true };
+  const diagnostics = await diagnoseFinalDivergence(session, expected);
+  return { pass: false, stableForMs: 0, expected, states, timedOut: true, diagnostics };
+}
+
+/**
+ * 최종 수렴 실패 원인을 가르기 위해 지연 복구 여부와 새로 접속한 클라이언트의 값을 확인한다.
+ * - recoveredAfterMs: 추가 대기 후 모든 클라이언트가 수렴했다면 동기화 지연이다.
+ * - freshJoin: 새 접속도 기대값을 못 보면 서버 쪽 손실, 보면 해당 클라이언트의 실시간 수신 누락이다.
+ * @param {object} session 실행 세션
+ * @param {object[]} expected 작성자별 최종 기대값
+ * @returns {Promise<object>} 진단 결과
+ */
+async function diagnoseFinalDivergence(session, expected) {
+  const clients = session.finalClients ?? session.clients;
+  /** 클라이언트별로 기대값과 다른 항목을 읽는다. */
+  const readMismatches = async () =>
+    Promise.all(
+      clients.map(async ({ page }, clientIndex) => {
+        const values = await page.evaluate(
+          (items) =>
+            items.map((item) => ({
+              writer: item.writer,
+              value:
+                window.__collabBench
+                  .tableState(item.table)
+                  ?.columns.find((column) => column.id === item.column)?.name ?? null,
+            })),
+          expected,
+        );
+        return {
+          clientIndex,
+          mismatches: expected
+            .map((item, index) => ({ ...item, actual: values[index].value }))
+            .filter((item) => item.actual !== item.value),
+        };
+      }),
+    );
+  const join = session.result.joins?.at(-1);
+  const lastEditStartedAt = Math.max(
+    0,
+    ...session.result.samples
+      .filter((sample) => sample.startedAt !== null)
+      .map((sample) => sample.startedAt),
+  );
+  const startedAt = Date.now();
+  let mismatches = await readMismatches();
+  while (mismatches.some((item) => item.mismatches.length) && Date.now() - startedAt < 20000) {
+    await delay(250);
+    mismatches = await readMismatches();
+  }
+  const recovered = !mismatches.some((item) => item.mismatches.length);
+  const diagnostics = {
+    recovered,
+    recoveredAfterMs: recovered ? Date.now() - startedAt : null,
+    mismatches: mismatches.filter((item) => item.mismatches.length),
+    joinReadyAt: join?.readyAt ?? null,
+    lastEditStartedAt,
+    pageErrors: clients.map((client) => client.pageErrors),
+    wsLogs: clients.map((client) => client.wsLog),
+    consoleLogs: clients.map((client) => client.consoleLog),
+  };
+  if (recovered) return diagnostics;
+  const fresh = await loginClient(session);
+  try {
+    await joinDiagram(session, fresh);
+    await delay(1000);
+    const freshState = await fresh.page.evaluate(
+      (items) =>
+        items.map((item) => ({
+          writer: item.writer,
+          value:
+            window.__collabBench
+              .tableState(item.table)
+              ?.columns.find((column) => column.id === item.column)?.name ?? null,
+        })),
+      expected,
+    );
+    diagnostics.freshJoin = expected.map((item, index) => ({
+      ...item,
+      actual: freshState[index].value,
+    }));
+  } catch (error) {
+    diagnostics.freshJoin = { error: errorMessage(error) };
+  } finally {
+    await fresh.context.close().catch(() => {});
+    session.contexts.delete(fresh.context);
+  }
+  return diagnostics;
 }
 
 /**
@@ -1043,7 +1151,16 @@ async function runC4(session) {
     await loaded.page.evaluate((tickets) => {
       for (const ticket of tickets) window.__collabBench.arm(ticket.id, ticket.spec);
     }, session.loadTickets);
-    session.result.joins.push({ mode: 'under-C2-load', ...join });
+    const joinEntry = { mode: 'under-C2-load', ...join };
+    session.result.joins.push(joinEntry);
+    // preview 표시 이후 remote snapshot 적용/fallback 여부가 정해질 때까지 기다려 기록한다.
+    await delay(4000);
+    joinEntry.handoff = loaded.consoleLog.filter((entry) =>
+      /snapshot-fallback|preview-unlocked|live-ready/.test(entry.text),
+    );
+    joinEntry.usedFallback = joinEntry.handoff.some((entry) =>
+      /snapshot-fallback/.test(entry.text),
+    );
   });
 }
 
