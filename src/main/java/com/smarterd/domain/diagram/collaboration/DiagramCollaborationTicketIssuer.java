@@ -33,8 +33,16 @@ public class DiagramCollaborationTicketIssuer implements CollaborationTicketIssu
      * {@inheritDoc}
      */
     @Override
-    public CollaborationTicketIssueResult issueVerifiedTicket(String loginId, CollaborationResourceKey resourceKey) {
-        final var result = wsTicketService.issueVerifiedTicket(loginId, resourceKeyFactory.parseDiagramId(resourceKey));
+    public CollaborationTicketIssueResult issueVerifiedTicket(
+        String loginId,
+        CollaborationResourceKey resourceKey,
+        int editProtocolVersion
+    ) {
+        final var result = wsTicketService.issueVerifiedTicket(
+            loginId,
+            resourceKeyFactory.parseDiagramId(resourceKey),
+            editProtocolVersion
+        );
         return new CollaborationTicketIssueResult(result.ticket(), result.userId(), result.presenceProtocolVersion());
     }
 }

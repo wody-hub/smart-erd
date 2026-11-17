@@ -3,6 +3,7 @@ package com.smarterd.domain.diagram.websocket.transport;
 import com.smarterd.application.diagram.command.ValidateDiagramCollaborationHandshakeUseCase;
 import com.smarterd.collaboration.CollaborationProtocolPolicy;
 import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
+import com.smarterd.domain.common.exception.ProtocolTooOldException;
 import com.smarterd.utils.AppStringUtils;
 import java.util.Map;
 import java.util.Objects;
@@ -117,6 +118,11 @@ public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
                 validationResult.diagramId(),
                 sessionInfo.protocolVersion()
             );
+            return true;
+        } catch (ProtocolTooOldException e) {
+            // 유효한 ticket의 발급 당시 REST 버전이 현재 정책에 미달한다.
+            // 방 입장 전에 브라우저가 읽을 수 있는 명시적 정책 close를 전달한다.
+            attributes.put(CollaborationProtocolPolicy.PROTOCOL_TOO_OLD, Boolean.TRUE);
             return true;
         } catch (NumberFormatException e) {
             log.warn("WebSocket 핸드셰이크 실패: diagramId 파싱 오류", e);

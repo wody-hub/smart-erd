@@ -19,13 +19,13 @@ class InMemoryWsTicketStoreTest {
 
         final var firstIssued = store.issueTicketAtomically(
             "ticket-1",
-            new TicketData("u1", "login-1", "User 1", 100L, now.plusSeconds(30)),
+            new TicketData("u1", "login-1", "User 1", 100L, now.plusSeconds(30), 1),
             TTL,
             1
         );
         final var replacedIssued = store.issueTicketAtomically(
             "ticket-2",
-            new TicketData("u1", "login-1", "User 1", 100L, now.plusSeconds(30)),
+            new TicketData("u1", "login-1", "User 1", 100L, now.plusSeconds(30), 1),
             TTL,
             1
         );
@@ -46,7 +46,7 @@ class InMemoryWsTicketStoreTest {
         assertThat(
             store.issueTicketAtomically(
                 "ticket-1",
-                new TicketData("u1", "login-1", "User 1", 100L, now.plusSeconds(30)),
+                new TicketData("u1", "login-1", "User 1", 100L, now.plusSeconds(30), 1),
                 TTL,
                 1
             )
@@ -54,7 +54,7 @@ class InMemoryWsTicketStoreTest {
         assertThat(
             store.issueTicketAtomically(
                 "ticket-2",
-                new TicketData("u1", "login-1", "User 1", 101L, now.plusSeconds(30)),
+                new TicketData("u1", "login-1", "User 1", 101L, now.plusSeconds(30), 1),
                 TTL,
                 1
             )

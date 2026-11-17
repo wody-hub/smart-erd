@@ -3,7 +3,11 @@ import {
   CLIENT_PROTOCOL_VERSION,
   PROTOCOL_UPGRADE_REQUIRED,
 } from '@/constants/collaboration-protocol';
-import { collaborationProtocolGate, ProtocolTooOldError } from '@/lib/collaboration-protocol';
+import {
+  collaborationProtocolGate,
+  isProtocolTooOldError,
+  ProtocolTooOldError,
+} from '@/lib/collaboration-protocol';
 import axiosInstance from './axiosInstance';
 import { STORAGE_KEYS } from '@/constants/storage';
 import { downloadBlob } from '@/lib/download';
@@ -255,8 +259,12 @@ export function persistDiagramYdocSnapshotKeepalive(
     },
     body: requestBody,
   })
-    .then((response) => {
-      if (response.status === PROTOCOL_UPGRADE_REQUIRED) collaborationProtocolGate.block();
+    .then(async (response) => {
+      if (response.status !== PROTOCOL_UPGRADE_REQUIRED) return;
+      const data: unknown = await response.json();
+      if (isProtocolTooOldError({ response: { status: response.status, data } })) {
+        collaborationProtocolGate.block();
+      }
     })
     .catch(() => undefined);
 

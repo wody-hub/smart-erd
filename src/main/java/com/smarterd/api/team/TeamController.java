@@ -1,5 +1,6 @@
 package com.smarterd.api.team;
 
+import com.smarterd.api.common.RequiresEditProtocol;
 import com.smarterd.api.team.dto.CreateTeamRequest;
 import com.smarterd.api.team.dto.MyRoleResponse;
 import com.smarterd.api.team.dto.TeamResponse;
@@ -142,6 +143,7 @@ public class TeamController {
     @ApiResponse(responseCode = "204", description = "삭제 성공")
     @ApiResponse(responseCode = "403", description = "ADMIN 아님", content = @Content)
     @ApiResponse(responseCode = "404", description = "팀 미존재", content = @Content)
+    @RequiresEditProtocol
     @DeleteMapping("/{teamId}")
     public ResponseEntity<Void> deleteTeam(
         @AuthenticationPrincipal Jwt jwt,

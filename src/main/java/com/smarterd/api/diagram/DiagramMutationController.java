@@ -1,5 +1,6 @@
 package com.smarterd.api.diagram;
 
+import com.smarterd.api.common.RequiresEditProtocol;
 import com.smarterd.api.diagram.dto.DiagramResponse;
 import com.smarterd.api.diagram.dto.RenameDiagramRequest;
 import com.smarterd.api.diagram.dto.UpdateDiagramDictionarySetRequest;
@@ -33,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @Tag(name = "Diagram Mutation", description = "다이어그램 변경 API")
 @RestController
+@RequiresEditProtocol
 @RequestMapping("/api/teams/{teamId}/projects/{projectId}/diagrams")
 @RequiredArgsConstructor
 public class DiagramMutationController {

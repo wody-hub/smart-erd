@@ -46,7 +46,7 @@ public class CollaborationProtocolPolicy {
      */
     public void requireEditVersion(int version) {
         if (!allowsEdit(version)) {
-            throw new ProtocolTooOldException();
+            throw new ProtocolTooOldException(properties.getMinEditProtocolVersion());
         }
     }
 }

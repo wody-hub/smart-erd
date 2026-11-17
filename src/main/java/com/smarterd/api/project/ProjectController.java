@@ -1,5 +1,6 @@
 package com.smarterd.api.project;
 
+import com.smarterd.api.common.RequiresEditProtocol;
 import com.smarterd.api.project.dto.BusinessOverviewResponse;
 import com.smarterd.api.project.dto.CreateProjectRequest;
 import com.smarterd.api.project.dto.ProjectResponse;
@@ -123,6 +124,7 @@ public class ProjectController {
     @Operation(summary = "프로젝트 삭제", description = "프로젝트를 삭제한다. 팀 멤버만 가능.")
     @ApiResponse(responseCode = "204", description = "삭제 성공")
     @ApiResponse(responseCode = "400", description = "프로젝트 미존재 또는 접근 권한 없음")
+    @RequiresEditProtocol
     @DeleteMapping("/{projectId}")
     public ResponseEntity<Void> deleteProject(
         @AuthenticationPrincipal Jwt jwt,

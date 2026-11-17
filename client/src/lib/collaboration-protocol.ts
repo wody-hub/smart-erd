@@ -41,8 +41,16 @@ export const collaborationProtocolGate = new ClientProtocolGate();
  */
 export function isProtocolTooOldError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
-  const value = error as { code?: string; response?: { status?: number } };
-  return value.code === PROTOCOL_TOO_OLD || value.response?.status === PROTOCOL_UPGRADE_REQUIRED;
+  const value = error as { code?: unknown; response?: { status?: number; data?: unknown } };
+  const data = value.response?.data;
+  return (
+    value.code === PROTOCOL_TOO_OLD ||
+    (value.response?.status === PROTOCOL_UPGRADE_REQUIRED &&
+      data !== null &&
+      typeof data === 'object' &&
+      'code' in data &&
+      data.code === PROTOCOL_TOO_OLD)
+  );
 }
 
 /** 새로고침 전 저장 재시도를 네트워크 요청 없이 거부하는 예외. */

@@ -32,12 +32,12 @@ class IssueDiagramCollaborationTicketUseCaseTest {
         final var result = new CollaborationTicketIssueResult("ticket-1", "user-1", 2);
 
         when(diagramCollaborationResourceKeyFactory.forDiagramId(101L)).thenReturn(resourceKey);
-        when(issueCollaborationTicketUseCase.issueVerifiedTicket("tester", resourceKey)).thenReturn(result);
+        when(issueCollaborationTicketUseCase.issueVerifiedTicket("tester", resourceKey, 3)).thenReturn(result);
 
-        final var actual = useCase.execute("tester", 101L);
+        final var actual = useCase.execute("tester", 101L, 3);
 
         assertThat(actual).isEqualTo(result);
         verify(diagramCollaborationResourceKeyFactory).forDiagramId(101L);
-        verify(issueCollaborationTicketUseCase).issueVerifiedTicket("tester", resourceKey);
+        verify(issueCollaborationTicketUseCase).issueVerifiedTicket("tester", resourceKey, 3);
     }
 }

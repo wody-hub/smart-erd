@@ -33,8 +33,8 @@ class IssueCollaborationTicketUseCaseTest {
 
         when(collaborationTicketSupportRegistry.getRequired(resourceKey)).thenReturn(collaborationTicketSupport);
         when(collaborationTicketSupport.ticketIssuer()).thenReturn(collaborationTicketIssuer);
-        when(collaborationTicketIssuer.issueVerifiedTicket("tester", resourceKey)).thenReturn(expected);
+        when(collaborationTicketIssuer.issueVerifiedTicket("tester", resourceKey, 3)).thenReturn(expected);
 
-        assertThat(useCase.issueVerifiedTicket("tester", resourceKey)).isEqualTo(expected);
+        assertThat(useCase.issueVerifiedTicket("tester", resourceKey, 3)).isEqualTo(expected);
     }
 }

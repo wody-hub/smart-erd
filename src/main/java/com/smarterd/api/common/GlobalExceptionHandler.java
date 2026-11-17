@@ -50,7 +50,11 @@ public class GlobalExceptionHandler {
             ex.getMessageArgs(),
             locale
         );
-        return ResponseEntity.status(Objects.requireNonNull(resolveStatus(ex))).body(ErrorResponse.of(message));
+        final var body =
+            ex instanceof ProtocolTooOldException protocolError
+                ? ErrorResponse.protocolTooOld(message, protocolError.getMinEditProtocolVersion())
+                : ErrorResponse.of(message);
+        return ResponseEntity.status(Objects.requireNonNull(resolveStatus(ex))).body(body);
     }
 
     /**

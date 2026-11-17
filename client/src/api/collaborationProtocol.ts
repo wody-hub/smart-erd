@@ -24,7 +24,10 @@ export function installProtocolInterceptors(
     const method = config.method?.toUpperCase();
     const path = (config.url ?? '').split('?')[0];
     const isContentWrite =
-      (method === 'PUT' && /\/diagrams\/[^/]+$/.test(path)) ||
+      (['PUT', 'PATCH', 'DELETE'].includes(method ?? '') && /\/diagrams\/[^/]+$/.test(path)) ||
+      (method === 'PATCH' && /\/diagrams\/[^/]+\/dictionary-set$/.test(path)) ||
+      (method === 'POST' && /\/diagrams$/.test(path)) ||
+      (method === 'DELETE' && /\/(?:teams|projects|dictionary-sets)\/[^/]+$/.test(path)) ||
       (method === 'POST' && /\/diagrams\/[^/]+\/ydoc-snapshot$/.test(path)) ||
       (method === 'POST' && /\/ws-ticket$/.test(path));
     if (gate.isBlocked() && isContentWrite) throw new ProtocolTooOldError();

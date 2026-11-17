@@ -1,5 +1,6 @@
 package com.smarterd.api.dictionary;
 
+import com.smarterd.api.common.RequiresEditProtocol;
 import com.smarterd.api.dictionary.dto.CreateDictionarySetRequest;
 import com.smarterd.api.dictionary.dto.DictionarySetResponse;
 import com.smarterd.api.dictionary.dto.UpdateDictionarySetRequest;
@@ -168,6 +169,7 @@ public class DictionarySetController {
     @Operation(summary = "사전 세트 삭제")
     @ApiResponse(responseCode = "204", description = "삭제 성공")
     @ApiResponse(responseCode = "400", description = "사전 세트 미존재 또는 접근 권한 없음", content = @Content)
+    @RequiresEditProtocol
     @DeleteMapping("/{setId}")
     public ResponseEntity<Void> deleteDictionarySet(
         @AuthenticationPrincipal Jwt jwt,

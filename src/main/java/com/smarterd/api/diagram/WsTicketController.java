@@ -4,6 +4,7 @@ import com.smarterd.api.common.RequiresEditProtocol;
 import com.smarterd.api.diagram.dto.WsTicketRequest;
 import com.smarterd.api.diagram.dto.WsTicketResponse;
 import com.smarterd.application.diagram.command.IssueDiagramCollaborationTicketUseCase;
+import com.smarterd.collaboration.CollaborationProtocolPolicy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -11,10 +12,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.Nullable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -34,11 +37,15 @@ public class WsTicketController {
     /** 협업 ticket 발급 유스케이스 */
     private final IssueDiagramCollaborationTicketUseCase issueDiagramCollaborationTicketUseCase;
 
+    /** REST 요청 편집 버전 해석 정책. */
+    private final CollaborationProtocolPolicy protocolPolicy;
+
     /**
      * WebSocket 일회용 ticket을 발급한다.
      *
      * @param jwt     JWT 인증 정보
      * @param request ticket 발급 요청 (다이어그램 ID)
+     * @param editProtocolVersion 발급 요청의 편집 프로토콜 헤더
      * @return ticket 응답
      */
     @Operation(summary = "WebSocket ticket 발급", description = "다이어그램 협업 접속용 일회용 ticket을 발급한다.")
@@ -49,9 +56,20 @@ public class WsTicketController {
     )
     @ApiResponse(responseCode = "400", description = "잘못된 요청", content = @Content)
     @PostMapping
-    public WsTicketResponse issueTicket(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody WsTicketRequest request) {
+    public WsTicketResponse issueTicket(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody WsTicketRequest request,
+        @RequestHeader(
+            value = CollaborationProtocolPolicy.CLIENT_PROTOCOL_HEADER,
+            required = false
+        ) @Nullable String editProtocolVersion
+    ) {
         final var loginId = jwt.getSubject();
-        final var result = issueDiagramCollaborationTicketUseCase.execute(loginId, request.diagramId());
+        final var result = issueDiagramCollaborationTicketUseCase.execute(
+            loginId,
+            request.diagramId(),
+            protocolPolicy.restVersion(editProtocolVersion)
+        );
         return new WsTicketResponse(result.ticket(), result.userId(), result.presenceProtocolVersion());
     }
 }

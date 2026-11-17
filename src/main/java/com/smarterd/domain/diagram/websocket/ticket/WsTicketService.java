@@ -1,5 +1,6 @@
 package com.smarterd.domain.diagram.websocket.ticket;
 
+import com.smarterd.collaboration.CollaborationProtocolPolicy;
 import com.smarterd.config.websocket.WebSocketProperties;
 import com.smarterd.domain.common.exception.BusinessException;
 import com.smarterd.domain.common.exception.DomainAccessDeniedException;
@@ -58,6 +59,9 @@ public class WsTicketService {
     /** ticket 저장소 */
     private final WsTicketStore wsTicketStore;
 
+    /** ticket 발급/소비 시점의 최소 편집 버전 정책. */
+    private final CollaborationProtocolPolicy protocolPolicy;
+
     /**
      * 사용자/다이어그램 검증 후 일회용 WebSocket ticket을 발급한다.
      *
@@ -67,9 +71,11 @@ public class WsTicketService {
      *
      * @param loginId   JWT에서 추출한 사용자 로그인 ID
      * @param diagramId 접속 대상 다이어그램 ID
+     * @param editProtocolVersion 발급 요청의 유효 편집 프로토콜 버전
      * @return 발급된 ticket 문자열
      */
-    public TicketIssueResult issueVerifiedTicket(String loginId, Long diagramId) {
+    public TicketIssueResult issueVerifiedTicket(String loginId, Long diagramId, int editProtocolVersion) {
+        protocolPolicy.requireEditVersion(editProtocolVersion);
         // 사용자 조회
         final var user = userRepository
             .findByLoginId(loginId)
@@ -85,7 +91,7 @@ public class WsTicketService {
             throw new DomainAccessDeniedException(MessageCode.ERROR_ACCESS_DENIED_NOT_MEMBER.code());
         }
 
-        return issueTicket(String.valueOf(user.getId()), loginId, user.getName(), diagramId);
+        return issueTicket(String.valueOf(user.getId()), loginId, user.getName(), diagramId, editProtocolVersion);
     }
 
     /**
@@ -99,14 +105,21 @@ public class WsTicketService {
      * @param loginId   사용자 로그인 ID
      * @param userName  사용자 표시 이름
      * @param diagramId 접속 대상 다이어그램 ID
+     * @param editProtocolVersion 발급 요청의 유효 편집 프로토콜 버전
      * @return 발급된 ticket + 메타데이터
      */
-    private TicketIssueResult issueTicket(String userId, String loginId, String userName, Long diagramId) {
+    private TicketIssueResult issueTicket(
+        String userId,
+        String loginId,
+        String userName,
+        Long diagramId,
+        int editProtocolVersion
+    ) {
         final var ticket = UUID.randomUUID().toString();
         final var expiresAt = Instant.now().plus(TICKET_TTL);
         final var issued = wsTicketStore.issueTicketAtomically(
             ticket,
-            new TicketData(userId, loginId, userName, diagramId, expiresAt),
+            new TicketData(userId, loginId, userName, diagramId, expiresAt, editProtocolVersion),
             TICKET_TTL,
             MAX_OUTSTANDING_TICKETS_PER_USER
         );
@@ -125,12 +138,14 @@ public class WsTicketService {
      *
      * @param ticket 검증할 ticket 문자열
      * @return 검증 성공 시 세션 정보, 실패 시 empty
+     * @throws com.smarterd.domain.common.exception.ProtocolTooOldException 발급 당시 편집 버전이 현재 최소값보다 낮으면 발생
      */
     @Transactional
     public Optional<AuthenticatedSession> validateAndConsume(String ticket) {
         final var result = wsTicketStore
             .consume(ticket)
             .map((data) -> {
+                protocolPolicy.requireEditVersion(data.editProtocolVersion());
                 final var sessionExpiresAt = Instant.now().plus(
                     Duration.ofMillis(webSocketProperties.getSessionMaxDuration())
                 );

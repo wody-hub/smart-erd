@@ -9,7 +9,12 @@ public interface CollaborationTicketIssuer {
      *
      * @param loginId     로그인 ID
      * @param resourceKey 협업 리소스 key
+     * @param editProtocolVersion 발급 요청의 유효 편집 프로토콜 버전
      * @return ticket 발급 결과
      */
-    CollaborationTicketIssueResult issueVerifiedTicket(String loginId, CollaborationResourceKey resourceKey);
+    CollaborationTicketIssueResult issueVerifiedTicket(
+        String loginId,
+        CollaborationResourceKey resourceKey,
+        int editProtocolVersion
+    );
 }

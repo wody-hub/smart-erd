@@ -133,7 +133,7 @@ class DiagramWebSocketE2ETest {
     private String issueTicket(String userId, String loginId, String userName, Long diagramId) {
         final var ticket = UUID.randomUUID().toString();
         final var ttl = Duration.ofMinutes(2);
-        final var data = new TicketData(userId, loginId, userName, diagramId, Instant.now().plus(ttl));
+        final var data = new TicketData(userId, loginId, userName, diagramId, Instant.now().plus(ttl), 1);
         wsTicketStore.issueTicketAtomically(ticket, data, ttl, 10);
         return ticket;
     }

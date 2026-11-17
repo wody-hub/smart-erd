@@ -1,5 +1,6 @@
 package com.smarterd.api.diagram;
 
+import com.smarterd.api.common.RequiresEditProtocol;
 import com.smarterd.api.diagram.dto.CreateDiagramRequest;
 import com.smarterd.api.diagram.dto.DiagramBootstrapResponse;
 import com.smarterd.api.diagram.dto.DiagramDetailResponse;
@@ -59,6 +60,7 @@ public class DiagramController {
         content = @Content(schema = @Schema(implementation = DiagramResponse.class))
     )
     @ApiResponse(responseCode = "400", description = "잘못된 요청", content = @Content)
+    @RequiresEditProtocol
     @PostMapping
     public ResponseEntity<DiagramResponse> createDiagram(
         @AuthenticationPrincipal Jwt jwt,

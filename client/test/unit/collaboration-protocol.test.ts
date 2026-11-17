@@ -17,7 +17,7 @@ test('protocol header is attached and 426 blocks future content writes without r
     assert.equal(config.headers.get('X-Smart-Erd-Client-Protocol'), '3');
     if (config.method === 'put') {
       throw new AxiosError('upgrade', 'ERR_BAD_RESPONSE', config, undefined, {
-        data: { error: 'Reload' },
+        data: { error: 'Reload', code: 'protocol-too-old', minEditProtocolVersion: 3 },
         status: 426,
         statusText: 'Upgrade Required',
         headers: {},
@@ -30,6 +30,10 @@ test('protocol header is attached and 426 blocks future content writes without r
   assert.equal(gate.isBlocked(), true);
   await assert.rejects(client.post('/teams/1/projects/2/diagrams/3/ydoc-snapshot', {}));
   await assert.rejects(client.post('/ws-ticket', {}));
+  await assert.rejects(client.patch('/teams/1/projects/2/diagrams/3/dictionary-set', {}));
+  await assert.rejects(client.patch('/teams/1/projects/2/diagrams/3', {}));
+  await assert.rejects(client.delete('/teams/1/projects/2/diagrams/3'));
+  await assert.rejects(client.post('/teams/1/projects/2/diagrams', {}));
   assert.equal(calls, 1);
   await client.get('/teams/1/projects/2/diagrams/3');
   assert.equal(calls, 2);
@@ -63,6 +67,7 @@ test('keepalive advertises v3, observes 426, and stops subsequent keepalive and 
         ...protocolConstants,
         collaborationProtocolGate: gate,
         ProtocolTooOldError,
+        isProtocolTooOldError,
       },
       platform: { getApiBaseUrl: () => '/api' },
       storage: { STORAGE_KEYS: { ACCESS_TOKEN: 'token', LANGUAGE: 'language' } },
@@ -78,7 +83,10 @@ test('keepalive advertises v3, observes 426, and stops subsequent keepalive and 
           (options.headers as Record<string, string>)['X-Smart-Erd-Client-Protocol'],
           '3',
         );
-        return { status: 426 };
+        return {
+          status: 426,
+          json: async () => ({ code: 'protocol-too-old', minEditProtocolVersion: 3 }),
+        };
       },
     },
   );
@@ -94,8 +102,8 @@ test('keepalive advertises v3, observes 426, and stops subsequent keepalive and 
   assert.equal(requests, 1);
 });
 
-for (const outcome of ['ticket-426', 'handshake-close', 'rest-426']) {
-  test(`${outcome} blocks provider with no reconnect or outbound compaction`, async () => {
+for (const outcome of ['ticket-426', 'ticket-proxy-426', 'handshake-close', 'rest-426']) {
+  test(`${outcome} handles provider protocol refusal without latching generic 426`, async () => {
     const gate = new ClientProtocolGate();
     const sockets: FakeSocket[] = [];
     let ticketCalls = 0;
@@ -143,7 +151,15 @@ for (const outcome of ['ticket-426', 'handshake-close', 'rest-426']) {
       diagramId: '3',
       getTicket: async () => {
         ticketCalls++;
-        if (outcome === 'ticket-426') throw { response: { status: 426 } };
+        if (outcome === 'ticket-proxy-426')
+          throw { response: { status: 426, data: '<html>proxy</html>' } };
+        if (outcome === 'ticket-426')
+          throw {
+            response: {
+              status: 426,
+              data: { code: 'protocol-too-old', minEditProtocolVersion: 3 },
+            },
+          };
         return { ticket: 'ticket', userId: 'user', presenceProtocolVersion: 0 };
       },
     });
@@ -151,6 +167,13 @@ for (const outcome of ['ticket-426', 'handshake-close', 'rest-426']) {
     provider.onConnectionIssueDetected = (issue) => issues.push(issue);
     provider.connect();
     await new Promise<void>((resolve) => setImmediate(resolve));
+    if (outcome === 'ticket-proxy-426') {
+      assert.equal(gate.isBlocked(), false);
+      assert.equal(issues.includes('protocol-too-old'), false);
+      provider.destroy();
+      doc.destroy();
+      return;
+    }
     if (outcome !== 'ticket-426') {
       assert.match(sockets[0].url, /protocolVersion=3$/);
       if (outcome === 'handshake-close') {
@@ -172,5 +195,74 @@ for (const outcome of ['ticket-426', 'handshake-close', 'rest-426']) {
     assert.equal(sockets[0]?.sent.length ?? 0, 0);
     provider.destroy();
     doc.destroy();
+  });
+}
+
+for (const data of [
+  undefined,
+  '<html>proxy upgrade</html>',
+  { error: 'Upgrade Required' },
+  { code: 'other' },
+]) {
+  test(`generic 426 does not latch axios or ticket errors: ${JSON.stringify(data)}`, async () => {
+    const gate = new ClientProtocolGate();
+    const client = axios.create();
+    installProtocolInterceptors(client, gate);
+    let calls = 0;
+    client.defaults.adapter = async (config) => {
+      calls++;
+      if (calls === 1)
+        throw new AxiosError('proxy', 'ERR_BAD_RESPONSE', config, undefined, {
+          data,
+          status: 426,
+          statusText: 'Upgrade Required',
+          headers: {},
+          config,
+        });
+      return { data: {}, status: 200, statusText: 'OK', headers: {}, config };
+    };
+    await assert.rejects(client.post('/ws-ticket', {}));
+    assert.equal(isProtocolTooOldError({ response: { status: 426, data } }), false);
+    assert.equal(gate.isBlocked(), false);
+    await client.put('/teams/1/projects/2/diagrams/3', {});
+    assert.equal(calls, 2);
+  });
+}
+
+for (const data of [undefined, '<html>proxy upgrade</html>', { error: 'Upgrade Required' }]) {
+  test(`generic keepalive 426 does not latch: ${JSON.stringify(data)}`, async () => {
+    const gate = new ClientProtocolGate();
+    const h = sourceHookHarness(
+      'src/api/diagramApi.ts',
+      {
+        'collaboration-protocol': {
+          ...protocolConstants,
+          collaborationProtocolGate: gate,
+          ProtocolTooOldError,
+          isProtocolTooOldError,
+        },
+        platform: { getApiBaseUrl: () => '/api' },
+        storage: { STORAGE_KEYS: { ACCESS_TOKEN: 'token', LANGUAGE: 'language' } },
+      },
+      {
+        localStorage: { getItem: () => null },
+        navigator: { language: 'en' },
+        btoa,
+        fetch: async () => ({
+          status: 426,
+          json: async () => {
+            if (typeof data === 'string' || data === undefined) throw new SyntaxError('Not JSON');
+            return data;
+          },
+        }),
+      },
+    );
+    const keepalive = h.exports.persistDiagramYdocSnapshotKeepalive as (
+      ...args: unknown[]
+    ) => boolean;
+    assert.equal(keepalive('1', '2', '3', '1', new Uint8Array([1])), true);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(gate.isBlocked(), false);
+    assert.equal(keepalive('1', '2', '3', '1', new Uint8Array([1])), true);
   });
 }

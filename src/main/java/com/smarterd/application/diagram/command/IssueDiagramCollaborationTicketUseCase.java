@@ -26,12 +26,14 @@ public class IssueDiagramCollaborationTicketUseCase {
      *
      * @param loginId 로그인 ID
      * @param diagramId 다이어그램 ID
+     * @param editProtocolVersion 발급 요청의 유효 편집 프로토콜 버전
      * @return ticket 발급 결과
      */
-    public CollaborationTicketIssueResult execute(String loginId, Long diagramId) {
+    public CollaborationTicketIssueResult execute(String loginId, Long diagramId, int editProtocolVersion) {
         return issueCollaborationTicketUseCase.issueVerifiedTicket(
             loginId,
-            diagramCollaborationResourceKeyFactory.forDiagramId(diagramId)
+            diagramCollaborationResourceKeyFactory.forDiagramId(diagramId),
+            editProtocolVersion
         );
     }
 }
