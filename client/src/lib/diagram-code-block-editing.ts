@@ -154,6 +154,43 @@ export class CodeBlockEditingController {
     }
   }
   /**
+   * 저널 기준으로 일반 편집을 재개한 뒤 최신 원격 값과 세 방향 병합한다.
+   * @param base 저장한 안정 ID·필드·토큰 기준
+   * @param text 미커밋 원문
+   * @param kind 구조 편집 출처
+   * @param authoritative 수화 완료된 현재 블록 또는 원격 삭제
+   * @returns 없음
+   */
+  recover(
+    base: BlockCommitBase,
+    text: string,
+    kind: BlockEditKind,
+    authoritative?: TableBlock,
+  ): void {
+    if (!this.ready || !this.options.ready()) return;
+    this.cancel(base.tableId);
+    this.blocks.delete(base.tableId);
+    this.add(base);
+    const block = this.blocks.get(base.tableId)!;
+    block.base = base;
+    this.edit(base.tableId, text, kind);
+    this.remote(authoritative, [], base.tableId);
+  }
+  /**
+   * 복구 원문을 버리고 현재 원격 값으로 되돌린다. 삭제된 ID는 재생성하지 않는다.
+   * @param id 복구 블록 ID
+   * @returns 없음
+   */
+  discardRecovered(id: string): void {
+    const block = this.blocks.get(id);
+    if (!block) return;
+    this.cancel(id);
+    const authoritative = block.authoritative;
+    this.blocks.delete(id);
+    if (authoritative) this.add(authoritative);
+    this.options.changed();
+  }
+  /**
    * IME·커서 이탈·blur 이벤트를 순수 reducer에 전달한다. pagehide는 쓰지 않는다.
    * @param id 안정 테이블 ID
    * @param type 에디터 이벤트
@@ -486,7 +523,7 @@ export class CodeBlockEditingController {
           });
         else this.fail(id, result, effect.version);
       } else if (effect.type === 'commit') this.commit(id, effect.text, effect.version);
-      // 복구 헬퍼는 ID sidecar를 저장하지 못하므로 기존 work-mode draft에 섞어 저장하지 않는다.
+      // 복구 저널은 changed 포트에서 ID sidecar와 함께 저장한다.
     }
     this.options.changed(id);
   }

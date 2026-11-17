@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { CodeBlockRecoveryJournal } from './code-block-recovery-journal';
 import { STORAGE_KEYS } from '@/constants/storage';
 import { getApiBaseUrl } from '@/lib/platform';
 
@@ -51,6 +52,8 @@ function setAuthTokens(accessToken: string, refreshToken: string): void {
  * 인증 상태를 초기화한다.
  */
 export function clearAuthState(): void {
+  const accountId = localStorage.getItem(STORAGE_KEYS.LOGIN_ID);
+  if (accountId) CodeBlockRecoveryJournal.clearAccount(localStorage, accountId);
   localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
   localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
   localStorage.removeItem(STORAGE_KEYS.LOGIN_ID);

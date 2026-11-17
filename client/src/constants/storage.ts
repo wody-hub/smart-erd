@@ -18,6 +18,8 @@ export const STORAGE_KEYS = {
   DIAGRAM_WORK_MODE_PREFIX: 'smart-erd-work-mode',
   /** 다이어그램 단위 DSL draft prefix */
   DIAGRAM_DSL_DRAFT_PREFIX: 'smart-erd-dsl-draft',
+  /** 계정·다이어그램별 미커밋 블록 복구 저널 prefix */
+  CODE_BLOCK_RECOVERY_PREFIX: 'smart-erd-code-block-recovery-v1',
   /** 팀 단위 최근 프로젝트 컨텍스트 prefix */
   RECENT_PROJECT_CONTEXT_PREFIX: 'smart-erd-recent-project-context',
   /** Diff Apply rollout 강제 모드 override */

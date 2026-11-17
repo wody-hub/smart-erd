@@ -1,3 +1,4 @@
+import useAuthStore from '@/stores/useAuthStore';
 import { duplicateColumnNames } from '@/lib/code-block-names';
 import '@/lib/monaco-setup';
 import { useId, useMemo } from 'react';
@@ -39,6 +40,7 @@ export default function DslEditableProjectionPanel({
   isReady,
 }: DslEditableProjectionPanelProps) {
   const { t } = useTranslation();
+  const accountId = useAuthStore((state) => state.loginId);
   const { terms, domains, dictionaryRevision } = useErdDictionary();
   const dictionary = useMemo(
     () => ({
@@ -52,6 +54,8 @@ export default function DslEditableProjectionPanel({
   const hasUnappliedSharedDraft = useDiagramUnappliedSharedDraft(runtime);
   const ready = commandReady && runtime.ready && projection.status === 'ready';
   const editing = useDiagramCodeBlockEditing({
+    accountId,
+    diagramId,
     projection,
     dictionary,
     ready,
@@ -90,6 +94,18 @@ export default function DslEditableProjectionPanel({
         </span>
         {!changedBlocks.length && <span>{t('erd.unifiedEditing.CLEAN')}</span>}
       </div>
+      {editing.recoveredCount > 0 && (
+        <div
+          role="status"
+          data-testid="dsl-recovery-banner"
+          className="banner-warm-surface flex items-center justify-between gap-2 border-b px-4 py-2 text-xs text-ink-secondary"
+        >
+          <span>{t('erd.unifiedEditing.recovered', { count: editing.recoveredCount })}</span>
+          <Button size="sm" variant="outline" onClick={editing.discardRecovered}>
+            {t('erd.unifiedEditing.discardRecovered')}
+          </Button>
+        </div>
+      )}
       {duplicates.length > 0 && (
         <div
           role="note"

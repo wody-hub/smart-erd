@@ -1,3 +1,9 @@
+import {
+  CodeBlockRecoverySession,
+  browserRecoveryJournal,
+  recoveryAccountActive,
+} from '@/lib/code-block-recovery-session';
+import { RECOVERY_LIMITS } from '@/lib/code-block-recovery-journal';
 import { duplicateColumnNames } from '@/lib/code-block-names';
 import { useEffect, useRef, useState } from 'react';
 import type { OnMount } from '@monaco-editor/react';
@@ -31,6 +37,10 @@ import useCanvasStore from '@/stores/erd/useCanvasStore';
 
 /** 편집 전용 패널의 Monaco·문서 연결 입력. */
 interface CodeBlockEditingInput {
+  /** 인증된 계정의 안정 로그인 ID. 익명은 복구하지 않는다. */
+  accountId?: string | null;
+  /** 저널을 분리할 다이어그램 ID. */
+  diagramId?: string;
   /** 누락 없는 S3 투영 스트림. */
   projection: ReturnType<typeof useDiagramCodeProjection>;
   /** 공유 사전. */
@@ -53,6 +63,8 @@ export function useDiagramCodeBlockEditing(input: CodeBlockEditingInput) {
   const latest = useRef({ ...input, actions, notifyRejected });
   latest.current = { ...input, actions, notifyRejected };
   const pageActive = useRef(true);
+  const recoveryRef = useRef<CodeBlockRecoverySession | null>(null);
+  const [recoveredCount, setRecoveredCount] = useState(0);
   const controllerRef = useRef<CodeBlockEditingController | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   /** 헤더·충돌 안내에 필요한 블록 상태 사본. */
@@ -61,6 +73,7 @@ export function useDiagramCodeBlockEditing(input: CodeBlockEditingInput) {
   const refreshRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     controllerRef.current?.setReady(input.ready && pageActive.current);
+    recoveryRef.current?.restore();
   }, [input.ready]);
   useEffect(() => {
     refreshRef.current?.();
@@ -75,6 +88,7 @@ export function useDiagramCodeBlockEditing(input: CodeBlockEditingInput) {
     const hide = () => {
       pageActive.current = false;
       controllerRef.current?.setReady(false);
+      recoveryRef.current?.release();
     };
     /**
      * BFCache 복귀 시 현재 세션 권한으로 로컬 텍스트를 재검증한다.
@@ -83,10 +97,18 @@ export function useDiagramCodeBlockEditing(input: CodeBlockEditingInput) {
     const show = () => {
       pageActive.current = true;
       controllerRef.current?.setReady(latest.current.ready && latest.current.isReady());
+      recoveryRef.current?.restore();
     };
+    /** 숨김 전환에서는 로컬 저널만 동기 저장한다. */
+    const visibility = () => {
+      if (document.visibilityState === 'hidden') recoveryRef.current?.flush();
+    };
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', visibility);
     window.addEventListener('pagehide', hide);
     window.addEventListener('pageshow', show);
     return () => {
+      if (typeof document !== 'undefined')
+        document.removeEventListener('visibilitychange', visibility);
       window.removeEventListener('pagehide', hide);
       window.removeEventListener('pageshow', show);
     };
@@ -103,6 +125,9 @@ export function useDiagramCodeBlockEditing(input: CodeBlockEditingInput) {
     const model = codeEditor.getModel();
     if (!model) return;
     const disposables: IDisposable[] = [];
+    let recovery: CodeBlockRecoverySession | undefined;
+    const accountId = input.accountId;
+    const journal = browserRecoveryJournal(accountId, input.diagramId);
     const collections = new Map<string, editor.IEditorDecorationsCollection>();
     const tableIds = new Map<string, string>();
     let previousFresh = true;
@@ -243,6 +268,7 @@ export function useDiagramCodeBlockEditing(input: CodeBlockEditingInput) {
     };
     /** 로컬 입력에서는 변경 ID의 상태만 교체하고 전체 투영 시에만 목록을 재구성한다. */
     const refresh = (id?: string) => {
+      recovery?.changed(id);
       const changed = id && controller.get(id);
       const items = changed ? [changed] : [...controller.blocks.values()];
       if (!changed) {
@@ -312,7 +338,15 @@ export function useDiagramCodeBlockEditing(input: CodeBlockEditingInput) {
         edges: current.blocks.flatMap((block) => block.metadata.relations.map((item) => item.edge)),
       }),
       uuid: () => crypto.randomUUID(),
-      commit: (commit) => latest.current.actions.commitCodeBlock(commit),
+      commit: (commit) => {
+        // heartbeat 만료 후 다른 탭이 가져간 원문으로 중복 커밋하지 않는다.
+        if (
+          journal &&
+          (!accountId || !recoveryAccountActive(accountId) || !journal.owns(commit.tableId))
+        )
+          return { status: 'rejected', commitId: commit.commitId, reason: 'not-ready' };
+        return latest.current.actions.commitCodeBlock(commit);
+      },
       changed: refresh,
       replaceText: (id, text, authoritative) => {
         const range = collections.get(id)?.getRange(0);
@@ -765,9 +799,73 @@ export function useDiagramCodeBlockEditing(input: CodeBlockEditingInput) {
       localBlocks.clear();
       refresh();
     };
-    const unsubscribe = input.projection.subscribePatches(acceptPatch);
+    /** 복구·버리기 직후 로컬 블록만 표시하고 삭제된 엔티티 원문도 읽을 수 있게 남긴다. */
+    const showRecovered = (count: number, refreshModel = true) => {
+      setRecoveredCount(count);
+      if (!refreshModel) return;
+      applying = true;
+      try {
+        const items = [...controller.blocks.values()].map((block) => {
+          const bound = bindBlockIds(block.base, block.state.text);
+          return {
+            ...block.base,
+            text: block.state.text,
+            tableRange: { ...block.base.tableRange, start: 0, end: block.state.text.length },
+            columnRanges: bound.status === 'bound' ? bound.parsed.columnRanges : [],
+          };
+        });
+        const layout = layoutEditableProjection(items, ++revision);
+        collections.forEach((collection) => collection.clear());
+        collections.clear();
+        initializeLiveProjectionModel(model, layout.text);
+        decorate(layout.blocks);
+        previous = visible();
+        previousFresh = true;
+        localBlocks.clear();
+      } finally {
+        applying = false;
+      }
+      refresh();
+    };
+    if (journal && accountId) {
+      recovery = new CodeBlockRecoverySession({
+        controller,
+        journal,
+        ready: () =>
+          pageActive.current &&
+          latest.current.ready &&
+          latest.current.isReady() &&
+          current.status === 'ready',
+        active: () => latest.current.accountId === accountId && recoveryAccountActive(accountId),
+        authoritative: () => current.blocks,
+        schedule: (run, delay) => {
+          const timer = setTimeout(run, delay);
+          return () => clearTimeout(timer);
+        },
+        restored: showRecovered,
+        now: () => Date.now(),
+      });
+      recoveryRef.current = recovery;
+      recovery.restore();
+      let cancelHeartbeat: (() => void) | undefined;
+      /** crash 이후 만료된 소유권도 다음 heartbeat에서 다시 확인한다. */
+      const heartbeat = () => {
+        recovery?.heartbeat();
+        const timer = setTimeout(heartbeat, RECOVERY_LIMITS.heartbeatMs);
+        cancelHeartbeat = () => clearTimeout(timer);
+      };
+      const timer = setTimeout(heartbeat, RECOVERY_LIMITS.heartbeatMs);
+      cancelHeartbeat = () => clearTimeout(timer);
+      disposables.push({ dispose: () => cancelHeartbeat?.() });
+    }
+    const unsubscribe = input.projection.subscribePatches((event) => {
+      acceptPatch(event);
+      recovery?.restore();
+    });
     cleanupRef.current = () => {
       unsubscribe();
+      recovery?.dispose();
+      recoveryRef.current = null;
       controller.dispose();
       disposables.forEach((item) => item.dispose());
       collections.forEach((collection) => collection.clear());
@@ -778,6 +876,8 @@ export function useDiagramCodeBlockEditing(input: CodeBlockEditingInput) {
   };
   return {
     onMount,
+    recoveredCount,
+    discardRecovered: () => recoveryRef.current?.discard(),
     blocks: blocks.current,
     resolve: (id: string, choice: 'mine' | 'remote') => controllerRef.current?.resolve(id, choice),
   };

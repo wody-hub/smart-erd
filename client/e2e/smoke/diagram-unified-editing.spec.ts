@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { STORAGE_KEYS } from '../../src/constants/storage';
 import type * as Monaco from 'monaco-editor';
 import type * as Y from 'yjs';
 import type { ERDEdge, TableNode } from '../../src/types/erd';
@@ -369,4 +370,92 @@ test('flag-off keeps the existing work-mode page @smoke', async ({ page }) => {
   await waitForEditableDiagram(page, 30000);
   await expect(page.getByTestId('dsl-live-projection')).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: /작업 모드|work mode/i })).toBeVisible();
+});
+
+/** 복구 저널만 조회하여 공유 문서 저장과 구분한다. */
+async function recoveryRecords(page: Page) {
+  return page.evaluate(
+    (prefix) =>
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith(`${prefix}:`))
+        .flatMap(
+          (key) =>
+            (
+              JSON.parse(localStorage.getItem(key)!) as {
+                records: { tableId: string; text: string }[];
+              }
+            ).records,
+        ),
+    STORAGE_KEYS.CODE_BLOCK_RECOVERY_PREFIX,
+  );
+}
+
+test.describe('unified local recovery journal @smoke', () => {
+  test.skip(
+    !UNIFIED_ENABLED || process.env.SMART_ERD_E2E_UNIFIED_OFF === '1',
+    'Requires VITE_ERD_UNIFIED_EDIT_MODE=internal and all allowlist',
+  );
+
+  test('invalid edit survives reload with banner; Discard removes the journal and restored text', async ({
+    browser,
+  }) => {
+    const h = await setup(browser);
+    try {
+      await editPanel(h.owner, 'value ::INT', 'value ::?');
+      await expect.poll(async () => (await readPanel(h.owner)).text).toContain('value ::?');
+      await h.owner.reload({ waitUntil: 'domcontentloaded' });
+      await expect(h.owner.getByTestId('dsl-live-projection')).toHaveAttribute(
+        'data-status',
+        'ready',
+      );
+      await expect(h.owner.getByTestId('dsl-recovery-banner')).toBeVisible();
+      await expect.poll(async () => (await readPanel(h.owner)).text).toContain('value ::?');
+      expect(
+        (await readDocument(h.owner)).nodes
+          .find((n) => n.id === 'a')!
+          .data.columns.find((c) => c.id === 'value')!.type,
+      ).toBe('INT');
+      await h.owner
+        .getByTestId('dsl-recovery-banner')
+        .getByRole('button', { name: /버리기|Discard/ })
+        .click();
+      await expect(h.owner.getByTestId('dsl-recovery-banner')).toHaveCount(0);
+      await expect.poll(async () => (await readPanel(h.owner)).text).toContain('value ::INT');
+      await expect.poll(() => recoveryRecords(h.owner)).toEqual([]);
+      await h.owner.reload({ waitUntil: 'domcontentloaded' });
+      await expect(h.owner.getByTestId('dsl-live-projection')).toHaveAttribute(
+        'data-status',
+        'ready',
+      );
+      await expect(h.owner.getByTestId('dsl-recovery-banner')).toHaveCount(0);
+    } finally {
+      await h.close();
+    }
+  });
+
+  test('committed edits leave no recovery record or reload banner', async ({ browser }) => {
+    const h = await setup(browser);
+    try {
+      await editPanel(h.owner, 'value ::INT', 'value ::TEXT');
+      await expect
+        .poll(
+          async () =>
+            (await readDocument(h.owner)).nodes
+              .find((n) => n.id === 'a')!
+              .data.columns.find((c) => c.id === 'value')!.type,
+        )
+        .toBe('TEXT');
+      await expect.poll(() => recoveryRecords(h.owner)).toEqual([]);
+      await h.owner.reload({ waitUntil: 'domcontentloaded' });
+      await expect(h.owner.getByTestId('dsl-live-projection')).toHaveAttribute(
+        'data-status',
+        'ready',
+      );
+      await expect.poll(async () => (await readPanel(h.owner)).text).toContain('value ::TEXT');
+      await expect(h.owner.getByTestId('dsl-recovery-banner')).toHaveCount(0);
+      expect(await recoveryRecords(h.owner)).toEqual([]);
+    } finally {
+      await h.close();
+    }
+  });
 });

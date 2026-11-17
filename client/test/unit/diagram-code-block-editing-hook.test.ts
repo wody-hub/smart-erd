@@ -1,3 +1,8 @@
+import * as recoverySession from '../../src/lib/code-block-recovery-session.js';
+import {
+  CodeBlockRecoveryJournal,
+  type RecoveryStorage,
+} from '../../src/lib/code-block-recovery-journal.js';
 import * as blockNames from '../../src/lib/code-block-names.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -22,7 +27,7 @@ import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
 /** 실제 TextModel 위에 에디터 UI 포트와 가상 타이머를 연결한다. */
-async function mounted(size = 2) {
+async function mounted(size = 2, storage?: RecoveryStorage) {
   const { Selection } = await import(
     pathToFileURL(resolve('node_modules/monaco-editor/esm/vs/editor/common/core/selection.js')).href
   );
@@ -80,6 +85,10 @@ async function mounted(size = 2) {
       changedFields: commit.patches.length,
     };
   };
+  let loggedIn = true;
+  const journal =
+    storage &&
+    new CodeBlockRecoveryJournal(storage, 'account', 'diagram', `tab-${Math.random()}`, () => 1000);
   const h = sourceHookHarness(
     'src/collaboration/channel/diagram/use-diagram-code-block-editing.ts',
     {
@@ -88,6 +97,12 @@ async function mounted(size = 2) {
       },
       'use-diagram-command-feedback': { useDiagramRejectedCommandToast: () => () => {} },
       'code-block-commit': { bindBlockIds },
+      'code-block-recovery-session': {
+        ...recoverySession,
+        browserRecoveryJournal: () => journal,
+        recoveryAccountActive: () => loggedIn,
+      },
+      'code-block-recovery-journal': { RECOVERY_LIMITS: { heartbeatMs: 5000 } },
       'code-block-names': blockNames,
       'diagram-code-block-editing': {
         CodeBlockEditingController: class extends CodeBlockEditingController {
@@ -124,6 +139,12 @@ async function mounted(size = 2) {
         addEventListener: (name: string, fn: () => void) => callbacks.set(name, fn),
         removeEventListener: (name: string) => callbacks.delete(name),
       },
+      Date: { now: () => 1000 },
+      document: {
+        visibilityState: 'hidden',
+        addEventListener: (name: string, fn: () => void) => callbacks.set(name, fn),
+        removeEventListener: (name: string) => callbacks.delete(name),
+      },
       performance: { now: () => time },
       crypto: { randomUUID: () => `commit-${++seq}` },
       setTimeout: (run: () => void, delay: number) => {
@@ -136,6 +157,8 @@ async function mounted(size = 2) {
   );
   const hook = h.exports.useDiagramCodeBlockEditing as typeof useDiagramCodeBlockEditing;
   const input = {
+    accountId: 'account',
+    diagramId: 'diagram',
     projection: {
       ...snapshot,
       getSnapshot: () => snapshot,
@@ -224,6 +247,11 @@ async function mounted(size = 2) {
   result.onMount(codeEditor, monaco);
   return {
     model,
+    journal,
+    logout: () => {
+      loggedIn = false;
+      if (storage) CodeBlockRecoveryJournal.clearAccount(storage, 'account');
+    },
     controller: () => editingControllers[0],
     dom,
     doc,
@@ -671,6 +699,133 @@ test('hook: multiple edits inside one block avoid full text collection', async (
     assert.equal(h.commits.length, 1);
     assert.equal(h.doc.nodes[1].data.columns[0].name, 'renamed_b');
     assert.equal(h.doc.nodes[1].data.columns[0].type, 'BIGINT');
+  } finally {
+    h.close();
+  }
+});
+
+/** 저널 통합 테스트에 쓰는 localStorage 호환 저장소. */
+function recoveryStorage(): RecoveryStorage {
+  const data = new Map<string, string>();
+  return {
+    get length() {
+      return data.size;
+    },
+    key: (i) => [...data.keys()][i] ?? null,
+    getItem: (key) => data.get(key) ?? null,
+    setItem: (key, value) => {
+      data.set(key, value);
+    },
+    removeItem: (key) => {
+      data.delete(key);
+    },
+  };
+}
+
+test('hook recovery: debounce, pagehide flush, reload banner, discard and no document writes', async () => {
+  const storage = recoveryStorage();
+  const first = await mounted(2, storage);
+  first.edit('value_b ::INT', 'value_b ::?');
+  first.tick(499);
+  assert.equal(first.journal!.read().length, 0);
+  first.tick(1);
+  assert.equal(first.journal!.read().length, 1);
+  first.edit('value_b ::?', 'value_b ::??');
+  first.event('pagehide');
+  assert.match(first.journal!.read()[0].text, /::\?\?/);
+  assert.equal(first.commits.length, 0);
+  first.close();
+  const second = await mounted(2, storage);
+  try {
+    assert.match(second.model.getValue(), /value_b ::\?\?/);
+    assert.equal(second.state().recoveredCount, 1);
+    second.tick(6000);
+    assert.equal(second.commits.length, 0);
+    second.state().discardRecovered();
+    assert.equal(second.state().recoveredCount, 0);
+    assert.match(second.model.getValue(), /value_b ::INT/);
+    assert.equal(second.journal!.read().length, 0);
+  } finally {
+    second.close();
+  }
+});
+
+test('hook recovery: hidden/unmount flush; success and revert delete journal; logout cannot repopulate', async () => {
+  const storage = recoveryStorage();
+  const h = await mounted(2, storage);
+  h.edit('value_b ::INT', 'value_b ::TEXT');
+  h.event('visibilitychange');
+  assert.equal(h.journal!.read().length, 1);
+  h.tick(800);
+  assert.equal(h.commits.length, 1);
+  assert.equal(h.journal!.read().length, 0);
+  h.edit('value_a ::INT', 'value_a ::TEXT');
+  h.tick(500);
+  assert.equal(h.journal!.read().length, 1);
+  h.edit('value_a ::TEXT', 'value_a ::INT');
+  assert.equal(h.journal!.read().length, 0);
+  h.edit('value_a ::INT', 'value_a ::?');
+  h.close();
+  assert.match(h.journal!.read()[0].text, /::\?/);
+  const next = await mounted(2, storage);
+  next.edit('value_a ::?', 'value_a ::??');
+  next.logout();
+  next.event('pagehide');
+  next.close();
+  assert.equal(storage.length, 0);
+});
+
+test('hook recovery: second tab skips live dirty owner and cannot duplicate its commit', async () => {
+  const storage = recoveryStorage();
+  const first = await mounted(2, storage);
+  first.edit('value_b ::INT', 'value_b ::TEXT');
+  first.tick(500);
+  const second = await mounted(2, storage);
+  try {
+    assert.equal(second.state().recoveredCount, 0);
+    assert.match(second.model.getValue(), /value_b ::INT/);
+    first.tick(300);
+    second.tick(1000);
+    assert.equal(first.commits.length, 1);
+    assert.equal(second.commits.length, 0);
+  } finally {
+    first.close();
+    second.close();
+  }
+});
+
+test('hook recovery: restored valid edit uses normal idle flow and clears banner on success', async () => {
+  const storage = recoveryStorage();
+  const first = await mounted(2, storage);
+  first.edit('value_b ::INT', 'value_b ::TEXT');
+  first.event('pagehide');
+  first.close();
+  const second = await mounted(2, storage);
+  try {
+    assert.equal(second.state().recoveredCount, 1);
+    assert.equal(second.commits.length, 0);
+    second.tick(799);
+    assert.equal(second.commits.length, 0);
+    second.tick(1);
+    assert.equal(second.commits.length, 1);
+    assert.equal(second.state().recoveredCount, 0);
+    assert.equal(second.journal!.read().length, 0);
+  } finally {
+    second.close();
+  }
+});
+
+test('hook recovery: BFCache release reacquires ownership before resuming normal commit', async () => {
+  const h = await mounted(2, recoveryStorage());
+  try {
+    h.edit('value_b ::INT', 'value_b ::TEXT');
+    h.event('pagehide');
+    h.tick(6000);
+    assert.equal(h.commits.length, 0);
+    h.event('pageshow');
+    h.tick(800);
+    assert.equal(h.commits.length, 1);
+    assert.equal(h.journal!.read().length, 0);
   } finally {
     h.close();
   }

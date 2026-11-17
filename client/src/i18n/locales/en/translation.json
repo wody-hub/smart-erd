@@ -2348,6 +2348,8 @@
       "actual": "Actual: {{value}}"
     },
     "unifiedEditing": {
+      "recovered": "Restored {{count}} unsaved edits",
+      "discardRecovered": "Discard",
       "duplicateColumnNames": "Duplicate column physical names ({{count}} columns): {{names}}. Rename them on the ERD canvas before editing this block.",
       "editable": "Edit existing fields",
       "CLEAN": "Saved",
