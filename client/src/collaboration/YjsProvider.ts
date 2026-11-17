@@ -1,3 +1,5 @@
+import { CLIENT_PROTOCOL_VERSION, PROTOCOL_TOO_OLD } from '@/constants/collaboration-protocol';
+import { collaborationProtocolGate, isProtocolTooOldError } from '@/lib/collaboration-protocol';
 import * as Y from 'yjs';
 import { CANVAS_HISTORY_ORIGIN, DRAG_TRANSACTION_ORIGIN } from '@/constants/canvas-history';
 import { getWsBaseUrl } from '@/lib/platform';
@@ -34,7 +36,10 @@ const MAX_INITIALIZATION_RETRIES = 3;
  * @param reason WebSocket close reason
  * @returns 알려진 연결 이슈면 해당 kind, 아니면 null
  */
-function mapCloseEventToConnectionIssue(code: number, reason: string): ConnectionIssueKind | null {
+export function mapCloseEventToConnectionIssue(
+  code: number,
+  reason: string,
+): ConnectionIssueKind | null {
   if (code === 4408) {
     return 'connection-limit-exceeded';
   }
@@ -44,6 +49,7 @@ function mapCloseEventToConnectionIssue(code: number, reason: string): Connectio
   if (code !== 1008) {
     return null;
   }
+  if (reason === PROTOCOL_TOO_OLD) return PROTOCOL_TOO_OLD;
   if (reason === 'connection-limit-exceeded') {
     return 'connection-limit-exceeded';
   }
@@ -85,6 +91,9 @@ function shouldQueuePendingLocalStatePush(origin: unknown): boolean {
  * Awareness(커서/선택 상태) 메시지도 같은 연결로 전송한다.
  */
 export class YjsProvider {
+  /** 탭 전체 프로토콜 차단 구독 해제 함수. */
+  private unsubscribeProtocolGate: (() => void) | null = null;
+
   /** Yjs 문서 */
   readonly doc: Y.Doc;
 
@@ -234,6 +243,13 @@ export class YjsProvider {
     if (this.destroyed) {
       return;
     }
+    this.unsubscribeProtocolGate ??= collaborationProtocolGate.subscribe(() =>
+      this.blockForProtocolUpgrade(),
+    );
+    if (collaborationProtocolGate.isBlocked()) {
+      this.blockForProtocolUpgrade();
+      return;
+    }
     if (this.socketCreationInFlight) {
       return;
     }
@@ -254,6 +270,8 @@ export class YjsProvider {
   destroy(): void {
     this.intentionalClose = true;
     this.destroyed = true;
+    this.unsubscribeProtocolGate?.();
+    this.unsubscribeProtocolGate = null;
     this.doc.off('update', this.updateHandler);
     this.clearReconnectTimer();
     this.clearPresenceBootstrapTimer();
@@ -294,13 +312,27 @@ export class YjsProvider {
     this.sendAwareness();
   }
 
+  /** 프로토콜 거부 후 재연결, 송신, 편집 준비 상태를 새로고침까지 차단한다. */
+  private blockForProtocolUpgrade(): void {
+    this.intentionalClose = true;
+    this.clearReconnectTimer();
+    this.clearPresenceBootstrapTimer();
+    this.clearSyncRetryTimer();
+    const socket = this.ws;
+    this.ws = null;
+    socket?.close();
+    this.emitSyncState(false);
+    this.emitConnectionStatus('disconnected');
+    this.onConnectionIssueDetected?.(PROTOCOL_TOO_OLD);
+  }
+
   /**
    * WebSocket 인스턴스를 생성하고 이벤트를 바인딩한다.
    *
    * @returns 없음
    */
   private async createWebSocket(): Promise<void> {
-    if (this.destroyed || this.intentionalClose) {
+    if (this.destroyed || this.intentionalClose || collaborationProtocolGate.isBlocked()) {
       return;
     }
     if (this.socketCreationInFlight) {
@@ -319,7 +351,11 @@ export class YjsProvider {
       try {
         ticketData = await this.options.getTicket();
       } catch (e) {
-        if (this.destroyed || this.intentionalClose) {
+        if (this.destroyed || this.intentionalClose || collaborationProtocolGate.isBlocked()) {
+          return;
+        }
+        if (isProtocolTooOldError(e)) {
+          collaborationProtocolGate.block();
           return;
         }
         console.error('[YjsProvider] ticket 발급 실패:', e);
@@ -328,7 +364,7 @@ export class YjsProvider {
         return;
       }
 
-      if (this.destroyed || this.intentionalClose) {
+      if (this.destroyed || this.intentionalClose || collaborationProtocolGate.isBlocked()) {
         return;
       }
       if (
@@ -362,7 +398,7 @@ export class YjsProvider {
 
       socket.onopen = () => {
         if (this.ws !== socket) return;
-        if (this.destroyed || this.intentionalClose) {
+        if (this.destroyed || this.intentionalClose || collaborationProtocolGate.isBlocked()) {
           this.ws?.close();
           this.ws = null;
           return;
@@ -411,6 +447,9 @@ export class YjsProvider {
         const connectionIssue = this.intentionalClose
           ? null
           : mapCloseEventToConnectionIssue(event.code, event.reason);
+        if (connectionIssue === PROTOCOL_TOO_OLD) {
+          collaborationProtocolGate.block();
+        }
         if (connectionIssue) {
           this.onConnectionIssueDetected?.(connectionIssue);
         }
@@ -445,7 +484,7 @@ export class YjsProvider {
         if (payload.length === 1 && payload[0] >= 1 && payload[0] <= 3) {
           this.negotiatedProtocolVersion = payload[0];
           probeMark('ws-protocol-negotiated', {
-            requestedVersion: this.options.protocolVersion ?? 3,
+            requestedVersion: this.options.protocolVersion ?? CLIENT_PROTOCOL_VERSION,
             negotiatedVersion: payload[0],
           });
         }
@@ -652,6 +691,7 @@ export class YjsProvider {
    * @param payload 페이로드 데이터
    */
   private sendMessage(type: number, payload: Uint8Array): void {
+    if (collaborationProtocolGate.isBlocked()) return;
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
     const message = new Uint8Array(payload.length + 1);
@@ -924,6 +964,7 @@ export class YjsProvider {
    */
   private scheduleReconnect(): void {
     this.clearReconnectTimer();
+    if (collaborationProtocolGate.isBlocked()) return;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       void this.createWebSocket();
@@ -953,7 +994,7 @@ export class YjsProvider {
    */
   private buildWsUrl(ticket: string): string {
     const websocketPath = this.options.websocketPath ?? `/ws/diagram/${this.options.diagramId}`;
-    return `${getWsBaseUrl()}${websocketPath}?ticket=${encodeURIComponent(ticket)}&protocolVersion=${this.options.protocolVersion ?? 3}`;
+    return `${getWsBaseUrl()}${websocketPath}?ticket=${encodeURIComponent(ticket)}&protocolVersion=${this.options.protocolVersion ?? CLIENT_PROTOCOL_VERSION}`;
   }
 
   /**

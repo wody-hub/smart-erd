@@ -4,6 +4,11 @@ import i18n from '@/i18n';
 import { clearAuthState, initAuthRefresh, refreshAccessToken } from '@/lib/auth-refresh';
 import { getApiBaseUrl, redirectToLogin } from '@/lib/platform';
 import useAuthStore from '@/stores/useAuthStore';
+import useCollaborationStore from '@/stores/useCollaborationStore';
+import { toast } from 'sonner';
+import { installProtocolInterceptors } from '@/api/collaborationProtocol';
+import { collaborationProtocolGate } from '@/lib/collaboration-protocol';
+import { PROTOCOL_TOO_OLD } from '@/constants/collaboration-protocol';
 
 /**
  * API 통신용 Axios 인스턴스.
@@ -16,6 +21,18 @@ import useAuthStore from '@/stores/useAuthStore';
  * 401 응답 시 Refresh Token으로 자동 갱신을 시도한다 (큐 패턴).
  */
 const axiosInstance = axios.create();
+installProtocolInterceptors(axiosInstance);
+collaborationProtocolGate.subscribe(() => {
+  useCollaborationStore.getState().setConnectionStatus('disconnected');
+  useCollaborationStore.getState().setConnectionIssue(PROTOCOL_TOO_OLD);
+  toast.error(i18n.t('diagram.previewSync.banner.descriptionIssue.protocol-too-old'), {
+    id: PROTOCOL_TOO_OLD,
+    action: {
+      label: i18n.t('diagram.previewSync.banner.reloadApp'),
+      onClick: () => window.location.reload(),
+    },
+  });
+});
 
 // auth-refresh 모듈에 Zustand 스토어 콜백을 주입한다 (DI).
 // lib/ 레이어가 stores/에 직접 의존하지 않도록 api/ 레이어에서 연결한다.

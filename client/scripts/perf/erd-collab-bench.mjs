@@ -128,7 +128,12 @@ function parseOptions(args) {
 async function api(url, token, method = 'GET', body = undefined) {
   const response = await fetch(url, {
     method,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      // 서버 최소 편집 프로토콜 게이트를 통과하는 최신 클라이언트 헤더.
+      'X-Smart-Erd-Client-Protocol': '3',
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(10000),
   });

@@ -4,6 +4,7 @@ package com.smarterd.domain.common.message;
  * 다국어 메시지 코드 enum.
  */
 public enum MessageCode {
+    ERROR_COLLABORATION_PROTOCOL_TOO_OLD("error.collaboration.protocol-too-old"),
     ERROR_AUTH_BAD_CREDENTIALS("error.auth.bad-credentials"),
     ERROR_AUTH_LOGIN_RATE_LIMITED("error.auth.login-rate-limited"),
     ERROR_ACCESS_DENIED_NOT_ADMIN("error.access-denied.not-admin"),

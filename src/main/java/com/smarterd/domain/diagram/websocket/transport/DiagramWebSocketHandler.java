@@ -1,5 +1,6 @@
 package com.smarterd.domain.diagram.websocket.transport;
 
+import com.smarterd.collaboration.CollaborationProtocolPolicy;
 import com.smarterd.config.websocket.WebSocketProperties;
 import java.nio.channels.ClosedChannelException;
 import java.util.Objects;
@@ -50,6 +51,16 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
      */
     @Override
     public void afterConnectionEstablished(@NonNull WebSocketSession session) {
+        if (Boolean.TRUE.equals(session.getAttributes().get(CollaborationProtocolPolicy.PROTOCOL_TOO_OLD))) {
+            // 입장하지 않은 세션은 leave/flush도 수행하지 않는다.
+            session.getAttributes().put(CLEANED_UP_ATTR, Boolean.TRUE);
+            try {
+                session.close(CloseStatus.POLICY_VIOLATION.withReason(CollaborationProtocolPolicy.PROTOCOL_TOO_OLD));
+            } catch (Exception e) {
+                log.warn("구버전 프로토콜 세션 종료 실패", e);
+            }
+            return;
+        }
         session.setBinaryMessageSizeLimit(webSocketProperties.getBinaryMessageSizeLimit());
 
         final var info = inboundMessageContextFactory.resolveEstablishedSession(session);
@@ -69,6 +80,9 @@ public class DiagramWebSocketHandler extends BinaryWebSocketHandler {
      */
     @Override
     protected void handleBinaryMessage(@NonNull WebSocketSession session, @NonNull BinaryMessage message) {
+        if (Boolean.TRUE.equals(session.getAttributes().get(CollaborationProtocolPolicy.PROTOCOL_TOO_OLD))) {
+            return;
+        }
         final var context = inboundMessageContextFactory.createInboundContext(session, message);
         if (context == null) {
             return;

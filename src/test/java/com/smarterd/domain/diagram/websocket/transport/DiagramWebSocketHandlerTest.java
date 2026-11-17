@@ -42,6 +42,25 @@ import org.springframework.web.socket.WebSocketSession;
 class DiagramWebSocketHandlerTest {
 
     @Test
+    void protocolTooOldClosesBeforeJoinAndIgnoresInboundCompactionAndCleanup() throws Exception {
+        final var fixture = createFixture(createRequiredHandlers());
+        final var session = mock(WebSocketSession.class);
+        final var attributes = new HashMap<String, Object>();
+        attributes.put("protocol-too-old", Boolean.TRUE);
+        when(session.getAttributes()).thenReturn(attributes);
+        fixture.handler().afterConnectionEstablished(session);
+        verify(session).close(CloseStatus.POLICY_VIOLATION.withReason("protocol-too-old"));
+        fixture
+            .handler()
+            .handleBinaryMessage(
+                session,
+                new BinaryMessage(new byte[] { DiagramMessageTypes.MSG_COMPACTED_SNAPSHOT, 1 })
+            );
+        fixture.handler().afterConnectionClosed(session, CloseStatus.POLICY_VIOLATION);
+        org.mockito.Mockito.verifyNoInteractions(fixture.diagramSessionTransportUseCase());
+    }
+
+    @Test
     @DisplayName("initHandlerMap - 필수 메시지 타입 핸들러가 누락되면 예외가 발생한다")
     void initHandlerMap_missingRequiredTypes_throwsException() {
         // given

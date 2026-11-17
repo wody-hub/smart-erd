@@ -60,6 +60,8 @@ decorator:
       logging: slf4j
 
 smart-erd:
+  collaboration:
+    min-edit-protocol-version: ${SMART_ERD_COLLABORATION_MIN_EDIT_PROTOCOL_VERSION:1}
   dictionary:
     bulk-validation:
       store: in-memory # in-memory | redis (redis 사용 시: docker compose --profile redis up -d)

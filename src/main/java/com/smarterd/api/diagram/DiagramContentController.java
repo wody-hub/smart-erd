@@ -1,5 +1,6 @@
 package com.smarterd.api.diagram;
 
+import com.smarterd.api.common.RequiresEditProtocol;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotRequest;
 import com.smarterd.api.diagram.dto.PersistYdocSnapshotResponse;
 import com.smarterd.api.diagram.dto.SaveDiagramRequest;
@@ -33,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @Tag(name = "Diagram Content", description = "다이어그램 콘텐츠 저장 API")
 @RestController
+@RequiresEditProtocol
 @RequestMapping("/api/teams/{teamId}/projects/{projectId}/diagrams")
 @RequiredArgsConstructor
 public class DiagramContentController {

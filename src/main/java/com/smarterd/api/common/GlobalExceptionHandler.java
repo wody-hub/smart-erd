@@ -7,6 +7,7 @@ import com.smarterd.domain.common.exception.DomainAccessDeniedException;
 import com.smarterd.domain.common.exception.DuplicateException;
 import com.smarterd.domain.common.exception.EntityNotFoundException;
 import com.smarterd.domain.common.exception.LocalizedException;
+import com.smarterd.domain.common.exception.ProtocolTooOldException;
 import com.smarterd.domain.common.exception.TooManyRequestsException;
 import com.smarterd.domain.common.message.MessageCode;
 import java.util.Locale;
@@ -135,6 +136,7 @@ public class GlobalExceptionHandler {
      */
     private HttpStatus resolveStatus(LocalizedException ex) {
         return switch (ex) {
+            case ProtocolTooOldException _ -> HttpStatus.UPGRADE_REQUIRED;
             case EntityNotFoundException _ -> HttpStatus.NOT_FOUND;
             case DomainAccessDeniedException _ -> HttpStatus.FORBIDDEN;
             case DuplicateException _ -> HttpStatus.CONFLICT;

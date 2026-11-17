@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as Y from 'yjs';
 import * as ws from '../../src/constants/ws.js';
+import * as protocolConstants from '../../src/constants/collaboration-protocol.js';
+import { ClientProtocolGate, isProtocolTooOldError } from '../../src/lib/collaboration-protocol.js';
 import { isDiagramDocumentReady } from '../../src/collaboration/channel/diagram/diagram-document-mutation-session.js';
 import { sourceHookHarness } from '../helpers/source-hook-harness.js';
 
@@ -49,6 +51,11 @@ for (const room of ['empty', 'snapshot-null-content', 'populated']) {
       'src/collaboration/YjsProvider.ts',
       {
         yjs: Y,
+        'collaboration-protocol': {
+          ...protocolConstants,
+          collaborationProtocolGate: new ClientProtocolGate(),
+          isProtocolTooOldError,
+        },
         ws,
         platform: { getWsBaseUrl: () => 'ws://local' },
       },
@@ -233,6 +240,11 @@ for (const negotiated of [undefined, 1, 2, 3]) {
       'src/collaboration/YjsProvider.ts',
       {
         yjs: Y,
+        'collaboration-protocol': {
+          ...protocolConstants,
+          collaborationProtocolGate: new ClientProtocolGate(),
+          isProtocolTooOldError,
+        },
         ws,
         platform: { getWsBaseUrl: () => 'ws://local' },
       },

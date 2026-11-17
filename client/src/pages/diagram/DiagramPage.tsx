@@ -1,9 +1,10 @@
 import DiagramLiveProjectionSlot from '@/components/erd/DiagramLiveProjectionSlot';
 import { resolveErdUnifiedEditRollout } from '@/lib/erd-unified-edit-rollout';
 import { useDiagramRejectedCommandToast } from '@/collaboration/channel/diagram/use-diagram-command-feedback';
-import { lazy, Suspense, useCallback, useLayoutEffect, useMemo } from 'react';
+import { lazy, Suspense, useCallback, useLayoutEffect, useMemo, useSyncExternalStore } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { collaborationProtocolGate } from '@/lib/collaboration-protocol';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -158,7 +159,13 @@ export default function DiagramPage() {
   const setActiveEditNodeId = useCanvasStore((s) => s.setActiveEditNodeId);
   const clearHighlights = useCanvasStore((s) => s.clearHighlights);
   const connectionStatus = useCollaborationStore((s) => s.connectionStatus);
-  const connectionIssue = useCollaborationStore((s) => s.connectionIssue);
+  const storeConnectionIssue = useCollaborationStore((s) => s.connectionIssue);
+  /** 앱 새로고침 전까지 유지되는 프로토콜 차단(스토어 reset과 무관하게 배너에 반영한다). */
+  const protocolBlocked = useSyncExternalStore(
+    collaborationProtocolGate.subscribe.bind(collaborationProtocolGate),
+    () => collaborationProtocolGate.isBlocked(),
+  );
+  const connectionIssue = protocolBlocked ? 'protocol-too-old' : storeConnectionIssue;
   /** store에 렌더 가능한 노드/엣지가 존재하는지 (boolean selector로 리렌더 최소화) */
   const storeHasRenderableGraph = useCanvasStore((s) => s.nodes.length > 0 || s.edges.length > 0);
   const { persistedNodes, persistedEdges } = useCanvasStore(

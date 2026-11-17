@@ -1,5 +1,6 @@
 package com.smarterd.api.diagram;
 
+import com.smarterd.api.common.RequiresEditProtocol;
 import com.smarterd.api.diagram.dto.WsTicketRequest;
 import com.smarterd.api.diagram.dto.WsTicketResponse;
 import com.smarterd.application.diagram.command.IssueDiagramCollaborationTicketUseCase;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @Tag(name = "WebSocket Ticket", description = "WebSocket 협업 ticket 발급 API")
 @RestController
+@RequiresEditProtocol
 @RequestMapping("/api/ws-ticket")
 @RequiredArgsConstructor
 public class WsTicketController {

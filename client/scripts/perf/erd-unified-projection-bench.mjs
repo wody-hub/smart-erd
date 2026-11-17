@@ -90,7 +90,11 @@ for (const size of options.sizes) {
   });
   await fetch(apiPath, {
     method: 'PUT',
-    headers: { Authorization: `Bearer ${owner.token}`, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: `Bearer ${owner.token}`,
+      'Content-Type': 'application/json',
+      'X-Smart-Erd-Client-Protocol': '3',
+    },
     body: JSON.stringify({
       content: JSON.stringify({ nodes: seed.nodes, edges: seed.edges, groups: [] }),
     }),

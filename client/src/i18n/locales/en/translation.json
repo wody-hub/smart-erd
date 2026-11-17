@@ -1726,10 +1726,12 @@
         "descriptionIssue": {
           "connection-limit-exceeded": "Too many collaboration tabs are open for this user. Close unused tabs or windows, then reconnect.",
           "room-capacity-exceeded": "This diagram has reached its collaboration session limit. Please reconnect in a moment.",
-          "policy-violation": "The collaboration connection was rejected by server policy. Refresh the page or reconnect."
+          "policy-violation": "The collaboration connection was rejected by server policy. Refresh the page or reconnect.",
+          "protocol-too-old": "App update required. Reload the page to continue editing."
         },
         "retryConnection": "Reconnect",
-        "locked": "Editing locked until sync completes"
+        "locked": "Editing locked until sync completes",
+        "reloadApp": "Reload app"
       },
       "toast": {
         "connected": "Real-time sync connected. Editing is now enabled."

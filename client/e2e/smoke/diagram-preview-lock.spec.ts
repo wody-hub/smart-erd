@@ -31,6 +31,8 @@ async function putDiagramContent(
         Authorization: `Bearer ${token}`,
         'Accept-Language': 'ko',
         'Content-Type': 'application/json',
+        // 최신 클라이언트처럼 편집 프로토콜 버전을 알린다(서버 최소 버전 게이트 대응).
+        'X-Smart-Erd-Client-Protocol': '3',
       },
       data: { content },
     },
@@ -108,13 +110,15 @@ test('diagram preview renders before ws sync and unlocks editing afterwards @smo
   const editableBackupButton = await waitForEditableDiagram(page, 30_000);
   await expect(editableBackupButton).toBeVisible();
 
-  test.info().annotations.push(
-    { type: 'target-team', description: `${target.teamId}:${target.teamName}` },
-    { type: 'target-project', description: `${target.projectId}:${target.projectName}` },
-    { type: 'target-diagram', description: `${target.diagramId}:${target.diagramName}` },
-    { type: 'first-visible-ms', description: String(result.visibleMs) },
-    { type: 'ws-ticket-delay-ms', description: String(WS_TICKET_DELAY_MS) },
-  );
+  test
+    .info()
+    .annotations.push(
+      { type: 'target-team', description: `${target.teamId}:${target.teamName}` },
+      { type: 'target-project', description: `${target.projectId}:${target.projectName}` },
+      { type: 'target-diagram', description: `${target.diagramId}:${target.diagramName}` },
+      { type: 'first-visible-ms', description: String(result.visibleMs) },
+      { type: 'ws-ticket-delay-ms', description: String(WS_TICKET_DELAY_MS) },
+    );
 
   expect(result.visibleMs).toBeLessThan(10_000);
 });

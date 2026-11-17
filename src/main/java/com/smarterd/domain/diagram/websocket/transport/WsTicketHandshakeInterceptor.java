@@ -1,6 +1,7 @@
 package com.smarterd.domain.diagram.websocket.transport;
 
 import com.smarterd.application.diagram.command.ValidateDiagramCollaborationHandshakeUseCase;
+import com.smarterd.collaboration.CollaborationProtocolPolicy;
 import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
 import com.smarterd.utils.AppStringUtils;
 import java.util.Map;
@@ -31,6 +32,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 @Slf4j
 public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
+
+    /** 최소 편집 프로토콜 정책. */
+    private final CollaborationProtocolPolicy protocolPolicy;
 
     /** 다이어그램 handshake 검증 유스케이스 */
     private final ValidateDiagramCollaborationHandshakeUseCase validateDiagramCollaborationHandshakeUseCase;
@@ -97,6 +101,12 @@ public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
             }
             final var validationResult = validationResultOpt.get();
             final var sessionInfo = validationResult.session();
+
+            // 브라우저는 실패한 HTTP upgrade 응답을 읽을 수 없다. 인증 성공 후 방 입장 전에
+            // 1008/protocol-too-old로 종료하도록 표시하여 명시적 정책 사유를 전달한다.
+            if (!protocolPolicy.allowsEdit(sessionInfo.protocolVersion())) {
+                attributes.put(CollaborationProtocolPolicy.PROTOCOL_TOO_OLD, Boolean.TRUE);
+            }
 
             // 4. 공통 세션 메타데이터 저장
             attributes.put(CollaborationAuthenticatedSession.SESSION_ATTR_KEY, sessionInfo);

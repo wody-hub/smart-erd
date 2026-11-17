@@ -24,30 +24,37 @@ export default function DiagramSyncStatusBanner({
   onRetry,
 }: DiagramSyncStatusBannerProps) {
   const { t } = useTranslation();
+  const requiresReload = connectionIssue === 'protocol-too-old';
   const isDisconnected = connectionStatus === 'disconnected';
   const isAuthoritativeBootstrapBlocked = setupErrorKind === 'authoritative-bootstrap-required';
   const isSnapshotDelayed = previewSyncStatus === 'degraded';
   const shouldShowRetry =
-    (isAuthoritativeBootstrapBlocked || connectionIssue !== null || isSnapshotDelayed) && !!onRetry;
+    requiresReload ||
+    ((isAuthoritativeBootstrapBlocked || connectionIssue !== null || isSnapshotDelayed) &&
+      !!onRetry);
   const retryLabel = t(
-    connectionIssue
-      ? 'diagram.previewSync.banner.retryConnection'
-      : isSnapshotDelayed
-        ? 'diagram.previewSync.retrySnapshot'
-        : 'erd.collabSync.overlay.retry',
+    requiresReload
+      ? 'diagram.previewSync.banner.reloadApp'
+      : connectionIssue
+        ? 'diagram.previewSync.banner.retryConnection'
+        : isSnapshotDelayed
+          ? 'diagram.previewSync.retrySnapshot'
+          : 'erd.collabSync.overlay.retry',
   );
 
-  const description = isAuthoritativeBootstrapBlocked
-    ? t('erd.collabSync.overlay.failed')
-    : connectionIssue
-      ? t(`diagram.previewSync.banner.descriptionIssue.${connectionIssue}`)
-      : isSnapshotDelayed
-        ? t('diagram.previewSync.snapshotDelayed')
-        : t(
-            isDisconnected
-              ? 'diagram.previewSync.banner.descriptionDisconnected'
-              : 'diagram.previewSync.banner.description',
-          );
+  const description = requiresReload
+    ? t('diagram.previewSync.banner.descriptionIssue.protocol-too-old')
+    : isAuthoritativeBootstrapBlocked
+      ? t('erd.collabSync.overlay.failed')
+      : connectionIssue
+        ? t(`diagram.previewSync.banner.descriptionIssue.${connectionIssue}`)
+        : isSnapshotDelayed
+          ? t('diagram.previewSync.snapshotDelayed')
+          : t(
+              isDisconnected
+                ? 'diagram.previewSync.banner.descriptionDisconnected'
+                : 'diagram.previewSync.banner.description',
+            );
 
   return (
     <div
@@ -82,7 +89,7 @@ export default function DiagramSyncStatusBanner({
             variant="outline"
             size="sm"
             className="self-start border-brand-warm/30 bg-card/82 text-foreground hover:bg-card md:self-center"
-            onClick={onRetry}
+            onClick={requiresReload ? () => window.location.reload() : onRetry}
             aria-label={retryLabel}
           >
             {retryLabel}

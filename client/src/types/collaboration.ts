@@ -71,7 +71,8 @@ export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
 export type ConnectionIssueKind =
   | 'connection-limit-exceeded'
   | 'room-capacity-exceeded'
-  | 'policy-violation';
+  | 'policy-violation'
+  | 'protocol-too-old';
 
 /** Presence 모드. */
 export type PresenceMode = 'active' | 'degraded';

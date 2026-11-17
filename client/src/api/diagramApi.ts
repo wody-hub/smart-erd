@@ -1,3 +1,9 @@
+import {
+  CLIENT_PROTOCOL_HEADER,
+  CLIENT_PROTOCOL_VERSION,
+  PROTOCOL_UPGRADE_REQUIRED,
+} from '@/constants/collaboration-protocol';
+import { collaborationProtocolGate, ProtocolTooOldError } from '@/lib/collaboration-protocol';
 import axiosInstance from './axiosInstance';
 import { STORAGE_KEYS } from '@/constants/storage';
 import { downloadBlob } from '@/lib/download';
@@ -165,6 +171,7 @@ export async function saveDiagram(
   content: string,
   ydocSnapshot?: Uint8Array | null,
 ): Promise<SaveDiagramResult> {
+  if (collaborationProtocolGate.isBlocked()) throw new ProtocolTooOldError();
   const res = await axiosInstance.put(
     `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}`,
     {
@@ -197,6 +204,7 @@ export async function persistDiagramYdocSnapshot(
     persistOnlyIfMissing?: boolean;
   },
 ): Promise<boolean> {
+  if (collaborationProtocolGate.isBlocked()) throw new ProtocolTooOldError();
   const response = await axiosInstance.post(
     `/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/ydoc-snapshot`,
     {
@@ -227,6 +235,7 @@ export function persistDiagramYdocSnapshotKeepalive(
   expectedContentRevision: string,
   ydocSnapshot: Uint8Array,
 ): boolean {
+  if (collaborationProtocolGate.isBlocked()) return false;
   const accessToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
   const language = localStorage.getItem(STORAGE_KEYS.LANGUAGE) || navigator.language || 'en';
   const requestUrl = `${getApiBaseUrl()}/teams/${teamId}/projects/${projectId}/diagrams/${diagramId}/ydoc-snapshot`;
@@ -239,12 +248,17 @@ export function persistDiagramYdocSnapshotKeepalive(
     method: 'POST',
     keepalive: true,
     headers: {
+      [CLIENT_PROTOCOL_HEADER]: String(CLIENT_PROTOCOL_VERSION),
       'Content-Type': 'application/json',
       'Accept-Language': language,
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
     body: requestBody,
-  }).catch(() => undefined);
+  })
+    .then((response) => {
+      if (response.status === PROTOCOL_UPGRADE_REQUIRED) collaborationProtocolGate.block();
+    })
+    .catch(() => undefined);
 
   return true;
 }
