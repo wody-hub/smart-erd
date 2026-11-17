@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { createProjectionMonacoModel } from '../helpers/projection-monaco-model.js';
 import { strict as assert } from 'node:assert';
 import {
   generateProjection,
@@ -565,3 +566,38 @@ test('removing the first block coalesces its adjacent separator deletion', () =>
   assert.deepEqual(batch.patches, [{ start: 0, end: before.blocks[1].tableRange.start, text: '' }]);
   assert.equal(apply(before.text, batch), after.text);
 });
+
+for (const newline of ['\n', '\r\n', '\r']) {
+  test(`table/column/domain names normalize ${JSON.stringify(newline)} with exact model coordinates`, async () => {
+    const input = fixture();
+    for (const node of input.nodes) {
+      node.data.logicalTableName = `table${newline}name`;
+      node.data.columns[0].logicalName = `column${newline}name`;
+    }
+    input.dictionary.domains[0].logicalName = `domain${newline}name`;
+    const result = generateProjection(input);
+    assert.ok(!result.text.includes('\r'));
+    assert.ok(result.text.includes('table name'));
+    assert.ok(result.text.includes('column name'));
+    assert.ok(result.text.includes('domain name'));
+    const model = await createProjectionMonacoModel(result.text);
+    assert.equal(model.getValue(), result.text);
+    const position = (offset: number) => {
+      const value = model.getPositionAt(offset);
+      return { line: value.lineNumber, column: value.column };
+    };
+    for (const block of result.blocks) {
+      for (const range of [block.tableRange, ...block.columnRanges]) {
+        assert.deepEqual(position(range.start), {
+          line: range.startLine,
+          column: range.startColumn,
+        });
+        assert.deepEqual(position(range.end), { line: range.endLine, column: range.endColumn });
+      }
+      assert.equal(block.metadata.tableLogicalName, `table${newline}name`);
+      assert.equal(block.metadata.columns[0].logicalName, `column${newline}name`);
+    }
+    assert.equal(input.dictionary.domains[0].logicalName, `domain${newline}name`);
+    model.dispose();
+  });
+}

@@ -18,6 +18,7 @@ export function sourceHookHarness(
   const effects: (() => void | (() => void))[] = [];
   const cleanups: (() => void)[] = [];
   const hooks = {
+    useId: () => ':test:',
     useState: (initial: unknown) => {
       const index = cursor++;
       if (!(index in states)) states[index] = typeof initial === 'function' ? initial() : initial;

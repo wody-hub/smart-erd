@@ -192,6 +192,7 @@ export default function DiagramPage() {
     projectId,
     diagramId,
     enableCodeModeDraftPersist: workModeCapabilities.persistCodeDraft,
+    projectionEnabled: unifiedProjectionEnabled,
     canEdit,
   });
 

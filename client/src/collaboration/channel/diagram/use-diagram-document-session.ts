@@ -18,6 +18,8 @@ interface UseDiagramDocumentSessionParams {
   diagramId: string | undefined;
   enableCodeModeDraftPersist: boolean;
   canEdit: boolean;
+  /** 내부 라이브 투영 활성 여부. */
+  projectionEnabled?: boolean;
 }
 
 interface UseDiagramDocumentSessionResult {
@@ -70,6 +72,7 @@ export function useDiagramDocumentSession({
   diagramId,
   enableCodeModeDraftPersist,
   canEdit,
+  projectionEnabled = false,
 }: UseDiagramDocumentSessionParams): UseDiagramDocumentSessionResult {
   const ydoc = useCanvasStore((state) => state.ydoc);
   const beforeDestroyYDocRef = useRef<(() => void) | null>(null);
@@ -114,6 +117,7 @@ export function useDiagramDocumentSession({
     projectId,
     canEdit,
     handleBeforeDestroyYDoc,
+    projectionEnabled,
   );
   const retryCollaborationSetup = useCallback(() => {
     void retryDocumentSetup().finally(() => {

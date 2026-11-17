@@ -33,6 +33,7 @@ export function useDiagramCollaborationSession(
   projectId: string | undefined,
   canEdit: boolean,
   beforeDestroyYDoc?: (() => void) | null,
+  projectionEnabled = false,
 ): UseDiagramCollaborationSessionReturn {
   const [setupAttempt, setSetupAttempt] = useState(0);
   const retryCollaborationSetup = useCallback(() => {
@@ -55,7 +56,13 @@ export function useDiagramCollaborationSession(
     getHydratedSnapshot,
     getHydratedContentRevision,
     getRemoteHydrationGeneration,
-  } = useDiagramCollaborationRuntime(diagram, documentBootstrap, setupAttempt, canEdit);
+  } = useDiagramCollaborationRuntime(
+    diagram,
+    documentBootstrap,
+    setupAttempt,
+    canEdit,
+    projectionEnabled,
+  );
   const { providerRef, isPreviewMode, setupErrorKind } = useDiagramCollaborationProvider({
     collaborationBootstrap,
     sharedDocumentEngine,

@@ -1,0 +1,56 @@
+{
+  "generatedAt": "2026-11-17T07:19:39.035Z",
+  "options": {
+    "sizes": [
+      200,
+      500
+    ],
+    "iterations": 60,
+    "pace": 250,
+    "baseUrl": "http://localhost:4502",
+    "apiUrl": "http://localhost:9502/api",
+    "out": "/private/tmp/claude-501/-Users-j-jaeyo-Project-ETC-smart-erd/b049c80d-5301-4aeb-818d-a1a3d3e80311/scratchpad/proj-bench2.json"
+  },
+  "results": [
+    {
+      "size": 200,
+      "hydrateTextLength": 50714,
+      "iterations": 60,
+      "misses": 0,
+      "ownerInputToPanelMs": {
+        "n": 60,
+        "p50": 20,
+        "p95": 230.5,
+        "max": 380.6
+      },
+      "eventToMonacoAppliedMs": {
+        "n": 60,
+        "p50": 9.1,
+        "p95": 13.3,
+        "max": 14.4
+      },
+      "probeEnabled": true,
+      "peerLongTaskTotalMs": 0
+    },
+    {
+      "size": 500,
+      "hydrateTextLength": 124826,
+      "iterations": 60,
+      "misses": 0,
+      "ownerInputToPanelMs": {
+        "n": 60,
+        "p50": 46.4,
+        "p95": 995.9,
+        "max": 1150.1
+      },
+      "eventToMonacoAppliedMs": {
+        "n": 60,
+        "p50": 15.9,
+        "p95": 20.3,
+        "max": 26.3
+      },
+      "probeEnabled": true,
+      "peerLongTaskTotalMs": 0
+    }
+  ]
+}

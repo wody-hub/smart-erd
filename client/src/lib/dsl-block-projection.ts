@@ -84,8 +84,13 @@ function generateIndexedBlock(
       parentColLogical: sourceCol.logicalName || sourceCol.name,
     });
   }
-  const lines = formatDslTableLines(node, context.dictionary, (id) => refs.get(id));
-  const text = lines.join('\n') + '\n';
+  // 단위 A의 식별자 이스케이프 한계를 유지한다. 표시 행의 CR/LF는 공백 하나로
+  // 정규화하고 원본 이름은 sidecar에 보존한다(사전 원본은 입력 스냅샷에 유지).
+  const text =
+    formatDslTableLines(node, context.dictionary, (id) => refs.get(id))
+      .map((line) => line.replace(/\r\n|[\r\n]/g, ' '))
+      .join('\n') + '\n';
+  const lines = text.split('\n');
   let offset = lines[0].length + 1;
   const columnRanges = node.data.columns.map((column, index) => {
     const length = lines[index + 1].length;
@@ -120,7 +125,7 @@ function generateIndexedBlock(
       start: 0,
       end: text.length,
       startLine: 1,
-      endLine: lines.length + 1,
+      endLine: lines.length,
       startColumn: 1,
       endColumn: 1,
     },
@@ -200,16 +205,33 @@ export function generateProjection(snapshot: ProjectionSnapshot): DslProjection 
   );
 }
 
-/** 공통 접두·접미를 제외한 최소 연속 치환을 계산한다. */
+/** UTF-16 위치가 서로게이트 쌍 내부인지 검사한다. */
+function insideCodePoint(text: string, offset: number): boolean {
+  return (
+    offset > 0 &&
+    offset < text.length &&
+    text.charCodeAt(offset - 1) >= 0xd800 &&
+    text.charCodeAt(offset - 1) <= 0xdbff &&
+    text.charCodeAt(offset) >= 0xdc00 &&
+    text.charCodeAt(offset) <= 0xdfff
+  );
+}
+
+/** 양쪽 문자열의 코드 포인트 경계를 지키며 최소 연속 치환을 계산한다. */
 function contiguousPatch(previous: string, next: string, offset: number): TextPatch | undefined {
   if (previous === next) return undefined;
   let start = 0;
   while (start < previous.length && start < next.length && previous[start] === next[start]) start++;
+  if (insideCodePoint(previous, start) || insideCodePoint(next, start)) start--;
   let end = previous.length;
   let nextEnd = next.length;
   while (end > start && nextEnd > start && previous[end - 1] === next[nextEnd - 1]) {
     end--;
     nextEnd--;
+  }
+  if (insideCodePoint(previous, end) || insideCodePoint(next, nextEnd)) {
+    end++;
+    nextEnd++;
   }
   return { start: offset + start, end: offset + end, text: next.slice(start, nextEnd) };
 }
@@ -391,9 +413,10 @@ export function updateProjection(
   previous: DslProjection,
   prevSnapshot: ProjectionSnapshot,
   nextSnapshot: ProjectionSnapshot,
+  affected = affectedTableIds(prevSnapshot, nextSnapshot),
 ): DslProjection {
   if (previous.revision !== prevSnapshot.revision) throw new Error('Projection revision mismatch');
-  const affected = affectedTableIds(prevSnapshot, nextSnapshot);
+  if (!affected.size) return { ...previous, revision: nextSnapshot.revision };
   const blocks = new Map(previous.blocks.map((block) => [block.tableId, block]));
   const context = buildContext(nextSnapshot);
   return assemble(

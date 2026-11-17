@@ -588,3 +588,21 @@ test('a subscribed consumer can recover a dropped batch and continue the revisio
   port.dispose();
   h.dispose();
 });
+
+test('position/group-only batches reuse block ranges and column edits replace only invalidated blocks', () => {
+  const h = harness();
+  seed(h);
+  h.port.hydrate();
+  const blocks = h.batches.at(-1)!.blockMetadata;
+  h.tables.get('a')!.set('positionX', 55);
+  const position = h.port.flush()!;
+  assert.deepEqual(position.invalidatedTableIds, []);
+  assert.deepEqual(position.patches, []);
+  assert.equal(position.blockMetadata, blocks);
+  h.doc.getMap('groups').set('group', 'changed');
+  const group = h.port.flush()!;
+  assert.deepEqual(group.invalidatedTableIds, []);
+  assert.equal(group.blockMetadata, blocks);
+  h.check();
+  h.dispose();
+});

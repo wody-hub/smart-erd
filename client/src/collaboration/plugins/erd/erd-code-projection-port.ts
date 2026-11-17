@@ -231,10 +231,12 @@ export class ErdCodeProjectionPort {
       this.schedule();
       return;
     }
+    const affected =
+      full || !this.snapshot ? undefined : affectedTableIds(this.snapshot, result.snapshot);
     const next =
       full || !this.snapshot
         ? generateProjection(result.snapshot)
-        : updateProjection(this.projection, this.snapshot, result.snapshot);
+        : updateProjection(this.projection, this.snapshot, result.snapshot, affected);
     const invalidated =
       full || !this.snapshot
         ? [
@@ -243,9 +245,9 @@ export class ErdCodeProjectionPort {
               ...next.blocks.map((block) => block.tableId),
             ]),
           ].sort()
-        : [...affectedTableIds(this.snapshot, result.snapshot)];
+        : [...affected!];
     const batch: TextPatchBatch = {
-      ...diffProjection(this.projection, next),
+      ...(affected?.size === 0 ? { patches: [] } : diffProjection(this.projection, next)),
       baseRevision: this.revision,
       nextRevision: ++this.revision,
       dictionaryVersion: dictionary.version,

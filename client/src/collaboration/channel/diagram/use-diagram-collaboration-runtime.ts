@@ -59,6 +59,7 @@ export function useDiagramCollaborationRuntime(
   documentBootstrap: DocumentBootstrapPayload | undefined,
   setupAttempt: number,
   canEdit: boolean,
+  projectionEnabled = false,
 ): UseDiagramCollaborationRuntimeReturn {
   const connectionStatus = useCollaborationStore((state) => state.connectionStatus);
   const [, setInitializationComplete] = useState(false);
@@ -127,10 +128,11 @@ export function useDiagramCollaborationRuntime(
 
   const projectionIsReady = useCallback(
     () =>
+      projectionEnabled &&
       initializationRef.current.complete &&
       !(previewRef.current ?? previewEnabled) &&
       useCollaborationStore.getState().connectionStatus === 'connected',
-    [previewEnabled],
+    [projectionEnabled, previewEnabled],
   );
   const getProjectionEpoch = useCallback(
     () => `${providerGenerationRef.current}:${projectionGenerationRef.current}`,
@@ -138,19 +140,19 @@ export function useDiagramCollaborationRuntime(
   );
   const projectionSource = useMemo(
     () =>
-      codeProjectionRead
+      projectionEnabled && codeProjectionRead
         ? {
             ...codeProjectionRead,
             isReady: projectionIsReady,
             getEpoch: getProjectionEpoch,
           }
         : null,
-    [codeProjectionRead, projectionIsReady, getProjectionEpoch],
+    [projectionEnabled, codeProjectionRead, projectionIsReady, getProjectionEpoch],
   );
   const codeProjectionRuntime: DiagramCodeProjectionRuntime = {
     source: projectionSource,
-    ready: connectionStatus === 'connected' && projectionIsReady(),
-    generation: getProjectionEpoch(),
+    ready: projectionEnabled && connectionStatus === 'connected' && projectionIsReady(),
+    generation: projectionEnabled ? getProjectionEpoch() : 0,
   };
 
   const createProviderLifecycle = useCallback(

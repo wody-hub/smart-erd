@@ -44,6 +44,7 @@ export function useDiagramUnappliedSharedDraft(runtime: DiagramCodeProjectionRun
     const document = runtime.source.getDocument();
     const schema = getSharedSchemaDraftMap(document);
     const legacy = getCodeModeSharedDraftMap(document);
+    let previousText: Y.Text | null = null;
     /**
      * 초안 루트가 바뀐 트랜잭션에서만 안내를 갱신한다.
      * @param transaction Yjs 변경 트랜잭션 (초기 읽기에서는 생략)
@@ -51,9 +52,13 @@ export function useDiagramUnappliedSharedDraft(runtime: DiagramCodeProjectionRun
      */
     const sync = (transaction?: Y.Transaction) => {
       const text = getCodeModeSharedDraftText(document);
+      // 최초 원격 루트는 AbstractType에서 Y.Text로 구체화되므로 트랜잭션의 키와 다를 수 있다.
+      const rootAppeared = text !== previousText;
+      previousText = text;
       const changed: ReadonlyMap<unknown, unknown> | undefined = transaction?.changedParentTypes;
       if (
         transaction &&
+        !rootAppeared &&
         !changed?.has(schema) &&
         !changed?.has(legacy) &&
         !(text && changed?.has(text))

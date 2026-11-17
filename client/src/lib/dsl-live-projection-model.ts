@@ -36,6 +36,8 @@ interface EntityAnchor {
   tableId?: string;
   /** 컬럼 행이면 컬럼 ID. */
   columnId?: string;
+  /** 다음 테이블 직전 구분 LF에 고정한 위치. */
+  separator?: boolean;
   /** 선택한 엔티티 범위 내 UTF-16 오프셋. */
   offset: number;
   /** 삭제 시 인접 생존 블록을 찾기 위한 기존 블록 인덱스. */
@@ -65,6 +67,14 @@ function captureAnchor(blocks: TableBlock[], offset: number): EntityAnchor {
   if (index < 0) index = blocks.length - 1;
   const block = blocks[index];
   if (!block) return { offset: 0, index: 0 };
+  if (offset < block.tableRange.start) {
+    return {
+      tableId: block.tableId,
+      separator: true,
+      offset: offset - block.tableRange.start,
+      index,
+    };
+  }
   const column = block.columnRanges.find((range) => offset >= range.start && offset <= range.end);
   return {
     tableId: block.tableId,
@@ -91,6 +101,9 @@ function restoreAnchor(
     ? table?.columnRanges.find((range) => range.columnId === anchor.columnId)
     : undefined;
   if (table && (!anchor.columnId || column)) {
+    if (anchor.separator) {
+      return { offset: Math.max(0, table.tableRange.start + anchor.offset), relocated: 0 };
+    }
     const range = column ?? table.tableRange;
     return { offset: Math.min(range.end, range.start + anchor.offset), relocated: 0 };
   }
@@ -112,6 +125,22 @@ function restoreAnchor(
   };
 }
 
+/** 블록·컬럼의 ID와 절대 범위가 달라졌는지 검사한다. */
+export function liveProjectionRangesChanged(previous: TableBlock[], next: TableBlock[]): boolean {
+  return (
+    previous !== next &&
+    (previous.length !== next.length ||
+      previous.some((block, index) => {
+        const after = next[index];
+        return (
+          block.tableId !== after.tableId ||
+          JSON.stringify([block.tableRange, block.columnRanges]) !==
+            JSON.stringify([after.tableRange, after.columnRanges])
+        );
+      }))
+  );
+}
+
 /**
  * 단위 B 패치를 한 applyEdits로 적용하고 선택·스크롤의 의미상 위치를 복원한다.
  * 초기화 이후 setValue·전체 모델 범위 치환을 합성하지 않는다.
@@ -130,6 +159,8 @@ export function applyLiveProjectionBatch(
   if (previous.revision !== batch.baseRevision || batch.nextRevision <= batch.baseRevision) {
     throw new Error('Projection revision mismatch');
   }
+  if (!batch.patches.length && !liveProjectionRangesChanged(previous.blocks, batch.blockMetadata))
+    return { ...view, relocatedTargets: 0 };
   let boundary = previous.text.length;
   for (const patch of [...batch.patches].reverse()) {
     if (
@@ -218,4 +249,70 @@ export function buildLiveProjectionDecorations(
       },
     })),
   ]);
+}
+
+/** decoration에 영향을 주는 ID와 행·열만 비교한다(문자 오프셋 이동은 Monaco가 추적). */
+function decorationLayout(block: TableBlock): string {
+  return JSON.stringify([
+    block.tableId,
+    ...[block.tableRange, ...block.columnRanges].map((range) => [
+      'columnId' in range ? range.columnId : undefined,
+      range.startLine,
+      range.startColumn,
+      range.endLine,
+      range.endColumn,
+    ]),
+  ]);
+}
+
+/**
+ * 블록별 collection을 유지해 변경되거나 행 좌표가 이동한 블록만 갱신한다.
+ * @param createCollection Monaco collection 생성 함수
+ * @returns 블록 갱신 및 전체 정리 함수
+ */
+export function createLiveProjectionDecorationUpdater(
+  createCollection: (
+    items: editor.IModelDeltaDecoration[],
+  ) => Pick<editor.IEditorDecorationsCollection, 'set' | 'clear'>,
+) {
+  const entries = new Map<
+    string,
+    { block: TableBlock; layout: string; collection: ReturnType<typeof createCollection> }
+  >();
+  return {
+    /** 변경 블록만 만들고 삭제된 블록의 decoration을 해제한다. */
+    update(blocks: TableBlock[]) {
+      const surviving = new Set<string>();
+      for (const block of blocks) {
+        surviving.add(block.tableId);
+        const entry = entries.get(block.tableId);
+        if (entry?.block === block) continue;
+        const layout = decorationLayout(block);
+        if (!entry) {
+          entries.set(block.tableId, {
+            block,
+            layout,
+            collection: createCollection(buildLiveProjectionDecorations([block])),
+          });
+        } else {
+          // 행 추가·삭제로 뒤 블록이 이동한 경우에도 최종 좌표를 명시해 경계 stickiness에 의존하지 않는다.
+          if (entry.block.text !== block.text || entry.layout !== layout)
+            entry.collection.set(buildLiveProjectionDecorations([block]));
+          entry.block = block;
+          entry.layout = layout;
+        }
+      }
+      for (const [id, entry] of entries) {
+        if (!surviving.has(id)) {
+          entry.collection.clear();
+          entries.delete(id);
+        }
+      }
+    },
+    /** 패널 수명이 끝나면 모든 collection을 정리한다. */
+    clear() {
+      for (const entry of entries.values()) entry.collection.clear();
+      entries.clear();
+    },
+  };
 }

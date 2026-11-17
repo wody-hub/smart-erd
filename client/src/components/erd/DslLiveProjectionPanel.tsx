@@ -3,7 +3,6 @@ import '@/lib/monaco-setup';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { useTranslation } from 'react-i18next';
-import type { editor } from 'monaco-editor';
 import {
   useDiagramCodeProjection,
   type DiagramCodeProjectionRuntime,
@@ -13,7 +12,8 @@ import Spinner from '@/components/ui/spinner';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import {
   applyLiveProjectionBatch,
-  buildLiveProjectionDecorations,
+  createLiveProjectionDecorationUpdater,
+  liveProjectionRangesChanged,
   initializeLiveProjectionModel,
 } from '@/lib/dsl-live-projection-model';
 import { DSL_LANGUAGE_ID, registerDslLanguage } from '@/lib/monaco-dsl-language';
@@ -55,7 +55,9 @@ export default function DslLiveProjectionPanel({
   const instanceId = useId();
   const uri = `erd-live-projection://${encodeURIComponent(diagramId)}/${encodeURIComponent(instanceId)}.dsl`;
   const unsubscribeRef = useRef<(() => void) | null>(null);
-  const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(null);
+  const decorationsRef = useRef<ReturnType<typeof createLiveProjectionDecorationUpdater> | null>(
+    null,
+  );
   /** 삭제된 대상의 커서·선택·viewport 이동 누계. */
   const [relocatedTargets, setRelocatedTargets] = useState(0);
 
@@ -79,11 +81,18 @@ export default function DslLiveProjectionPanel({
     let current = projection.getSnapshot();
     initializeLiveProjectionModel(model, current.text);
     probeExposeProjectionEditor(codeEditor);
-    decorationsRef.current = codeEditor.createDecorationsCollection(
-      buildLiveProjectionDecorations(current.blocks),
+    decorationsRef.current?.clear();
+    decorationsRef.current = createLiveProjectionDecorationUpdater((items) =>
+      codeEditor.createDecorationsCollection(items),
     );
+    decorationsRef.current.update(current.blocks);
     unsubscribeRef.current?.();
     unsubscribeRef.current = projection.subscribePatches(({ batch, snapshot, receivedAt }) => {
+      if (!batch.patches.length && !liveProjectionRangesChanged(current.blocks, snapshot.blocks)) {
+        current = snapshot;
+        probeProjectionPatchApplied(receivedAt, batch.nextRevision, 0);
+        return;
+      }
       const selection = codeEditor.getSelection();
       const topLine = codeEditor.getVisibleRanges()[0]?.startLineNumber ?? 1;
       const scrollLeft = codeEditor.getScrollLeft();
@@ -104,7 +113,7 @@ export default function DslLiveProjectionPanel({
         pixelOffset: codeEditor.getScrollTop() - codeEditor.getTopForLineNumber(topLine),
       });
       current = snapshot;
-      decorationsRef.current?.set(buildLiveProjectionDecorations(snapshot.blocks));
+      decorationsRef.current?.update(snapshot.blocks);
       if (selection) {
         const anchor = model.getPositionAt(restored.anchor);
         const active = model.getPositionAt(restored.active);
