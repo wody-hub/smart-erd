@@ -2344,6 +2344,40 @@
       "allMatched": "모든 컬럼이 사전과 일치합니다.",
       "expected": "예상: {{value}}",
       "actual": "현재: {{value}}"
+    },
+    "unifiedEditing": {
+      "editable": "기존 필드 편집",
+      "CLEAN": "저장됨",
+      "DIRTY": "편집 중",
+      "VALID": "편집 중",
+      "INVALID": "구문 오류",
+      "UNSUPPORTED": "미지원 편집",
+      "COMMITTING": "저장 중",
+      "CONFLICT": "충돌",
+      "BLOCKED": "차단",
+      "remotePending": "원격 변경 대기 중",
+      "unsupported": "블록 구조 변경(컬럼 추가·삭제·이동, FK, 사전 연결)은 아직 지원되지 않습니다",
+      "invalid": "DSL 구문 또는 중복 이름을 확인하세요. 변경은 저장되지 않았습니다.",
+      "dictionaryLinked": "사전에 연결된 이름·타입 편집은 아직 지원되지 않습니다.",
+      "dictionaryChanged": "편집 중 사전이 변경되었습니다. 로컬 텍스트는 유지됩니다.",
+      "entityRemoved": "원격에서 대상이 삭제되었습니다. 로컬 텍스트를 유지하며 다시 생성하지 않습니다.",
+      "conflictTitle": "같은 필드가 원격에서 변경되었습니다. 이 블록에 적용할 값을 선택하세요.",
+      "applyMine": "내 값 적용",
+      "keepRemote": "원격 값 유지",
+      "applyMineFor": "{{table}}: 내 값 적용",
+      "keepRemoteFor": "{{table}}: 원격 값 유지",
+      "undo": "실행 취소",
+      "redo": "다시 실행",
+      "fields": {
+        "label": "물리 테이블명",
+        "logicalTableName": "논리 테이블명",
+        "name": "물리 컬럼명",
+        "logicalName": "논리 컬럼명",
+        "type": "타입",
+        "pk": "기본 키",
+        "nullable": "NULL 허용"
+      },
+      "notReady": "연결과 편집 권한을 확인하는 동안 로컬 텍스트를 보관합니다."
     }
   },
   "dictionary": {

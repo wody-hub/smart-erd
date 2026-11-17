@@ -656,6 +656,9 @@ export default function DiagramPage() {
                       enabled={unifiedProjectionEnabled}
                       diagramId={diagramId!}
                       runtime={codeProjectionRuntime}
+                      canEdit={canEdit}
+                      editReady={documentMutationSession?.ready ?? false}
+                      isEditReady={() => canEdit && (documentMutationSession?.ready ?? false)}
                     />
                     {validationOpen && <ValidationPanel onClose={() => setValidationOpen(false)} />}
                   </div>

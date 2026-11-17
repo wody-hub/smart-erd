@@ -1,0 +1,103 @@
+{
+  "generatedAt": "2026-11-17T08:52:17.621Z",
+  "options": {
+    "edit": true,
+    "sizes": [
+      200,
+      500
+    ],
+    "iterations": 40,
+    "pace": 250,
+    "baseUrl": "http://localhost:4502",
+    "apiUrl": "http://localhost:9502/api",
+    "out": "/private/tmp/claude-501/-Users-j-jaeyo-Project-ETC-smart-erd/b049c80d-5301-4aeb-818d-a1a3d3e80311/scratchpad/proj-edit-bench.json"
+  },
+  "results": [
+    {
+      "size": 200,
+      "mode": "edit",
+      "hydrateTextLength": 50714,
+      "iterations": 40,
+      "misses": 0,
+      "parseDebounceMs": {
+        "n": 40,
+        "p50": 151.1,
+        "p95": 152.5,
+        "max": 152.6
+      },
+      "commitWaitMs": {
+        "n": 40,
+        "p50": 801.3,
+        "p95": 803.6,
+        "max": 807.4
+      },
+      "lastInputToOwnerAppliedIncludingWaitMs": {
+        "n": 40,
+        "p50": 806.9,
+        "p95": 809.8,
+        "max": 814.4
+      },
+      "ownerAppliedExcludingWaitMs": {
+        "n": 40,
+        "p50": 5.8,
+        "p95": 6.8,
+        "max": 7.9
+      },
+      "peerPanelExcludingWaitMs": {
+        "n": 40,
+        "p50": 17,
+        "p95": 19.6,
+        "max": 25.9
+      },
+      "peerCanvasExcludingWaitMs": {
+        "n": 40,
+        "p50": 17,
+        "p95": 19.6,
+        "max": 25.9
+      }
+    },
+    {
+      "size": 500,
+      "mode": "edit",
+      "hydrateTextLength": 124826,
+      "iterations": 40,
+      "misses": 0,
+      "parseDebounceMs": {
+        "n": 40,
+        "p50": 151.2,
+        "p95": 152.3,
+        "max": 152.5
+      },
+      "commitWaitMs": {
+        "n": 40,
+        "p50": 801.5,
+        "p95": 803.5,
+        "max": 804.1
+      },
+      "lastInputToOwnerAppliedIncludingWaitMs": {
+        "n": 40,
+        "p50": 809.1,
+        "p95": 811.7,
+        "max": 813.4
+      },
+      "ownerAppliedExcludingWaitMs": {
+        "n": 40,
+        "p50": 7.6,
+        "p95": 9.4,
+        "max": 11
+      },
+      "peerPanelExcludingWaitMs": {
+        "n": 40,
+        "p50": 26.3,
+        "p95": 352,
+        "max": 387.1
+      },
+      "peerCanvasExcludingWaitMs": {
+        "n": 40,
+        "p50": 26.3,
+        "p95": 352,
+        "max": 387.1
+      }
+    }
+  ]
+}

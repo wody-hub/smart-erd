@@ -39,7 +39,9 @@ async function readProjection(page: Page) {
     const monaco = window.monaco as unknown as typeof Monaco | undefined;
     const codeEditor = monaco?.editor
       .getEditors()
-      .find((editor) => editor.getModel()?.uri.scheme === 'erd-live-projection');
+      .find((editor) =>
+        ['erd-live-projection', 'erd-unified-edit'].includes(editor.getModel()?.uri.scheme ?? ''),
+      );
     const model = codeEditor?.getModel();
     if (!codeEditor || !model || !monaco) throw new Error('Dedicated projection model is missing');
     const selection = codeEditor.getSelection();
@@ -86,7 +88,8 @@ async function readProjection(page: Page) {
       draftWrites: draftWindow.__unifiedDraftWrites ?? -1,
       modelCount: monaco.editor
         .getModels()
-        .filter((item) => item.uri.scheme === 'erd-live-projection').length,
+        .filter((item) => ['erd-live-projection', 'erd-unified-edit'].includes(item.uri.scheme))
+        .length,
     };
   });
 }
@@ -142,7 +145,9 @@ async function selectPeerColumn(page: Page) {
     const monaco = window.monaco as unknown as typeof Monaco;
     const codeEditor = monaco.editor
       .getEditors()
-      .find((editor) => editor.getModel()?.uri.scheme === 'erd-live-projection');
+      .find((editor) =>
+        ['erd-live-projection', 'erd-unified-edit'].includes(editor.getModel()?.uri.scheme ?? ''),
+      );
     const model = codeEditor?.getModel();
     const column = model
       ?.getAllDecorations()
@@ -159,7 +164,7 @@ async function selectPeerColumn(page: Page) {
   return readProjection(page);
 }
 
-test('internal live DSL follows persisted collaboration without editing or draft writes @smoke', async ({
+test('internal live DSL follows persisted collaboration without draft writes @smoke', async ({
   browser,
 }) => {
   test.skip(
@@ -243,12 +248,17 @@ test('internal live DSL follows persisted collaboration without editing or draft
     const after = await readProjection(peer);
     expect(after.anchor).toEqual(selected.anchor);
     expect(after.active).toEqual(selected.active);
-    expect(after.readOnly).toBe(true);
+    expect(after.readOnly).toBe(false);
     expect(after.modelCount).toBe(1);
 
     // 같은 사용자의 두 번째 탭에도 FK와 부모 이름 변경이 도달한다.
-    const parent = owner.locator('[data-table-name="Table 1"]');
-    await parent.getByText('Table 1', { exact: true }).dblclick();
+    // FK 연결 UI의 부모는 두 번째로 클릭한 테이블이므로, 투영 텍스트의 FK 참조에서 실제 부모 이름을 읽는다.
+    const parentName = (/> '([^']+)'\.(?:id|projection_owner_id) ::BIGINT/.exec(
+      (await readProjection(owner)).text,
+    ) ?? [])[1];
+    if (!parentName) throw new Error('FK parent table name was not found in the projection');
+    const parent = owner.locator(`[data-table-name="${parentName}"]`);
+    await parent.getByText(parentName, { exact: true }).dblclick();
     const tableName = parent.getByLabel(/테이블 이름|table name/i);
     await tableName.fill('projection_parent');
     await tableName.press('Enter');
@@ -259,7 +269,7 @@ test('internal live DSL follows persisted collaboration without editing or draft
       await expect
         .poll(async () => (await readProjection(page)).text)
         .toBe((await readProjection(owner)).text);
-      await expectReadOnlyInputPaths(page);
+      expect((await readProjection(page)).readOnly).toBe(false);
     }
     // 전체 reload 없이 같은 SPA 안에서 패널이 사라지고 다시 생겨도 모델이 남지 않는다.
     const timeOrigin = await secondTab.evaluate(() => performance.timeOrigin);
@@ -305,7 +315,7 @@ test('internal live DSL follows persisted collaboration without editing or draft
       .toContain('Table 3');
     for (const page of [owner, peer]) {
       const state = await readProjection(page);
-      expect(state.readOnly).toBe(true);
+      expect(state.readOnly).toBe(false);
       expect(state.draftWrites).toBe(0);
       expect(await page.evaluate((key) => localStorage.getItem(key), modeKey)).toBe('code');
       await page.evaluate(() => (window as DraftWatchWindow).__stopUnifiedDraftWatch?.());
@@ -386,7 +396,9 @@ async function expectReadOnlyInputPaths(page: Page): Promise<void> {
     const monaco = window.monaco as unknown as typeof Monaco;
     const codeEditor = monaco.editor
       .getEditors()
-      .find((editor) => editor.getModel()?.uri.scheme === 'erd-live-projection');
+      .find((editor) =>
+        ['erd-live-projection', 'erd-unified-edit'].includes(editor.getModel()?.uri.scheme ?? ''),
+      );
     const model = codeEditor?.getModel();
     if (!codeEditor || !model) throw new Error('Projection editor is missing');
     const range = model.getFullModelRange();
@@ -601,7 +613,7 @@ test('team VIEWER follows owner and refreshed dictionary without local doc write
     await expect
       .poll(async () => (await readProjection(viewer)).text, { timeout: PROPAGATION_TIMEOUT_MS })
       .toContain('Table 2');
-    const parent = owner.locator('.react-flow__node-table').filter({ hasText: 'viewer_seed' });
+    const parent = owner.locator('[data-table-name="viewer_seed"]');
     await parent.getByText('viewer_seed', { exact: true }).dblclick();
     const name = parent.getByLabel(/테이블 이름|table name/i);
     await name.fill('viewer_renamed');

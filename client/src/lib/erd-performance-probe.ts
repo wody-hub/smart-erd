@@ -386,3 +386,30 @@ export function probeExposeProjectionEditor(editorInstance: unknown): void {
   if (!enabled) return;
   probeWindow.__ERD_PROJECTION_EDITOR__ = editorInstance;
 }
+
+/**
+ * 내부 편집의 최종 파싱·dispatch·문서 적용·echo 지연을 이중 probe 플래그 뒤에서 기록한다.
+ * @param phase 커밋 처리 단계
+ * @param tableId 블록의 안정 ID(사용자 텍스트는 수집하지 않는다)
+ * @param startedAt 최종 파싱 또는 원격 이벤트의 performance.now 시각
+ * @param lastInputAt 마지막 사용자 입력 시각
+ * @returns 없음
+ */
+export function probeCodeBlockCommitPhase(
+  phase: 'parse' | 'dispatch' | 'applied' | 'echo',
+  tableId: string,
+  startedAt: number,
+  lastInputAt?: number,
+): void {
+  if (!enabled || !navigationOriginSet) return;
+  const timestamp = performance.now();
+  const durationMs = Math.max(0, timestamp - startedAt);
+  if (phase === 'applied' || phase === 'echo') probeCounter(`code-block-${phase}`, 1, durationMs);
+  emit(`code-block-${phase}`, {
+    tableId,
+    durationMs,
+    epochMs: performance.timeOrigin + timestamp,
+    inputEpochMs: lastInputAt === undefined ? 0 : performance.timeOrigin + lastInputAt,
+    debounceMs: lastInputAt === undefined ? 0 : Math.max(0, startedAt - lastInputAt),
+  });
+}

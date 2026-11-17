@@ -5,13 +5,27 @@ import type { editor } from 'monaco-editor';
 /**
  * DOM 없이 실제 Monaco TextModel을 만든다. 토큰화 서비스만 비활성화하며 범위 검증·편집은 원본이다.
  * @param text 초기 LF 텍스트
+ * @param withHistory 실제 Monaco UndoRedoService 연결 여부
  * @returns 호출자가 dispose할 Monaco 모델
  */
-export async function createProjectionMonacoModel(text = ''): Promise<editor.ITextModel> {
+export async function createProjectionMonacoModel(
+  text = '',
+  withHistory = false,
+): Promise<editor.ITextModel> {
   const { TextModel } = await import(
     pathToFileURL(resolve('node_modules/monaco-editor/esm/vs/editor/common/model/textModel.js'))
       .href
   );
+  const { UndoRedoService } = withHistory
+    ? await import(
+        pathToFileURL(
+          resolve('node_modules/monaco-editor/esm/vs/platform/undoRedo/common/undoRedoService.js'),
+        ).href
+      )
+    : { UndoRedoService: null };
+  const history = withHistory
+    ? new UndoRedoService({ confirm: async () => ({ confirmed: true }) }, { warn() {}, error() {} })
+    : { removeElements() {} };
   return new TextModel(
     text,
     'plaintext',
@@ -20,7 +34,7 @@ export async function createProjectionMonacoModel(text = ''): Promise<editor.ITe
       bracketPairColorizationOptions: { enabled: false, independentColorPoolPerBracketType: false },
     },
     null,
-    { removeElements() {} },
+    history,
     { requestRichLanguageFeatures() {} },
     { onDidChange: () => ({ dispose() {} }) },
     {

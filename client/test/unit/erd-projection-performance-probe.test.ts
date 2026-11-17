@@ -12,7 +12,7 @@ function probeHarness(buildEnabled: boolean, runtimeEnabled: boolean) {
     __ERD_PERF_PROBE_ENABLE__: runtimeEnabled,
     addEventListener: () => {},
   };
-  const module = { exports: {} as Record<string, (...args: number[]) => void> };
+  const module = { exports: {} as Record<string, (...args: unknown[]) => void> };
   const source = readFileSync('src/lib/erd-performance-probe.ts', 'utf8').replaceAll(
     'import.meta.env',
     'env',
@@ -25,7 +25,7 @@ function probeHarness(buildEnabled: boolean, runtimeEnabled: boolean) {
     exports: module.exports,
     window,
     env: { VITE_ERD_PERF_PROBE: String(buildEnabled) },
-    performance: { now: () => now, mark: (name: string) => marks.push(name) },
+    performance: { timeOrigin: 1000, now: () => now, mark: (name: string) => marks.push(name) },
     requestAnimationFrame: () => 0,
     structuredClone,
   });
@@ -70,4 +70,33 @@ test('enabled projection mark records event-to-Monaco duration and deleted-targe
   assert.equal(snapshot.counters['projection-patch-applied'].maxMs, 16);
   assert.equal(snapshot.counters['projection-deleted-target-relocations'].calls, 2);
   assert.ok(h.marks.includes('erdperf:projection-patch-applied'));
+});
+
+test('editing phase marks separate commit wait from final parse-to-applied cost and require both flags', () => {
+  for (const flags of [
+    [false, true],
+    [true, false],
+  ]) {
+    const h = probeHarness(flags[0], flags[1]);
+    h.api.probeSetNavigationOrigin();
+    h.api.probeCodeBlockCommitPhase('parse', 'table-id', 0, 0);
+    assert.equal(h.marks.length, 0);
+  }
+  const h = probeHarness(true, true);
+  h.api.probeSetNavigationOrigin();
+  h.time(800);
+  h.api.probeCodeBlockCommitPhase('parse', 'table-id', 800, 0);
+  h.time(802);
+  h.api.probeCodeBlockCommitPhase('dispatch', 'table-id', 800, 0);
+  h.time(810);
+  h.api.probeCodeBlockCommitPhase('applied', 'table-id', 800, 0);
+  const read = h.window.__ERD_PERF_SNAPSHOT__ as () => {
+    events: { type: string; detail?: Record<string, unknown> }[];
+  };
+  const event = read().events.find((event) => event.type === 'code-block-applied')!;
+  assert.equal(event.detail?.durationMs, 10);
+  assert.equal(event.detail?.debounceMs, 800);
+  assert.equal(event.detail?.epochMs, 1810);
+  assert.equal(event.detail?.inputEpochMs, 1000);
+  assert.ok(h.marks.includes('erdperf:code-block-applied'));
 });

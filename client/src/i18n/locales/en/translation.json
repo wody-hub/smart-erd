@@ -2346,6 +2346,40 @@
       "allMatched": "All columns match the dictionary.",
       "expected": "Expected: {{value}}",
       "actual": "Actual: {{value}}"
+    },
+    "unifiedEditing": {
+      "editable": "Edit existing fields",
+      "CLEAN": "Saved",
+      "DIRTY": "Editing",
+      "VALID": "Editing",
+      "INVALID": "Syntax error",
+      "UNSUPPORTED": "Unsupported edit",
+      "COMMITTING": "Saving",
+      "CONFLICT": "Conflict",
+      "BLOCKED": "Blocked",
+      "remotePending": "Remote change pending",
+      "unsupported": "Block structure changes (adding, deleting or moving columns, FK, dictionary links) are not supported yet.",
+      "invalid": "Check DSL syntax or duplicate names. Changes have not been saved.",
+      "dictionaryLinked": "Editing dictionary-linked names or types is not supported yet.",
+      "dictionaryChanged": "The dictionary changed during editing. Local text is preserved.",
+      "entityRemoved": "The target was removed remotely. Local text is preserved and the entity will not be recreated.",
+      "conflictTitle": "The same field changed remotely. Choose the values to apply to this block.",
+      "applyMine": "Apply mine",
+      "keepRemote": "Keep remote",
+      "applyMineFor": "{{table}}: Apply mine",
+      "keepRemoteFor": "{{table}}: Keep remote",
+      "undo": "Undo",
+      "redo": "Redo",
+      "fields": {
+        "label": "Physical table name",
+        "logicalTableName": "Logical table name",
+        "name": "Physical column name",
+        "logicalName": "Logical column name",
+        "type": "Type",
+        "pk": "Primary key",
+        "nullable": "Nullable"
+      },
+      "notReady": "Local text is preserved while connection and edit permission are checked."
     }
   },
   "dictionary": {
