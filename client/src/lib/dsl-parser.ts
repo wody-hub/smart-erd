@@ -1,4 +1,10 @@
 import type {
+  BlockMetadata,
+  BlockRange,
+  BlockColumnRange,
+  DslExternalSymbols,
+} from './dsl-block-contracts.js';
+import type {
   DdlParseResult,
   ParsedColumn,
   ParsedRelation,
@@ -606,7 +612,11 @@ function parsePass1(lines: string[]): Pass1Result {
  * @param dictionary 사전 데이터 (Term/Domain 매핑)
  * @returns Pass2Result (tables, relations, tableRanges, diagnostics, errors)
  */
-function parsePass2(rawTables: RawTable[], dictionary: DslDictionary): Pass2Result {
+function parsePass2(
+  rawTables: RawTable[],
+  dictionary: DslDictionary,
+  externalSymbols?: DslExternalSymbols,
+): Pass2Result {
   const diagnostics: DslError[] = [];
   const errors: string[] = [];
   const tables: ParsedTable[] = [];
@@ -618,6 +628,12 @@ function parsePass2(rawTables: RawTable[], dictionary: DslDictionary): Pass2Resu
   const tablePhysicalMap = new Map<string, string>();
   // 논리명 → 컬럼 물리명 Set (FK 참조 해석용)
   const tableColumnsPhysical = new Map<string, Map<string, string>>();
+
+  // 블록 API에서만 공급한다. 현재 블록 선언은 아래에서 외부 심볼보다 우선한다.
+  for (const [logicalName, symbol] of externalSymbols ?? []) {
+    tablePhysicalMap.set(logicalName, symbol.physicalName);
+    tableColumnsPhysical.set(logicalName, new Map(symbol.columns));
+  }
 
   for (const rawTable of rawTables) {
     // 테이블명 사전 해석
@@ -1008,5 +1024,112 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
     },
     diagnostics,
     physicalNameHints: pass2.physicalNameHints,
+  };
+}
+
+/** 블록 전용 외부 심볼과 원본 sidecar 입력. */
+export interface DslBlockParseOptions {
+  externalSymbols?: DslExternalSymbols;
+  metadata?: BlockMetadata;
+}
+
+/** 단일 블록 파싱 결과. 물리명·ID 원본은 metadata를 기준으로 보존한다. */
+export interface DslBlockParseResult extends DslParseResult {
+  tableRange?: BlockRange;
+  columnRanges: BlockColumnRange[];
+  /** 입력 sidecar의 분리된 사본. 파싱 결과로 원본을 재계산하지 않는다. */
+  metadata?: BlockMetadata;
+  /** 원본 이름·컬럼 순서가 일치할 때만 범위에 안정 ID를 부여한다. */
+  metadataMatchesText: boolean;
+}
+
+/**
+ * 외부 테이블을 재파싱하지 않고 단일 블록의 FK와 UTF-16 범위를 해석한다.
+ * 기존 parseDsl의 사전 진단·이름 해석을 유지하며 원본 sidecar는 별도로 반환한다.
+ * 편집 후 metadataMatchesText가 false이면 범위의 ID를 복구한 것으로 간주하지 않는다.
+ * 외부 표시명 중복은 호출자가 선택한 심볼을 사용하며 로컬 선언이 우선한다.
+ * @param dsl 단일 테이블 블록 텍스트
+ * @param dictionary 기존 파서 사전
+ * @param options 외부 심볼 및 보존할 원본 메타데이터
+ * @returns 파싱 결과·블록 및 컬럼 범위·원본 sidecar
+ */
+export function parseDslBlock(
+  dsl: string,
+  dictionary: DslDictionary,
+  options: DslBlockParseOptions = {},
+): DslBlockParseResult {
+  const lines = dsl.split('\n');
+  const pass1 = parsePass1(lines);
+  const pass2 = parsePass2(pass1.rawTables, dictionary, options.externalSymbols);
+  const diagnostics = [...pass1.diagnostics, ...pass2.diagnostics];
+  const errors = [...pass1.errors, ...pass2.errors];
+  if (pass1.rawTables.length > 1) {
+    diagnostics.push({
+      messageKey: 'erd.dsl.error.syntaxError',
+      line: pass1.rawTables[1].line,
+      startColumn: 1,
+      endColumn: 2,
+      severity: 'error',
+    });
+    errors.push('Expected a single DSL table block');
+  }
+  const raw = pass1.rawTables.length === 1 ? pass1.rawTables[0] : undefined;
+  const metadata = options.metadata === undefined ? undefined : structuredClone(options.metadata);
+  const metadataMatchesText = !!(
+    raw &&
+    metadata &&
+    raw.logicalName === (metadata.tableLogicalName || metadata.tablePhysicalName).trim() &&
+    raw.columns.length === metadata.columns.length &&
+    raw.columns.every(
+      (col, index) =>
+        col.logicalName ===
+        (metadata.columns[index].logicalName || metadata.columns[index].name).trim(),
+    )
+  );
+  const starts: number[] = [];
+  let offset = 0;
+  for (const line of lines) {
+    starts.push(offset);
+    offset += line.length + 1;
+  }
+  const endLine = raw?.endLine ?? raw?.line ?? 1;
+  const hasFinalNewline = endLine < lines.length;
+  const tableRange: BlockRange | undefined = raw
+    ? {
+        start: starts[raw.line - 1],
+        end: hasFinalNewline ? starts[endLine] : dsl.length,
+        startLine: raw.line,
+        endLine: hasFinalNewline ? endLine + 1 : endLine,
+        startColumn: 1,
+        endColumn: hasFinalNewline ? 1 : (lines[endLine - 1]?.length ?? 0) + 1,
+      }
+    : undefined;
+  const columnRanges = (raw?.columns ?? []).map((col, index) => {
+    const length = lines[col.line - 1].replace(/\r$/, '').length;
+    return {
+      columnId: metadataMatchesText ? metadata?.columnIds[index] : undefined,
+      logicalName: col.logicalName,
+      start: starts[col.line - 1],
+      end: starts[col.line - 1] + length,
+      startLine: col.line,
+      endLine: col.line,
+      startColumn: 1,
+      endColumn: length + 1,
+    };
+  });
+  return {
+    result: {
+      diagnostics: [],
+      tables: pass2.tables,
+      relations: pass2.relations,
+      errors,
+      tableRanges: pass2.tableRanges,
+    },
+    diagnostics,
+    physicalNameHints: pass2.physicalNameHints,
+    tableRange,
+    columnRanges,
+    metadata,
+    metadataMatchesText,
   };
 }

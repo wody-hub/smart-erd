@@ -14,7 +14,7 @@ export interface DslGeneratorDictionary {
 }
 
 /** FK 참조 정보 (논리명 기반) */
-interface DslFkRef {
+export interface DslFkRef {
   /** 부모 테이블 논리명 */
   parentTableLogical: string;
   /** 부모 컬럼 논리명 */
@@ -29,7 +29,7 @@ interface DslFkRef {
  * @param node 테이블 노드
  * @returns 테이블 논리명
  */
-function resolveTableLogicalName(node: TableNode): string {
+export function resolveTableLogicalName(node: Pick<TableNode, 'data'>): string {
   return node.data.logicalTableName || node.data.label;
 }
 
@@ -94,47 +94,11 @@ export function generateDsl(
 
   // 테이블 순회
   for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i];
-    const tableLogical = resolveTableLogicalName(node);
-
-    lines.push(`${DSL_TABLE_KEYWORD} ${formatDslIdentifier(tableLogical)} {`);
-
-    for (const col of node.data.columns) {
-      const colLogical = col.logicalName || col.name;
-
-      const parts: string[] = [`  ${formatDslIdentifier(colLogical)}`];
-
-      // FK 참조
-      const fkRef = fkMap.get(`${node.id}:${col.id}`);
-      if (fkRef) {
-        parts.push(
-          `> ${formatDslIdentifier(fkRef.parentTableLogical)}.${formatDslIdentifier(
-            fkRef.parentColLogical,
-          )}`,
-        );
-      }
-
-      // 도메인 명시 판정
-      const domainLabel = resolveDomainLabel(col, dictionary);
-      if (domainLabel) {
-        parts.push(`:${formatDslIdentifier(domainLabel)}`);
-      } else {
-        const typeLabel = resolveTypeLabel(col);
-        if (typeLabel) {
-          parts.push(`::${typeLabel}`);
-        }
-      }
-
-      // 옵션
-      const options = buildOptions(col);
-      if (options) {
-        parts.push(`[${options}]`);
-      }
-
-      lines.push(parts.join(' '));
-    }
-
-    lines.push('}');
+    lines.push(
+      ...formatDslTableLines(nodes[i], dictionary, (columnId) =>
+        fkMap.get(`${nodes[i].id}:${columnId}`),
+      ),
+    );
 
     // 테이블 간 빈 줄
     if (i < nodes.length - 1) {
@@ -143,6 +107,64 @@ export function generateDsl(
   }
 
   return lines.join('\n') + '\n';
+}
+
+/**
+ * 날짜·구분자 없이 테이블의 행을 생성한다. 기존 전체 생성기와 블록 생성기가 공유한다.
+ *
+ * @param node 테이블 데이터
+ * @param dictionary 사전 역조회
+ * @param findFk 컬럼 ID로 선택한 FK 참조 조회
+ * @returns LF로 결합할 테이블 행
+ */
+export function formatDslTableLines(
+  node: Pick<TableNode, 'data'>,
+  dictionary: DslGeneratorDictionary,
+  findFk: (columnId: string) => DslFkRef | undefined,
+): string[] {
+  const lines: string[] = [];
+  const tableLogical = resolveTableLogicalName(node);
+
+  lines.push(`${DSL_TABLE_KEYWORD} ${formatDslIdentifier(tableLogical)} {`);
+
+  for (const col of node.data.columns) {
+    const colLogical = col.logicalName || col.name;
+
+    const parts: string[] = [`  ${formatDslIdentifier(colLogical)}`];
+
+    // FK 참조
+    const fkRef = findFk(col.id);
+    if (fkRef) {
+      parts.push(
+        `> ${formatDslIdentifier(fkRef.parentTableLogical)}.${formatDslIdentifier(
+          fkRef.parentColLogical,
+        )}`,
+      );
+    }
+
+    // 도메인 명시 판정
+    const domainLabel = resolveDomainLabel(col, dictionary);
+    if (domainLabel) {
+      parts.push(`:${formatDslIdentifier(domainLabel)}`);
+    } else {
+      const typeLabel = resolveTypeLabel(col);
+      if (typeLabel) {
+        parts.push(`::${typeLabel}`);
+      }
+    }
+
+    // 옵션
+    const options = buildOptions(col);
+    if (options) {
+      parts.push(`[${options}]`);
+    }
+
+    lines.push(parts.join(' '));
+  }
+
+  lines.push('}');
+
+  return lines;
 }
 
 /**
