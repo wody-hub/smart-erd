@@ -47,7 +47,9 @@ export function createDiagramDocumentMutationSession(
     const result = store.applyMutation<T>(policy.toMutation(command, resolvedMeta), resolvedMeta);
     if (!result.applied) {
       refresh();
-      return { status: 'rejected' };
+      return result.value === undefined
+        ? { status: 'rejected' }
+        : { status: 'rejected', value: result.value };
     }
     return { status: 'applied', value: result.value };
   };

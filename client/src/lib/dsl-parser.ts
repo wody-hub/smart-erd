@@ -1,3 +1,4 @@
+import { normalizeBlockDisplayName } from './dsl-block-display.js';
 import type {
   BlockMetadata,
   BlockRange,
@@ -1031,10 +1032,31 @@ export function parseDsl(dsl: string, dictionary: DslDictionary): DslParseResult
 export interface DslBlockParseOptions {
   externalSymbols?: DslExternalSymbols;
   metadata?: BlockMetadata;
+  /** 내부 필드 편집 경로에서만 미등록 용어를 경고로 낮춘다. 기본값은 error다. */
+  unknownTermSeverity?: 'error' | 'warning';
+}
+
+/** 사전 해석 전 토큰. 필드 편집과 구조·FK·사전 연결 변경을 구분한다. */
+export interface DslBlockSyntax {
+  logicalName: string;
+  columns: Pick<
+    RawColumn,
+    | 'logicalName'
+    | 'fkTable'
+    | 'fkColumn'
+    | 'domainName'
+    | 'explicitType'
+    | 'options'
+    | 'line'
+    | 'nameStartCol'
+    | 'nameEndCol'
+  >[];
 }
 
 /** 단일 블록 파싱 결과. 물리명·ID 원본은 metadata를 기준으로 보존한다. */
 export interface DslBlockParseResult extends DslParseResult {
+  /** 단일 블록일 때만 제공하는 사전 해석 전 토큰. */
+  syntax?: DslBlockSyntax;
   tableRange?: BlockRange;
   columnRanges: BlockColumnRange[];
   /** 입력 sidecar의 분리된 사본. 파싱 결과로 원본을 재계산하지 않는다. */
@@ -1062,7 +1084,14 @@ export function parseDslBlock(
   const pass1 = parsePass1(lines);
   const pass2 = parsePass2(pass1.rawTables, dictionary, options.externalSymbols);
   const diagnostics = [...pass1.diagnostics, ...pass2.diagnostics];
-  const errors = [...pass1.errors, ...pass2.errors];
+  const errors = [...pass1.errors, ...pass2.errors].filter(
+    (error) => options.unknownTermSeverity !== 'warning' || !error.startsWith('Unknown term:'),
+  );
+  if (options.unknownTermSeverity === 'warning') {
+    for (const diagnostic of diagnostics) {
+      if (diagnostic.messageKey === 'erd.dsl.error.unknownTerm') diagnostic.severity = 'warning';
+    }
+  }
   if (pass1.rawTables.length > 1) {
     diagnostics.push({
       messageKey: 'erd.dsl.error.syntaxError',
@@ -1075,16 +1104,27 @@ export function parseDslBlock(
   }
   const raw = pass1.rawTables.length === 1 ? pass1.rawTables[0] : undefined;
   const metadata = options.metadata === undefined ? undefined : structuredClone(options.metadata);
+  const displayNames =
+    metadata?.columns.map((col) => normalizeBlockDisplayName(col.logicalName || col.name).trim()) ??
+    [];
+  // 정규화 전에는 달랐던 이름이 충돌하면 위치만으로 ID를 복구하지 않는다.
+  const ambiguousDisplay = displayNames.some((name, index) =>
+    displayNames.some(
+      (other, otherIndex) =>
+        otherIndex !== index &&
+        name === other &&
+        (metadata!.columns[index].logicalName || metadata!.columns[index].name) !==
+          (metadata!.columns[otherIndex].logicalName || metadata!.columns[otherIndex].name),
+    ),
+  );
   const metadataMatchesText = !!(
+    !ambiguousDisplay &&
     raw &&
     metadata &&
-    raw.logicalName === (metadata.tableLogicalName || metadata.tablePhysicalName).trim() &&
+    raw.logicalName ===
+      normalizeBlockDisplayName(metadata.tableLogicalName || metadata.tablePhysicalName).trim() &&
     raw.columns.length === metadata.columns.length &&
-    raw.columns.every(
-      (col, index) =>
-        col.logicalName ===
-        (metadata.columns[index].logicalName || metadata.columns[index].name).trim(),
-    )
+    raw.columns.every((col, index) => col.logicalName === displayNames[index])
   );
   const starts: number[] = [];
   let offset = 0;
@@ -1131,5 +1171,11 @@ export function parseDslBlock(
     columnRanges,
     metadata,
     metadataMatchesText,
+    syntax: raw
+      ? {
+          logicalName: raw.logicalName,
+          columns: raw.columns.map((col) => ({ ...col, options: [...col.options] })),
+        }
+      : undefined,
   };
 }

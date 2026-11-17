@@ -21,6 +21,7 @@ export function shouldScheduleCodeModeSnapshotPersist(origin: unknown): boolean 
     origin === SHARED_SCHEMA_DRAFT_ORIGIN ||
     origin === 'canvas-user-layout' ||
     origin === 'canvas-user-preview-position' ||
+    origin === 'canvas-user-code-commit' ||
     (typeof origin === 'object' &&
       origin !== null &&
       'type' in origin &&

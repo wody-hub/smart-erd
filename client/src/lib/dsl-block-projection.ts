@@ -1,3 +1,4 @@
+import { normalizeBlockDisplayName } from './dsl-block-display.js';
 import { extractColId } from './handle-id.js';
 import { formatDslTableLines, resolveTableLogicalName, type DslFkRef } from './dsl-generator.js';
 import type { DslGeneratorDictionary } from './dsl-generator.js';
@@ -88,7 +89,7 @@ function generateIndexedBlock(
   // 정규화하고 원본 이름은 sidecar에 보존한다(사전 원본은 입력 스냅샷에 유지).
   const text =
     formatDslTableLines(node, context.dictionary, (id) => refs.get(id))
-      .map((line) => line.replace(/\r\n|[\r\n]/g, ' '))
+      .map(normalizeBlockDisplayName)
       .join('\n') + '\n';
   const lines = text.split('\n');
   let offset = lines[0].length + 1;

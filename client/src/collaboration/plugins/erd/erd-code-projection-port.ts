@@ -1,3 +1,4 @@
+import { CODE_BLOCK_COMMIT_META_KEY, registerCodeBlockDictionary } from './erd-code-block-commit';
 import type * as Y from 'yjs';
 import type {
   DocumentReadExecutor,
@@ -36,6 +37,10 @@ export interface TextPatchBatch extends BlockTextPatchBatch {
   invalidatedTableIds: string[];
   fullRevalidation: boolean;
   fullResync: boolean;
+  /** 이 배치를 만든 사용자 커밋 ID. 혼합 배치를 통째로 무시하는 근거로 쓰지 않는다. */
+  commitIds?: string[];
+  /** 원격 변경을 포함해 배치로 병합된 실제 Yjs transaction origin 목록. */
+  transactionOrigins?: unknown[];
 }
 
 /** 포트는 읽기·구독만 요구하며 권한 게이트나 mutation 포트를 받지 않는다. */
@@ -102,6 +107,10 @@ export class ErdCodeProjectionPort {
   private full = false;
   private scheduled = false;
   private disposed = false;
+  private observedDocument?: Y.Doc;
+  private unbindDocument?: () => void;
+  private readonly commitIds = new Set<string>();
+  private readonly transactionOrigins = new Set<unknown>();
   private readonly scopes = new Map<string, ScopeRef>();
   private readonly listeners = new Set<(batch: TextPatchBatch) => void>();
   private readonly unsubscribe: () => void;
@@ -141,6 +150,7 @@ export class ErdCodeProjectionPort {
     )
       return;
     this.dictionary = structuredClone(dictionary);
+    if (this.hydrated) this.bindDocument(true);
     this.schedule();
   }
 
@@ -203,10 +213,15 @@ export class ErdCodeProjectionPort {
   private flushPending(notify: boolean): TextPatchBatch | undefined {
     if (this.disposed || !this.hydrated) return;
     const document = this.options.getDocument();
+    this.bindDocument();
     const epoch = this.options.getEpoch?.();
     const full = this.full || this.document !== document || this.epoch !== epoch;
     if (!this.dirty && !full) return;
     const scopes = [...this.scopes.values()];
+    const commitIds = [...this.commitIds];
+    const transactionOrigins = [...this.transactionOrigins];
+    this.commitIds.clear();
+    this.transactionOrigins.clear();
     this.dirty = false;
     this.full = false;
     this.scopes.clear();
@@ -227,6 +242,8 @@ export class ErdCodeProjectionPort {
       epoch !== this.options.getEpoch?.() ||
       result.documentRevision !== this.options.read.getRevision()
     ) {
+      for (const id of commitIds) this.commitIds.add(id);
+      for (const origin of transactionOrigins) this.transactionOrigins.add(origin);
       this.full = true;
       this.schedule();
       return;
@@ -256,6 +273,8 @@ export class ErdCodeProjectionPort {
       invalidatedTableIds: invalidated,
       fullRevalidation: full,
       fullResync: false,
+      commitIds,
+      transactionOrigins,
     };
     this.snapshot = result.snapshot;
     this.projection = next;
@@ -270,10 +289,39 @@ export class ErdCodeProjectionPort {
    * @returns 없음
    */
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
     this.unsubscribe();
+    this.unbindDocument?.();
+    this.commitIds.clear();
+    this.transactionOrigins.clear();
     this.listeners.clear();
     this.scopes.clear();
+  }
+
+  /** 문서 교체 시 구독과 사전 출처를 옮겨 코어 수정 없이 원본 transaction 정보를 보존한다. */
+  private bindDocument(refreshDictionary = false): void {
+    const document = this.options.getDocument();
+    if (this.observedDocument === document && !refreshDictionary) return;
+    this.unbindDocument?.();
+    if (this.observedDocument !== document) {
+      this.commitIds.clear();
+      this.transactionOrigins.clear();
+    }
+    this.observedDocument = document;
+    const unregister = registerCodeBlockDictionary(document, this, this.dictionary.fingerprint);
+    /** 스토어의 afterTransaction 알림보다 먼저 원본 메타데이터를 수집한다. */
+    const capture = (transaction: Y.Transaction) => {
+      if (transaction.changed.size === 0) return;
+      this.transactionOrigins.add(transaction.origin);
+      const commitId = transaction.meta.get(CODE_BLOCK_COMMIT_META_KEY);
+      if (typeof commitId === 'string') this.commitIds.add(commitId);
+    };
+    document.on('beforeObserverCalls', capture);
+    this.unbindDocument = () => {
+      document.off('beforeObserverCalls', capture);
+      unregister();
+    };
   }
 
   /**

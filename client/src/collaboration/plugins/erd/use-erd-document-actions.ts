@@ -1,3 +1,4 @@
+import type { CodeBlockCommit, CodeBlockCommitResult } from '@/lib/code-block-commit-contract';
 import type { PositionBatch } from './erd-position-batch';
 import { useMemo } from 'react';
 import type { DdlParseResult } from '@/lib/ddl-parser';
@@ -25,6 +26,7 @@ type TableMetaUpdates = Partial<
 
 export interface ErdDocumentActions {
   available: boolean;
+  commitCodeBlock: (commit: CodeBlockCommit, meta?: MutationMeta) => CodeBlockCommitResult;
   applyLayout: (batch: PositionBatch, meta?: MutationMeta) => DocumentCommandDispatchStatus;
   applyPreviewPositions: (
     batch: PositionBatch,
@@ -138,6 +140,11 @@ export interface ErdDocumentActions {
 
 const UNAVAILABLE_ACTIONS: ErdDocumentActions = {
   available: false,
+  commitCodeBlock: (commit) => ({
+    status: 'rejected',
+    commitId: commit.commitId,
+    reason: 'not-ready',
+  }),
   applyLayout: () => 'unavailable',
   applyPreviewPositions: () => 'unavailable',
   addTable: () => 'unavailable',
@@ -201,6 +208,13 @@ function createErdDocumentActions(
 ): ErdDocumentActions {
   return {
     available: true,
+    commitCodeBlock: (commit, meta) => {
+      const result = emitCommandWithResult<CodeBlockCommitResult>(
+        canvasAdapter.commitCodeBlock(commit),
+        meta,
+      );
+      return result.value ?? { status: 'rejected', commitId: commit.commitId, reason: 'not-ready' };
+    },
     applyLayout: (batch, meta) => emitCommand(canvasAdapter.applyLayout(batch), meta),
     applyPreviewPositions: (batch, meta) =>
       emitCommand(canvasAdapter.applyPreviewPositions(batch), meta),

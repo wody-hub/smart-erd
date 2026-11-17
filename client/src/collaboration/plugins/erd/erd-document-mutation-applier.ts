@@ -1,3 +1,4 @@
+import { applyCodeBlockCommit, getCodeBlockDictionaryFingerprint } from './erd-code-block-commit';
 import {
   writeSharedSchemaDraftPositions,
   SHARED_SCHEMA_DRAFT_ORIGIN,
@@ -81,10 +82,19 @@ export class ErdDocumentMutationApplier {
   constructor(
     private readonly engine: YjsSharedDocumentEngine,
     private readonly stopHistoryCapture: () => void = () => {},
+    private readonly getDictionaryFingerprint: () => string | undefined = () =>
+      getCodeBlockDictionaryFingerprint(this.engine.getDocument()),
   ) {}
 
   apply<T = unknown>(mutation: DocumentMutation): DocumentMutationApplyResult<T> {
     switch (mutation.key) {
+      case 'code-block:commit': {
+        const result = applyCodeBlockCommit(this.engine.getDocument(), mutation.payload, {
+          dictionaryFingerprint: this.getDictionaryFingerprint(),
+          stopHistoryCapture: this.stopHistoryCapture,
+        });
+        return { applied: result.status === 'applied', value: result as T };
+      }
       case 'schema-draft:positions': {
         const positions = mutation.payload?.positions;
         if (!positions || typeof positions !== 'object' || Array.isArray(positions)) {

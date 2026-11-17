@@ -1,3 +1,5 @@
+import type { CodeBlockCommit } from '@/lib/code-block-commit-contract';
+import { isCodeBlockCommit } from './erd-code-block-commit';
 import { isPositionBatch, type PositionBatch } from './erd-position-batch';
 export const ERD_DOCUMENT_PLUGIN_ID = 'erd';
 
@@ -58,6 +60,7 @@ export interface ErdCanvasInputAdapter extends CanvasInputAdapter {
   updateEdgeWaypoints(edgeId: string, waypoints: Waypoint[]): DocumentCommand;
   resetEdgeWaypoints(edgeId: string): DocumentCommand;
   normalizeEdgeHandles(nodeIds?: string[], reason?: EdgeHandleNormalizationReason): DocumentCommand;
+  commitCodeBlock(commit: CodeBlockCommit): DocumentCommand;
   applyLayout(batch: PositionBatch): DocumentCommand;
   applyPreviewPositions(batch: PositionBatch): DocumentCommand;
   moveTable(tableId: string, positionX: number, positionY: number): DocumentCommand;
@@ -194,6 +197,11 @@ class ErdCanvasInputAdapterImpl implements ErdCanvasInputAdapter {
         reason,
       },
     };
+  }
+
+  /** 블록의 명시적 필드 패치를 strict 문서 명령으로 변환한다. */
+  commitCodeBlock(commit: CodeBlockCommit): DocumentCommand {
+    return { key: 'code-block:commit', payload: { ...commit } };
   }
 
   /** 자동정렬 위치 배치를 문서 명령으로 변환한다. */
@@ -380,6 +388,7 @@ export function isErdCanvasInputAdapter(
     typeof (adapter as ErdCanvasInputAdapter).updateEdgeWaypoints === 'function' &&
     typeof (adapter as ErdCanvasInputAdapter).resetEdgeWaypoints === 'function' &&
     typeof (adapter as ErdCanvasInputAdapter).normalizeEdgeHandles === 'function' &&
+    typeof (adapter as ErdCanvasInputAdapter).commitCodeBlock === 'function' &&
     typeof (adapter as ErdCanvasInputAdapter).applyLayout === 'function' &&
     typeof (adapter as ErdCanvasInputAdapter).applyPreviewPositions === 'function' &&
     typeof (adapter as ErdCanvasInputAdapter).moveTable === 'function' &&
@@ -426,6 +435,22 @@ class ErdProjector implements Projector {
 
 class ErdScopeResolver implements ScopeResolver {
   resolve(command: DocumentCommand): ScopeRef[] {
+    if (command.key === 'code-block:commit') {
+      if (!isCodeBlockCommit(command.payload)) return [];
+      const commit = command.payload;
+      return [
+        { kind: 'table', id: commit.tableId, mode: 'exclusive' },
+        ...[
+          ...new Set(
+            commit.patches.flatMap((patch) => (patch.target === 'column' ? [patch.columnId] : [])),
+          ),
+        ].map((id) => ({
+          kind: 'column',
+          id: buildErdColumnEntityId(commit.tableId, id),
+          mode: 'exclusive' as const,
+        })),
+      ];
+    }
     if (command.key === 'layout:apply' || command.key === 'preview-position:apply') {
       return isPositionBatch(command.payload)
         ? command.payload.entries.map((entry) => ({
