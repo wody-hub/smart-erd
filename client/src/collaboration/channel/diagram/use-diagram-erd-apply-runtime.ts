@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { Edge, Node } from '@xyflow/react';
-import useCanvasStore from '@/stores/erd/useCanvasStore';
+import { useDiagramErdApplyActions } from './use-diagram-erd-apply-actions';
 import type { ERDEdge, TableGroup, TableNode, TableNodeData } from '@/types/erd';
 import {
   useDiagramErdGroupsReader,
@@ -25,7 +25,10 @@ export interface DiagramErdApplyCurrentState {
 
 export interface DiagramErdApplyRuntime {
   currentNodes: TableNode[];
-  applyLayout: (nodes: Node<TableNodeData>[]) => void;
+  applyLayout: (
+    nodes: Node<TableNodeData>[],
+    fromNodes: readonly Node<TableNodeData>[],
+  ) => 'applied' | 'rejected';
   captureBeforeState: () => DiagramErdApplyBeforeState;
   getCurrentNodes: () => TableNode[];
   getCurrentState: () => DiagramErdApplyCurrentState;
@@ -34,7 +37,7 @@ export interface DiagramErdApplyRuntime {
 export function useDiagramErdApplyRuntime(): DiagramErdApplyRuntime {
   const diagramErdGroupsReader = useDiagramErdGroupsReader();
   const diagramErdStructureSnapshot = useDiagramErdStructureSnapshot();
-  const applyLayout = useCanvasStore((state) => state.applyLayout);
+  const { applyLayout } = useDiagramErdApplyActions();
 
   return useMemo(
     () => ({

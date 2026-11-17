@@ -1,3 +1,4 @@
+import type { PositionBatch } from './erd-position-batch';
 import { useMemo } from 'react';
 import type { DdlParseResult } from '@/lib/ddl-parser';
 import type { DiagramDictionaryReconciliationPlan } from '@/lib/diagram-dictionary-reconciliation';
@@ -24,6 +25,11 @@ type TableMetaUpdates = Partial<
 
 export interface ErdDocumentActions {
   available: boolean;
+  applyLayout: (batch: PositionBatch, meta?: MutationMeta) => DocumentCommandDispatchStatus;
+  applyPreviewPositions: (
+    batch: PositionBatch,
+    meta?: MutationMeta,
+  ) => DocumentCommandDispatchStatus;
   addTable: (name?: string, meta?: MutationMeta) => DocumentCommandDispatchStatus;
   deleteTable: (tableId: string, meta?: MutationMeta) => DocumentCommandDispatchStatus;
   connectEdge: (
@@ -132,6 +138,8 @@ export interface ErdDocumentActions {
 
 const UNAVAILABLE_ACTIONS: ErdDocumentActions = {
   available: false,
+  applyLayout: () => 'unavailable',
+  applyPreviewPositions: () => 'unavailable',
   addTable: () => 'unavailable',
   deleteTable: () => 'unavailable',
   connectEdge: () => 'unavailable',
@@ -193,6 +201,9 @@ function createErdDocumentActions(
 ): ErdDocumentActions {
   return {
     available: true,
+    applyLayout: (batch, meta) => emitCommand(canvasAdapter.applyLayout(batch), meta),
+    applyPreviewPositions: (batch, meta) =>
+      emitCommand(canvasAdapter.applyPreviewPositions(batch), meta),
     addTable: (name, meta) => emitCommand(canvasAdapter.addTable(name), meta),
     deleteTable: (tableId, meta) => emitCommand(canvasAdapter.deleteTable(tableId), meta),
     connectEdge: (sourceTableId, targetTableId, sourceHandle, targetHandle, relationType, meta) =>

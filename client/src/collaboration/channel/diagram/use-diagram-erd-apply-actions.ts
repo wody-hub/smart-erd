@@ -16,7 +16,10 @@ import type { TableNodeData } from '@/types/erd';
 type AppliedStatus = 'applied' | 'rejected';
 
 export interface DiagramErdApplyActions {
-  applyLayout: (nodes: Node<TableNodeData>[]) => AppliedStatus;
+  applyLayout: (
+    nodes: Node<TableNodeData>[],
+    fromNodes: readonly Node<TableNodeData>[],
+  ) => AppliedStatus;
   replaceFromDdl: (result: DdlParseResult) => AppliedStatus;
   applyDiffPlan: (plan: DiffPlan) => ApplyDiffResult | null;
   updateGroupTables: (groupId: string, toAdd: string[], toRemove: string[]) => AppliedStatus;
@@ -24,7 +27,6 @@ export interface DiagramErdApplyActions {
 
 export function useDiagramErdApplyActions(): DiagramErdApplyActions {
   const erdDocumentActions = useErdDocumentActions();
-  const applyLayoutFallback = useCanvasStore((state) => state.applyLayout);
   const replaceFromDdlFallback = useCanvasStore((state) => state.replaceFromDdl);
   const applyDiffPlanFallback = useCanvasStore((state) => state.applyDiffPlan);
   const updateGroupTablesFallback = useCanvasStore((state) => state.updateGroupTables);
@@ -32,8 +34,8 @@ export function useDiagramErdApplyActions(): DiagramErdApplyActions {
 
   return useMemo(
     () => ({
-      applyLayout: (nodes: Node<TableNodeData>[]) => {
-        return commitErdLayoutNodes(nodes, erdDocumentActions, applyLayoutFallback, notifyRejected);
+      applyLayout: (nodes: Node<TableNodeData>[], fromNodes: readonly Node<TableNodeData>[]) => {
+        return commitErdLayoutNodes(nodes, fromNodes, erdDocumentActions, notifyRejected);
       },
       replaceFromDdl: (result: DdlParseResult) => {
         return resolveDiagramAppliedStatus(
@@ -59,7 +61,6 @@ export function useDiagramErdApplyActions(): DiagramErdApplyActions {
     }),
     [
       applyDiffPlanFallback,
-      applyLayoutFallback,
       erdDocumentActions,
       notifyRejected,
       replaceFromDdlFallback,

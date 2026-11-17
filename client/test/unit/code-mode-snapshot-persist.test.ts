@@ -27,3 +27,7 @@ test('shouldScheduleCodeModeSnapshotPersist 는 remote/system/origin 없음 을 
   assert.equal(shouldScheduleCodeModeSnapshotPersist(null), false);
   assert.equal(shouldScheduleCodeModeSnapshotPersist(undefined), false);
 });
+
+test('preview position batches reserve a code-mode snapshot', () => {
+  assert.equal(shouldScheduleCodeModeSnapshotPersist('canvas-user-preview-position'), true);
+});

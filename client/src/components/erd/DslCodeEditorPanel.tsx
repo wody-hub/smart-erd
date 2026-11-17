@@ -666,17 +666,13 @@ export default function DslCodeEditorPanel({
         ? diagramPreviewPositionActions.syncPreviewPositionOverridesToPersisted(
             previewGraph.nodes,
             previewPositionOverrides,
-            diagramErdStructureSnapshot.currentNodes,
+            diagramErdStructureSnapshot.readCurrentStructure().nodes,
           )
-        : [];
+        : null;
 
-      const syncedPreviewNodeIds = new Set(previewPositionChanges);
-      const remainingPreviewPositions = Object.fromEntries(
-        Object.entries(previewPositionOverrides).filter(
-          ([previewNodeId]) => !syncedPreviewNodeIds.has(previewNodeId),
-        ),
-      );
-      if (syncedPreviewNodeIds.size > 0) {
+      const remainingPreviewPositions =
+        previewPositionChanges?.remainingPositionOverrides ?? previewPositionOverrides;
+      if (previewPositionChanges && previewPositionChanges.syncedPreviewNodeIds.length > 0) {
         onPreviewPositionOverridesChange?.(remainingPreviewPositions);
       }
 
@@ -699,7 +695,7 @@ export default function DslCodeEditorPanel({
       });
     }, [
       buildCurrentPersistedRevisionHash,
-      diagramErdStructureSnapshot.currentNodes,
+      diagramErdStructureSnapshot,
       diagramPreviewPositionActions,
       draftHydrated,
       dslText,
@@ -855,6 +851,7 @@ export default function DslCodeEditorPanel({
    *
    * 적용 결과와 현재 공유 초안의 schema hash가 같으면 초안을 완전히 비운다.
    * 다르면 다른 사용자의 후속 초안을 보호하기 위해 baseline만 최신 persisted 기준으로 갱신한다.
+   * 위치 초안은 호출부에서 원자 배치가 성공한 항목만 정리한다.
    *
    * @param nextBaselineRevision 적용 직후 최신 persisted baseline revision
    * @param appliedSchemaHash 방금 persisted로 반영한 schema hash
@@ -877,14 +874,12 @@ export default function DslCodeEditorPanel({
     if (shouldClearSharedSchemaDraft) {
       clearSharedSchemaDraft(ydoc, SHARED_SCHEMA_DRAFT_ORIGIN);
       clearCodeModeSharedDraft(ydoc, SHARED_SCHEMA_DRAFT_ORIGIN);
-      onPreviewPositionOverridesChange?.({});
       return;
     }
 
     if (!hasSharedSchemaDraftContent(currentSharedSchemaDraft)) {
       clearSharedSchemaDraft(ydoc, SHARED_SCHEMA_DRAFT_ORIGIN);
       clearCodeModeSharedDraft(ydoc, SHARED_SCHEMA_DRAFT_ORIGIN);
-      onPreviewPositionOverridesChange?.({});
       return;
     }
 

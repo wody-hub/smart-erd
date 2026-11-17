@@ -1,3 +1,4 @@
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { useEffect, useMemo } from 'react';
 import type { DiagramDetail } from '@/types/diagram';
 import type { DocumentCheckpointReader } from '@/collaboration/core/contracts/document-checkpoint';
@@ -53,7 +54,12 @@ export function useDiagramDocumentRuntime({
     [documentBootstrap?.revision],
   );
   const documentMutationApplier = useMemo(
-    () => (sharedDocumentEngine ? new ErdDocumentMutationApplier(sharedDocumentEngine) : null),
+    () =>
+      sharedDocumentEngine
+        ? new ErdDocumentMutationApplier(sharedDocumentEngine, () =>
+            useCanvasStore.getState().stopHistoryCapture(),
+          )
+        : null,
     [sharedDocumentEngine],
   );
   const documentReadContextFactory = useMemo(

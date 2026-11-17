@@ -1,3 +1,4 @@
+import { isPositionBatch, type PositionBatch } from './erd-position-batch';
 export const ERD_DOCUMENT_PLUGIN_ID = 'erd';
 
 import * as Y from 'yjs';
@@ -57,6 +58,8 @@ export interface ErdCanvasInputAdapter extends CanvasInputAdapter {
   updateEdgeWaypoints(edgeId: string, waypoints: Waypoint[]): DocumentCommand;
   resetEdgeWaypoints(edgeId: string): DocumentCommand;
   normalizeEdgeHandles(nodeIds?: string[], reason?: EdgeHandleNormalizationReason): DocumentCommand;
+  applyLayout(batch: PositionBatch): DocumentCommand;
+  applyPreviewPositions(batch: PositionBatch): DocumentCommand;
   moveTable(tableId: string, positionX: number, positionY: number): DocumentCommand;
   renameTable(tableId: string, label: string): DocumentCommand;
   updateTableMeta(tableId: string, updates: Record<string, unknown>): DocumentCommand;
@@ -191,6 +194,16 @@ class ErdCanvasInputAdapterImpl implements ErdCanvasInputAdapter {
         reason,
       },
     };
+  }
+
+  /** 자동정렬 위치 배치를 문서 명령으로 변환한다. */
+  applyLayout(batch: PositionBatch): DocumentCommand {
+    return { key: 'layout:apply', payload: batch };
+  }
+
+  /** 미리보기 위치 배치를 문서 명령으로 변환한다. */
+  applyPreviewPositions(batch: PositionBatch): DocumentCommand {
+    return { key: 'preview-position:apply', payload: batch };
   }
 
   moveTable(tableId: string, positionX: number, positionY: number): DocumentCommand {
@@ -367,6 +380,8 @@ export function isErdCanvasInputAdapter(
     typeof (adapter as ErdCanvasInputAdapter).updateEdgeWaypoints === 'function' &&
     typeof (adapter as ErdCanvasInputAdapter).resetEdgeWaypoints === 'function' &&
     typeof (adapter as ErdCanvasInputAdapter).normalizeEdgeHandles === 'function' &&
+    typeof (adapter as ErdCanvasInputAdapter).applyLayout === 'function' &&
+    typeof (adapter as ErdCanvasInputAdapter).applyPreviewPositions === 'function' &&
     typeof (adapter as ErdCanvasInputAdapter).moveTable === 'function' &&
     typeof (adapter as ErdCanvasInputAdapter).renameTable === 'function' &&
     typeof (adapter as ErdCanvasInputAdapter).updateTableMeta === 'function' &&
@@ -411,6 +426,15 @@ class ErdProjector implements Projector {
 
 class ErdScopeResolver implements ScopeResolver {
   resolve(command: DocumentCommand): ScopeRef[] {
+    if (command.key === 'layout:apply' || command.key === 'preview-position:apply') {
+      return isPositionBatch(command.payload)
+        ? command.payload.entries.map((entry) => ({
+            kind: 'table',
+            id: entry.tableId,
+            mode: 'exclusive',
+          }))
+        : [];
+    }
     const tableId = readString(command.payload?.tableId);
     const colId = readString(command.payload?.colId);
     const groupId = readString(command.payload?.groupId);

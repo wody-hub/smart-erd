@@ -1750,6 +1750,7 @@
       "sharedDraftConflict": "The persisted ERD changed since this shared draft started. Refresh before applying it again."
     },
     "toast": {
+      "commandRejected": "Could not apply the changes. Check the latest state and try again.",
       "created": "ERD document created",
       "createFailed": "Failed to create the ERD document",
       "deleted": "ERD document deleted",

@@ -26,14 +26,27 @@ export function syncEdgeHandlePreference(
   edgeYMap.delete('targetSide');
 }
 
-export function normalizeEdgeHandlesInYDoc(params: { doc: Y.Doc; nodeIds?: string[] }): boolean {
-  const { doc, nodeIds } = params;
+/** 쓰기 전에 계산한 엣지 핸들 정규화 계획. */
+export interface EdgeHandleNormalizationPatch {
+  edgeId: string;
+  edgeYMap: Y.Map<unknown>;
+  resolution: EdgeHandleResolution;
+  clearWaypoints: boolean;
+}
+
+/** 위치 배치의 최종 좌표를 기준으로 정규화 계획만 계산한다. */
+export function planEdgeHandleNormalization(params: {
+  doc: Y.Doc;
+  nodeIds?: string[];
+  positions?: ReadonlyMap<string, { x: number; y: number }>;
+}): EdgeHandleNormalizationPatch[] {
+  const { doc, nodeIds, positions } = params;
   const tablesMap = getTablesMap(doc);
   const edgesMap = getEdgesMap(doc);
   const filterIds = nodeIds && nodeIds.length > 0 ? new Set(nodeIds) : null;
-  let mutated = false;
+  const patches: EdgeHandleNormalizationPatch[] = [];
 
-  edgesMap.forEach((edgeYMap) => {
+  edgesMap.forEach((edgeYMap, edgeId) => {
     const sourceTableId = readString(edgeYMap.get('source'));
     const targetTableId = readString(edgeYMap.get('target'));
     const sourceHandle = readString(edgeYMap.get('sourceHandle'));
@@ -57,6 +70,8 @@ export function normalizeEdgeHandlesInYDoc(params: { doc: Y.Doc; nodeIds?: strin
       return;
     }
 
+    sourceNode.position = positions?.get(sourceTableId) ?? sourceNode.position;
+    targetNode.position = positions?.get(targetTableId) ?? targetNode.position;
     const resolution = resolveEdgeHandlesFromPreference({
       sourceNode,
       targetNode,
@@ -83,16 +98,31 @@ export function normalizeEdgeHandlesInYDoc(params: { doc: Y.Doc; nodeIds?: strin
       return;
     }
 
+    patches.push({
+      edgeId,
+      edgeYMap,
+      resolution,
+      clearWaypoints: readRoutingType(edgeYMap.get('routingType')) === 'straight' && handlesChanged,
+    });
+  });
+  return patches;
+}
+
+/** 계산된 정규화 계획을 현재 transaction에 반영한다. */
+export function applyEdgeHandleNormalizationPatches(patches: EdgeHandleNormalizationPatch[]): void {
+  for (const { edgeYMap, resolution, clearWaypoints } of patches) {
     edgeYMap.set('sourceHandle', resolution.sourceHandle);
     edgeYMap.set('targetHandle', resolution.targetHandle);
     syncEdgeHandlePreference(edgeYMap, resolution);
-    if (readRoutingType(edgeYMap.get('routingType')) === 'straight' && handlesChanged) {
-      edgeYMap.delete('waypoints');
-    }
-    mutated = true;
-  });
+    if (clearWaypoints) edgeYMap.delete('waypoints');
+  }
+}
 
-  return mutated;
+/** 대상 노드에 연결된 엣지 핸들을 정규화한다. */
+export function normalizeEdgeHandlesInYDoc(params: { doc: Y.Doc; nodeIds?: string[] }): boolean {
+  const patches = planEdgeHandleNormalization(params);
+  applyEdgeHandleNormalizationPatches(patches);
+  return patches.length > 0;
 }
 
 function readHandleMode(value: unknown): EdgeHandleMode | undefined {

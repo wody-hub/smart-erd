@@ -1,3 +1,4 @@
+import { isPositionBatch } from './erd-position-batch';
 import {
   ensureColumnStorage,
   getColumnYMap,
@@ -26,7 +27,12 @@ import {
   populateFromDdl,
 } from '@/lib/erd-ddl-yjs-utils';
 import { resolveUniqueTableLabel } from '@/lib/erd-yjs-utils';
-import { normalizeEdgeHandlesInYDoc, syncEdgeHandlePreference } from '@/lib/erd-edge-yjs-utils';
+import {
+  applyEdgeHandleNormalizationPatches,
+  planEdgeHandleNormalization,
+  normalizeEdgeHandlesInYDoc,
+  syncEdgeHandlePreference,
+} from '@/lib/erd-edge-yjs-utils';
 import {
   buildStableEdgeId,
   type EdgeHandleSelectionValue,
@@ -66,7 +72,10 @@ import {
  * core store는 이 구현을 통해서만 ERD/Yjs 세부사항과 연결된다.
  */
 export class ErdDocumentMutationApplier {
-  constructor(private readonly engine: YjsSharedDocumentEngine) {}
+  constructor(
+    private readonly engine: YjsSharedDocumentEngine,
+    private readonly stopHistoryCapture: () => void = () => {},
+  ) {}
 
   apply<T = unknown>(mutation: DocumentMutation): DocumentMutationApplyResult<T> {
     switch (mutation.key) {
@@ -90,6 +99,9 @@ export class ErdDocumentMutationApplier {
         return this.toApplyResult(this.applyEdgeResetWaypoints(mutation));
       case 'edge:normalize-handles':
         return this.toApplyResult(this.applyEdgeNormalizeHandles(mutation));
+      case 'layout:apply':
+      case 'preview-position:apply':
+        return this.toApplyResult(this.applyPositionBatch(mutation));
       case 'table:move':
         return this.toApplyResult(this.applyTableMove(mutation));
       case 'table:rename':
@@ -221,6 +233,58 @@ export class ErdDocumentMutationApplier {
         }
       });
     }, CANVAS_HISTORY_ORIGIN.USER_TABLE);
+    return true;
+  }
+
+  /** 전체 검증과 계획을 마친 위치 배치를 단일 transaction으로 반영한다. */
+  private applyPositionBatch(mutation: DocumentMutation): boolean {
+    const batch = mutation.payload;
+    if (!isPositionBatch(batch)) return false;
+    const doc = this.engine.getDocument();
+    const tablesMap = getTablesMap(doc);
+    const changes: { tableYMap: Y.Map<unknown>; position: { x: number; y: number } }[] = [];
+    for (const entry of batch.entries) {
+      const tableYMap = tablesMap.get(entry.tableId);
+      if (
+        !tableYMap ||
+        tableYMap.get('positionX') !== entry.from.x ||
+        tableYMap.get('positionY') !== entry.from.y
+      )
+        return false;
+      if (entry.from.x !== entry.to.x || entry.from.y !== entry.to.y) {
+        changes.push({ tableYMap, position: entry.to });
+      }
+    }
+    const targetIds = batch.entries.map((entry) => entry.tableId);
+    for (const id of targetIds) {
+      if (!mutation.affectedScopes.some((scope) => scope.kind === 'table' && scope.id === id)) {
+        mutation.affectedScopes.push({ kind: 'table', id, mode: 'exclusive' });
+      }
+    }
+    if (changes.length === 0) return true;
+    const patches = planEdgeHandleNormalization({
+      doc,
+      nodeIds: targetIds,
+      positions: new Map(batch.entries.map((entry) => [entry.tableId, entry.to])),
+    });
+    for (const { edgeId } of patches) {
+      if (!mutation.affectedScopes.some((scope) => scope.kind === 'edge' && scope.id === edgeId)) {
+        mutation.affectedScopes.push({ kind: 'edge', id: edgeId, mode: 'exclusive' });
+      }
+    }
+    const origin =
+      mutation.key === 'layout:apply'
+        ? CANVAS_HISTORY_ORIGIN.USER_LAYOUT
+        : CANVAS_HISTORY_ORIGIN.USER_PREVIEW_POSITION;
+    this.stopHistoryCapture();
+    try {
+      doc.transact(() => {
+        for (const { tableYMap, position } of changes) setTableYMapPosition(tableYMap, position);
+        applyEdgeHandleNormalizationPatches(patches);
+      }, origin);
+    } finally {
+      this.stopHistoryCapture();
+    }
     return true;
   }
 

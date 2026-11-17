@@ -225,7 +225,10 @@ interface ExecuteLayoutPhaseParams {
   syncPolicy: SyncPolicy;
   applyPath: ApplyPath;
   diffAppliedOperations: number;
-  applyLayout: (nodes: Node<TableNodeData>[]) => void;
+  applyLayout: (
+    nodes: Node<TableNodeData>[],
+    fromNodes: readonly Node<TableNodeData>[],
+  ) => 'applied' | 'rejected';
   getCurrentState: () => { nodes: Node<TableNodeData>[]; edges: Edge[] };
 }
 
@@ -257,10 +260,17 @@ async function executeLayoutPhase(params: ExecuteLayoutPhaseParams): Promise<Lay
       if (layoutResult.status === 'failed') {
         console.warn('[erd-sync] full layout failed; preserving existing positions');
       }
-      params.applyLayout(layoutResult.nodes);
+      if (
+        layoutResult.status !== 'failed' &&
+        params.applyLayout(layoutResult.nodes, freshNodes) === 'rejected'
+      ) {
+        throw new Error('Layout batch rejected');
+      }
     } else if (effectiveLayoutMode === 'incremental') {
       const layoutedNodes = applyIncrementalLayoutByLabel(params.beforeNodes, freshNodes);
-      params.applyLayout(layoutedNodes);
+      if (params.applyLayout(layoutedNodes, freshNodes) === 'rejected') {
+        throw new Error('Layout batch rejected');
+      }
     }
     layoutDurationMs = performance.now() - layoutStart;
   }

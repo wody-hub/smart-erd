@@ -7,6 +7,7 @@ export const CANVAS_HISTORY_ORIGIN = {
   USER_EDGE: 'canvas-user-edge',
   USER_GROUP: 'canvas-user-group',
   USER_LAYOUT: 'canvas-user-layout',
+  USER_PREVIEW_POSITION: 'canvas-user-preview-position',
   SYSTEM_PREVIEW: 'canvas-system-preview',
   SYSTEM_FALLBACK: 'canvas-system-fallback',
   SYSTEM_CODE_SYNC: 'canvas-system-code-sync',
@@ -28,6 +29,7 @@ export function createTrackedCanvasHistoryOrigins(): Set<unknown> {
     CANVAS_HISTORY_ORIGIN.USER_EDGE,
     CANVAS_HISTORY_ORIGIN.USER_GROUP,
     CANVAS_HISTORY_ORIGIN.USER_LAYOUT,
+    CANVAS_HISTORY_ORIGIN.USER_PREVIEW_POSITION,
     DRAG_TRANSACTION_ORIGIN,
   ]);
 }

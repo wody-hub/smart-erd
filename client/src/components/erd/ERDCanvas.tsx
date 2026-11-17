@@ -43,7 +43,6 @@ import type {
   Waypoint,
 } from '@/types/erd';
 import type { YjsProvider } from '@/collaboration/YjsProvider';
-import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { applyErdLayout } from '@/lib/auto-layout';
 import type { CodeEditorTableFocusRequest } from '@/lib/code-editor-table-navigation';
@@ -941,16 +940,10 @@ function ERDCanvas({
       return;
     }
 
-    const appliedStatus = applyActions.applyLayout(result.nodes);
-    requestAnimationFrame(() => {
-      edgeActions.normalizeEdgeHandles(undefined, 'layout', {
-        nodeOverrides: reactFlowInstance.getNodes() as Node<TableNodeData>[],
-        origin: CANVAS_HISTORY_ORIGIN.USER_LAYOUT,
-      });
-      if (appliedStatus === 'applied') {
-        void onPersistLayout?.();
-      }
-    });
+    const appliedStatus = applyActions.applyLayout(result.nodes, nodes);
+    if (appliedStatus === 'applied') {
+      void onPersistLayout?.();
+    }
   };
 
   /** Delete 키 — 하이라이트된 엣지 삭제 다이얼로그 */
