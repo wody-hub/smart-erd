@@ -22,7 +22,7 @@ import {
   type TableBlock,
 } from './dsl-block-projection.js';
 
-/** 사용자 텍스트 이력 한 단계. 원격 패치의 절대 좌표를 저장하지 않는다. */
+/** 미커밋 로컬 편집 세션의 텍스트 이력. 원격 변경이 도착하면 undo·redo를 모두 폐기한다. */
 interface TextHistoryEntry {
   /** 블록 전체 사용자 텍스트. */
   text: string;
@@ -71,7 +71,7 @@ export interface CodeBlockEditingOptions {
   /** 단위 B 문서 명령. */
   commit: (commit: CodeBlockCommit) => CodeBlockCommitResult | Promise<CodeBlockCommitResult>;
   /** 상태·진단 갱신 알림. */
-  changed: () => void;
+  changed: (id?: string) => void;
   /** 원격 선택·텍스트 이력의 비기록 편집. */
   replaceText: (id: string, text: string, authoritative?: TableBlock) => void;
   /** 이중 플래그로 제한한 성능 계측. */
@@ -132,7 +132,7 @@ export class CodeBlockEditingController {
         block.kind = kind;
         block.state.dirtySince ??= this.options.now();
         this.fail(id, { status: 'unsupported', reasons: ['structure-changed'], diagnostics: [] });
-        this.options.changed();
+        this.options.changed(id);
       }
       return;
     }
@@ -150,7 +150,7 @@ export class CodeBlockEditingController {
       block.state = { ...createBlockCommitState(text, this.ready), version: block.state.version };
       block.kind = 'field';
       block.conflicts = [];
-      this.options.changed();
+      this.options.changed(id);
     }
   }
   /**
@@ -204,8 +204,18 @@ export class CodeBlockEditingController {
       this.options.mark?.('echo', id);
       block.sent = undefined;
       // 성공 시점에 기준은 갱신되어 있으므로 echo로 추가 입력을 재기준화하지 않는다.
-      this.options.changed();
+      this.options.changed(id);
       return true;
+    }
+    // 전체 블록 스냅샷은 원격 이전 필드를 되살릴 수 있으므로 같은 echo 이외의 변경에서 폐기한다.
+    if (
+      !authoritative ||
+      !previous ||
+      previous.text !== authoritative.text ||
+      JSON.stringify(previous.metadata) !== JSON.stringify(authoritative.metadata)
+    ) {
+      block.undo = [];
+      block.redo = [];
     }
     if (
       authoritative &&
@@ -258,7 +268,7 @@ export class CodeBlockEditingController {
     } else if (merged.status === 'entity-removed')
       this.dispatch(id, { type: 'entity-removed', now: this.options.now() });
     else this.fail(id, merged);
-    this.options.changed();
+    this.options.changed(id);
     return true;
   }
   /**
@@ -285,19 +295,40 @@ export class CodeBlockEditingController {
       block.remotePending = false;
       this.cancel(id);
       this.options.replaceText(id, authoritative.text, authoritative);
-      this.options.changed();
+      this.options.changed(id);
       return;
     }
-    const rebased = mergeRemoteIntoLocalEdit({
-      base: block.base,
-      edited: block.base.text,
-      authoritativeBlock: authoritative,
-    });
-    if (rebased.status !== 'merged') {
+    if (
+      JSON.stringify(block.base.metadata.columnIds) !==
+      JSON.stringify(authoritative.metadata.columnIds)
+    ) {
       this.remote(authoritative, []);
       return;
     }
-    block.base = rebased.base;
+    // 토큰 기준은 유지하고, 승인할 필드의 비교값만 현재 문서 값으로 전진시킨다.
+    // 최초 base.text를 재병합하면 이전에 확정한 토큰이 새 변경으로 오인된다.
+    const metadata = structuredClone(block.base.metadata);
+    for (const conflict of block.conflicts) {
+      const target =
+        conflict.target === 'table'
+          ? metadata
+          : metadata.columns.find((column) => column.id === conflict.columnId);
+      if (!target) continue;
+      const field =
+        conflict.target === 'table'
+          ? conflict.field === 'label'
+            ? 'tablePhysicalName'
+            : 'tableLogicalName'
+          : conflict.field;
+      const current =
+        conflict.target === 'table'
+          ? authoritative.metadata[field as 'tablePhysicalName' | 'tableLogicalName']
+          : authoritative.metadata.columns.find((column) => column.id === conflict.columnId)?.[
+              conflict.field as keyof (typeof metadata.columns)[number]
+            ];
+      Object.assign(target, { [field]: current });
+    }
+    block.base = { ...block.base, metadata };
     block.conflicts = [];
     block.failure = undefined;
     block.state = {
@@ -336,7 +367,7 @@ export class CodeBlockEditingController {
         this.cancel(id!);
         block.state = { ...createBlockCommitState(next.text, true), version: block.state.version };
       }
-      this.options.changed();
+      this.options.changed(id);
       return 'text';
     }
     return 'document';
@@ -395,7 +426,7 @@ export class CodeBlockEditingController {
     block.kind = 'replace-lines';
     block.state.dirtySince ??= this.options.now();
     this.fail(id, { status: 'unsupported', reasons: ['structure-changed'], diagnostics: [] });
-    this.options.changed();
+    this.options.changed(id);
   }
   /**
    * 마운트 해제 시 늦은 응답과 모든 타이머를 무효화한다.
@@ -457,7 +488,7 @@ export class CodeBlockEditingController {
       } else if (effect.type === 'commit') this.commit(id, effect.text, effect.version);
       // 복구 헬퍼는 ID sidecar를 저장하지 못하므로 기존 work-mode draft에 섞어 저장하지 않는다.
     }
-    this.options.changed();
+    this.options.changed(id);
   }
   /**
    * 현재 기준으로 커밋을 계산한다. 사용자 ID는 dispatch 시에만 생성한다.
@@ -616,7 +647,7 @@ export class CodeBlockEditingController {
           reasons: [result.reason],
           diagnostics: [],
         };
-        this.options.changed();
+        this.options.changed(id);
       }
     };
     const result = this.options.commit(commit);

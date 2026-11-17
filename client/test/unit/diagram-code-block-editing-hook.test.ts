@@ -1,3 +1,4 @@
+import * as blockNames from '../../src/lib/code-block-names.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { OnMount } from '@monaco-editor/react';
@@ -21,7 +22,7 @@ import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
 /** 실제 TextModel 위에 에디터 UI 포트와 가상 타이머를 연결한다. */
-async function mounted() {
+async function mounted(size = 2) {
   const { Selection } = await import(
     pathToFileURL(resolve('node_modules/monaco-editor/esm/vs/editor/common/core/selection.js')).href
   );
@@ -29,11 +30,18 @@ async function mounted() {
     revision: 1,
     dictionary: { terms: [], domains: [] },
     edges: [],
-    nodes: ['a', 'b'].map((id) => ({
+    nodes: Array.from({ length: size }, (_, i) =>
+      i === 0 ? 'a' : i === 1 ? 'b' : `t${String(i).padStart(4, '0')}`,
+    ).map((id) => ({
       id,
       data: {
         label: id,
-        columns: [{ id: `${id}-col`, name: `value_${id}`, type: 'INT', nullable: true }],
+        columns: Array.from({ length: size > 2 ? 20 : 1 }, (_, j) => ({
+          id: j === 0 ? `${id}-col` : `${id}-col-${j}`,
+          name: j === 0 ? `value_${id}` : `value_${id}_${j}`,
+          type: 'INT',
+          nullable: true,
+        })),
       },
     })),
   };
@@ -52,6 +60,7 @@ async function mounted() {
   const callbacks = new Map<string, () => void>();
   const commands = new Map<string, editor.IActionDescriptor>();
   const commits: CodeBlockCommit[] = [];
+  const editingControllers: CodeBlockEditingController[] = [];
   let markers: editor.IMarkerData[] = [];
   const commitCodeBlock = (commit: CodeBlockCommit) => {
     commits.push(commit);
@@ -79,7 +88,16 @@ async function mounted() {
       },
       'use-diagram-command-feedback': { useDiagramRejectedCommandToast: () => () => {} },
       'code-block-commit': { bindBlockIds },
-      'diagram-code-block-editing': { CodeBlockEditingController },
+      'code-block-names': blockNames,
+      'diagram-code-block-editing': {
+        CodeBlockEditingController: class extends CodeBlockEditingController {
+          /** 입력 경로가 전체 상태를 순회하는지 관측할 컨트롤러를 보관한다. */
+          constructor(options: ConstructorParameters<typeof CodeBlockEditingController>[0]) {
+            super(options);
+            editingControllers.push(this);
+          }
+        },
+      },
       'dsl-live-projection-model': projectionModel,
       'dsl-editable-projection-model': editingModel,
       'dsl-block-projection': { diffProjection },
@@ -147,7 +165,9 @@ async function mounted() {
       },
     };
   };
+  const dom = new EventTarget();
   const codeEditor = {
+    getDomNode: () => dom,
     getModel: () => model,
     getPosition: () => selection.getPosition(),
     getSelection: () => selection,
@@ -204,6 +224,8 @@ async function mounted() {
   result.onMount(codeEditor, monaco);
   return {
     model,
+    controller: () => editingControllers[0],
+    dom,
     doc,
     commits,
     listeners,
@@ -302,7 +324,7 @@ test('hook: typing uses reducer timers; own echo causes zero model edits/cursor 
     h.emit([h.commits[0].commitId]);
     assert.equal(h.model.getVersionId(), before);
     assert.deepEqual(h.selection(), selection);
-    await h.commands.get('undo')!.run({} as editor.ICodeEditor);
+    await h.commands.get('erd-unified-editing.undo')!.run({} as editor.ICodeEditor);
     assert.equal(h.undoCount(), 1);
     assert.equal(
       h.state().blocks.find((block) => block.base.tableId === 'a')?.state.status,
@@ -387,14 +409,14 @@ test('hook: multi-block deletion has local undo/redo with ID restoration and def
     assert.equal(h.commits.length, 0);
     assert.ok(h.markers().length);
     assert.equal(h.model.getValue(), '');
-    await h.commands.get('undo')!.run({} as editor.ICodeEditor);
+    await h.commands.get('erd-unified-editing.undo')!.run({} as editor.ICodeEditor);
     assert.equal(h.model.getValue(), original);
-    await h.commands.get('redo')!.run({} as editor.ICodeEditor);
+    await h.commands.get('erd-unified-editing.redo')!.run({} as editor.ICodeEditor);
     assert.equal(h.model.getValue(), '');
     h.doc.nodes[0].data.label = 'remote_a';
     h.emit();
     assert.equal(h.model.getValue(), '');
-    await h.commands.get('undo')!.run({} as editor.ICodeEditor);
+    await h.commands.get('erd-unified-editing.undo')!.run({} as editor.ICodeEditor);
     assert.match(h.model.getValue(), /remote_a \{/);
     assert.match(h.model.getValue(), /value_b ::INT/);
     h.edit('value_b ::INT', 'value_b ::TEXT');
@@ -414,7 +436,7 @@ test('hook: undo of a deleted column line restores its ID decoration range', asy
   try {
     h.edit('  value_b ::INT\n', '');
     h.tick(200);
-    await h.commands.get('undo')!.run({} as editor.ICodeEditor);
+    await h.commands.get('erd-unified-editing.undo')!.run({} as editor.ICodeEditor);
     const columns = h.model
       .getAllDecorations()
       .filter((item) => item.options.className?.startsWith('erd-projection-column-'));
@@ -442,6 +464,213 @@ test('hook: pagehide writes nothing and BFCache pageshow reparses retained text'
     h.event('pageshow');
     h.tick(800);
     assert.equal(h.commits.length, 1);
+  } finally {
+    h.close();
+  }
+});
+
+test('hook: real TextModel native undo after shifted remote patch routes to document history', async () => {
+  const h = await mounted();
+  try {
+    h.edit('value_b ::INT', 'value_b ::TEXT');
+    h.tick(800);
+    h.emit([h.commits[0].commitId]);
+    h.doc.nodes[0].data.label = 'a_much_longer_remote_name';
+    h.emit();
+    const text = h.model.getValue();
+    await h.model.undo();
+    assert.equal(h.model.getValue(), text);
+    assert.equal(h.undoCount(), 1);
+  } finally {
+    h.close();
+  }
+});
+for (const inputType of ['historyUndo', 'historyRedo'])
+  test(`hook: beforeinput ${inputType} is prevented and uses local router`, async () => {
+    const h = await mounted();
+    try {
+      h.edit('value_b ::INT', 'value_b ::TEXT');
+      if (inputType === 'historyRedo') await h.model.undo();
+      const event = new Event('beforeinput', { cancelable: true });
+      Object.defineProperty(event, 'inputType', { value: inputType });
+      h.dom.dispatchEvent(event);
+      assert.equal(event.defaultPrevented, true);
+      assert.match(
+        h.model.getValue(),
+        inputType === 'historyUndo' ? /value_b ::INT/ : /value_b ::TEXT/,
+      );
+      assert.equal(h.undoCount(), 0);
+    } finally {
+      h.close();
+    }
+  });
+for (const [key, shiftKey, metaKey] of [
+  ['z', false, false],
+  ['z', false, true],
+  ['z', true, false],
+  ['z', true, true],
+  ['y', false, false],
+] as const)
+  test(`hook: keyboard ${metaKey ? 'Cmd' : 'Ctrl'} ${shiftKey ? 'Shift' : ''} ${key}`, async () => {
+    const h = await mounted();
+    try {
+      h.edit('value_b ::INT', 'value_b ::TEXT');
+      const redo = shiftKey || key === 'y';
+      if (redo) await h.model.undo();
+      const event = new Event('keydown', { cancelable: true });
+      Object.assign(event, { key, shiftKey, metaKey, ctrlKey: !metaKey, altKey: false });
+      h.dom.dispatchEvent(event);
+      assert.equal(event.defaultPrevented, true);
+      assert.match(h.model.getValue(), redo ? /value_b ::TEXT/ : /value_b ::INT/);
+    } finally {
+      h.close();
+    }
+  });
+test('hook: context menu actions share the history router', async () => {
+  const h = await mounted();
+  try {
+    h.edit('value_b ::INT', 'value_b ::TEXT');
+    const undo = h.commands.get('erd-unified-editing.undo')!;
+    assert.equal(undo.contextMenuGroupId, '1_modification');
+    await undo.run({} as editor.ICodeEditor);
+    assert.match(h.model.getValue(), /value_b ::INT/);
+    await h.commands.get('erd-unified-editing.redo')!.run({} as editor.ICodeEditor);
+    assert.match(h.model.getValue(), /value_b ::TEXT/);
+  } finally {
+    h.close();
+  }
+});
+
+test('hook: merged duplicate physical names mark all affected column lines', async () => {
+  const h = await mounted();
+  try {
+    h.doc.nodes[0].data.columns.push({
+      id: 'second',
+      name: 'value_a',
+      type: 'TEXT',
+      nullable: true,
+    });
+    h.emit();
+    assert.equal(h.markers().length, 2);
+    assert.ok(h.markers().every((marker) => marker.message.includes('duplicateColumnNames')));
+    assert.equal(new Set(h.markers().map((marker) => marker.startLineNumber)).size, 2);
+  } finally {
+    h.close();
+  }
+});
+
+test('hook: ordinary keystroke reads no full text and only the changed block columns', async () => {
+  const h = await mounted(200);
+  try {
+    let fullReads = 0,
+      rangeReads = 0,
+      fullStateReads = 0;
+    const values = h.controller().blocks.values.bind(h.controller().blocks);
+    h.controller().blocks.values = () => {
+      fullStateReads++;
+      return values();
+    };
+    const getValue = h.model.getValue.bind(h.model);
+    const getRange = h.model.getValueInRange.bind(h.model);
+    h.model.getValue = (...args) => {
+      fullReads++;
+      return getValue(...args);
+    };
+    h.model.getValueInRange = (...args) => {
+      rangeReads++;
+      return getRange(...args);
+    };
+    h.edit('value_b ::INT', 'value_b ::TEXT');
+    assert.equal(fullReads, 1); // 입력을 만드는 테스트 코드의 getValue 한 번뿐이다.
+    assert.equal(fullStateReads, 0);
+    assert.equal(rangeReads, 2); // Monaco의 텍스트 undo 기록용 부분 읽기 한 번을 포함한다.
+  } finally {
+    h.close();
+  }
+});
+for (const size of [200, 500])
+  test(`hook: complete node keystroke handler S${size} p95 <= 2ms`, async (t) => {
+    const h = await mounted(size);
+    try {
+      const at = h.model.getValue().indexOf('value_b ::INT') + 'value_b ::IN'.length;
+      const start = h.model.getPositionAt(at),
+        end = h.model.getPositionAt(at + 1);
+      const range = {
+        startLineNumber: start.lineNumber,
+        startColumn: start.column,
+        endLineNumber: end.lineNumber,
+        endColumn: end.column,
+      };
+      const samples: number[] = [];
+      for (let i = 0; i < 280; i++) {
+        const begin = performance.now();
+        h.model.applyEdits([{ range, text: i % 2 ? 'T' : 'X' }]);
+        if (i >= 30) samples.push(performance.now() - begin);
+      }
+      samples.sort((a, b) => a - b);
+      t.diagnostic(
+        `complete hook S${size} p50=${samples[125].toFixed(3)}ms p95=${samples[237].toFixed(3)}ms`,
+      );
+      assert.ok(samples[237] <= 2, `p95=${samples[237]}ms`);
+    } finally {
+      h.close();
+    }
+  });
+
+test('hook: structural undo after incremental edits restores updated text and column ID ranges', async () => {
+  const h = await mounted();
+  try {
+    h.edit('value_b ::INT', 'value_b ::BIGINT');
+    const text = h.model.getValue();
+    h.model.applyEdits([{ range: h.model.getFullModelRange(), text: '' }]);
+    await h.model.undo();
+    assert.equal(h.model.getValue(), text);
+    assert.equal(h.commits.length, 0);
+    const columns = h.model
+      .getAllDecorations()
+      .filter((item) => item.options.className?.startsWith('erd-projection-column-'));
+    assert.ok(
+      columns.some((item) => h.model.getValueInRange(item.range).includes('value_b ::BIGINT')),
+    );
+  } finally {
+    h.close();
+  }
+});
+
+test('hook: multiple edits inside one block avoid full text collection', async () => {
+  const h = await mounted();
+  try {
+    const text = h.model.getValue();
+    const edits = [
+      ['value_b', 'renamed_b'],
+      ['INT', 'BIGINT'],
+    ].map(([from, to]) => {
+      const at =
+        from === 'INT' ? text.indexOf('::INT', text.indexOf('value_b')) + 2 : text.indexOf(from);
+      const start = h.model.getPositionAt(at),
+        end = h.model.getPositionAt(at + from.length);
+      return {
+        range: {
+          startLineNumber: start.lineNumber,
+          startColumn: start.column,
+          endLineNumber: end.lineNumber,
+          endColumn: end.column,
+        },
+        text: to,
+      };
+    });
+    let reads = 0;
+    const getValue = h.model.getValue.bind(h.model);
+    h.model.getValue = (...args) => {
+      reads++;
+      return getValue(...args);
+    };
+    h.model.applyEdits(edits);
+    assert.equal(reads, 0);
+    h.tick(800);
+    assert.equal(h.commits.length, 1);
+    assert.equal(h.doc.nodes[1].data.columns[0].name, 'renamed_b');
+    assert.equal(h.doc.nodes[1].data.columns[0].type, 'BIGINT');
   } finally {
     h.close();
   }

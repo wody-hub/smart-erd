@@ -284,3 +284,54 @@ test('a mixed own echo that lost the same field keeps the local value in conflic
   assert.match(h.visible(), /TEXT/);
   h.controller.dispose();
 });
+
+test('remote NN after text undo drops redo instead of silently reverting nullable', () => {
+  const h = harness();
+  h.edit();
+  h.controller.history('t', 'undo');
+  h.snapshot.nodes[0].data.columns[0].nullable = false;
+  h.controller.remote(generateTableBlock('t', h.snapshot), []);
+  assert.equal(h.controller.get('t')!.redo.length, 0);
+  assert.equal(h.controller.history('t', 'redo'), 'document');
+  h.tick(1000);
+  assert.equal(h.snapshot.nodes[0].data.columns[0].nullable, false);
+  assert.equal(h.commits.length, 0);
+  h.controller.dispose();
+});
+test('accepted dirty remote merge drops both text history stacks', () => {
+  const h = harness();
+  h.edit();
+  h.edit(h.block.text.replace('INT', 'TEXT'));
+  h.controller.history('t', 'undo');
+  h.snapshot.nodes[0].data.columns[0].nullable = false;
+  h.controller.remote(generateTableBlock('t', h.snapshot), []);
+  assert.equal(h.controller.get('t')!.undo.length, 0);
+  assert.equal(h.controller.get('t')!.redo.length, 0);
+  h.tick(800);
+  assert.equal(h.snapshot.nodes[0].data.columns[0].nullable, false);
+  assert.deepEqual(
+    h.commits[0].patches.map((p) => p.field),
+    ['type'],
+  );
+  h.controller.dispose();
+});
+test('apply mine after a committed edit advances current field base without re-conflict', () => {
+  const h = harness();
+  h.edit();
+  h.tick(800);
+  h.controller.remote(generateTableBlock('t', h.snapshot), [h.commits[0].commitId]);
+  h.edit(h.visible().replace('BIGINT', 'TEXT'));
+  h.snapshot.nodes[0].data.columns[0].type = 'VARCHAR';
+  h.controller.remote(generateTableBlock('t', h.snapshot), []);
+  assert.equal(h.controller.get('t')!.state.status, 'CONFLICT');
+  h.controller.resolve('t', 'mine');
+  assert.notEqual(h.controller.get('t')!.state.status, 'CONFLICT');
+  h.tick(800); // 이전 성공 커밋과의 최소 간격을 유지한다.
+  assert.equal(h.commits.length, 2);
+  assert.deepEqual(
+    h.commits[1].patches.map((p) => [p.field, p.baseValue, p.nextValue]),
+    [['type', 'VARCHAR', 'TEXT']],
+  );
+  assert.equal(h.controller.get('t')!.state.status, 'CLEAN');
+  h.controller.dispose();
+});

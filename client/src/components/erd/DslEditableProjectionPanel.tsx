@@ -1,3 +1,4 @@
+import { duplicateColumnNames } from '@/lib/code-block-names';
 import '@/lib/monaco-setup';
 import { useId, useMemo } from 'react';
 import Editor from '@monaco-editor/react';
@@ -57,6 +58,16 @@ export default function DslEditableProjectionPanel({
     isReady: () => ready && isReady() && (runtime.source?.isReady() ?? false),
     t,
   });
+  const duplicates = useMemo(
+    () =>
+      projection.blocks.flatMap((block) =>
+        duplicateColumnNames(block.metadata.columns).map((issue) => ({
+          ...issue,
+          table: block.metadata.tableLogicalName || block.metadata.tablePhysicalName,
+        })),
+      ),
+    [projection.blocks],
+  );
   const instanceId = useId();
   const isDark = useDarkMode();
   const uri = `erd-unified-edit://${encodeURIComponent(diagramId)}/${encodeURIComponent(instanceId)}.dsl`;
@@ -79,6 +90,17 @@ export default function DslEditableProjectionPanel({
         </span>
         {!changedBlocks.length && <span>{t('erd.unifiedEditing.CLEAN')}</span>}
       </div>
+      {duplicates.length > 0 && (
+        <div
+          role="note"
+          className="banner-warm-surface border-b px-4 py-2 text-xs text-ink-secondary"
+        >
+          {t('erd.unifiedEditing.duplicateColumnNames', {
+            count: duplicates.reduce((count, issue) => count + issue.columnIds.length, 0),
+            names: duplicates.map((issue) => `${issue.table}: ${issue.name}`).join(', '),
+          })}
+        </div>
+      )}
       {hasUnappliedSharedDraft && (
         <div
           role="note"

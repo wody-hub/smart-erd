@@ -1,3 +1,4 @@
+import { duplicateColumnNames, tableNameCollision } from './code-block-names.js';
 import {
   CODE_BLOCK_COMMIT_KIND,
   type CodeBlockCommit,
@@ -111,6 +112,28 @@ function failure(
     ],
   };
 }
+/** 병합 전부터 중복인 블록은 위치로 ID를 추측하지 않고 명시적 이름 진단을 반환한다. */
+function duplicateNameFailure(
+  duplicates: ReturnType<typeof duplicateColumnNames>,
+): BlockCommitFailure {
+  return {
+    status: 'invalid',
+    reasons: ['duplicate-name'],
+    diagnostics: [
+      {
+        messageKey: 'erd.unifiedEditing.duplicateColumnNames',
+        messageArgs: {
+          count: String(duplicates.reduce((count, issue) => count + issue.columnIds.length, 0)),
+          names: duplicates.map((issue) => issue.name).join(', '),
+        },
+        severity: 'error',
+        line: 1,
+        startColumn: 1,
+        endColumn: 2,
+      },
+    ],
+  };
+}
 /** 표시 이름만 비교하며 원본 CR/LF와 물리명은 sidecar에 남긴다. */
 function display(value: string): string {
   return normalizeBlockDisplayName(value).trim();
@@ -127,6 +150,8 @@ export function bindBlockIds(
   editKind: BlockEditKind = 'field',
 ): BoundBlockIds | BlockCommitFailure {
   const block = asBlock(base);
+  const duplicates = duplicateColumnNames(block.metadata.columns);
+  if (duplicates.length) return duplicateNameFailure(duplicates);
   const options = { unknownTermSeverity: 'warning' as const };
   const original = parseDslBlock(block.text, dictionary, options);
   const parsed = parseDslBlock(editedText, dictionary, options);
@@ -248,6 +273,9 @@ export function computeBlockCommit(
     base.dictionaryFingerprint !== dictionaryFingerprint
   )
     return failure('unsupported', 'dictionary-changed');
+  const existing = currentSnapshot.nodes.find((node) => node.id === base.tableId);
+  const duplicates = existing && duplicateColumnNames(existing.data.columns);
+  if (duplicates?.length) return duplicateNameFailure(duplicates);
   const bound = bindBlockIds(
     base,
     edited,
@@ -383,6 +411,25 @@ export function computeBlockCommit(
       });
   }
   if (conflicts.length) return { ...failure('unsupported', 'conflict', parsed), conflicts };
+  if (
+    patches.some((patch) => patch.target === 'table') &&
+    tableNameCollision(
+      {
+        label: String(
+          patches.find((p) => p.target === 'table' && p.field === 'label')?.nextValue ??
+            current.data.label,
+        ),
+        logicalTableName: patches.some(
+          (p) => p.target === 'table' && p.field === 'logicalTableName',
+        )
+          ? (patches.find((p) => p.target === 'table' && p.field === 'logicalTableName')!
+              .nextValue as string | null)
+          : current.data.logicalTableName,
+      },
+      currentSnapshot.nodes.filter((node) => node.id !== base.tableId).map((node) => node.data),
+    )
+  )
+    return failure('invalid', 'duplicate-name', parsed);
   const finalNames = new Map<string, string>();
   for (const column of current.data.columns) {
     const patch = patches.find(

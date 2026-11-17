@@ -417,3 +417,50 @@ test('foreign FK display changes accompanying own echo are still visible', () =>
     false,
   );
 });
+
+for (const label of ['occupied', '기존논리명'])
+  test(`table rename rejects an existing physical or logical DSL target: ${label}`, () => {
+    const snapshot = fixture();
+    snapshot.nodes.push({
+      id: 'other',
+      data: { label: 'occupied', logicalTableName: '기존논리명', columns: [] },
+    });
+    const base = generateTableBlock('t', snapshot);
+    const result = computeBlockCommit({
+      base,
+      edited: base.text.replace('테이블 {', `${label} {`),
+      currentSnapshot: snapshot,
+      dictionaryFingerprint: 'd',
+      commitId: 'rename',
+    });
+    assert.ok(!('kind' in result));
+    if (!('kind' in result)) assert.deepEqual(result.reasons, ['duplicate-name']);
+  });
+test('pre-existing duplicate physical names reject even a type edit before positional ID binding', () => {
+  const snapshot = fixture();
+  snapshot.nodes[0].data.columns[1].name = snapshot.nodes[0].data.columns[0].name;
+  const base = generateTableBlock('t', snapshot);
+  const result = computeBlockCommit({
+    base,
+    edited: base.text.replace('::INT', '::BIGINT'),
+    currentSnapshot: snapshot,
+    dictionaryFingerprint: 'd',
+    commitId: 'edit',
+  });
+  assert.ok(!('kind' in result));
+  if (!('kind' in result)) {
+    assert.equal(result.status, 'invalid');
+    assert.deepEqual(result.reasons, ['duplicate-name']);
+    assert.ok(result.diagnostics.length);
+  }
+});
+
+test('pre-existing duplicate names never bind stable IDs by position', () => {
+  const snapshot = fixture();
+  snapshot.nodes[0].data.columns[1].name = snapshot.nodes[0].data.columns[0].name;
+  const base = generateTableBlock('t', snapshot);
+  const result = bindBlockIds(base, base.text);
+  assert.equal(result.status, 'invalid');
+  assert.equal(result.diagnostics[0].messageKey, 'erd.unifiedEditing.duplicateColumnNames');
+  assert.match(result.diagnostics[0].messageArgs!.names, /a_physical/);
+});

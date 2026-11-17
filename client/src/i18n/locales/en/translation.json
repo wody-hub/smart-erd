@@ -2348,6 +2348,7 @@
       "actual": "Actual: {{value}}"
     },
     "unifiedEditing": {
+      "duplicateColumnNames": "Duplicate column physical names ({{count}} columns): {{names}}. Rename them on the ERD canvas before editing this block.",
       "editable": "Edit existing fields",
       "CLEAN": "Saved",
       "DIRTY": "Editing",

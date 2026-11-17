@@ -2346,6 +2346,7 @@
       "actual": "현재: {{value}}"
     },
     "unifiedEditing": {
+      "duplicateColumnNames": "중복된 컬럼 물리명 {{count}}개: {{names}}. ERD 캔버스에서 이름을 수정한 뒤 다시 편집하세요.",
       "editable": "기존 필드 편집",
       "CLEAN": "저장됨",
       "DIRTY": "편집 중",

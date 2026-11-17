@@ -111,3 +111,55 @@ export function replaceEditableBlock(
   ]);
   return true;
 }
+
+/** 한 블록 내부 변경만 읽고, 경계 변경은 전체 구조 검사로 넘긴다. */
+export function readEditableBlockChange(
+  model: Pick<editor.ITextModel, 'getDecorationsInRange' | 'getOffsetAt' | 'getValueInRange'>,
+  event: editor.IModelContentChangedEvent,
+  tableIds: ReadonlyMap<string, string>,
+): { tableId: string; text: string; multiline: boolean } | undefined {
+  if (!event.changes.length) return;
+  const changes = [...event.changes].sort((a, b) => a.rangeOffset - b.rangeOffset);
+  const change = changes[0];
+  const point = {
+    ...change.range,
+    endLineNumber: change.range.startLineNumber,
+    endColumn: change.range.startColumn,
+  };
+  for (const decoration of model.getDecorationsInRange(point)) {
+    const tableId = tableIds.get(decoration.options.className ?? '');
+    if (!tableId) continue;
+    const start = model.getOffsetAt({
+      lineNumber: decoration.range.startLineNumber,
+      column: decoration.range.startColumn,
+    });
+    const end = model.getOffsetAt({
+      lineNumber: decoration.range.endLineNumber,
+      column: decoration.range.endColumn,
+    });
+    let shift = 0;
+    const contained = changes.every((item) => {
+      const from = item.rangeOffset + shift;
+      const to = from + item.text.length;
+      shift += item.text.length - item.rangeLength;
+      return from > start && to < end;
+    });
+    const oldEnd = end - shift;
+    // 블록 첫/끝 경계와 구분자 변경은 기존의 전체 구조 검증으로 처리한다.
+    if (
+      !contained ||
+      changes.some(
+        (item) => item.rangeOffset <= start || item.rangeOffset + item.rangeLength >= oldEnd,
+      )
+    )
+      continue;
+    return {
+      tableId,
+      text: model.getValueInRange(decoration.range),
+      multiline: changes.some(
+        (item) =>
+          item.range.startLineNumber !== item.range.endLineNumber || item.text.includes('\n'),
+      ),
+    };
+  }
+}

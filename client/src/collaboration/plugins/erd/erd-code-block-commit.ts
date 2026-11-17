@@ -1,3 +1,4 @@
+import { tableNameCollision } from '@/lib/code-block-names';
 import * as Y from 'yjs';
 import { ensureColumnStorage, getColumnYMap, readColumnYMaps } from '@/collaboration/yjs-columns';
 import { getTablesMap } from '@/collaboration/yjsBridge';
@@ -192,6 +193,31 @@ export function applyCodeBlockCommit(
   if (conflicts.length) return { status: 'rejected', commitId, reason: 'conflict', conflicts };
   const physicalNames = [...names.values()].map((name) => name.toLowerCase());
   if (new Set(physicalNames).size !== physicalNames.length) return reject('duplicate-name');
+  if (
+    changes.some((patch) => patch.target === 'table') &&
+    tableNameCollision(
+      {
+        label: String(
+          changes.find((p) => p.target === 'table' && p.field === 'label')?.nextValue ??
+            table.get('label') ??
+            '',
+        ),
+        logicalTableName: changes.some(
+          (p) => p.target === 'table' && p.field === 'logicalTableName',
+        )
+          ? (changes.find((p) => p.target === 'table' && p.field === 'logicalTableName')!
+              .nextValue as string | null)
+          : (table.get('logicalTableName') as string | undefined),
+      },
+      [...getTablesMap(doc)]
+        .filter(([id]) => id !== value.tableId)
+        .map(([, other]) => ({
+          label: String(other.get('label') ?? ''),
+          logicalTableName: other.get('logicalTableName') as string | undefined,
+        })),
+    )
+  )
+    return reject('duplicate-name');
   if (!changes.length) return { status: 'applied', commitId, changedFields: 0, noop: true };
   if (doc._transaction) return reject('invalid');
   if (changes.some((patch) => patch.target === 'column')) {

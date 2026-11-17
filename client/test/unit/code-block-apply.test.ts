@@ -500,3 +500,109 @@ test('A delta for removing NN from an omitted nullable field applies and reproje
   );
   h.doc.destroy();
 });
+
+for (const field of ['label', 'logicalTableName'] as const)
+  test(`strict applier rejects table rename colliding with ${field}`, () => {
+    const h = harness();
+    getTablesMap(h.doc).set('b', new Y.Map<unknown>([[field, 'people']]));
+    const before = Y.encodeStateAsUpdate(h.doc);
+    const result = h.apply().value!;
+    assert.equal(result.status, 'rejected');
+    if (result.status === 'rejected') assert.equal(result.reason, 'duplicate-name');
+    assert.deepEqual(Y.encodeStateAsUpdate(h.doc), before);
+    h.doc.destroy();
+  });
+
+import { duplicateColumnNames } from '../../src/lib/code-block-names.js';
+import { readColumnYMaps } from '../../src/collaboration/yjs-columns.js';
+
+for (const canvas of [false, true])
+  for (const reverse of [false, true])
+    test(`${canvas ? 'existing canvas' : 'strict code'} concurrent column renames expose merged duplicates (${reverse ? 'reverse' : 'forward'})`, () => {
+      const h = harness();
+      ensureColumnStorage(h.table);
+      const peer = new Y.Doc();
+      Y.applyUpdate(peer, Y.encodeStateAsUpdate(h.doc));
+      const docs = reverse ? [peer, h.doc] : [h.doc, peer];
+      for (const [index, doc] of docs.entries()) {
+        const colId = index === 0 ? 'id' : 'name';
+        if (canvas) {
+          const applier = new ErdDocumentMutationApplier(
+            new YjsSharedDocumentEngine(doc),
+            () => {},
+          );
+          assert.equal(
+            applier.apply({
+              key: 'column:update',
+              payload: { tableId: 'a', colId, name: 'same' },
+              affectedScopes: [],
+            }).applied,
+            true,
+          );
+        } else {
+          assert.equal(
+            applyCodeBlockCommit(
+              doc,
+              {
+                ...h.commit,
+                patches: [
+                  {
+                    target: 'column',
+                    tableId: 'a',
+                    columnId: colId,
+                    field: 'name',
+                    baseValue: colId,
+                    nextValue: 'same',
+                  },
+                ],
+              },
+              { dictionaryFingerprint: 'empty' },
+            ).status,
+            'applied',
+          );
+        }
+      }
+      Y.applyUpdate(docs[0], Y.encodeStateAsUpdate(docs[1]));
+      Y.applyUpdate(docs[1], Y.encodeStateAsUpdate(docs[0]));
+      for (const doc of docs) {
+        const columns = readColumnYMaps(getTablesMap(doc).get('a')!).map((col) => ({
+          id: String(col.get('id')),
+          name: String(col.get('name')),
+        }));
+        assert.deepEqual(
+          columns.map((col) => col.name),
+          ['same', 'same'],
+        );
+        assert.deepEqual(duplicateColumnNames(columns), [
+          { name: 'same', columnIds: ['id', 'name'] },
+        ]);
+      }
+      peer.destroy();
+      h.doc.destroy();
+    });
+
+test('concurrent table rename calculated earlier is rejected on a peer that sees the first rename', () => {
+  const h = harness();
+  getTablesMap(h.doc).set('b', new Y.Map<unknown>([['label', 'other']]));
+  const peer = new Y.Doc();
+  Y.applyUpdate(peer, Y.encodeStateAsUpdate(h.doc));
+  assert.equal(h.apply().applied, true);
+  Y.applyUpdate(peer, Y.encodeStateAsUpdate(h.doc));
+  const before = Y.encodeStateAsUpdate(peer);
+  const result = applyCodeBlockCommit(
+    peer,
+    {
+      ...h.commit,
+      tableId: 'b',
+      patches: [
+        { target: 'table', tableId: 'b', field: 'label', baseValue: 'other', nextValue: 'people' },
+      ],
+    },
+    { dictionaryFingerprint: 'empty' },
+  );
+  assert.equal(result.status, 'rejected');
+  if (result.status === 'rejected') assert.equal(result.reason, 'duplicate-name');
+  assert.deepEqual(Y.encodeStateAsUpdate(peer), before);
+  peer.destroy();
+  h.doc.destroy();
+});
