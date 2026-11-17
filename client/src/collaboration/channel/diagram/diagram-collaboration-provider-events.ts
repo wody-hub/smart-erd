@@ -40,8 +40,10 @@ export class DiagramCollaborationProviderEvents {
 
   createBindingCallbacks(
     onConnected: (wsConnectedAt: number) => void,
+    onSyncStateChange: (synced: boolean) => void,
   ): DiagramCollaborationProviderBindingCallbacks {
     return {
+      onSyncStateChange,
       onConnectionStatusChange: (status) => {
         this.currentConnectionStatus = status;
         this.options.storeBridge.setConnectionStatus(status);

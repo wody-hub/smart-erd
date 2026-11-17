@@ -9,6 +9,7 @@ import type {
 } from '../../../types/collaboration.js';
 
 export interface DiagramCollaborationProviderBindingCallbacks {
+  onSyncStateChange: (synced: boolean) => void;
   onConnectionStatusChange: (status: ConnectionStatus) => void;
   onConnectionIssueDetected: (issue: ConnectionIssueKind | null) => void;
   onIdentityResolved: (userId: string) => void;

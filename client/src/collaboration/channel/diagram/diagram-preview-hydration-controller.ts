@@ -17,6 +17,7 @@ interface DiagramPreviewHydrationControllerOptions {
   dispatchRuntimeEvent: (event: CollaborationRuntimeEvent) => void;
   updatePreviewMode: (next: boolean) => void;
   loadPreview: (content: string) => void;
+  refreshPersistedCanvasFromYDoc: () => void;
   getConnectionStatus: () => ConnectionStatus;
 }
 
@@ -63,6 +64,7 @@ export class DiagramPreviewHydrationController {
     }
     this.clearFallbackTimers();
 
+    this.options.refreshPersistedCanvasFromYDoc();
     this.options.updatePreviewMode(false);
     this.previewUnlockedAt = performance.now();
     probeMark('preview-unlock', { reason: source, updatesApplied });
@@ -149,6 +151,16 @@ export class DiagramPreviewHydrationController {
       this.snapshotFallbackTimer = null;
       this.reportSnapshotTimeout('timeout', this.options.fallbackTimeoutMs);
     }, this.options.fallbackTimeoutMs);
+  }
+
+  /**
+   * 원격 sync 완료 시 빈 문서도 확정된 snapshot으로 보고 preview를 해제한다.
+   * @param synced 원격 snapshot 적용 완료 여부
+   */
+  onSyncStateChange(synced: boolean): void {
+    if (synced && this.previewShownAt !== null) {
+      this.finishPreviewUnlock('remote', getTablesMap(this.options.ydoc).size);
+    }
   }
 
   /**

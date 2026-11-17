@@ -1,10 +1,12 @@
-import { LoaderCircle, Lock } from 'lucide-react';
+import { LoaderCircle, Lock, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import type { ConnectionIssueKind, ConnectionStatus } from '@/types/collaboration';
 import type { DiagramCollaborationSetupErrorKind } from '@/collaboration/channel/diagram/use-diagram-collaboration-provider';
+import type { PreviewSyncStatus } from '@/collaboration/core/collaboration-preview-sync-status';
 
 interface DiagramSyncStatusBannerProps {
+  previewSyncStatus: PreviewSyncStatus;
   connectionStatus: ConnectionStatus;
   connectionIssue?: ConnectionIssueKind | null;
   setupErrorKind?: DiagramCollaborationSetupErrorKind;
@@ -16,6 +18,7 @@ interface DiagramSyncStatusBannerProps {
  */
 export default function DiagramSyncStatusBanner({
   connectionStatus,
+  previewSyncStatus,
   connectionIssue = null,
   setupErrorKind = null,
   onRetry,
@@ -23,18 +26,28 @@ export default function DiagramSyncStatusBanner({
   const { t } = useTranslation();
   const isDisconnected = connectionStatus === 'disconnected';
   const isAuthoritativeBootstrapBlocked = setupErrorKind === 'authoritative-bootstrap-required';
+  const isSnapshotDelayed = previewSyncStatus === 'degraded';
   const shouldShowRetry =
-    (isAuthoritativeBootstrapBlocked || connectionIssue !== null) && !!onRetry;
+    (isAuthoritativeBootstrapBlocked || connectionIssue !== null || isSnapshotDelayed) && !!onRetry;
+  const retryLabel = t(
+    connectionIssue
+      ? 'diagram.previewSync.banner.retryConnection'
+      : isSnapshotDelayed
+        ? 'diagram.previewSync.retrySnapshot'
+        : 'erd.collabSync.overlay.retry',
+  );
 
   const description = isAuthoritativeBootstrapBlocked
     ? t('erd.collabSync.overlay.failed')
     : connectionIssue
       ? t(`diagram.previewSync.banner.descriptionIssue.${connectionIssue}`)
-      : t(
-          isDisconnected
-            ? 'diagram.previewSync.banner.descriptionDisconnected'
-            : 'diagram.previewSync.banner.description',
-        );
+      : isSnapshotDelayed
+        ? t('diagram.previewSync.snapshotDelayed')
+        : t(
+            isDisconnected
+              ? 'diagram.previewSync.banner.descriptionDisconnected'
+              : 'diagram.previewSync.banner.description',
+          );
 
   return (
     <div
@@ -45,9 +58,14 @@ export default function DiagramSyncStatusBanner({
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 rounded-full bg-brand-warm/12 p-2 text-brand-warm">
-            <LoaderCircle
-              className={`h-4 w-4 ${isDisconnected || connectionIssue ? '' : 'animate-spin'}`}
-            />
+            {isSnapshotDelayed ? (
+              <TriangleAlert className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <LoaderCircle
+                className={`h-4 w-4 ${isDisconnected || connectionIssue ? '' : 'animate-spin'}`}
+                aria-hidden="true"
+              />
+            )}
           </div>
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold">
@@ -65,12 +83,9 @@ export default function DiagramSyncStatusBanner({
             size="sm"
             className="self-start border-brand-warm/30 bg-card/82 text-foreground hover:bg-card md:self-center"
             onClick={onRetry}
+            aria-label={retryLabel}
           >
-            {t(
-              connectionIssue
-                ? 'diagram.previewSync.banner.retryConnection'
-                : 'erd.collabSync.overlay.retry',
-            )}
+            {retryLabel}
           </Button>
         ) : (
           <div className="flex items-center gap-2 self-start rounded-full border border-brand-warm/30 bg-card/82 px-3 py-1 text-xs font-medium text-ink-secondary md:self-center">

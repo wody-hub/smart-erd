@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as Y from 'yjs';
+import { createEdgeYMap, getEdgesMap, yEdgeYMapToEdge } from '../../src/collaboration/yjsBridge.js';
 import type { Edge } from '@xyflow/react';
 import { applyEdgeDisplayState } from '../../src/components/erd/edgeDisplay';
 
@@ -39,4 +41,27 @@ test('copies only edges whose highlight display state changes', () => {
   assert.notStrictEqual(result[1], highlighted);
   assert.equal(result[1].selected, true);
   assert.equal(result[1].animated, true);
+});
+
+test('projected edges retain unrelated references across highlight and drag toggles', () => {
+  const doc = new Y.Doc();
+  try {
+    const edgesMap = getEdgesMap(doc);
+    edgesMap.set('first', createEdgeYMap('a', 'b'));
+    edgesMap.set('second', createEdgeYMap('b', 'c'));
+    const edges = [...edgesMap].map(([id, edge]) => yEdgeYMapToEdge(id, edge));
+    const initial = applyEdgeDisplayState(edges, null, false);
+    const highlighted = applyEdgeDisplayState(edges, 'first', false);
+    const dragging = applyEdgeDisplayState(edges, 'first', true);
+    const cleared = applyEdgeDisplayState(edges, null, false);
+    assert.equal(initial[1], edges[1]);
+    assert.equal(highlighted[1], initial[1]);
+    assert.equal(dragging[1], highlighted[1]);
+    assert.equal(cleared[1], dragging[1]);
+    assert.equal(highlighted[0].animated, true);
+    assert.equal(dragging[0].animated, false);
+    assert.equal(cleared[0].selected ?? false, false);
+  } finally {
+    doc.destroy();
+  }
 });

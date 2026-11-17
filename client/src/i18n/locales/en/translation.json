@@ -1715,6 +1715,8 @@
       "dictionaryContext": "Diagram dictionary context: {{name}}"
     },
     "previewSync": {
+      "snapshotDelayed": "The latest snapshot is taking longer than expected. Please try again.",
+      "retrySnapshot": "Retry loading snapshot",
       "headerReadonly": "Real-time sync in progress",
       "sharedDraftOverlaySuppressed": "Large diagrams hide the shared draft preview to keep the canvas responsive. Code-first drafts will appear on the ERD after they are applied.",
       "banner": {

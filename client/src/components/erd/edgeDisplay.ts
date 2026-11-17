@@ -15,7 +15,7 @@ export function applyEdgeDisplayState(
   return edges.map((edge) => {
     const selected = edge.id === highlightedEdgeId;
     const animated = !isDraggingNode && selected;
-    if (edge.selected === selected && edge.animated === animated) {
+    if ((edge.selected ?? false) === selected && (edge.animated ?? false) === animated) {
       return edge;
     }
     return { ...edge, selected, animated };

@@ -51,12 +51,15 @@ export function createDiagramCollaborationProviderLifecycle(
     dispatchRuntimeEvent: options.dispatchRuntimeEvent,
     updatePreviewMode: options.updatePreviewMode,
     loadPreview: options.storeBridge.loadPreview,
+    refreshPersistedCanvasFromYDoc: () =>
+      options.storeBridge.refreshPersistedCanvasFromYDoc({ forceFull: true }),
     getConnectionStatus: providerEvents.getConnectionStatus,
   });
   const providerBinding = new DiagramCollaborationProviderBinding(
-    providerEvents.createBindingCallbacks((wsConnectedAt) => {
-      previewHydrationController.onConnected(wsConnectedAt);
-    }),
+    providerEvents.createBindingCallbacks(
+      (wsConnectedAt) => previewHydrationController.onConnected(wsConnectedAt),
+      (synced) => previewHydrationController.onSyncStateChange(synced),
+    ),
   );
   const providerConnection = new DiagramCollaborationProviderConnection<
     YjsProvider,

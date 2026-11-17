@@ -4,6 +4,8 @@ import {
   DiagramCollaborationProviderEvents,
   type DiagramCollaborationStoreBridge,
 } from '../../src/collaboration/channel/diagram/diagram-collaboration-testable.js';
+import { DiagramCollaborationProviderBinding } from '../../src/collaboration/channel/diagram/diagram-collaboration-provider-binding.js';
+import type { YjsProvider } from '../../src/collaboration/YjsProvider.js';
 import type { CollaborationRuntimeEvent } from '../../src/collaboration/core/collaboration-runtime-types.js';
 
 function createStoreBridge() {
@@ -84,9 +86,10 @@ test('connected 이후 reconnect-start 와 disconnect/runtime status 를 올린�
   withSuppressedConsoleInfo(() => {
     const { events, calls, runtimeEvents } = createEvents();
     const connectedAt: number[] = [];
-    const callbacks = events.createBindingCallbacks((wsConnectedAt) => {
-      connectedAt.push(wsConnectedAt);
-    });
+    const callbacks = events.createBindingCallbacks(
+      (wsConnectedAt) => connectedAt.push(wsConnectedAt),
+      () => undefined,
+    );
 
     callbacks.onConnectionStatusChange('connected');
     callbacks.onConnectionStatusChange('connecting');
@@ -105,7 +108,10 @@ test('connected 이후 reconnect-start 와 disconnect/runtime status 를 올린�
 
 test('identity/presence/awareness/peer-left 이벤트를 store bridge에 전달한다', () => {
   const { events, calls } = createEvents();
-  const callbacks = events.createBindingCallbacks(() => undefined);
+  const callbacks = events.createBindingCallbacks(
+    () => undefined,
+    () => undefined,
+  );
 
   callbacks.onIdentityResolved('user-1');
   callbacks.onPresenceModeChange('active');
@@ -168,4 +174,28 @@ test('identity/presence/awareness/peer-left 이벤트를 store bridge에 전달�
     },
   ]);
   assert.deepEqual(calls.removedLoginIds, ['legacy@example.com']);
+});
+
+test('provider binding forwards sync completion across reconnect and detaches on dispose', () => {
+  withSuppressedConsoleInfo(() => {
+    const { events } = createEvents();
+    const syncStates: boolean[] = [];
+    const binding = new DiagramCollaborationProviderBinding(
+      events.createBindingCallbacks(
+        () => undefined,
+        (synced) => syncStates.push(synced),
+      ),
+    );
+    const provider = {} as YjsProvider;
+    binding.bind(provider);
+    provider.onConnectionStatusChange?.('connected');
+    provider.onSyncStateChange?.(false);
+    provider.onConnectionStatusChange?.('disconnected');
+    provider.onConnectionStatusChange?.('connecting');
+    provider.onConnectionStatusChange?.('connected');
+    provider.onSyncStateChange?.(true);
+    assert.deepEqual(syncStates, [false, true]);
+    binding.dispose(provider);
+    assert.equal(provider.onSyncStateChange, null);
+  });
 });

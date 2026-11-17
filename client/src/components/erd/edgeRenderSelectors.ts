@@ -84,6 +84,32 @@ export interface EdgeCardinalitySelectorState {
   nodeLookup: ReadonlyMap<string, { data?: unknown }>;
 }
 
+const identifyingSymbols = new WeakMap<TableNodeData['columns'], EdgeCardinality['targetSymbol']>();
+
+/**
+ * 같은 컬럼 배열을 구독하는 엣지들이 식별 관계의 PK 집계를 공유한다.
+ * @param columns 대상 테이블 컬럼 목록
+ * @returns 전체 PK가 FK이면 one, 아니면 many
+ */
+function getIdentifyingTargetSymbol(
+  columns: TableNodeData['columns'],
+): EdgeCardinality['targetSymbol'] {
+  const cached = identifyingSymbols.get(columns);
+  if (cached) return cached;
+  let primaryKeyCount = 0;
+  let foreignPrimaryKeyCount = 0;
+  for (const column of columns) {
+    if (column.pk) {
+      primaryKeyCount += 1;
+      if (column.fk) foreignPrimaryKeyCount += 1;
+    }
+  }
+  const symbol =
+    foreignPrimaryKeyCount > 0 && foreignPrimaryKeyCount === primaryKeyCount ? 'one' : 'many';
+  identifyingSymbols.set(columns, symbol);
+  return symbol;
+}
+
 /**
  * 대상 노드의 카디널리티 관련 필드만 선택하고 결과 참조를 재사용하는 selector를 만든다.
  * @param targetNodeId 대상 노드 ID
@@ -97,26 +123,25 @@ export function createEdgeCardinalitySelector(
   relationType: RelationType,
 ): (state: EdgeCardinalitySelectorState) => EdgeCardinality {
   let previous: EdgeCardinality | null = null;
+  let previousColumns: TableNodeData['columns'] | undefined;
 
   return (state) => {
     const childData = state.nodeLookup.get(targetNodeId)?.data as TableNodeData | undefined;
+    const columns = childData?.columns;
+    if (previous && previousColumns === columns) return previous;
+    previousColumns = columns;
     let optional = true;
     let targetSymbol: EdgeCardinality['targetSymbol'] = 'many';
 
-    if (childData) {
+    if (columns) {
       if (targetHandle) {
         const colId = extractColId(targetHandle, targetNodeId);
-        const fkColumn = childData.columns.find((column) => column.id === colId);
+        const fkColumn = columns.find((column) => column.id === colId);
         optional = fkColumn?.nullable !== false;
       }
 
       if (relationType === 'identifying') {
-        const primaryKeyCount = childData.columns.filter((column) => column.pk).length;
-        const foreignPrimaryKeyCount = childData.columns.filter(
-          (column) => column.pk && column.fk,
-        ).length;
-        targetSymbol =
-          foreignPrimaryKeyCount > 0 && foreignPrimaryKeyCount === primaryKeyCount ? 'one' : 'many';
+        targetSymbol = getIdentifyingTargetSymbol(columns);
       }
     }
 

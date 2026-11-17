@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as Y from 'yjs';
 import { DiagramPreviewHydrationController } from '../../src/collaboration/channel/diagram/diagram-preview-hydration-controller.js';
 import { DiagramYjsDocumentAdapter } from '../../src/collaboration/yjs/diagram-yjs-document-adapter.js';
+import useCanvasStore from '../../src/stores/useCanvasStore.js';
 import { getTablesMap } from '../../src/collaboration/yjsBridge.js';
 import { transitionCollaborationRuntimeState } from '../../src/collaboration/core/collaboration-session-machine.js';
 import type {
@@ -32,6 +33,8 @@ function createHarness(context: TestContext) {
   );
   const ydoc = new Y.Doc();
   const remoteDoc = new Y.Doc();
+  useCanvasStore.getState().destroyYDoc();
+  useCanvasStore.getState().initYDoc(ydoc);
   const tablesMap = getTablesMap(ydoc);
   const unobserve = context.mock.method(tablesMap, 'unobserveDeep');
   const updates = context.mock.fn();
@@ -39,6 +42,10 @@ function createHarness(context: TestContext) {
   const events: CollaborationRuntimeEvent[] = [];
   const previewModes: boolean[] = [];
   let state: CollaborationRuntimeState = 'preview';
+  const dispatchEvent = (event: CollaborationRuntimeEvent) => {
+    events.push(event);
+    state = transitionCollaborationRuntimeState(state, event);
+  };
   const controller = new DiagramPreviewHydrationController({
     ydoc,
     bootstrap: {
@@ -46,24 +53,24 @@ function createHarness(context: TestContext) {
       contentRevision: '1',
       content: JSON.stringify({
         nodes: [{ id: 'table-1', position: { x: 0, y: 0 }, data: { label: 'seed', columns: [] } }],
-        edges: [],
+        edges: [{ id: 'stale-edge', source: 'table-1', target: 'table-1' }],
+        groups: [{ id: 'stale-group', name: 'seed', tableIds: ['table-1'] }],
       }),
     },
     previewEnabled: true,
     fallbackTimeoutMs: 5_000,
     handoffStartedAt: 0,
     handoffLogPrefix: '[test]',
-    dispatchRuntimeEvent: (event) => {
-      events.push(event);
-      state = transitionCollaborationRuntimeState(state, event);
-    },
+    dispatchRuntimeEvent: dispatchEvent,
     updatePreviewMode: (next) => previewModes.push(next),
-    loadPreview: context.mock.fn(),
+    loadPreview: useCanvasStore.getState().loadPreview,
+    refreshPersistedCanvasFromYDoc: () =>
+      useCanvasStore.getState().syncFromYDoc({ forceFull: true }),
     getConnectionStatus: () => 'connected',
   });
   context.after(() => {
     controller.dispose();
-    ydoc.destroy();
+    useCanvasStore.getState().destroyYDoc();
     remoteDoc.destroy();
   });
   const applyRemoteSnapshot = () => {
@@ -73,12 +80,14 @@ function createHarness(context: TestContext) {
   controller.start();
   return {
     controller,
+    remoteDoc,
     ydoc,
     tablesMap,
     updates,
     applyBootstrap,
     applyRemoteSnapshot,
     events,
+    dispatchEvent,
     previewModes,
     info,
     warn,
@@ -176,5 +185,48 @@ for (const degraded of [false, true]) {
     assert.equal(h.warn.mock.callCount(), warningCount);
     assert.equal(h.applyBootstrap.mock.callCount(), 0);
     assert.equal(h.timerFired.mock.callCount(), degraded ? 1 : 0);
+  });
+}
+
+for (const scenario of ['empty', 'deleted', 'reconnect', 'late'] as const) {
+  test(`${scenario} remote empty snapshot clears stale preview and unlocks without seeding`, (context) => {
+    const h = createHarness(context);
+    assert.equal(useCanvasStore.getState().nodes.length, 1);
+    h.controller.onConnected(0);
+    if (scenario === 'deleted') {
+      const remoteTables = getTablesMap(h.remoteDoc);
+      remoteTables.set('deleted-table', new Y.Map([['label', 'deleted']]));
+      remoteTables.delete('deleted-table');
+    }
+    if (scenario === 'reconnect') {
+      for (const event of ['disconnect', 'reconnect-start', 'ws-connected'] as const) {
+        h.dispatchEvent(event);
+      }
+      h.controller.onSyncStateChange(false);
+      h.controller.onConnected(100);
+    }
+    if (scenario === 'late') {
+      context.mock.timers.tick(5_000);
+      assert.equal(h.getState(), 'degraded');
+    }
+    Y.applyUpdate(h.ydoc, Y.encodeStateAsUpdate(h.remoteDoc), 'remote');
+    const snapshotState = Y.encodeStateAsUpdate(h.ydoc);
+    const updateCount = h.updates.mock.callCount();
+    h.controller.onSyncStateChange(true);
+    h.controller.onSyncStateChange(true);
+
+    assert.equal(h.getState(), 'live');
+    assert.deepEqual(h.previewModes, [true, false]);
+    assert.deepEqual(useCanvasStore.getState().nodes, []);
+    assert.deepEqual(useCanvasStore.getState().edges, []);
+    assert.deepEqual(useCanvasStore.getState().groups, []);
+    assert.equal(h.tablesMap.size, 0);
+    assert.deepEqual(Y.encodeStateAsUpdate(h.ydoc), snapshotState);
+    assert.equal(h.updates.mock.callCount(), updateCount);
+    assert.equal(h.applyBootstrap.mock.callCount(), 0);
+    assert.equal(h.unobserve.mock.callCount(), 1);
+    assert.equal(h.events.filter((event) => event === 'remote-snapshot-applied').length, 1);
+    context.mock.timers.tick(10_000);
+    assert.equal(h.warn.mock.callCount(), scenario === 'late' ? 1 : 0);
   });
 }

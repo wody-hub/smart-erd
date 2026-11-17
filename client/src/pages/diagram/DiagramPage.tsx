@@ -436,11 +436,13 @@ export default function DiagramPage() {
                     connectionIssue) && (
                     <DiagramSyncStatusBanner
                       connectionStatus={connectionStatus}
+                      previewSyncStatus={previewSyncStatus}
                       connectionIssue={connectionIssue}
                       setupErrorKind={collaborationSetupErrorKind}
                       onRetry={
                         collaborationSetupErrorKind === 'authoritative-bootstrap-required' ||
-                        connectionIssue
+                        connectionIssue ||
+                        previewSyncStatus === 'degraded'
                           ? retryCollaborationSetup
                           : undefined
                       }
