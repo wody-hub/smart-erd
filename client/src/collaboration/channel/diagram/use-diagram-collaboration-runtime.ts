@@ -44,6 +44,8 @@ interface UseDiagramCollaborationRuntimeReturn {
   documentMutationSession: DocumentMutationSession | null;
   documentCheckpointReader: DocumentCheckpointReader | null;
   getHydratedSnapshot: () => Uint8Array | null;
+  getHydratedContentRevision: () => string | null;
+  getRemoteHydrationGeneration: () => number;
 }
 
 /**
@@ -58,10 +60,16 @@ export function useDiagramCollaborationRuntime(
   useCollaborationStore((state) => state.connectionStatus);
   const [, setInitializationComplete] = useState(false);
   const initializationRef = useRef({ generation: 0, complete: false });
+  const initializationSourceRef = useRef<'waiting' | 'remote' | 'empty-room-assumed'>('waiting');
+  const hydratedContentRevisionRef = useRef<string | null>(null);
+  const remoteHydrationGenerationRef = useRef(0);
+  const contentRevisionRef = useRef(diagram?.contentRevision);
+  contentRevisionRef.current = diagram?.contentRevision;
+  const getHydratedContentRevision = useCallback(() => hydratedContentRevisionRef.current, []);
+  const getRemoteHydrationGeneration = useCallback(() => remoteHydrationGenerationRef.current, []);
   const providerGenerationRef = useRef(0);
   const hydratedSnapshotRef = useRef<Uint8Array | null>(null);
   const lastDiagramIdRef = useRef<string | null>(null);
-  const getHydratedSnapshot = useCallback(() => hydratedSnapshotRef.current, []);
   /** preview 여부. 아직 provider가 알리지 않았으면 null이며 이때는 previewEnabled를 따른다. */
   const previewRef = useRef<boolean | null>(null);
   const permissionRef = useRef(canEdit);
@@ -87,6 +95,15 @@ export function useDiagramCollaborationRuntime(
     transport,
     contentOnlySnapshotSeeder,
   } = useDiagramRuntimeBootstrap(diagram, documentBootstrap, setupAttempt);
+  const getHydratedSnapshot = useCallback(() => {
+    // 빈 방 추정은 원격 수화가 아니며, 문서가 여전히 비어 있으면 저장 기준으로 쓰지 않는다.
+    if (
+      initializationSourceRef.current === 'empty-room-assumed' &&
+      (!sharedDocumentEngine || sharedDocumentEngine.exportSnapshot().length <= 2)
+    )
+      return null;
+    return hydratedSnapshotRef.current;
+  }, [sharedDocumentEngine]);
   const { runtimeState, dispatchRuntimeEvent, resetRuntimeState } = useCollaborationSession({
     transition: runtimeTransition,
   });
@@ -125,6 +142,7 @@ export function useDiagramCollaborationRuntime(
       let firstConnection = lastDiagramIdRef.current !== diagramId;
       const providerGeneration = ++providerGenerationRef.current;
       hydratedSnapshotRef.current = null;
+      initializationSourceRef.current = 'waiting';
       initializationRef.current = { generation: 0, complete: false };
       const captureHydratedSnapshot = () => {
         if (
@@ -133,6 +151,8 @@ export function useDiagramCollaborationRuntime(
           !hydratedSnapshotRef.current
         ) {
           hydratedSnapshotRef.current = sharedDocumentEngine.exportSnapshot();
+          hydratedContentRevisionRef.current =
+            contentRevisionRef.current ?? collaborationBootstrap.contentRevision;
         }
       };
       return createDiagramCollaborationProviderLifecycle(
@@ -155,8 +175,29 @@ export function useDiagramCollaborationRuntime(
           onSyncStateChange: (next) => {
             if (providerGenerationRef.current !== providerGeneration) return;
             initializationRef.current.complete = next;
+            initializationSourceRef.current = next ? 'remote' : 'waiting';
+            if (next) remoteHydrationGenerationRef.current += 1;
+            hydratedSnapshotRef.current = null;
             captureHydratedSnapshot();
             setInitializationComplete(next);
+          },
+          onSyncRetry: (attempt) => {
+            if (
+              providerGenerationRef.current !== providerGeneration ||
+              attempt < 2 ||
+              initializationRef.current.complete ||
+              useCollaborationStore.getState().connectionStatus !== 'connected' ||
+              collaborationBootstrap.hasYdocSnapshot ||
+              collaborationBootstrap.content ||
+              previewEnabled
+            )
+              return;
+            // 임시 규칙: S2-D/S5의 서버 빈 문서 ACK가 실제 해결책이다.
+            // sync 완료로 위장하거나 bootstrap 내용을 시딩하지 않고 이 연결 세대만 편집 가능하게 한다.
+            initializationSourceRef.current = 'empty-room-assumed';
+            initializationRef.current.complete = true;
+            captureHydratedSnapshot();
+            setInitializationComplete(true);
           },
           onConnectionStatusChange: (status) => {
             if (providerGenerationRef.current !== providerGeneration) return;
@@ -168,6 +209,7 @@ export function useDiagramCollaborationRuntime(
                 !collaborationBootstrap.hasYdocSnapshot &&
                 !collaborationBootstrap.content
               ) {
+                initializationSourceRef.current = 'empty-room-assumed';
                 initializationRef.current.complete = true;
                 captureHydratedSnapshot();
                 setInitializationComplete(true);
@@ -175,6 +217,8 @@ export function useDiagramCollaborationRuntime(
               firstConnection = false;
               initializationRef.current.generation += 1;
             } else {
+              initializationSourceRef.current = 'waiting';
+              hydratedSnapshotRef.current = null;
               initializationRef.current.complete = false;
               setInitializationComplete(false);
             }
@@ -238,5 +282,7 @@ export function useDiagramCollaborationRuntime(
     documentMutationSession,
     documentCheckpointReader,
     getHydratedSnapshot,
+    getHydratedContentRevision,
+    getRemoteHydrationGeneration,
   };
 }

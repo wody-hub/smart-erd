@@ -49,20 +49,22 @@ export function getCodeModeSharedDraftMap(doc: Y.Doc): Y.Map<unknown> {
 /**
  * code 모드 shared draft의 Y.Text를 반환한다.
  *
- * 없으면 생성하여 루트 map에 연결한다.
+ * 조회 중에는 문서를 변경하지 않고, 없으면 null을 반환한다.
  *
  * @param doc 대상 Y.Doc
- * @returns code 모드 shared draft Y.Text
+ * @returns code 모드 shared draft Y.Text 또는 null
  */
-export function getCodeModeSharedDraftText(doc: Y.Doc): Y.Text {
-  const draftMap = getCodeModeSharedDraftMap(doc);
-  const existing = draftMap.get(CODE_MODE_SHARED_DRAFT_TEXT_KEY);
-  if (existing instanceof Y.Text) {
-    return existing;
-  }
+export function getCodeModeSharedDraftText(doc: Y.Doc): Y.Text | null {
+  const existing = getCodeModeSharedDraftMap(doc).get(CODE_MODE_SHARED_DRAFT_TEXT_KEY);
+  return existing instanceof Y.Text ? existing : null;
+}
 
+/** 준비된 쓰기 트랜잭션 안에서만 누락된 텍스트를 생성한다. */
+function ensureCodeModeSharedDraftText(doc: Y.Doc): Y.Text {
+  const existing = getCodeModeSharedDraftText(doc);
+  if (existing) return existing;
   const text = new Y.Text();
-  draftMap.set(CODE_MODE_SHARED_DRAFT_TEXT_KEY, text);
+  getCodeModeSharedDraftMap(doc).set(CODE_MODE_SHARED_DRAFT_TEXT_KEY, text);
   return text;
 }
 
@@ -73,7 +75,7 @@ export function getCodeModeSharedDraftText(doc: Y.Doc): Y.Text {
  * @returns 현재 shared draft text
  */
 export function readCodeModeSharedDraftText(doc: Y.Doc): string {
-  return getCodeModeSharedDraftText(doc).toString();
+  return getCodeModeSharedDraftText(doc)?.toString() ?? '';
 }
 
 /**
@@ -85,13 +87,13 @@ export function readCodeModeSharedDraftText(doc: Y.Doc): string {
  * @returns 없음
  */
 export function replaceCodeModeSharedDraftText(doc: Y.Doc, text: string, origin: unknown): void {
-  const yText = getCodeModeSharedDraftText(doc);
-  const currentText = yText.toString();
+  const currentText = readCodeModeSharedDraftText(doc);
   if (currentText === text) {
     return;
   }
 
   doc.transact(() => {
+    const yText = ensureCodeModeSharedDraftText(doc);
     if (yText.length > 0) {
       yText.delete(0, yText.length);
     }
@@ -176,8 +178,7 @@ export function writeCodeModeSharedDraftTextSnapshot(
   origin: unknown,
 ): void {
   const draftMap = getCodeModeSharedDraftMap(doc);
-  const yText = getCodeModeSharedDraftText(doc);
-  const currentText = yText.toString();
+  const currentText = readCodeModeSharedDraftText(doc);
   const currentBaseline = readCodeModeSharedDraftBaselineRevision(doc);
   const currentIntentionalBlank = readCodeModeSharedDraftIntentionalBlank(doc);
   const currentConfirmedBlank = readCodeModeSharedDraftConfirmedBlank(doc);
@@ -191,6 +192,7 @@ export function writeCodeModeSharedDraftTextSnapshot(
   }
 
   doc.transact(() => {
+    const yText = ensureCodeModeSharedDraftText(doc);
     if (currentText !== text) {
       if (yText.length > 0) {
         yText.delete(0, yText.length);
@@ -304,7 +306,7 @@ export function clearCodeModeSharedDraft(doc: Y.Doc, origin: unknown): void {
   const draftMap = getCodeModeSharedDraftMap(doc);
   const yText = getCodeModeSharedDraftText(doc);
 
-  const hasText = yText.length > 0;
+  const hasText = (yText?.length ?? 0) > 0;
   const hasGraph = draftMap.has(CODE_MODE_SHARED_DRAFT_GRAPH_KEY);
   const hasBaseline = draftMap.has(CODE_MODE_SHARED_DRAFT_BASELINE_KEY);
   const hasIntentionalBlank = draftMap.has(CODE_MODE_SHARED_DRAFT_INTENTIONAL_BLANK_KEY);
@@ -315,7 +317,7 @@ export function clearCodeModeSharedDraft(doc: Y.Doc, origin: unknown): void {
   }
 
   doc.transact(() => {
-    if (yText.length > 0) {
+    if (yText && yText.length > 0) {
       yText.delete(0, yText.length);
     }
     draftMap.delete(CODE_MODE_SHARED_DRAFT_GRAPH_KEY);

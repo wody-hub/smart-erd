@@ -1,3 +1,24 @@
+import * as Y from 'yjs';
+import { YjsSharedDocumentEngine } from '../../src/collaboration/core/engines/yjs-shared-document-engine.js';
+import { ErdDocumentMutationApplier } from '../../src/collaboration/plugins/erd/erd-document-mutation-applier.js';
+import {
+  ErdDocumentPlugin,
+  isErdCanvasInputAdapter,
+} from '../../src/collaboration/plugins/erd/erd-document-plugin.js';
+import { ErdDocumentReadContextFactory } from '../../src/collaboration/plugins/erd/query/erd-document-read-context-factory.js';
+import {
+  readErdDocumentNodes,
+  readErdDocumentGroups,
+} from '../../src/collaboration/plugins/erd/query/erd-document-graph-query.js';
+import { DocumentStore } from '../../src/collaboration/core/store/document-store.js';
+import { DocumentRevisionTracker } from '../../src/collaboration/core/store/document-revision-tracker.js';
+import { createDiagramDocumentMutationSession } from '../../src/collaboration/channel/diagram/diagram-document-mutation-session.js';
+import { getTablesMap, getGroupsMap, getEdgesMap } from '../../src/collaboration/yjsBridge.js';
+import {
+  createTrackedCanvasHistoryOrigins,
+  CANVAS_HISTORY_ORIGIN,
+} from '../../src/constants/canvas-history.js';
+import type { DdlParseResult } from '../../src/lib/ddl-parser.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ReactElement } from 'react';
@@ -188,7 +209,7 @@ test('group picker keeps its selection open on rejection and closes on success',
   assert.equal(closed, 1);
 });
 
-for (const rejection of ['diff', 'replace', 'group']) {
+for (const rejection of ['diff', 'replace']) {
   test(`code apply ${rejection} rejection stops commands without success or fallback retry`, async () => {
     let replacements = 0;
     let groups = 0;
@@ -255,5 +276,152 @@ for (const rejection of ['diff', 'replace', 'group']) {
     assert.equal(layouts, 0);
     assert.equal(success, 0);
     assert.equal(failure, 0);
+  });
+}
+
+for (const rejectGroup of [false, true]) {
+  test(`real Y.Doc replace then group restore: rejected=${rejectGroup}, partial result and production undo`, async () => {
+    const doc = new Y.Doc();
+    const engine = new YjsSharedDocumentEngine(doc);
+    const revisions = new DocumentRevisionTracker();
+    const store = new DocumentStore(
+      new ErdDocumentMutationApplier(engine),
+      revisions,
+      new ErdDocumentReadContextFactory(engine, revisions),
+      () => engine.exportSnapshot(),
+      () => [],
+    );
+    const plugin = new ErdDocumentPlugin();
+    const inputs = plugin.createInputAdapters({ read: store });
+    const adapter = inputs.canvas;
+    assert.ok(isErdCanvasInputAdapter(adapter));
+    let ready = true;
+    const session = createDiagramDocumentMutationSession(
+      store,
+      plugin.createMutationPolicy({ read: store }),
+      inputs,
+      () => ready,
+      () => {},
+    );
+    session.emitCommand(adapter.addTable('a'));
+    session.emitCommand(adapter.addGroup('g'));
+    const oldId = [...getTablesMap(doc).keys()][0];
+    const groupId = [...getGroupsMap(doc).keys()][0];
+    session.emitCommand(adapter.updateGroupTables(groupId, [oldId], []));
+    const before = {
+      nodes: readErdDocumentNodes(store),
+      groups: readErdDocumentGroups(store),
+      edges: [],
+      layoutNodes: readErdDocumentNodes(store),
+    };
+    const undo = new Y.UndoManager([getTablesMap(doc), getEdgesMap(doc), getGroupsMap(doc)], {
+      trackedOrigins: createTrackedCanvasHistoryOrigins(),
+    });
+    const transactions: unknown[] = [];
+    doc.on('update', (_update: Uint8Array, origin: unknown) => transactions.push(origin));
+    let partial = 0;
+    let success = 0;
+    const h = sourceHookHarness('src/hooks/useApplyToErd.ts', {
+      'react-i18next': translation,
+      useAuthStore: { __esModule: true, default: () => 'user' },
+      'use-diagram-erd-apply-actions': {
+        useDiagramErdApplyActions: () => ({
+          replaceFromDdl: (result: DdlParseResult) => {
+            const status = session.emitCommand(adapter.replaceFromDdl(result));
+            if (rejectGroup) ready = false;
+            return status;
+          },
+          updateGroupTables: (id: string, add: string[], remove: string[]) =>
+            session.emitCommand(adapter.updateGroupTables(id, add, remove)),
+        }),
+      },
+      'use-diagram-erd-apply-runtime': {
+        useDiagramErdApplyRuntime: () => ({
+          currentNodes: before.nodes,
+          captureBeforeState: () => before,
+          getCurrentNodes: () => readErdDocumentNodes(store),
+          getCurrentState: () => ({ nodes: readErdDocumentNodes(store), edges: [] }),
+        }),
+      },
+      'erd-diff-plan': { createCurrentSnapshots: () => ({ tables: [], edgeById: {} }) },
+      'erd-scoped-diff-builder': {
+        buildScopedDiffPlan: () => {
+          throw new Error('계획 생성 실패');
+        },
+      },
+      // 계획 실패를 강제하되, 복원 대상은 교체 후 실제 문서의 테이블 ID를 사용한다.
+      'erd-fallback-group-remap': {
+        buildFallbackGroupAssignments: () => [
+          { groupId, tableIds: [...getTablesMap(doc).keys()], droppedCount: 0 },
+        ],
+      },
+      'sync-policy': {
+        loadSyncPolicy: () => ({ layoutMode: 'none' }),
+        getAutoApplyBlockReason: () => null,
+      },
+      'diff-apply-rollout': {
+        resolveDiffApplyRollout: () => ({ enabled: true }),
+        loadDiffApplyLocalOverride: () => null,
+      },
+      sonner: {
+        toast: {
+          warning: () => partial++,
+          success: () => success++,
+          error: () => assert.fail('예상하지 않은 오류'),
+        },
+      },
+    });
+    const hook = h.exports.useApplyToErd as (params: unknown) => {
+      applyParsedToErd: () => Promise<boolean>;
+    };
+    const actions = h.render(() =>
+      hook({
+        canEdit: true,
+        parsing: false,
+        parseResult: {
+          tables: [
+            { name: 'a', columns: [] },
+            { name: 'b', columns: [] },
+          ],
+          relations: [],
+          errors: [],
+          diagnostics: [],
+          tableRanges: [],
+        },
+      }),
+    );
+    assert.equal(
+      await actions.applyParsedToErd(),
+      true,
+      '스키마가 반영된 부분 적용도 true를 반환한다',
+    );
+    assert.deepEqual(
+      readErdDocumentNodes(store)
+        .map((node) => node.data.label)
+        .sort(),
+      ['a', 'b'],
+    );
+    assert.equal(getTablesMap(doc).has(oldId), false);
+    const newIds = [...getTablesMap(doc).keys()];
+    assert.deepEqual(
+      readErdDocumentGroups(store)[0].tableIds.sort(),
+      rejectGroup ? [] : newIds.sort(),
+    );
+    assert.equal(partial, rejectGroup ? 1 : 0);
+    assert.equal(success, 0);
+    assert.deepEqual(
+      transactions,
+      rejectGroup
+        ? [CANVAS_HISTORY_ORIGIN.SYSTEM_DDL_IMPORT]
+        : [CANVAS_HISTORY_ORIGIN.SYSTEM_DDL_IMPORT, CANVAS_HISTORY_ORIGIN.USER_GROUP],
+    );
+    assert.equal(undo.undoStack.length, rejectGroup ? 0 : 1);
+    ready = true;
+    undo.undo();
+    // 기존 히스토리 정책상 시스템 스키마 교체는 추적하지 않고, 성공한 그룹 복원만 되돌린다.
+    assert.deepEqual(readErdDocumentGroups(store)[0].tableIds, []);
+    assert.deepEqual([...getTablesMap(doc).keys()].sort(), newIds.sort());
+    undo.destroy();
+    doc.destroy();
   });
 }

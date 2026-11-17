@@ -218,7 +218,8 @@ export default function DiagramPage() {
     previewSyncStatus,
   ]);
 
-  const { sharedSchemaDraft, writePreviewPositionOverrides } = useDiagramSharedSchemaDraft();
+  const { sharedSchemaDraft, writePreviewPositionOverrides } =
+    useDiagramSharedSchemaDraft(documentMutationSession);
   const {
     activeGroupId,
     activeGroup,
@@ -237,6 +238,7 @@ export default function DiagramPage() {
     handleNavigateToCodeFromDiagram,
     handleNavigateToTableFromEditor,
     handleSharedSchemaDraftPositionsChange,
+    handleLocalSchemaDraftPositionsChange,
     handleToggleCodeEditor,
     handleViewGroup,
     previewReadOnlyMessage,
@@ -520,9 +522,7 @@ export default function DiagramPage() {
                             dslOnly={workModeCapabilities.dslOnlyCodeEditor}
                             workMode={workMode}
                             previewPositionOverrides={dslPreviewPositionOverrides}
-                            onPreviewPositionOverridesChange={
-                              handleSharedSchemaDraftPositionsChange
-                            }
+                            onPreviewPositionOverridesChange={handleLocalSchemaDraftPositionsChange}
                             onNavigateToTable={handleNavigateToTableFromEditor}
                             tableRevealRequest={tableCodeRevealRequest}
                             delayDraftHydration={delayCodeDraftHydration}

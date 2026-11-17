@@ -49,6 +49,8 @@ export function useDiagramCollaborationSession(
     documentMutationSession,
     documentCheckpointReader,
     getHydratedSnapshot,
+    getHydratedContentRevision,
+    getRemoteHydrationGeneration,
   } = useDiagramCollaborationRuntime(diagram, documentBootstrap, setupAttempt, canEdit);
   const { providerRef, isPreviewMode, setupErrorKind } = useDiagramCollaborationProvider({
     collaborationBootstrap,
@@ -77,6 +79,8 @@ export function useDiagramCollaborationSession(
             checkpointReader: documentCheckpointReader,
             isReady: () => documentMutationSession?.ready ?? false,
             getHydratedSnapshot,
+            getHydratedContentRevision,
+            getRemoteHydrationGeneration,
           })
         : null,
     [
@@ -84,6 +88,8 @@ export function useDiagramCollaborationSession(
       documentCheckpointReader,
       documentMutationSession,
       getHydratedSnapshot,
+      getHydratedContentRevision,
+      getRemoteHydrationGeneration,
       projectId,
       teamId,
     ],

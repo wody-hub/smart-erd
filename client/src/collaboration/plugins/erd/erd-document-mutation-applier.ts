@@ -1,3 +1,8 @@
+import {
+  writeSharedSchemaDraftPositions,
+  SHARED_SCHEMA_DRAFT_ORIGIN,
+} from '@/lib/shared-schema-draft';
+import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
 import { isPositionBatch } from './erd-position-batch';
 import {
   ensureColumnStorage,
@@ -80,6 +85,31 @@ export class ErdDocumentMutationApplier {
 
   apply<T = unknown>(mutation: DocumentMutation): DocumentMutationApplyResult<T> {
     switch (mutation.key) {
+      case 'schema-draft:positions': {
+        const positions = mutation.payload?.positions;
+        if (!positions || typeof positions !== 'object' || Array.isArray(positions)) {
+          return this.toApplyResult(false);
+        }
+        for (const value of Object.values(positions)) {
+          if (
+            !value ||
+            typeof value !== 'object' ||
+            !('x' in value) ||
+            !('y' in value) ||
+            typeof value.x !== 'number' ||
+            typeof value.y !== 'number' ||
+            !Number.isFinite(value.x) ||
+            !Number.isFinite(value.y)
+          )
+            return this.toApplyResult(false);
+        }
+        writeSharedSchemaDraftPositions(
+          this.engine.getDocument(),
+          positions as DiagramPreviewPositionRecord,
+          SHARED_SCHEMA_DRAFT_ORIGIN,
+        );
+        return this.toApplyResult(true);
+      }
       case 'table:add':
         return this.toApplyResult(this.applyTableAdd(mutation));
       case 'table:delete':

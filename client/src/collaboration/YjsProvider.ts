@@ -117,6 +117,9 @@ export class YjsProvider {
   /** 초기 sync 완료 여부 변경 콜백 */
   onSyncStateChange: ((synced: boolean) => void) | null = null;
 
+  /** 현재 연결 세대에서 응답 없이 실행한 sync 재시도 횟수 콜백 */
+  onSyncRetry: ((attempt: number) => void) | null = null;
+
   /** 연결 거부/종료 사유 콜백 */
   onConnectionIssueDetected: ((issue: ConnectionIssueKind | null) => void) | null = null;
 
@@ -170,6 +173,9 @@ export class YjsProvider {
 
   /** 현재 presence 모드 */
   private presenceMode: PresenceMode = 'active';
+
+  /** 현재 연결 세대의 sync 재시도 횟수 */
+  private syncRetryAttempts = 0;
 
   /** initial sync 재시도 타이머 */
   private syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -349,6 +355,7 @@ export class YjsProvider {
         }
         this.clearReconnectTimer();
         this.clearSyncRetryTimer();
+        this.syncRetryAttempts = 0;
         this.reconnectDelay = WS_RECONNECT.INITIAL_DELAY;
         this.lastRoomEpoch = null;
         this.lastPresenceVersion = 0;
@@ -579,6 +586,7 @@ export class YjsProvider {
         return;
       }
       this.requestSync();
+      this.onSyncRetry?.(++this.syncRetryAttempts);
       this.scheduleSyncRetry();
     }, 1500);
   }

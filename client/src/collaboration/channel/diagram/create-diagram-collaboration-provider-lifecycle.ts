@@ -25,6 +25,7 @@ export interface CreateDiagramCollaborationProviderLifecycleOptions extends Diag
   storeBridge: DiagramCollaborationStoreBridge;
   onProviderReady: (provider: YjsProvider) => void;
   onProviderDisposed: () => void;
+  onSyncRetry?: (attempt: number) => void;
   onSyncStateChange?: (synced: boolean) => void;
   onConnectionStatusChange?: (status: ConnectionStatus) => void;
 }
@@ -70,6 +71,7 @@ export function createDiagramCollaborationProviderLifecycle(
   );
   const providerBinding = new DiagramCollaborationProviderBinding({
     ...callbacks,
+    onSyncRetry: options.onSyncRetry,
     onConnectionStatusChange: (status) => {
       options.onConnectionStatusChange?.(status);
       callbacks.onConnectionStatusChange(status);

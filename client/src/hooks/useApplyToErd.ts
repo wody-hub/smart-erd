@@ -121,6 +121,7 @@ interface DiffPhaseResult {
   diffAppliedOperations: number;
   diffSkippedOperations: number;
   groupDroppedCount: number;
+  groupRestoreRejected: boolean;
 }
 
 interface LayoutPhaseResult {
@@ -164,6 +165,7 @@ function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
       diffAppliedOperations: 0,
       diffSkippedOperations: 0,
       groupDroppedCount: 0,
+      groupRestoreRejected: false,
     };
   }
 
@@ -199,18 +201,22 @@ function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
       diffTableDiffs,
       replacedNodes,
     );
+    let groupRestoreRejected = false;
     for (const assignment of assignments) {
       if (!params.updateGroupTables(assignment.groupId, assignment.tableIds, [])) {
-        throw new DiagramApplyRejectedError('group restoration rejected');
+        // 스키마 교체는 이미 완료됐으므로 재시도/전체 실패 대신 부분 적용으로 반환한다.
+        groupRestoreRejected = true;
+        break;
       }
     }
     const droppedCount = assignments.reduce((sum, item) => sum + item.droppedCount, 0);
-    params.onFallback(droppedCount, error);
+    if (!groupRestoreRejected) params.onFallback(droppedCount, error);
     return {
       applyPath: 'full-replace-fallback',
       diffAppliedOperations: 0,
       diffSkippedOperations: 0,
       groupDroppedCount: droppedCount,
+      groupRestoreRejected,
     };
   }
   const diffResult = params.applyDiffPlan(diffPlan);
@@ -222,6 +228,7 @@ function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
     diffAppliedOperations: diffResult.appliedOperations,
     diffSkippedOperations: diffResult.skippedOperations,
     groupDroppedCount: diffResult.groupRemap.droppedCount,
+    groupRestoreRejected: false,
   };
 }
 
@@ -456,7 +463,15 @@ export function useApplyToErd({
           totalDurationMs,
         });
 
-        if (layoutPhase.layoutRejected) {
+        if (diffPhase.groupRestoreRejected) {
+          toast.warning(
+            t('erd.codeEditor.partialGroupApply', {
+              defaultValue:
+                '스키마는 적용했지만 그룹 복원을 완료하지 못했습니다. 연결 상태를 확인한 뒤 그룹을 다시 지정해 주세요.',
+            }),
+            { id: 'diagram-schema-partial-apply' },
+          );
+        } else if (layoutPhase.layoutRejected) {
           toast.warning(
             t('erd.codeEditor.partialApply', {
               defaultValue:
@@ -467,7 +482,7 @@ export function useApplyToErd({
         }
         if (source === 'manual') {
           onManualApplySuccess?.();
-          if (!layoutPhase.layoutRejected) {
+          if (!layoutPhase.layoutRejected && !diffPhase.groupRestoreRejected) {
             toast.success(t('erd.codeEditor.success', { count: parseResult.tables.length }));
           }
         }

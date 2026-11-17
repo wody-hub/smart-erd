@@ -96,6 +96,7 @@ type UseDiagramPageRuntimeStateResult = {
   handleNavigateToCodeFromDiagram: (request: CodeEditorTableRevealRequest) => void;
   handleNavigateToTableFromEditor: (request: CodeEditorTableFocusRequest) => void;
   handleSharedSchemaDraftPositionsChange: (nextPositions: DiagramPreviewPositionRecord) => void;
+  handleLocalSchemaDraftPositionsChange: (nextPositions: DiagramPreviewPositionRecord) => void;
   handleToggleCodeEditor: (() => void) | undefined;
   handleViewGroup: (groupId: string) => void;
   previewReadOnlyMessage: string | undefined;
@@ -404,6 +405,7 @@ export function useDiagramPageRuntimeState({
     handleNavigateToCodeFromDiagram,
     handleNavigateToTableFromEditor,
     handleSharedSchemaDraftPositionsChange,
+    handleLocalSchemaDraftPositionsChange: setDslPreviewPositionOverrides,
     handleToggleCodeEditor,
     handleViewGroup,
     previewReadOnlyMessage,

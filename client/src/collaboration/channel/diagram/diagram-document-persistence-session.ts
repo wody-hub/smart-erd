@@ -19,6 +19,8 @@ interface DiagramDocumentPersistenceSessionParams {
   checkpointReader: DocumentCheckpointReader | null;
   isReady: () => boolean;
   getHydratedSnapshot: () => Uint8Array | null;
+  getHydratedContentRevision: () => string | null;
+  getRemoteHydrationGeneration: () => number;
 }
 
 export type DiagramSnapshotPersistStatus = 'persisted' | 'stale' | 'missing-checkpoint';
@@ -28,10 +30,14 @@ export interface DiagramSnapshotPersistResult {
   refreshedDiagram?: DiagramDetail;
 }
 
+export interface DiagramRevisionCheckpoint extends DocumentCheckpoint {
+  contentRevision: string | null;
+}
+
 export interface DiagramPublishedBackup {
   content: string;
   hash: string;
-  checkpoint: DocumentCheckpoint;
+  checkpoint: DiagramRevisionCheckpoint;
 }
 
 /**
@@ -40,13 +46,22 @@ export interface DiagramPublishedBackup {
  * 페이지 계층은 이 세션을 통해 content 저장과 snapshot persist를 호출한다.
  */
 export class DiagramDocumentPersistenceSession {
+  /** 409 이후에는 HTTP revision 갱신만으로 전체 스냅샷 저장을 재개하지 않는다. */
+  private conflictGeneration: number | null = null;
+  private savedRevision: { generation: number; revision: string } | null = null;
+
   constructor(private readonly params: DiagramDocumentPersistenceSessionParams) {}
 
   get ready(): boolean {
-    return this.params.isReady() && this.params.getHydratedSnapshot() != null;
+    return (
+      this.params.isReady() &&
+      this.params.getHydratedSnapshot() != null &&
+      (this.conflictGeneration == null ||
+        this.params.getRemoteHydrationGeneration() > this.conflictGeneration)
+    );
   }
 
-  getLatestCheckpoint(): DocumentCheckpoint | null {
+  getLatestCheckpoint(): DiagramRevisionCheckpoint | null {
     if (!this.ready) return null;
     const checkpoint = this.params.checkpointReader?.getLatestCheckpoint() ?? null;
     // 빈 Y.Doc도 2바이트로 인코딩되므로 길이 0 검사만으로는 빈 문서를 거를 수 없다.
@@ -54,7 +69,14 @@ export class DiagramDocumentPersistenceSession {
     if (!checkpoint || checkpoint.snapshot.length <= 2) {
       return null;
     }
-    return checkpoint;
+    const generation = this.params.getRemoteHydrationGeneration();
+    return {
+      ...checkpoint,
+      contentRevision:
+        this.savedRevision?.generation === generation
+          ? this.savedRevision.revision
+          : this.params.getHydratedContentRevision(),
+    };
   }
 
   /**
@@ -62,7 +84,7 @@ export class DiagramDocumentPersistenceSession {
    *
    * @returns 수화 기준과 다른 체크포인트. 준비 전이거나 변경이 없으면 null
    */
-  getChangedCheckpoint(): DocumentCheckpoint | null {
+  getChangedCheckpoint(): DiagramRevisionCheckpoint | null {
     const checkpoint = this.getLatestCheckpoint();
     const baseline = this.params.getHydratedSnapshot();
     if (!checkpoint || !baseline || equalSnapshot(checkpoint.snapshot, baseline)) {
@@ -92,35 +114,31 @@ export class DiagramDocumentPersistenceSession {
 
   async savePublishedBackup(backup: DiagramPublishedBackup): Promise<SaveDiagramResult> {
     // mutation 예약 이후 연결/권한이 바뀌었으면 성공 처리하지 않는다.
-    if (!this.getLatestCheckpoint()) {
+    const current = this.getLatestCheckpoint();
+    if (!current || current.contentRevision !== backup.checkpoint.contentRevision) {
       throw new Error('Diagram snapshot is not ready for persistence');
     }
-    return saveDiagram(
+    const generation = this.params.getRemoteHydrationGeneration();
+    const saved = await saveDiagram(
       this.params.teamId,
       this.params.projectId,
       this.params.diagramId,
       backup.content,
       backup.checkpoint.snapshot,
     );
+    this.savedRevision = { generation, revision: saved.contentRevision };
+    return saved;
   }
 
   async persistSnapshot(expectedContentRevision: string): Promise<boolean> {
-    const checkpoint = this.getLatestCheckpoint();
-    if (!checkpoint) {
-      return false;
-    }
-    return persistDiagramYdocSnapshot(
-      this.params.teamId,
-      this.params.projectId,
-      this.params.diagramId,
-      expectedContentRevision,
-      checkpoint.snapshot,
+    return (
+      (await this.persistSnapshotWithConflictRetry(expectedContentRevision)).status === 'persisted'
     );
   }
 
   persistSnapshotKeepalive(expectedContentRevision: string): boolean {
     const checkpoint = this.getLatestCheckpoint();
-    if (!checkpoint) {
+    if (!checkpoint || checkpoint.contentRevision !== expectedContentRevision) {
       return false;
     }
     return persistDiagramYdocSnapshotKeepalive(
@@ -136,9 +154,10 @@ export class DiagramDocumentPersistenceSession {
     expectedContentRevision: string,
   ): Promise<DiagramSnapshotPersistResult> {
     const checkpoint = this.getLatestCheckpoint();
-    if (!checkpoint) {
+    if (!checkpoint || checkpoint.contentRevision !== expectedContentRevision) {
       return { status: 'missing-checkpoint' };
     }
+    const generation = this.params.getRemoteHydrationGeneration();
 
     try {
       const persisted = await persistDiagramYdocSnapshot(
@@ -148,12 +167,14 @@ export class DiagramDocumentPersistenceSession {
         expectedContentRevision,
         checkpoint.snapshot,
       );
+      if (!persisted) this.conflictGeneration = generation;
       return { status: persisted ? 'persisted' : 'stale' };
     } catch (error) {
       if (!isAxiosError(error) || error.response?.status !== 409) {
         throw error;
       }
 
+      this.conflictGeneration = generation;
       const refreshedDiagram = await fetchDiagram(
         this.params.teamId,
         this.params.projectId,

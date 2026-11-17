@@ -12,6 +12,7 @@ export class DiagramCollaborationProviderBinding {
    */
   bind(provider: YjsProvider): void {
     provider.onSyncStateChange = this.callbacks.onSyncStateChange;
+    provider.onSyncRetry = this.callbacks.onSyncRetry ?? null;
     provider.onConnectionStatusChange = this.callbacks.onConnectionStatusChange;
     provider.onConnectionIssueDetected = this.callbacks.onConnectionIssueDetected;
     provider.onIdentityResolved = this.callbacks.onIdentityResolved;
@@ -31,6 +32,7 @@ export class DiagramCollaborationProviderBinding {
       return;
     }
     provider.onSyncStateChange = null;
+    provider.onSyncRetry = null;
     provider.onConnectionStatusChange = null;
     provider.onConnectionIssueDetected = null;
     provider.onIdentityResolved = null;

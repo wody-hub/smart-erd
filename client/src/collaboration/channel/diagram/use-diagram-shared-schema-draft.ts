@@ -1,3 +1,4 @@
+import type { DiagramDocumentMutationSession } from './diagram-document-mutation-session';
 import { useCallback, useEffect, useState } from 'react';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
@@ -5,9 +6,7 @@ import {
   getSharedSchemaDraftMap,
   hasSharedSchemaDraftContent,
   readSharedSchemaDraftSnapshot,
-  SHARED_SCHEMA_DRAFT_ORIGIN,
   type SharedSchemaDraftSnapshot,
-  writeSharedSchemaDraftPositions,
 } from '@/lib/shared-schema-draft';
 
 interface UseDiagramSharedSchemaDraftResult {
@@ -15,7 +14,9 @@ interface UseDiagramSharedSchemaDraftResult {
   writePreviewPositionOverrides: (nextPositions: DiagramPreviewPositionRecord) => void;
 }
 
-export function useDiagramSharedSchemaDraft(): UseDiagramSharedSchemaDraftResult {
+export function useDiagramSharedSchemaDraft(
+  session: DiagramDocumentMutationSession | null,
+): UseDiagramSharedSchemaDraftResult {
   const ydoc = useCanvasStore((state) => state.ydoc);
   const [sharedSchemaDraft, setSharedSchemaDraft] = useState<SharedSchemaDraftSnapshot | null>(
     null,
@@ -42,15 +43,12 @@ export function useDiagramSharedSchemaDraft(): UseDiagramSharedSchemaDraftResult
 
   const writePreviewPositionOverrides = useCallback(
     (nextPositions: DiagramPreviewPositionRecord) => {
-      if (!ydoc && Object.keys(nextPositions).length === 0) {
-        return;
-      }
-      if (!ydoc) {
-        return;
-      }
-      writeSharedSchemaDraftPositions(ydoc, nextPositions, SHARED_SCHEMA_DRAFT_ORIGIN);
+      session?.emitCommand({
+        key: 'schema-draft:positions',
+        payload: { positions: nextPositions },
+      });
     },
-    [ydoc],
+    [session],
   );
 
   return {

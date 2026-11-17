@@ -48,6 +48,13 @@ for (const blocked of [
     );
     const before = Y.encodeStateAsUpdate(h.doc);
     assert.equal(h.session.emitCommand(h.adapter.addTable('blocked')), 'rejected');
+    assert.equal(
+      h.session.emitCommand({
+        key: 'schema-draft:positions',
+        payload: { positions: { draft: { x: 3, y: 5 } } },
+      }),
+      'rejected',
+    );
     assert.deepEqual(Y.encodeStateAsUpdate(h.doc), before);
     h.setReady(() => true);
     assert.equal(h.session.emitCommand(h.adapter.addTable('reconnected')), 'applied');
@@ -331,3 +338,48 @@ for (const hasYdocSnapshot of [false, true]) {
     assert.equal(isReady(), false, '폐기된 provider의 지연 이벤트도 무시한다');
   });
 }
+
+test('shared draft position command writes through dispatch while local VIEWER restore stays local', () => {
+  const d = harness();
+  const positions = { draft: { x: 10, y: 20 } };
+  let sharedWrites = 0;
+  const h = sourceHookHarness('src/pages/diagram/use-diagram-page-runtime-state.ts', {
+    'diagram-work-mode': { resolveDiagramWorkModeRuntimeState },
+    'shared-schema-draft': { hasSharedSchemaDraftContent: () => false },
+  });
+  const hook = h.exports.useDiagramPageRuntimeState as (params: unknown) => {
+    handleLocalSchemaDraftPositionsChange: (positions: unknown) => void;
+    dslPreviewPositionOverrides: unknown;
+  };
+  const render = () =>
+    h.render(() =>
+      hook({
+        canEdit: false,
+        documentCommandReady: false,
+        groups: [],
+        persistedNodes: [],
+        persistedEdges: [],
+        workMode: 'code',
+        workModeCapabilities: createDiagramWorkModeCapabilities('code'),
+        sharedSchemaDraft: null,
+        t: (key: string) => key,
+        writePreviewPositionOverrides: () => sharedWrites++,
+      }),
+    );
+  let updates = 0;
+  d.doc.on('update', () => updates++);
+  render().handleLocalSchemaDraftPositionsChange(positions);
+  assert.deepEqual(render().dslPreviewPositionOverrides, positions);
+  assert.equal(sharedWrites, 0);
+  assert.equal(updates, 0);
+  assert.equal(
+    d.session.emitCommand({ key: 'schema-draft:positions', payload: { positions } }),
+    'applied',
+  );
+  assert.equal(updates, 1);
+  assert.deepEqual(
+    JSON.parse(d.doc.getMap('sharedSchemaDraft').get('positions') as string),
+    positions,
+  );
+  d.doc.destroy();
+});

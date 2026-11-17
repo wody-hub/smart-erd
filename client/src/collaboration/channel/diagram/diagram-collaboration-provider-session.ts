@@ -80,11 +80,15 @@ export class DiagramCollaborationProviderSession {
       return;
     }
     this.hasCleanedUp = true;
-    this.providerLifecycle?.dispose();
-    this.providerLifecycle = null;
-    this.options.beforeDestroyYDoc?.();
-    this.options.resetRuntimeState();
-    this.options.destroyYDoc();
-    this.options.resetCollaboration();
+    // 준비 상태가 내려가기 전에 초안을 flush하고 체크포인트 저장 요청을 시작한다.
+    try {
+      this.options.beforeDestroyYDoc?.();
+    } finally {
+      this.providerLifecycle?.dispose();
+      this.providerLifecycle = null;
+      this.options.resetRuntimeState();
+      this.options.destroyYDoc();
+      this.options.resetCollaboration();
+    }
   }
 }
