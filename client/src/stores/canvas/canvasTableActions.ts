@@ -22,20 +22,14 @@ import { buildStableEdgeId, resolveAutoEdgeHandles } from '@/lib/edge-handles';
 import {
   createColumnYMap,
   createEdgeYMap,
-  createTableYMap,
   getEdgesMap,
   getGroupsMap,
   getTablesMap,
-  removeTableIdFromYArray,
   syncLegacyWaypointsInEdgeYMap,
 } from '@/collaboration/yjsBridge';
 import type { CanvasGetState, CanvasSetState, CanvasState } from './canvasStoreTypes';
 
 type CanvasTableActionKeys =
-  | 'addTable'
-  | 'deleteTable'
-  | 'renameTable'
-  | 'updateTableMeta'
   | 'addColumn'
   | 'deleteColumn'
   | 'updateColumn'
@@ -59,127 +53,6 @@ export function createCanvasTableActions(
   get: CanvasGetState,
 ): Pick<CanvasState, CanvasTableActionKeys> {
   return {
-    addTable: (name) => {
-      const { ydoc, nodes } = get();
-      if (!ydoc) {
-        return;
-      }
-      const tableId = `table-${crypto.randomUUID()}`;
-      const tableName = name ?? `Table ${nodes.length + 1}`;
-      let x = 100;
-      let y = 100;
-      if (nodes.length > 0) {
-        const maxX = Math.max(...nodes.map((n) => (n.position?.x ?? 0) + 220));
-        x = maxX + 40;
-        y = nodes[0]?.position?.y ?? 100;
-      }
-      ydoc.transact(() => {
-        const tablesMap = getTablesMap(ydoc);
-        tablesMap.set(
-          tableId,
-          createTableYMap(tableName, { x, y }, [
-            {
-              id: `col-${crypto.randomUUID()}`,
-              name: 'id',
-              type: 'BIGINT',
-              pk: true,
-              nullable: false,
-            },
-          ]),
-        );
-      }, CANVAS_HISTORY_ORIGIN.USER_TABLE);
-    },
-
-    deleteTable: (nodeId) => {
-      const { ydoc } = get();
-      if (!ydoc) {
-        return;
-      }
-      ydoc.transact(() => {
-        const tablesMap = getTablesMap(ydoc);
-        const edgesMap = getEdgesMap(ydoc);
-        tablesMap.delete(nodeId);
-        const toDelete: string[] = [];
-        edgesMap.forEach((ey, eid) => {
-          if (ey.get('source') === nodeId || ey.get('target') === nodeId) {
-            toDelete.push(eid);
-          }
-        });
-        toDelete.forEach((eid) => edgesMap.delete(eid));
-
-        // 삭제된 테이블이 포함된 그룹 참조를 함께 정리한다.
-        const groupsMap = getGroupsMap(ydoc);
-        groupsMap.forEach((groupYMap) => {
-          const tableIdsYArray = groupYMap.get('tableIds') as Y.Array<string> | undefined;
-          if (tableIdsYArray) {
-            removeTableIdFromYArray(tableIdsYArray, nodeId);
-          }
-        });
-      }, CANVAS_HISTORY_ORIGIN.USER_TABLE);
-
-      if (get().activeEditNodeId === nodeId) {
-        set({ activeEditNodeId: null });
-      }
-    },
-
-    renameTable: (nodeId, newName) => {
-      const { ydoc } = get();
-      if (!ydoc) {
-        return;
-      }
-      const nextLabel = newName.trim();
-      if (!nextLabel) {
-        return;
-      }
-      const tablesMap = getTablesMap(ydoc);
-      const tableYMap = tablesMap.get(nodeId);
-      if (!tableYMap) {
-        return;
-      }
-      const currentLabel = tableYMap.get('label');
-      if (currentLabel === nextLabel) {
-        return;
-      }
-      const existingLabels: string[] = [];
-      tablesMap.forEach((table, tableId) => {
-        if (tableId === nodeId) {
-          return;
-        }
-        const label = table.get('label');
-        if (typeof label === 'string' && label.length > 0) {
-          existingLabels.push(label);
-        }
-      });
-      const uniqueLabel = buildUniqueName(nextLabel, existingLabels);
-      ydoc.transact(() => {
-        tableYMap.set('label', uniqueLabel);
-      }, CANVAS_HISTORY_ORIGIN.USER_TABLE);
-    },
-
-    updateTableMeta: (nodeId, updates) => {
-      const { ydoc } = get();
-      if (!ydoc) {
-        return;
-      }
-      const tableYMap = getTablesMap(ydoc).get(nodeId);
-      if (!tableYMap) {
-        return;
-      }
-      ydoc.transact(() => {
-        for (const [key, value] of Object.entries(updates)) {
-          if (value === undefined || value === null) {
-            tableYMap.delete(key);
-          } else if (key === 'headerColor' && value === 'default') {
-            tableYMap.delete('headerColor');
-          } else if (key === 'handleLayout' && value === 'split') {
-            tableYMap.delete('handleLayout');
-          } else {
-            tableYMap.set(key, value);
-          }
-        }
-      }, CANVAS_HISTORY_ORIGIN.USER_TABLE);
-    },
-
     addColumn: (nodeId) => {
       const { ydoc } = get();
       if (!ydoc) {

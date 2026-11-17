@@ -6,6 +6,18 @@ export interface DiagramSessionActionResult<T> {
   value?: T;
 }
 
+/** 문서가 준비되지 않았거나 명령이 거절되면 쓰기 없이 차단 알림을 한 번 표시한다. */
+export function resolveDiagramDocumentStatus(
+  status: DiagramSessionActionStatus,
+  onRejected: () => void,
+): DiagramAppliedStatus {
+  if (status !== 'applied') {
+    onRejected();
+    return 'rejected';
+  }
+  return 'applied';
+}
+
 export function resolveDiagramAppliedStatus(
   status: DiagramSessionActionStatus,
   onUnavailable: () => void,

@@ -3,7 +3,10 @@ import type { DdlParseResult } from '@/lib/ddl-parser';
 import { useErdDocumentActions } from '@/collaboration/plugins/erd/use-erd-document-actions';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { Column, TableHeaderColor, TableNodeData } from '@/types/erd';
-import { resolveDiagramAppliedStatus } from '@/collaboration/channel/diagram/diagram-session-action-utils';
+import {
+  resolveDiagramAppliedStatus,
+  resolveDiagramDocumentStatus,
+} from '@/collaboration/channel/diagram/diagram-session-action-utils';
 import { useDiagramRejectedCommandToast } from '@/collaboration/channel/diagram/use-diagram-command-feedback';
 
 type TableMetaUpdates = Partial<
@@ -32,126 +35,83 @@ export interface DiagramErdCrudActions {
 
 export function useDiagramErdCrudActions(): DiagramErdCrudActions {
   const erdDocumentActions = useErdDocumentActions();
-  const addTableFallback = useCanvasStore((s) => s.addTable);
-  const deleteTableFallback = useCanvasStore((s) => s.deleteTable);
-  const finalizeNodeDragFallback = useCanvasStore((s) => s.finalizeNodeDrag);
-  const renameTableFallback = useCanvasStore((s) => s.renameTable);
-  const updateTableMetaFallback = useCanvasStore((s) => s.updateTableMeta);
-  const addColumnFallback = useCanvasStore((s) => s.addColumn);
-  const deleteColumnFallback = useCanvasStore((s) => s.deleteColumn);
-  const moveColumnFallback = useCanvasStore((s) => s.moveColumn);
-  const updateColumnFallback = useCanvasStore((s) => s.updateColumn);
-  const addGroupFallback = useCanvasStore((s) => s.addGroup);
-  const deleteGroupFallback = useCanvasStore((s) => s.deleteGroup);
-  const renameGroupFallback = useCanvasStore((s) => s.renameGroup);
-  const updateGroupColorFallback = useCanvasStore((s) => s.updateGroupColor);
-  const updateGroupTablesFallback = useCanvasStore((s) => s.updateGroupTables);
   const importDdlFallback = useCanvasStore((s) => s.importDdl);
   const notifyRejected = useDiagramRejectedCommandToast();
 
   return useMemo(
     () => ({
       addTable: (name?: string) => {
-        return resolveDiagramAppliedStatus(
-          erdDocumentActions.addTable(name),
-          () => addTableFallback(name),
-          notifyRejected,
-        );
+        return resolveDiagramDocumentStatus(erdDocumentActions.addTable(name), notifyRejected);
       },
       deleteTable: (tableId: string) => {
-        return resolveDiagramAppliedStatus(
+        return resolveDiagramDocumentStatus(
           erdDocumentActions.deleteTable(tableId),
-          () => deleteTableFallback(tableId),
           notifyRejected,
         );
       },
       moveTable: (tableId: string, positionX: number, positionY: number) => {
-        return resolveDiagramAppliedStatus(
+        return resolveDiagramDocumentStatus(
           erdDocumentActions.moveTable(tableId, positionX, positionY),
-          () =>
-            finalizeNodeDragFallback([
-              {
-                nodeId: tableId,
-                position: { x: positionX, y: positionY },
-              },
-            ]),
           notifyRejected,
         );
       },
       renameTable: (tableId: string, label: string) => {
-        return resolveDiagramAppliedStatus(
+        return resolveDiagramDocumentStatus(
           erdDocumentActions.renameTable(tableId, label),
-          () => renameTableFallback(tableId, label),
           notifyRejected,
         );
       },
       updateTableMeta: (tableId: string, updates: TableMetaUpdates) => {
-        return resolveDiagramAppliedStatus(
+        return resolveDiagramDocumentStatus(
           erdDocumentActions.updateTableMeta(tableId, updates),
-          () => updateTableMetaFallback(tableId, updates),
           notifyRejected,
         );
       },
       addColumn: (tableId: string) => {
-        return resolveDiagramAppliedStatus(
-          erdDocumentActions.addColumn(tableId),
-          () => addColumnFallback(tableId),
-          notifyRejected,
-        );
+        return resolveDiagramDocumentStatus(erdDocumentActions.addColumn(tableId), notifyRejected);
       },
       deleteColumn: (tableId: string, colId: string) => {
-        return resolveDiagramAppliedStatus(
+        return resolveDiagramDocumentStatus(
           erdDocumentActions.deleteColumn(tableId, colId),
-          () => deleteColumnFallback(tableId, colId),
           notifyRejected,
         );
       },
       moveColumn: (tableId: string, fromIndex: number, toIndex: number) => {
-        return resolveDiagramAppliedStatus(
+        return resolveDiagramDocumentStatus(
           erdDocumentActions.moveColumn(tableId, fromIndex, toIndex),
-          () => moveColumnFallback(tableId, fromIndex, toIndex),
           notifyRejected,
         );
       },
       updateColumn: (tableId: string, colId: string, updates: Partial<Column>) => {
-        return resolveDiagramAppliedStatus(
+        return resolveDiagramDocumentStatus(
           erdDocumentActions.updateColumn(tableId, colId, updates),
-          () => updateColumnFallback(tableId, colId, updates),
           notifyRejected,
         );
       },
       addGroup: (label?: string) => {
-        return resolveDiagramAppliedStatus(
-          erdDocumentActions.addGroup(label),
-          () => addGroupFallback(label),
-          notifyRejected,
-        );
+        return resolveDiagramDocumentStatus(erdDocumentActions.addGroup(label), notifyRejected);
       },
       deleteGroup: (groupId: string) => {
-        return resolveDiagramAppliedStatus(
+        return resolveDiagramDocumentStatus(
           erdDocumentActions.deleteGroup(groupId),
-          () => deleteGroupFallback(groupId),
           notifyRejected,
         );
       },
       renameGroup: (groupId: string, label: string) => {
-        return resolveDiagramAppliedStatus(
+        return resolveDiagramDocumentStatus(
           erdDocumentActions.renameGroup(groupId, label),
-          () => renameGroupFallback(groupId, label),
           notifyRejected,
         );
       },
       updateGroupColor: (groupId: string, color: TableHeaderColor | 'default') => {
-        return resolveDiagramAppliedStatus(
+        return resolveDiagramDocumentStatus(
           erdDocumentActions.updateGroupColor(groupId, color),
-          () => updateGroupColorFallback(groupId, color),
           notifyRejected,
         );
       },
       updateGroupTables: (groupId: string, toAdd: string[], toRemove: string[]) => {
-        return resolveDiagramAppliedStatus(
+        return resolveDiagramDocumentStatus(
           erdDocumentActions.updateGroupTables(groupId, toAdd, toRemove),
-          () => updateGroupTablesFallback(groupId, toAdd, toRemove),
           notifyRejected,
         );
       },
@@ -163,24 +123,6 @@ export function useDiagramErdCrudActions(): DiagramErdCrudActions {
         );
       },
     }),
-    [
-      addColumnFallback,
-      addGroupFallback,
-      addTableFallback,
-      deleteColumnFallback,
-      deleteGroupFallback,
-      deleteTableFallback,
-      erdDocumentActions,
-      finalizeNodeDragFallback,
-      importDdlFallback,
-      moveColumnFallback,
-      notifyRejected,
-      renameGroupFallback,
-      renameTableFallback,
-      updateColumnFallback,
-      updateGroupColorFallback,
-      updateGroupTablesFallback,
-      updateTableMetaFallback,
-    ],
+    [erdDocumentActions, importDdlFallback, notifyRejected],
   );
 }

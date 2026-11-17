@@ -12,7 +12,6 @@ import type {
   EdgeRoutingType,
   RelationType,
   TableGroup,
-  TableHeaderColor,
   TableNodeData,
   Waypoint,
 } from '@/types/erd';
@@ -97,18 +96,6 @@ export interface CanvasState {
   lastBackupHash: string;
   markBackedUp: (hash: string) => void;
   prepareBackup: () => { content: string; hash: string } | null;
-  addTable: (name?: string) => void;
-  deleteTable: (nodeId: string) => void;
-  renameTable: (nodeId: string, newName: string) => void;
-  updateTableMeta: (
-    nodeId: string,
-    updates: Partial<
-      Pick<
-        TableNodeData,
-        'label' | 'logicalTableName' | 'tableTermId' | 'headerColor' | 'handleLayout'
-      >
-    >,
-  ) => void;
   addColumn: (nodeId: string) => void;
   deleteColumn: (nodeId: string, colId: string) => void;
   updateColumn: (nodeId: string, colId: string, updates: Partial<Column>) => void;
@@ -161,14 +148,6 @@ export interface CanvasState {
   importDdl: (result: DdlParseResult) => void;
   replaceFromDdl: (result: DdlParseResult) => void;
   applyDiffPlan: (plan: DiffPlan) => ApplyDiffResult | null;
-  /** 새 논리적 그룹을 생성한다. */
-  addGroup: (label?: string) => void;
-  /** 논리적 그룹을 삭제한다. 소속 테이블에는 영향이 없다. */
-  deleteGroup: (groupId: string) => void;
-  /** 그룹 이름을 변경한다. */
-  renameGroup: (groupId: string, newName: string) => void;
-  /** 그룹 색상을 변경한다. */
-  updateGroupColor: (groupId: string, color: TableHeaderColor | 'default') => void;
   /** 그룹에 테이블을 추가한다. 이미 존재하면 무시한다. */
   addTableToGroup: (groupId: string, tableId: string) => void;
   /** 그룹에 여러 테이블을 추가한다. */

@@ -1,13 +1,9 @@
 import * as Y from 'yjs';
 import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
-import { createGroupYMap, getGroupsMap, removeTableIdFromYArray } from '@/collaboration/yjsBridge';
+import { getGroupsMap, removeTableIdFromYArray } from '@/collaboration/yjsBridge';
 import type { CanvasGetState, CanvasState } from './canvasStoreTypes';
 
 type CanvasGroupActionKeys =
-  | 'addGroup'
-  | 'deleteGroup'
-  | 'renameGroup'
-  | 'updateGroupColor'
   | 'addTableToGroup'
   | 'addTablesToGroup'
   | 'removeTableFromGroup'
@@ -24,61 +20,6 @@ export function createCanvasGroupActions(
   get: CanvasGetState,
 ): Pick<CanvasState, CanvasGroupActionKeys> {
   return {
-    addGroup: (label) => {
-      const { ydoc, groups } = get();
-      if (!ydoc) {
-        return;
-      }
-
-      const groupId = `group-${crypto.randomUUID()}`;
-      const groupLabel = label ?? `Group ${groups.length + 1}`;
-      ydoc.transact(() => {
-        getGroupsMap(ydoc).set(groupId, createGroupYMap(groupLabel));
-      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
-    },
-
-    deleteGroup: (groupId) => {
-      const { ydoc } = get();
-      if (!ydoc) {
-        return;
-      }
-      ydoc.transact(() => {
-        getGroupsMap(ydoc).delete(groupId);
-      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
-    },
-
-    renameGroup: (groupId, newName) => {
-      const { ydoc } = get();
-      if (!ydoc) {
-        return;
-      }
-      const groupYMap = getGroupsMap(ydoc).get(groupId);
-      if (!groupYMap) {
-        return;
-      }
-      ydoc.transact(() => {
-        groupYMap.set('label', newName);
-      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
-    },
-
-    updateGroupColor: (groupId, color) => {
-      const { ydoc } = get();
-      if (!ydoc) {
-        return;
-      }
-      const groupYMap = getGroupsMap(ydoc).get(groupId);
-      if (!groupYMap) {
-        return;
-      }
-      ydoc.transact(() => {
-        if (color === 'default') {
-          groupYMap.delete('color');
-        } else {
-          groupYMap.set('color', color);
-        }
-      }, CANVAS_HISTORY_ORIGIN.USER_GROUP);
-    },
-
     addTableToGroup: (groupId, tableId) => {
       const { ydoc } = get();
       if (!ydoc) {
