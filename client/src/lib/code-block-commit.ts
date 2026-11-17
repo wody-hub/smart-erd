@@ -468,7 +468,7 @@ export function classifyField<T>(
 /** 로컬 텍스트를 유지하는 원자적인 원격 재기준 결과. */
 export type RemoteBlockMergeResult =
   | { status: 'merged'; base: BlockCommitBase; edited: string }
-  | { status: 'conflict'; conflicts: BlockFieldConflict[]; edited: string }
+  | { status: 'conflict'; conflicts: BlockFieldConflict[]; edited: string; base?: BlockCommitBase }
   | { status: 'entity-removed'; edited: string }
   | BlockCommitFailure;
 
@@ -498,6 +498,29 @@ export function mergeRemoteIntoLocalEdit({
     JSON.stringify(authoritativeBlock.metadata.columnIds)
   )
     return failure('unsupported', 'structure-changed');
+  const duplicates = duplicateColumnNames(authoritativeBlock.metadata.columns);
+  if (duplicates.length) return duplicateNameFailure(duplicates);
+  // 이전 기준에 남은 중복 물리명만 안정 ID로 복구하고 텍스트 비교 기준은 유지한다.
+  const duplicateIds = new Set(
+    duplicateColumnNames(base.metadata.columns).flatMap((issue) => issue.columnIds),
+  );
+  const bindingBase = duplicateIds.size
+    ? {
+        ...base,
+        metadata: {
+          ...base.metadata,
+          columns: base.metadata.columns.map((column) =>
+            duplicateIds.has(column.id)
+              ? {
+                  ...column,
+                  name: authoritativeBlock.metadata.columns.find((item) => item.id === column.id)!
+                    .name,
+                }
+              : column,
+          ),
+        },
+      }
+    : base;
   const snapshot: ProjectionSnapshot = {
     revision: 0,
     dictionary: { terms: [], domains: [] },
@@ -509,13 +532,13 @@ export function mergeRemoteIntoLocalEdit({
           label: base.metadata.tablePhysicalName,
           logicalTableName: base.metadata.tableLogicalName,
           tableTermId: base.metadata.tableTermId,
-          columns: base.metadata.columns,
+          columns: bindingBase.metadata.columns,
         },
       },
     ],
   };
   const commit = computeBlockCommit({
-    base,
+    base: bindingBase,
     edited,
     currentSnapshot: snapshot,
     dictionaryFingerprint: base.dictionaryFingerprint ?? '',
@@ -523,7 +546,7 @@ export function mergeRemoteIntoLocalEdit({
     dictionary,
   });
   if (!('kind' in commit)) return commit;
-  const bound = bindBlockIds(base, edited, dictionary);
+  const bound = bindBlockIds(bindingBase, edited, dictionary);
   if (bound.status !== 'bound') return bound;
   const before = { ...(base.textFieldBaselines ?? tokenValues(bound.original, base.metadata)) };
   const after = tokenValues(bound.parsed, base.metadata);
@@ -531,13 +554,14 @@ export function mergeRemoteIntoLocalEdit({
   const metadata = structuredClone(base.metadata);
   for (const patch of commit.patches) {
     const currentValue = readValue(authoritativeBlock.metadata, patch)!;
-    const classification = classifyField(patch.baseValue, patch.nextValue, currentValue);
+    const baseValue = readValue(base.metadata, patch)!;
+    const classification = classifyField(baseValue, patch.nextValue, currentValue);
     if (classification === 'conflict')
       conflicts.push({
         target: patch.target,
         columnId: patch.target === 'column' ? patch.columnId : undefined,
         field: patch.field,
-        baseValue: patch.baseValue,
+        baseValue,
         localValue: patch.nextValue,
         currentValue,
       });
@@ -550,7 +574,13 @@ export function mergeRemoteIntoLocalEdit({
       before[key] = after[key];
     }
   }
-  if (conflicts.length) return { status: 'conflict', conflicts, edited };
+  if (conflicts.length)
+    return {
+      status: 'conflict',
+      conflicts,
+      edited,
+      ...(duplicateIds.size ? { base: bindingBase } : {}),
+    };
   metadata.tablePhysicalName = authoritativeBlock.metadata.tablePhysicalName;
   metadata.tableLogicalName = authoritativeBlock.metadata.tableLogicalName;
   metadata.tableTermId = authoritativeBlock.metadata.tableTermId;

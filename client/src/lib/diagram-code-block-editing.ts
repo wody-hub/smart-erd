@@ -51,6 +51,8 @@ export interface EditingBlock {
   undo: TextHistoryEntry[];
   /** 블록별 사용자 redo 이력. */
   redo: TextHistoryEntry[];
+  /** 텍스트 버전과 별도로 늦은 비동기 응답을 구분하는 요청 ID. */
+  inFlightCommitId?: string;
   /** 커밋 echo의 값 비교 기준. */
   sent?: { commit: CodeBlockCommit; base: BlockCommitBase };
 }
@@ -298,8 +300,14 @@ export class CodeBlockEditingController {
       edited: block.state.text,
       authoritativeBlock: authoritative,
     });
-    if (merged.status === 'merged') block.base = merged.base;
-    else if (merged.status === 'conflict') {
+    if (merged.status === 'merged') {
+      block.base = merged.base;
+      if (block.failure?.reasons.includes('duplicate-name')) {
+        block.failure = undefined;
+        this.dispatch(id, { type: 'readiness', ready: this.ready, now: this.options.now() });
+      }
+    } else if (merged.status === 'conflict') {
+      if (merged.base) block.base = merged.base;
       block.conflicts = merged.conflicts;
       this.dispatch(id, { type: 'conflict', now: this.options.now() });
     } else if (merged.status === 'entity-removed')
@@ -321,6 +329,7 @@ export class CodeBlockEditingController {
     if (!snapshot.nodes.some((node) => node.id === id)) return;
     const authoritative = generateTableBlock(id, snapshot);
     if (choice === 'remote') {
+      block.inFlightCommitId = undefined;
       block.base = { ...authoritative, dictionaryFingerprint: this.options.fingerprint() };
       block.cleanText = authoritative.text;
       block.state = createBlockCommitState(authoritative.text, true);
@@ -366,6 +375,7 @@ export class CodeBlockEditingController {
       Object.assign(target, { [field]: current });
     }
     block.base = { ...block.base, metadata };
+    block.inFlightCommitId = undefined;
     block.conflicts = [];
     block.failure = undefined;
     block.state = {
@@ -596,6 +606,7 @@ export class CodeBlockEditingController {
       this.fail(id, commit);
       return;
     }
+    block.inFlightCommitId = commit.commitId;
     const sentBase = block.base;
     block.sent = { commit, base: sentBase };
     const started = this.options.now();
@@ -606,7 +617,15 @@ export class CodeBlockEditingController {
      * @returns 없음
      */
     const finish = (result: CodeBlockCommitResult) => {
-      if (this.disposed || block.state.inFlightVersion !== version) return;
+      if (
+        this.disposed ||
+        this.blocks.get(id) !== block ||
+        block.state.inFlightVersion !== version ||
+        block.inFlightCommitId !== commit.commitId ||
+        result.commitId !== commit.commitId
+      )
+        return;
+      block.inFlightCommitId = undefined;
       if (result.status === 'applied') {
         const snapshot = this.options.snapshot();
         const expected = structuredClone(snapshot);

@@ -606,3 +606,21 @@ test('concurrent table rename calculated earlier is rejected on a peer that sees
   peer.destroy();
   h.doc.destroy();
 });
+
+test('strict applier allows a logical rename crossing another physical name', () => {
+  const h = harness();
+  h.table.set('label', 'C');
+  getTablesMap(h.doc).set(
+    'b',
+    new Y.Map<unknown>([
+      ['label', 'B'],
+      ['logicalTableName', 'D'],
+    ]),
+  );
+  h.commit.patches = [
+    { target: 'table', tableId: 'a', field: 'logicalTableName', baseValue: null, nextValue: 'B' },
+  ];
+  assert.equal(h.apply().value!.status, 'applied');
+  assert.equal(h.table.get('logicalTableName'), 'B');
+  h.doc.destroy();
+});

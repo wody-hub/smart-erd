@@ -27,15 +27,16 @@ export function duplicateColumnNames(
     }));
 }
 
-/** DSL 표시·FK 대상 이름의 정확한 비교로 테이블 별칭 충돌을 검사한다. */
+/** 물리명과 실제 DSL 선언·FK 이름을 각각 독립된 이름 공간에서 검사한다. */
 export function tableNameCollision(
   candidate: { label: string; logicalTableName?: string | null },
   others: Iterable<{ label: string; logicalTableName?: string | null }>,
 ): boolean {
-  const aliases = (table: typeof candidate) =>
-    [table.label, table.logicalTableName]
-      .filter((name): name is string => !!name)
-      .map((name) => normalizeBlockDisplayName(name).trim());
-  const names = new Set(aliases(candidate));
-  return [...others].some((table) => aliases(table).some((name) => names.has(name)));
+  const physical = normalizeBlockDisplayName(candidate.label).trim();
+  const declared = normalizeBlockDisplayName(candidate.logicalTableName || candidate.label).trim();
+  return [...others].some(
+    (table) =>
+      normalizeBlockDisplayName(table.label).trim() === physical ||
+      normalizeBlockDisplayName(table.logicalTableName || table.label).trim() === declared,
+  );
 }

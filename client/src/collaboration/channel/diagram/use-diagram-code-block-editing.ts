@@ -654,17 +654,21 @@ export function useDiagramCodeBlockEditing(input: CodeBlockEditingInput) {
       },
     });
     const dom = codeEditor.getDomNode();
+    /** 검색·치환 등 보조 입력은 제외하고 본문 텍스트 입력만 이력을 라우팅한다. */
+    const isEditorTextInput = (event: Event) =>
+      codeEditor.hasTextFocus() &&
+      (event.target as Element | null)?.matches?.('textarea.inputarea') === true;
     /** 브라우저·execCommand의 네이티브 이력 입력을 편집 이력으로 바꾼다. */
     const beforeInput = (event: Event) => {
       const type = (event as InputEvent).inputType;
-      if (type !== 'historyUndo' && type !== 'historyRedo') return;
+      if (!isEditorTextInput(event) || (type !== 'historyUndo' && type !== 'historyRedo')) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       routeHistory(type === 'historyUndo' ? 'undo' : 'redo');
     };
     /** 플랫폼별 보조 키 조합도 Monaco 기본 핸들러보다 먼저 소비한다. */
     const keyDown = (event: KeyboardEvent) => {
-      if ((!event.ctrlKey && !event.metaKey) || event.altKey) return;
+      if (!isEditorTextInput(event) || (!event.ctrlKey && !event.metaKey) || event.altKey) return;
       const key = event.key.toLowerCase();
       if (key !== 'z' && key !== 'y') return;
       event.preventDefault();

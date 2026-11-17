@@ -106,3 +106,28 @@ for (const locale of ['ko', 'en'])
     assert.equal(rendered.editor?.options.contextmenu, false);
     h.cleanup();
   });
+
+test('table physical names and declared DSL names have separate uniqueness scopes', () => {
+  assert.equal(
+    names.tableNameCollision({ label: 'C', logicalTableName: 'B' }, [
+      { label: 'B', logicalTableName: 'D' },
+    ]),
+    false,
+  );
+  assert.equal(
+    names.tableNameCollision({ label: 'C', logicalTableName: 'B' }, [
+      { label: 'C', logicalTableName: 'D' },
+    ]),
+    true,
+  );
+  assert.equal(
+    names.tableNameCollision({ label: 'C', logicalTableName: 'B' }, [
+      { label: 'D', logicalTableName: 'B' },
+    ]),
+    true,
+  );
+  assert.equal(
+    names.tableNameCollision({ label: 'C', logicalTableName: 'B' }, [{ label: 'B' }]),
+    true,
+  );
+});

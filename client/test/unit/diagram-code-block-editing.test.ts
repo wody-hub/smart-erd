@@ -335,3 +335,116 @@ test('apply mine after a committed edit advances current field base without re-c
   assert.equal(h.controller.get('t')!.state.status, 'CLEAN');
   h.controller.dispose();
 });
+
+for (const staleDuplicateBase of [false, true])
+  test(`canvas duplicate resolution restores local fields and stable IDs (stale base: ${staleDuplicateBase})`, () => {
+    const h = harness();
+    h.snapshot.nodes[0].data.columns.push({
+      id: 'second',
+      name: 'other',
+      type: 'INT',
+      nullable: true,
+    });
+    h.controller.remote(generateTableBlock('t', h.snapshot), []);
+    const base = h.controller.get('t')!.base;
+    h.edit(base.text.replace('value ::INT', 'value ::BIGINT'));
+    h.snapshot.nodes[0].data.columns[1].name = 'value';
+    h.controller.remote(generateTableBlock('t', h.snapshot), []);
+    h.tick(800);
+    assert.equal(h.controller.get('t')!.state.status, 'INVALID');
+    assert.equal(h.commits.length, 0);
+    if (staleDuplicateBase) {
+      h.controller.get('t')!.base.metadata = structuredClone(
+        generateTableBlock('t', h.snapshot).metadata,
+      );
+    }
+    h.snapshot.nodes[0].data.columns[1].name = 'fixed';
+    h.snapshot.nodes[0].data.columns[1].nullable = false;
+    h.controller.remote(generateTableBlock('t', h.snapshot), []);
+    if (staleDuplicateBase) h.tick(800);
+    else h.controller.event('t', 'blur');
+    assert.equal(h.commits.length, 1);
+    assert.deepEqual(
+      h.commits[0].patches.map((p) => [p.target === 'column' && p.columnId, p.field, p.nextValue]),
+      [['c', 'type', 'BIGINT']],
+    );
+    assert.equal(h.controller.get('t')!.state.status, 'CLEAN');
+    assert.match(h.visible(), /fixed ::INT.*NN/);
+    h.controller.dispose();
+  });
+
+for (const oldStatus of ['applied', 'rejected'] as const)
+  for (const order of ['A-B', 'B-A'])
+    test(`apply mine ignores superseded asynchronous ${oldStatus} response (${order})`, async () => {
+      const replies: ((result: CodeBlockCommitResult) => void)[] = [];
+      const h = harness(() => new Promise((resolve) => replies.push(resolve)));
+      h.edit();
+      h.tick(800);
+      h.snapshot.nodes[0].data.columns[0].type = 'TEXT';
+      h.controller.remote(generateTableBlock('t', h.snapshot), []);
+      assert.equal(h.controller.get('t')!.state.status, 'CONFLICT');
+      h.controller.resolve('t', 'mine');
+      assert.equal(h.commits.length, 2);
+      const finishA = async () => {
+        replies[0](
+          oldStatus === 'rejected'
+            ? { status: 'rejected', commitId: h.commits[0].commitId, reason: 'invalid' }
+            : { status: 'applied', commitId: h.commits[0].commitId, changedFields: 1, noop: false },
+        );
+        await Promise.resolve();
+      };
+      const applyB = async () => {
+        h.snapshot.nodes[0].data.columns[0].type = 'BIGINT';
+        replies[1]({
+          status: 'applied',
+          commitId: h.commits[1].commitId,
+          changedFields: 1,
+          noop: false,
+        });
+        await Promise.resolve();
+      };
+      if (order === 'A-B') {
+        await finishA();
+        assert.equal(h.controller.get('t')!.state.status, 'COMMITTING');
+        await applyB();
+      } else {
+        await applyB();
+        await finishA();
+      }
+      assert.equal(h.controller.get('t')!.state.status, 'CLEAN');
+      assert.equal(h.controller.get('t')!.failure, undefined);
+      h.controller.dispose();
+    });
+
+test('duplicate recovery still reports a same-field conflict against current authoritative values', () => {
+  const h = harness();
+  h.snapshot.nodes[0].data.columns.push({
+    id: 'second',
+    name: 'other',
+    type: 'INT',
+    nullable: true,
+  });
+  h.controller.remote(generateTableBlock('t', h.snapshot), []);
+  h.edit(h.controller.get('t')!.base.text.replace('value ::INT', 'value ::BIGINT'));
+  h.snapshot.nodes[0].data.columns[1].name = 'value';
+  h.controller.remote(generateTableBlock('t', h.snapshot), []);
+  h.tick(800);
+  h.controller.get('t')!.base.metadata = structuredClone(
+    generateTableBlock('t', h.snapshot).metadata,
+  );
+  h.snapshot.nodes[0].data.columns[1].name = 'fixed';
+  h.snapshot.nodes[0].data.columns[0].type = 'TEXT';
+  h.controller.remote(generateTableBlock('t', h.snapshot), []);
+  assert.equal(h.controller.get('t')!.state.status, 'CONFLICT');
+  assert.deepEqual(
+    h.controller
+      .get('t')!
+      .conflicts.map((c) => [c.columnId, c.field, c.localValue, c.currentValue]),
+    [['c', 'type', 'BIGINT', 'TEXT']],
+  );
+  assert.equal(h.commits.length, 0);
+  h.controller.resolve('t', 'mine');
+  assert.equal(h.commits.length, 1);
+  assert.equal(h.controller.get('t')!.state.status, 'CLEAN');
+  h.controller.dispose();
+});

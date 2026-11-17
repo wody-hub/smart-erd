@@ -59,7 +59,8 @@ async function mounted(size = 2, storage?: RecoveryStorage) {
   let ready = true,
     time = 0,
     seq = 0,
-    documentUndo = 0;
+    documentUndo = 0,
+    documentRedo = 0;
   const timers = new Map<number, { at: number; run: () => void }>();
   const listeners = new Set<(event: DiagramCodeProjectionPatch) => void>();
   const callbacks = new Map<string, () => void>();
@@ -129,7 +130,9 @@ async function mounted(size = 2, storage?: RecoveryStorage) {
             undo: () => {
               documentUndo++;
             },
-            redo() {},
+            redo: () => {
+              documentRedo++;
+            },
           }),
         },
       },
@@ -191,6 +194,7 @@ async function mounted(size = 2, storage?: RecoveryStorage) {
   const dom = new EventTarget();
   const codeEditor = {
     getDomNode: () => dom,
+    hasTextFocus: () => true,
     getModel: () => model,
     getPosition: () => selection.getPosition(),
     getSelection: () => selection,
@@ -261,6 +265,7 @@ async function mounted(size = 2, storage?: RecoveryStorage) {
     markers: () => markers,
     selection: () => selection,
     undoCount: () => documentUndo,
+    redoCount: () => documentRedo,
     state: () => {
       result = h.render(() => hook(input));
       return result;
@@ -521,6 +526,12 @@ for (const inputType of ['historyUndo', 'historyRedo'])
       if (inputType === 'historyRedo') await h.model.undo();
       const event = new Event('beforeinput', { cancelable: true });
       Object.defineProperty(event, 'inputType', { value: inputType });
+      Object.defineProperty(event, 'target', {
+        value: {
+          tagName: 'TEXTAREA',
+          matches: (selector: string) => selector === 'textarea.inputarea',
+        },
+      });
       h.dom.dispatchEvent(event);
       assert.equal(event.defaultPrevented, true);
       assert.match(
@@ -547,6 +558,12 @@ for (const [key, shiftKey, metaKey] of [
       if (redo) await h.model.undo();
       const event = new Event('keydown', { cancelable: true });
       Object.assign(event, { key, shiftKey, metaKey, ctrlKey: !metaKey, altKey: false });
+      Object.defineProperty(event, 'target', {
+        value: {
+          tagName: 'TEXTAREA',
+          matches: (selector: string) => selector === 'textarea.inputarea',
+        },
+      });
       h.dom.dispatchEvent(event);
       assert.equal(event.defaultPrevented, true);
       assert.match(h.model.getValue(), redo ? /value_b ::TEXT/ : /value_b ::INT/);
@@ -826,6 +843,49 @@ test('hook recovery: BFCache release reacquires ownership before resuming normal
     h.tick(800);
     assert.equal(h.commits.length, 1);
     assert.equal(h.journal!.read().length, 0);
+  } finally {
+    h.close();
+  }
+});
+
+for (const input of ['find', 'replace', 'other textarea'])
+  for (const direction of ['undo', 'redo'] as const)
+    for (const type of ['keydown', 'beforeinput'])
+      test(`hook: ${input} ${type} ${direction} keeps native input history`, async () => {
+        const h = await mounted();
+        try {
+          const event = new Event(type, { cancelable: true });
+          Object.assign(event, {
+            key: direction === 'undo' ? 'z' : 'y',
+            ctrlKey: true,
+            inputType: direction === 'undo' ? 'historyUndo' : 'historyRedo',
+          });
+          Object.defineProperty(event, 'target', {
+            value: {
+              tagName: input === 'other textarea' ? 'TEXTAREA' : 'INPUT',
+              matches: () => false,
+            },
+          });
+          h.dom.dispatchEvent(event);
+          assert.equal(event.defaultPrevented, false);
+          assert.equal(h.undoCount(), 0);
+          assert.equal(h.redoCount(), 0);
+        } finally {
+          h.close();
+        }
+      });
+
+test('hook: CLEAN editor text Control+z still routes to document history', async () => {
+  const h = await mounted();
+  try {
+    const event = new Event('keydown', { cancelable: true });
+    Object.assign(event, { key: 'z', ctrlKey: true });
+    Object.defineProperty(event, 'target', {
+      value: { tagName: 'TEXTAREA', matches: () => true },
+    });
+    h.dom.dispatchEvent(event);
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(h.undoCount(), 1);
   } finally {
     h.close();
   }
