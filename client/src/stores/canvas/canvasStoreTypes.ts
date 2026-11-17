@@ -1,20 +1,7 @@
 import * as Y from 'yjs';
 import type { Edge, Node, OnEdgesChange, OnNodesChange } from '@xyflow/react';
 import type { CanvasUndoManager } from '@/constants/canvas-history';
-import type { DdlParseResult } from '@/lib/ddl-parser';
-import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
-import type { ApplyDiffResult } from '@/lib/erd-diff-apply';
-import type { DiffPlan } from '@/lib/erd-diff-plan';
-import type { EdgeHandleSelectionValue } from '@/lib/edge-handles';
-import type { DslPreviewNode } from '@/lib/dsl-preview-graph';
-import type {
-  Column,
-  EdgeRoutingType,
-  RelationType,
-  TableGroup,
-  TableNodeData,
-  Waypoint,
-} from '@/types/erd';
+import type { Column, RelationType, TableGroup, TableNodeData } from '@/types/erd';
 
 /** FK 관계 추가 파라미터 */
 export interface AddFkRelationParams {
@@ -99,13 +86,6 @@ export interface CanvasState {
   addColumn: (nodeId: string) => void;
   deleteColumn: (nodeId: string, colId: string) => void;
   updateColumn: (nodeId: string, colId: string, updates: Partial<Column>) => void;
-  applyDictionaryReconciliation: (updates: {
-    tableMetaUpdates: Array<{
-      nodeId: string;
-      updates: Partial<Pick<TableNodeData, 'label' | 'logicalTableName' | 'tableTermId'>>;
-    }>;
-    columnUpdates: Array<{ nodeId: string; colId: string; updates: Partial<Column> }>;
-  }) => void;
   moveColumn: (nodeId: string, fromIndex: number, toIndex: number) => void;
   setHighlightedNodes: (ids: string[]) => void;
   setHighlightedEdge: (id: string | null) => void;
@@ -113,51 +93,9 @@ export interface CanvasState {
   undo: (isReady: () => boolean, notifyRejected: () => void) => void;
   redo: (isReady: () => boolean, notifyRejected: () => void) => void;
   stopHistoryCapture: () => void;
-  removeEdge: (edgeId: string) => void;
-  removeEdgeWithFkColumn: (edgeId: string) => void;
-  updateEdgeRoutingType: (edgeId: string, routingType: EdgeRoutingType) => void;
-  updateEdgeHandleSelection: (
-    edgeId: string,
-    selection: EdgeHandleSelectionValue,
-    nodeOverrides?: Node<TableNodeData>[],
-  ) => void;
-  updateEdgeWaypoints: (edgeId: string, waypoints: Waypoint[]) => void;
-  resetEdgeWaypoints: (edgeId: string) => void;
-  normalizeEdgeHandles: (
-    nodeIds?: string[],
-    nodeOverrides?: Node<TableNodeData>[],
-    origin?: unknown,
-  ) => void;
-  applyLayout: (nodes: Node<TableNodeData>[]) => void;
-  finalizeNodeDrag: (
-    nodePositions?: Array<{ nodeId: string; position: { x: number; y: number } }>,
-  ) => void;
-  applyPreviewPositionChangesToPersisted: (
-    previewNodes: readonly DslPreviewNode[],
-    positionOverrides: DiagramPreviewPositionRecord,
-  ) => string[];
+  /** 드래그 임시 상태를 버리고 문서 위치로 화면을 복구한다. */
+  finalizeNodeDrag: () => void;
   serialize: () => string;
-  addFkRelation: (params: AddFkRelationParams) => number;
-  connectWithRelationType: (
-    source: string,
-    target: string,
-    sourceHandle: string | undefined,
-    targetHandle: string | undefined,
-    relationType: RelationType,
-  ) => void;
-  importDdl: (result: DdlParseResult) => void;
-  replaceFromDdl: (result: DdlParseResult) => void;
-  applyDiffPlan: (plan: DiffPlan) => ApplyDiffResult | null;
-  /** 그룹에 테이블을 추가한다. 이미 존재하면 무시한다. */
-  addTableToGroup: (groupId: string, tableId: string) => void;
-  /** 그룹에 여러 테이블을 추가한다. */
-  addTablesToGroup: (groupId: string, tableIds: string[]) => void;
-  /** 그룹에서 테이블을 제거한다. */
-  removeTableFromGroup: (groupId: string, tableId: string) => void;
-  /** 그룹에서 여러 테이블을 제거한다. */
-  removeTablesFromGroup: (groupId: string, tableIds: string[]) => void;
-  /** 그룹 테이블 목록을 원자적으로 갱신한다. */
-  updateGroupTables: (groupId: string, toAdd: string[], toRemove: string[]) => void;
   ydoc: Y.Doc | null;
   internal: InternalState;
   initYDoc: (ydoc: Y.Doc) => void;

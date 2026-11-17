@@ -1,50 +1,31 @@
 import { useMemo } from 'react';
-import type { Node } from '@xyflow/react';
-import { DRAG_TRANSACTION_ORIGIN } from '@/constants/canvas-history';
 import { useErdDocumentActions } from '@/collaboration/plugins/erd/use-erd-document-actions';
-import { useDiagramErdEdgeActions } from '@/collaboration/channel/diagram/use-diagram-erd-edge-actions';
+import { resolveDiagramDocumentStatus } from '@/collaboration/channel/diagram/diagram-session-action-utils';
+import { useDiagramRejectedCommandToast } from '@/collaboration/channel/diagram/use-diagram-command-feedback';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
-import type { TableNodeData } from '@/types/erd';
 
 export interface DiagramErdDragActions {
-  commitTableDrag: (
-    nodeId: string,
-    position: { x: number; y: number },
-    normalizedNode?: Node<TableNodeData>,
-  ) => void;
+  commitTableDrag: (nodeId: string, position: { x: number; y: number }) => void;
 }
 
 export function useDiagramErdDragActions(): DiagramErdDragActions {
   const erdDocumentActions = useErdDocumentActions();
-  const edgeActions = useDiagramErdEdgeActions();
+  const notifyRejected = useDiagramRejectedCommandToast();
   const finalizeNodeDrag = useCanvasStore((state) => state.finalizeNodeDrag);
   const stopHistoryCapture = useCanvasStore((state) => state.stopHistoryCapture);
 
   return useMemo(
     () => ({
-      commitTableDrag: (
-        nodeId: string,
-        position: { x: number; y: number },
-        normalizedNode?: Node<TableNodeData>,
-      ) => {
-        const moveResult = erdDocumentActions.moveTable(nodeId, position.x, position.y);
-        finalizeNodeDrag(
-          moveResult !== 'unavailable'
-            ? undefined
-            : [
-                {
-                  nodeId,
-                  position,
-                },
-              ],
+      commitTableDrag: (nodeId: string, position: { x: number; y: number }) => {
+        resolveDiagramDocumentStatus(
+          erdDocumentActions.moveTable(nodeId, position.x, position.y),
+          notifyRejected,
         );
-        edgeActions.normalizeEdgeHandles([nodeId], 'table-move', {
-          nodeOverrides: normalizedNode ? [normalizedNode] : undefined,
-          origin: DRAG_TRANSACTION_ORIGIN,
-        });
+        // 성공 여부와 무관하게 임시 위치를 버리고 확정된 문서 위치를 다시 투영한다.
+        finalizeNodeDrag();
         stopHistoryCapture();
       },
     }),
-    [edgeActions, erdDocumentActions, finalizeNodeDrag, stopHistoryCapture],
+    [erdDocumentActions, finalizeNodeDrag, notifyRejected, stopHistoryCapture],
   );
 }

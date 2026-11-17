@@ -6,50 +6,19 @@ import {
   moveTableColumn,
   patchColumnYMap,
 } from '@/collaboration/yjs-columns';
-import * as Y from 'yjs';
 import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
-import { applyDiffToYDoc } from '@/lib/erd-diff-apply';
-import {
-  buildEdgePresentationByRelationKey,
-  buildFkPrefix,
-  buildTableMetaRestoreMaps,
-  buildUniqueFkColumnName,
-  buildUniqueName,
-  populateFromDdl,
-} from '@/stores/canvas/canvasStoreHelpers';
-import { extractColId } from '@/lib/handle-id';
-import { buildStableEdgeId, resolveAutoEdgeHandles } from '@/lib/edge-handles';
-import {
-  createColumnYMap,
-  createEdgeYMap,
-  getEdgesMap,
-  getGroupsMap,
-  getTablesMap,
-  syncLegacyWaypointsInEdgeYMap,
-} from '@/collaboration/yjsBridge';
-import type { CanvasGetState, CanvasSetState, CanvasState } from './canvasStoreTypes';
+import { createColumnYMap, getEdgesMap, getTablesMap } from '@/collaboration/yjsBridge';
+import type { CanvasGetState, CanvasState } from './canvasStoreTypes';
 
-type CanvasTableActionKeys =
-  | 'addColumn'
-  | 'deleteColumn'
-  | 'updateColumn'
-  | 'applyDictionaryReconciliation'
-  | 'moveColumn'
-  | 'addFkRelation'
-  | 'connectWithRelationType'
-  | 'importDdl'
-  | 'replaceFromDdl'
-  | 'applyDiffPlan';
+type CanvasTableActionKeys = 'addColumn' | 'deleteColumn' | 'updateColumn' | 'moveColumn';
 
 /**
  * 캔버스 테이블/컬럼/관계 액션 팩토리.
  *
- * @param set Zustand set 함수
  * @param get Zustand get 함수
  * @returns 테이블/컬럼/관계 액션 맵
  */
 export function createCanvasTableActions(
-  set: CanvasSetState,
   get: CanvasGetState,
 ): Pick<CanvasState, CanvasTableActionKeys> {
   return {
@@ -134,44 +103,6 @@ export function createCanvasTableActions(
       }, CANVAS_HISTORY_ORIGIN.USER_COLUMN);
     },
 
-    applyDictionaryReconciliation: ({ tableMetaUpdates, columnUpdates }) => {
-      const { ydoc } = get();
-      if (!ydoc || (tableMetaUpdates.length === 0 && columnUpdates.length === 0)) {
-        return;
-      }
-
-      const tables = getTablesMap(ydoc);
-      for (const tableId of new Set(columnUpdates.map((update) => update.nodeId))) {
-        const table = tables.get(tableId);
-        if (table) ensureColumnStorage(table);
-      }
-      ydoc.transact(() => {
-        const tablesMap = getTablesMap(ydoc);
-
-        for (const tableUpdate of tableMetaUpdates) {
-          const tableYMap = tablesMap.get(tableUpdate.nodeId);
-          if (!tableYMap) {
-            continue;
-          }
-          for (const [key, value] of Object.entries(tableUpdate.updates)) {
-            if (value === undefined || value === null) {
-              tableYMap.delete(key);
-            } else {
-              tableYMap.set(key, value);
-            }
-          }
-        }
-
-        for (const columnUpdate of columnUpdates) {
-          const tableYMap = tablesMap.get(columnUpdate.nodeId);
-          if (!tableYMap) {
-            continue;
-          }
-          patchColumnYMap(tableYMap, columnUpdate.colId, columnUpdate.updates);
-        }
-      }, CANVAS_HISTORY_ORIGIN.SYSTEM_DICTIONARY_RECONCILE);
-    },
-
     moveColumn: (nodeId, fromIndex, toIndex) => {
       const { ydoc } = get();
       if (!ydoc || fromIndex === toIndex) {
@@ -185,231 +116,6 @@ export function createCanvasTableActions(
           CANVAS_HISTORY_ORIGIN.USER_COLUMN,
         );
       }
-    },
-
-    addFkRelation: ({
-      parentNodeId,
-      childNodeId,
-      pkColumns,
-      parentLabel,
-      existingNames,
-      relationType,
-    }) => {
-      const { ydoc } = get();
-      if (!ydoc) {
-        return 0;
-      }
-      const { nodes } = get();
-      const parentNode = nodes.find((node) => node.id === parentNodeId);
-      const childNode = nodes.find((node) => node.id === childNodeId);
-      if (!parentNode || !childNode) {
-        return 0;
-      }
-
-      const prefix = buildFkPrefix(parentLabel);
-      const names = [...existingNames];
-      const isId = relationType === 'identifying';
-      let count = 0;
-
-      const childTable = getTablesMap(ydoc).get(childNodeId);
-      if (!childTable) return 0;
-      ensureColumnStorage(childTable);
-      ydoc.transact(() => {
-        const tablesMap = getTablesMap(ydoc);
-        const childTableYMap = tablesMap.get(childNodeId);
-        if (!childTableYMap) {
-          return;
-        }
-        for (const pkCol of pkColumns) {
-          const base = prefix ? `${prefix}_${pkCol.name}` : pkCol.name;
-          const fkName = buildUniqueFkColumnName(base, names);
-          names.push(fkName);
-          const fkColId = `col-${crypto.randomUUID()}`;
-          insertColumnYMap(
-            childTableYMap,
-            fkColId,
-            createColumnYMap({
-              id: fkColId,
-              name: fkName,
-              type: pkCol.type,
-              pk: isId ? true : undefined,
-              fk: true,
-              nullable: !isId,
-              logicalName: pkCol.logicalName,
-              domainId: pkCol.domainId,
-            }),
-          );
-
-          const { sourceHandle, targetHandle } = resolveAutoEdgeHandles({
-            sourceNode: parentNode,
-            targetNode: childNode,
-            sourceColId: pkCol.id,
-            targetColId: fkColId,
-          });
-          const edgeYMap = createEdgeYMap(
-            parentNodeId,
-            childNodeId,
-            sourceHandle,
-            targetHandle,
-            relationType,
-          );
-          getEdgesMap(ydoc).set(
-            buildStableEdgeId({
-              parentTable: parentNode.data.label,
-              parentColumn: pkCol.name,
-              childTable: childNode.data.label,
-              childColumn: fkName,
-            }),
-            edgeYMap,
-          );
-          syncLegacyWaypointsInEdgeYMap(edgeYMap);
-          count += 1;
-        }
-      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
-
-      return count;
-    },
-
-    connectWithRelationType: (source, target, sourceHandle, targetHandle, relationType) => {
-      const { ydoc, nodes } = get();
-      if (!ydoc || !sourceHandle || !targetHandle) {
-        return;
-      }
-      const isId = relationType === 'identifying';
-      const sourceNode = nodes.find((node) => node.id === source);
-      const targetNode = nodes.find((node) => node.id === target);
-      const sourceColId = sourceNode ? extractColId(sourceHandle, source) : null;
-      const targetColId = targetNode ? extractColId(targetHandle, target) : null;
-      const sourceColumn =
-        sourceNode && sourceColId
-          ? sourceNode.data.columns.find((column) => column.id === sourceColId)
-          : null;
-      const targetColumn =
-        targetNode && targetColId
-          ? targetNode.data.columns.find((column) => column.id === targetColId)
-          : null;
-      const edgeId =
-        sourceNode && targetNode && sourceColumn && targetColumn
-          ? buildStableEdgeId({
-              parentTable: sourceNode.data.label,
-              parentColumn: sourceColumn.name,
-              childTable: targetNode.data.label,
-              childColumn: targetColumn.name,
-            })
-          : buildStableEdgeId({
-              parentTable: source,
-              parentColumn: sourceHandle,
-              childTable: target,
-              childColumn: targetHandle,
-            });
-      const resolvedHandles =
-        sourceNode && targetNode && sourceColId && targetColId
-          ? resolveAutoEdgeHandles({
-              sourceNode,
-              targetNode,
-              sourceColId,
-              targetColId,
-            })
-          : {
-              sourceHandle,
-              targetHandle,
-            };
-      const targetTable = getTablesMap(ydoc).get(target);
-      if (targetTable) ensureColumnStorage(targetTable);
-      ydoc.transact(() => {
-        const edgeYMap = createEdgeYMap(
-          source,
-          target,
-          resolvedHandles.sourceHandle,
-          resolvedHandles.targetHandle,
-          relationType,
-        );
-        getEdgesMap(ydoc).set(edgeId, edgeYMap);
-        syncLegacyWaypointsInEdgeYMap(edgeYMap);
-        const colId = extractColId(targetHandle, target);
-        const tableYMap = getTablesMap(ydoc).get(target);
-        if (tableYMap) {
-          patchColumnYMap(tableYMap, colId, {
-            fk: true,
-            ...(isId ? { pk: true, nullable: false } : {}),
-          });
-        }
-      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
-    },
-
-    importDdl: (result) => {
-      const { ydoc, nodes } = get();
-      if (!ydoc || result.tables.length === 0) {
-        return;
-      }
-      const assigned = new Set(nodes.map((n) => n.data.label));
-      ydoc.transact(() => {
-        const tablesMap = getTablesMap(ydoc);
-        const edgesMap = getEdgesMap(ydoc);
-        const startY =
-          nodes.length > 0 ? Math.max(...nodes.map((n) => n.position?.y ?? 0)) + 300 : 100;
-        populateFromDdl(tablesMap, edgesMap, result, {
-          resolveTableName: (name) => {
-            const unique = buildUniqueName(name, [...assigned]);
-            assigned.add(unique);
-            return unique;
-          },
-          startY,
-        });
-      }, CANVAS_HISTORY_ORIGIN.SYSTEM_DDL_IMPORT);
-    },
-
-    replaceFromDdl: (result) => {
-      const { edges, nodes, ydoc } = get();
-      if (!ydoc || result.tables.length === 0) {
-        return;
-      }
-      const assigned = new Set<string>();
-      const edgePresentationByRelationKey = buildEdgePresentationByRelationKey(nodes, edges);
-      const { tableMetaByPhysicalName, tableMetaByUniqueLogicalName } =
-        buildTableMetaRestoreMaps(nodes);
-      ydoc.transact(() => {
-        const tablesMap = getTablesMap(ydoc);
-        const edgesMap = getEdgesMap(ydoc);
-        const groupsMap = getGroupsMap(ydoc);
-        for (const key of [...tablesMap.keys()]) {
-          tablesMap.delete(key);
-        }
-        for (const key of [...edgesMap.keys()]) {
-          edgesMap.delete(key);
-        }
-        // 전체 스키마 교체 시 기존 테이블 ID 참조는 모두 무효이므로 그룹 연결을 초기화한다.
-        groupsMap.forEach((groupYMap) => {
-          const tableIdsYArray = groupYMap.get('tableIds') as Y.Array<string> | undefined;
-          if (tableIdsYArray && tableIdsYArray.length > 0) {
-            tableIdsYArray.delete(0, tableIdsYArray.length);
-          }
-        });
-        populateFromDdl(tablesMap, edgesMap, result, {
-          resolveTableName: (name) => {
-            const unique = buildUniqueName(name, [...assigned]);
-            assigned.add(unique);
-            return unique;
-          },
-          startY: 100,
-          edgePresentationByRelationKey,
-          tableMetaByPhysicalName,
-          tableMetaByUniqueLogicalName,
-        });
-      }, CANVAS_HISTORY_ORIGIN.SYSTEM_DDL_IMPORT);
-    },
-
-    applyDiffPlan: (plan) => {
-      const { ydoc, activeEditNodeId } = get();
-      if (!ydoc) {
-        return null;
-      }
-
-      const result = applyDiffToYDoc(ydoc, plan, CANVAS_HISTORY_ORIGIN.SYSTEM_CODE_SYNC);
-      if (activeEditNodeId && !getTablesMap(ydoc).has(activeEditNodeId)) {
-        set({ activeEditNodeId: null });
-      }
-      return result;
     },
   };
 }

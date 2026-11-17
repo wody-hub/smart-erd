@@ -23,7 +23,6 @@ function createStoreBridge() {
   const bridge: DiagramCollaborationStoreBridge = {
     loadPreview: () => undefined,
     refreshPersistedCanvasFromYDoc: () => undefined,
-    applyPreviewPositionChangesToPersisted: () => [],
     setConnectionStatus: (status) => {
       calls.connectionStatus.push(status);
     },

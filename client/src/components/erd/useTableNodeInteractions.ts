@@ -7,7 +7,6 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { CANVAS_HISTORY_ORIGIN } from '@/constants/canvas-history';
 import { useDiagramErdCrudActions } from '@/collaboration/channel/diagram/use-diagram-erd-crud-actions';
 import { useDiagramErdEdgeActions } from '@/collaboration/channel/diagram/use-diagram-erd-edge-actions';
 import type { LogicalNameResolution } from '@/lib/logical-name-resolution';
@@ -242,9 +241,7 @@ export function useTableNodeInteractions({
   const handleHeaderHandleLayoutChange = (layout: TableNodeType['data']['handleLayout']) => {
     if (applyTableMetaUpdates({ handleLayout: layout }) !== 'applied') return;
     requestAnimationFrame(() => {
-      edgeActions.normalizeEdgeHandles([nodeId], 'table-meta', {
-        origin: CANVAS_HISTORY_ORIGIN.USER_TABLE,
-      });
+      edgeActions.normalizeEdgeHandles([nodeId], 'table-meta');
     });
   };
 

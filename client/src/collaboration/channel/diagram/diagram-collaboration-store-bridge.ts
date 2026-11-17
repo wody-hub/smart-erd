@@ -1,6 +1,4 @@
 import type { ProjectionRefreshRequest } from '@/collaboration/core/contracts/document-plugin';
-import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
-import type { DslPreviewNode } from '@/lib/dsl-preview-graph';
 import type {
   AwarenessState,
   ConnectionIssueKind,
@@ -15,10 +13,6 @@ import type {
 export interface DiagramCollaborationStoreBridge {
   loadPreview: (content: string) => void;
   refreshPersistedCanvasFromYDoc: (request?: ProjectionRefreshRequest) => void;
-  applyPreviewPositionChangesToPersisted: (
-    previewNodes: readonly DslPreviewNode[],
-    positionOverrides: DiagramPreviewPositionRecord,
-  ) => string[];
   setConnectionStatus: (status: ConnectionStatus) => void;
   setConnectionIssue: (issue: ConnectionIssueKind | null) => void;
   setPresenceMode: (mode: PresenceMode) => void;

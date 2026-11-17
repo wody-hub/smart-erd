@@ -297,22 +297,29 @@ export class ErdDocumentMutationApplier {
       return false;
     }
 
+    if (!Number.isFinite(positionX) || !Number.isFinite(positionY)) return false;
     const doc = this.engine.getDocument();
-    let resolved = false;
+    const tableYMap = getTablesMap(doc).get(tableId);
+    if (!tableYMap) return false;
+    const position = { x: positionX, y: positionY };
+    const patches = planEdgeHandleNormalization({
+      doc,
+      nodeIds: [tableId],
+      positions: new Map([[tableId, position]]),
+    });
+    for (const { edgeId } of patches) {
+      if (!mutation.affectedScopes.some((scope) => scope.kind === 'edge' && scope.id === edgeId)) {
+        mutation.affectedScopes.push({ kind: 'edge', id: edgeId, mode: 'exclusive' });
+      }
+    }
+    // 위치와 연결 핸들을 같은 문서 명령의 단일 transaction으로 확정한다.
     doc.transact(() => {
-      const tableYMap = getTablesMap(doc).get(tableId);
-      if (!tableYMap) {
-        return;
+      if (tableYMap.get('positionX') !== positionX || tableYMap.get('positionY') !== positionY) {
+        setTableYMapPosition(tableYMap, position);
       }
-      resolved = true;
-      const currentPositionX = tableYMap.get('positionX');
-      const currentPositionY = tableYMap.get('positionY');
-      if (currentPositionX === positionX && currentPositionY === positionY) {
-        return;
-      }
-      setTableYMapPosition(tableYMap, { x: positionX, y: positionY });
+      applyEdgeHandleNormalizationPatches(patches);
     }, DRAG_TRANSACTION_ORIGIN);
-    return resolved;
+    return true;
   }
 
   private applyTableRename(mutation: DocumentMutation): boolean {

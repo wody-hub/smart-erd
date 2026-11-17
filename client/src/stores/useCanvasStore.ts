@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { createCanvasGroupActions } from '@/stores/canvas/canvasGroupActions';
 import { createCanvasSyncActions } from '@/stores/canvas/canvasSyncActions';
 import { createCanvasTableActions } from '@/stores/canvas/canvasTableActions';
 import type { CanvasState } from '@/stores/canvas/canvasStoreTypes';
@@ -33,8 +32,7 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
     tablePositionQueue: { pending: new Map() },
   },
   ...createCanvasSyncActions(set, get),
-  ...createCanvasTableActions(set, get),
-  ...createCanvasGroupActions(get),
+  ...createCanvasTableActions(get),
 }));
 
 export default useCanvasStore;

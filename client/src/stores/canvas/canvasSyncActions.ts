@@ -1,4 +1,3 @@
-import { deleteTableColumn, ensureColumnStorage } from '@/collaboration/yjs-columns';
 import * as Y from 'yjs';
 import {
   type Edge,
@@ -14,19 +13,14 @@ import {
   UNDO_CAPTURE_TIMEOUT_MS,
 } from '@/constants/canvas-history';
 import { djb2 } from '@/lib/hash';
-import { extractColId } from '@/lib/handle-id';
-import { normalizeEdgeHandlesInYDoc, syncEdgeHandlePreference } from '@/lib/erd-edge-yjs-utils';
-import type { DiagramPreviewPositionRecord } from '@/lib/diagram-code-draft';
-import type { ERDEdgeData, TableGroup, TableNode, TableNodeData } from '@/types/erd';
-import type { DslPreviewNode } from '@/lib/dsl-preview-graph';
+import { normalizeEdgeHandlesInYDoc } from '@/lib/erd-edge-yjs-utils';
+import type { ERDEdgeData, TableGroup, TableNodeData } from '@/types/erd';
 import {
-  createWaypointsYArray,
   getEdgesMap,
   getGroupsMap,
   yEdgeYMapToEdge,
   yGroupYMapToTableGroup,
   yTableYMapToNode,
-  setTableYMapPosition,
   getTablesMap,
   yDocToJson,
   yEdgesMapToEdges,
@@ -34,13 +28,7 @@ import {
 } from '@/collaboration/yjsBridge';
 import { collectErdAffectedScopesFromEvents } from '@/collaboration/plugins/erd/erd-yjs-update-scope-collector';
 import { buildErdProjectionRefreshRequest } from '@/collaboration/plugins/erd/erd-projection-refresh-request';
-import type { EdgeRoutingType, Waypoint } from '@/types/erd';
-import { buildPersistedPreviewPositionChanges } from '@/lib/preview-position-sync';
 import { mergeProjectedEntitiesById, mergeProjectedNodesById } from '@/lib/erd-projection';
-import {
-  parseEdgeHandleSelectionValue,
-  resolveEdgeHandlesFromPreference,
-} from '@/lib/edge-handles';
 import { isProjectorManagedDocumentOrigin } from '@/collaboration/core/store/document-change-origin';
 import {
   probeBegin,
@@ -54,7 +42,6 @@ import type {
   ProjectionSyncTarget,
   CanvasSetState,
   CanvasState,
-  PositionQueueCtx,
 } from './canvasStoreTypes';
 
 type CanvasSyncActionKeys =
@@ -74,16 +61,7 @@ type CanvasSyncActionKeys =
   | 'undo'
   | 'redo'
   | 'stopHistoryCapture'
-  | 'removeEdge'
-  | 'removeEdgeWithFkColumn'
-  | 'updateEdgeRoutingType'
-  | 'updateEdgeHandleSelection'
-  | 'updateEdgeWaypoints'
-  | 'resetEdgeWaypoints'
-  | 'normalizeEdgeHandles'
-  | 'applyLayout'
   | 'finalizeNodeDrag'
-  | 'applyPreviewPositionChangesToPersisted'
   | 'serialize';
 
 /**
@@ -154,64 +132,6 @@ export function createCanvasSyncActions(
     return targets;
   }
 
-  function isFinitePosition(
-    position: { x: number; y: number } | null | undefined,
-  ): position is { x: number; y: number } {
-    return !!position && Number.isFinite(position.x) && Number.isFinite(position.y);
-  }
-
-  /**
-   * 노드 position 변경을 대기 큐에 적재한다.
-   *
-   * @param changes React Flow 노드 변경 목록
-   * @param ctx 위치 동기화 큐 컨텍스트
-   * @returns 없음
-   */
-  function queuePositionToYDoc(changes: NodeChange[], ctx: PositionQueueCtx) {
-    const posChanges = changes.filter(
-      (c) => c.type === 'position' && 'position' in c && c.position,
-    );
-    if (posChanges.length === 0) {
-      return;
-    }
-    for (const change of posChanges) {
-      if (change.type === 'position' && 'position' in change && isFinitePosition(change.position)) {
-        ctx.pending.set(change.id, change.position);
-      }
-    }
-  }
-
-  /**
-   * 큐에 쌓인 position 변경을 Y.Doc에 반영한다.
-   *
-   * @param ctx 위치 동기화 큐 컨텍스트
-   * @param getYMap 대상 Y.Map getter
-   * @returns 없음
-   */
-  function flushQueuedPositionsToYDoc(
-    ctx: PositionQueueCtx,
-    getYMap: (doc: Y.Doc) => Y.Map<Y.Map<unknown>>,
-  ) {
-    const ydoc = get().ydoc;
-    if (!ydoc || ctx.pending.size === 0) {
-      return;
-    }
-    ydoc.transact(() => {
-      const yMap = getYMap(ydoc);
-      for (const [nodeId, pos] of ctx.pending) {
-        if (!isFinitePosition(pos)) {
-          continue;
-        }
-        const nodeYMap = yMap.get(nodeId);
-        if (!nodeYMap) {
-          continue;
-        }
-        setTableYMapPosition(nodeYMap, pos);
-      }
-    }, DRAG_TRANSACTION_ORIGIN);
-    ctx.pending.clear();
-  }
-
   /**
    * position-only 변경은 빠른 경로로 적용한다.
    *
@@ -258,15 +178,6 @@ export function createCanvasSyncActions(
       return { ...node, position: nextPosition, dragging: nextDragging } as T;
     });
     return mutated ? next : current;
-  }
-
-  function buildNodeLookup(nodeOverrides?: Node<TableNodeData>[]) {
-    const nodeById = new Map(get().nodes.map((node) => [node.id, node]));
-    for (const node of nodeOverrides ?? []) {
-      const existingNode = nodeById.get(node.id);
-      nodeById.set(node.id, existingNode ? { ...existingNode, ...node } : node);
-    }
-    return nodeById;
   }
 
   function syncProjectionFromYDocWithRequest(request?: ProjectionSyncRequest): void {
@@ -702,10 +613,6 @@ export function createCanvasSyncActions(
         return;
       }
 
-      queuePositionToYDoc(changes, internal.tablePositionQueue);
-      if (!internal.isNodeDragging) {
-        flushQueuedPositionsToYDoc(internal.tablePositionQueue, getTablesMap);
-      }
       if (shouldFlushDeferredProjection) {
         flushDeferredProjectionSync();
       }
@@ -773,232 +680,18 @@ export function createCanvasSyncActions(
       get().internal.undoManager?.stopCapturing();
     },
 
-    removeEdge: (edgeId) => {
-      const { ydoc } = get();
-      if (!ydoc) {
-        return;
-      }
-      ydoc.transact(() => {
-        getEdgesMap(ydoc).delete(edgeId);
-      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
-      set({ highlightedEdgeId: null, highlightedNodeIds: [] });
-    },
-
-    removeEdgeWithFkColumn: (edgeId) => {
-      const { ydoc, edges } = get();
-      if (!ydoc) {
-        return;
-      }
-      const edge = edges.find((e) => e.id === edgeId);
-      if (!edge) {
-        return;
-      }
-
-      const targetNodeId = edge.target;
-      const targetHandle = edge.targetHandle;
-      const targetTable = getTablesMap(ydoc).get(targetNodeId);
-      if (targetTable && targetHandle) ensureColumnStorage(targetTable);
-      ydoc.transact(() => {
-        getEdgesMap(ydoc).delete(edgeId);
-        if (targetHandle) {
-          const colId = extractColId(targetHandle, targetNodeId);
-          const tablesMap = getTablesMap(ydoc);
-          const tableYMap = tablesMap.get(targetNodeId);
-          if (tableYMap) {
-            deleteTableColumn(tableYMap, colId);
-          }
-        }
-      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
-      set({ highlightedEdgeId: null, highlightedNodeIds: [] });
-    },
-
-    updateEdgeRoutingType: (edgeId, routingType) => {
-      const { ydoc } = get();
-      if (!ydoc) {
-        return;
-      }
-      ydoc.transact(() => {
-        const edgeYMap = getEdgesMap(ydoc).get(edgeId);
-        if (!edgeYMap) {
-          return;
-        }
-        edgeYMap.set('routingType', routingType as EdgeRoutingType);
-        if (routingType !== 'straight') {
-          edgeYMap.delete('waypoints');
-        }
-      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
-    },
-
-    updateEdgeHandleSelection: (edgeId, selection, nodeOverrides) => {
-      const { ydoc, edges } = get();
-      if (!ydoc) {
-        return;
-      }
-      const edge = edges.find((candidate) => candidate.id === edgeId);
-      if (!edge?.sourceHandle || !edge.targetHandle) {
-        return;
-      }
-
-      const nodeById = buildNodeLookup(nodeOverrides);
-      const sourceNode = nodeById.get(edge.source);
-      const targetNode = nodeById.get(edge.target);
-      if (!sourceNode || !targetNode) {
-        return;
-      }
-
-      const sourceColId = extractColId(edge.sourceHandle, edge.source);
-      const targetColId = extractColId(edge.targetHandle, edge.target);
-      const preference = parseEdgeHandleSelectionValue(selection);
-      const resolution = resolveEdgeHandlesFromPreference({
-        sourceNode,
-        targetNode,
-        sourceColId,
-        targetColId,
-        handleMode: preference.handleMode,
-        sourceSide: preference.sourceSide,
-        targetSide: preference.targetSide,
-      });
-      const routingType = ((edge.data as ERDEdgeData | undefined)?.routingType ??
-        'smoothstep') as EdgeRoutingType;
-      const handlesChanged =
-        edge.sourceHandle !== resolution.sourceHandle ||
-        edge.targetHandle !== resolution.targetHandle;
-
-      ydoc.transact(() => {
-        const edgeYMap = getEdgesMap(ydoc).get(edgeId);
-        if (!edgeYMap) {
-          return;
-        }
-        edgeYMap.set('sourceHandle', resolution.sourceHandle);
-        edgeYMap.set('targetHandle', resolution.targetHandle);
-        syncEdgeHandlePreference(edgeYMap, resolution);
-        if (routingType === 'straight' && handlesChanged) {
-          edgeYMap.delete('waypoints');
-        }
-      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
-    },
-
-    updateEdgeWaypoints: (edgeId, waypoints) => {
-      const { ydoc, internal } = get();
-      if (!ydoc) {
-        return;
-      }
-      internal.undoManager?.stopCapturing();
-      ydoc.transact(() => {
-        const edgeYMap = getEdgesMap(ydoc).get(edgeId);
-        if (!edgeYMap) {
-          return;
-        }
-        const nextWaypoints = waypoints.filter(
-          (waypoint): waypoint is Waypoint =>
-            Number.isFinite(waypoint.x) && Number.isFinite(waypoint.y),
-        );
-        if (nextWaypoints.length === 0) {
-          edgeYMap.delete('waypoints');
-          return;
-        }
-        edgeYMap.set('waypoints', createWaypointsYArray(nextWaypoints));
-      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
-      internal.undoManager?.stopCapturing();
-    },
-
-    resetEdgeWaypoints: (edgeId) => {
-      const { ydoc, internal } = get();
-      if (!ydoc) {
-        return;
-      }
-      internal.undoManager?.stopCapturing();
-      ydoc.transact(() => {
-        const edgeYMap = getEdgesMap(ydoc).get(edgeId);
-        edgeYMap?.delete('waypoints');
-      }, CANVAS_HISTORY_ORIGIN.USER_EDGE);
-      internal.undoManager?.stopCapturing();
-    },
-
-    normalizeEdgeHandles: (nodeIds, _nodeOverrides, origin = CANVAS_HISTORY_ORIGIN.USER_EDGE) => {
-      const { ydoc, edges } = get();
-      if (!ydoc || edges.length === 0) {
-        return;
-      }
-
-      ydoc.transact(() => {
-        const mutated = normalizeEdgeHandlesInYDoc({ doc: ydoc, nodeIds });
-        if (mutated) {
-          get().internal.undoManager?.stopCapturing();
-        }
-      }, origin);
-    },
-
-    applyLayout: (nodes) => {
-      const { ydoc } = get();
-      if (!ydoc) {
-        return;
-      }
-      ydoc.transact(() => {
-        const tablesMap = getTablesMap(ydoc);
-        for (const node of nodes) {
-          const tableYMap = tablesMap.get(node.id);
-          if (!tableYMap) {
-            continue;
-          }
-          setTableYMapPosition(tableYMap, node.position);
-        }
-      }, CANVAS_HISTORY_ORIGIN.USER_LAYOUT);
-    },
-
-    finalizeNodeDrag: (nodePositions) => {
-      const internal = get().internal;
-      for (const entry of nodePositions ?? []) {
-        if (!isFinitePosition(entry.position)) {
-          continue;
-        }
-        internal.tablePositionQueue.pending.set(entry.nodeId, entry.position);
-      }
+    finalizeNodeDrag: () => {
+      const { internal, ydoc } = get();
+      internal.tablePositionQueue.pending.clear();
       internal.isNodeDragging = false;
-      flushQueuedPositionsToYDoc(internal.tablePositionQueue, getTablesMap);
       flushDeferredProjectionSync();
-    },
-
-    applyPreviewPositionChangesToPersisted: (
-      previewNodes: readonly DslPreviewNode[],
-      positionOverrides: DiagramPreviewPositionRecord,
-    ) => {
-      const { ydoc, nodes } = get();
-      const persistedPositionChanges = buildPersistedPreviewPositionChanges(
-        previewNodes,
-        nodes as TableNode[],
-        positionOverrides,
-      );
-      if (persistedPositionChanges.length === 0) {
-        return [];
+      if (ydoc) {
+        set({
+          nodes: projectTableNodes(ydoc).map((node) =>
+            node.dragging ? { ...node, dragging: false } : node,
+          ),
+        });
       }
-
-      if (!ydoc) {
-        const reactFlowPositionChanges: NodeChange[] = persistedPositionChanges.map((change) => ({
-          id: change.nodeId,
-          type: 'position',
-          position: change.position,
-          dragging: false,
-        }));
-        get().onNodesChange(reactFlowPositionChanges);
-        return persistedPositionChanges.map((change) => change.previewNodeId);
-      }
-
-      ydoc.transact(() => {
-        const tablesMap = getTablesMap(ydoc);
-        for (const change of persistedPositionChanges) {
-          if (!isFinitePosition(change.position)) {
-            continue;
-          }
-          const tableYMap = tablesMap.get(change.nodeId);
-          if (!tableYMap) {
-            continue;
-          }
-          setTableYMapPosition(tableYMap, change.position);
-        }
-      }, DRAG_TRANSACTION_ORIGIN);
-      set({ nodes: projectTableNodes(ydoc) });
-      return persistedPositionChanges.map((change) => change.previewNodeId);
     },
 
     serialize: () => {

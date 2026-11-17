@@ -27,9 +27,6 @@ function collectProjectionTargets(
 export function useDiagramCollaborationStoreBridge(): DiagramCollaborationStoreBridge {
   const loadPreview = useCanvasStore((s) => s.loadPreview);
   const syncFromYDoc = useCanvasStore((s) => s.syncFromYDoc);
-  const applyPreviewPositionChangesToPersisted = useCanvasStore(
-    (state) => state.applyPreviewPositionChangesToPersisted,
-  );
   const setConnectionStatus = useCollaborationStore((s) => s.setConnectionStatus);
   const setConnectionIssue = useCollaborationStore((s) => s.setConnectionIssue);
   const setPresenceMode = useCollaborationStore((s) => s.setPresenceMode);
@@ -46,7 +43,6 @@ export function useDiagramCollaborationStoreBridge(): DiagramCollaborationStoreB
   return useMemo(
     () => ({
       loadPreview,
-      applyPreviewPositionChangesToPersisted,
       refreshPersistedCanvasFromYDoc: (request?: ProjectionRefreshRequest) => {
         const nextRequest = buildErdProjectionRefreshRequest(request);
         if (nextRequest?.forceFull) {
@@ -78,7 +74,6 @@ export function useDiagramCollaborationStoreBridge(): DiagramCollaborationStoreB
       applyPeerLeft,
       applyPresenceSnapshot,
       loadPreview,
-      applyPreviewPositionChangesToPersisted,
       removePeerByLoginId,
       removePeerByUserId,
       resetCollaboration,

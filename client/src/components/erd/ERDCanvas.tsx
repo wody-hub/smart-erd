@@ -753,11 +753,7 @@ function ERDCanvas({
       if (!resolvedPosition) {
         return;
       }
-      const normalizedNode =
-        latestNode.position.x === resolvedPosition.x && latestNode.position.y === resolvedPosition.y
-          ? latestNode
-          : { ...latestNode, position: resolvedPosition };
-      latest.dragActions.commitTableDrag(latestNode.id, resolvedPosition, normalizedNode);
+      latest.dragActions.commitTableDrag(latestNode.id, resolvedPosition);
     });
   }, []);
   const handleReactFlowInit = useCallback(
@@ -1154,11 +1150,7 @@ function ERDCanvas({
             if (remoteEditLocks.edgeLocksById.has(contextMenu.edgeId)) {
               return;
             }
-            const nodeOverrides = [
-              reactFlowInstance.getNode(contextMenuEdge.source),
-              reactFlowInstance.getNode(contextMenuEdge.target),
-            ].filter((node): node is Node<TableNodeData> => !!node);
-            edgeActions.updateEdgeHandleSelection(contextMenu.edgeId, selection, nodeOverrides);
+            edgeActions.updateEdgeHandleSelection(contextMenu.edgeId, selection);
             setContextMenu(null);
           }}
           onDelete={() => {

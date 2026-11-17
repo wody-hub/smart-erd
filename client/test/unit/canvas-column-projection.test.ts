@@ -1,3 +1,5 @@
+import { ErdDocumentMutationApplier } from '../../src/collaboration/plugins/erd/erd-document-mutation-applier.js';
+import { YjsSharedDocumentEngine } from '../../src/collaboration/core/engines/yjs-shared-document-engine.js';
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import * as Y from 'yjs';
@@ -149,7 +151,7 @@ test('projector-managed remote update retains local fields when explicitly proje
 });
 
 test('deferred rename during drag preserves the completed drag state and dimensions', () => {
-  withMeasuredTable((_doc, previous) => {
+  withMeasuredTable((doc, previous) => {
     useCanvasStore
       .getState()
       .onNodesChange([
@@ -162,7 +164,16 @@ test('deferred rename during drag preserves the completed drag state and dimensi
       .onNodesChange([
         { id: 'table', type: 'position', position: { x: 50, y: 25 }, dragging: false },
       ]);
-    useCanvasStore.getState().finalizeNodeDrag([{ nodeId: 'table', position: { x: 50, y: 25 } }]);
+    const applier = new ErdDocumentMutationApplier(new YjsSharedDocumentEngine(doc));
+    assert.equal(
+      applier.apply({
+        key: 'table:move',
+        payload: { tableId: 'table', positionX: 50, positionY: 25 },
+        affectedScopes: [],
+      }).applied,
+      true,
+    );
+    useCanvasStore.getState().finalizeNodeDrag();
     const next = useCanvasStore.getState().nodes[0];
     assert.equal(next.data.columns[0].name, 'during_drag');
     assert.deepEqual(next.position, { x: 50, y: 25 });

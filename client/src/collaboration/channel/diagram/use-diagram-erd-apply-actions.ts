@@ -4,11 +4,7 @@ import type { DdlParseResult } from '@/lib/ddl-parser';
 import type { ApplyDiffResult } from '@/lib/erd-diff-apply';
 import type { DiffPlan } from '@/lib/erd-diff-plan';
 import { useErdDocumentActions } from '@/collaboration/plugins/erd/use-erd-document-actions';
-import useCanvasStore from '@/stores/erd/useCanvasStore';
-import {
-  resolveDiagramActionResult,
-  resolveDiagramAppliedStatus,
-} from '@/collaboration/channel/diagram/diagram-session-action-utils';
+import { resolveDiagramDocumentStatus } from '@/collaboration/channel/diagram/diagram-session-action-utils';
 import { useDiagramRejectedCommandToast } from '@/collaboration/channel/diagram/use-diagram-command-feedback';
 import { commitErdLayoutNodes } from '@/lib/erd-layout-commit';
 import type { TableNodeData } from '@/types/erd';
@@ -27,9 +23,6 @@ export interface DiagramErdApplyActions {
 
 export function useDiagramErdApplyActions(): DiagramErdApplyActions {
   const erdDocumentActions = useErdDocumentActions();
-  const replaceFromDdlFallback = useCanvasStore((state) => state.replaceFromDdl);
-  const applyDiffPlanFallback = useCanvasStore((state) => state.applyDiffPlan);
-  const updateGroupTablesFallback = useCanvasStore((state) => state.updateGroupTables);
   const notifyRejected = useDiagramRejectedCommandToast();
 
   return useMemo(
@@ -38,33 +31,24 @@ export function useDiagramErdApplyActions(): DiagramErdApplyActions {
         return commitErdLayoutNodes(nodes, fromNodes, erdDocumentActions, notifyRejected);
       },
       replaceFromDdl: (result: DdlParseResult) => {
-        return resolveDiagramAppliedStatus(
+        return resolveDiagramDocumentStatus(
           erdDocumentActions.replaceFromDdl(result),
-          () => replaceFromDdlFallback(result),
           notifyRejected,
         );
       },
       applyDiffPlan: (plan: DiffPlan) => {
-        return resolveDiagramActionResult(
-          erdDocumentActions.applyDiffPlan(plan),
-          () => applyDiffPlanFallback(plan),
-          notifyRejected,
-        );
+        const result = erdDocumentActions.applyDiffPlan(plan);
+        return resolveDiagramDocumentStatus(result.status, notifyRejected) === 'applied'
+          ? (result.value ?? null)
+          : null;
       },
       updateGroupTables: (groupId: string, toAdd: string[], toRemove: string[]) => {
-        return resolveDiagramAppliedStatus(
+        return resolveDiagramDocumentStatus(
           erdDocumentActions.updateGroupTables(groupId, toAdd, toRemove),
-          () => updateGroupTablesFallback(groupId, toAdd, toRemove),
           notifyRejected,
         );
       },
     }),
-    [
-      applyDiffPlanFallback,
-      erdDocumentActions,
-      notifyRejected,
-      replaceFromDdlFallback,
-      updateGroupTablesFallback,
-    ],
+    [erdDocumentActions, notifyRejected],
   );
 }

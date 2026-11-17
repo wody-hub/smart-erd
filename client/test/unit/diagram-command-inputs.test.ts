@@ -187,3 +187,73 @@ test('group picker keeps its selection open on rejection and closes on success',
   confirm();
   assert.equal(closed, 1);
 });
+
+for (const rejection of ['diff', 'replace', 'group']) {
+  test(`code apply ${rejection} rejection stops commands without success or fallback retry`, async () => {
+    let replacements = 0;
+    let groups = 0;
+    let layouts = 0;
+    let success = 0;
+    let failure = 0;
+    const h = sourceHookHarness('src/hooks/useApplyToErd.ts', {
+      'react-i18next': translation,
+      useAuthStore: { __esModule: true, default: () => 'user' },
+      'use-diagram-erd-apply-actions': {
+        useDiagramErdApplyActions: () => ({
+          replaceFromDdl: () => {
+            replacements++;
+            return rejection === 'replace' ? 'rejected' : 'applied';
+          },
+          applyDiffPlan: () => null,
+          updateGroupTables: () => {
+            groups++;
+            return 'rejected';
+          },
+        }),
+      },
+      'use-diagram-erd-apply-runtime': {
+        useDiagramErdApplyRuntime: () => ({
+          currentNodes: [],
+          captureBeforeState: () => ({ nodes: [], edges: [], groups: [], layoutNodes: [] }),
+          getCurrentNodes: () => [],
+          getCurrentState: () => {
+            layouts++;
+            return { nodes: [], edges: [] };
+          },
+        }),
+      },
+      'erd-diff-plan': { createCurrentSnapshots: () => ({ tables: [], edgeById: {} }) },
+      'erd-scoped-diff-builder': {
+        buildScopedDiffPlan: () => {
+          if (rejection === 'group') throw new Error('계획 생성 실패');
+          return { safe: true, plan: { tables: [] } };
+        },
+      },
+      'erd-fallback-group-remap': {
+        buildFallbackGroupAssignments: () => [{ groupId: 'g', tableIds: ['a'], droppedCount: 0 }],
+      },
+      'sync-policy': { loadSyncPolicy: () => ({}), getAutoApplyBlockReason: () => null },
+      'diff-apply-rollout': {
+        resolveDiffApplyRollout: () => ({ enabled: rejection !== 'replace' }),
+        loadDiffApplyLocalOverride: () => null,
+      },
+      sonner: { toast: { success: () => success++, error: () => failure++, info: () => {} } },
+    });
+    const hook = h.exports.useApplyToErd as (params: unknown) => {
+      applyParsedToErd: () => Promise<boolean>;
+    };
+    const actions = h.render(() =>
+      hook({
+        canEdit: true,
+        parsing: false,
+        parseResult: { tables: [{ name: 'a', columns: [] }], relations: [], errors: [] },
+      }),
+    );
+    assert.equal(await actions.applyParsedToErd(), false);
+    assert.equal(replacements, rejection === 'diff' ? 0 : 1);
+    assert.equal(groups, rejection === 'group' ? 1 : 0);
+    assert.equal(layouts, 0);
+    assert.equal(success, 0);
+    assert.equal(failure, 0);
+  });
+}

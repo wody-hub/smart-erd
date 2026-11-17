@@ -140,10 +140,13 @@ interface ExecuteDiffPhaseParams {
   parseResult: DdlParseResult;
   replaceFromDdl: (result: DdlParseResult) => boolean;
   applyDiffPlan: (plan: DiffPlan) => ApplyDiffResult | null;
-  updateGroupTables: (groupId: string, toAdd: string[], toRemove: string[]) => void;
+  updateGroupTables: (groupId: string, toAdd: string[], toRemove: string[]) => boolean;
   getCurrentNodes: () => TableNode[];
   onFallback: (droppedCount: number, error: unknown) => void;
 }
+
+/** 문서 명령 거절은 전체 교체나 일반 오류 알림으로 재시도하지 않는다. */
+class DiagramApplyRejectedError extends Error {}
 
 /**
  * Diff 적용 경로를 실행하고, 실패 시 Full Replace 폴백까지 처리한다.
@@ -154,7 +157,7 @@ interface ExecuteDiffPhaseParams {
 function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
   if (!params.diffApplyEnabled) {
     if (!params.replaceFromDdl(params.parseResult)) {
-      throw new Error('replaceFromDdl unavailable');
+      throw new DiagramApplyRejectedError('replaceFromDdl rejected');
     }
     return {
       applyPath: 'full-replace',
@@ -165,6 +168,7 @@ function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
   }
 
   let diffTableDiffs: TableDiff[] = [];
+  let diffPlan: DiffPlan;
   try {
     const currentSnapshots = createCurrentSnapshots(params.beforeNodes, params.beforeEdges);
     const nextTables = toDiffParsedTables(params.parseResult);
@@ -175,7 +179,7 @@ function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
       nextTables,
       nextRelations,
     );
-    const diffPlan =
+    diffPlan =
       scopedDiffResult?.safe === true
         ? scopedDiffResult.plan
         : buildErdTableDiffPlan({
@@ -185,19 +189,9 @@ function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
             nextRelations,
           });
     diffTableDiffs = diffPlan.tables;
-    const diffResult = params.applyDiffPlan(diffPlan);
-    if (!diffResult) {
-      throw new Error('applyDiffPlan unavailable');
-    }
-    return {
-      applyPath: 'diff',
-      diffAppliedOperations: diffResult.appliedOperations,
-      diffSkippedOperations: diffResult.skippedOperations,
-      groupDroppedCount: diffResult.groupRemap.droppedCount,
-    };
   } catch (error) {
     if (!params.replaceFromDdl(params.parseResult)) {
-      throw error;
+      throw new DiagramApplyRejectedError('replaceFromDdl rejected');
     }
     const replacedNodes = params.getCurrentNodes();
     const assignments = buildFallbackGroupAssignments(
@@ -206,7 +200,9 @@ function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
       replacedNodes,
     );
     for (const assignment of assignments) {
-      params.updateGroupTables(assignment.groupId, assignment.tableIds, []);
+      if (!params.updateGroupTables(assignment.groupId, assignment.tableIds, [])) {
+        throw new DiagramApplyRejectedError('group restoration rejected');
+      }
     }
     const droppedCount = assignments.reduce((sum, item) => sum + item.droppedCount, 0);
     params.onFallback(droppedCount, error);
@@ -217,6 +213,16 @@ function executeDiffPhase(params: ExecuteDiffPhaseParams): DiffPhaseResult {
       groupDroppedCount: droppedCount,
     };
   }
+  const diffResult = params.applyDiffPlan(diffPlan);
+  if (!diffResult) {
+    throw new DiagramApplyRejectedError('applyDiffPlan rejected');
+  }
+  return {
+    applyPath: 'diff',
+    diffAppliedOperations: diffResult.appliedOperations,
+    diffSkippedOperations: diffResult.skippedOperations,
+    groupDroppedCount: diffResult.groupRemap.droppedCount,
+  };
 }
 
 interface ExecuteLayoutPhaseParams {
@@ -401,7 +407,7 @@ export function useApplyToErd({
         toAdd: string[],
         toRemove: string[],
       ) => {
-        diagramErdApplyActions.updateGroupTables(groupId, toAdd, toRemove);
+        return diagramErdApplyActions.updateGroupTables(groupId, toAdd, toRemove) === 'applied';
       };
       const applyDiffPlanThroughSession = (plan: DiffPlan) =>
         diagramErdApplyActions.applyDiffPlan(plan);
@@ -467,6 +473,7 @@ export function useApplyToErd({
         }
         return true;
       } catch (err) {
+        if (err instanceof DiagramApplyRejectedError) return false;
         console.error('[erd-sync-metrics] apply-failed', err);
         if (source === 'manual') {
           toast.error(t('erd.codeEditor.failed'));

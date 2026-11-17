@@ -457,10 +457,10 @@ test('migrated column field updates invalidate table and column scopes and queri
   assert.equal(read.getEntity({ kind: 'column', id: columnId }), null);
 });
 
-test('canvas store fallback writers merge field edits with moves and dictionary patches', () => {
+test('column projection helpers merge field edits with moves and document dictionary patches', () => {
   const [a, b] = peers(false);
-  const actionsA = createCanvasTableActions(() => {}, (() => ({ ydoc: a })) as never);
-  const actionsB = createCanvasTableActions(() => {}, (() => ({ ydoc: b })) as never);
+  const actionsA = createCanvasTableActions((() => ({ ydoc: a })) as never);
+  const actionsB = createCanvasTableActions((() => ({ ydoc: b })) as never);
   actionsA.moveColumn('t', 0, 2);
   actionsB.updateColumn('t', 'a', { type: 'TEXT' });
   merge(a, b);
@@ -469,10 +469,15 @@ test('canvas store fallback writers merge field edits with moves and dictionary 
     ['b', 'c', 'a'],
   );
   assert.equal(columns(a)[2]!.type, 'TEXT');
-  actionsA.applyDictionaryReconciliation({
-    tableMetaUpdates: [],
-    columnUpdates: [{ nodeId: 't', colId: 'a', updates: { logicalName: '사전 이름' } }],
-  });
+  assert.equal(
+    mutate(a, 'dictionary:reconcile', {
+      plan: {
+        tableMetaUpdates: [],
+        columnUpdates: [{ nodeId: 't', colId: 'a', updates: { logicalName: '사전 이름' } }],
+      },
+    }),
+    true,
+  );
   merge(a, b);
   assert.equal(columns(b)[2]!.logicalName, '사전 이름');
 });
