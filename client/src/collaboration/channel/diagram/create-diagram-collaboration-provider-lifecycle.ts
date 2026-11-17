@@ -25,7 +25,8 @@ export interface CreateDiagramCollaborationProviderLifecycleOptions extends Diag
   storeBridge: DiagramCollaborationStoreBridge;
   onProviderReady: (provider: YjsProvider) => void;
   onProviderDisposed: () => void;
-  onSyncRetry?: (attempt: number) => void;
+  /** 현재 연결에서 받은 서버의 빈 문서 초기화 확인 콜백 */
+  onEmptyDocumentInitialized?: () => void;
   onSyncStateChange?: (synced: boolean) => void;
   onConnectionStatusChange?: (status: ConnectionStatus) => void;
 }
@@ -71,7 +72,7 @@ export function createDiagramCollaborationProviderLifecycle(
   );
   const providerBinding = new DiagramCollaborationProviderBinding({
     ...callbacks,
-    onSyncRetry: options.onSyncRetry,
+    onEmptyDocumentInitialized: options.onEmptyDocumentInitialized,
     onConnectionStatusChange: (status) => {
       options.onConnectionStatusChange?.(status);
       callbacks.onConnectionStatusChange(status);

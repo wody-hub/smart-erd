@@ -257,7 +257,7 @@ test('runtime reads disconnect, reconnect sync, hydration and permission changes
 });
 
 for (const hasYdocSnapshot of [false, true]) {
-  test(`empty content, snapshot=${hasYdocSnapshot}: only first genuinely empty connection permits commands`, () => {
+  test(`empty content, snapshot=${hasYdocSnapshot}: explicit empty confirmation or real sync permits commands`, () => {
     let connectionStatus = 'connected';
     let isReady = () => false;
     const engine = { exportSnapshot: () => new Uint8Array([0, 0]) };
@@ -302,16 +302,21 @@ for (const hasYdocSnapshot of [false, true]) {
         onProviderReady: (provider: unknown) => void;
         onConnectionStatusChange: (status: string) => void;
         onSyncStateChange: (synced: boolean) => void;
+        onEmptyDocumentInitialized: () => void;
       };
     };
     const runtime = h.render(() => hook(undefined, undefined, 0, true));
     const params = { diagramId: 'd', onProviderReady: () => {}, onProviderDisposed: () => {} };
-    // StrictMode처럼 연결 전에 폐기된 provider는 최초 빈 방 확인을 소모하지 않는다.
+    // StrictMode에서 폐기된 provider의 지연 응답을 무시한다.
     const abandoned = runtime.createProviderLifecycle(params);
     abandoned.onProviderReady({});
     const lifecycle = runtime.createProviderLifecycle(params);
     lifecycle.onProviderReady({});
     lifecycle.onConnectionStatusChange?.('connected');
+    assert.equal(isReady(), false);
+    abandoned.onEmptyDocumentInitialized();
+    assert.equal(isReady(), false, '이전 provider의 확인 응답은 무시한다');
+    lifecycle.onEmptyDocumentInitialized();
     assert.equal(isReady(), !hasYdocSnapshot);
     let writes = 0;
     const dispatch = () => {

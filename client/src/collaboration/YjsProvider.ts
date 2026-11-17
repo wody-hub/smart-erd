@@ -117,8 +117,8 @@ export class YjsProvider {
   /** 초기 sync 완료 여부 변경 콜백 */
   onSyncStateChange: ((synced: boolean) => void) | null = null;
 
-  /** 현재 연결 세대에서 응답 없이 실행한 sync 재시도 횟수 콜백 */
-  onSyncRetry: ((attempt: number) => void) | null = null;
+  /** 현재 연결에서 서버가 빈 문서를 확인했음을 알리는 콜백 (실제 sync와 구분) */
+  onEmptyDocumentInitialized: (() => void) | null = null;
 
   /** 연결 거부/종료 사유 콜백 */
   onConnectionIssueDetected: ((issue: ConnectionIssueKind | null) => void) | null = null;
@@ -174,8 +174,8 @@ export class YjsProvider {
   /** 현재 presence 모드 */
   private presenceMode: PresenceMode = 'active';
 
-  /** 현재 연결 세대의 sync 재시도 횟수 */
-  private syncRetryAttempts = 0;
+  /** 현재 연결에서 서버의 빈 문서 초기화 확인을 받았는지 여부 */
+  private emptyDocumentInitialized = false;
 
   /** initial sync 재시도 타이머 */
   private syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -344,10 +344,12 @@ export class YjsProvider {
       const serverUrl = this.buildWsUrl(ticketData.ticket);
       this.emitConnectionStatus('connecting');
 
-      this.ws = new WebSocket(serverUrl);
-      this.ws.binaryType = 'arraybuffer';
+      const socket = new WebSocket(serverUrl);
+      this.ws = socket;
+      socket.binaryType = 'arraybuffer';
 
-      this.ws.onopen = () => {
+      socket.onopen = () => {
+        if (this.ws !== socket) return;
         if (this.destroyed || this.intentionalClose) {
           this.ws?.close();
           this.ws = null;
@@ -355,7 +357,8 @@ export class YjsProvider {
         }
         this.clearReconnectTimer();
         this.clearSyncRetryTimer();
-        this.syncRetryAttempts = 0;
+        this.emptyDocumentInitialized = false;
+        this.emitSyncState(false);
         this.reconnectDelay = WS_RECONNECT.INITIAL_DELAY;
         this.lastRoomEpoch = null;
         this.lastPresenceVersion = 0;
@@ -376,14 +379,18 @@ export class YjsProvider {
         this.flushPendingLocalState();
       };
 
-      this.ws.onmessage = (event: MessageEvent) => {
+      socket.onmessage = (event: MessageEvent) => {
+        // 소켓 인스턴스를 연결 세대로 사용해 이전 연결의 지연 응답을 차단한다.
+        if (this.ws !== socket || socket.readyState !== WebSocket.OPEN || this.destroyed) return;
         if (event.data instanceof ArrayBuffer) {
           this.handleMessage(new Uint8Array(event.data));
         }
       };
 
-      this.ws.onclose = (event) => {
+      socket.onclose = (event) => {
+        if (this.ws !== socket) return;
         this.ws = null;
+        this.emptyDocumentInitialized = false;
         this.emitSyncState(false);
         this.clearPresenceBootstrapTimer();
         this.clearSyncRetryTimer();
@@ -399,7 +406,7 @@ export class YjsProvider {
         }
       };
 
-      this.ws.onerror = () => {
+      socket.onerror = () => {
         // onclose가 자동으로 뒤따르므로 여기서는 별도 처리 불필요
       };
     } finally {
@@ -453,6 +460,13 @@ export class YjsProvider {
         if (messageType === WS_MSG_TYPE.SYNC_STEP2) {
           this.emitSyncState(true);
           this.clearSyncRetryTimer();
+        }
+        break;
+      }
+      case WS_MSG_TYPE.EMPTY_DOCUMENT_INITIALIZED: {
+        if (!this.synced && !this.emptyDocumentInitialized) {
+          this.emptyDocumentInitialized = true;
+          this.onEmptyDocumentInitialized?.();
         }
         break;
       }
@@ -567,7 +581,7 @@ export class YjsProvider {
   }
 
   /**
-   * sync 완료 전까지 state vector 요청을 재전송한다.
+   * 빈 문서 확인과 별개로 실제 sync 완료 전까지 state vector 요청을 재전송한다.
    *
    * 첫 입장 사용자는 빈 room에 SYNC_STEP1을 보내도 응답을 받을 peer가 없으므로,
    * 뒤늦게 다른 peer가 참가했을 때도 handoff를 완료할 수 있도록 재시도를 유지한다.
@@ -586,7 +600,6 @@ export class YjsProvider {
         return;
       }
       this.requestSync();
-      this.onSyncRetry?.(++this.syncRetryAttempts);
       this.scheduleSyncRetry();
     }, 1500);
   }
@@ -909,7 +922,7 @@ export class YjsProvider {
    */
   private buildWsUrl(ticket: string): string {
     const websocketPath = this.options.websocketPath ?? `/ws/diagram/${this.options.diagramId}`;
-    return `${getWsBaseUrl()}${websocketPath}?ticket=${encodeURIComponent(ticket)}`;
+    return `${getWsBaseUrl()}${websocketPath}?ticket=${encodeURIComponent(ticket)}&protocolVersion=${this.options.protocolVersion ?? 3}`;
   }
 
   /**

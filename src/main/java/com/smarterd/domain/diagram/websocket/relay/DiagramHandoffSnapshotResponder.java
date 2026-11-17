@@ -1,7 +1,9 @@
 package com.smarterd.domain.diagram.websocket.relay;
 
 import com.smarterd.application.collaboration.query.LoadCollaborationHandoffUseCase;
+import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
 import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
+import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,8 @@ public class DiagramHandoffSnapshotResponder {
 
     private final LoadCollaborationHandoffUseCase loadCollaborationHandoffUseCase;
     private final DiagramMessageSender messageSender;
+    /** peer 및 미반영 update 확인용 room 관리자 */
+    private final DiagramRoomManager roomManager;
 
     /**
      * handoff snapshot을 로드해 요청 세션으로 응답 메시지를 전송한다.
@@ -33,6 +37,7 @@ public class DiagramHandoffSnapshotResponder {
             final var snapshot = handoff.snapshot();
             final var snapshotSource = handoff.source();
             if (snapshot.length == 0) {
+                confirmEmptyDocument(context);
                 log.info(
                     "snapshot-handoff diagramId={} session={} mode={} source={} snapshotBytes=0 loadMs={} decodeMs=0 sendMs=0 totalMs={}",
                     context.diagramId(),
@@ -54,6 +59,30 @@ public class DiagramHandoffSnapshotResponder {
         } catch (Exception e) {
             log.error("스냅샷 전송 실패 (다이어그램 {})", context.diagramId(), e);
         }
+    }
+
+    /**
+     * 빈 snapshot이며 sync에 응답할 peer와 미반영 update가 없을 때 v3 세션에만 확인을 보낸다.
+     *
+     * @param context 요청 세션 컨텍스트
+     * @throws Exception 메시지 전송 실패 시
+     */
+    private void confirmEmptyDocument(DiagramMessageContext context) throws Exception {
+        final var metadata = context.session().getAttributes().get(CollaborationAuthenticatedSession.SESSION_ATTR_KEY);
+        if (!(metadata instanceof CollaborationAuthenticatedSession sessionInfo) || sessionInfo.protocolVersion() < 3) {
+            return;
+        }
+        final var hasPeer = roomManager
+            .getSessions(context.diagramId())
+            .stream()
+            .anyMatch((peer) -> !context.sessionId().equals(peer.getId()) && peer.isOpen());
+        if (hasPeer || roomManager.hasUpdates(context.diagramId())) {
+            return;
+        }
+        messageSender.sendBinaryToSession(
+            context.session(),
+            messageSender.wrapMessage(DiagramMessageTypes.MSG_EMPTY_DOCUMENT_INITIALIZED, new byte[0])
+        );
     }
 
     private void sendV2(

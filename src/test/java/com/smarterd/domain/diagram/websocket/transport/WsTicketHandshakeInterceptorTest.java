@@ -13,6 +13,8 @@ import java.util.HashMap;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -35,8 +37,9 @@ class WsTicketHandshakeInterceptorTest {
     @Mock
     private WebSocketHandler webSocketHandler;
 
-    @Test
-    void beforeHandshake_storesCommonSessionAttributesOnSuccess() {
+    @ParameterizedTest
+    @ValueSource(ints = { 1, 2, 3 })
+    void beforeHandshake_storesCommonSessionAttributesOnSuccess(int protocolVersion) {
         final var interceptor = new WsTicketHandshakeInterceptor(validateDiagramCollaborationHandshakeUseCase);
         final var attributes = new HashMap<String, Object>();
         final var resourceKey = new com.smarterd.collaboration.channel.CollaborationResourceKey("diagram", "42");
@@ -46,13 +49,15 @@ class WsTicketHandshakeInterceptorTest {
             "Tester",
             resourceKey,
             Instant.parse("2026-03-23T00:00:00Z"),
-            2
+            protocolVersion
         );
 
-        when(request.getURI()).thenReturn(URI.create("/ws/diagram/42?ticket=ticket-1&protocolVersion=2"));
-        when(validateDiagramCollaborationHandshakeUseCase.validate("/ws/diagram/42", "ticket-1", 2)).thenReturn(
-            Optional.of(new DiagramHandshakeValidationResult(session, 42L))
+        when(request.getURI()).thenReturn(
+            URI.create("/ws/diagram/42?ticket=ticket-1&protocolVersion=" + protocolVersion)
         );
+        when(
+            validateDiagramCollaborationHandshakeUseCase.validate("/ws/diagram/42", "ticket-1", protocolVersion)
+        ).thenReturn(Optional.of(new DiagramHandshakeValidationResult(session, 42L)));
 
         final var accepted = interceptor.beforeHandshake(request, response, webSocketHandler, attributes);
 

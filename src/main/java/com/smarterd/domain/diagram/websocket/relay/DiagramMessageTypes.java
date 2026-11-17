@@ -49,6 +49,9 @@ public final class DiagramMessageTypes {
     /** Snapshot response v2 (서버 → 클라이언트, raw snapshot blob) */
     public static final byte MSG_SNAPSHOT_RESPONSE_V2 = 0x0E;
 
+    /** Empty document initialized (서버 → v3 클라이언트, payload 없음, 저장 ACK가 아님) */
+    public static final byte MSG_EMPTY_DOCUMENT_INITIALIZED = 0x0F;
+
     /**
      * 메시지 타입 상수 전용 유틸리티 클래스 인스턴스화를 방지한다.
      */

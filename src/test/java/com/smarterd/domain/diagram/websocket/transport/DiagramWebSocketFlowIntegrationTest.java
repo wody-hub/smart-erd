@@ -236,7 +236,7 @@ class DiagramWebSocketFlowIntegrationTest {
             new YjsUpdateMessageHandler(diagramRealtimeSessionUseCase, messageSender),
             new AwarenessMessageHandler(objectMapper, messageSender),
             new SnapshotRequestMessageHandler(
-                new DiagramHandoffSnapshotResponder(loadCollaborationHandoffUseCase, messageSender)
+                new DiagramHandoffSnapshotResponder(loadCollaborationHandoffUseCase, messageSender, roomManager)
             ),
             new CompactedSnapshotMessageHandler(new ApplyDiagramCompactedSnapshotUseCase(roomManager, snapshotService)),
             new PresenceSnapshotRequestMessageHandler(diagramRealtimeSessionUseCase)

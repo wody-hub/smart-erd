@@ -64,14 +64,14 @@ public class WsTicketHandshakeInterceptor implements HandshakeInterceptor {
 
             // URL 경로에서 diagram resource key 추출
             final var path = Objects.requireNonNull(uri.getPath());
-            // 2. protocolVersion 파싱 (1 또는 2만 허용, 그 외 1로 강등)
+            // 2. protocolVersion 파싱 (1~3만 허용 (3: 빈 문서 초기화 확인 지원), 그 외 1로 강등)
             var protocolVersion = 1;
             final var pvParam = queryParams.getFirst("protocolVersion");
             if (pvParam != null) {
                 try {
                     final var parsed = Integer.parseInt(pvParam);
-                    if (parsed == 2) {
-                        protocolVersion = 2;
+                    if (parsed == 2 || parsed == 3) {
+                        protocolVersion = parsed;
                     } else if (parsed != 1) {
                         log.warn("WebSocket 핸드셰이크: 미지원 protocolVersion={}, 1로 강등", parsed);
                     }

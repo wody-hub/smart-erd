@@ -33,6 +33,8 @@ export const WS_MSG_TYPE = {
   SNAPSHOT_REQUEST_V2: 0x0d,
   /** Snapshot response v2 (서버 → 클라이언트, raw snapshot blob) */
   SNAPSHOT_RESPONSE_V2: 0x0e,
+  /** 빈 문서 초기화 확인 (서버 → v3 클라이언트, payload 없음, 저장 ACK가 아님) */
+  EMPTY_DOCUMENT_INITIALIZED: 0x0f,
 } as const;
 
 /** Awareness 커서 색상 팔레트 (6색) — CSS Variable 기반 디자인 토큰 */

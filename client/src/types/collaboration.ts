@@ -58,8 +58,8 @@ export interface YjsProviderOptions {
   websocketPath?: string;
   /** 일회용 WebSocket ticket을 발급받는 콜백 */
   getTicket: () => Promise<WsTicketIssueResponse>;
-  /** WS 프로토콜 버전 (1: 레거시, 2: 리비전 포함 바이너리). 기본값 1 */
-  protocolVersion?: 1 | 2;
+  /** WS 프로토콜 버전 (1/2: 기존 동작, 3: 빈 문서 초기화 확인 지원). 기본값 3 */
+  protocolVersion?: 1 | 2 | 3;
 }
 
 /**

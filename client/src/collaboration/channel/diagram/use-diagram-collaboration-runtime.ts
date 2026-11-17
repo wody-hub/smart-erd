@@ -59,8 +59,10 @@ export function useDiagramCollaborationRuntime(
 ): UseDiagramCollaborationRuntimeReturn {
   useCollaborationStore((state) => state.connectionStatus);
   const [, setInitializationComplete] = useState(false);
-  const initializationRef = useRef({ generation: 0, complete: false });
-  const initializationSourceRef = useRef<'waiting' | 'remote' | 'empty-room-assumed'>('waiting');
+  const initializationRef = useRef({ complete: false });
+  const initializationSourceRef = useRef<'waiting' | 'remote' | 'server-confirmed-empty'>(
+    'waiting',
+  );
   const hydratedContentRevisionRef = useRef<string | null>(null);
   const remoteHydrationGenerationRef = useRef(0);
   const contentRevisionRef = useRef(diagram?.contentRevision);
@@ -69,7 +71,6 @@ export function useDiagramCollaborationRuntime(
   const getRemoteHydrationGeneration = useCallback(() => remoteHydrationGenerationRef.current, []);
   const providerGenerationRef = useRef(0);
   const hydratedSnapshotRef = useRef<Uint8Array | null>(null);
-  const lastDiagramIdRef = useRef<string | null>(null);
   /** preview 여부. 아직 provider가 알리지 않았으면 null이며 이때는 previewEnabled를 따른다. */
   const previewRef = useRef<boolean | null>(null);
   const permissionRef = useRef(canEdit);
@@ -96,9 +97,9 @@ export function useDiagramCollaborationRuntime(
     contentOnlySnapshotSeeder,
   } = useDiagramRuntimeBootstrap(diagram, documentBootstrap, setupAttempt);
   const getHydratedSnapshot = useCallback(() => {
-    // 빈 방 추정은 원격 수화가 아니며, 문서가 여전히 비어 있으면 저장 기준으로 쓰지 않는다.
+    // 빈 문서 확인은 원격 수화가 아니며, 문서가 여전히 비어 있으면 저장 기준으로 쓰지 않는다.
     if (
-      initializationSourceRef.current === 'empty-room-assumed' &&
+      initializationSourceRef.current === 'server-confirmed-empty' &&
       (!sharedDocumentEngine || sharedDocumentEngine.exportSnapshot().length <= 2)
     )
       return null;
@@ -138,12 +139,10 @@ export function useDiagramCollaborationRuntime(
       ) {
         throw new Error('Diagram collaboration runtime bootstrap is not ready');
       }
-      // bootstrap의 빈 문서 확인은 해당 문서의 첫 연결 세대에만 유효하다.
-      let firstConnection = lastDiagramIdRef.current !== diagramId;
       const providerGeneration = ++providerGenerationRef.current;
       hydratedSnapshotRef.current = null;
       initializationSourceRef.current = 'waiting';
-      initializationRef.current = { generation: 0, complete: false };
+      initializationRef.current = { complete: false };
       const captureHydratedSnapshot = () => {
         if (
           initializationRef.current.complete &&
@@ -181,10 +180,9 @@ export function useDiagramCollaborationRuntime(
             captureHydratedSnapshot();
             setInitializationComplete(next);
           },
-          onSyncRetry: (attempt) => {
+          onEmptyDocumentInitialized: () => {
             if (
               providerGenerationRef.current !== providerGeneration ||
-              attempt < 2 ||
               initializationRef.current.complete ||
               useCollaborationStore.getState().connectionStatus !== 'connected' ||
               collaborationBootstrap.hasYdocSnapshot ||
@@ -192,36 +190,19 @@ export function useDiagramCollaborationRuntime(
               previewEnabled
             )
               return;
-            // 임시 규칙: S2-D/S5의 서버 빈 문서 ACK가 실제 해결책이다.
-            // sync 완료로 위장하거나 bootstrap 내용을 시딩하지 않고 이 연결 세대만 편집 가능하게 한다.
-            initializationSourceRef.current = 'empty-room-assumed';
+            // 서버 확인은 이 연결만 초기화하며 실제 sync나 content 시딩으로 취급하지 않는다.
+            initializationSourceRef.current = 'server-confirmed-empty';
             initializationRef.current.complete = true;
             captureHydratedSnapshot();
             setInitializationComplete(true);
           },
-          onConnectionStatusChange: (status) => {
+          onConnectionStatusChange: () => {
             if (providerGenerationRef.current !== providerGeneration) return;
-            if (status === 'connected') {
-              lastDiagramIdRef.current = diagramId;
-              if (
-                firstConnection &&
-                initializationRef.current.generation === 0 &&
-                !collaborationBootstrap.hasYdocSnapshot &&
-                !collaborationBootstrap.content
-              ) {
-                initializationSourceRef.current = 'empty-room-assumed';
-                initializationRef.current.complete = true;
-                captureHydratedSnapshot();
-                setInitializationComplete(true);
-              }
-              firstConnection = false;
-              initializationRef.current.generation += 1;
-            } else {
-              initializationSourceRef.current = 'waiting';
-              hydratedSnapshotRef.current = null;
-              initializationRef.current.complete = false;
-              setInitializationComplete(false);
-            }
+            // 모든 연결 세대는 새 sync 또는 서버의 빈 문서 확인을 기다린다.
+            initializationSourceRef.current = 'waiting';
+            hydratedSnapshotRef.current = null;
+            initializationRef.current.complete = false;
+            setInitializationComplete(false);
           },
           diagramId,
           teamId,
