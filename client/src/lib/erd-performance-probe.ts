@@ -354,3 +354,23 @@ export function probeRelevantActivity(kind: 'routing' | 'geometry' | 'projection
   snapshot.lastRelevantActivityAt = now();
   probeCounter(`${kind}-activity`);
 }
+
+/**
+ * 문서 이벤트 수신부터 전용 Monaco 패치·선택·viewport 복원 완료까지 기록한다.
+ * 기존 probe 이중 플래그가 켜진 경우에만 snapshot과 User Timing mark를 남긴다.
+ * @param receivedAt performance.now 기준 문서 이벤트 수신 시각
+ * @param revision 적용한 투영 버전
+ * @param relocatedTargets 삭제 대상의 의미상 위치 이동 개수
+ * @returns 없음
+ */
+export function probeProjectionPatchApplied(
+  receivedAt: number,
+  revision: number,
+  relocatedTargets: number,
+): void {
+  if (!enabled || !navigationOriginSet) return;
+  const durationMs = Math.max(0, performance.now() - receivedAt);
+  probeCounter('projection-patch-applied', 1, durationMs);
+  probeCounter('projection-deleted-target-relocations', relocatedTargets);
+  emit('projection-patch-applied', { durationMs, revision, relocatedTargets });
+}

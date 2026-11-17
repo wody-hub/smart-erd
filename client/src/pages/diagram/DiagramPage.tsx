@@ -1,3 +1,5 @@
+import DiagramLiveProjectionSlot from '@/components/erd/DiagramLiveProjectionSlot';
+import { resolveErdUnifiedEditRollout } from '@/lib/erd-unified-edit-rollout';
 import { useDiagramRejectedCommandToast } from '@/collaboration/channel/diagram/use-diagram-command-feedback';
 import { lazy, Suspense, useCallback, useLayoutEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -114,7 +116,9 @@ export default function DiagramPage() {
     enabled: !!teamId && !!projectId,
   });
 
+  const unifiedProjectionEnabled = resolveErdUnifiedEditRollout(diagramId) === 'internal';
   const { workMode, handleWorkModeChange } = useDiagramWorkModeState({
+    forcedMode: unifiedProjectionEnabled ? 'erd' : undefined,
     teamId,
     projectId,
     diagramId,
@@ -165,6 +169,7 @@ export default function DiagramPage() {
   );
 
   const {
+    codeProjectionRuntime,
     diagram,
     isLoading,
     isError,
@@ -268,7 +273,7 @@ export default function DiagramPage() {
     previewSyncStatus,
     projectId,
     setLeftPanel,
-    sharedSchemaDraft,
+    sharedSchemaDraft: unifiedProjectionEnabled ? null : sharedSchemaDraft,
     storeHasRenderableGraph,
     toggleCodeEditorPanel,
     t,
@@ -318,7 +323,9 @@ export default function DiagramPage() {
       readOnlyMessage={!workModeRuntimeState.headerCanEdit ? previewReadOnlyMessage : undefined}
       accessory={
         <div className="header-utility-rail">
-          <DiagramWorkModeSwitcher mode={workMode} onModeChange={handleWorkModeChange} />
+          {!unifiedProjectionEnabled && (
+            <DiagramWorkModeSwitcher mode={workMode} onModeChange={handleWorkModeChange} />
+          )}
           <DiagramCollaboratorsBar />
         </div>
       }
@@ -505,7 +512,7 @@ export default function DiagramPage() {
                       )}
                       style={isMobileEditorLayout ? undefined : { width: sidebarWidth }}
                     >
-                      {leftPanel === 'sidebar' ? (
+                      {unifiedProjectionEnabled || leftPanel === 'sidebar' ? (
                         <DiagramSidebar
                           canEdit={workModeRuntimeState.effectiveCanvasCanEdit}
                           activeGroupId={activeGroupId}
@@ -601,7 +608,9 @@ export default function DiagramPage() {
                         <>
                           <ERDCanvas
                             diagramName={diagramName || 'diagram'}
-                            draftOverlayGraph={sharedDraftOverlayGraph}
+                            draftOverlayGraph={
+                              unifiedProjectionEnabled ? null : sharedDraftOverlayGraph
+                            }
                             tableFocusRequest={tableFocusRequest}
                             provider={providerRef.current}
                             validationOpen={validationOpen}
@@ -611,8 +620,10 @@ export default function DiagramPage() {
                             activeGroupId={activeGroupId}
                             activeGroupName={activeGroup?.label}
                             activeGroupTableIds={activeGroupTableIds}
-                            codeEditorActive={leftPanel === 'code'}
-                            onToggleCodeEditor={handleToggleCodeEditor}
+                            codeEditorActive={!unifiedProjectionEnabled && leftPanel === 'code'}
+                            onToggleCodeEditor={
+                              unifiedProjectionEnabled ? undefined : handleToggleCodeEditor
+                            }
                             onPersistLayout={persistPublishedDiagramNow}
                             isSidebarResizing={isSidebarResizing}
                             onExportTableDefinition={handleExportTableDefinition}
@@ -633,6 +644,11 @@ export default function DiagramPage() {
                         </>
                       )}
                     </main>
+                    <DiagramLiveProjectionSlot
+                      enabled={unifiedProjectionEnabled}
+                      diagramId={diagramId!}
+                      runtime={codeProjectionRuntime}
+                    />
                     {validationOpen && <ValidationPanel onClose={() => setValidationOpen(false)} />}
                   </div>
                 </div>

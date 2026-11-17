@@ -7,6 +7,8 @@ import {
 } from '@/lib/diagram-work-mode';
 
 interface UseDiagramWorkModeStateParams {
+  /** 내부 투영은 저장된 모드를 읽거나 변경하지 않고 이 모드로 동작한다. */
+  forcedMode?: DiagramWorkMode;
   teamId: string | undefined;
   projectId: string | undefined;
   diagramId: string | undefined;
@@ -22,6 +24,7 @@ export function useDiagramWorkModeState({
   teamId,
   projectId,
   diagramId,
+  forcedMode,
 }: UseDiagramWorkModeStateParams): UseDiagramWorkModeStateResult {
   const [workMode, setWorkMode] = useState<DiagramWorkMode>(DEFAULT_DIAGRAM_WORK_MODE);
   const [workModeHydrated, setWorkModeHydrated] = useState(false);
@@ -31,20 +34,21 @@ export function useDiagramWorkModeState({
   }, []);
 
   useEffect(() => {
+    if (forcedMode) return;
     setWorkModeHydrated(false);
     setWorkMode(loadDiagramWorkMode({ teamId, projectId, diagramId }));
     setWorkModeHydrated(true);
-  }, [diagramId, projectId, teamId]);
+  }, [diagramId, projectId, teamId, forcedMode]);
 
   useEffect(() => {
-    if (!workModeHydrated) {
+    if (forcedMode || !workModeHydrated) {
       return;
     }
     saveDiagramWorkMode({ teamId, projectId, diagramId }, workMode);
-  }, [diagramId, projectId, teamId, workMode, workModeHydrated]);
+  }, [diagramId, projectId, teamId, workMode, workModeHydrated, forcedMode]);
 
   return {
-    workMode,
+    workMode: forcedMode ?? workMode,
     workModeHydrated,
     handleWorkModeChange,
   };

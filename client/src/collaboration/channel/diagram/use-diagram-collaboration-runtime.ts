@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
+import type { DiagramCodeProjectionRuntime } from './use-diagram-code-projection';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import { isDiagramDocumentReady } from './diagram-document-mutation-session';
 import * as Y from 'yjs';
@@ -31,6 +32,8 @@ const WS_SNAPSHOT_FALLBACK_MS = 5_000;
 export type { CreateDiagramCollaborationProviderLifecycle };
 
 interface UseDiagramCollaborationRuntimeReturn {
+  /** 권한과 독립적인 authoritative 투영 읽기 런타임. */
+  codeProjectionRuntime: DiagramCodeProjectionRuntime;
   collaborationBootstrap: DiagramCollaborationBootstrap | null;
   previewSyncStatus: PreviewSyncStatus;
   initYDoc: (doc: Y.Doc) => void;
@@ -57,7 +60,7 @@ export function useDiagramCollaborationRuntime(
   setupAttempt: number,
   canEdit: boolean,
 ): UseDiagramCollaborationRuntimeReturn {
-  useCollaborationStore((state) => state.connectionStatus);
+  const connectionStatus = useCollaborationStore((state) => state.connectionStatus);
   const [, setInitializationComplete] = useState(false);
   const initializationRef = useRef({ complete: false });
   const initializationSourceRef = useRef<'waiting' | 'remote' | 'server-confirmed-empty'>(
@@ -70,6 +73,8 @@ export function useDiagramCollaborationRuntime(
   const getHydratedContentRevision = useCallback(() => hydratedContentRevisionRef.current, []);
   const getRemoteHydrationGeneration = useCallback(() => remoteHydrationGenerationRef.current, []);
   const providerGenerationRef = useRef(0);
+  /** 빈 문서 확인까지 포함하는 투영 수화 세대. */
+  const projectionGenerationRef = useRef(0);
   const hydratedSnapshotRef = useRef<Uint8Array | null>(null);
   /** preview 여부. 아직 provider가 알리지 않았으면 null이며 이때는 previewEnabled를 따른다. */
   const previewRef = useRef<boolean | null>(null);
@@ -109,15 +114,44 @@ export function useDiagramCollaborationRuntime(
     transition: runtimeTransition,
   });
   const previewSyncStatus = toPreviewSyncStatus(runtimeState, previewEnabled);
-  const { documentMutationSession, documentCheckpointReader } = useDiagramDocumentRuntime({
-    diagram,
-    documentBootstrap,
-    resolvedSessionBootstrap,
-    sharedDocumentEngine,
-    snapshotCodec,
-    storeBridge,
-    isCommandReady,
-  });
+  const { documentMutationSession, documentCheckpointReader, codeProjectionRead } =
+    useDiagramDocumentRuntime({
+      diagram,
+      documentBootstrap,
+      resolvedSessionBootstrap,
+      sharedDocumentEngine,
+      snapshotCodec,
+      storeBridge,
+      isCommandReady,
+    });
+
+  const projectionIsReady = useCallback(
+    () =>
+      initializationRef.current.complete &&
+      !(previewRef.current ?? previewEnabled) &&
+      useCollaborationStore.getState().connectionStatus === 'connected',
+    [previewEnabled],
+  );
+  const getProjectionEpoch = useCallback(
+    () => `${providerGenerationRef.current}:${projectionGenerationRef.current}`,
+    [],
+  );
+  const projectionSource = useMemo(
+    () =>
+      codeProjectionRead
+        ? {
+            ...codeProjectionRead,
+            isReady: projectionIsReady,
+            getEpoch: getProjectionEpoch,
+          }
+        : null,
+    [codeProjectionRead, projectionIsReady, getProjectionEpoch],
+  );
+  const codeProjectionRuntime: DiagramCodeProjectionRuntime = {
+    source: projectionSource,
+    ready: connectionStatus === 'connected' && projectionIsReady(),
+    generation: getProjectionEpoch(),
+  };
 
   const createProviderLifecycle = useCallback(
     ({
@@ -175,7 +209,10 @@ export function useDiagramCollaborationRuntime(
             if (providerGenerationRef.current !== providerGeneration) return;
             initializationRef.current.complete = next;
             initializationSourceRef.current = next ? 'remote' : 'waiting';
-            if (next) remoteHydrationGenerationRef.current += 1;
+            if (next) {
+              remoteHydrationGenerationRef.current += 1;
+              projectionGenerationRef.current += 1;
+            }
             hydratedSnapshotRef.current = null;
             captureHydratedSnapshot();
             setInitializationComplete(next);
@@ -191,6 +228,7 @@ export function useDiagramCollaborationRuntime(
             )
               return;
             // 서버 확인은 이 연결만 초기화하며 실제 sync나 content 시딩으로 취급하지 않는다.
+            projectionGenerationRef.current += 1;
             initializationSourceRef.current = 'server-confirmed-empty';
             initializationRef.current.complete = true;
             captureHydratedSnapshot();
@@ -198,6 +236,7 @@ export function useDiagramCollaborationRuntime(
           },
           onConnectionStatusChange: () => {
             if (providerGenerationRef.current !== providerGeneration) return;
+            projectionGenerationRef.current += 1;
             // 모든 연결 세대는 새 sync 또는 서버의 빈 문서 확인을 기다린다.
             initializationSourceRef.current = 'waiting';
             hydratedSnapshotRef.current = null;
@@ -250,6 +289,7 @@ export function useDiagramCollaborationRuntime(
   );
 
   return {
+    codeProjectionRuntime,
     collaborationBootstrap,
     previewSyncStatus,
     initYDoc,

@@ -1,3 +1,4 @@
+import type { DiagramCodeProjectionRuntime } from './use-diagram-code-projection';
 import { useCallback, useMemo, useState } from 'react';
 import { YjsProvider } from '@/collaboration/YjsProvider';
 import type { DiagramDocumentMutationSession as DocumentMutationSession } from './diagram-document-mutation-session';
@@ -13,6 +14,8 @@ import {
 } from './use-diagram-collaboration-provider.js';
 
 interface UseDiagramCollaborationSessionReturn {
+  /** authoritative 읽기 전용 투영 연결. */
+  codeProjectionRuntime: DiagramCodeProjectionRuntime;
   providerRef: React.RefObject<YjsProvider | null>;
   isPreviewMode: boolean;
   previewSyncStatus: PreviewSyncStatus;
@@ -36,6 +39,7 @@ export function useDiagramCollaborationSession(
     setSetupAttempt((attempt) => attempt + 1);
   }, []);
   const {
+    codeProjectionRuntime,
     collaborationBootstrap,
     previewSyncStatus,
     initYDoc,
@@ -102,6 +106,7 @@ export function useDiagramCollaborationSession(
   );
 
   return {
+    codeProjectionRuntime,
     providerRef,
     isPreviewMode,
     previewSyncStatus,

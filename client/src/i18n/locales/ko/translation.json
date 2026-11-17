@@ -1769,6 +1769,14 @@
     }
   },
   "erd": {
+    "liveProjection": {
+      "title": "라이브 DSL 투영",
+      "readOnly": "읽기 전용",
+      "hydrating": "확정 문서를 불러오는 중…",
+      "resync": "문서를 다시 동기화하는 중…",
+      "unsupportedRelations": "관계 {{count}}개는 DSL로 표현할 수 없습니다. 원본 다이어그램에 유지됩니다.",
+      "unappliedDraft": "미적용 공유 초안이 있습니다. 이 패널은 저장된 다이어그램을 표시합니다."
+    },
     "sidebar": {
       "tables": "테이블",
       "noTables": "아직 테이블이 없습니다",

@@ -1,3 +1,4 @@
+import type { ErdCodeProjectionPortOptions } from '@/collaboration/plugins/erd/erd-code-projection-port';
 import useCanvasStore from '@/stores/erd/useCanvasStore';
 import { useEffect, useMemo, useRef } from 'react';
 import { createDiagramDocumentMutationSession } from './diagram-document-mutation-session';
@@ -34,6 +35,8 @@ interface UseDiagramDocumentRuntimeParams {
 }
 
 interface UseDiagramDocumentRuntimeResult {
+  /** 기존 스토어를 재사용하는 읽기 전용 투영 연결. */
+  codeProjectionRead: Pick<ErdCodeProjectionPortOptions, 'read' | 'getDocument'> | null;
   documentMutationSession: DocumentMutationSession | null;
   documentCheckpointReader: DocumentCheckpointReader | null;
 }
@@ -90,6 +93,13 @@ export function useDiagramDocumentRuntime({
       documentRevisionTracker,
       sharedDocumentEngine,
     ],
+  );
+  const codeProjectionRead = useMemo(
+    () =>
+      documentStore && sharedDocumentEngine
+        ? { read: documentStore, getDocument: () => sharedDocumentEngine.getDocument() }
+        : null,
+    [documentStore, sharedDocumentEngine],
   );
   const pluginContext = useMemo<PluginContext | null>(
     () =>
@@ -203,6 +213,7 @@ export function useDiagramDocumentRuntime({
   }, [documentPersistenceCoordinator]);
 
   return {
+    codeProjectionRead,
     documentMutationSession,
     documentCheckpointReader: documentPersistenceCoordinator,
   };

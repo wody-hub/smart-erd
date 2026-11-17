@@ -1,3 +1,4 @@
+import type { DiagramCodeProjectionRuntime } from './use-diagram-code-projection';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { fetchDiagram, fetchDiagramBootstrap } from '@/api/diagramApi';
 import { useDiagramCollaborationSession } from '@/collaboration/channel/diagram/use-diagram-collaboration-session';
@@ -20,6 +21,8 @@ interface UseDiagramDocumentSessionParams {
 }
 
 interface UseDiagramDocumentSessionResult {
+  /** authoritative 읽기 전용 투영 연결. */
+  codeProjectionRuntime: DiagramCodeProjectionRuntime;
   documentBootstrap: ReturnType<typeof useDocumentPageHost<DiagramDetail>>['documentBootstrap'];
   diagram: DiagramDetail | undefined;
   isLoading: boolean;
@@ -95,6 +98,7 @@ export function useDiagramDocumentSession({
   );
 
   const {
+    codeProjectionRuntime,
     providerRef,
     isPreviewMode,
     previewSyncStatus,
@@ -169,6 +173,7 @@ export function useDiagramDocumentSession({
   beforeDestroyYDocRef.current = flushCodeModeSnapshotBeforeDispose;
 
   return {
+    codeProjectionRuntime,
     documentBootstrap,
     diagram,
     isLoading,

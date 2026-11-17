@@ -1771,6 +1771,14 @@
     }
   },
   "erd": {
+    "liveProjection": {
+      "title": "Live DSL projection",
+      "readOnly": "Read only",
+      "hydrating": "Loading authoritative document…",
+      "resync": "Resynchronizing document…",
+      "unsupportedRelations": "Relations not representable in DSL: {{count}}. All remain in the persisted diagram.",
+      "unappliedDraft": "An unapplied shared draft exists. This panel shows the persisted diagram."
+    },
     "sidebar": {
       "tables": "Tables",
       "noTables": "No tables yet",
