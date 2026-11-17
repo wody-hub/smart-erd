@@ -48,6 +48,7 @@ export function useDiagramCollaborationSession(
     snapshotCodec,
     documentMutationSession,
     documentCheckpointReader,
+    getHydratedSnapshot,
   } = useDiagramCollaborationRuntime(diagram, documentBootstrap, setupAttempt, canEdit);
   const { providerRef, isPreviewMode, setupErrorKind } = useDiagramCollaborationProvider({
     collaborationBootstrap,
@@ -66,8 +67,6 @@ export function useDiagramCollaborationSession(
     setupAttempt,
   });
 
-  useSnapshotCompaction(providerRef, diagramId);
-
   const diagramPersistenceSession = useMemo(
     () =>
       teamId && projectId && diagramId
@@ -76,9 +75,24 @@ export function useDiagramCollaborationSession(
             projectId,
             diagramId,
             checkpointReader: documentCheckpointReader,
+            isReady: () => documentMutationSession?.ready ?? false,
+            getHydratedSnapshot,
           })
         : null,
-    [diagramId, documentCheckpointReader, projectId, teamId],
+    [
+      diagramId,
+      documentCheckpointReader,
+      documentMutationSession,
+      getHydratedSnapshot,
+      projectId,
+      teamId,
+    ],
+  );
+
+  useSnapshotCompaction(
+    providerRef,
+    diagramId,
+    () => diagramPersistenceSession?.getLatestCheckpoint() != null,
   );
 
   return {

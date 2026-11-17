@@ -189,7 +189,10 @@ export function useAutoBackup({
     const backup = diagramPersistenceSession?.preparePublishedBackup(lastBackupHash) ?? null;
     if (!backup) {
       // 마지막 저장 직후/수동 저장 직후처럼 더 이상 미저장 로컬 변경이 없으면 플래그를 내린다.
-      hasLocalChangeRef.current = false;
+      // 준비되지 않은 저장은 보류된 변경을 유지한다.
+      if (diagramPersistenceSession?.ready) {
+        hasLocalChangeRef.current = false;
+      }
       metricsRef.current.skipCounts.unchanged += 1;
       logAutosaveMetrics('skip', trigger, metricsRef.current, { reason: 'unchanged' });
       return;

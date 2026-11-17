@@ -43,6 +43,7 @@ interface UseDiagramCollaborationRuntimeReturn {
   snapshotCodec: DocumentSnapshotCodec | null;
   documentMutationSession: DocumentMutationSession | null;
   documentCheckpointReader: DocumentCheckpointReader | null;
+  getHydratedSnapshot: () => Uint8Array | null;
 }
 
 /**
@@ -54,9 +55,13 @@ export function useDiagramCollaborationRuntime(
   setupAttempt: number,
   canEdit: boolean,
 ): UseDiagramCollaborationRuntimeReturn {
-  const connectionStatus = useCollaborationStore((state) => state.connectionStatus);
-  const [synced, setSynced] = useState(false);
-  const syncedRef = useRef(false);
+  useCollaborationStore((state) => state.connectionStatus);
+  const [, setInitializationComplete] = useState(false);
+  const initializationRef = useRef({ generation: 0, complete: false });
+  const providerGenerationRef = useRef(0);
+  const hydratedSnapshotRef = useRef<Uint8Array | null>(null);
+  const lastDiagramIdRef = useRef<string | null>(null);
+  const getHydratedSnapshot = useCallback(() => hydratedSnapshotRef.current, []);
   /** preview 여부. 아직 provider가 알리지 않았으면 null이며 이때는 previewEnabled를 따른다. */
   const previewRef = useRef<boolean | null>(null);
   const permissionRef = useRef(canEdit);
@@ -66,8 +71,7 @@ export function useDiagramCollaborationRuntime(
       localOnly: false,
       canEdit: permissionRef.current,
       hydrated: !(previewRef.current ?? previewEnabled),
-      // 빈 room의 첫 입장자는 SYNC_STEP2를 받지 못할 수 있어 snapshot이 없는 문서는 연결 상태만 본다.
-      synced: !previewEnabled || syncedRef.current,
+      synced: initializationRef.current.complete,
       connectionStatus: useCollaborationStore.getState().connectionStatus,
     });
   const initYDoc = useCanvasStore((s) => s.initYDoc);
@@ -95,13 +99,6 @@ export function useDiagramCollaborationRuntime(
     snapshotCodec,
     storeBridge,
     isCommandReady,
-    commandReady: isDiagramDocumentReady({
-      localOnly: false,
-      canEdit,
-      hydrated: !(previewRef.current ?? previewEnabled),
-      synced: !previewEnabled || synced,
-      connectionStatus,
-    }),
   });
 
   const createProviderLifecycle = useCallback(
@@ -124,6 +121,20 @@ export function useDiagramCollaborationRuntime(
       ) {
         throw new Error('Diagram collaboration runtime bootstrap is not ready');
       }
+      // bootstrap의 빈 문서 확인은 해당 문서의 첫 연결 세대에만 유효하다.
+      let firstConnection = lastDiagramIdRef.current !== diagramId;
+      const providerGeneration = ++providerGenerationRef.current;
+      hydratedSnapshotRef.current = null;
+      initializationRef.current = { generation: 0, complete: false };
+      const captureHydratedSnapshot = () => {
+        if (
+          initializationRef.current.complete &&
+          !(previewRef.current ?? previewEnabled) &&
+          !hydratedSnapshotRef.current
+        ) {
+          hydratedSnapshotRef.current = sharedDocumentEngine.exportSnapshot();
+        }
+      };
       return createDiagramCollaborationProviderLifecycle(
         {
           ydoc,
@@ -136,27 +147,54 @@ export function useDiagramCollaborationRuntime(
           handoffLogPrefix,
           dispatchRuntimeEvent,
           updatePreviewMode: (next) => {
+            if (providerGenerationRef.current !== providerGeneration) return;
             previewRef.current = next;
+            captureHydratedSnapshot();
             updatePreviewMode(next);
           },
           onSyncStateChange: (next) => {
-            syncedRef.current = next;
-            setSynced(next);
+            if (providerGenerationRef.current !== providerGeneration) return;
+            initializationRef.current.complete = next;
+            captureHydratedSnapshot();
+            setInitializationComplete(next);
+          },
+          onConnectionStatusChange: (status) => {
+            if (providerGenerationRef.current !== providerGeneration) return;
+            if (status === 'connected') {
+              lastDiagramIdRef.current = diagramId;
+              if (
+                firstConnection &&
+                initializationRef.current.generation === 0 &&
+                !collaborationBootstrap.hasYdocSnapshot &&
+                !collaborationBootstrap.content
+              ) {
+                initializationRef.current.complete = true;
+                captureHydratedSnapshot();
+                setInitializationComplete(true);
+              }
+              firstConnection = false;
+              initializationRef.current.generation += 1;
+            } else {
+              initializationRef.current.complete = false;
+              setInitializationComplete(false);
+            }
           },
           diagramId,
           teamId,
           projectId,
           storeBridge,
           onProviderReady: (provider) => {
-            syncedRef.current = false;
+            if (providerGenerationRef.current !== providerGeneration) return;
+            initializationRef.current.complete = false;
             previewRef.current = previewEnabled;
-            setSynced(false);
+            setInitializationComplete(false);
             onProviderReady(provider);
           },
           onProviderDisposed: () => {
-            syncedRef.current = false;
+            if (providerGenerationRef.current !== providerGeneration) return;
+            initializationRef.current.complete = false;
             previewRef.current = true;
-            setSynced(false);
+            setInitializationComplete(false);
             onProviderDisposed();
           },
         },
@@ -199,5 +237,6 @@ export function useDiagramCollaborationRuntime(
     snapshotCodec,
     documentMutationSession,
     documentCheckpointReader,
+    getHydratedSnapshot,
   };
 }

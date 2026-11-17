@@ -43,7 +43,10 @@ function isLikelyAlone(
 export function useSnapshotCompaction(
   providerRef: React.RefObject<YjsProvider | null>,
   diagramId: string | undefined,
+  isReady: () => boolean,
 ): void {
+  const readyRef = useRef(isReady);
+  readyRef.current = isReady;
   /** 현재 세션의 컴팩션 시도 횟수 */
   const attemptsRef = useRef(0);
   /** 컴팩션 완료 시점의 provider 참조 — 다이어그램 전환 감지용 */
@@ -72,7 +75,7 @@ export function useSnapshotCompaction(
 
     const timer = setTimeout(() => {
       const currentProvider = providerRef.current;
-      if (!currentProvider || !currentProvider.isSynced()) {
+      if (!readyRef.current() || !currentProvider || !currentProvider.isSynced()) {
         return;
       }
 

@@ -69,7 +69,7 @@ export function useDiagramPublishedSave({
   });
 
   const handleSave = useCallback(() => {
-    if (!diagramPersistenceSession || saveMutation.isPending) {
+    if (!diagramPersistenceSession?.ready || saveMutation.isPending) {
       return;
     }
 
@@ -91,7 +91,7 @@ export function useDiagramPublishedSave({
   }, [diagramPersistenceSession, lastBackupHash, markBackedUp, saveMutation, t]);
 
   const persistPublishedDiagramNow = useCallback(async (): Promise<boolean> => {
-    if (!diagramPersistenceSession || saveMutation.isPending) {
+    if (!diagramPersistenceSession?.ready || saveMutation.isPending) {
       return false;
     }
 

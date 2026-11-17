@@ -3,7 +3,11 @@ import { DiagramPreviewHydrationController } from './diagram-preview-hydration-c
 import { DiagramCollaborationProviderEvents } from './diagram-collaboration-provider-events.js';
 import { DiagramCollaborationProviderConnection } from './diagram-collaboration-provider-connection.js';
 import { YjsProvider } from '@/collaboration/YjsProvider';
-import type { WsTicketIssueResponse, YjsProviderOptions } from '@/types/collaboration';
+import type {
+  ConnectionStatus,
+  WsTicketIssueResponse,
+  YjsProviderOptions,
+} from '@/types/collaboration';
 import {
   DiagramCollaborationProviderLifecycle,
   type DiagramCollaborationProviderLifecycleOptions,
@@ -22,6 +26,7 @@ export interface CreateDiagramCollaborationProviderLifecycleOptions extends Diag
   onProviderReady: (provider: YjsProvider) => void;
   onProviderDisposed: () => void;
   onSyncStateChange?: (synced: boolean) => void;
+  onConnectionStatusChange?: (status: ConnectionStatus) => void;
 }
 
 interface CreateDiagramCollaborationProviderLifecycleDependencies {
@@ -56,15 +61,20 @@ export function createDiagramCollaborationProviderLifecycle(
       options.storeBridge.refreshPersistedCanvasFromYDoc({ forceFull: true }),
     getConnectionStatus: providerEvents.getConnectionStatus,
   });
-  const providerBinding = new DiagramCollaborationProviderBinding(
-    providerEvents.createBindingCallbacks(
-      (wsConnectedAt) => previewHydrationController.onConnected(wsConnectedAt),
-      (synced) => {
-        previewHydrationController.onSyncStateChange(synced);
-        options.onSyncStateChange?.(synced);
-      },
-    ),
+  const callbacks = providerEvents.createBindingCallbacks(
+    (wsConnectedAt) => previewHydrationController.onConnected(wsConnectedAt),
+    (synced) => {
+      previewHydrationController.onSyncStateChange(synced);
+      options.onSyncStateChange?.(synced);
+    },
   );
+  const providerBinding = new DiagramCollaborationProviderBinding({
+    ...callbacks,
+    onConnectionStatusChange: (status) => {
+      options.onConnectionStatusChange?.(status);
+      callbacks.onConnectionStatusChange(status);
+    },
+  });
   const providerConnection = new DiagramCollaborationProviderConnection<
     YjsProvider,
     WsTicketIssueResponse

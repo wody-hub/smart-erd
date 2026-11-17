@@ -93,6 +93,7 @@ test('local-only document session supports table/column/group CRUD and layout', 
   const doc = new Y.Doc();
   const engine = new YjsSharedDocumentEngine(doc);
   let session: DocumentMutationSession | null = null;
+  let ready = true;
   function LocalRuntime() {
     session = useDiagramDocumentRuntime({
       diagram: undefined,
@@ -102,8 +103,7 @@ test('local-only document session supports table/column/group CRUD and layout', 
       snapshotCodec: null,
       storeBridge: useDiagramCollaborationStoreBridge(),
       plugin: new ErdDocumentPlugin(),
-      isCommandReady: () => true,
-      commandReady: true,
+      isCommandReady: () => ready,
     }).documentMutationSession;
     return null;
   }
@@ -147,6 +147,8 @@ test('local-only document session supports table/column/group CRUD and layout', 
   );
   assert.equal(table.get('positionX'), 50);
   assert.equal(h.session.emitCommand(h.adapter.deleteTable(tableId)), 'applied');
+  ready = false;
+  assert.equal((localSession as { readonly ready?: boolean }).ready, false);
   h.doc.destroy();
 });
 
@@ -179,7 +181,6 @@ for (const ready of [false, true]) {
 
 test('runtime reads disconnect, reconnect sync, hydration and permission changes before dispatch', () => {
   let connectionStatus = 'connected';
-  let commandReady = false;
   let isReady = () => false;
   const h = sourceHookHarness(
     'src/collaboration/channel/diagram/use-diagram-collaboration-runtime.ts',
@@ -195,7 +196,7 @@ test('runtime reads disconnect, reconnect sync, hydration and permission changes
         useDiagramRuntimeBootstrap: () => ({
           collaborationBootstrap: {},
           previewEnabled: true,
-          sharedDocumentEngine: {},
+          sharedDocumentEngine: { exportSnapshot: () => new Uint8Array([0, 0]) },
           snapshotCodec: {},
           contentOnlySnapshotSeeder: {},
         }),
@@ -203,12 +204,8 @@ test('runtime reads disconnect, reconnect sync, hydration and permission changes
       'use-collaboration-session': { useCollaborationSession: () => ({ runtimeState: 'live' }) },
       'collaboration-preview-sync-status': { toPreviewSyncStatus: () => 'live' },
       'use-diagram-document-runtime': {
-        useDiagramDocumentRuntime: (params: {
-          isCommandReady: () => boolean;
-          commandReady: boolean;
-        }) => {
+        useDiagramDocumentRuntime: (params: { isCommandReady: () => boolean }) => {
           isReady = params.isCommandReady;
-          commandReady = params.commandReady;
           return {};
         },
       },
@@ -239,7 +236,6 @@ test('runtime reads disconnect, reconnect sync, hydration and permission changes
   lifecycle.updatePreviewMode(false);
   assert.equal(isReady(), true);
   render();
-  assert.equal(commandReady, true);
   connectionStatus = 'disconnected';
   assert.equal(isReady(), false, '리렌더 전에도 단절을 검사한다');
   connectionStatus = 'reconnecting';
@@ -251,5 +247,87 @@ test('runtime reads disconnect, reconnect sync, hydration and permission changes
   assert.equal(isReady(), true);
   render(false);
   assert.equal(isReady(), false);
-  assert.equal(commandReady, false);
 });
+
+for (const hasYdocSnapshot of [false, true]) {
+  test(`empty content, snapshot=${hasYdocSnapshot}: only first genuinely empty connection permits commands`, () => {
+    let connectionStatus = 'connected';
+    let isReady = () => false;
+    const engine = { exportSnapshot: () => new Uint8Array([0, 0]) };
+    const h = sourceHookHarness(
+      'src/collaboration/channel/diagram/use-diagram-collaboration-runtime.ts',
+      {
+        useCollaborationStore: {
+          __esModule: true,
+          default: Object.assign(() => connectionStatus, {
+            getState: () => ({ connectionStatus }),
+          }),
+        },
+        useCanvasStore: { __esModule: true, default: () => () => {} },
+        'diagram-document-mutation-session': { isDiagramDocumentReady },
+        'use-diagram-collaboration-store-bridge': {
+          useDiagramCollaborationStoreBridge: () => ({}),
+        },
+        'use-diagram-runtime-bootstrap': {
+          useDiagramRuntimeBootstrap: () => ({
+            collaborationBootstrap: { hasYdocSnapshot, content: null },
+            previewEnabled: false,
+            sharedDocumentEngine: engine,
+            snapshotCodec: {},
+            contentOnlySnapshotSeeder: {},
+          }),
+        },
+        'use-collaboration-session': { useCollaborationSession: () => ({ runtimeState: 'live' }) },
+        'collaboration-preview-sync-status': { toPreviewSyncStatus: () => 'live' },
+        'use-diagram-document-runtime': {
+          useDiagramDocumentRuntime: (params: { isCommandReady: () => boolean }) => {
+            isReady = params.isCommandReady;
+            return {};
+          },
+        },
+        'create-diagram-collaboration-provider-lifecycle': {
+          createDiagramCollaborationProviderLifecycle: (options: unknown) => options,
+        },
+      },
+    );
+    const hook = h.exports.useDiagramCollaborationRuntime as (...args: unknown[]) => {
+      createProviderLifecycle: (params: unknown) => {
+        onProviderReady: (provider: unknown) => void;
+        onConnectionStatusChange: (status: string) => void;
+        onSyncStateChange: (synced: boolean) => void;
+      };
+    };
+    const runtime = h.render(() => hook(undefined, undefined, 0, true));
+    const params = { diagramId: 'd', onProviderReady: () => {}, onProviderDisposed: () => {} };
+    // StrictMode처럼 연결 전에 폐기된 provider는 최초 빈 방 확인을 소모하지 않는다.
+    const abandoned = runtime.createProviderLifecycle(params);
+    abandoned.onProviderReady({});
+    const lifecycle = runtime.createProviderLifecycle(params);
+    lifecycle.onProviderReady({});
+    lifecycle.onConnectionStatusChange?.('connected');
+    assert.equal(isReady(), !hasYdocSnapshot);
+    let writes = 0;
+    const dispatch = () => {
+      if (isReady()) writes++;
+    };
+    if (hasYdocSnapshot) {
+      dispatch();
+      assert.equal(writes, 0);
+    }
+    connectionStatus = 'disconnected';
+    lifecycle.onConnectionStatusChange?.('disconnected');
+    connectionStatus = 'connected';
+    lifecycle.onConnectionStatusChange?.('connected');
+    dispatch();
+    assert.equal(writes, 0, '재연결에는 이전 빈 방 확인을 재사용하지 않는다');
+    lifecycle.onSyncStateChange(true);
+    dispatch();
+    assert.equal(writes, 1);
+    const replacement = runtime.createProviderLifecycle(params);
+    replacement.onProviderReady({});
+    replacement.onConnectionStatusChange?.('connected');
+    assert.equal(isReady(), false, 'provider 재생성도 초기 확인을 다시 기다린다');
+    lifecycle.onSyncStateChange(true);
+    assert.equal(isReady(), false, '폐기된 provider의 지연 이벤트도 무시한다');
+  });
+}

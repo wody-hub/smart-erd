@@ -733,7 +733,11 @@ export function createCanvasSyncActions(
     setHighlightedNodes: (ids) => set({ highlightedNodeIds: ids }),
     setHighlightedEdge: (id) => set({ highlightedEdgeId: id }),
     clearHighlights: () => set({ highlightedNodeIds: [], highlightedEdgeId: null }),
-    undo: () => {
+    undo: (isReady, notifyRejected) => {
+      if (!isReady()) {
+        notifyRejected();
+        return;
+      }
       const undoManager = get().internal.undoManager;
       if (!undoManager || undoManager.undoStack.length === 0) {
         return;
@@ -747,7 +751,11 @@ export function createCanvasSyncActions(
         canRedo: undoManager.redoStack.length > 0,
       });
     },
-    redo: () => {
+    redo: (isReady, notifyRejected) => {
+      if (!isReady()) {
+        notifyRejected();
+        return;
+      }
       const undoManager = get().internal.undoManager;
       if (!undoManager || undoManager.redoStack.length === 0) {
         return;

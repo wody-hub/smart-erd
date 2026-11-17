@@ -17,6 +17,8 @@ interface DiagramDocumentPersistenceSessionParams {
   projectId: string;
   diagramId: string;
   checkpointReader: DocumentCheckpointReader | null;
+  isReady: () => boolean;
+  getHydratedSnapshot: () => Uint8Array | null;
 }
 
 export type DiagramSnapshotPersistStatus = 'persisted' | 'stale' | 'missing-checkpoint';
@@ -40,8 +42,33 @@ export interface DiagramPublishedBackup {
 export class DiagramDocumentPersistenceSession {
   constructor(private readonly params: DiagramDocumentPersistenceSessionParams) {}
 
+  get ready(): boolean {
+    return this.params.isReady() && this.params.getHydratedSnapshot() != null;
+  }
+
   getLatestCheckpoint(): DocumentCheckpoint | null {
-    return this.params.checkpointReader?.getLatestCheckpoint() ?? null;
+    if (!this.ready) return null;
+    const checkpoint = this.params.checkpointReader?.getLatestCheckpoint() ?? null;
+    // 빈 Y.Doc도 2바이트로 인코딩되므로 길이 0 검사만으로는 빈 문서를 거를 수 없다.
+    // 수화된 문서를 그대로 저장하는 것은 멱등이므로 명시적 백업은 변경 여부를 요구하지 않는다.
+    if (!checkpoint || checkpoint.snapshot.length <= 2) {
+      return null;
+    }
+    return checkpoint;
+  }
+
+  /**
+   * 수화 이후 실제로 바뀐 체크포인트만 반환한다. pagehide/hidden/cleanup 같은 자동 저장 전용이다.
+   *
+   * @returns 수화 기준과 다른 체크포인트. 준비 전이거나 변경이 없으면 null
+   */
+  getChangedCheckpoint(): DocumentCheckpoint | null {
+    const checkpoint = this.getLatestCheckpoint();
+    const baseline = this.params.getHydratedSnapshot();
+    if (!checkpoint || !baseline || equalSnapshot(checkpoint.snapshot, baseline)) {
+      return null;
+    }
+    return checkpoint;
   }
 
   preparePublishedBackup(lastBackupHash?: string | null): DiagramPublishedBackup | null {
@@ -64,6 +91,10 @@ export class DiagramDocumentPersistenceSession {
   }
 
   async savePublishedBackup(backup: DiagramPublishedBackup): Promise<SaveDiagramResult> {
+    // mutation 예약 이후 연결/권한이 바뀌었으면 성공 처리하지 않는다.
+    if (!this.getLatestCheckpoint()) {
+      throw new Error('Diagram snapshot is not ready for persistence');
+    }
     return saveDiagram(
       this.params.teamId,
       this.params.projectId,
@@ -141,4 +172,8 @@ function decodeCompatibilityArtifact(checkpoint: DocumentCheckpoint): string | n
     return null;
   }
   return new TextDecoder().decode(checkpoint.compatibilityArtifact);
+}
+
+function equalSnapshot(left: Uint8Array, right: Uint8Array): boolean {
+  return left.length === right.length && left.every((byte, index) => byte === right[index]);
 }

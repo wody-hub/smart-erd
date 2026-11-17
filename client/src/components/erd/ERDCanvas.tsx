@@ -1,3 +1,6 @@
+import { useDocumentMutationSession } from '@/collaboration/core/session/document-mutation-session';
+import type { DiagramDocumentMutationSession } from '@/collaboration/channel/diagram/diagram-document-mutation-session';
+import { useDiagramRejectedCommandToast } from '@/collaboration/channel/diagram/use-diagram-command-feedback';
 import {
   lazy,
   memo,
@@ -269,6 +272,8 @@ function ERDCanvas({
   const setHighlightedEdge = useCanvasStore((s) => s.setHighlightedEdge);
   const setHighlightedNodes = useCanvasStore((s) => s.setHighlightedNodes);
   const clearHighlights = useCanvasStore((s) => s.clearHighlights);
+  const mutationSession = useDocumentMutationSession() as DiagramDocumentMutationSession | null;
+  const notifyRejectedCommand = useDiagramRejectedCommandToast();
   const undo = useCanvasStore((s) => s.undo);
   const redo = useCanvasStore((s) => s.redo);
   const canUndo = useCanvasStore((s) => s.canUndo);
@@ -1088,8 +1093,12 @@ function ERDCanvas({
                         onOpenDictionaryContext={onOpenDictionaryContext}
                         canUndo={effectiveCanEdit && canUndo}
                         canRedo={effectiveCanEdit && canRedo}
-                        onUndo={undo}
-                        onRedo={redo}
+                        onUndo={() =>
+                          undo(() => mutationSession?.ready ?? false, notifyRejectedCommand)
+                        }
+                        onRedo={() =>
+                          redo(() => mutationSession?.ready ?? false, notifyRejectedCommand)
+                        }
                         canEdit={effectiveCanEdit}
                         isExporting={
                           exportProgress.isExporting ||

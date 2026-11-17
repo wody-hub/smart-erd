@@ -1,3 +1,4 @@
+import { useDiagramRejectedCommandToast } from '@/collaboration/channel/diagram/use-diagram-command-feedback';
 import { lazy, Suspense, useCallback, useLayoutEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -59,15 +60,17 @@ const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPane
 const noop = () => {};
 
 function DiagramDictionaryReconciler({
+  canEdit,
   diagramId,
   isPreviewMode,
   previewSyncStatus,
 }: {
+  canEdit: boolean;
   diagramId: string;
   isPreviewMode: boolean;
   previewSyncStatus: PreviewSyncStatus;
 }) {
-  useDiagramDictionaryReconciliation({ diagramId, isPreviewMode, previewSyncStatus });
+  useDiagramDictionaryReconciliation({ canEdit, diagramId, isPreviewMode, previewSyncStatus });
   return null;
 }
 
@@ -319,6 +322,7 @@ export default function DiagramPage() {
       }
     />
   );
+  const notifyRejectedCommand = useDiagramRejectedCommandToast();
   /**
    * 현재 포커스가 캔버스 undo 단축키를 가로채면 안 되는 입력 필드인지 확인한다.
    *
@@ -347,10 +351,16 @@ export default function DiagramPage() {
         return;
       }
       event.preventDefault();
-      undo();
+      undo(() => documentMutationSession?.ready ?? false, notifyRejectedCommand);
     },
     { enabled: workModeRuntimeState.effectiveCanvasCanEdit && canUndo },
-    [workModeRuntimeState.effectiveCanvasCanEdit, canUndo, undo],
+    [
+      workModeRuntimeState.effectiveCanvasCanEdit,
+      canUndo,
+      undo,
+      documentMutationSession,
+      notifyRejectedCommand,
+    ],
   );
 
   useHotkeys(
@@ -360,10 +370,16 @@ export default function DiagramPage() {
         return;
       }
       event.preventDefault();
-      redo();
+      redo(() => documentMutationSession?.ready ?? false, notifyRejectedCommand);
     },
     { enabled: workModeRuntimeState.effectiveCanvasCanEdit && canRedo },
-    [workModeRuntimeState.effectiveCanvasCanEdit, canRedo, redo],
+    [
+      workModeRuntimeState.effectiveCanvasCanEdit,
+      canRedo,
+      redo,
+      documentMutationSession,
+      notifyRejectedCommand,
+    ],
   );
 
   if (isError) {
@@ -407,6 +423,7 @@ export default function DiagramPage() {
       <DocumentMutationSessionProvider value={documentMutationSession}>
         <ErdDictionaryProvider teamId={teamId!} setId={dictionaryContextSetId}>
           <DiagramDictionaryReconciler
+            canEdit={canEdit}
             diagramId={diagramId!}
             isPreviewMode={isPreviewMode}
             previewSyncStatus={previewSyncStatus}

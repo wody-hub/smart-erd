@@ -1,3 +1,5 @@
+import { useDocumentMutationSession } from '@/collaboration/core/session/document-mutation-session';
+import type { DiagramDocumentMutationSession } from '@/collaboration/channel/diagram/diagram-document-mutation-session';
 import { useEffect, useRef } from 'react';
 import type { PreviewSyncStatus } from '@/collaboration/core/collaboration-preview-sync-status';
 import { useDiagramDictionaryReconciliationActions } from '@/collaboration/channel/diagram/use-diagram-dictionary-reconciliation-actions';
@@ -8,6 +10,7 @@ import { probeBegin, probeEnd, probeMark } from '@/lib/erd-performance-probe';
 
 interface UseDiagramDictionaryReconciliationParams {
   diagramId: string;
+  canEdit: boolean;
   isPreviewMode: boolean;
   previewSyncStatus: PreviewSyncStatus;
 }
@@ -23,6 +26,7 @@ interface UseDiagramDictionaryReconciliationParams {
  */
 export function useDiagramDictionaryReconciliation({
   diagramId,
+  canEdit,
   isPreviewMode,
   previewSyncStatus,
 }: UseDiagramDictionaryReconciliationParams): void {
@@ -36,10 +40,14 @@ export function useDiagramDictionaryReconciliation({
   } = useErdDictionary();
   const diagramErdNodesSnapshot = useDiagramErdNodesSnapshot();
   const dictionaryReconciliationActions = useDiagramDictionaryReconciliationActions();
+  const session = useDocumentMutationSession() as DiagramDocumentMutationSession | null;
+  const commandReady = session?.ready ?? false;
   const appliedRevisionRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (
+      !canEdit ||
+      !session?.ready ||
       !setId ||
       !isDictionaryReady ||
       isPreviewMode ||
@@ -87,6 +95,9 @@ export function useDiagramDictionaryReconciliation({
       appliedRevisionRef.current = revisionKey;
     }
   }, [
+    canEdit,
+    commandReady,
+    session,
     dictionaryReconciliationActions,
     dictionaryRevision,
     diagramErdNodesSnapshot.currentNodes,

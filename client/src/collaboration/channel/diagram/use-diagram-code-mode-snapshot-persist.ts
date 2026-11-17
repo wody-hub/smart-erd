@@ -101,17 +101,12 @@ export function useDiagramCodeModeSnapshotPersist({
       beforeSnapshotPersistRef.current?.();
 
       const requestEpoch = codeModeSnapshotPersistEpochRef.current;
-      const checkpoint = diagramPersistenceSession.getLatestCheckpoint();
+      const checkpoint = diagramPersistenceSession.getChangedCheckpoint();
       if (!checkpoint) {
         return;
       }
       const nextSnapshot = checkpoint.snapshot;
-      if (nextSnapshot.length === 0) {
-        codeModeSnapshotPersistDirtyRef.current = false;
-        codeModeSnapshotKeepalivePendingRef.current = false;
-        if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
-          setCodeModeDraftPersistStatus('saved');
-        }
+      if (nextSnapshot.length <= 2) {
         return;
       }
 
@@ -127,7 +122,9 @@ export function useDiagramCodeModeSnapshotPersist({
         }
         codeModeSnapshotLastKeepaliveAtRef.current = keepaliveDecision.nextLastKeepaliveAt;
         codeModeSnapshotKeepalivePendingRef.current = keepaliveDecision.keepalivePending;
-        diagramPersistenceSession.persistSnapshotKeepalive(diagramContentRevision);
+        if (!diagramPersistenceSession.persistSnapshotKeepalive(diagramContentRevision)) {
+          return;
+        }
         if (requestEpoch === codeModeSnapshotPersistEpochRef.current) {
           setCodeModeDraftPersistStatus('saving');
           setCodeModeDraftPersistedAt(null);
@@ -237,6 +234,13 @@ export function useDiagramCodeModeSnapshotPersist({
     }
     void persistCodeModeSnapshotNow(true);
   }, [diagramPersistenceSession, persistCodeModeSnapshotNow, ydoc]);
+
+  const ready = diagramPersistenceSession?.ready ?? false;
+  useEffect(() => {
+    if (enabled && ready && codeModeSnapshotPersistDirtyRef.current) {
+      scheduleCodeModeSnapshotPersist();
+    }
+  }, [enabled, ready, scheduleCodeModeSnapshotPersist]);
 
   useEffect(() => {
     codeModeSnapshotPersistEnabledRef.current = enabled;

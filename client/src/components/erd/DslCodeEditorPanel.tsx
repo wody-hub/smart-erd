@@ -1,3 +1,5 @@
+import { useDocumentMutationSession } from '@/collaboration/core/session/document-mutation-session';
+import type { DiagramDocumentMutationSession } from '@/collaboration/channel/diagram/diagram-document-mutation-session';
 import { memo, startTransition, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -322,6 +324,17 @@ export default function DslCodeEditorPanel({
   const editorFlushChangeDisposableRef = useRef<Monaco.IDisposable | null>(null);
   /** 최신 편집 가능 여부 */
   const canEditRef = useRef(canEdit);
+  canEditRef.current = canEdit;
+  const mutationSession = useDocumentMutationSession() as DiagramDocumentMutationSession | null;
+  const mutationSessionRef = useRef(mutationSession);
+  mutationSessionRef.current = mutationSession;
+  // 예약된 콜백과 unmount flush도 실행 시점의 세션 상태를 확인한다.
+  const isCodeEditable = useCallback(
+    () =>
+      canEditRef.current &&
+      (mutationSessionRef.current ? mutationSessionRef.current.ready : !persistDraft),
+    [persistDraft],
+  );
   /** Monaco mount 완료 여부 */
   const [monacoReady, setMonacoReady] = useState(false);
   /** code 모드 최종 저장 시 apply 선행 필요 여부 */
@@ -789,7 +802,7 @@ export default function DslCodeEditorPanel({
   ]);
 
   const flushSharedSchemaDraftImmediately = useCallback(() => {
-    if (!persistDraft || !draftHydrated || !ydoc) {
+    if (!persistDraft || !draftHydrated || !ydoc || !isCodeEditable()) {
       return;
     }
 
@@ -811,6 +824,7 @@ export default function DslCodeEditorPanel({
     onScheduleCodeModeSnapshotPersist?.();
   }, [
     buildCurrentSharedSchemaDraftSnapshot,
+    isCodeEditable,
     draftHydrated,
     onScheduleCodeModeSnapshotPersist,
     persistDraft,
@@ -861,7 +875,7 @@ export default function DslCodeEditorPanel({
     nextBaselineRevision: string | null,
     appliedSchemaHash: string | null,
   ): void {
-    if (!ydoc) {
+    if (!ydoc || !isCodeEditable()) {
       return;
     }
 
@@ -1022,7 +1036,7 @@ export default function DslCodeEditorPanel({
         if (!event.isFlush) {
           return;
         }
-        if (!canEditRef.current) {
+        if (!isCodeEditable()) {
           return;
         }
 
@@ -1040,7 +1054,7 @@ export default function DslCodeEditorPanel({
         handleUserCodeChangeRef.current(nextValue);
       });
     },
-    [],
+    [isCodeEditable],
   );
 
   /**
@@ -1746,7 +1760,13 @@ export default function DslCodeEditorPanel({
   }, [persistDraft, ydoc]);
 
   useEffect(() => {
-    if (!persistDraft || !ydoc || !hasDictionary || !codeModeSharedDraftBootstrap) {
+    if (
+      !persistDraft ||
+      !ydoc ||
+      !hasDictionary ||
+      !codeModeSharedDraftBootstrap ||
+      !isCodeEditable()
+    ) {
       return;
     }
 
@@ -1769,7 +1789,16 @@ export default function DslCodeEditorPanel({
 
     writeSharedSchemaDraftSnapshot(ydoc, migratedSnapshot, SHARED_SCHEMA_DRAFT_ORIGIN);
     clearCodeModeSharedDraft(ydoc, SHARED_SCHEMA_DRAFT_ORIGIN);
-  }, [codeModeSharedDraftBootstrap, dictionary, hasDictionary, persistDraft, ydoc]);
+  }, [
+    codeModeSharedDraftBootstrap,
+    dictionary,
+    hasDictionary,
+    isCodeEditable,
+    mutationSession,
+    canEdit,
+    persistDraft,
+    ydoc,
+  ]);
 
   useEffect(() => {
     if (
@@ -1907,7 +1936,7 @@ export default function DslCodeEditorPanel({
       isIntentionalBlank: currentText.trim().length === 0,
       isConfirmedBlank: currentText.trim().length === 0 && confirmedBlankDraftRef.current,
     };
-    if (persistDraft && ydoc) {
+    if (persistDraft && ydoc && isCodeEditable()) {
       writeCodeModeSharedDraftTextSnapshot(
         ydoc,
         currentText,
@@ -1923,6 +1952,7 @@ export default function DslCodeEditorPanel({
     draftHydrated,
     flushSharedSchemaDraftImmediately,
     hasPendingDraftChanges,
+    isCodeEditable,
     persistDraft,
     persistDraftRecordImmediately,
     previewPositionOverrides,
@@ -2147,7 +2177,7 @@ export default function DslCodeEditorPanel({
    */
   const guardedOnChange = useCallback(
     (value: string | undefined) => {
-      if (shouldIgnoreChange(value)) {
+      if (!isCodeEditable() || shouldIgnoreChange(value)) {
         return;
       }
       markLocalEditStarted();
@@ -2155,7 +2185,13 @@ export default function DslCodeEditorPanel({
       markFinalizationDirty();
       handleUserCodeChange(value);
     },
-    [handleUserCodeChange, markFinalizationDirty, markLocalEditStarted, shouldIgnoreChange],
+    [
+      handleUserCodeChange,
+      isCodeEditable,
+      markFinalizationDirty,
+      markLocalEditStarted,
+      shouldIgnoreChange,
+    ],
   );
 
   /**
@@ -2346,6 +2382,7 @@ export default function DslCodeEditorPanel({
           beforeMount={handleBeforeMount}
           onMount={handleOnMount}
           options={{
+            readOnly: !canEdit,
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
             fontSize: 13,

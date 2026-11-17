@@ -110,8 +110,8 @@ export interface CanvasState {
   setHighlightedNodes: (ids: string[]) => void;
   setHighlightedEdge: (id: string | null) => void;
   clearHighlights: () => void;
-  undo: () => void;
-  redo: () => void;
+  undo: (isReady: () => boolean, notifyRejected: () => void) => void;
+  redo: (isReady: () => boolean, notifyRejected: () => void) => void;
   stopHistoryCapture: () => void;
   removeEdge: (edgeId: string) => void;
   removeEdgeWithFkColumn: (edgeId: string) => void;

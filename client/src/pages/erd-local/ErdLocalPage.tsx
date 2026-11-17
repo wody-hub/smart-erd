@@ -79,7 +79,6 @@ export default function ErdLocalPage() {
     storeBridge,
     plugin,
     isCommandReady: () => useCanvasStore.getState().ydoc === ydoc && ydoc !== null,
-    commandReady: ydoc !== null,
   });
 
   /** 파일 열기 버튼 클릭 시 숨겨진 입력을 연다. */

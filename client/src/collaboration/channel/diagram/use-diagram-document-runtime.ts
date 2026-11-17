@@ -31,7 +31,6 @@ interface UseDiagramDocumentRuntimeParams {
   storeBridge: DiagramCollaborationStoreBridge;
   plugin?: RegisteredDocumentPlugin;
   isCommandReady: () => boolean;
-  commandReady: boolean;
 }
 
 interface UseDiagramDocumentRuntimeResult {
@@ -48,7 +47,6 @@ export function useDiagramDocumentRuntime({
   storeBridge,
   plugin: localPlugin,
   isCommandReady,
-  commandReady,
 }: UseDiagramDocumentRuntimeParams): UseDiagramDocumentRuntimeResult {
   const engineRef = useRef(sharedDocumentEngine);
   engineRef.current = sharedDocumentEngine;
@@ -136,13 +134,12 @@ export function useDiagramDocumentRuntime({
       () => engineRef.current === sharedDocumentEngine && readyRef.current(),
       () => storeBridge.refreshPersistedCanvasFromYDoc({ forceFull: true }),
     );
-    return { ...session, ready: commandReady };
+    return session;
   }, [
     documentInputAdapters,
     documentMutationPolicy,
     documentStore,
     storeBridge,
-    commandReady,
     sharedDocumentEngine,
   ]);
   const documentPersistenceCoordinator = useMemo(() => {
