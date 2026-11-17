@@ -51,3 +51,50 @@ test('preview가 없는 빈 문서도 초기화 지연 배너 상태를 노출�
   assert.equal(toPreviewSyncStatus('degraded', false), 'degraded');
   assert.equal(toPreviewSyncStatus('live', false), 'inactive');
 });
+
+test('a stalled hydration banner invokes retry while the projection stays waiting', async () => {
+  const { sourceHookHarness } = await import('../helpers/source-hook-harness.js');
+  const { DiagramCodeProjectionState } =
+    await import('../../src/collaboration/channel/diagram/diagram-code-projection-state.js');
+  const state = new DiagramCodeProjectionState();
+  let retries = 0;
+  const harness = sourceHookHarness('src/components/erd/DiagramSyncStatusBanner.tsx', {
+    'react-i18next': { useTranslation: () => ({ t: (key: string) => key }) },
+  });
+  const banner = harness.exports.default as (props: unknown) => import('react').ReactElement;
+  /** JSX에서 재시도 버튼의 실제 콜백을 찾는다. */
+  function retryButton(node: import('react').ReactNode): (() => void) | undefined {
+    if (!node || typeof node !== 'object' || !('props' in node)) return;
+    const props = node.props as {
+      onClick?: () => void;
+      'aria-label'?: string;
+      children?: import('react').ReactNode;
+    };
+    if (props['aria-label'] === 'diagram.previewSync.retrySnapshot') return props.onClick;
+    const children = Array.isArray(props.children) ? props.children : [props.children];
+    return children.map(retryButton).find(Boolean);
+  }
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const tree = harness.render(() =>
+        banner({
+          connectionStatus: 'connected',
+          previewSyncStatus: 'degraded',
+          onRetry: () => {
+            retries++;
+            state.refreshReadiness();
+          },
+        }),
+      );
+      const retry = retryButton(tree);
+      assert.equal(typeof retry, 'function');
+      retry!();
+      assert.equal(state.getSnapshot().status, 'hydrating');
+      assert.equal(state.getSnapshot().text, '');
+    }
+    assert.equal(retries, 3);
+  } finally {
+    harness.cleanup();
+    state.disconnect();
+  }
+});

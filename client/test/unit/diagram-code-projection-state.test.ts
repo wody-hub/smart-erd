@@ -244,3 +244,116 @@ test('shared draft notices include legacy root text and never change either draf
   state.disconnect();
   h.dispose();
 });
+
+test('repeated mounts release document, snapshot and patch subscribers including queued work', async () => {
+  const h = harness();
+  h.ready(true);
+  h.tables.set('a', createTableYMap('initial', { x: 0, y: 0 }, []));
+  let active = 0;
+  const source = {
+    ...h.source,
+    read: {
+      execute: h.source.read.execute.bind(h.source.read),
+      getRevision: () => h.source.read.getRevision(),
+      subscribe: (listener: Parameters<typeof h.source.read.subscribe>[0]) => {
+        active++;
+        const off = h.source.read.subscribe(listener);
+        return () => {
+          active--;
+          off();
+        };
+      },
+    },
+  };
+  try {
+    for (let mount = 0; mount < 20; mount++) {
+      const state = new DiagramCodeProjectionState();
+      let renders = 0;
+      let patches = 0;
+      const offRender = state.subscribe(() => renders++);
+      const offPatch = state.subscribePatches(() => patches++);
+      state.connect(true, source, dictionary);
+      assert.equal(active, 1);
+      assert.match(state.getSnapshot().text, mount ? /after-disconnect/ : /initial/);
+      h.tables.get('a')!.set('label', `queued-${mount}`);
+      offRender();
+      offPatch();
+      offRender();
+      offPatch();
+      const notifications = { renders, patches };
+      await Promise.resolve();
+      assert.match(state.getSnapshot().text, new RegExp(`queued-${mount}`));
+      assert.equal(renders, notifications.renders);
+      assert.equal(patches, notifications.patches);
+      h.tables.get('a')!.set('label', 'pending-unmount');
+      const before = { renders, patches, snapshot: state.getSnapshot() };
+      state.disconnect();
+      state.disconnect();
+      assert.equal(active, 0);
+      await Promise.resolve();
+      h.tables.get('a')!.set('label', 'after-disconnect');
+      await Promise.resolve();
+      assert.equal(renders, before.renders);
+      assert.equal(patches, before.patches);
+      assert.equal(state.getSnapshot(), before.snapshot);
+    }
+  } finally {
+    h.dispose();
+  }
+});
+
+test('two mounted projections subscribe independently and one can unmount while the other follows', async () => {
+  const h = harness();
+  h.ready(true);
+  const left = new DiagramCodeProjectionState();
+  const right = new DiagramCodeProjectionState();
+  try {
+    left.connect(true, h.source, dictionary);
+    right.connect(true, h.source, dictionary);
+    assert.notEqual(left.getSnapshot(), right.getSnapshot());
+    left.disconnect();
+    const stopped = left.getSnapshot();
+    h.tables.set('a', createTableYMap('still-following', { x: 0, y: 0 }, []));
+    await Promise.resolve();
+    assert.equal(left.getSnapshot(), stopped);
+    assert.match(right.getSnapshot().text, /still-following/);
+  } finally {
+    left.disconnect();
+    right.disconnect();
+    h.dispose();
+  }
+});
+
+test('never hydrated generations stay waiting through retries and dictionary changes without reading or writing', async () => {
+  const h = harness();
+  let reads = 0;
+  let updates = 0;
+  h.doc.on('update', () => updates++);
+  const source = {
+    ...h.source,
+    getDocument: () => {
+      reads++;
+      return h.doc;
+    },
+  };
+  const state = new DiagramCodeProjectionState();
+  try {
+    state.connect(true, source, dictionary);
+    const waiting = state.getSnapshot();
+    for (let retry = 0; retry < 10; retry++) {
+      h.ready(false);
+      state.refreshReadiness();
+      state.setDictionary({ ...dictionary, version: retry + 2 });
+      await Promise.resolve();
+      assert.equal(state.getSnapshot(), waiting);
+      assert.equal(state.getSnapshot().status, 'hydrating');
+      assert.equal(state.getSnapshot().text, '');
+      assert.equal(state.getSnapshot().revision, 0);
+    }
+    assert.equal(reads, 0);
+    assert.equal(updates, 0);
+  } finally {
+    state.disconnect();
+    h.dispose();
+  }
+});

@@ -107,7 +107,9 @@ function resolveEndpointConfig(
 ): { url: string; host: string; port: number } {
   const parsedUrl = parseRequiredUrl(url, urlEnvName);
   const explicitUrlPort = parsedUrl.port ? parsePositiveInt(parsedUrl.port, fallbackPort) : null;
-  const configuredPort = portEnvValue ? parsePositiveInt(portEnvValue, fallbackPort) : explicitUrlPort ?? fallbackPort;
+  const configuredPort = portEnvValue
+    ? parsePositiveInt(portEnvValue, fallbackPort)
+    : (explicitUrlPort ?? fallbackPort);
   if (explicitUrlPort !== null && configuredPort !== explicitUrlPort) {
     throw new Error(
       `Conflicting E2E endpoint configuration: ${urlEnvName}=${url} but ${portEnvName}=${configuredPort}`,
@@ -419,6 +421,32 @@ export async function provisionCollaborationFixture(
   };
 }
 
+/**
+ * 별도 계정을 만들고 기존 팀에 지정한 역할로 초대한다.
+ * @param config 테스트 API 설정
+ * @param ownerToken 팀 소유자 토큰
+ * @param teamId 초대할 팀 ID
+ * @param role 초대할 역할
+ * @returns UI 로그인에 사용할 별도 계정
+ */
+export async function provisionTeamMember(
+  config: E2EConfig,
+  ownerToken: string,
+  teamId: number,
+  role: 'MEMBER' | 'VIEWER',
+): Promise<{ loginId: string; password: string }> {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const loginId = `e2e-${role.toLowerCase()}-${suffix}@example.com`;
+  const password = `E2E-${suffix}`;
+  await postJson(`${config.apiBaseUrl}/auth/signup`, {
+    loginId,
+    password,
+    name: `E2E ${role} ${suffix}`,
+  });
+  await postJson(`${config.apiBaseUrl}/teams/${teamId}/members`, { loginId, role }, ownerToken);
+  return { loginId, password };
+}
+
 export async function loginViaUi(page: Page, config: E2EConfig): Promise<string> {
   await waitForPortState(config.frontendPort, true, 5_000, config.frontendHost).catch((error) => {
     throw new Error(
@@ -703,9 +731,11 @@ export async function clickBackupAndWaitForPersistedDiagramSave(
   const responsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === 'PUT' &&
-      response.url().includes(
-        `/teams/${target.teamId}/projects/${target.projectId}/diagrams/${target.diagramId}`,
-      ) &&
+      response
+        .url()
+        .includes(
+          `/teams/${target.teamId}/projects/${target.projectId}/diagrams/${target.diagramId}`,
+        ) &&
       response.status() >= 200 &&
       response.status() < 300,
     { timeout: timeoutMs },
