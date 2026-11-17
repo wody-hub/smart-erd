@@ -17,7 +17,10 @@ import {
   initializeLiveProjectionModel,
 } from '@/lib/dsl-live-projection-model';
 import { DSL_LANGUAGE_ID, registerDslLanguage } from '@/lib/monaco-dsl-language';
-import { probeProjectionPatchApplied } from '@/lib/erd-performance-probe';
+import {
+  probeExposeProjectionEditor,
+  probeProjectionPatchApplied,
+} from '@/lib/erd-performance-probe';
 
 /** 읽기 전용 라이브 DSL 패널 입력. */
 interface DslLiveProjectionPanelProps {
@@ -75,6 +78,7 @@ export default function DslLiveProjectionPanel({
     if (!model) return;
     let current = projection.getSnapshot();
     initializeLiveProjectionModel(model, current.text);
+    probeExposeProjectionEditor(codeEditor);
     decorationsRef.current = codeEditor.createDecorationsCollection(
       buildLiveProjectionDecorations(current.blocks),
     );

@@ -58,3 +58,16 @@ Astra 분석(근거: `ERDCanvas.tsx`의 인라인 콜백/옵션, `yTableYMapToNo
 - C4(부하 중 늦은 합류) S500: 합류 전에 일어난 편집은 합류 클라이언트가 관찰할 수 없어 "전파 시간 초과"가 기록된다(변경 전 빌드에서도 동일).
 - S500 C4를 변경 후 빌드로 11회 반복했을 때 1회, 합류 클라이언트가 최종값 대신 시드 값을 보여 `final-diverged`로 기록됐다(변경 전 빌드 5회에서는 0회). 표본이 적어 원인은 확정하지 못했다. 재발 여부와 원인(합류 클라이언트의 동기화 지연 vs 실제 누락) 확인이 필요하다.
 - smoke E2E: 변경 전후 동일하게 9건 실패(사전 존재, 작업모드/코드모드 UI·사전 다이얼로그·markdown 3계정)와 `diagram-loading`(환경변수 필요). 프로덕션 빌드 preview에서는 screen-spec 2건이 추가로 실패하나 변경 전 프로덕션 빌드에서도 동일하다(개발 서버에서는 통과).
+
+## S3 읽기 전용 DSL 투영 패널 (internal 플래그) - production 빌드 측정 (2026-11-17)
+
+도구: `node scripts/perf/erd-unified-projection-bench.mjs --sizes 200,500 --iterations 60` (번들은 `VITE_ERD_PERF_PROBE=true VITE_ERD_UNIFIED_EDIT_MODE=internal VITE_ERD_UNIFIED_EDIT_DIAGRAM_IDS=all`로 빌드해 `vite preview` 4502). 소유자가 컬럼 이름을 바꾸고 동료 패널에 반영될 때까지를 잰다. 같은 머신의 헤드리스 Chromium 2개 + 백엔드라 상대 비교용이다. 결과 원본: `erd-unified-projection-prod.json`.
+
+| 규모 | 문서 텍스트 | 이벤트 수신→Monaco 적용 완료 p50/p95/max (ms) | 소유자 입력→동료 패널 반영 p50/p95/max (ms) | 누락 | 동료 longtask |
+| ---- | ----------: | --------------------------------------------- | ------------------------------------------- | ---: | ------------: |
+| S200 |    50,714자 | 10.7 / 12.8 / 17.3                            | 17.1 / 188 / 355                            | 0/60 |             0 |
+| S500 |   124,826자 | 23.3 / 28.2 / 30.5                            | 40 / 972 / 1,217                            | 0/60 |             0 |
+
+- 목표 대비: S200 이벤트→Monaco p95 12.8ms (목표 16ms 이하 충족), S500 28.2ms (추가 목표 32ms 이하 충족). 포트 내부 계산(1~3ms)보다 큰 이유는 Monaco `applyEdits`, decoration 갱신, 선택·viewport 복원 비용이 포함되기 때문이다.
+- "소유자 입력→패널" 꼬리(S500 p95 약 1초)는 투영이 아니라 소유자→서버→동료 전파 구간이며 협업 하네스 S500 피어 p95(약 970ms)와 같은 수준이다. 투영 자체 비용은 위 표의 이벤트→Monaco 열이다.
+- 한계: 단일 컬럼 rename만 측정. FK 추가/부모 rename fanout/사전 전체 변경/초기 하이드레이션 비용, 픽셀 단위 viewport 오차는 미측정.

@@ -47,6 +47,7 @@ interface ProbeWindow extends Window {
   __ERD_PERF_ROUTE_DETOUR_OFF__?: boolean;
   __ERD_PERF_RUN_ID__?: string;
   __ERD_PERF_SNAPSHOT__?: () => ProbeSnapshot;
+  __ERD_PROJECTION_EDITOR__?: unknown;
 }
 
 const probeWindow = (typeof window === 'undefined' ? {} : window) as ProbeWindow;
@@ -373,4 +374,15 @@ export function probeProjectionPatchApplied(
   probeCounter('projection-patch-applied', 1, durationMs);
   probeCounter('projection-deleted-target-relocations', relocatedTargets);
   emit('projection-patch-applied', { durationMs, revision, relocatedTargets });
+}
+
+/**
+ * 투영 패널의 Monaco 에디터 인스턴스를 벤치 하네스가 읽을 수 있도록 노출한다.
+ * production 번들은 전역 `monaco`를 두지 않으므로 기존 probe 이중 플래그가 켜진 경우에만 사용한다.
+ * @param editorInstance 읽기 전용 투영 에디터
+ * @returns 없음
+ */
+export function probeExposeProjectionEditor(editorInstance: unknown): void {
+  if (!enabled) return;
+  probeWindow.__ERD_PROJECTION_EDITOR__ = editorInstance;
 }
