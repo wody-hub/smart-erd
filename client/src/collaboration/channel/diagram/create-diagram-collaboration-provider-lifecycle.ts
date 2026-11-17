@@ -21,6 +21,7 @@ export interface CreateDiagramCollaborationProviderLifecycleOptions extends Diag
   storeBridge: DiagramCollaborationStoreBridge;
   onProviderReady: (provider: YjsProvider) => void;
   onProviderDisposed: () => void;
+  onSyncStateChange?: (synced: boolean) => void;
 }
 
 interface CreateDiagramCollaborationProviderLifecycleDependencies {
@@ -58,7 +59,10 @@ export function createDiagramCollaborationProviderLifecycle(
   const providerBinding = new DiagramCollaborationProviderBinding(
     providerEvents.createBindingCallbacks(
       (wsConnectedAt) => previewHydrationController.onConnected(wsConnectedAt),
-      (synced) => previewHydrationController.onSyncStateChange(synced),
+      (synced) => {
+        previewHydrationController.onSyncStateChange(synced);
+        options.onSyncStateChange?.(synced);
+      },
     ),
   );
   const providerConnection = new DiagramCollaborationProviderConnection<

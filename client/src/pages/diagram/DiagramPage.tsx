@@ -184,6 +184,7 @@ export default function DiagramPage() {
     projectId,
     diagramId,
     enableCodeModeDraftPersist: workModeCapabilities.persistCodeDraft,
+    canEdit,
   });
 
   useLayoutEffect(() => {
@@ -249,6 +250,7 @@ export default function DiagramPage() {
       clearHighlights();
     },
     canEdit,
+    documentCommandReady: documentMutationSession?.ready ?? false,
     collaborationSetupErrorKind,
     diagram,
     diagramId,

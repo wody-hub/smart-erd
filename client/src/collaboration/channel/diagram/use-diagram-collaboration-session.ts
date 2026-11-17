@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { YjsProvider } from '@/collaboration/YjsProvider';
-import type { DocumentMutationSession } from '@/collaboration/core/session/document-mutation-session';
+import type { DiagramDocumentMutationSession as DocumentMutationSession } from './diagram-document-mutation-session';
 import type { PreviewSyncStatus } from '@/collaboration/core/collaboration-preview-sync-status';
 import { useSnapshotCompaction } from '@/hooks/useSnapshotCompaction';
 import type { DiagramDetail } from '@/types/diagram';
@@ -28,6 +28,7 @@ export function useDiagramCollaborationSession(
   diagramId: string | undefined,
   teamId: string | undefined,
   projectId: string | undefined,
+  canEdit: boolean,
   beforeDestroyYDoc?: (() => void) | null,
 ): UseDiagramCollaborationSessionReturn {
   const [setupAttempt, setSetupAttempt] = useState(0);
@@ -47,7 +48,7 @@ export function useDiagramCollaborationSession(
     snapshotCodec,
     documentMutationSession,
     documentCheckpointReader,
-  } = useDiagramCollaborationRuntime(diagram, documentBootstrap, setupAttempt);
+  } = useDiagramCollaborationRuntime(diagram, documentBootstrap, setupAttempt, canEdit);
   const { providerRef, isPreviewMode, setupErrorKind } = useDiagramCollaborationProvider({
     collaborationBootstrap,
     sharedDocumentEngine,

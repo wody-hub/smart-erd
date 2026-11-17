@@ -16,7 +16,7 @@ interface DiagramSidebarTableItemProps {
   /** 테이블 클릭 시 캔버스 포커스 핸들러 */
   onClick: (nodeId: string) => void;
   /** 이름 변경 핸들러 */
-  onRename: (nodeId: string, newName: string) => void;
+  onRename: (nodeId: string, newName: string) => 'applied' | 'rejected' | void;
   /** 삭제 핸들러 */
   onDelete: (nodeId: string) => void;
   /** 편집 가능 여부 (VIEWER일 때 false — 이름변경/삭제 버튼 숨김) */

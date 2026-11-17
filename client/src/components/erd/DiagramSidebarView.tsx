@@ -45,7 +45,7 @@ interface DiagramSidebarViewProps {
   /** 테이블 포커스 핸들러 */
   onFocusTable: (tableId: string) => void;
   /** 테이블 이름 변경 핸들러 */
-  onRenameTable: (tableId: string, newName: string) => void;
+  onRenameTable: (tableId: string, newName: string) => 'applied' | 'rejected' | void;
   /** 테이블 삭제 핸들러 */
   onDeleteTable: (tableId: string) => void;
   /** 그룹 뷰 진입 핸들러 */
@@ -53,7 +53,7 @@ interface DiagramSidebarViewProps {
   /** 전체 보기 복귀 핸들러 */
   onBackToAll?: () => void;
   /** 그룹 이름 변경 핸들러 */
-  onRenameGroup: (groupId: string, newName: string) => void;
+  onRenameGroup: (groupId: string, newName: string) => 'applied' | 'rejected' | void;
   /** 그룹 삭제 핸들러 */
   onDeleteGroup: (groupId: string) => void;
   /** 그룹에서 테이블 제거 핸들러 */

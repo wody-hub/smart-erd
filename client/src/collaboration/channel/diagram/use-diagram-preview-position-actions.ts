@@ -13,6 +13,7 @@ export interface DiagramPreviewPositionActions {
   syncMatchedPreviewNodePosition: (
     previewNode: DslPreviewNode,
     persistedNodes: readonly TableNode[],
+    previewNodes: readonly DslPreviewNode[],
   ) => boolean;
   syncPreviewPositionOverridesToPersisted: (
     previewNodes: readonly DslPreviewNode[],
@@ -27,9 +28,9 @@ export function useDiagramPreviewPositionActions(): DiagramPreviewPositionAction
 
   return useMemo(
     () => ({
-      syncMatchedPreviewNodePosition: (previewNode, persistedNodes) => {
+      syncMatchedPreviewNodePosition: (previewNode, persistedNodes, previewNodes) => {
         const result = commitPreviewPositionOverrides(
-          [previewNode],
+          previewNodes,
           { [previewNode.id]: previewNode.position },
           persistedNodes,
           erdDocumentActions,

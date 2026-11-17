@@ -95,9 +95,12 @@ interface TableNodeEditableRowsProps {
   onDomainPopoverOpenChange: (open: boolean, colId: string) => void;
   onUpdateColumn: (colId: string, updates: Partial<Column>) => void;
   onDeleteColumn: (colId: string) => void;
-  onLogicalNameChange: (colId: string, value: string) => void;
-  onSelectTerm: (colId: string, result: TermSelectResult) => void;
-  onSelectDerived: (colId: string, resolution: LogicalNameResolution) => void;
+  onLogicalNameChange: (colId: string, value: string) => 'applied' | 'rejected' | void;
+  onSelectTerm: (colId: string, result: TermSelectResult) => 'applied' | 'rejected' | void;
+  onSelectDerived: (
+    colId: string,
+    resolution: LogicalNameResolution,
+  ) => 'applied' | 'rejected' | void;
   onRegisterNew: (colId: string, logicalName: string) => void;
   onDomainChange: (colId: string, domainId: number | null, physicalType?: string) => void;
   /** ERD 카드 변형 (`ie`이면 PK 블록을 구분해 표시) */

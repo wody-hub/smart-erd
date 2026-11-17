@@ -35,11 +35,11 @@ interface ColumnAutocompleteProps {
   /** 현재 논리명 값 */
   value: string;
   /** 논리명 변경 핸들러 */
-  onChange: (value: string) => void;
+  onChange: (value: string) => 'applied' | 'rejected' | void;
   /** Term 선택 핸들러 */
-  onSelectTerm: (result: TermSelectResult) => void;
+  onSelectTerm: (result: TermSelectResult) => 'applied' | 'rejected' | void;
   /** 단어사전 기반 해석 결과 적용 핸들러 */
-  onSelectDerived: (resolution: LogicalNameResolution) => void;
+  onSelectDerived: (resolution: LogicalNameResolution) => 'applied' | 'rejected' | void;
   /** 신규 등록 흐름 진입 핸들러 */
   onRegisterNew: (logicalName: string) => void;
   /** 비활성 상태 */
@@ -80,6 +80,8 @@ export default function ColumnAutocomplete({
   /** debounce 타이머 */
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
+  const documentValueRef = useRef(value);
+  documentValueRef.current = value;
 
   useEffect(() => {
     if (!composingRef.current) {
@@ -126,6 +128,15 @@ export default function ColumnAutocomplete({
     }
   }, [value]);
 
+  /** 거절된 입력은 문서에서 받은 값으로 되돌린다. */
+  const applyValue = (next: string) => {
+    if (onChange(next) === 'rejected') {
+      setLocalValue(documentValueRef.current);
+      return false;
+    }
+    return true;
+  };
+
   const flushToStore = () => {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -133,7 +144,7 @@ export default function ColumnAutocomplete({
         return;
       }
       const latest = inputRef.current.value;
-      onChange(latest);
+      if (!applyValue(latest)) return;
       if (latest.trim().length >= 1) {
         setOpen(true);
       }
@@ -146,7 +157,7 @@ export default function ColumnAutocomplete({
 
     if (!newValue.trim()) {
       clearTimeout(debounceRef.current);
-      onChange(newValue);
+      applyValue(newValue);
       return;
     }
 
@@ -167,7 +178,7 @@ export default function ColumnAutocomplete({
   const handleBlur = () => {
     clearTimeout(debounceRef.current);
     if (inputRef.current && inputRef.current.value !== value) {
-      onChange(inputRef.current.value);
+      applyValue(inputRef.current.value);
     }
   };
 
@@ -178,22 +189,23 @@ export default function ColumnAutocomplete({
     }
 
     const termWithType = getTermWithType(term);
-    onSelectTerm({
+    const status = onSelectTerm({
       logicalName: term.logicalName,
       name: term.physicalName,
       type: termWithType.physicalType,
       termId: term.id,
       domainId: term.domainId ?? undefined,
     });
-    setOpen(false);
+    if (status !== 'rejected') setOpen(false);
+    else setLocalValue(documentValueRef.current);
   };
 
   const handleSelectDerived = () => {
     if (!derivedResolution) {
       return;
     }
-    onSelectDerived(derivedResolution);
-    setOpen(false);
+    if (onSelectDerived(derivedResolution) !== 'rejected') setOpen(false);
+    else setLocalValue(documentValueRef.current);
   };
 
   const handleRegisterNew = () => {

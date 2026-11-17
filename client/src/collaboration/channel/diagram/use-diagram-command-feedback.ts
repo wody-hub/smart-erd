@@ -10,6 +10,7 @@ export function useDiagramRejectedCommandToast(): () => void {
       t('diagram.toast.commandRejected', {
         defaultValue: '변경을 적용하지 못했습니다. 최신 상태를 확인한 뒤 다시 시도해 주세요.',
       }),
+      { id: 'diagram-command-rejected' },
     );
   }, [t]);
 }

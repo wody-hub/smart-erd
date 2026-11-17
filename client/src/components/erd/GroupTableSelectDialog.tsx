@@ -83,7 +83,7 @@ export default function GroupTableSelectDialog({
     const toRemove = snapshotIds.filter((tableId) => !selected.has(tableId));
 
     if (groupId && (toAdd.length > 0 || toRemove.length > 0)) {
-      crudActions.updateGroupTables(groupId, toAdd, toRemove);
+      if (crudActions.updateGroupTables(groupId, toAdd, toRemove) !== 'applied') return;
     }
     onOpenChange(false);
   };

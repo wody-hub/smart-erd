@@ -6,7 +6,7 @@ import { useState } from 'react';
  * @param onConfirm 편집 확정 시 호출되는 콜백 (트리밍된 값 전달)
  * @returns 편집 상태와 제어 함수들 (editing, value, setValue, startEdit, confirmEdit, cancelEdit)
  */
-export function useInlineEdit(onConfirm: (value: string) => void) {
+export function useInlineEdit(onConfirm: (value: string) => 'applied' | 'rejected' | void) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
 
@@ -17,7 +17,7 @@ export function useInlineEdit(onConfirm: (value: string) => void) {
 
   const confirmEdit = () => {
     const trimmed = value.trim();
-    if (trimmed) onConfirm(trimmed);
+    if (trimmed && onConfirm(trimmed) === 'rejected') return;
     setEditing(false);
   };
 

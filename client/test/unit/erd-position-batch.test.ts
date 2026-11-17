@@ -262,3 +262,33 @@ test('plugin adapters, scope policy and document events include every target and
   unsubscribe();
   store.dispose();
 });
+
+for (const format of ['object', 'ymap', 'scalar']) {
+  test(`position batch reads ${format} coordinates and writes scalar coordinates`, () => {
+    const { doc, tables, applier } = harness();
+    const table = tables.get('a')!;
+    if (format !== 'scalar') {
+      table.delete('positionX');
+      table.delete('positionY');
+      table.set(
+        'position',
+        format === 'ymap' ? new Y.Map(Object.entries({ x: 0, y: 0 })) : { x: 0, y: 0 },
+      );
+    }
+    const edge = createEdgeYMap(
+      'a',
+      'b',
+      'a-id-source',
+      'b-id-target',
+      'non-identifying',
+      'straight',
+    );
+    getEdgesMap(doc).set('legacy-edge', edge);
+    const beforeHandle = edge.get('sourceHandle');
+    assert.equal(applier.apply(batch()).applied, true);
+    assert.notEqual(edge.get('sourceHandle'), beforeHandle);
+    assert.equal(table.get('positionX'), 700);
+    assert.equal(table.get('positionY'), 30);
+    doc.destroy();
+  });
+}

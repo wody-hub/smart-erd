@@ -58,6 +58,7 @@ import {
   getTablesMap,
   removeTableIdFromYArray,
   setTableYMapPosition,
+  readTablePosition,
 } from '@/collaboration/yjsBridge';
 import {
   createColumnYMap,
@@ -245,11 +246,8 @@ export class ErdDocumentMutationApplier {
     const changes: { tableYMap: Y.Map<unknown>; position: { x: number; y: number } }[] = [];
     for (const entry of batch.entries) {
       const tableYMap = tablesMap.get(entry.tableId);
-      if (
-        !tableYMap ||
-        tableYMap.get('positionX') !== entry.from.x ||
-        tableYMap.get('positionY') !== entry.from.y
-      )
+      const position = tableYMap ? readTablePosition(tableYMap) : null;
+      if (!tableYMap || !position || position.x !== entry.from.x || position.y !== entry.from.y)
         return false;
       if (entry.from.x !== entry.to.x || entry.from.y !== entry.to.y) {
         changes.push({ tableYMap, position: entry.to });

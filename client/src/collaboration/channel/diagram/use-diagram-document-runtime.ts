@@ -1,20 +1,15 @@
 import useCanvasStore from '@/stores/erd/useCanvasStore';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { createDiagramDocumentMutationSession } from './diagram-document-mutation-session';
 import type { DiagramDetail } from '@/types/diagram';
 import type { DocumentCheckpointReader } from '@/collaboration/core/contracts/document-checkpoint';
-import type {
-  DocumentChangeEvent,
-  MutationMeta,
-} from '@/collaboration/core/contracts/document-read-executor';
+import type { DocumentChangeEvent } from '@/collaboration/core/contracts/document-read-executor';
 import type {
   ArtifactFallbackCapablePlugin,
-  DocumentCommand,
   PluginContext,
+  RegisteredDocumentPlugin,
 } from '@/collaboration/core/contracts/document-plugin';
-import type {
-  DocumentCommandDispatchResult,
-  DocumentMutationSession,
-} from '@/collaboration/core/session/document-mutation-session';
+import type { DiagramDocumentMutationSession as DocumentMutationSession } from './diagram-document-mutation-session';
 import type { ResolvedDocumentSessionBootstrap } from '@/collaboration/core/session/document-session-bootstrap';
 import { DocumentPersistenceCoordinator } from '@/collaboration/core/persistence/document-persistence-coordinator';
 import { DocumentRevisionTracker } from '@/collaboration/core/store/document-revision-tracker';
@@ -34,6 +29,9 @@ interface UseDiagramDocumentRuntimeParams {
   sharedDocumentEngine: YjsSharedDocumentEngine | null;
   snapshotCodec: DocumentSnapshotCodec | null;
   storeBridge: DiagramCollaborationStoreBridge;
+  plugin?: RegisteredDocumentPlugin;
+  isCommandReady: () => boolean;
+  commandReady: boolean;
 }
 
 interface UseDiagramDocumentRuntimeResult {
@@ -48,7 +46,15 @@ export function useDiagramDocumentRuntime({
   sharedDocumentEngine,
   snapshotCodec,
   storeBridge,
+  plugin: localPlugin,
+  isCommandReady,
+  commandReady,
 }: UseDiagramDocumentRuntimeParams): UseDiagramDocumentRuntimeResult {
+  const engineRef = useRef(sharedDocumentEngine);
+  engineRef.current = sharedDocumentEngine;
+  const readyRef = useRef(isCommandReady);
+  readyRef.current = isCommandReady;
+  const plugin = localPlugin ?? resolvedSessionBootstrap?.plugin;
   const documentRevisionTracker = useMemo(
     () => new DocumentRevisionTracker(documentBootstrap?.revision ?? '0'),
     [documentBootstrap?.revision],
@@ -100,76 +106,45 @@ export function useDiagramDocumentRuntime({
     [documentStore, storeBridge.refreshPersistedCanvasFromYDoc],
   );
   const documentMutationPolicy = useMemo(
-    () =>
-      resolvedSessionBootstrap && pluginContext
-        ? resolvedSessionBootstrap.plugin.createMutationPolicy(pluginContext)
-        : null,
-    [pluginContext, resolvedSessionBootstrap],
+    () => (plugin && pluginContext ? plugin.createMutationPolicy(pluginContext) : null),
+    [pluginContext, plugin],
   );
   const documentInputAdapters = useMemo(
-    () =>
-      resolvedSessionBootstrap && pluginContext
-        ? resolvedSessionBootstrap.plugin.createInputAdapters(pluginContext)
-        : null,
-    [pluginContext, resolvedSessionBootstrap],
+    () => (plugin && pluginContext ? plugin.createInputAdapters(pluginContext) : null),
+    [pluginContext, plugin],
   );
   const documentProjectors = useMemo(
-    () =>
-      resolvedSessionBootstrap && pluginContext
-        ? resolvedSessionBootstrap.plugin.createProjectors(pluginContext)
-        : [],
-    [pluginContext, resolvedSessionBootstrap],
+    () => (plugin && pluginContext ? plugin.createProjectors(pluginContext) : []),
+    [pluginContext, plugin],
   );
   const documentArtifactSerializer = useMemo(
     () =>
-      resolvedSessionBootstrap &&
-      pluginContext &&
-      'createArtifactSerializer' in resolvedSessionBootstrap.plugin
-        ? (
-            resolvedSessionBootstrap.plugin as ArtifactFallbackCapablePlugin
-          ).createArtifactSerializer(pluginContext)
+      plugin && pluginContext && 'createArtifactSerializer' in plugin
+        ? (plugin as ArtifactFallbackCapablePlugin).createArtifactSerializer(pluginContext)
         : null,
-    [pluginContext, resolvedSessionBootstrap],
+    [pluginContext, plugin],
   );
   const documentMutationSession = useMemo<DocumentMutationSession | null>(() => {
     if (!documentStore || !documentMutationPolicy) {
       return null;
     }
 
-    const emitCommandWithResult = <T>(
-      command: DocumentCommand,
-      meta?: MutationMeta,
-    ): DocumentCommandDispatchResult<T> => {
-      const resolvedMeta: MutationMeta = meta ?? {
-        origin: {
-          source: 'local',
-        },
-      };
-      const result = documentStore.applyMutation<T>(
-        documentMutationPolicy.toMutation(command, resolvedMeta),
-        resolvedMeta,
-      );
-      if (!result.applied) {
-        storeBridge.refreshPersistedCanvasFromYDoc({ forceFull: true });
-        return {
-          status: 'rejected',
-        };
-      }
-      return {
-        status: 'applied',
-        value: result.value,
-      };
-    };
-
-    return {
-      enabled: true,
-      inputAdapters: documentInputAdapters,
-      read: documentStore,
-      emitCommand: (command: DocumentCommand, meta?: MutationMeta) =>
-        emitCommandWithResult(command, meta).status,
-      emitCommandWithResult,
-    };
-  }, [documentInputAdapters, documentMutationPolicy, documentStore, storeBridge]);
+    const session = createDiagramDocumentMutationSession(
+      documentStore,
+      documentMutationPolicy,
+      documentInputAdapters,
+      () => engineRef.current === sharedDocumentEngine && readyRef.current(),
+      () => storeBridge.refreshPersistedCanvasFromYDoc({ forceFull: true }),
+    );
+    return { ...session, ready: commandReady };
+  }, [
+    documentInputAdapters,
+    documentMutationPolicy,
+    documentStore,
+    storeBridge,
+    commandReady,
+    sharedDocumentEngine,
+  ]);
   const documentPersistenceCoordinator = useMemo(() => {
     if (!diagram || !resolvedSessionBootstrap || !sharedDocumentEngine || !snapshotCodec) {
       return null;

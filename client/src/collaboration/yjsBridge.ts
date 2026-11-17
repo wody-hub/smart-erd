@@ -85,7 +85,8 @@ function readNodePosition(rawPosition: unknown): { x: number; y: number } | null
   return null;
 }
 
-function readTablePosition(tableYMap: Y.Map<unknown>): { x: number; y: number } | null {
+/** scalar 좌표를 우선하고 레거시 객체·Y.Map 좌표를 함께 읽는다. */
+export function readTablePosition(tableYMap: Y.Map<unknown>): { x: number; y: number } | null {
   const x = tableYMap.get(TABLE_POSITION_X_KEY);
   const y = tableYMap.get(TABLE_POSITION_Y_KEY);
   if (typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)) {

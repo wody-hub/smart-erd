@@ -128,6 +128,7 @@ interface LayoutPhaseResult {
   freshEdges: Edge[];
   effectiveLayoutMode: SyncPolicy['layoutMode'];
   layoutDurationMs: number;
+  layoutRejected: boolean;
 }
 
 interface ExecuteDiffPhaseParams {
@@ -253,6 +254,7 @@ async function executeLayoutPhase(params: ExecuteLayoutPhaseParams): Promise<Lay
       : 'none';
 
   let layoutDurationMs = 0;
+  let layoutRejected = false;
   if (freshNodes.length > 0 && shouldRunLayout) {
     const layoutStart = performance.now();
     if (effectiveLayoutMode === 'full') {
@@ -264,12 +266,12 @@ async function executeLayoutPhase(params: ExecuteLayoutPhaseParams): Promise<Lay
         layoutResult.status !== 'failed' &&
         params.applyLayout(layoutResult.nodes, freshNodes) === 'rejected'
       ) {
-        throw new Error('Layout batch rejected');
+        layoutRejected = true;
       }
     } else if (effectiveLayoutMode === 'incremental') {
       const layoutedNodes = applyIncrementalLayoutByLabel(params.beforeNodes, freshNodes);
       if (params.applyLayout(layoutedNodes, freshNodes) === 'rejected') {
-        throw new Error('Layout batch rejected');
+        layoutRejected = true;
       }
     }
     layoutDurationMs = performance.now() - layoutStart;
@@ -280,6 +282,7 @@ async function executeLayoutPhase(params: ExecuteLayoutPhaseParams): Promise<Lay
     freshEdges,
     effectiveLayoutMode,
     layoutDurationMs,
+    layoutRejected,
   };
 }
 
@@ -447,9 +450,20 @@ export function useApplyToErd({
           totalDurationMs,
         });
 
+        if (layoutPhase.layoutRejected) {
+          toast.warning(
+            t('erd.codeEditor.partialApply', {
+              defaultValue:
+                '스키마는 적용했지만 자동정렬을 적용하지 못했습니다. 연결 상태를 확인한 뒤 자동정렬을 다시 실행해 주세요.',
+            }),
+            { id: 'diagram-schema-partial-apply' },
+          );
+        }
         if (source === 'manual') {
           onManualApplySuccess?.();
-          toast.success(t('erd.codeEditor.success', { count: parseResult.tables.length }));
+          if (!layoutPhase.layoutRejected) {
+            toast.success(t('erd.codeEditor.success', { count: parseResult.tables.length }));
+          }
         }
         return true;
       } catch (err) {

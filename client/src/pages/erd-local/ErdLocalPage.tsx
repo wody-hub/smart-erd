@@ -1,8 +1,15 @@
-import { Suspense, lazy, useRef, useState } from 'react';
+import { Suspense, lazy, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { DocumentMutationSession } from '@/collaboration/core/session/document-mutation-session';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { DocumentMutationSessionProvider } from '@/collaboration/core/session/document-mutation-session';
+import { useDiagramDocumentRuntime } from '@/collaboration/channel/diagram/use-diagram-document-runtime';
+import { useDiagramCollaborationStoreBridge } from '@/collaboration/channel/diagram/use-diagram-collaboration-store-bridge';
+import { YjsSharedDocumentEngine } from '@/collaboration/core/engines/yjs-shared-document-engine';
+import { ErdDocumentPlugin } from '@/collaboration/plugins/erd/erd-document-plugin';
+import useCanvasStore from '@/stores/erd/useCanvasStore';
 import ERDCanvas from '@/components/erd/ERDCanvas';
 import DiagramSidebar from '@/components/erd/DiagramSidebar';
 import { ErdPermissionProvider } from '@/components/erd/ErdPermissionContext';
@@ -22,6 +29,21 @@ type ErdLocalLeftPanel = 'sidebar' | 'code';
 
 /** DDL 코드 에디터 (monaco 무게로 lazy 로드). */
 const DdlCodeEditorPanel = lazy(() => import('@/components/erd/DdlCodeEditorPanel'));
+
+/** 로컬 사전과 동일한 Y.Doc의 명령 세션을 편집 UI 전체에 제공한다. */
+function ErdLocalProviders({
+  session,
+  children,
+}: {
+  session: DocumentMutationSession | null;
+  children: ReactNode;
+}) {
+  return (
+    <DocumentMutationSessionProvider value={session}>
+      <ErdLocalDictionaryProvider>{children}</ErdLocalDictionaryProvider>
+    </DocumentMutationSessionProvider>
+  );
+}
 
 /**
  * 로그인 불필요 ERD 단독 편집 페이지.
@@ -43,6 +65,22 @@ export default function ErdLocalPage() {
   /** 숨겨진 파일 입력 참조 */
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { exportFile, importFileText, resetAll } = useErdLocalPersistence();
+
+  const ydoc = useCanvasStore((state) => state.ydoc);
+  const engine = useMemo(() => (ydoc ? new YjsSharedDocumentEngine(ydoc) : null), [ydoc]);
+  const plugin = useMemo(() => new ErdDocumentPlugin(), []);
+  const storeBridge = useDiagramCollaborationStoreBridge();
+  const { documentMutationSession } = useDiagramDocumentRuntime({
+    diagram: undefined,
+    documentBootstrap: undefined,
+    resolvedSessionBootstrap: null,
+    sharedDocumentEngine: engine,
+    snapshotCodec: null,
+    storeBridge,
+    plugin,
+    isCommandReady: () => useCanvasStore.getState().ydoc === ydoc && ydoc !== null,
+    commandReady: ydoc !== null,
+  });
 
   /** 파일 열기 버튼 클릭 시 숨겨진 입력을 연다. */
   const handleOpenFileClick = () => {
@@ -75,7 +113,7 @@ export default function ErdLocalPage() {
   };
 
   return (
-    <ErdLocalDictionaryProvider>
+    <ErdLocalProviders session={documentMutationSession}>
       <div className="flex h-screen flex-col bg-background text-foreground">
         <header className="flex items-center gap-2 border-b border-border bg-card px-4 py-2">
           <Button variant="ghost" size="sm" onClick={() => navigate(ROUTES.GUIDE)}>
@@ -152,6 +190,6 @@ export default function ErdLocalPage() {
           onConfirm={handleConfirmReset}
         />
       </div>
-    </ErdLocalDictionaryProvider>
+    </ErdLocalProviders>
   );
 }

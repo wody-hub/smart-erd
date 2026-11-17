@@ -52,11 +52,14 @@ export interface EditableColumnRowProps {
   /** 컬럼 삭제 핸들러 */
   onDeleteColumn: (colId: string) => void;
   /** 논리명 변경 핸들러 */
-  onLogicalNameChange: (colId: string, value: string) => void;
+  onLogicalNameChange: (colId: string, value: string) => 'applied' | 'rejected' | void;
   /** 용어 선택 핸들러 */
-  onSelectTerm: (colId: string, result: TermSelectResult) => void;
+  onSelectTerm: (colId: string, result: TermSelectResult) => 'applied' | 'rejected' | void;
   /** 단어사전 기반 해석 결과 적용 핸들러 */
-  onSelectDerived: (colId: string, resolution: LogicalNameResolution) => void;
+  onSelectDerived: (
+    colId: string,
+    resolution: LogicalNameResolution,
+  ) => 'applied' | 'rejected' | void;
   /** 빠른 등록 흐름 요청 핸들러 */
   onRegisterNew: (colId: string, logicalName: string) => void;
   /** 도메인 변경 핸들러 */

@@ -30,6 +30,17 @@ import {
 import useCanvasStore from '../../src/stores/erd/useCanvasStore.js';
 
 const cases: { key: string; run: (actions: DiagramErdCrudActions) => string }[] = [
+  {
+    key: 'ddl:import',
+    run: (a) =>
+      a.importDdl({
+        tables: [{ name: 'imported', columns: [] }],
+        relations: [],
+        errors: [],
+        diagnostics: [],
+        tableRanges: [],
+      }),
+  },
   { key: 'table:add', run: (a) => a.addTable('new_table') },
   { key: 'table:delete', run: (a) => a.deleteTable('a') },
   { key: 'table:move', run: (a) => a.moveTable('a', 40, 50) },
@@ -166,7 +177,7 @@ for (const item of cases) {
       assert.equal(item.run(h.actions), 'applied');
       assert.deepEqual(h.commands, [item.key]);
       assert.notDeepEqual(Y.encodeStateAsUpdate(h.doc), beforeDoc);
-      assert.notEqual(useCanvasStore.getState(), beforeStore);
+      if (item.key !== 'ddl:import') assert.notEqual(useCanvasStore.getState(), beforeStore);
       assert.equal(h.updates(), 1);
       assert.equal(warning.mock.callCount(), 0);
     } finally {
@@ -176,3 +187,22 @@ for (const item of cases) {
     }
   });
 }
+
+test('repeated blocked keystrokes and drags reuse one toast', async () => {
+  const h = await harness('ko', 'rejected');
+  try {
+    for (let index = 0; index < 4; index++) {
+      assert.equal(h.actions.updateColumn('a', 'id', { name: `blocked-${index}` }), 'rejected');
+      assert.equal(h.actions.moveTable('a', index, index), 'rejected');
+    }
+    assert.equal(
+      toast.getHistory().filter((item) => item.id === 'diagram-command-rejected').length,
+      1,
+    );
+    assert.equal(h.updates(), 0);
+  } finally {
+    h.unsubscribe();
+    useCanvasStore.getState().destroyYDoc();
+    h.doc.destroy();
+  }
+});

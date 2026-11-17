@@ -1,7 +1,7 @@
 import { resolveEdgeHandlesFromPreference, type EdgeHandleResolution } from '@/lib/edge-handles';
 import { extractColId } from '@/lib/handle-id';
 import { readString } from '@/lib/yjs-read-utils';
-import { getEdgesMap, getTablesMap } from '@/collaboration/yjsBridge';
+import { getEdgesMap, getTablesMap, readTablePosition } from '@/collaboration/yjsBridge';
 import type {
   EdgeHandleMode,
   EdgeHandleSide,
@@ -147,16 +147,13 @@ function readTableNodeLike(
   position: { x: number; y: number };
   data: { handleLayout?: TableHandleLayout };
 } | null {
-  const positionX = tableYMap.get('positionX');
-  const positionY = tableYMap.get('positionY');
-  if (typeof positionX !== 'number' || typeof positionY !== 'number') {
-    return null;
-  }
+  const position = readTablePosition(tableYMap);
+  if (!position) return null;
 
   const handleLayout = tableYMap.get('handleLayout');
   return {
     id: tableId,
-    position: { x: positionX, y: positionY },
+    position,
     data: {
       handleLayout:
         handleLayout === 'split' || handleLayout === 'left' || handleLayout === 'right'

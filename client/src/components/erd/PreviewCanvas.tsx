@@ -585,6 +585,7 @@ export default function PreviewCanvas({
       const syncedToPersisted = previewPositionActions.syncMatchedPreviewNodePosition(
         node,
         persistedNodes,
+        effectiveGraph?.nodes ?? [],
       );
       if (syncedToPersisted) {
         delete nextOverrides[node.id];
@@ -594,7 +595,7 @@ export default function PreviewCanvas({
       positionOverridesRef.current = nextOverrides;
       onPositionOverridesChange(nextOverrides);
     },
-    [onPositionOverridesChange, persistedNodes, previewPositionActions],
+    [effectiveGraph, onPositionOverridesChange, persistedNodes, previewPositionActions],
   );
 
   /**

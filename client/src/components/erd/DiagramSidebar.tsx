@@ -97,7 +97,7 @@ function DiagramSidebar({
     if (!trimmed) {
       return;
     }
-    crudActions.renameTable(tableId, trimmed);
+    return crudActions.renameTable(tableId, trimmed);
   };
 
   const handleAddTable = () => {
@@ -117,7 +117,7 @@ function DiagramSidebar({
     if (!trimmed) {
       return;
     }
-    crudActions.renameGroup(groupId, trimmed);
+    return crudActions.renameGroup(groupId, trimmed);
   };
 
   const handleDeleteGroup = (groupId: string) => {

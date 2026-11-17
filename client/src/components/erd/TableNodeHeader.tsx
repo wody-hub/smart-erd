@@ -31,17 +31,17 @@ export interface TableNodeHeaderProps {
   /** 원격 락 정보 (없으면 null) */
   lockInfo: { name: string } | undefined;
   /** 테이블 논리명 변경 핸들러 */
-  onLogicalNameChange: (value: string) => void;
+  onLogicalNameChange: (value: string) => 'applied' | 'rejected' | void;
   /** 용어 선택 핸들러 */
-  onSelectTerm: (result: TermSelectResult) => void;
+  onSelectTerm: (result: TermSelectResult) => 'applied' | 'rejected' | void;
   /** 단어사전 기반 해석 결과 적용 핸들러 */
-  onSelectDerived: (resolution: LogicalNameResolution) => void;
+  onSelectDerived: (resolution: LogicalNameResolution) => 'applied' | 'rejected' | void;
   /** 빠른 등록 흐름 요청 핸들러 */
   onRegisterNew: (logicalName: string) => void;
   /** 코드 에디터 해당 테이블로 이동 핸들러 */
   onNavigateToCode?: () => void;
   /** 테이블 물리명 변경 핸들러 */
-  onRename: (value: string) => void;
+  onRename: (value: string) => 'applied' | 'rejected' | void;
   /** 헤더 색상 변경 핸들러 */
   onColorChange: (color: TableHeaderColor) => void;
   /** 핸들 레이아웃 변경 핸들러 */

@@ -53,7 +53,7 @@ export default function DdlImportDialog({ open, onOpenChange }: DdlImportDialogP
     if (!parseResult || parseResult.tables.length === 0) return;
 
     try {
-      crudActions.importDdl(parseResult);
+      if (crudActions.importDdl(parseResult) !== 'applied') return;
       toast.success(t('erd.ddlImport.success', { count: parseResult.tables.length }));
       handleClose();
     } catch (err) {

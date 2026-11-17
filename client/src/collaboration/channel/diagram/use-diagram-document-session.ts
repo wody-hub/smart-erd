@@ -16,6 +16,7 @@ interface UseDiagramDocumentSessionParams {
   projectId: string | undefined;
   diagramId: string | undefined;
   enableCodeModeDraftPersist: boolean;
+  canEdit: boolean;
 }
 
 interface UseDiagramDocumentSessionResult {
@@ -65,6 +66,7 @@ export function useDiagramDocumentSession({
   projectId,
   diagramId,
   enableCodeModeDraftPersist,
+  canEdit,
 }: UseDiagramDocumentSessionParams): UseDiagramDocumentSessionResult {
   const ydoc = useCanvasStore((state) => state.ydoc);
   const beforeDestroyYDocRef = useRef<(() => void) | null>(null);
@@ -106,6 +108,7 @@ export function useDiagramDocumentSession({
     diagramId,
     teamId,
     projectId,
+    canEdit,
     handleBeforeDestroyYDoc,
   );
   const retryCollaborationSetup = useCallback(() => {

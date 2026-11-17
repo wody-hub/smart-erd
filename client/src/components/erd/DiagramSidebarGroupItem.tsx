@@ -20,7 +20,7 @@ interface DiagramSidebarGroupItemProps {
   /** 그룹 뷰 진입 핸들러 */
   onViewGroup?: (groupId: string) => void;
   /** 이름 변경 핸들러 */
-  onRename: (newName: string) => void;
+  onRename: (newName: string) => 'applied' | 'rejected' | void;
   /** 그룹 삭제 핸들러 */
   onDelete: () => void;
   /** 그룹에서 테이블 제거 핸들러 */

@@ -1,3 +1,4 @@
+import { sourceHookHarness } from '../helpers/source-hook-harness.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as Y from 'yjs';
@@ -126,3 +127,49 @@ test('already identical matched previews succeed without updates and clear their
   assert.deepEqual(result.remainingPositionOverrides, {});
   assert.equal(updates, 0);
 });
+
+for (const movedId of ['physical', 'logical']) {
+  test(`single preview drag validates the full graph: ${movedId}`, () => {
+    const fullGraph = [
+      preview('physical', 'a'),
+      {
+        ...preview('logical', 'alias'),
+        data: { label: 'alias', logicalTableName: '논리명', columns: [] },
+      },
+    ];
+    const table = {
+      ...persisted('a'),
+      data: { label: 'a', logicalTableName: '논리명', columns: [] },
+    };
+    const overrides = { [movedId]: { x: 30, y: 50 } };
+    const h = sourceHookHarness(
+      'src/collaboration/channel/diagram/use-diagram-preview-position-actions.ts',
+      {
+        'use-erd-document-actions': {
+          useErdDocumentActions: () => ({
+            available: true,
+            applyPreviewPositions: () => assert.fail('중복 매핑 쓰기 금지'),
+          }),
+        },
+        'use-diagram-command-feedback': { useDiagramRejectedCommandToast: () => () => {} },
+        'erd-preview-position-commit': { commitPreviewPositionOverrides },
+      },
+    );
+    const hook = h.exports.useDiagramPreviewPositionActions as () => {
+      syncMatchedPreviewNodePosition: (
+        node: DslPreviewNode,
+        tables: TableNode[],
+        fullGraph: DslPreviewNode[],
+      ) => boolean;
+    };
+    const synced = h
+      .render(hook)
+      .syncMatchedPreviewNodePosition(
+        { ...fullGraph.find((node) => node.id === movedId)!, position: overrides[movedId] },
+        [table],
+        fullGraph,
+      );
+    assert.equal(synced, false);
+    assert.deepEqual(overrides[movedId], { x: 30, y: 50 });
+  });
+}

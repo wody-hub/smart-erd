@@ -1,12 +1,8 @@
 import { useMemo } from 'react';
 import type { DdlParseResult } from '@/lib/ddl-parser';
 import { useErdDocumentActions } from '@/collaboration/plugins/erd/use-erd-document-actions';
-import useCanvasStore from '@/stores/erd/useCanvasStore';
 import type { Column, TableHeaderColor, TableNodeData } from '@/types/erd';
-import {
-  resolveDiagramAppliedStatus,
-  resolveDiagramDocumentStatus,
-} from '@/collaboration/channel/diagram/diagram-session-action-utils';
+import { resolveDiagramDocumentStatus } from '@/collaboration/channel/diagram/diagram-session-action-utils';
 import { useDiagramRejectedCommandToast } from '@/collaboration/channel/diagram/use-diagram-command-feedback';
 
 type TableMetaUpdates = Partial<
@@ -35,7 +31,6 @@ export interface DiagramErdCrudActions {
 
 export function useDiagramErdCrudActions(): DiagramErdCrudActions {
   const erdDocumentActions = useErdDocumentActions();
-  const importDdlFallback = useCanvasStore((s) => s.importDdl);
   const notifyRejected = useDiagramRejectedCommandToast();
 
   return useMemo(
@@ -116,13 +111,9 @@ export function useDiagramErdCrudActions(): DiagramErdCrudActions {
         );
       },
       importDdl: (result: DdlParseResult) => {
-        return resolveDiagramAppliedStatus(
-          erdDocumentActions.importDdl(result),
-          () => importDdlFallback(result),
-          notifyRejected,
-        );
+        return resolveDiagramDocumentStatus(erdDocumentActions.importDdl(result), notifyRejected);
       },
     }),
-    [erdDocumentActions, importDdlFallback, notifyRejected],
+    [erdDocumentActions, notifyRejected],
   );
 }

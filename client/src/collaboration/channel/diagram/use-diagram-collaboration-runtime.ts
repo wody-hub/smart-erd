@@ -1,9 +1,11 @@
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import useCollaborationStore from '@/stores/erd/useCollaborationStore';
+import { isDiagramDocumentReady } from './diagram-document-mutation-session';
 import * as Y from 'yjs';
 import type { DocumentCheckpointReader } from '@/collaboration/core/contracts/document-checkpoint';
 import type { DocumentSnapshotCodec } from '@/collaboration/core/contracts/document-snapshot-codec';
 import { useCollaborationSession } from '@/collaboration/core/use-collaboration-session';
-import type { DocumentMutationSession } from '@/collaboration/core/session/document-mutation-session';
+import type { DiagramDocumentMutationSession as DocumentMutationSession } from './diagram-document-mutation-session';
 import {
   toPreviewSyncStatus,
   type PreviewSyncStatus,
@@ -50,7 +52,24 @@ export function useDiagramCollaborationRuntime(
   diagram: DiagramDetail | undefined,
   documentBootstrap: DocumentBootstrapPayload | undefined,
   setupAttempt: number,
+  canEdit: boolean,
 ): UseDiagramCollaborationRuntimeReturn {
+  const connectionStatus = useCollaborationStore((state) => state.connectionStatus);
+  const [synced, setSynced] = useState(false);
+  const syncedRef = useRef(false);
+  /** preview 여부. 아직 provider가 알리지 않았으면 null이며 이때는 previewEnabled를 따른다. */
+  const previewRef = useRef<boolean | null>(null);
+  const permissionRef = useRef(canEdit);
+  permissionRef.current = canEdit;
+  const isCommandReady = () =>
+    isDiagramDocumentReady({
+      localOnly: false,
+      canEdit: permissionRef.current,
+      hydrated: !(previewRef.current ?? previewEnabled),
+      // 빈 room의 첫 입장자는 SYNC_STEP2를 받지 못할 수 있어 snapshot이 없는 문서는 연결 상태만 본다.
+      synced: !previewEnabled || syncedRef.current,
+      connectionStatus: useCollaborationStore.getState().connectionStatus,
+    });
   const initYDoc = useCanvasStore((s) => s.initYDoc);
   const destroyYDoc = useCanvasStore((s) => s.destroyYDoc);
   const storeBridge = useDiagramCollaborationStoreBridge();
@@ -75,6 +94,14 @@ export function useDiagramCollaborationRuntime(
     sharedDocumentEngine,
     snapshotCodec,
     storeBridge,
+    isCommandReady,
+    commandReady: isDiagramDocumentReady({
+      localOnly: false,
+      canEdit,
+      hydrated: !(previewRef.current ?? previewEnabled),
+      synced: !previewEnabled || synced,
+      connectionStatus,
+    }),
   });
 
   const createProviderLifecycle = useCallback(
@@ -108,13 +135,30 @@ export function useDiagramCollaborationRuntime(
           handoffStartedAt,
           handoffLogPrefix,
           dispatchRuntimeEvent,
-          updatePreviewMode,
+          updatePreviewMode: (next) => {
+            previewRef.current = next;
+            updatePreviewMode(next);
+          },
+          onSyncStateChange: (next) => {
+            syncedRef.current = next;
+            setSynced(next);
+          },
           diagramId,
           teamId,
           projectId,
           storeBridge,
-          onProviderReady,
-          onProviderDisposed,
+          onProviderReady: (provider) => {
+            syncedRef.current = false;
+            previewRef.current = previewEnabled;
+            setSynced(false);
+            onProviderReady(provider);
+          },
+          onProviderDisposed: () => {
+            syncedRef.current = false;
+            previewRef.current = true;
+            setSynced(false);
+            onProviderDisposed();
+          },
         },
         {
           transport,

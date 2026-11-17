@@ -73,11 +73,11 @@ export function useTableNodeInteractions({
       >
     >,
   ) => {
-    crudActions.updateTableMeta(nodeId, updates);
+    return crudActions.updateTableMeta(nodeId, updates);
   };
 
   const applyColumnUpdates = (colId: string, updates: Partial<Column>) => {
-    crudActions.updateColumn(nodeId, colId, updates);
+    return crudActions.updateColumn(nodeId, colId, updates);
   };
 
   const handleAddColumn = () => {
@@ -93,13 +93,13 @@ export function useTableNodeInteractions({
     if (!trimmed) {
       return;
     }
-    crudActions.renameTable(nodeId, trimmed);
+    return crudActions.renameTable(nodeId, trimmed);
   };
 
   const handleTableLogicalNameChange = (newValue: string) => {
     const trimmed = newValue.trim();
     const resolution = resolveLogicalName(newValue);
-    applyTableMetaUpdates({
+    return applyTableMetaUpdates({
       logicalTableName: trimmed || undefined,
       label: resolution.isWordCompleteMatch ? resolution.physicalName : label,
       tableTermId: resolution.isRegisteredTerm ? resolution.termId : undefined,
@@ -107,7 +107,7 @@ export function useTableNodeInteractions({
   };
 
   const handleTableSelectTerm = (result: TermSelectResult) => {
-    applyTableMetaUpdates({
+    return applyTableMetaUpdates({
       logicalTableName: result.logicalName,
       label: result.name,
       tableTermId: result.termId,
@@ -115,7 +115,7 @@ export function useTableNodeInteractions({
   };
 
   const handleTableSelectDerived = (resolution: LogicalNameResolution) => {
-    applyTableMetaUpdates({
+    return applyTableMetaUpdates({
       logicalTableName: resolution.query,
       label: resolution.physicalName,
       tableTermId: resolution.isRegisteredTerm ? resolution.termId : undefined,
@@ -160,7 +160,7 @@ export function useTableNodeInteractions({
       updates.type = revertDomainTypeIfNeeded(column, findDomainById) ?? updates.type;
     }
 
-    applyColumnUpdates(colId, updates);
+    return applyColumnUpdates(colId, updates);
   };
 
   const handleSelectTerm = (colId: string, result: TermSelectResult) => {
@@ -176,7 +176,7 @@ export function useTableNodeInteractions({
     } else {
       updates.type = revertDomainTypeIfNeeded(column, findDomainById) ?? updates.type;
     }
-    applyColumnUpdates(colId, updates);
+    return applyColumnUpdates(colId, updates);
   };
 
   const handleDomainChange = (colId: string, domainId: number | null, physicalType?: string) => {
@@ -187,7 +187,7 @@ export function useTableNodeInteractions({
         updates.type = resolvedType;
       }
     }
-    applyColumnUpdates(colId, updates);
+    return applyColumnUpdates(colId, updates);
   };
 
   const handleDerivedSelect = (colId: string, resolution: LogicalNameResolution) => {
@@ -203,24 +203,25 @@ export function useTableNodeInteractions({
     } else {
       updates.type = revertDomainTypeIfNeeded(column, findDomainById) ?? updates.type;
     }
-    applyColumnUpdates(colId, updates);
+    return applyColumnUpdates(colId, updates);
   };
 
   const handleQuickTermApply = (updates: Partial<Column>) => {
     if (!quickTermTarget) {
       return;
     }
-    applyColumnUpdates(quickTermTarget.colId, updates);
-    setQuickTermTarget(null);
+    if (applyColumnUpdates(quickTermTarget.colId, updates) === 'applied') {
+      setQuickTermTarget(null);
+    }
   };
 
   const handleTableQuickTermApply = (updates: Partial<Column>) => {
-    applyTableMetaUpdates({
+    const status = applyTableMetaUpdates({
       logicalTableName: updates.logicalName || undefined,
       label: updates.name || label,
       tableTermId: updates.termId,
     });
-    setTableQuickTermLogicalName(null);
+    if (status === 'applied') setTableQuickTermLogicalName(null);
   };
 
   const handleNavigateToCode = () => {
@@ -235,11 +236,11 @@ export function useTableNodeInteractions({
   };
 
   const handleHeaderColorChange = (color: TableNodeType['data']['headerColor']) => {
-    applyTableMetaUpdates({ headerColor: color });
+    return applyTableMetaUpdates({ headerColor: color });
   };
 
   const handleHeaderHandleLayoutChange = (layout: TableNodeType['data']['handleLayout']) => {
-    applyTableMetaUpdates({ handleLayout: layout });
+    if (applyTableMetaUpdates({ handleLayout: layout }) !== 'applied') return;
     requestAnimationFrame(() => {
       edgeActions.normalizeEdgeHandles([nodeId], 'table-meta', {
         origin: CANVAS_HISTORY_ORIGIN.USER_TABLE,

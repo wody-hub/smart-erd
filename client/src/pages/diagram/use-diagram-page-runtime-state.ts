@@ -56,6 +56,7 @@ type DiagramSummary = {
 type UseDiagramPageRuntimeStateParams = {
   beforeViewGroup?: () => void;
   canEdit: boolean;
+  documentCommandReady: boolean;
   collaborationSetupErrorKind: string | null;
   diagram: DiagramSummary | undefined;
   diagramId: string | undefined;
@@ -110,6 +111,7 @@ type UseDiagramPageRuntimeStateResult = {
 export function useDiagramPageRuntimeState({
   beforeViewGroup,
   canEdit,
+  documentCommandReady,
   collaborationSetupErrorKind,
   diagram,
   diagramId,
@@ -204,30 +206,45 @@ export function useDiagramPageRuntimeState({
     workModeCapabilities.canvasSource,
   ]);
 
-  const workModeRuntimeState = useMemo(
-    () =>
-      resolveDiagramWorkModeRuntimeState({
-        mode: workMode,
-        capabilities: workModeCapabilities,
-        canEdit,
-        isAuthoritativeBootstrapBlocked:
-          collaborationSetupErrorKind === 'authoritative-bootstrap-required',
-        isPersistedPreviewMode: isPreviewMode,
-        hasActiveGroupView: !!activeGroupId,
-      }),
-    [
-      activeGroupId,
+  const workModeRuntimeState = useMemo(() => {
+    const base = resolveDiagramWorkModeRuntimeState({
+      mode: workMode,
+      capabilities: workModeCapabilities,
       canEdit,
-      collaborationSetupErrorKind,
-      isPreviewMode,
-      workMode,
-      workModeCapabilities,
-    ],
-  );
+      isAuthoritativeBootstrapBlocked:
+        collaborationSetupErrorKind === 'authoritative-bootstrap-required',
+      isPersistedPreviewMode: isPreviewMode,
+      hasActiveGroupView: !!activeGroupId,
+    });
+    // 권한이 있어도 문서 명령 준비(수화·연결)가 끝나기 전에는 편집 표면을 열지 않는다.
+    // 안내 배너 판정에는 권한만 쓰므로 showPreviewSyncBanner는 그대로 둔다.
+    if (documentCommandReady) {
+      return base;
+    }
+    return {
+      ...base,
+      persistedEditingAllowed: false,
+      headerCanEdit: false,
+      effectiveCanvasCanEdit: false,
+      effectiveCodeCanEdit: false,
+      canPersistDiagramSave: false,
+      canToggleCodeEditor: false,
+      canEditDictionaryManagement: false,
+    };
+  }, [
+    activeGroupId,
+    canEdit,
+    documentCommandReady,
+    collaborationSetupErrorKind,
+    isPreviewMode,
+    workMode,
+    workModeCapabilities,
+  ]);
 
-  const previewReadOnlyMessage = isPreviewMode
-    ? t('diagram.previewSync.headerReadonly')
-    : undefined;
+  const previewReadOnlyMessage =
+    isPreviewMode || (canEdit && !documentCommandReady)
+      ? t('diagram.previewSync.headerReadonly')
+      : undefined;
   const canOpenDictionaryContext =
     !!dictionaryContextSetId && workModeRuntimeState.canOpenDictionaryManagement;
 
