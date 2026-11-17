@@ -23,6 +23,9 @@ import type {
 
 /** snapshot 재요청 rate limit (분당 최대 횟수) */
 const MAX_SNAPSHOT_REQUESTS_PER_MINUTE = 6;
+/** 초기 snapshot 재요청 간격과 최대 횟수 */
+const INITIALIZATION_RETRY_MS = 2_000;
+const MAX_INITIALIZATION_RETRIES = 3;
 
 /**
  * WebSocket 종료 코드와 reason을 사용자 노출용 연결 이슈로 매핑한다.
@@ -120,6 +123,9 @@ export class YjsProvider {
   /** 현재 연결에서 서버가 빈 문서를 확인했음을 알리는 콜백 (실제 sync와 구분) */
   onEmptyDocumentInitialized: (() => void) | null = null;
 
+  /** 초기화 재시도 소진 시 기존 동기화 배너를 표시하는 콜백 */
+  onInitializationDelayed: (() => void) | null = null;
+
   /** 연결 거부/종료 사유 콜백 */
   onConnectionIssueDetected: ((issue: ConnectionIssueKind | null) => void) | null = null;
 
@@ -176,6 +182,12 @@ export class YjsProvider {
 
   /** 현재 연결에서 서버의 빈 문서 초기화 확인을 받았는지 여부 */
   private emptyDocumentInitialized = false;
+
+  /** 서버가 이번 연결에서 수락한 버전. 응답이 없는 구 서버는 기존 STEP2 규칙을 유지한다. */
+  private negotiatedProtocolVersion: number | null = null;
+
+  /** 현재 연결의 snapshot 재요청 횟수 */
+  private initializationRetryCount = 0;
 
   /** initial sync 재시도 타이머 */
   private syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -358,6 +370,8 @@ export class YjsProvider {
         this.clearReconnectTimer();
         this.clearSyncRetryTimer();
         this.emptyDocumentInitialized = false;
+        this.negotiatedProtocolVersion = null;
+        this.initializationRetryCount = 0;
         this.emitSyncState(false);
         this.reconnectDelay = WS_RECONNECT.INITIAL_DELAY;
         this.lastRoomEpoch = null;
@@ -427,6 +441,16 @@ export class YjsProvider {
     probeMark('ws-frame', { messageType, bytes: data.byteLength });
 
     switch (messageType) {
+      case WS_MSG_TYPE.PROTOCOL_CAPABILITY: {
+        if (payload.length === 1 && payload[0] >= 1 && payload[0] <= 3) {
+          this.negotiatedProtocolVersion = payload[0];
+          probeMark('ws-protocol-negotiated', {
+            requestedVersion: this.options.protocolVersion ?? 3,
+            negotiatedVersion: payload[0],
+          });
+        }
+        break;
+      }
       case WS_MSG_TYPE.SYNC_STEP1: {
         // 상대방의 state vector 수신 -> diff를 SYNC_STEP2로 응답
         const stateVector = payload;
@@ -457,7 +481,9 @@ export class YjsProvider {
           this.reconnectAfterError();
           return;
         }
-        if (messageType === WS_MSG_TYPE.SYNC_STEP2) {
+        // 새 서버는 peer relay 전에 capability를 보낸다. 수락된 v3에서는 서버 handoff만
+        // 준비 상태를 열며, capability가 없는 구 서버 또는 명시적 v1/v2는 기존 규칙을 쓴다.
+        if (messageType === WS_MSG_TYPE.SYNC_STEP2 && (this.negotiatedProtocolVersion ?? 1) < 3) {
           this.emitSyncState(true);
           this.clearSyncRetryTimer();
         }
@@ -466,6 +492,7 @@ export class YjsProvider {
       case WS_MSG_TYPE.EMPTY_DOCUMENT_INITIALIZED: {
         if (!this.synced && !this.emptyDocumentInitialized) {
           this.emptyDocumentInitialized = true;
+          this.clearSyncRetryTimer();
           this.onEmptyDocumentInitialized?.();
         }
         break;
@@ -581,27 +608,31 @@ export class YjsProvider {
   }
 
   /**
-   * 빈 문서 확인과 별개로 실제 sync 완료 전까지 state vector 요청을 재전송한다.
-   *
-   * 첫 입장 사용자는 빈 room에 SYNC_STEP1을 보내도 응답을 받을 peer가 없으므로,
-   * 뒤늦게 다른 peer가 참가했을 때도 handoff를 완료할 수 있도록 재시도를 유지한다.
+   * 초기화 전 snapshot과 peer sync를 제한된 횟수로 재요청한다.
+   * 소진 후에도 편집은 차단하며 사용자가 배너에서 연결을 재시도할 수 있다.
    */
   private scheduleSyncRetry(): void {
-    if (this.synced || this.destroyed || this.intentionalClose) {
+    if (this.synced || this.emptyDocumentInitialized || this.destroyed || this.intentionalClose) {
       return;
     }
     this.clearSyncRetryTimer();
     this.syncRetryTimer = setTimeout(() => {
       this.syncRetryTimer = null;
-      if (this.synced || this.destroyed || this.intentionalClose) {
+      if (this.synced || this.emptyDocumentInitialized || this.destroyed || this.intentionalClose) {
         return;
       }
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         return;
       }
+      if (this.initializationRetryCount >= MAX_INITIALIZATION_RETRIES) {
+        this.onInitializationDelayed?.();
+        return;
+      }
+      this.initializationRetryCount += 1;
+      this.requestSnapshot();
       this.requestSync();
       this.scheduleSyncRetry();
-    }, 1500);
+    }, INITIALIZATION_RETRY_MS);
   }
 
   /**

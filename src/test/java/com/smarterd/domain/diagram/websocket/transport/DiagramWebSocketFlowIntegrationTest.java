@@ -1,6 +1,7 @@
 package com.smarterd.domain.diagram.websocket.transport;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -41,12 +42,20 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketMessage;
@@ -188,6 +197,154 @@ class DiagramWebSocketFlowIntegrationTest {
         assertThat(messageTypes(s1Reconnect.inbox())).contains(DiagramMessageTypes.MSG_SYNC_STEP1);
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = { 1, 2, 3 })
+    @DisplayName("실제 handler는 수락된 버전을 먼저 보고하고 빈 문서 확인은 v3에만 보낸다")
+    void emptyHandoff_reportsCapabilityAndConfirmsOnlyV3(int version) throws Exception {
+        final var fixture = createFixture(100);
+        final var requester = newSession("requester", "u1", "login1", "User", 1L, version);
+        fixture.handler().afterConnectionEstablished(requester.session());
+        assertThat(messagePayload(requester.inbox().getFirst())).containsExactly(
+            DiagramMessageTypes.MSG_PROTOCOL_CAPABILITY,
+            (byte) version
+        );
+        requester.clearInbox();
+        requestSnapshot(fixture, requester);
+        assertThat(
+            messageTypes(requester.inbox()).contains(DiagramMessageTypes.MSG_EMPTY_DOCUMENT_INITIALIZED)
+        ).isEqualTo(version == 3);
+    }
+
+    @Test
+    @DisplayName("서버 기준으로 비어 있으면 peer STEP2와 별개로 EMPTY를 보내고, 이후 데이터가 쌓이면 snapshot으로 전달한다")
+    void peerStep2_serverEmptyStillConfirms() throws Exception {
+        final var fixture = createFixture(100);
+        final var peer = newSession("peer", "u1", "login1", "User", 1L, 3);
+        final var requester = newSession("requester", "u2", "login2", "User", 1L, 3);
+        fixture.handler().afterConnectionEstablished(peer.session());
+        fixture.handler().afterConnectionEstablished(requester.session());
+        requester.clearInbox();
+        requestSnapshot(fixture, requester);
+        fixture
+            .handler()
+            .handleBinaryMessage(
+                requester.session(),
+                new BinaryMessage(new byte[] { DiagramMessageTypes.MSG_SYNC_STEP1, 0 })
+            );
+        fixture
+            .handler()
+            .handleBinaryMessage(
+                peer.session(),
+                new BinaryMessage(new byte[] { DiagramMessageTypes.MSG_SYNC_STEP2, 0, 0 })
+            );
+        assertThat(messageTypes(requester.inbox()))
+            .contains(DiagramMessageTypes.MSG_SYNC_STEP2)
+            .contains(DiagramMessageTypes.MSG_EMPTY_DOCUMENT_INITIALIZED);
+        requester.clearInbox();
+        fixture
+            .handler()
+            .handleBinaryMessage(
+                peer.session(),
+                new BinaryMessage(new byte[] { DiagramMessageTypes.MSG_YJS_UPDATE, 0x11 })
+            );
+        requestSnapshot(fixture, requester);
+        assertThat(messageTypes(requester.inbox()))
+            .contains(DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE_V2)
+            .doesNotContain(DiagramMessageTypes.MSG_EMPTY_DOCUMENT_INITIALIZED);
+    }
+
+    @Test
+    @DisplayName("peer가 있어도 서버 기준으로 비어 있으면 확인을 보내고, peer 퇴장 후 재요청에도 같다")
+    void peerPresentOrLeft_emptyConfirmedBothTimes() throws Exception {
+        final var fixture = createFixture(100);
+        final var peer = newSession("peer", "u1", "login1", "User", 1L, 3);
+        final var requester = newSession("requester", "u2", "login2", "User", 1L, 3);
+        fixture.handler().afterConnectionEstablished(peer.session());
+        fixture.handler().afterConnectionEstablished(requester.session());
+        requester.clearInbox();
+        requestSnapshot(fixture, requester);
+        assertThat(messageTypes(requester.inbox())).contains(DiagramMessageTypes.MSG_EMPTY_DOCUMENT_INITIALIZED);
+        requester.clearInbox();
+        fixture.handler().afterConnectionClosed(peer.session(), CloseStatus.NORMAL);
+        requestSnapshot(fixture, requester);
+        assertThat(messageTypes(requester.inbox())).contains(DiagramMessageTypes.MSG_EMPTY_DOCUMENT_INITIALIZED);
+    }
+
+    @Test
+    @DisplayName("마지막 퇴장 drain과 commit 사이에는 handoff를 대기시키고 commit된 update를 전달한다")
+    void lastLeave_drainBeforeCommitNeverConfirmsEmpty() throws Exception {
+        final var fixture = createFixture(100);
+        final var peer = newSession("peer", "u1", "login1", "User", 1L, 3);
+        final var requester = newSession("requester", "u2", "login2", "User", 1L, 3);
+        fixture.handler().afterConnectionEstablished(peer.session());
+        fixture
+            .handler()
+            .handleBinaryMessage(
+                peer.session(),
+                new BinaryMessage(new byte[] { DiagramMessageTypes.MSG_YJS_UPDATE, 0x11, 0x22 })
+            );
+        final var drained = new CountDownLatch(1);
+        final var commit = new CountDownLatch(1);
+        final var handoffStarted = new CountDownLatch(1);
+        doAnswer((invocation) -> {
+            drained.countDown();
+            assertThat(commit.await(5, TimeUnit.SECONDS)).isTrue();
+            fixture.persisted().set(invocation.getArgument(1));
+            return null;
+        })
+            .when(fixture.snapshotService())
+            .saveSnapshotWithUpdates(any(), any());
+        try (final var executor = Executors.newFixedThreadPool(2)) {
+            final var leaving = executor.submit(() ->
+                fixture.handler().afterConnectionClosed(peer.session(), CloseStatus.NORMAL)
+            );
+            try {
+                assertThat(drained.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThat(fixture.roomManager().hasUpdates(1L)).isFalse();
+                final var entering = executor.submit(() -> {
+                    handoffStarted.countDown();
+                    fixture.handler().afterConnectionEstablished(requester.session());
+                    requestSnapshot(fixture, requester);
+                    return null;
+                });
+                assertThat(handoffStarted.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThatThrownBy(() -> entering.get(100, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+                assertThat(messageTypes(requester.inbox())).doesNotContain(
+                    DiagramMessageTypes.MSG_EMPTY_DOCUMENT_INITIALIZED
+                );
+                commit.countDown();
+                leaving.get(5, TimeUnit.SECONDS);
+                entering.get(5, TimeUnit.SECONDS);
+                assertThat(messageTypes(requester.inbox()))
+                    .contains(DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE_V2)
+                    .doesNotContain(DiagramMessageTypes.MSG_EMPTY_DOCUMENT_INITIALIZED);
+                final var snapshot = requester
+                    .inbox()
+                    .stream()
+                    .filter((message) -> messageType(message) == DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE_V2)
+                    .findFirst()
+                    .orElseThrow();
+                final var body = java.util.Arrays.copyOfRange(
+                    messagePayload(snapshot),
+                    1,
+                    messagePayload(snapshot).length
+                );
+                assertThat(YjsUpdateFormat.decode(body).getFirst()).containsExactly(0x11, 0x22);
+            } finally {
+                commit.countDown();
+            }
+        }
+    }
+
+    private void requestSnapshot(Fixture fixture, SessionProbe requester) throws Exception {
+        fixture
+            .handler()
+            .handleBinaryMessage(
+                requester.session(),
+                new BinaryMessage(new byte[] { DiagramMessageTypes.MSG_SNAPSHOT_REQUEST_V2 })
+            );
+    }
+
     private Fixture createFixture(int maxMessagesPerSecond) {
         final var properties = new WebSocketProperties();
         properties.setMaxMessagesPerSecond(maxMessagesPerSecond);
@@ -198,6 +355,12 @@ class DiagramWebSocketFlowIntegrationTest {
         properties.setSessionMaxDuration(1800000);
 
         final var snapshotService = mock(DiagramSnapshotService.class);
+        final var persisted = new AtomicReference<>(new byte[0]);
+        when(snapshotService.getCachedSnapshot(any())).thenReturn(Optional.empty());
+        when(snapshotService.loadSnapshot(any())).thenAnswer((invocation) -> persisted.get());
+        when(snapshotService.buildWarmHandoffSnapshot(any(), any())).thenAnswer((invocation) ->
+            invocation.getArgument(1)
+        );
         final var roomManager = new DiagramRoomManager(properties);
         final var objectMapper = new ObjectMapper();
         final var messageSender = new DiagramMessageSender(roomManager, objectMapper);
@@ -255,11 +418,22 @@ class DiagramWebSocketFlowIntegrationTest {
             messageDispatcher
         );
         messageDispatcher.initHandlerMap();
-        return new Fixture(handler, roomManager);
+        return new Fixture(handler, roomManager, snapshotService, persisted);
     }
 
     private SessionProbe newSession(String sessionId, String userId, String loginId, String userName, Long diagramId)
         throws Exception {
+        return newSession(sessionId, userId, loginId, userName, diagramId, 1);
+    }
+
+    private SessionProbe newSession(
+        String sessionId,
+        String userId,
+        String loginId,
+        String userName,
+        Long diagramId,
+        int version
+    ) throws Exception {
         final var session = mock(WebSocketSession.class);
         final Map<String, Object> attributes = new ConcurrentHashMap<>();
         final var legacySession = new AuthenticatedSession(
@@ -268,7 +442,7 @@ class DiagramWebSocketFlowIntegrationTest {
             userName,
             diagramId,
             Instant.now().plusSeconds(60),
-            1
+            version
         );
         attributes.put(
             com.smarterd.collaboration.session.CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
@@ -322,7 +496,12 @@ class DiagramWebSocketFlowIntegrationTest {
         return messages.stream().map(this::messageType).collect(java.util.stream.Collectors.toSet());
     }
 
-    private record Fixture(DiagramWebSocketHandler handler, DiagramRoomManager roomManager) {}
+    private record Fixture(
+        DiagramWebSocketHandler handler,
+        DiagramRoomManager roomManager,
+        DiagramSnapshotService snapshotService,
+        AtomicReference<byte[]> persisted
+    ) {}
 
     private record SessionProbe(WebSocketSession session, List<BinaryMessage> inbox) {
         void clearInbox() {

@@ -49,8 +49,7 @@ public class DiagramCollaborationHandoffPolicy implements CollaborationHandoffPo
         CollaborationSnapshotStore snapshotStore
     ) {
         final var diagramId = resourceKeyFactory.parseDiagramId(resourceKey);
-        final var roomSessionCount = roomManager.getSessionCount(diagramId);
-        final var pendingUpdates = roomSessionCount > 1 ? roomManager.peekMergedUpdates(diagramId) : new byte[0];
+        final var pendingUpdates = roomManager.peekMergedUpdates(diagramId);
         if (pendingUpdates.length > 0) {
             return new CollaborationHandoffResult(
                 snapshotService.buildWarmHandoffSnapshot(diagramId, pendingUpdates),

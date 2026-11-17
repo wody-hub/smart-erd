@@ -9,6 +9,8 @@ export const CODE_MODE_SHARED_DRAFT_TEXT_ORIGIN = 'code-mode-shared-draft';
 export const CODE_MODE_SHARED_DRAFT_GRAPH_ORIGIN = 'code-preview-shared-draft';
 /** code 모드 shared draft text 키 */
 const CODE_MODE_SHARED_DRAFT_TEXT_KEY = 'text';
+/** 동시 최초 입력도 병합되는 고정 루트 텍스트 키 */
+const CODE_MODE_SHARED_DRAFT_ROOT_TEXT_KEY = 'codeModeSharedDraftText';
 /** code 모드 shared draft preview graph 키 */
 const CODE_MODE_SHARED_DRAFT_GRAPH_KEY = 'previewGraph';
 /** code 모드 shared draft baseline revision 키 */
@@ -55,16 +57,20 @@ export function getCodeModeSharedDraftMap(doc: Y.Doc): Y.Map<unknown> {
  * @returns code 모드 shared draft Y.Text 또는 null
  */
 export function getCodeModeSharedDraftText(doc: Y.Doc): Y.Text | null {
+  // 원격 적용 직후의 AbstractType도 getText로 구체화하며 update는 만들지 않는다.
+  if (doc.share.has(CODE_MODE_SHARED_DRAFT_ROOT_TEXT_KEY)) {
+    return doc.getText(CODE_MODE_SHARED_DRAFT_ROOT_TEXT_KEY);
+  }
   const existing = getCodeModeSharedDraftMap(doc).get(CODE_MODE_SHARED_DRAFT_TEXT_KEY);
   return existing instanceof Y.Text ? existing : null;
 }
 
 /** 준비된 쓰기 트랜잭션 안에서만 누락된 텍스트를 생성한다. */
 function ensureCodeModeSharedDraftText(doc: Y.Doc): Y.Text {
-  const existing = getCodeModeSharedDraftText(doc);
-  if (existing) return existing;
-  const text = new Y.Text();
-  getCodeModeSharedDraftMap(doc).set(CODE_MODE_SHARED_DRAFT_TEXT_KEY, text);
+  const hasRoot = doc.share.has(CODE_MODE_SHARED_DRAFT_ROOT_TEXT_KEY);
+  const legacy = hasRoot ? '' : (getCodeModeSharedDraftText(doc)?.toString() ?? '');
+  const text = doc.getText(CODE_MODE_SHARED_DRAFT_ROOT_TEXT_KEY);
+  if (legacy) text.insert(0, legacy);
   return text;
 }
 

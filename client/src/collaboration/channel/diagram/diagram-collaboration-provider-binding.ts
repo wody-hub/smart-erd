@@ -11,6 +11,7 @@ export class DiagramCollaborationProviderBinding {
    * provider 이벤트를 store 콜백에 연결한다.
    */
   bind(provider: YjsProvider): void {
+    provider.onInitializationDelayed = this.callbacks.onInitializationDelayed ?? null;
     provider.onSyncStateChange = this.callbacks.onSyncStateChange;
     provider.onEmptyDocumentInitialized = this.callbacks.onEmptyDocumentInitialized ?? null;
     provider.onConnectionStatusChange = this.callbacks.onConnectionStatusChange;
@@ -31,6 +32,7 @@ export class DiagramCollaborationProviderBinding {
     if (!provider) {
       return;
     }
+    provider.onInitializationDelayed = null;
     provider.onSyncStateChange = null;
     provider.onEmptyDocumentInitialized = null;
     provider.onConnectionStatusChange = null;

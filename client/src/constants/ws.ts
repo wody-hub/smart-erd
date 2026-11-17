@@ -5,6 +5,8 @@
  * 백엔드 DiagramWebSocketHandler의 타입 코드와 일치해야 한다.
  */
 export const WS_MSG_TYPE = {
+  /** 서버가 수락한 프로토콜 버전 (1바이트 버전) */
+  PROTOCOL_CAPABILITY: 0x10,
   /** Yjs sync step 1 (state vector 요청) */
   SYNC_STEP1: 0x01,
   /** Yjs sync step 2 (diff 응답) */

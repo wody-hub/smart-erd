@@ -41,6 +41,7 @@ public class DiagramWebSocketSessionLifecycle {
      * @param info 정규화된 세션 메타데이터
      */
     public void establish(WebSocketSession session, DiagramWebSocketSessionInfo info) {
+        diagramSessionTransportUseCase.reportProtocolVersion(session);
         final var joinResult = diagramSessionTransportUseCase.join(
             session,
             info.diagramId(),
@@ -81,6 +82,18 @@ public class DiagramWebSocketSessionLifecycle {
      * @param info 세션 메타데이터. 없으면 roomManager 조회 결과로 보완한다.
      */
     public void close(WebSocketSession session, @Nullable DiagramWebSocketSessionInfo info) {
+        synchronized (diagramSessionTransportUseCase.getCloseLock(session, info != null ? info.diagramId() : null)) {
+            closeUnderLock(session, info);
+        }
+    }
+
+    /**
+     * flush 락 안에서 room 제거와 마지막 update 저장 완료를 연속해서 수행한다.
+     *
+     * @param session 종료 세션
+     * @param info 세션 메타데이터
+     */
+    private void closeUnderLock(WebSocketSession session, @Nullable DiagramWebSocketSessionInfo info) {
         final var closeResult = diagramSessionTransportUseCase.close(
             session,
             info != null ? info.diagramId() : null,

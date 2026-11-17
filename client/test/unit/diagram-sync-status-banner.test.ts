@@ -5,6 +5,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createInstance } from 'i18next';
 import { I18nextProvider } from 'react-i18next';
+import { toPreviewSyncStatus } from '../../src/collaboration/core/collaboration-preview-sync-status.js';
 import DiagramSyncStatusBanner from '../../src/components/erd/DiagramSyncStatusBanner.js';
 
 for (const language of ['ko', 'en']) {
@@ -45,3 +46,8 @@ for (const language of ['ko', 'en']) {
     });
   }
 }
+
+test('preview가 없는 빈 문서도 초기화 지연 배너 상태를 노출한다', () => {
+  assert.equal(toPreviewSyncStatus('degraded', false), 'degraded');
+  assert.equal(toPreviewSyncStatus('live', false), 'inactive');
+});

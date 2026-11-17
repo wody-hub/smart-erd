@@ -248,6 +248,12 @@ class DiagramWebSocketHandlerTest {
 
     private Fixture createFixture(List<TestMessageHandler> handlers) {
         final var diagramSessionTransportUseCase = mock(DiagramSessionTransportUseCase.class);
+        when(
+            diagramSessionTransportUseCase.getCloseLock(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.nullable(Long.class)
+            )
+        ).thenReturn(new Object());
         final var snapshotService = mock(DiagramSnapshotService.class);
         final var messageSender = mock(DiagramMessageSender.class);
         final var presenceNotifier = mock(DiagramPresenceNotifier.class);

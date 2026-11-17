@@ -16,6 +16,7 @@ export function toPreviewSyncStatus(
   runtimeState: CollaborationRuntimeState,
   previewEnabled: boolean,
 ): PreviewSyncStatus {
+  if (runtimeState === 'degraded') return 'degraded';
   if (!previewEnabled) {
     return 'inactive';
   }
@@ -23,8 +24,6 @@ export function toPreviewSyncStatus(
   switch (runtimeState) {
     case 'live':
       return 'live';
-    case 'degraded':
-      return 'degraded';
     case 'preview':
     case 'hydrating':
     case 'reconnecting':

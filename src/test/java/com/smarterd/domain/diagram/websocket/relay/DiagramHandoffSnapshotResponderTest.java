@@ -1,5 +1,7 @@
 package com.smarterd.domain.diagram.websocket.relay;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyByte;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -14,12 +16,18 @@ import com.smarterd.application.collaboration.query.LoadCollaborationHandoffUseC
 import com.smarterd.collaboration.channel.CollaborationResourceKey;
 import com.smarterd.collaboration.handoff.CollaborationHandoffResult;
 import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
+import com.smarterd.config.websocket.WebSocketProperties;
 import com.smarterd.domain.diagram.websocket.protocol.YjsUpdateFormat;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -34,11 +42,7 @@ class DiagramHandoffSnapshotResponderTest {
     void respond_v2SendsSingleSnapshotMessage() throws Exception {
         final var loadUseCase = mock(LoadCollaborationHandoffUseCase.class);
         final var messageSender = mock(DiagramMessageSender.class);
-        final var responder = new DiagramHandoffSnapshotResponder(
-            loadUseCase,
-            messageSender,
-            mock(DiagramRoomManager.class)
-        );
+        final var responder = new DiagramHandoffSnapshotResponder(loadUseCase, messageSender, roomManager());
         final var session = mock(WebSocketSession.class);
         final var resourceKey = new CollaborationResourceKey("diagram", "1");
         final var context = new DiagramMessageContext(
@@ -80,11 +84,7 @@ class DiagramHandoffSnapshotResponderTest {
     void respond_v1DecodesAndSendsWrappedUpdates() throws Exception {
         final var loadUseCase = mock(LoadCollaborationHandoffUseCase.class);
         final var messageSender = mock(DiagramMessageSender.class);
-        final var responder = new DiagramHandoffSnapshotResponder(
-            loadUseCase,
-            messageSender,
-            mock(DiagramRoomManager.class)
-        );
+        final var responder = new DiagramHandoffSnapshotResponder(loadUseCase, messageSender, roomManager());
         final var session = mock(WebSocketSession.class);
         final var resourceKey = new CollaborationResourceKey("diagram", "1");
         final var snapshot = YjsUpdateFormat.encode(List.of(new byte[] { 0x11 }, new byte[] { 0x22, 0x33 }));
@@ -129,7 +129,7 @@ class DiagramHandoffSnapshotResponderTest {
     void respond_emptySnapshotConfirmsOnlyV3(int protocolVersion, byte requestType) throws Exception {
         final var loadUseCase = mock(LoadCollaborationHandoffUseCase.class);
         final var messageSender = mock(DiagramMessageSender.class);
-        final var roomManager = mock(DiagramRoomManager.class);
+        final var roomManager = roomManager();
         final var responder = new DiagramHandoffSnapshotResponder(loadUseCase, messageSender, roomManager);
         final var session = mock(WebSocketSession.class);
         final var resourceKey = new CollaborationResourceKey("diagram", "1");
@@ -174,21 +174,18 @@ class DiagramHandoffSnapshotResponderTest {
     }
 
     @ParameterizedTest
-    @CsvSource({ "5,true", "13,true", "5,false", "13,false" })
-    @DisplayName("sync에 응답할 peer나 미반영 update가 있으면 빈 snapshot 확인을 보내지 않는다")
-    void respond_emptySnapshotWithPeerOrUpdatesSendsNothing(byte requestType, boolean hasPeer) {
+    @CsvSource({ "5", "13" })
+    @DisplayName("미반영 update가 있으면 빈 snapshot 확인을 보내지 않는다")
+    void respond_emptySnapshotWithPendingUpdatesSendsNothing(byte requestType) {
         final var loadUseCase = mock(LoadCollaborationHandoffUseCase.class);
         final var messageSender = mock(DiagramMessageSender.class);
-        final var roomManager = mock(DiagramRoomManager.class);
+        final var roomManager = roomManager();
         final var responder = new DiagramHandoffSnapshotResponder(loadUseCase, messageSender, roomManager);
         final var session = mock(WebSocketSession.class);
-        final var peer = mock(WebSocketSession.class);
         final var resourceKey = new CollaborationResourceKey("diagram", "1");
         when(session.getId()).thenReturn("requester");
-        when(peer.getId()).thenReturn("peer");
-        when(peer.isOpen()).thenReturn(true);
-        when(roomManager.getSessions(1L)).thenReturn(hasPeer ? Set.of(session, peer) : Set.of(session));
-        when(roomManager.hasUpdates(1L)).thenReturn(!hasPeer);
+        when(roomManager.getSessions(1L)).thenReturn(Set.of(session));
+        when(roomManager.hasUpdates(1L)).thenReturn(true);
         when(session.getAttributes()).thenReturn(
             Map.of(
                 CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
@@ -202,6 +199,104 @@ class DiagramHandoffSnapshotResponderTest {
         responder.respond(context(session, resourceKey, requestType));
 
         verifyNoInteractions(messageSender);
+    }
+
+    @ParameterizedTest
+    @CsvSource({ "5", "13" })
+    @DisplayName("서버 기준으로 비어 있으면 다른 peer가 있어도 v3 세션에 초기화 확인을 보낸다")
+    void respond_emptySnapshotWithOpenPeerStillConfirms(byte requestType) throws Exception {
+        final var loadUseCase = mock(LoadCollaborationHandoffUseCase.class);
+        final var messageSender = mock(DiagramMessageSender.class);
+        final var roomManager = roomManager();
+        final var responder = new DiagramHandoffSnapshotResponder(loadUseCase, messageSender, roomManager);
+        final var session = mock(WebSocketSession.class);
+        final var peer = mock(WebSocketSession.class);
+        final var resourceKey = new CollaborationResourceKey("diagram", "1");
+        when(session.getId()).thenReturn("requester");
+        when(peer.getId()).thenReturn("peer");
+        when(peer.isOpen()).thenReturn(true);
+        when(roomManager.getSessions(1L)).thenReturn(Set.of(session, peer));
+        when(roomManager.hasUpdates(1L)).thenReturn(false);
+        when(session.getAttributes()).thenReturn(
+            Map.of(
+                CollaborationAuthenticatedSession.SESSION_ATTR_KEY,
+                new CollaborationAuthenticatedSession("user-1", "login-1", "User", resourceKey, Instant.MAX, 3)
+            )
+        );
+        when(loadUseCase.loadHandoffSnapshot(resourceKey)).thenReturn(
+            new CollaborationHandoffResult(new byte[0], "snapshot-store")
+        );
+        when(messageSender.wrapMessage(eq((byte) 0x0F), argThat((byte[] body) -> body.length == 0))).thenReturn(
+            new byte[] { 0x0F }
+        );
+
+        responder.respond(context(session, resourceKey, requestType));
+
+        verify(messageSender).sendBinaryToSession(
+            eq(session),
+            argThat((byte[] bytes) -> java.util.Arrays.equals(bytes, new byte[] { 0x0F }))
+        );
+    }
+
+    @Test
+    @DisplayName("flush drain 후 commit 전 handoff는 빈 조회를 실행하지 않고 commit된 데이터를 전송한다")
+    void respond_waitsForDrainedUpdatesToCommit() throws Exception {
+        final var manager = new DiagramRoomManager(new WebSocketProperties());
+        final var loadUseCase = mock(LoadCollaborationHandoffUseCase.class);
+        final var sender = mock(DiagramMessageSender.class);
+        final var responder = new DiagramHandoffSnapshotResponder(loadUseCase, sender, manager);
+        final var session = mock(WebSocketSession.class);
+        final var key = new CollaborationResourceKey("diagram", "1");
+        final var committed = new AtomicReference<>(new byte[0]);
+        when(loadUseCase.loadHandoffSnapshot(key)).thenAnswer((invocation) ->
+            new CollaborationHandoffResult(committed.get(), "db")
+        );
+        when(sender.wrapMessage(eq(DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE_V2), any())).thenReturn(
+            new byte[] { DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE_V2, 0x11 }
+        );
+        assertThat(manager.appendUpdate(1L, new byte[] { 0x11 })).isTrue();
+        final var drained = new CountDownLatch(1);
+        final var commit = new CountDownLatch(1);
+        final var requested = new CountDownLatch(1);
+        try (final var executor = Executors.newFixedThreadPool(2)) {
+            final var flushing = executor.submit(() -> {
+                synchronized (manager.getFlushLock(1L)) {
+                    final var updates = manager.drainAndMergeUpdates(1L);
+                    drained.countDown();
+                    assertThat(commit.await(5, TimeUnit.SECONDS)).isTrue();
+                    committed.set(updates);
+                }
+                return null;
+            });
+            try {
+                assertThat(drained.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThat(manager.hasUpdates(1L)).isFalse();
+                final var response = executor.submit(() -> {
+                    requested.countDown();
+                    responder.respond(context(session, key, DiagramMessageTypes.MSG_SNAPSHOT_REQUEST_V2));
+                });
+                assertThat(requested.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThatThrownBy(() -> response.get(100, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+                verifyNoInteractions(loadUseCase, sender);
+                commit.countDown();
+                flushing.get(5, TimeUnit.SECONDS);
+                response.get(5, TimeUnit.SECONDS);
+                verify(sender).wrapMessage(
+                    eq(DiagramMessageTypes.MSG_SNAPSHOT_RESPONSE_V2),
+                    argThat((byte[] bytes) -> java.util.Arrays.equals(bytes, committed.get()))
+                );
+                verify(sender).sendBinaryToSession(eq(session), any());
+                verify(sender, never()).wrapMessage(eq(DiagramMessageTypes.MSG_EMPTY_DOCUMENT_INITIALIZED), any());
+            } finally {
+                commit.countDown();
+            }
+        }
+    }
+
+    private DiagramRoomManager roomManager() {
+        final var manager = mock(DiagramRoomManager.class);
+        when(manager.getFlushLock(1L)).thenReturn(new Object());
+        return manager;
     }
 
     /**

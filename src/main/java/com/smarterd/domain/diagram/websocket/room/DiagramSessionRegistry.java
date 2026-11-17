@@ -20,8 +20,10 @@ final class DiagramSessionRegistry {
     /** 세션 ID → 실제 WebSocket 세션 */
     private final Map<String, WebSocketSession> sessionsById = new ConcurrentHashMap<>();
 
-    /** 다이어그램별 flush 동기화 락 */
-    private final Map<Long, Object> flushLocks = new ConcurrentHashMap<>();
+    /** room 재생성과 대기자 수명에 무관하게 유지되는 고정 크기 flush 락 */
+    private final Object[] flushLocks = java.util.stream.IntStream.range(0, 256)
+        .mapToObj((index) -> new Object())
+        .toArray();
 
     /** 사용자별 동시 WebSocket 연결 수 (userId → 카운터) */
     private final Map<String, AtomicInteger> userSessionCounts = new ConcurrentHashMap<>();
@@ -232,16 +234,16 @@ final class DiagramSessionRegistry {
      * @return flush 락
      */
     Object getFlushLock(Long diagramId) {
-        return flushLocks.computeIfAbsent(diagramId, (k) -> new Object());
+        return flushLocks[Math.floorMod(diagramId.hashCode(), flushLocks.length)];
     }
 
     /**
-     * 다이어그램 flush 락을 제거한다.
+     * 기존 cleanup 호출과 호환하되 대기자와 공유하는 stripe 락은 유지한다.
      *
      * @param diagramId 다이어그램 ID
      */
     void removeFlushLock(Long diagramId) {
-        flushLocks.remove(diagramId);
+        // 고정 stripe 락은 대기 중인 handoff/flush와 같은 객체를 계속 사용한다.
     }
 
     /**

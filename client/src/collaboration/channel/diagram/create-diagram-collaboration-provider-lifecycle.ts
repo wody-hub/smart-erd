@@ -68,11 +68,20 @@ export function createDiagramCollaborationProviderLifecycle(
     (synced) => {
       previewHydrationController.onSyncStateChange(synced);
       options.onSyncStateChange?.(synced);
+      if (synced) options.dispatchRuntimeEvent('remote-snapshot-applied');
     },
   );
   const providerBinding = new DiagramCollaborationProviderBinding({
     ...callbacks,
-    onEmptyDocumentInitialized: options.onEmptyDocumentInitialized,
+    onInitializationDelayed: () => options.dispatchRuntimeEvent('fallback-timeout'),
+    onEmptyDocumentInitialized: () => {
+      options.onEmptyDocumentInitialized?.();
+      options.dispatchRuntimeEvent(
+        options.bootstrap.hasYdocSnapshot || options.bootstrap.content || options.previewEnabled
+          ? 'fallback-timeout'
+          : 'remote-snapshot-applied',
+      );
+    },
     onConnectionStatusChange: (status) => {
       options.onConnectionStatusChange?.(status);
       callbacks.onConnectionStatusChange(status);

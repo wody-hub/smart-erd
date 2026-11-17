@@ -77,3 +77,38 @@ test('draft lookup emits no updates and preserves the later remote text', () => 
   local.destroy();
   remote.destroy();
 });
+
+test('동시 최초 초안 입력은 두 탭의 텍스트를 모두 보존한다', () => {
+  const a = new Y.Doc();
+  const b = new Y.Doc();
+  writeCodeModeSharedDraftTextSnapshot(a, 'draft-A', 'r1', false, false, 'a');
+  writeCodeModeSharedDraftTextSnapshot(b, 'draft-B', 'r1', false, false, 'b');
+  const aUpdate = Y.encodeStateAsUpdate(a);
+  const bUpdate = Y.encodeStateAsUpdate(b);
+  Y.applyUpdate(a, bUpdate);
+  Y.applyUpdate(b, aUpdate);
+  assert.equal(readCodeModeSharedDraftText(a), readCodeModeSharedDraftText(b));
+  assert.ok(readCodeModeSharedDraftText(a).includes('draft-A'));
+  assert.ok(readCodeModeSharedDraftText(a).includes('draft-B'));
+  a.destroy();
+  b.destroy();
+});
+
+test('레거시 중첩 텍스트는 읽을 때 변경하지 않고 첫 쓰기에서 루트로 이관한다', () => {
+  const doc = new Y.Doc();
+  const legacy = new Y.Text('legacy');
+  doc.getMap('codeModeSharedDraft').set('text', legacy);
+  const before = Y.encodeStateAsUpdate(doc);
+  assert.equal(readCodeModeSharedDraftText(doc), 'legacy');
+  assert.deepEqual(Y.encodeStateAsUpdate(doc), before);
+  writeCodeModeSharedDraftTextSnapshot(doc, 'edited', 'r1', false, false, 'edit');
+  assert.equal(doc.getText('codeModeSharedDraftText').toString(), 'edited');
+  assert.equal(legacy.toString(), 'legacy');
+  clearCodeModeSharedDraft(doc, 'clear');
+  assert.equal(
+    readCodeModeSharedDraftText(doc),
+    '',
+    '이관 이후 레거시 내용이 다시 나타나지 않는다',
+  );
+  doc.destroy();
+});

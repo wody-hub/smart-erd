@@ -69,12 +69,16 @@ public class DiagramRoomManager {
 
     /** @param diagramId 다이어그램 ID @param session 세션 @param userId 사용자 ID @param displayName 표시 이름 @return 입장 결과 */
     public JoinResult join(Long diagramId, WebSocketSession session, String userId, String displayName) {
-        return joinSupport.join(diagramId, session, userId, displayName);
+        synchronized (getFlushLock(diagramId)) {
+            return joinSupport.join(diagramId, session, userId, displayName);
+        }
     }
 
     /** @param diagramId 다이어그램 ID @param session 세션 @param userId 사용자 ID @return 퇴장 결과 */
     public LeaveResult leave(Long diagramId, WebSocketSession session, String userId) {
-        return leaveSupport.leave(diagramId, session, userId);
+        synchronized (getFlushLock(diagramId)) {
+            return leaveSupport.leave(diagramId, session, userId);
+        }
     }
 
     /** @param diagramId 다이어그램 ID @return presence snapshot */

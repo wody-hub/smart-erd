@@ -28,6 +28,12 @@ class DiagramWebSocketSessionLifecycleTest {
     @DisplayName("join 거부 시 세션을 policy violation으로 종료하고 후속 join 처리를 호출하지 않는다")
     void establish_whenJoinRejected_closesSessionAndSkipsJoinCompletion() throws Exception {
         final var diagramSessionTransportUseCase = mock(DiagramSessionTransportUseCase.class);
+        when(
+            diagramSessionTransportUseCase.getCloseLock(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.nullable(Long.class)
+            )
+        ).thenReturn(new Object());
         final var completeJoinUseCase = mock(CompleteDiagramSessionJoinUseCase.class);
         final var completeLeaveUseCase = mock(CompleteDiagramSessionLeaveUseCase.class);
         final var legacyPresencePort = mock(DiagramLegacyPresencePort.class);
@@ -57,6 +63,12 @@ class DiagramWebSocketSessionLifecycleTest {
     @DisplayName("join 허용 시 후속 join use case에 결과를 위임한다")
     void establish_whenJoinAccepted_delegatesToJoinCompletion() {
         final var diagramSessionTransportUseCase = mock(DiagramSessionTransportUseCase.class);
+        when(
+            diagramSessionTransportUseCase.getCloseLock(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.nullable(Long.class)
+            )
+        ).thenReturn(new Object());
         final var completeJoinUseCase = mock(CompleteDiagramSessionJoinUseCase.class);
         final var completeLeaveUseCase = mock(CompleteDiagramSessionLeaveUseCase.class);
         final var legacyPresencePort = mock(DiagramLegacyPresencePort.class);
@@ -90,6 +102,12 @@ class DiagramWebSocketSessionLifecycleTest {
     @DisplayName("close 시 room 조회가 불가능하면 leave와 후속 leave 처리를 생략한다")
     void close_whenDiagramIdCannotBeResolved_skipsLeave() {
         final var diagramSessionTransportUseCase = mock(DiagramSessionTransportUseCase.class);
+        when(
+            diagramSessionTransportUseCase.getCloseLock(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.nullable(Long.class)
+            )
+        ).thenReturn(new Object());
         final var completeJoinUseCase = mock(CompleteDiagramSessionJoinUseCase.class);
         final var completeLeaveUseCase = mock(CompleteDiagramSessionLeaveUseCase.class);
         final var legacyPresencePort = mock(DiagramLegacyPresencePort.class);
@@ -116,6 +134,12 @@ class DiagramWebSocketSessionLifecycleTest {
     @DisplayName("close 시 fallback room 조회가 가능하면 leave 결과를 후속 leave use case에 위임한다")
     void close_whenDiagramIdResolvedViaFallback_delegatesToLeaveCompletion() {
         final var diagramSessionTransportUseCase = mock(DiagramSessionTransportUseCase.class);
+        when(
+            diagramSessionTransportUseCase.getCloseLock(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.nullable(Long.class)
+            )
+        ).thenReturn(new Object());
         final var completeJoinUseCase = mock(CompleteDiagramSessionJoinUseCase.class);
         final var completeLeaveUseCase = mock(CompleteDiagramSessionLeaveUseCase.class);
         final var legacyPresencePort = mock(DiagramLegacyPresencePort.class);
@@ -149,6 +173,12 @@ class DiagramWebSocketSessionLifecycleTest {
     @DisplayName("close 시 legacy loginId가 있으면 legacy peer-left 브로드캐스트를 수행한다")
     void close_whenLegacyLoginIdExists_broadcastsLegacyPeerLeft() {
         final var diagramSessionTransportUseCase = mock(DiagramSessionTransportUseCase.class);
+        when(
+            diagramSessionTransportUseCase.getCloseLock(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.nullable(Long.class)
+            )
+        ).thenReturn(new Object());
         final var completeJoinUseCase = mock(CompleteDiagramSessionJoinUseCase.class);
         final var completeLeaveUseCase = mock(CompleteDiagramSessionLeaveUseCase.class);
         final var legacyPresencePort = mock(DiagramLegacyPresencePort.class);

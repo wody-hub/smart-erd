@@ -142,6 +142,10 @@ for (const room of ['empty', 'snapshot-null-content', 'populated']) {
     clock.advance(1_000);
     await new Promise<void>((resolve) => setImmediate(resolve));
     sockets[1].open();
+    sockets[1].receive(new Uint8Array([ws.WS_MSG_TYPE.PROTOCOL_CAPABILITY, 3]));
+    sockets[1].receive(new Uint8Array([ws.WS_MSG_TYPE.SYNC_STEP2, 0, 0]));
+    assert.equal(ready(), false, 'v3 peer의 빈 STEP2는 편집이나 전체 저장을 허용하지 않는다');
+    assert.equal(runtime.getHydratedSnapshot(), null);
     sockets[0].receive(new Uint8Array([0x0f]));
     sockets[0].receive(new Uint8Array([ws.WS_MSG_TYPE.SYNC_STEP2, 0, 0]));
     sockets[0].onclose({ code: 1000, reason: '' });
@@ -157,7 +161,7 @@ for (const room of ['empty', 'snapshot-null-content', 'populated']) {
       assert.ok(runtime.getHydratedSnapshot(), '첫 편집 이후에는 빈 초기 기준으로 저장한다');
       assert.equal(runtime.getHydratedContentRevision(), '1');
     } else {
-      sockets[1].receive(new Uint8Array([ws.WS_MSG_TYPE.SYNC_STEP2, 0, 0]));
+      sockets[1].receive(new Uint8Array([ws.WS_MSG_TYPE.SNAPSHOT_RESPONSE, 0, 0]));
       assert.equal(provider.isSynced(), true);
       assert.equal(ready(), room === 'snapshot-null-content');
       lifecycle.updatePreviewMode(false);
@@ -198,4 +202,87 @@ function testClock() {
       now = target;
     },
   };
+}
+
+for (const negotiated of [undefined, 1, 2, 3]) {
+  test(`프로토콜 ${negotiated ?? '구 서버'}: peer STEP2와 서버 handoff의 준비 상태를 구분한다`, async () => {
+    const doc = new Y.Doc();
+    const clock = testClock();
+    class Socket {
+      static OPEN = 1;
+      static CONNECTING = 0;
+      static current: Socket;
+      readyState = 0;
+      sent: Uint8Array[] = [];
+      onopen = () => {};
+      onmessage = (_event: { data: ArrayBuffer }) => {};
+      constructor() {
+        Socket.current = this;
+      }
+      send(bytes: Uint8Array) {
+        this.sent.push(bytes);
+      }
+      close() {
+        this.readyState = 3;
+      }
+      receive(bytes: Uint8Array) {
+        this.onmessage({ data: bytes.buffer as ArrayBuffer });
+      }
+    }
+    const h = sourceHookHarness(
+      'src/collaboration/YjsProvider.ts',
+      {
+        yjs: Y,
+        ws,
+        platform: { getWsBaseUrl: () => 'ws://local' },
+      },
+      { WebSocket: Socket, TextEncoder, ArrayBuffer, ...clock.globals },
+    );
+    const Provider = h.exports.YjsProvider as new (...args: unknown[]) => {
+      connect: () => void;
+      destroy: () => void;
+      isSynced: () => boolean;
+      onInitializationDelayed: (() => void) | null;
+      onSyncStateChange: ((next: boolean) => void) | null;
+    };
+    const provider = new Provider(doc, { diagramId: 'd', getTicket: async () => ({ ticket: '' }) });
+    let delayed = 0;
+    let hydratedBaseline: Uint8Array | null = null;
+    provider.onInitializationDelayed = () => delayed++;
+    provider.onSyncStateChange = (next) => {
+      hydratedBaseline = next ? Y.encodeStateAsUpdate(doc) : null;
+    };
+    provider.connect();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const socket = Socket.current;
+    socket.readyState = 1;
+    socket.onopen();
+    if (negotiated !== undefined)
+      socket.receive(new Uint8Array([ws.WS_MSG_TYPE.PROTOCOL_CAPABILITY, negotiated]));
+    socket.receive(new Uint8Array([ws.WS_MSG_TYPE.SYNC_STEP2, 0, 0]));
+    assert.equal(provider.isSynced(), negotiated !== 3);
+    if (negotiated === 3) {
+      assert.equal(hydratedBaseline, null);
+      clock.advance(60_000);
+      assert.equal(provider.isSynced(), false, '시간 경과는 편집/저장 게이트를 열지 않는다');
+      assert.equal(delayed, 1);
+      assert.equal(
+        socket.sent.filter((m) => m[0] === ws.WS_MSG_TYPE.SNAPSHOT_REQUEST_V2).length,
+        4,
+      );
+      const remote = new Y.Doc();
+      remote.getMap('tables').set('server', 'hydrated');
+      const update = Y.encodeStateAsUpdate(remote);
+      socket.receive(new Uint8Array([ws.WS_MSG_TYPE.SNAPSHOT_RESPONSE_V2, ...update]));
+      assert.equal(doc.getMap('tables').get('server'), 'hydrated');
+      assert.equal(provider.isSynced(), true);
+      assert.ok(hydratedBaseline);
+      remote.destroy();
+    }
+    provider.destroy();
+    const count = socket.sent.length;
+    clock.advance(60_000);
+    assert.equal(socket.sent.length, count);
+    doc.destroy();
+  });
 }

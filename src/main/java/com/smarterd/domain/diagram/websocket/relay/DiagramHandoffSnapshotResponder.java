@@ -28,6 +28,17 @@ public class DiagramHandoffSnapshotResponder {
      * @param context 메시지 컨텍스트
      */
     public void respond(DiagramMessageContext context) {
+        synchronized (roomManager.getFlushLock(context.diagramId())) {
+            respondUnderLock(context);
+        }
+    }
+
+    /**
+     * flush/leave와 같은 경계에서 snapshot 조회 및 빈 문서 판정을 수행한다.
+     *
+     * @param context 요청 컨텍스트
+     */
+    private void respondUnderLock(DiagramMessageContext context) {
         final var startedAt = System.nanoTime();
         try {
             final var loadStartedAt = System.nanoTime();
@@ -62,7 +73,7 @@ public class DiagramHandoffSnapshotResponder {
     }
 
     /**
-     * 빈 snapshot이며 sync에 응답할 peer와 미반영 update가 없을 때 v3 세션에만 확인을 보낸다.
+     * 빈 snapshot이며 미반영 update가 없을 때 v3 세션에만 확인을 보낸다.
      *
      * @param context 요청 세션 컨텍스트
      * @throws Exception 메시지 전송 실패 시
@@ -72,11 +83,10 @@ public class DiagramHandoffSnapshotResponder {
         if (!(metadata instanceof CollaborationAuthenticatedSession sessionInfo) || sessionInfo.protocolVersion() < 3) {
             return;
         }
-        final var hasPeer = roomManager
-            .getSessions(context.diagramId())
-            .stream()
-            .anyMatch((peer) -> !context.sessionId().equals(peer.getId()) && peer.isOpen());
-        if (hasPeer || roomManager.hasUpdates(context.diagramId())) {
+        // 빈 판정은 DB snapshot과 room 버퍼(미반영 update 포함)를 같은 flush 경계에서 확인한 결과다.
+        // 다른 peer가 있어도 서버 기준으로 비어 있으면 확인을 보낸다. v3 클라이언트는 peer의 빈
+        // SYNC_STEP2가 아니라 서버 handoff만 초기화 근거로 쓰므로, peer 유무로 생략하면 영구 대기한다.
+        if (roomManager.hasUpdates(context.diagramId())) {
             return;
         }
         messageSender.sendBinaryToSession(

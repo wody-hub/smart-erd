@@ -52,6 +52,9 @@ public final class DiagramMessageTypes {
     /** Empty document initialized (서버 → v3 클라이언트, payload 없음, 저장 ACK가 아님) */
     public static final byte MSG_EMPTY_DOCUMENT_INITIALIZED = 0x0F;
 
+    /** 서버가 수락한 프로토콜 버전 (서버 → 클라이언트, 1바이트 버전) */
+    public static final byte MSG_PROTOCOL_CAPABILITY = 0x10;
+
     /**
      * 메시지 타입 상수 전용 유틸리티 클래스 인스턴스화를 방지한다.
      */

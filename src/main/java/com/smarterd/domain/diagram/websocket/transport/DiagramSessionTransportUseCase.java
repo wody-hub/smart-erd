@@ -1,10 +1,13 @@
 package com.smarterd.domain.diagram.websocket.transport;
 
+import com.smarterd.collaboration.session.CollaborationAuthenticatedSession;
 import com.smarterd.domain.diagram.websocket.model.JoinResult;
+import com.smarterd.domain.diagram.websocket.relay.DiagramMessageTypes;
 import com.smarterd.domain.diagram.websocket.room.DiagramRoomManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
+import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 /**
@@ -27,6 +30,41 @@ public class DiagramSessionTransportUseCase {
      */
     public JoinResult join(WebSocketSession session, Long diagramId, String userId, String userName) {
         return roomManager.join(diagramId, session, userId, userName);
+    }
+
+    /**
+     * drain부터 저장 commit까지 handoff와 공유할 락을 반환한다.
+     *
+     * @param session 종료 세션
+     * @param diagramId 메타데이터의 다이어그램 ID
+     * @return 안정적인 flush 락. room 매핑도 없으면 세션 자체
+     */
+    public Object getCloseLock(WebSocketSession session, @Nullable Long diagramId) {
+        final var resolvedId = diagramId != null ? diagramId : roomManager.findDiagramIdBySessionId(session.getId());
+        return resolvedId != null ? roomManager.getFlushLock(resolvedId) : session;
+    }
+
+    /**
+     * peer relay보다 먼저 서버가 수락한 프로토콜 버전을 보고한다.
+     *
+     * @param session 입장 세션
+     */
+    public void reportProtocolVersion(WebSocketSession session) {
+        final var metadata = session.getAttributes().get(CollaborationAuthenticatedSession.SESSION_ATTR_KEY);
+        if (!(metadata instanceof CollaborationAuthenticatedSession info)) {
+            return;
+        }
+        synchronized (roomManager.getSessionLock(session)) {
+            try {
+                session.sendMessage(
+                    new BinaryMessage(
+                        new byte[] { DiagramMessageTypes.MSG_PROTOCOL_CAPABILITY, (byte) info.protocolVersion() }
+                    )
+                );
+            } catch (Exception e) {
+                throw new IllegalStateException("협업 프로토콜 capability 전송 실패", e);
+            }
+        }
     }
 
     /**

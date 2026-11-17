@@ -453,6 +453,7 @@ export default function DiagramPage() {
                     rightSlot={diagramHeaderRightSlot}
                   />
                   {(workModeRuntimeState.showPreviewSyncBanner ||
+                    previewSyncStatus === 'degraded' ||
                     collaborationSetupErrorKind ||
                     connectionIssue) && (
                     <DiagramSyncStatusBanner

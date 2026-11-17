@@ -118,7 +118,6 @@ class DiagramCollaborationPluginTest {
         final var pendingUpdates = new byte[] { 0x55 };
         final var warmSnapshot = new byte[] { 0x11, 0x22 };
 
-        when(diagramRoomManager.getSessionCount(42L)).thenReturn(2);
         when(diagramRoomManager.peekMergedUpdates(42L)).thenReturn(pendingUpdates);
         when(diagramSnapshotService.buildWarmHandoffSnapshot(42L, pendingUpdates)).thenReturn(warmSnapshot);
 
@@ -126,7 +125,6 @@ class DiagramCollaborationPluginTest {
 
         assertThat(result).isEqualTo(new CollaborationHandoffResult(warmSnapshot, "warm"));
 
-        verify(diagramRoomManager).getSessionCount(42L);
         verify(diagramRoomManager).peekMergedUpdates(42L);
         verify(diagramSnapshotService).buildWarmHandoffSnapshot(42L, pendingUpdates);
         verify(collaborationSnapshotStore, never()).load(resourceKey);
@@ -141,7 +139,7 @@ class DiagramCollaborationPluginTest {
         );
         final var resourceKey = resourceKeyFactory.forDiagramId(42L);
         final var cachedSnapshot = new byte[] { 0x10, 0x20 };
-        when(diagramRoomManager.getSessionCount(42L)).thenReturn(1);
+        when(diagramRoomManager.peekMergedUpdates(42L)).thenReturn(new byte[0]);
         when(diagramSnapshotService.getCachedSnapshot(42L)).thenReturn(java.util.Optional.of(cachedSnapshot));
 
         final var result = policy.buildHandoffSnapshot(resourceKey, collaborationSnapshotStore);
@@ -161,7 +159,7 @@ class DiagramCollaborationPluginTest {
         final var resourceKey = resourceKeyFactory.forDiagramId(42L);
         final var snapshot = new byte[] { 0x33, 0x44 };
 
-        when(diagramRoomManager.getSessionCount(42L)).thenReturn(1);
+        when(diagramRoomManager.peekMergedUpdates(42L)).thenReturn(new byte[0]);
         when(diagramSnapshotService.getCachedSnapshot(42L)).thenReturn(java.util.Optional.empty());
         when(collaborationSnapshotStore.load(resourceKey)).thenReturn(snapshot);
 
@@ -169,9 +167,8 @@ class DiagramCollaborationPluginTest {
 
         assertThat(result).isEqualTo(new CollaborationHandoffResult(snapshot, "db"));
 
-        verify(diagramRoomManager).getSessionCount(42L);
+        verify(diagramRoomManager).peekMergedUpdates(42L);
         verify(collaborationSnapshotStore).load(resourceKey);
-        verify(diagramRoomManager, never()).peekMergedUpdates(42L);
         verify(diagramSnapshotService, never()).buildWarmHandoffSnapshot(anyLong(), any());
     }
 

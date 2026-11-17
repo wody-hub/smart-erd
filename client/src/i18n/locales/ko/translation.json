@@ -1713,7 +1713,7 @@
       "dictionaryContext": "다이어그램 사전 컨텍스트: {{name}}"
     },
     "previewSync": {
-      "snapshotDelayed": "최신 스냅샷을 불러오는 데 예상보다 오래 걸리고 있습니다. 다시 시도해 주세요.",
+      "snapshotDelayed": "문서 초기화가 예상보다 오래 걸리고 있습니다. 편집은 잠긴 상태입니다. 연결을 다시 시도해 주세요.",
       "retrySnapshot": "스냅샷 다시 불러오기",
       "headerReadonly": "실시간 동기화 연결 중",
       "sharedDraftOverlaySuppressed": "대형 다이어그램에서는 캔버스 응답성을 위해 shared draft 미리보기를 숨깁니다. code-first 초안은 적용 후 ERD에 반영됩니다.",
