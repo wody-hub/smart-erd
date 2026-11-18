@@ -85,6 +85,74 @@ export function readCodeModeSharedDraftText(doc: Y.Doc): string {
 }
 
 /**
+ * Y.Text 내용을 `next`로 바꾸되, 공통 앞·뒤 구간은 건드리지 않고 달라진 가운데 구간만 교체한다.
+ *
+ * 전체 삭제 후 재삽입은 동시 편집(또는 되먹임 루프)에서 문서 이력을 폭증시키고
+ * 두 클라이언트가 서로 덮어쓰는 문제를 키우므로, 최소 변경만 적용한다.
+ * UTF-16 서로게이트 쌍은 경계에서 쪼개지 않는다.
+ *
+ * @param yText 대상 Y.Text
+ * @param next  반영할 새 텍스트
+ * @returns 없음
+ */
+function applyMinimalTextChange(yText: Y.Text, next: string): void {
+  const current = yText.toString();
+  if (current === next) {
+    return;
+  }
+
+  const maxPrefix = Math.min(current.length, next.length);
+  let prefix = 0;
+  while (prefix < maxPrefix && current.charCodeAt(prefix) === next.charCodeAt(prefix)) {
+    prefix += 1;
+  }
+  if (prefix > 0 && isHighSurrogate(current.charCodeAt(prefix - 1))) {
+    prefix -= 1;
+  }
+
+  const maxSuffix = Math.min(current.length, next.length) - prefix;
+  let suffix = 0;
+  while (
+    suffix < maxSuffix &&
+    current.charCodeAt(current.length - 1 - suffix) === next.charCodeAt(next.length - 1 - suffix)
+  ) {
+    suffix += 1;
+  }
+  if (suffix > 0 && isLowSurrogate(current.charCodeAt(current.length - suffix))) {
+    suffix -= 1;
+  }
+
+  const deleteLength = current.length - prefix - suffix;
+  const insertText = next.slice(prefix, next.length - suffix);
+  if (deleteLength > 0) {
+    yText.delete(prefix, deleteLength);
+  }
+  if (insertText.length > 0) {
+    yText.insert(prefix, insertText);
+  }
+}
+
+/**
+ * UTF-16 high surrogate 여부를 반환한다.
+ *
+ * @param code charCode
+ * @returns high surrogate면 true
+ */
+function isHighSurrogate(code: number): boolean {
+  return code >= 0xd800 && code <= 0xdbff;
+}
+
+/**
+ * UTF-16 low surrogate 여부를 반환한다.
+ *
+ * @param code charCode
+ * @returns low surrogate면 true
+ */
+function isLowSurrogate(code: number): boolean {
+  return code >= 0xdc00 && code <= 0xdfff;
+}
+
+/**
  * code 모드 shared draft text를 통째로 교체한다.
  *
  * @param doc 대상 Y.Doc
@@ -99,13 +167,7 @@ export function replaceCodeModeSharedDraftText(doc: Y.Doc, text: string, origin:
   }
 
   doc.transact(() => {
-    const yText = ensureCodeModeSharedDraftText(doc);
-    if (yText.length > 0) {
-      yText.delete(0, yText.length);
-    }
-    if (text.length > 0) {
-      yText.insert(0, text);
-    }
+    applyMinimalTextChange(ensureCodeModeSharedDraftText(doc), text);
   }, origin);
 }
 
@@ -173,7 +235,7 @@ export function writeCodeModeSharedDraftBaselineRevision(
  * @param text 저장할 DSL text
  * @param baselineRevision 저장할 baseline revision
  * @param origin Yjs transaction origin
- * @returns 없음
+ * @returns 문서를 실제로 변경했으면 true, 이미 같은 값이라 생략했으면 false
  */
 export function writeCodeModeSharedDraftTextSnapshot(
   doc: Y.Doc,
@@ -182,7 +244,7 @@ export function writeCodeModeSharedDraftTextSnapshot(
   isIntentionalBlank: boolean,
   isConfirmedBlank: boolean,
   origin: unknown,
-): void {
+): boolean {
   const draftMap = getCodeModeSharedDraftMap(doc);
   const currentText = readCodeModeSharedDraftText(doc);
   const currentBaseline = readCodeModeSharedDraftBaselineRevision(doc);
@@ -194,18 +256,12 @@ export function writeCodeModeSharedDraftTextSnapshot(
     currentIntentionalBlank === isIntentionalBlank &&
     currentConfirmedBlank === isConfirmedBlank
   ) {
-    return;
+    return false;
   }
 
   doc.transact(() => {
-    const yText = ensureCodeModeSharedDraftText(doc);
     if (currentText !== text) {
-      if (yText.length > 0) {
-        yText.delete(0, yText.length);
-      }
-      if (text.length > 0) {
-        yText.insert(0, text);
-      }
+      applyMinimalTextChange(ensureCodeModeSharedDraftText(doc), text);
     }
 
     if (baselineRevision) {
@@ -228,6 +284,7 @@ export function writeCodeModeSharedDraftTextSnapshot(
 
     draftMap.set(CODE_MODE_SHARED_DRAFT_UPDATED_AT_KEY, Date.now());
   }, origin);
+  return true;
 }
 
 /**

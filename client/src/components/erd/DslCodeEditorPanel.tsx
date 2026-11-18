@@ -315,7 +315,9 @@ export default function DslCodeEditorPanel({
   const previousEditorScopeKeyRef = useRef(editorScopeKey);
   const dslTextScopeKeyRef = useRef(editorScopeKey);
   const dslTextValueRef = useRef('');
-  const flushPendingDraftImmediatelyRef = useRef<() => void>(() => {});
+  const flushPendingDraftImmediatelyRef = useRef<
+    (options?: { skipPersistSchedule?: boolean }) => void
+  >(() => {});
   /** 에디터 인스턴스 ref */
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   /** Monaco 인스턴스 ref */
@@ -801,36 +803,55 @@ export default function DslCodeEditorPanel({
     readCurrentDslText,
   ]);
 
-  const flushSharedSchemaDraftImmediately = useCallback(() => {
-    if (!persistDraft || !draftHydrated || !ydoc || !isCodeEditable()) {
-      return;
-    }
+  /**
+   * 현재 shared schema draft를 즉시 Y.Doc에 반영한다.
+   *
+   * 문서가 실제로 바뀐 경우에만 서버 스냅샷 저장을 예약한다. 변경이 없는데도 예약하면
+   * 저장 직전 콜백이 다시 저장을 예약하는 순환이 생긴다.
+   *
+   * @param options.skipPersistSchedule true면 변경이 있어도 저장 예약을 생략한다(저장 직전 콜백용)
+   * @returns 문서를 실제로 변경했으면 true
+   */
+  const flushSharedSchemaDraftImmediately = useCallback(
+    (options?: { skipPersistSchedule?: boolean }): boolean => {
+      if (!persistDraft || !draftHydrated || !ydoc || !isCodeEditable()) {
+        return false;
+      }
 
-    if (shouldSkipGeneratedFallbackSharedDraftWrite()) {
-      return;
-    }
+      if (shouldSkipGeneratedFallbackSharedDraftWrite()) {
+        return false;
+      }
 
-    if (sharedSchemaDraftSyncTimerRef.current) {
-      clearTimeout(sharedSchemaDraftSyncTimerRef.current);
-      sharedSchemaDraftSyncTimerRef.current = null;
-    }
+      if (sharedSchemaDraftSyncTimerRef.current) {
+        clearTimeout(sharedSchemaDraftSyncTimerRef.current);
+        sharedSchemaDraftSyncTimerRef.current = null;
+      }
 
-    const nextSnapshot = buildCurrentSharedSchemaDraftSnapshot();
-    if (!nextSnapshot) {
-      return;
-    }
+      const nextSnapshot = buildCurrentSharedSchemaDraftSnapshot();
+      if (!nextSnapshot) {
+        return false;
+      }
 
-    writeSharedSchemaDraftSnapshot(ydoc, nextSnapshot, SHARED_SCHEMA_DRAFT_ORIGIN);
-    onScheduleCodeModeSnapshotPersist?.();
-  }, [
-    buildCurrentSharedSchemaDraftSnapshot,
-    isCodeEditable,
-    draftHydrated,
-    onScheduleCodeModeSnapshotPersist,
-    persistDraft,
-    shouldSkipGeneratedFallbackSharedDraftWrite,
-    ydoc,
-  ]);
+      const changed = writeSharedSchemaDraftSnapshot(
+        ydoc,
+        nextSnapshot,
+        SHARED_SCHEMA_DRAFT_ORIGIN,
+      );
+      if (changed && !options?.skipPersistSchedule) {
+        onScheduleCodeModeSnapshotPersist?.();
+      }
+      return changed;
+    },
+    [
+      buildCurrentSharedSchemaDraftSnapshot,
+      isCodeEditable,
+      draftHydrated,
+      onScheduleCodeModeSnapshotPersist,
+      persistDraft,
+      shouldSkipGeneratedFallbackSharedDraftWrite,
+      ydoc,
+    ],
+  );
 
   /**
    * shared schema draft snapshot을 로컬 코드 문자열로 재생성한다.
@@ -1920,58 +1941,84 @@ export default function DslCodeEditorPanel({
     syncCodeChange,
   ]);
 
-  const flushPendingDraftImmediately = useCallback(() => {
-    if (!draftHydrated || !hasPendingDraftChanges) {
-      return;
-    }
-    const currentText = readCurrentDslText();
-    if (pendingHydratedTextRef.current != null && currentText !== pendingHydratedTextRef.current) {
-      return;
-    }
+  /**
+   * 대기 중인 초안(텍스트·schema draft)을 즉시 Y.Doc에 반영한다.
+   *
+   * @param options.skipPersistSchedule true면 서버 스냅샷 저장 예약을 생략한다.
+   *   저장 직전 콜백으로 호출될 때 저장이 자기 자신을 다시 예약하는 순환을 막는다.
+   * @returns 없음
+   */
+  const flushPendingDraftImmediately = useCallback(
+    (options?: { skipPersistSchedule?: boolean }) => {
+      if (!draftHydrated || !hasPendingDraftChanges) {
+        return;
+      }
+      const currentText = readCurrentDslText();
+      if (
+        pendingHydratedTextRef.current != null &&
+        currentText !== pendingHydratedTextRef.current
+      ) {
+        return;
+      }
 
-    pendingDraftRecordRef.current = {
-      text: currentText,
-      baselineRevision: draftBaselineRevisionRef.current,
-      previewPositions: previewPositionOverrides,
-      isIntentionalBlank: currentText.trim().length === 0,
-      isConfirmedBlank: currentText.trim().length === 0 && confirmedBlankDraftRef.current,
-    };
-    if (persistDraft && ydoc && isCodeEditable()) {
-      writeCodeModeSharedDraftTextSnapshot(
-        ydoc,
-        currentText,
-        draftBaselineRevisionRef.current,
-        currentText.trim().length === 0,
-        currentText.trim().length === 0 && confirmedBlankDraftRef.current,
-        SHARED_SCHEMA_DRAFT_ORIGIN,
-      );
-    }
-    persistDraftRecordImmediately(pendingDraftRecordRef.current);
-    flushSharedSchemaDraftImmediately();
-  }, [
-    draftHydrated,
-    flushSharedSchemaDraftImmediately,
-    hasPendingDraftChanges,
-    isCodeEditable,
-    persistDraft,
-    persistDraftRecordImmediately,
-    previewPositionOverrides,
-    readCurrentDslText,
-    ydoc,
-  ]);
+      pendingDraftRecordRef.current = {
+        text: currentText,
+        baselineRevision: draftBaselineRevisionRef.current,
+        previewPositions: previewPositionOverrides,
+        isIntentionalBlank: currentText.trim().length === 0,
+        isConfirmedBlank: currentText.trim().length === 0 && confirmedBlankDraftRef.current,
+      };
+      let textChanged = false;
+      if (persistDraft && ydoc && isCodeEditable()) {
+        textChanged = writeCodeModeSharedDraftTextSnapshot(
+          ydoc,
+          currentText,
+          draftBaselineRevisionRef.current,
+          currentText.trim().length === 0,
+          currentText.trim().length === 0 && confirmedBlankDraftRef.current,
+          SHARED_SCHEMA_DRAFT_ORIGIN,
+        );
+      }
+      persistDraftRecordImmediately(pendingDraftRecordRef.current);
+      const schemaChanged = flushSharedSchemaDraftImmediately({ skipPersistSchedule: true });
+      if ((textChanged || schemaChanged) && !options?.skipPersistSchedule) {
+        onScheduleCodeModeSnapshotPersist?.();
+      }
+    },
+    [
+      draftHydrated,
+      flushSharedSchemaDraftImmediately,
+      hasPendingDraftChanges,
+      isCodeEditable,
+      onScheduleCodeModeSnapshotPersist,
+      persistDraft,
+      persistDraftRecordImmediately,
+      previewPositionOverrides,
+      readCurrentDslText,
+      ydoc,
+    ],
+  );
   flushPendingDraftImmediatelyRef.current = flushPendingDraftImmediately;
 
+  /**
+   * pagehide·탭 숨김·언마운트 시 대기 중인 초안을 반영한다.
+   *
+   * 반드시 최신 flush 함수를 가리키는 ref로 호출한다. flush 함수를 의존성으로 두면 위치/텍스트가
+   * 바뀔 때마다 cleanup이 실행되어 직전 렌더의 낡은 값으로 문서를 덮어쓰고, 그 결과 문서 변경이
+   * 다시 props를 바꾸는 핑퐁(Maximum update depth)이 생긴다.
+   */
   useEffect(() => {
     if (!persistDraft) {
       return;
     }
 
+    const flushLatest = () => flushPendingDraftImmediatelyRef.current();
     if (typeof globalThis.addEventListener === 'function') {
-      globalThis.addEventListener('pagehide', flushPendingDraftImmediately);
+      globalThis.addEventListener('pagehide', flushLatest);
     }
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        flushPendingDraftImmediately();
+        flushLatest();
       }
     };
     if (typeof document !== 'undefined') {
@@ -1980,20 +2027,22 @@ export default function DslCodeEditorPanel({
 
     return () => {
       if (typeof globalThis.removeEventListener === 'function') {
-        globalThis.removeEventListener('pagehide', flushPendingDraftImmediately);
+        globalThis.removeEventListener('pagehide', flushLatest);
       }
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       }
-      flushPendingDraftImmediately();
+      flushLatest();
     };
-  }, [persistDraft, flushPendingDraftImmediately]);
+  }, [persistDraft]);
 
   useEffect(() => {
     if (!persistDraft || !registerBeforeCodeModeSnapshotPersist) {
       return;
     }
-    registerBeforeCodeModeSnapshotPersist(flushPendingDraftImmediately);
+    registerBeforeCodeModeSnapshotPersist(() =>
+      flushPendingDraftImmediately({ skipPersistSchedule: true }),
+    );
     return () => {
       registerBeforeCodeModeSnapshotPersist(null);
     };
@@ -2008,8 +2057,11 @@ export default function DslCodeEditorPanel({
       clearTimeout(sharedSchemaDraftSyncTimerRef.current);
     }
 
+    // 편집 후 유휴 시점에 텍스트와 schema draft를 함께 Y.Doc에 반영한다.
+    // 텍스트는 이 경로(또는 저장 직전 콜백)로만 공유 초안에 기록되므로 schema만 flush하면
+    // 스키마가 변하지 않는 편집(주석 등)이 서버에 저장되지 않는다.
     sharedSchemaDraftSyncTimerRef.current = setTimeout(() => {
-      flushSharedSchemaDraftImmediately();
+      flushPendingDraftImmediately();
     }, CODE_SHARED_DRAFT_SYNC_IDLE_MS);
 
     return () => {
@@ -2022,7 +2074,7 @@ export default function DslCodeEditorPanel({
     draftHydrated,
     dslText,
     errorCount,
-    flushSharedSchemaDraftImmediately,
+    flushPendingDraftImmediately,
     hasPendingDraftChanges,
     parseResult?.result,
     parsedSchemaHash,

@@ -215,7 +215,14 @@ test('clearSharedSchemaDraft 는 snapshot 전체를 제거한다', () => {
       baselineRevision: 'rev-3',
       schemaHash: 'schema-hash-3',
       tables: [{ name: 'post', columns: [] }],
-      relations: [{ childTable: 'post', childColumn: 'user_id', parentTable: 'user', parentColumn: 'user_id' }],
+      relations: [
+        {
+          childTable: 'post',
+          childColumn: 'user_id',
+          parentTable: 'user',
+          parentColumn: 'user_id',
+        },
+      ],
       positions: {
         'preview-table:post': { x: 1, y: 2 },
       },
@@ -329,4 +336,29 @@ test('buildSharedSchemaDraftSnapshotFromLegacyCodeModeDraft 는 confirmed blank�
     isIntentionalBlank: true,
     isConfirmedBlank: true,
   });
+});
+
+test('writeSharedSchemaDraftSnapshot 는 실제로 바꾼 경우에만 true 를 반환한다', () => {
+  const doc = new Y.Doc();
+  const snapshot = {
+    mode: 'dsl' as const,
+    baselineRevision: 'rev-1',
+    schemaHash: 'hash-1',
+    tables: [],
+    relations: [],
+    positions: { 'preview-table:a': { x: 1, y: 2 } },
+    isIntentionalBlank: false,
+    isConfirmedBlank: false,
+  };
+
+  assert.equal(writeSharedSchemaDraftSnapshot(doc, snapshot, 'o'), true);
+  assert.equal(writeSharedSchemaDraftSnapshot(doc, snapshot, 'o'), false);
+  assert.equal(
+    writeSharedSchemaDraftSnapshot(
+      doc,
+      { ...snapshot, positions: { 'preview-table:a': { x: 3, y: 2 } } },
+      'o',
+    ),
+    true,
+  );
 });

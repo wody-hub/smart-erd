@@ -7,6 +7,7 @@ import {
   readCodeModeSharedDraftIntentionalBlank,
   readCodeModeSharedDraftSnapshot,
   readCodeModeSharedDraftText,
+  replaceCodeModeSharedDraftText,
   writeCodeModeSharedDraftTextSnapshot,
 } from '../../src/lib/code-mode-shared-draft.js';
 
@@ -111,4 +112,58 @@ test('레거시 중첩 텍스트는 읽을 때 변경하지 않고 첫 쓰기에
     '이관 이후 레거시 내용이 다시 나타나지 않는다',
   );
   doc.destroy();
+});
+
+test('writeCodeModeSharedDraftTextSnapshot 는 실제로 바꾼 경우에만 true 를 반환한다', () => {
+  const doc = new Y.Doc();
+
+  assert.equal(writeCodeModeSharedDraftTextSnapshot(doc, 'a', 'rev-1', false, false, 'o'), true);
+  assert.equal(writeCodeModeSharedDraftTextSnapshot(doc, 'a', 'rev-1', false, false, 'o'), false);
+  assert.equal(writeCodeModeSharedDraftTextSnapshot(doc, 'ab', 'rev-1', false, false, 'o'), true);
+});
+
+test('텍스트 일부만 바뀌면 변경된 구간만 Y.Text 에 반영하고 전체를 다시 쓰지 않는다', () => {
+  const doc = new Y.Doc();
+  const longText = `Table 'T' {\n${"  '컬럼' ::VARCHAR(10)\n".repeat(400)}}`;
+  writeCodeModeSharedDraftTextSnapshot(doc, longText, 'rev-1', false, false, 'o');
+
+  let updateBytes = 0;
+  doc.on('update', (update: Uint8Array) => {
+    updateBytes += update.byteLength;
+  });
+  const edited = longText.replace("'컬럼' ::VARCHAR(10)", "'컬럼' ::VARCHAR(20)");
+  writeCodeModeSharedDraftTextSnapshot(doc, edited, 'rev-1', false, false, 'o');
+
+  assert.equal(readCodeModeSharedDraftText(doc), edited);
+  assert.ok(updateBytes < 400, `update 크기가 작아야 한다: ${updateBytes}`);
+});
+
+test('서로 다른 위치를 동시에 고친 두 클라이언트의 변경이 모두 보존된다', () => {
+  const base = 'AAAA\nBBBB\nCCCC';
+  const docA = new Y.Doc();
+  writeCodeModeSharedDraftTextSnapshot(docA, base, 'rev-1', false, false, 'o');
+  const docB = new Y.Doc();
+  Y.applyUpdate(docB, Y.encodeStateAsUpdate(docA));
+
+  replaceCodeModeSharedDraftText(docA, 'AAXX\nBBBB\nCCCC', 'o');
+  replaceCodeModeSharedDraftText(docB, 'AAAA\nBBBB\nCCYY', 'o');
+  Y.applyUpdate(docA, Y.encodeStateAsUpdate(docB));
+  Y.applyUpdate(docB, Y.encodeStateAsUpdate(docA));
+
+  assert.equal(readCodeModeSharedDraftText(docA), 'AAXX\nBBBB\nCCYY');
+  assert.equal(readCodeModeSharedDraftText(docB), 'AAXX\nBBBB\nCCYY');
+});
+
+test('이모지(서로게이트 쌍) 경계를 쪼개지 않고 교체한다', () => {
+  const doc = new Y.Doc();
+  writeCodeModeSharedDraftTextSnapshot(doc, 'a😀b', 'rev-1', false, false, 'o');
+
+  replaceCodeModeSharedDraftText(doc, 'a😁b', 'o');
+  assert.equal(readCodeModeSharedDraftText(doc), 'a😁b');
+
+  replaceCodeModeSharedDraftText(doc, '😁b', 'o');
+  assert.equal(readCodeModeSharedDraftText(doc), '😁b');
+
+  replaceCodeModeSharedDraftText(doc, '', 'o');
+  assert.equal(readCodeModeSharedDraftText(doc), '');
 });

@@ -236,13 +236,13 @@ export function shouldClearSharedSchemaDraftAfterPersistedApply(
  * @param doc 대상 Y.Doc
  * @param snapshot 저장할 shared schema draft snapshot
  * @param origin Yjs transaction origin
- * @returns 없음
+ * @returns 문서를 실제로 변경했으면 true, 이미 같은 값이라 생략했으면 false
  */
 export function writeSharedSchemaDraftSnapshot(
   doc: Y.Doc,
   snapshot: Omit<SharedSchemaDraftSnapshot, 'updatedAt'>,
   origin: unknown,
-): void {
+): boolean {
   const draftMap = getSharedSchemaDraftMap(doc);
   const nextTables = JSON.stringify(snapshot.tables);
   const nextRelations = JSON.stringify(snapshot.relations);
@@ -259,7 +259,7 @@ export function writeSharedSchemaDraftSnapshot(
     current.isIntentionalBlank === snapshot.isIntentionalBlank &&
     current.isConfirmedBlank === snapshot.isConfirmedBlank
   ) {
-    return;
+    return false;
   }
 
   doc.transact(() => {
@@ -294,6 +294,7 @@ export function writeSharedSchemaDraftSnapshot(
 
     draftMap.set(SHARED_SCHEMA_DRAFT_UPDATED_AT_KEY, Date.now());
   }, origin);
+  return true;
 }
 
 /**
