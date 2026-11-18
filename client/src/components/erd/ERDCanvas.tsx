@@ -116,6 +116,9 @@ const ENABLE_VISIBLE_ELEMENT_CULLING = false;
 const EMPTY_EDGE_LOCKS = new Map();
 const EMPTY_EDGE_PREVIEWS = new Map();
 const SNAP_GRID: [number, number] = [16, 16];
+
+/** 큰 다이어그램 전체(수천 px 규모의 방사형 배치)가 한 화면에 들어오도록 허용하는 최소 확대율 */
+const ERD_CANVAS_MIN_ZOOM = 0.1;
 const DEFAULT_EDGE_OPTIONS = { type: 'erdRelation' as const };
 
 /**
@@ -946,6 +949,10 @@ function ERDCanvas({
     const appliedStatus = applyActions.applyLayout(result.nodes, nodes);
     if (appliedStatus === 'applied') {
       void onPersistLayout?.();
+      // 정렬 결과 전체가 한눈에 보이도록 화면을 맞춘다. 좌표 반영 직후 렌더 이후에 실행한다.
+      requestAnimationFrame(() => {
+        reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+      });
     }
   };
 
@@ -1056,6 +1063,7 @@ function ERDCanvas({
                       snapGrid={SNAP_GRID}
                       defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
                       fitView
+                      minZoom={ERD_CANVAS_MIN_ZOOM}
                       onlyRenderVisibleElements={ENABLE_VISIBLE_ELEMENT_CULLING}
                       className={cn(fkMode && 'cursor-crosshair')}
                     >

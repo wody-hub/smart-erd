@@ -27,6 +27,7 @@ import {
   LARGE_DIAGRAM_WARNING_THRESHOLD,
   loadSyncPolicy,
   resolveLayoutMode,
+  type SyncLayoutMode,
   type SyncPolicy,
   type SyncPolicyScope,
 } from '@/lib/sync-policy';
@@ -260,15 +261,23 @@ async function executeLayoutPhase(params: ExecuteLayoutPhaseParams): Promise<Lay
   const { nodes: freshNodes, edges: freshEdges } = params.getCurrentState();
   const shouldRunLayout = params.applyPath !== 'diff' || params.diffAppliedOperations > 0;
   const preserveExistingDiagram = params.beforeNodes.length > 0;
-  const effectiveLayoutMode = preserveExistingDiagram
-    ? 'none'
-    : shouldRunLayout
-      ? resolveLayoutMode(
-          params.syncPolicy.layoutMode,
-          Math.max(params.estimatedNodeCount, freshNodes.length),
-          params.syncPolicy.largeDiagramThreshold,
-        )
-      : 'none';
+  const nodeCountForLayout = Math.max(params.estimatedNodeCount, freshNodes.length);
+  let effectiveLayoutMode: SyncLayoutMode = 'none';
+  if (!preserveExistingDiagram && shouldRunLayout) {
+    effectiveLayoutMode = resolveLayoutMode(
+      params.syncPolicy.layoutMode,
+      nodeCountForLayout,
+      params.syncPolicy.largeDiagramThreshold,
+    );
+    // 빈 ERD에 처음 적용하는데 정책이 'none'이면 좌표가 DSL 기본 격자(가로 한 줄·겹침)로 남는다.
+    // 보존할 기존 배치가 없으므로 대형 다이어그램이 아닐 때는 방사형 전체 배치를 쓴다.
+    if (
+      effectiveLayoutMode === 'none' &&
+      nodeCountForLayout < params.syncPolicy.largeDiagramThreshold
+    ) {
+      effectiveLayoutMode = 'full';
+    }
+  }
 
   let layoutDurationMs = 0;
   let layoutRejected = false;
