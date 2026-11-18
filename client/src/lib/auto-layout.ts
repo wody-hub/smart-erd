@@ -931,7 +931,7 @@ function resolveLayoutCollisions(nodes: Node<TableNodeData>[]): Node<TableNodeDa
  * @param options 배치 옵션
  * @returns 좌표가 갱신된 노드 목록 (입력 순서 유지)
  */
-function applyRadialLayout(
+export function applyRadialLayout(
   nodes: Node<TableNodeData>[],
   edges: Edge[],
   options: ErdLayoutOptions,

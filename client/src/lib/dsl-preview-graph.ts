@@ -1,6 +1,7 @@
 import dagre from 'dagre';
 import type { Node } from '@xyflow/react';
 import type { DdlParseResult, ParsedRelation, ParsedTable } from './ddl-parser.js';
+import { applyRadialLayout } from './auto-layout.js';
 import { normalizeTableHeaderColor } from './table-colors.js';
 import type {
   ERDEdge,
@@ -531,6 +532,37 @@ function applyPreviewDagreLayout(
 }
 
 /**
+ * 방사형(허브 중심) 배치로 preview 노드 위치를 계산한다.
+ *
+ * ERD 캔버스의 자동 정렬과 같은 알고리즘을 동기로 호출한다. 노드 크기는 실제 렌더링에 가깝게
+ * 컬럼/이름 길이로 추정하므로 고정 폭 dagre 배치처럼 겹치거나 한 줄로 길어지지 않는다.
+ * 계산에 실패하면 기존 dagre 배치로 되돌아간다.
+ *
+ * @param nodes preview 노드 목록
+ * @param relations parsed relation 목록
+ * @returns 위치가 반영된 preview 노드 목록
+ */
+function applyPreviewRadialLayout(
+  nodes: DslPreviewNode[],
+  relations: ParsedRelation[],
+): DslPreviewNode[] {
+  if (nodes.length === 0) {
+    return nodes;
+  }
+
+  try {
+    const edges = relations.map((relation, index) => ({
+      id: `preview-relation-${index}`,
+      source: buildPreviewTableNodeId(relation.parentTable),
+      target: buildPreviewTableNodeId(relation.childTable),
+    }));
+    return applyRadialLayout(nodes, edges, {}) as DslPreviewNode[];
+  } catch {
+    return applyPreviewDagreLayout(nodes, relations);
+  }
+}
+
+/**
  * persisted 위치가 없는 preview 노드만 바깥쪽에 추가 배치한다.
  *
  * 기존 persisted 테이블은 사용자가 정리한 좌표를 유지하고,
@@ -708,7 +740,7 @@ export function buildPreviewGraphFromDslParsedSchema(
   const nodes =
     persistedNodeIds.size > 0
       ? applyPreviewPersistedLayout(baseNodes, persistedNodeIds)
-      : applyPreviewDagreLayout(baseNodes, parsedSchema.relations);
+      : applyPreviewRadialLayout(baseNodes, parsedSchema.relations);
   const positionedNodes = applyPreviewDraftPositions(nodes, draftPositions);
   const edges = buildPreviewEdges(
     positionedNodes,
