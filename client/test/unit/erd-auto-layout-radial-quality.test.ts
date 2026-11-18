@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Node } from '@xyflow/react';
 import type { TableNodeData } from '../../src/types/erd.js';
+import type { PositionBatch } from '../../src/collaboration/plugins/erd/erd-position-batch.js';
 import { applyErdLayout, ERD_AUTO_LAYOUT_CALLER_STRATEGY } from '../../src/lib/auto-layout.js';
+import { commitErdLayoutNodes } from '../../src/lib/erd-layout-commit.js';
 import { measureLayoutMetrics, type LayoutMetrics } from '../../src/lib/auto-layout-metrics.js';
 import {
   buildLayoutGraph,
@@ -260,4 +262,37 @@ test('radial: empty graph and failure-free single node', async () => {
   const result = await applyErdLayout(graph.nodes, graph.edges, { strategy: 'radial' });
   assert.equal(result.status, 'applied');
   assert.equal(result.nodes.length, 1);
+});
+
+test('radial result commits as exactly one position batch anchored at the pre-layout coordinates', async () => {
+  const graph = buildAnonymizedRealDiagram();
+  const startNodes = graph.nodes.map((node, index) => ({
+    ...node,
+    position: { x: index * 7, y: index * 3 },
+  }));
+  const startSnapshot = JSON.stringify(startNodes.map((node) => node.position));
+  const batches: PositionBatch[] = [];
+
+  const result = await applyErdLayout(startNodes, graph.edges, { strategy: 'radial' });
+  const status = commitErdLayoutNodes(
+    result.nodes,
+    startNodes,
+    {
+      available: true,
+      applyLayout: (batch) => {
+        batches.push(batch);
+        return 'applied';
+      },
+    },
+    () => assert.fail('unexpected rejection'),
+  );
+
+  assert.equal(status, 'applied');
+  assert.equal(batches.length, 1);
+  assert.equal(JSON.stringify(startNodes.map((node) => node.position)), startSnapshot);
+  assert.equal(batches[0].entries.length, startNodes.length);
+  batches[0].entries.forEach((entry, index) => {
+    assert.deepEqual(entry.from, startNodes[index].position);
+    assert.deepEqual(entry.to, result.nodes[index].position);
+  });
 });
