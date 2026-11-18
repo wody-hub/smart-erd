@@ -2383,6 +2383,8 @@ export default function DslCodeEditorPanel({
           onMount={handleOnMount}
           options={{
             readOnly: !canEdit,
+            // 읽기 전용(초기화 지연·잠금)에서도 오류 밑줄을 표시한다. 기본값 'editable'은 readOnly 에디터의 마커 장식을 숨긴다.
+            renderValidationDecorations: 'on',
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
             fontSize: 13,
