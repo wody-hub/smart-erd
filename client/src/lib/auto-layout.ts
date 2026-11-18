@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { Column, TableNodeData } from '@/types/erd';
+import { computeRadialLayout } from './auto-layout-radial-layout.js';
 
 const MIN_RENDERED_NODE_WIDTH = 820;
 const HEADER_HEIGHT = 40;
@@ -18,6 +19,20 @@ const SMALL_COMPONENT_INLINE_LIMIT = 5;
 export type ErdLayoutDirection = 'RIGHT' | 'DOWN';
 export type ErdLayoutStatus = 'applied' | 'failed';
 
+/**
+ * 자동정렬 전략.
+ * - legacy: 참조 방향 rank 기반 계층형 격자 배치 (기존 동작)
+ * - radial: 메인(허브) 테이블 중심 방사형 + 연관 그룹 응집 + 원형 윤곽 배치
+ */
+export type ErdLayoutStrategy = 'legacy' | 'radial';
+
+/**
+ * 자동정렬 호출부(자동정렬 버튼·전체 정렬 적용)가 선택하는 전략.
+ *
+ * 문제가 생기면 이 값을 'legacy'로 바꾸는 것만으로 이전 배치로 즉시 되돌릴 수 있다.
+ */
+export const ERD_AUTO_LAYOUT_CALLER_STRATEGY: ErdLayoutStrategy = 'legacy';
+
 export interface ErdLayoutResult {
   nodes: Node<TableNodeData>[];
   status: ErdLayoutStatus;
@@ -25,8 +40,14 @@ export interface ErdLayoutResult {
 
 export interface ErdLayoutOptions {
   candidateDirections?: ErdLayoutDirection[];
+  /** radial: 이 노드 수를 넘으면 계산량을 고정해 줄인다 */
   largeGraphThreshold?: number;
+  /** legacy 기본 1.5, radial 기본 1(원). radial에서 명시하면 가로/세로 타원 목표로 존중한다 */
   targetAspect?: number;
+  /** 배치 전략 (기본 legacy) */
+  strategy?: ErdLayoutStrategy;
+  /** radial: 사용자가 지정한 메인(허브) 테이블 노드 id */
+  preferredHubIds?: string[];
 }
 
 interface MeasuredSize {
@@ -903,10 +924,46 @@ function resolveLayoutCollisions(nodes: Node<TableNodeData>[]): Node<TableNodeDa
 }
 
 /**
- * ERD 참조관계를 기준으로 노드를 정렬하고, 긴 체인은 사각형 비율의 snake grid로 접어서 배치한다.
+ * 허브 중심 방사형 전략으로 노드 좌표를 계산한다. 입력 노드는 변경하지 않는다.
  *
- * ELK/Dagre 계층형 레이아웃은 긴 참조 체인을 한 방향으로 과도하게 늘리는 경향이 있어,
- * persisted ERD 자동정렬은 도메인 특화 배치로 처리한다.
+ * @param nodes 대상 노드
+ * @param edges 관계 엣지 (source = 부모 테이블)
+ * @param options 배치 옵션
+ * @returns 좌표가 갱신된 노드 목록 (입력 순서 유지)
+ */
+function applyRadialLayout(
+  nodes: Node<TableNodeData>[],
+  edges: Edge[],
+  options: ErdLayoutOptions,
+): Node<TableNodeData>[] {
+  const items = nodes.map((node) => ({ id: node.id, ...measureErdNode(node) }));
+  const links = edges.map((edge) => ({ source: edge.source, target: edge.target }));
+  const { positions } = computeRadialLayout(items, links, {
+    targetAspect: options.targetAspect,
+    preferredHubIds: options.preferredHubIds,
+    largeGraphThreshold: options.largeGraphThreshold,
+  });
+
+  return nodes.map((node) => {
+    const position = positions.get(node.id);
+    return position ? { ...node, position } : node;
+  });
+}
+
+/**
+ * ERD 참조관계를 기준으로 노드를 정렬한다.
+ *
+ * - legacy: 긴 체인은 사각형 비율의 snake grid로 접어서 배치한다. ELK/Dagre 계층형 레이아웃은 긴 참조 체인을
+ *   한 방향으로 과도하게 늘리는 경향이 있어, persisted ERD 자동정렬은 도메인 특화 배치로 처리한다.
+ * - radial: 메인(허브) 테이블을 중심에 두고 연관 테이블을 BFS 링과 섹터로 감싸며, 전체 윤곽이 원에 가깝도록
+ *   직사각 충돌을 완화하고 연결 성분을 원형으로 패킹한다.
+ *
+ * 공개 시그니처와 반환형은 전략과 무관하게 같고, 계산 중간 좌표는 노출하지 않는다.
+ *
+ * @param nodes 정렬할 노드
+ * @param edges 관계 엣지
+ * @param options 배치 옵션 (strategy 기본 legacy)
+ * @returns 좌표가 갱신된 노드와 적용 상태
  */
 export async function applyErdLayout(
   nodes: Node<TableNodeData>[],
@@ -918,6 +975,10 @@ export async function applyErdLayout(
   }
 
   try {
+    if (options.strategy === 'radial') {
+      return { nodes: applyRadialLayout(nodes, edges, options), status: 'applied' };
+    }
+
     const targetAspect = options.targetAspect ?? DEFAULT_TARGET_ASPECT;
     const originalIndexById = new Map(nodes.map((node, index) => [node.id, index]));
     const graph = buildGraphIndex(nodes, edges);

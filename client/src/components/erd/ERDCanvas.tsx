@@ -47,7 +47,7 @@ import type {
 } from '@/types/erd';
 import type { YjsProvider } from '@/collaboration/YjsProvider';
 import { KEYBINDINGS } from '@/constants/keybindings';
-import { applyErdLayout } from '@/lib/auto-layout';
+import { applyErdLayout, ERD_AUTO_LAYOUT_CALLER_STRATEGY } from '@/lib/auto-layout';
 import type { CodeEditorTableFocusRequest } from '@/lib/code-editor-table-navigation';
 import { serializeDiagramDefinitionExportContent } from '@/lib/diagram-definition-export';
 import { findPersistedTableNodeForFocus } from '@/lib/diagram-table-focus';
@@ -935,7 +935,9 @@ function ERDCanvas({
    * @returns 없음
    */
   const handleAutoLayout = async () => {
-    const result = await applyErdLayout(nodes, edges);
+    const result = await applyErdLayout(nodes, edges, {
+      strategy: ERD_AUTO_LAYOUT_CALLER_STRATEGY,
+    });
     if (result.status === 'failed') {
       toast.error(t('erd.toolbar.autoLayoutFailed'));
       return;
