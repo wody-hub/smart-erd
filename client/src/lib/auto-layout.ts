@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { Column, TableNodeData } from '@/types/erd';
+import { computeRadialLayout } from './auto-layout-radial-layout.js';
 
 const MIN_RENDERED_NODE_WIDTH = 820;
 const HEADER_HEIGHT = 40;
@@ -18,6 +19,20 @@ const SMALL_COMPONENT_INLINE_LIMIT = 5;
 export type ErdLayoutDirection = 'RIGHT' | 'DOWN';
 export type ErdLayoutStatus = 'applied' | 'failed';
 
+/**
+ * 자동정렬 전략.
+ * - legacy: 참조 방향 rank 기반 계층형 격자 배치 (기존 동작)
+ * - radial: 메인(허브) 테이블 중심 방사형 + 연관 그룹 응집 + 원형 윤곽 배치
+ */
+export type ErdLayoutStrategy = 'legacy' | 'radial';
+
+/**
+ * 자동정렬 호출부(자동정렬 버튼·전체 정렬 적용)가 선택하는 전략.
+ *
+ * 문제가 생기면 이 값을 'legacy'로 바꾸는 것만으로 이전 배치로 즉시 되돌릴 수 있다.
+ */
+export const ERD_AUTO_LAYOUT_CALLER_STRATEGY: ErdLayoutStrategy = 'radial';
+
 export interface ErdLayoutResult {
   nodes: Node<TableNodeData>[];
   status: ErdLayoutStatus;
@@ -25,8 +40,14 @@ export interface ErdLayoutResult {
 
 export interface ErdLayoutOptions {
   candidateDirections?: ErdLayoutDirection[];
+  /** radial: 이 노드 수를 넘으면 계산량을 고정해 줄인다 */
   largeGraphThreshold?: number;
+  /** legacy 기본 1.5, radial 기본 1(원). radial에서 명시하면 가로/세로 타원 목표로 존중한다 */
   targetAspect?: number;
+  /** 배치 전략 (기본 legacy) */
+  strategy?: ErdLayoutStrategy;
+  /** radial: 사용자가 지정한 메인(허브) 테이블 노드 id */
+  preferredHubIds?: string[];
 }
 
 interface MeasuredSize {
@@ -83,7 +104,14 @@ function measureColumnWidth(column: Column): number {
   const fixedDomainWidth = 112;
   const rowPaddingAndGaps = 96;
 
-  return logicalWidth + physicalWidth + fixedBadgesWidth + fixedTypeWidth + fixedDomainWidth + rowPaddingAndGaps;
+  return (
+    logicalWidth +
+    physicalWidth +
+    fixedBadgesWidth +
+    fixedTypeWidth +
+    fixedDomainWidth +
+    rowPaddingAndGaps
+  );
 }
 
 /**
@@ -133,7 +161,9 @@ function classifyErdTable(node: Node<TableNodeData>, graph: GraphIndex): ErdTabl
   if (/\b(history|log|audit)\b|_history|_log|_audit/.test(searchText)) {
     return 'history';
   }
-  if (/\b(item|detail|attendee|participant)\b|_item|_detail|_attendee|_participant/.test(searchText)) {
+  if (
+    /\b(item|detail|attendee|participant)\b|_item|_detail|_attendee|_participant/.test(searchText)
+  ) {
     return 'detail';
   }
   if (undirectedDegree >= 4 || outgoingCount >= 4) {
@@ -219,7 +249,10 @@ function buildGraphIndex(nodes: Node<TableNodeData>[], edges: Edge[]): GraphInde
   return { outgoing, incoming, undirected };
 }
 
-function getWeakComponents(nodes: Node<TableNodeData>[], graph: GraphIndex): Node<TableNodeData>[][] {
+function getWeakComponents(
+  nodes: Node<TableNodeData>[],
+  graph: GraphIndex,
+): Node<TableNodeData>[][] {
   const nodesById = new Map(nodes.map((node) => [node.id, node]));
   const visited = new Set<string>();
   const components: Node<TableNodeData>[][] = [];
@@ -262,14 +295,19 @@ function orderComponentNodes(
   const level = new Map<string, number>();
 
   componentNodes.forEach((node) => {
-    const incomingCount = Array.from(graph.incoming.get(node.id) ?? []).filter((id) => componentIds.has(id)).length;
+    const incomingCount = Array.from(graph.incoming.get(node.id) ?? []).filter((id) =>
+      componentIds.has(id),
+    ).length;
     indegree.set(node.id, incomingCount);
     level.set(node.id, 0);
   });
 
   const ready = componentNodes
     .filter((node) => indegree.get(node.id) === 0)
-    .sort((left, right) => (originalIndexById.get(left.id) ?? 0) - (originalIndexById.get(right.id) ?? 0));
+    .sort(
+      (left, right) =>
+        (originalIndexById.get(left.id) ?? 0) - (originalIndexById.get(right.id) ?? 0),
+    );
   const orderedIds: string[] = [];
 
   while (ready.length > 0) {
@@ -281,7 +319,9 @@ function orderComponentNodes(
     orderedIds.push(node.id);
     Array.from(graph.outgoing.get(node.id) ?? [])
       .filter((targetId) => componentIds.has(targetId))
-      .sort((left, right) => (originalIndexById.get(left) ?? 0) - (originalIndexById.get(right) ?? 0))
+      .sort(
+        (left, right) => (originalIndexById.get(left) ?? 0) - (originalIndexById.get(right) ?? 0),
+      )
       .forEach((targetId) => {
         level.set(targetId, Math.max(level.get(targetId) ?? 0, (level.get(node.id) ?? 0) + 1));
         indegree.set(targetId, (indegree.get(targetId) ?? 0) - 1);
@@ -290,7 +330,8 @@ function orderComponentNodes(
           if (targetNode) {
             ready.push(targetNode);
             ready.sort(
-              (left, right) => (originalIndexById.get(left.id) ?? 0) - (originalIndexById.get(right.id) ?? 0),
+              (left, right) =>
+                (originalIndexById.get(left.id) ?? 0) - (originalIndexById.get(right.id) ?? 0),
             );
           }
         }
@@ -340,7 +381,9 @@ function assignHierarchicalRanks(
   const rankById = new Map<string, number>();
 
   componentNodes.forEach((node) => {
-    const incomingCount = Array.from(graph.incoming.get(node.id) ?? []).filter((id) => componentIds.has(id)).length;
+    const incomingCount = Array.from(graph.incoming.get(node.id) ?? []).filter((id) =>
+      componentIds.has(id),
+    ).length;
     indegree.set(node.id, incomingCount);
     rankById.set(node.id, 0);
   });
@@ -348,12 +391,16 @@ function assignHierarchicalRanks(
   const compareByStructure = (left: Node<TableNodeData>, right: Node<TableNodeData>) => {
     const leftMeta = metaById.get(left.id);
     const rightMeta = metaById.get(right.id);
-    const roleDelta = getRoleRankAdjustment(leftMeta?.role ?? 'regular') - getRoleRankAdjustment(rightMeta?.role ?? 'regular');
+    const roleDelta =
+      getRoleRankAdjustment(leftMeta?.role ?? 'regular') -
+      getRoleRankAdjustment(rightMeta?.role ?? 'regular');
     if (roleDelta !== 0) return roleDelta;
     return (leftMeta?.originalIndex ?? 0) - (rightMeta?.originalIndex ?? 0);
   };
 
-  const ready = componentNodes.filter((node) => indegree.get(node.id) === 0).sort(compareByStructure);
+  const ready = componentNodes
+    .filter((node) => indegree.get(node.id) === 0)
+    .sort(compareByStructure);
   const visited = new Set<string>();
 
   while (ready.length > 0) {
@@ -364,7 +411,10 @@ function assignHierarchicalRanks(
     const sourceRank = rankById.get(node.id) ?? 0;
     Array.from(graph.outgoing.get(node.id) ?? [])
       .filter((targetId) => componentIds.has(targetId))
-      .sort((left, right) => (metaById.get(left)?.originalIndex ?? 0) - (metaById.get(right)?.originalIndex ?? 0))
+      .sort(
+        (left, right) =>
+          (metaById.get(left)?.originalIndex ?? 0) - (metaById.get(right)?.originalIndex ?? 0),
+      )
       .forEach((targetId) => {
         rankById.set(targetId, Math.max(rankById.get(targetId) ?? 0, sourceRank + 1));
         indegree.set(targetId, Math.max(0, (indegree.get(targetId) ?? 0) - 1));
@@ -395,7 +445,10 @@ function assignHierarchicalRanks(
     const parentRank = Array.from(graph.incoming.get(node.id) ?? [])
       .filter((id) => componentIds.has(id))
       .reduce((maxRank, id) => Math.max(maxRank, rankById.get(id) ?? 0), -1);
-    const adjustedRank = Math.max(0, (rankById.get(node.id) ?? 0) + getRoleRankAdjustment(meta.role));
+    const adjustedRank = Math.max(
+      0,
+      (rankById.get(node.id) ?? 0) + getRoleRankAdjustment(meta.role),
+    );
 
     if (parentRank >= 0 && meta.role !== 'hub') {
       rankById.set(node.id, Math.max(parentRank + 1, adjustedRank));
@@ -468,7 +521,9 @@ function orderRanksByRelationshipWeight(
 
         const leftMeta = metaById.get(left.id);
         const rightMeta = metaById.get(right.id);
-        const roleDelta = getRoleOrderPriority(leftMeta?.role ?? 'regular') - getRoleOrderPriority(rightMeta?.role ?? 'regular');
+        const roleDelta =
+          getRoleOrderPriority(leftMeta?.role ?? 'regular') -
+          getRoleOrderPriority(rightMeta?.role ?? 'regular');
         if (roleDelta !== 0) return roleDelta;
 
         const hubDelta = (leftMeta?.hubScore ?? 0) - (rightMeta?.hubScore ?? 0);
@@ -502,13 +557,23 @@ function measureWrappedRankBounds(
   ranks.forEach((rank, index) => {
     const lane = Math.floor(index / columnCount);
     const column = index % columnCount;
-    columnWidths[column] = Math.max(columnWidths[column] ?? 0, rankWidths.get(rank) ?? MIN_RENDERED_NODE_WIDTH);
-    laneHeights[lane] = Math.max(laneHeights[lane] ?? 0, (rankHeights.get(rank) ?? 0) + getRankColumnStagger(column));
+    columnWidths[column] = Math.max(
+      columnWidths[column] ?? 0,
+      rankWidths.get(rank) ?? MIN_RENDERED_NODE_WIDTH,
+    );
+    laneHeights[lane] = Math.max(
+      laneHeights[lane] ?? 0,
+      (rankHeights.get(rank) ?? 0) + getRankColumnStagger(column),
+    );
   });
 
   return {
-    width: columnWidths.reduce((sum, width) => sum + width, 0) + Math.max(0, columnWidths.length - 1) * NODE_COLUMN_SPACING,
-    height: laneHeights.reduce((sum, height) => sum + height, 0) + Math.max(0, laneHeights.length - 1) * NODE_ROW_SPACING * 2,
+    width:
+      columnWidths.reduce((sum, width) => sum + width, 0) +
+      Math.max(0, columnWidths.length - 1) * NODE_COLUMN_SPACING,
+    height:
+      laneHeights.reduce((sum, height) => sum + height, 0) +
+      Math.max(0, laneHeights.length - 1) * NODE_ROW_SPACING * 2,
   };
 }
 
@@ -549,14 +614,22 @@ function layoutHierarchicalComponent(
   targetAspect: number,
 ): RelativeLayout {
   const hasRelationships = componentNodes.some(
-    (node) => (graph.incoming.get(node.id)?.size ?? 0) > 0 || (graph.outgoing.get(node.id)?.size ?? 0) > 0,
+    (node) =>
+      (graph.incoming.get(node.id)?.size ?? 0) > 0 || (graph.outgoing.get(node.id)?.size ?? 0) > 0,
   );
   if (!hasRelationships) {
-    return layoutComponent(orderComponentNodes(componentNodes, graph, originalIndexById, metaById), targetAspect);
+    return layoutComponent(
+      orderComponentNodes(componentNodes, graph, originalIndexById, metaById),
+      targetAspect,
+    );
   }
 
   const rankById = assignHierarchicalRanks(componentNodes, graph, metaById);
-  const orderedGroups = orderRanksByRelationshipWeight(groupNodesByRank(componentNodes, rankById), graph, metaById);
+  const orderedGroups = orderRanksByRelationshipWeight(
+    groupNodesByRank(componentNodes, rankById),
+    graph,
+    metaById,
+  );
   const ranks = Array.from(orderedGroups.keys()).sort((left, right) => left - right);
   const rankWidths = new Map<number, number>();
   const rankHeights = new Map<number, number>();
@@ -564,10 +637,16 @@ function layoutHierarchicalComponent(
   ranks.forEach((rank) => {
     const nodes = orderedGroups.get(rank) ?? [];
     const measuredNodes = nodes.map((node) => measureErdNode(node));
-    rankWidths.set(rank, measuredNodes.reduce((maxWidth, size) => Math.max(maxWidth, size.width), 0));
+    rankWidths.set(
+      rank,
+      measuredNodes.reduce((maxWidth, size) => Math.max(maxWidth, size.width), 0),
+    );
     rankHeights.set(
       rank,
-      measuredNodes.reduce((height, size, index) => height + size.height + (index === 0 ? 0 : NODE_ROW_SPACING), 0),
+      measuredNodes.reduce(
+        (height, size, index) => height + size.height + (index === 0 ? 0 : NODE_ROW_SPACING),
+        0,
+      ),
     );
   });
 
@@ -582,18 +661,23 @@ function layoutHierarchicalComponent(
 
   rankEntries.forEach(({ rank, lane, column }) => {
     const rankHeight = rankHeights.get(rank) ?? 0;
-    columnWidths[column] = Math.max(columnWidths[column] ?? 0, rankWidths.get(rank) ?? MIN_RENDERED_NODE_WIDTH);
+    columnWidths[column] = Math.max(
+      columnWidths[column] ?? 0,
+      rankWidths.get(rank) ?? MIN_RENDERED_NODE_WIDTH,
+    );
     laneHeights[lane] = Math.max(laneHeights[lane] ?? 0, rankHeight + getRankColumnStagger(column));
   });
 
   const columnX: number[] = [];
   for (let index = 0; index < columnWidths.length; index += 1) {
-    columnX[index] = index === 0 ? 0 : columnX[index - 1] + columnWidths[index - 1] + NODE_COLUMN_SPACING;
+    columnX[index] =
+      index === 0 ? 0 : columnX[index - 1] + columnWidths[index - 1] + NODE_COLUMN_SPACING;
   }
 
   const laneY: number[] = [];
   for (let index = 0; index < laneHeights.length; index += 1) {
-    laneY[index] = index === 0 ? 0 : laneY[index - 1] + laneHeights[index - 1] + NODE_ROW_SPACING * 2;
+    laneY[index] =
+      index === 0 ? 0 : laneY[index - 1] + laneHeights[index - 1] + NODE_ROW_SPACING * 2;
   }
 
   const placements: RankedNodePlacement[] = [];
@@ -609,7 +693,10 @@ function layoutHierarchicalComponent(
     const size = measureErdNode(node);
     const rankHeight = rankHeights.get(rank) ?? size.height;
     const staggerY = getRankColumnStagger(column);
-    const startY = (laneY[lane] ?? 0) + ((laneHeights[lane] ?? rankHeight) - rankHeight - staggerY) / 2 + staggerY;
+    const startY =
+      (laneY[lane] ?? 0) +
+      ((laneHeights[lane] ?? rankHeight) - rankHeight - staggerY) / 2 +
+      staggerY;
     const currentY = rankCursorY.get(rank) ?? startY;
     rankCursorY.set(rank, currentY + size.height + NODE_ROW_SPACING);
 
@@ -657,7 +744,9 @@ function getColumnCount(nodes: Node<TableNodeData>[], targetAspect: number): num
   const averageSize = getAverageMeasuredSize(nodes);
   const columnPitch = averageSize.width + NODE_COLUMN_SPACING;
   const rowPitch = averageSize.height + NODE_ROW_SPACING;
-  const estimatedColumns = Math.ceil(Math.sqrt((nodes.length * targetAspect * rowPitch) / columnPitch));
+  const estimatedColumns = Math.ceil(
+    Math.sqrt((nodes.length * targetAspect * rowPitch) / columnPitch),
+  );
 
   return Math.max(2, Math.min(nodes.length, estimatedColumns));
 }
@@ -684,7 +773,8 @@ function layoutComponent(
 
   const columnX: number[] = [];
   for (let index = 0; index < columnWidths.length; index += 1) {
-    columnX[index] = index === 0 ? 0 : columnX[index - 1] + columnWidths[index - 1] + NODE_COLUMN_SPACING;
+    columnX[index] =
+      index === 0 ? 0 : columnX[index - 1] + columnWidths[index - 1] + NODE_COLUMN_SPACING;
   }
 
   const rowY: number[] = [];
@@ -751,12 +841,16 @@ function packComponents(components: RelativeLayout[], targetAspect: number): Nod
 
   const columnX: number[] = [];
   for (let index = 0; index < columnWidths.length; index += 1) {
-    columnX[index] = index === 0 ? LAYOUT_MARGIN : columnX[index - 1] + columnWidths[index - 1] + COMPONENT_SPACING;
+    columnX[index] =
+      index === 0
+        ? LAYOUT_MARGIN
+        : columnX[index - 1] + columnWidths[index - 1] + COMPONENT_SPACING;
   }
 
   const rowY: number[] = [];
   for (let index = 0; index < rowHeights.length; index += 1) {
-    rowY[index] = index === 0 ? LAYOUT_MARGIN : rowY[index - 1] + rowHeights[index - 1] + COMPONENT_SPACING;
+    rowY[index] =
+      index === 0 ? LAYOUT_MARGIN : rowY[index - 1] + rowHeights[index - 1] + COMPONENT_SPACING;
   }
 
   placements.forEach(({ component, row, column }) => {
@@ -784,8 +878,16 @@ function getNodeBox(node: Node<TableNodeData>) {
   };
 }
 
-function boxesOverlap(left: ReturnType<typeof getNodeBox>, right: ReturnType<typeof getNodeBox>): boolean {
-  return left.left < right.right && left.right > right.left && left.top < right.bottom && left.bottom > right.top;
+function boxesOverlap(
+  left: ReturnType<typeof getNodeBox>,
+  right: ReturnType<typeof getNodeBox>,
+): boolean {
+  return (
+    left.left < right.right &&
+    left.right > right.left &&
+    left.top < right.bottom &&
+    left.bottom > right.top
+  );
 }
 
 function resolveLayoutCollisions(nodes: Node<TableNodeData>[]): Node<TableNodeData>[] {
@@ -822,10 +924,46 @@ function resolveLayoutCollisions(nodes: Node<TableNodeData>[]): Node<TableNodeDa
 }
 
 /**
- * ERD 참조관계를 기준으로 노드를 정렬하고, 긴 체인은 사각형 비율의 snake grid로 접어서 배치한다.
+ * 허브 중심 방사형 전략으로 노드 좌표를 계산한다. 입력 노드는 변경하지 않는다.
  *
- * ELK/Dagre 계층형 레이아웃은 긴 참조 체인을 한 방향으로 과도하게 늘리는 경향이 있어,
- * persisted ERD 자동정렬은 도메인 특화 배치로 처리한다.
+ * @param nodes 대상 노드
+ * @param edges 관계 엣지 (source = 부모 테이블)
+ * @param options 배치 옵션
+ * @returns 좌표가 갱신된 노드 목록 (입력 순서 유지)
+ */
+function applyRadialLayout(
+  nodes: Node<TableNodeData>[],
+  edges: Edge[],
+  options: ErdLayoutOptions,
+): Node<TableNodeData>[] {
+  const items = nodes.map((node) => ({ id: node.id, ...measureErdNode(node) }));
+  const links = edges.map((edge) => ({ source: edge.source, target: edge.target }));
+  const { positions } = computeRadialLayout(items, links, {
+    targetAspect: options.targetAspect,
+    preferredHubIds: options.preferredHubIds,
+    largeGraphThreshold: options.largeGraphThreshold,
+  });
+
+  return nodes.map((node) => {
+    const position = positions.get(node.id);
+    return position ? { ...node, position } : node;
+  });
+}
+
+/**
+ * ERD 참조관계를 기준으로 노드를 정렬한다.
+ *
+ * - legacy: 긴 체인은 사각형 비율의 snake grid로 접어서 배치한다. ELK/Dagre 계층형 레이아웃은 긴 참조 체인을
+ *   한 방향으로 과도하게 늘리는 경향이 있어, persisted ERD 자동정렬은 도메인 특화 배치로 처리한다.
+ * - radial: 메인(허브) 테이블을 중심에 두고 연관 테이블을 BFS 링과 섹터로 감싸며, 전체 윤곽이 원에 가깝도록
+ *   직사각 충돌을 완화하고 연결 성분을 원형으로 패킹한다.
+ *
+ * 공개 시그니처와 반환형은 전략과 무관하게 같고, 계산 중간 좌표는 노출하지 않는다.
+ *
+ * @param nodes 정렬할 노드
+ * @param edges 관계 엣지
+ * @param options 배치 옵션 (strategy 기본 legacy)
+ * @returns 좌표가 갱신된 노드와 적용 상태
  */
 export async function applyErdLayout(
   nodes: Node<TableNodeData>[],
@@ -837,6 +975,10 @@ export async function applyErdLayout(
   }
 
   try {
+    if (options.strategy === 'radial') {
+      return { nodes: applyRadialLayout(nodes, edges, options), status: 'applied' };
+    }
+
     const targetAspect = options.targetAspect ?? DEFAULT_TARGET_ASPECT;
     const originalIndexById = new Map(nodes.map((node, index) => [node.id, index]));
     const graph = buildGraphIndex(nodes, edges);

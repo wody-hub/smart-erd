@@ -3,7 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import type { Edge, Node } from '@xyflow/react';
 import useAuthStore from '@/stores/useAuthStore';
-import { applyErdLayout, applyIncrementalLayoutByLabel } from '@/lib/auto-layout';
+import {
+  applyErdLayout,
+  applyIncrementalLayoutByLabel,
+  ERD_AUTO_LAYOUT_CALLER_STRATEGY,
+} from '@/lib/auto-layout';
 import type { DdlParseResult } from '@/lib/ddl-parser';
 import type { ApplyDiffResult } from '@/lib/erd-diff-apply';
 import { buildErdTableDiffPlan } from '@/lib/erd-diff-builder';
@@ -271,7 +275,9 @@ async function executeLayoutPhase(params: ExecuteLayoutPhaseParams): Promise<Lay
   if (freshNodes.length > 0 && shouldRunLayout) {
     const layoutStart = performance.now();
     if (effectiveLayoutMode === 'full') {
-      const layoutResult = await applyErdLayout(freshNodes, freshEdges);
+      const layoutResult = await applyErdLayout(freshNodes, freshEdges, {
+        strategy: ERD_AUTO_LAYOUT_CALLER_STRATEGY,
+      });
       if (layoutResult.status === 'failed') {
         console.warn('[erd-sync] full layout failed; preserving existing positions');
       }
