@@ -1434,7 +1434,7 @@ export default function DslCodeEditorPanel({
   });
 
   // 진단 마커 동기화 훅
-  useDslDiagnosticMarkers({ monacoRef, editorRef, parseResult });
+  useDslDiagnosticMarkers({ monacoRef, editorRef, parseResult, editorReady: monacoReady });
   useDslPhysicalNameHints({
     editorReady: monacoReady,
     editorRef,

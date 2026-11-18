@@ -11,6 +11,11 @@ interface UseDslDiagnosticMarkersOptions {
   editorRef: React.RefObject<Monaco.editor.IStandaloneCodeEditor | null>;
   /** DSL 파싱 결과 (진단 정보 포함) */
   parseResult: DslParseResult | null;
+  /**
+   * Monaco editor 마운트 완료 여부.
+   * Monaco는 지연 로드되므로 파싱 결과가 에디터보다 먼저 도착할 수 있다. 마운트 후 마커를 다시 동기화한다.
+   */
+  editorReady?: boolean;
 }
 
 /**
@@ -22,11 +27,13 @@ interface UseDslDiagnosticMarkersOptions {
  * @param options.monacoRef   Monaco 네임스페이스 ref
  * @param options.editorRef   에디터 인스턴스 ref
  * @param options.parseResult DSL 파싱 결과
+ * @param options.editorReady  에디터 마운트 완료 여부 (마운트 이전에 도착한 진단을 뒤늦게 반영)
  */
 export function useDslDiagnosticMarkers({
   monacoRef,
   editorRef,
   parseResult,
+  editorReady = true,
 }: UseDslDiagnosticMarkersOptions): void {
   const { t } = useTranslation();
 
@@ -64,5 +71,5 @@ export function useDslDiagnosticMarkers({
         monaco.editor.setModelMarkers(model, 'dsl', []);
       }
     };
-  }, [parseResult, t, monacoRef, editorRef]);
+  }, [parseResult, t, monacoRef, editorRef, editorReady]);
 }

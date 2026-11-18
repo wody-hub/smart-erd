@@ -30,6 +30,8 @@ import useCanvasStore from '@/stores/erd/useCanvasStore';
 import useCollaborationStore from '@/stores/erd/useCollaborationStore';
 import { DocumentMutationSessionProvider } from '@/collaboration/core/session/document-mutation-session';
 import type { PreviewSyncStatus } from '@/collaboration/core/collaboration-preview-sync-status';
+import { ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { isTextInputLikeTarget } from '@/constants/canvas-history';
 import { KEYBINDINGS } from '@/constants/keybindings';
 import { queryKeys } from '@/constants/query-keys';
@@ -331,6 +333,18 @@ export default function DiagramPage() {
       readOnlyMessage={!workModeRuntimeState.headerCanEdit ? previewReadOnlyMessage : undefined}
       accessory={
         <div className="header-utility-rail">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="header-control-trigger h-8 shrink-0 rounded-full px-3 text-xs font-semibold"
+            aria-label={t('workspace.action.backToDocuments')}
+            title={t('workspace.action.backToDocuments')}
+            onClick={() => navigate(ROUTES.DIAGRAMS(teamId!, projectId!))}
+          >
+            <ArrowLeft className="h-4 w-4 2xl:mr-1" aria-hidden="true" />
+            {/* 좁은 화면에서는 문서 제목이 밀려나지 않도록 아이콘만 보여 준다. */}
+            <span className="hidden 2xl:inline">{t('workspace.action.backToDocuments')}</span>
+          </Button>
           {!unifiedProjectionEnabled && (
             <DiagramWorkModeSwitcher mode={workMode} onModeChange={handleWorkModeChange} />
           )}
