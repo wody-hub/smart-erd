@@ -230,3 +230,58 @@ for (const scenario of ['empty', 'deleted', 'reconnect', 'late'] as const) {
     assert.equal(h.warn.mock.callCount(), scenario === 'late' ? 1 : 0);
   });
 }
+
+/**
+ * 미리보기 없이(bootstrap content 없음, 테이블 0개) 열린 문서의 컨트롤러를 만든다.
+ */
+function createNoPreviewHarness(context: TestContext) {
+  context.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+  context.mock.method(performance, 'now', () => Date.now());
+  context.mock.method(console, 'info', () => {});
+  context.mock.method(console, 'warn', () => {});
+  const events: CollaborationRuntimeEvent[] = [];
+  const controller = new DiagramPreviewHydrationController({
+    ydoc: new Y.Doc(),
+    bootstrap: { hasYdocSnapshot: true, contentRevision: '1', content: null } as never,
+    previewEnabled: false,
+    fallbackTimeoutMs: 5_000,
+    handoffStartedAt: 0,
+    handoffLogPrefix: '[test]',
+    dispatchRuntimeEvent: (event) => events.push(event),
+    updatePreviewMode: () => {},
+    loadPreview: () => {},
+    refreshPersistedCanvasFromYDoc: () => {},
+    getConnectionStatus: () => 'connected',
+  });
+  context.after(() => controller.dispose());
+  return { controller, events };
+}
+
+test('no-preview doc: remote sync cancels the connected grace timer so it cannot degrade later', (context) => {
+  const h = createNoPreviewHarness(context);
+  h.controller.onConnected(0);
+  h.controller.onSyncStateChange(true);
+
+  context.mock.timers.tick(10_000);
+
+  assert.equal(h.events.includes('fallback-timeout'), false);
+});
+
+test('no-preview doc: connected after sync does not start a grace timer', (context) => {
+  const h = createNoPreviewHarness(context);
+  h.controller.onSyncStateChange(true);
+  h.controller.onConnected(0);
+
+  context.mock.timers.tick(10_000);
+
+  assert.equal(h.events.includes('fallback-timeout'), false);
+});
+
+test('no-preview doc: without remote sync the grace timer still degrades', (context) => {
+  const h = createNoPreviewHarness(context);
+  h.controller.onConnected(0);
+
+  context.mock.timers.tick(1_000);
+
+  assert.equal(h.events.filter((event) => event === 'fallback-timeout').length, 1);
+});

@@ -33,6 +33,9 @@ export class DiagramPreviewHydrationController {
 
   private previewUnlockedAt: number | null = null;
 
+  /** 원격 스냅샷 적용(synced) 완료 여부. 완료 후에는 늦은 fallback 타이머가 degraded로 되돌리지 못한다. */
+  private remoteSynced = false;
+
   private previewExitObserver: ((events: Y.YEvent<Y.AbstractType<unknown>>[]) => void) | null =
     null;
 
@@ -85,7 +88,7 @@ export class DiagramPreviewHydrationController {
   }
 
   private reportSnapshotTimeout(reason: 'timeout' | 'connected-grace', waitMs: number): void {
-    if (this.previewUnlockedAt != null || this.previewTimeoutReported) {
+    if (this.previewUnlockedAt != null || this.previewTimeoutReported || this.remoteSynced) {
       return;
     }
 
@@ -158,9 +161,18 @@ export class DiagramPreviewHydrationController {
    * @param synced 원격 snapshot 적용 완료 여부
    */
   onSyncStateChange(synced: boolean): void {
-    if (synced && this.previewShownAt !== null) {
-      this.finishPreviewUnlock('remote', getTablesMap(this.options.ydoc).size);
+    if (!synced) {
+      return;
     }
+    if (this.previewShownAt !== null) {
+      this.finishPreviewUnlock('remote', getTablesMap(this.options.ydoc).size);
+      return;
+    }
+
+    // 미리보기 없이(또는 테이블 0개 문서로) 원격 스냅샷이 적용된 경우에도 연결 유예 타이머를
+    // 해제한다. 그렇지 않으면 타이머가 뒤늦게 fallback-timeout을 보내 degraded로 고착된다.
+    this.remoteSynced = true;
+    this.clearFallbackTimers();
   }
 
   /**
@@ -176,6 +188,7 @@ export class DiagramPreviewHydrationController {
       if (
         this.previewUnlockedAt != null ||
         this.previewTimeoutReported ||
+        this.remoteSynced ||
         this.connectedGraceFallbackTimer
       ) {
         return;
