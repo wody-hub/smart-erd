@@ -45,7 +45,7 @@ const DEFAULT_LARGE_GRAPH_THRESHOLD = 300;
 /** 일반 크기에서 시도하는 시드 압축 배율 */
 const DEFAULT_SEED_SCALES = [1, 0.6, 0.35, 0.2, 0.1, 0.03];
 /** 대형 그래프에서 시도하는 시드 압축 배율 */
-const LARGE_GRAPH_SEED_SCALES = [0.2, 0.05];
+const LARGE_GRAPH_SEED_SCALES = [0.1, 0.01];
 
 /**
  * 허브 중심 방사형 초기 배치, 직사각 충돌 완화, 원형 성분 패킹으로 노드 좌표를 계산한다.

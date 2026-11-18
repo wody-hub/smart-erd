@@ -63,6 +63,16 @@ const TARGET_DISTANCE_WEIGHT = 1;
 const NEIGHBOR_DISTANCE_WEIGHT = 0.5;
 /** 허브 중심 이탈 가중치 (성분 외접 반지름 대비 px) */
 const HUB_OFFSET_WEIGHT = 1;
+/** 가까운 박스 기준 후보 생성의 최대 반복 횟수 (매번 기준 박스 수를 두 배로) */
+const MAX_REFERENCE_ROUNDS = 3;
+/** 바깥 방향 탐색에서 시도하는 방향 수 */
+const RAY_COUNT = 8;
+/** 바깥 방향 탐색의 걸음 길이 */
+const RAY_STEP = 80;
+/** 바깥 방향 탐색의 최대 걸음 수 */
+const RAY_MAX_STEPS = 600;
+/** 접점 이분 탐색 반복 횟수 */
+const RAY_REFINE_ITERATIONS = 6;
 /** 종횡비 오차(로그) 페널티 가중치 */
 const ASPECT_PENALTY_WEIGHT = 0.5;
 /** 나선 탐색 최대 단계 수 */
@@ -196,15 +206,55 @@ export class BoxGrid {
  * @returns 가까운 순 박스 (동률은 삽입 순서)
  */
 function pickNearestBoxes(boxes: PlacedBox[], target: Point, count: number): PlacedBox[] {
-  return boxes
-    .map((box, index) => {
-      const dx = Math.max(box.x - target.x, 0, target.x - (box.x + box.width));
-      const dy = Math.max(box.y - target.y, 0, target.y - (box.y + box.height));
-      return { box, index, distance: dx * dx + dy * dy };
-    })
-    .sort((left, right) => left.distance - right.distance || left.index - right.index)
-    .slice(0, count)
-    .map((entry) => entry.box);
+  const nearest: Array<{ box: PlacedBox; distance: number }> = [];
+  for (const box of boxes) {
+    const dx = Math.max(box.x - target.x, 0, target.x - (box.x + box.width));
+    const dy = Math.max(box.y - target.y, 0, target.y - (box.y + box.height));
+    const distance = dx * dx + dy * dy;
+    if (nearest.length >= count && distance >= nearest[nearest.length - 1].distance) continue;
+
+    let position = nearest.length;
+    while (position > 0 && nearest[position - 1].distance > distance) position -= 1;
+    nearest.splice(position, 0, { box, distance });
+    if (nearest.length > count) nearest.pop();
+  }
+  return nearest.map((entry) => entry.box);
+}
+
+/**
+ * 비용이 낮은 후보부터 충돌 없는 첫 후보를 찾는다.
+ *
+ * 비용(1px 단위 내림)과 후보 번호를 한 숫자로 묶어 네이티브 정렬로 비용 순서를 만든다. 동률은 후보 번호(작은 x, 작은 y) 순이다.
+ *
+ * @param grid 공간 인덱스
+ * @param costs 후보별 비용 (x 인덱스 * y 개수 + y 인덱스)
+ * @param xValues 후보 x 좌표 (오름차순)
+ * @param yValues 후보 y 좌표 (오름차순)
+ * @param item 배치할 노드 크기
+ * @param gap 최소 간격
+ * @returns 충돌 없는 최저 비용 좌상단 좌표 (없으면 null)
+ */
+function pickCheapestFreeCandidate(
+  grid: BoxGrid,
+  costs: Float64Array,
+  xValues: number[],
+  yValues: number[],
+  item: LayoutItem,
+  gap: number,
+): Point | null {
+  const keys = new Float64Array(costs.length);
+  for (let index = 0; index < costs.length; index += 1) {
+    keys[index] = Math.floor(costs[index]) * costs.length + index;
+  }
+  keys.sort();
+
+  for (const key of keys) {
+    const index = key % costs.length;
+    const x = xValues[Math.floor(index / yValues.length)];
+    const y = yValues[index % yValues.length];
+    if (grid.isFree(x, y, item.width, item.height, gap)) return { x, y };
+  }
+  return null;
 }
 
 /**
@@ -218,6 +268,7 @@ function pickNearestBoxes(boxes: PlacedBox[], target: Point, count: number): Pla
  * @param target 목표 중심점
  * @param neighborCenters 이미 배치된 이웃의 중심점
  * @param gap 최소 간격
+ * @param outwardPoint 시드 방향으로 현재 덩어리 바깥 경계에 놓은 기준점 (후보 좌표 생성에 함께 쓴다)
  * @returns 좌상단 좌표
  */
 export function findNearestFreePosition(
@@ -226,6 +277,7 @@ export function findNearestFreePosition(
   target: Point,
   neighborCenters: Point[],
   gap: number,
+  outwardPoint: Point = target,
 ): Point {
   const { width, height } = item;
   const evaluate = (x: number, y: number): number => {
@@ -239,45 +291,131 @@ export function findNearestFreePosition(
     return TARGET_DISTANCE_WEIGHT * toTarget + NEIGHBOR_DISTANCE_WEIGHT * toNeighbors;
   };
 
-  for (let count = NEAREST_BOX_COUNT; ; count *= 2) {
+  let count = NEAREST_BOX_COUNT;
+  for (let round = 0; round < MAX_REFERENCE_ROUNDS; round += 1, count *= 2) {
     const references = pickNearestBoxes(grid.boxes, target, count);
     const xs = new Set<number>([Math.round(target.x - width / 2)]);
     const ys = new Set<number>([Math.round(target.y - height / 2)]);
     references.forEach((box) => {
       xs.add(box.x + box.width + gap);
       xs.add(box.x - gap - width);
-      xs.add(box.x);
-      xs.add(box.x + box.width - width);
       ys.add(box.y + box.height + gap);
       ys.add(box.y - gap - height);
-      ys.add(box.y);
-      ys.add(box.y + box.height - height);
     });
 
-    const sortedXs = [...xs].sort((left, right) => left - right);
-    const sortedYs = [...ys].sort((left, right) => left - right);
-    let bestX = 0;
-    let bestY = 0;
-    let bestCost = Number.POSITIVE_INFINITY;
-    for (const x of sortedXs) {
-      for (const y of sortedYs) {
-        const cost = evaluate(x, y);
-        if (cost < bestCost && grid.isFree(x, y, width, height, gap)) {
-          bestX = x;
-          bestY = y;
-          bestCost = cost;
-        }
+    const xValues = [...xs].sort((left, right) => left - right);
+    const yValues = [...ys].sort((left, right) => left - right);
+    const costs = new Float64Array(xValues.length * yValues.length);
+    xValues.forEach((x, xIndex) => {
+      yValues.forEach((y, yIndex) => {
+        costs[xIndex * yValues.length + yIndex] = evaluate(x, y);
+      });
+    });
+
+    const feasible = pickCheapestFreeCandidate(grid, costs, xValues, yValues, item, gap);
+    if (feasible) {
+      return feasible;
+    }
+    if (count >= grid.boxes.length) break;
+  }
+
+  return searchOutwardRays(grid, item, target, outwardPoint, gap, evaluate);
+}
+
+/**
+ * 한 방향으로 한 걸음씩 나아가 처음 충돌이 없는 위치를 찾고, 이분 탐색으로 중심 쪽 접점에 붙인다.
+ *
+ * @param grid 공간 인덱스
+ * @param item 배치할 노드 크기
+ * @param origin 출발 중심점
+ * @param angle 진행 각도 (라디안)
+ * @param gap 최소 간격
+ * @returns 좌상단 좌표 (끝까지 막혀 있으면 null)
+ */
+function marchAlongRay(
+  grid: BoxGrid,
+  item: LayoutItem,
+  origin: Point,
+  angle: number,
+  gap: number,
+): Point | null {
+  const { width, height } = item;
+  /**
+   * 출발점에서 distance만큼 나아간 중심에 노드를 놓았을 때의 좌상단 좌표를 구한다.
+   *
+   * @param distance 진행 거리
+   * @returns 좌상단 좌표
+   */
+  const positionAt = (distance: number): Point => ({
+    x: Math.round(origin.x + Math.cos(angle) * distance - width / 2),
+    y: Math.round(origin.y + Math.sin(angle) * distance - height / 2),
+  });
+
+  for (let step = 0; step <= RAY_MAX_STEPS; step += 1) {
+    const distance = step * RAY_STEP;
+    const found = positionAt(distance);
+    if (!grid.isFree(found.x, found.y, width, height, gap)) continue;
+
+    let low = Math.max(0, distance - RAY_STEP);
+    let high = distance;
+    for (let iteration = 0; iteration < RAY_REFINE_ITERATIONS; iteration += 1) {
+      const middle = (low + high) / 2;
+      const probe = positionAt(middle);
+      if (grid.isFree(probe.x, probe.y, width, height, gap)) {
+        high = middle;
+      } else {
+        low = middle;
       }
     }
+    return positionAt(high);
+  }
+  return null;
+}
 
-    if (bestCost < Number.POSITIVE_INFINITY) {
-      return { x: bestX, y: bestY };
-    }
-    if (count >= grid.boxes.length) {
-      const bounds = grid.getBounds();
-      return { x: bounds.right + gap, y: Math.round(target.y - height / 2) };
+/**
+ * 시드 방향을 기준으로 여러 방향의 바깥 탐색을 하고 비용이 가장 낮은 접점을 고른다.
+ *
+ * 가까운 박스 기준 후보가 모두 막힌 조밀한 덩어리에서도 빈자리를 보장하는 마지막 수단이다.
+ * 끝까지 막혀 있으면 전체 경계 오른쪽에 둔다.
+ *
+ * @param grid 공간 인덱스
+ * @param item 배치할 노드 크기
+ * @param target 목표 중심점
+ * @param outwardPoint 바깥 방향 기준점
+ * @param gap 최소 간격
+ * @param evaluate 좌상단 좌표의 비용 함수
+ * @returns 좌상단 좌표
+ */
+function searchOutwardRays(
+  grid: BoxGrid,
+  item: LayoutItem,
+  target: Point,
+  outwardPoint: Point,
+  gap: number,
+  evaluate: (x: number, y: number) => number,
+): Point {
+  const baseAngle = Math.atan2(outwardPoint.y - target.y, outwardPoint.x - target.x);
+  let best: Point | null = null;
+  let bestCost = Number.POSITIVE_INFINITY;
+  for (let ray = 0; ray < RAY_COUNT; ray += 1) {
+    const found = marchAlongRay(
+      grid,
+      item,
+      target,
+      baseAngle + (ray * Math.PI * 2) / RAY_COUNT,
+      gap,
+    );
+    if (!found) continue;
+    const cost = evaluate(found.x, found.y);
+    if (cost < bestCost) {
+      best = found;
+      bestCost = cost;
     }
   }
+
+  if (best) return best;
+  const bounds = grid.getBounds();
+  return { x: bounds.right + gap, y: Math.round(target.y - item.height / 2) };
 }
 
 /**
@@ -295,6 +433,34 @@ function enclosingCircleOf(boxes: PlacedBox[]): { x: number; y: number; radius: 
       { x: box.x + box.width, y: box.y + box.height },
     ]),
   );
+}
+
+/**
+ * 박스 꼭짓점 중 원점에서 가장 먼 거리를 구한다.
+ *
+ * @param box 박스
+ * @returns 원점으로부터 최대 꼭짓점 거리
+ */
+function farthestCornerDistance(box: PlacedBox): number {
+  const farthestX = Math.max(Math.abs(box.x), Math.abs(box.x + box.width));
+  const farthestY = Math.max(Math.abs(box.y), Math.abs(box.y + box.height));
+  return Math.hypot(farthestX, farthestY);
+}
+
+/**
+ * 시드 방향으로 현재 덩어리 바깥 경계에 놓은 기준점을 구한다.
+ *
+ * @param seed 시드 (허브 중심 기준)
+ * @param blobRadius 지금까지 배치된 박스의 최대 꼭짓점 반지름
+ * @returns 기준점
+ */
+function outwardPointOf(seed: RadialSeed, blobRadius: number): Point {
+  const length = Math.hypot(seed.x, seed.y);
+  if (length === 0) return { x: 0, y: 0 };
+  return {
+    x: Math.round((seed.x / length) * blobRadius),
+    y: Math.round((seed.y / length) * blobRadius),
+  };
 }
 
 /**
@@ -316,6 +482,7 @@ function legalizeSeeds(
 ): PlacedBox[] {
   const grid = new BoxGrid();
   const placedById = new Map<string, PlacedBox>();
+  let blobRadius = 0;
 
   seeds.forEach((seed, index) => {
     const size = sizes.get(seed.id);
@@ -335,6 +502,7 @@ function legalizeSeeds(
                 : [];
             }),
             options.nodeGap,
+            outwardPointOf(seed, blobRadius),
           );
     const box: PlacedBox = {
       id: seed.id,
@@ -343,6 +511,7 @@ function legalizeSeeds(
       height: size.height,
       mark: 0,
     };
+    blobRadius = Math.max(blobRadius, farthestCornerDistance(box));
     placedById.set(seed.id, box);
     grid.insert(box);
   });
