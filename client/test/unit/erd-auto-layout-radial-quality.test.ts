@@ -249,7 +249,7 @@ test('strategy defaults to legacy so existing callers keep the previous layout',
     implicit.nodes.map((node) => node.position),
     explicit.nodes.map((node) => node.position),
   );
-  assert.ok(['legacy', 'radial'].includes(ERD_AUTO_LAYOUT_CALLER_STRATEGY));
+  assert.equal(ERD_AUTO_LAYOUT_CALLER_STRATEGY, 'radial');
 });
 
 test('radial: empty graph and failure-free single node', async () => {

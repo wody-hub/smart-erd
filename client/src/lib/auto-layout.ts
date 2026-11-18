@@ -31,7 +31,7 @@ export type ErdLayoutStrategy = 'legacy' | 'radial';
  *
  * 문제가 생기면 이 값을 'legacy'로 바꾸는 것만으로 이전 배치로 즉시 되돌릴 수 있다.
  */
-export const ERD_AUTO_LAYOUT_CALLER_STRATEGY: ErdLayoutStrategy = 'legacy';
+export const ERD_AUTO_LAYOUT_CALLER_STRATEGY: ErdLayoutStrategy = 'radial';
 
 export interface ErdLayoutResult {
   nodes: Node<TableNodeData>[];
