@@ -51,6 +51,8 @@ export interface LayoutMetrics {
   averageEdgeLength: number;
   /** 최대 엣지 길이 */
   maxEdgeLength: number;
+  /** 끝점을 공유하지 않는 엣지 쌍의 교차 수 (중심 간 직선 기준) */
+  edgeCrossings: number;
 }
 
 /** 최소 외접원 계산에서 쓰는 결정적 셔플용 LCG 상수 */
@@ -295,6 +297,50 @@ export function uniqueLinks(
 }
 
 /**
+ * 세 점의 방향(외적 부호)을 구한다.
+ *
+ * @param origin 기준점
+ * @param left 점 1
+ * @param right 점 2
+ * @returns 양수 = 반시계, 음수 = 시계, 0 = 일직선
+ */
+function orientation(origin: Point, left: Point, right: Point): number {
+  return Math.sign(
+    (left.x - origin.x) * (right.y - origin.y) - (left.y - origin.y) * (right.x - origin.x),
+  );
+}
+
+/**
+ * 끝점을 공유하지 않는 엣지 쌍 중 중심 간 직선이 서로 교차하는 수를 센다.
+ *
+ * @param pairs 고유 관계 쌍
+ * @returns 교차 수
+ */
+export function countEdgeCrossings(pairs: Array<[MetricBox, MetricBox]>): number {
+  let crossings = 0;
+  for (let left = 0; left < pairs.length; left += 1) {
+    for (let right = left + 1; right < pairs.length; right += 1) {
+      const [firstSource, firstTarget] = pairs[left];
+      const [secondSource, secondTarget] = pairs[right];
+      const ids = new Set([firstSource.id, firstTarget.id, secondSource.id, secondTarget.id]);
+      if (ids.size < 4) continue;
+
+      const a = centerOf(firstSource);
+      const b = centerOf(firstTarget);
+      const c = centerOf(secondSource);
+      const d = centerOf(secondTarget);
+      if (
+        orientation(a, b, c) * orientation(a, b, d) < 0 &&
+        orientation(c, d, a) * orientation(c, d, b) < 0
+      ) {
+        crossings += 1;
+      }
+    }
+  }
+  return crossings;
+}
+
+/**
  * 자동정렬 결과의 품질 지표를 계산한다 (종횡비, 원 채움률, 윤곽 원형도, 허브 중심성, 겹침, 엣지 길이).
  *
  * @param boxes 배치된 직사각형 목록
@@ -317,6 +363,7 @@ export function measureLayoutMetrics(
       overlapArea: 0,
       averageEdgeLength: 0,
       maxEdgeLength: 0,
+      edgeCrossings: 0,
     };
   }
 
@@ -361,13 +408,12 @@ export function measureLayoutMetrics(
     }
   }
 
-  const edgeLengths = uniqueLinks(new Map(boxes.map((box) => [box.id, box])), links).map(
-    ([source, target]) => {
-      const from = centerOf(source);
-      const to = centerOf(target);
-      return Math.hypot(from.x - to.x, from.y - to.y);
-    },
-  );
+  const linkPairs = uniqueLinks(new Map(boxes.map((box) => [box.id, box])), links);
+  const edgeLengths = linkPairs.map(([source, target]) => {
+    const from = centerOf(source);
+    const to = centerOf(target);
+    return Math.hypot(from.x - to.x, from.y - to.y);
+  });
 
   return {
     aspectRatio,
@@ -381,5 +427,6 @@ export function measureLayoutMetrics(
         ? 0
         : edgeLengths.reduce((sum, length) => sum + length, 0) / edgeLengths.length,
     maxEdgeLength: edgeLengths.length === 0 ? 0 : Math.max(...edgeLengths),
+    edgeCrossings: countEdgeCrossings(linkPairs),
   };
 }

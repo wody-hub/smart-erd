@@ -5,6 +5,7 @@ import {
   computeConvexHull,
   computeMinimumEnclosingCircle,
   computeOverlapArea,
+  countEdgeCrossings,
   measureLayoutMetrics,
   type MetricBox,
 } from '../../src/lib/auto-layout-metrics.js';
@@ -83,4 +84,34 @@ test('legacy auto layout baseline on the anonymized real diagram is measurable a
   assert.equal(metrics.overlapArea, 0);
   assert.ok(metrics.aspectRatio > 1 && Number.isFinite(metrics.aspectRatio));
   assert.ok(metrics.circleFill > 0 && metrics.circleFill < 0.3);
+});
+
+test('countEdgeCrossings counts proper crossings and skips pairs sharing an endpoint', () => {
+  const corner = (id: string, x: number, y: number): MetricBox => ({
+    id,
+    x,
+    y,
+    width: 2,
+    height: 2,
+  });
+  const a = corner('a', 0, 0);
+  const b = corner('b', 10, 10);
+  const c = corner('c', 0, 10);
+  const d = corner('d', 10, 0);
+  const e = corner('e', 20, 20);
+
+  assert.equal(
+    countEdgeCrossings([
+      [a, b],
+      [c, d],
+    ]),
+    1,
+  );
+  assert.equal(
+    countEdgeCrossings([
+      [a, b],
+      [b, e],
+    ]),
+    0,
+  );
 });
